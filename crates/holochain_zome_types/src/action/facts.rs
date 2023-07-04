@@ -2,88 +2,13 @@ use crate::prelude::*;
 use contrafact::*;
 use holo_hash::*;
 
-/// A rough check that a sequence of Actions constitutes a valid source chain
-/// - First action must be Dna
-/// - Each subsequent action's prev_action hash must match the previous action
-/// - The seq number must be increasing by 1, from 0
-///
-/// Notably, this does NOT check the following:
-/// xxx Genesis actions in the proper place
-/// xxx Genesis actions in the *wrong* place
-///
-/// TODO: It would be more readable/composable to break this into several parts:
-/// - constrain action types based on position
-/// - constrain seq num
-/// - constrain prev_hashes
-/// ...but, this does it all in one Fact
-#[derive(Debug)]
-struct ValidChainFact {
-    hash: Option<ActionHash>,
-    seq: u32,
-    author: AgentPubKey,
-}
-
-impl<'a> Fact<'a, Action> for ValidChainFact {
-    fn mutate(&self, mut action: Action, g: &mut Generator<'a>) -> Mutation<Action> {
-        match (self.hash.as_ref(), action.prev_action_mut()) {
-            (Some(stored), Some(prev)) => {
-                g.set(
-                    prev,
-                    stored,
-                    format!("Hashes don't match: {} != {}", prev, stored),
-                )?;
-            }
-            (None, None) => {}
-            (Some(_), None) => {
-                action = brute(
-                    format!(
-                        "Found Dna in position other than beginning of the chain. Hash: {}",
-                        ActionHash::with_data_sync(&action)
-                    ),
-                    |a: &Action| a.action_type() != ActionType::Dna,
-                )
-                .mutate(action, g)?;
-            }
-            (None, Some(_)) => {
-                let err = format!(
-                    "First action must be of type Dna, but instead got type {:?}",
-                    action.action_type()
-                );
-                action = Action::Dna(g.arbitrary(err)?);
-            }
-        };
-
-        match (self.seq, action.action_seq_mut()) {
-            (0, None) => {}
-            (stored, Some(seq)) if stored > 0 => {
-                g.set(seq, &stored, "Seq must be 1 more than the last")?
-            }
-            _ => {
-                return Err(MutationError::Exception(format!(
-                    "ValidChainFact: Action should already be set properly. action={:?}, fact={:?}",
-                    action, self
-                )))
-            }
-        }
-
-        g.set(action.author_mut(), &self.author, "Author must be the same")?;
-
-        Ok(action)
-    }
-
-    fn advance(&mut self, action: &Action) {
-        self.hash = Some(ActionHash::with_data_sync(action));
-        self.seq += 1;
-    }
-}
-
-pub fn is_of_type(action_type: ActionType) -> Facts<Action> {
+pub fn is_of_type(action_type: ActionType) -> impl Fact<'static, Action> {
     facts![brute("action is of type", move |h: &Action| h
         .action_type()
         == action_type)]
 }
 
-pub fn is_new_entry_action<'a>() -> FactsRef<'a, Action> {
+pub fn is_new_entry_action<'a>() -> impl Fact<'a, Action> {
     let et_fact = brute("is NewEntryAction", move |et: &EntryType| {
         matches!(et, EntryType::App(_))
     });
@@ -100,19 +25,91 @@ pub fn is_new_entry_action<'a>() -> FactsRef<'a, Action> {
     ]
 }
 
-pub fn is_not_entry_action<'a>() -> FactsRef<'a, Action> {
+pub fn is_not_entry_action<'a>() -> impl Fact<'a, Action> {
     facts![brute("is not NewEntryAction", move |a: &Action| a
         .entry_type()
         .is_none())]
 }
 
-/// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain(author: AgentPubKey) -> Facts<Action> {
-    facts![ValidChainFact {
-        hash: None,
-        seq: 0,
-        author
-    },]
+/// A rough check that a sequence of Actions constitutes a valid source chain
+/// - First action must be Dna
+/// - Each subsequent action's prev_action hash must match the previous action
+/// - The seq number must be increasing by 1, from 0
+///
+/// Notably, this does NOT check the following:
+/// xxx Genesis actions in the proper place
+/// xxx Genesis actions in the *wrong* place
+///
+/// TODO: It would be more readable/composable to break this into several parts:
+/// - constrain action types based on position
+/// - constrain seq num
+/// - constrain prev_hashes
+/// ...but, this does it all in one Fact
+pub fn valid_chain(len: usize, author: AgentPubKey) -> impl Fact<'static, Vec<Action>> {
+    vec_of_length(len, valid_chain_action(author))
+}
+
+pub fn valid_chain_action(author: AgentPubKey) -> impl Fact<'static, Action> {
+    lambda(
+        "valid_chain_action",
+        ValidChainFactState::default(),
+        move |g, s, mut action: Action| {
+            match (s.hash.as_ref(), action.prev_action_mut()) {
+                (Some(stored), Some(prev)) => {
+                    let p = prev.clone();
+                    g.set(prev, stored, || {
+                        format!("Hashes don't match: {} != {}", p, stored)
+                    })?;
+                }
+                (None, None) => {}
+                (Some(_), None) => {
+                    action = brute(
+                        format!(
+                            "Found Dna in position other than beginning of the chain. Hash: {}",
+                            ActionHash::with_data_sync(&action)
+                        ),
+                        |a: &Action| a.action_type() != ActionType::Dna,
+                    )
+                    .mutate(g, action)?;
+                }
+                (None, Some(_)) => {
+                    let err = || {
+                        format!(
+                            "First action must be of type Dna, but instead got type {:?}",
+                            action.action_type()
+                        )
+                    };
+                    action = Action::Dna(g.arbitrary(err)?);
+                }
+            };
+
+            match (s.seq, action.action_seq_mut()) {
+                (0, None) => {}
+                (stored, Some(seq)) if stored > 0 => {
+                    g.set(seq, &stored, || "Seq must be 1 more than the last")?
+                }
+                _ => {
+                    return Err(MutationError::User(format!(
+                    "ValidChainFact: Action should already be set properly. action={:?}, fact={:?}",
+                    action, s
+                )))
+                }
+            }
+
+            g.set(action.author_mut(), &author, || "Author must be the same")?;
+
+            s.hash = Some(ActionHash::with_data_sync(&action));
+            s.seq += 1;
+
+            Ok(action)
+        },
+    )
+}
+
+#[derive(Debug, Clone, Default)]
+struct ValidChainFactState {
+    hash: Option<ActionHash>,
+    seq: u32,
 }
 
 #[cfg(test)]
@@ -124,9 +121,9 @@ mod tests {
     fn test_valid_chain_fact() {
         let mut g = unstructured_noise().into();
         let author = ::fixt::fixt!(AgentPubKey);
-
-        let chain = build_seq(&mut g, 5, valid_chain(author.clone()));
-        check_seq(chain.as_slice(), valid_chain(author)).unwrap();
+        let fact = valid_chain(5, author.clone());
+        let chain = fact.clone().build(&mut g);
+        fact.check(&chain).unwrap();
 
         let hashes: Vec<_> = chain
             .iter()
