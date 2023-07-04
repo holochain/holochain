@@ -17,7 +17,6 @@ use holo_hash::*;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
-use rusqlite::Transaction;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;

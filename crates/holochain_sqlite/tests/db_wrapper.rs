@@ -1,13 +1,12 @@
 use common::TestDatabaseKind;
 use holochain_sqlite::conn::set_connection_timeout;
+use holochain_sqlite::db::num_read_threads;
 use holochain_sqlite::db::set_acquire_timeout;
 use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::db::{num_read_threads, PermittedConn};
 use holochain_sqlite::error::DatabaseError::{DbConnectionPoolError, Timeout};
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 
 #[cfg(feature = "test_utils")]
 mod common;
