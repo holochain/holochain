@@ -137,7 +137,6 @@ mod tests {
     use holochain_types::prelude::*;
     use rusqlite::Transaction;
     use std::collections::HashMap;
-    use std::convert::TryInto;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
@@ -337,13 +336,12 @@ mod tests {
                 setup(db.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
-            db.conn()
-                .unwrap()
-                .with_commit_test(|txn| {
-                    txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
-                        .unwrap();
-                })
-                .unwrap();
+            db.write_async(move |txn| -> DatabaseResult<()> {
+                txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])?;
+                Ok(())
+            })
+            .await
+            .unwrap();
 
             // Call the workflow
             call_workflow(db.clone().into(), dna_network, author).await;
@@ -465,15 +463,13 @@ mod tests {
                     .unwrap();
 
                 source_chain.flush(&dna_network).await.unwrap();
-                let (entry_create_action, entry_update_action) = db
-                    .conn()
-                    .unwrap()
-                    .with_commit_test(|writer| {
+                let (entry_create_action, entry_update_action) = db.write_async(move |writer| -> StateQueryResult<(SignedActionHashed, SignedActionHashed)> {
                         let store = Txn::from(writer);
                         let ech = store.get_action(&original_action_address).unwrap().unwrap();
                         let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
-                        (ech, euh)
+                        Ok((ech, euh))
                     })
+                    .await
                     .unwrap();
 
                 // Gather the expected op hashes, ops and basis

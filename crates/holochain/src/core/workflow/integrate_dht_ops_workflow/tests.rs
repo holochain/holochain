@@ -367,16 +367,15 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs(env: DbWrite<DbKindDht>) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            txn.execute("DELETE FROM DhtOP", []).unwrap();
-            txn.execute("DELETE FROM Action", []).unwrap();
-            txn.execute("DELETE FROM Entry", []).unwrap();
-            StateMutationResult::Ok(())
-        })
-        .unwrap();
+async fn clear_dbs(env: DbWrite<DbKindDht>) {
+    env.write_async(move |txn| -> StateMutationResult<()> {
+        txn.execute("DELETE FROM DhtOP", []).unwrap();
+        txn.execute("DELETE FROM Action", []).unwrap();
+        txn.execute("DELETE FROM Entry", []).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 // TESTS BEGIN HERE

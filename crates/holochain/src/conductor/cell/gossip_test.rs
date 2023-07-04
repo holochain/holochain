@@ -3,7 +3,6 @@ use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
-use holochain_sqlite::prelude::*;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;

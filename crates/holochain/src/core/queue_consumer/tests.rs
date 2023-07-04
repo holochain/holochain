@@ -357,13 +357,14 @@ async fn publish_loop() {
 
     // - Set the ops last publish time to five mins ago.
     // - Set receipts not complete.
-    db.conn()
-        .unwrap()
-        .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
-            mutations::set_receipts_complete(txn, &op_hash, false).unwrap();
-        })
-        .unwrap();
+    db.write_async(|txn| -> StateMutationResult<()> {
+        mutations::set_last_publish_time(txn, &op_hash, five_mins_ago)?;
+        mutations::set_receipts_complete(txn, &op_hash, false)?;
+
+        Ok(())
+    })
+    .await
+    .unwrap();
 
     // - Publish runs due to a trigger.
     ts.trigger(&"");

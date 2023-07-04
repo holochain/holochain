@@ -7,7 +7,6 @@ use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::block::BlockTargetId;
 use holochain_types::prelude::*;
@@ -37,10 +36,13 @@ async fn test_validation_receipt() {
     consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let vault = alice.dht_db().clone().into();
-    let record = fresh_store_test(&vault, |store| {
-        store.get_record(&hash.clone().into()).unwrap().unwrap()
-    });
+    let vault = alice.dht_db();
+    let record = vault
+        .read_async(move |txn| -> StateQueryResult<Record> {
+            Ok(Txn::from(&txn).get_record(&hash.clone().into())?.unwrap())
+        })
+        .await
+        .unwrap();
     let ops = produce_ops_from_record(&record)
         .unwrap()
         .into_iter()

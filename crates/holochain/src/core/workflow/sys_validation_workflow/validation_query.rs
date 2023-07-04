@@ -137,7 +137,7 @@ mod tests {
     async fn sys_validation_query() {
         holochain_trace::test_run().ok();
         let db = test_dht_db();
-        let expected = test_data(&db.to_db().into());
+        let expected = test_data(&db.to_db().into()).await;
         let r = get_ops_to_validate(&db.to_db().into(), true).await.unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder
@@ -152,38 +152,37 @@ mod tests {
         }
     }
 
-    fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
+    async fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                let hash = state.as_hash().clone();
-                insert_op(txn, &state).unwrap();
-                if facts.has_validation_status {
-                    set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
-                }
-                if facts.pending {
-                    // No need to do anything because status and stage are null already.
-                } else if facts.awaiting_sys_deps {
-                    set_validation_stage(
-                        txn,
-                        &hash,
-                        ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
-                    )
-                    .unwrap();
-                }
-                txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
-                DatabaseResult::Ok(())
-            })
-            .unwrap();
+        db.write_async(move |txn| -> DatabaseResult<()> {
+            let hash = state.as_hash().clone();
+            insert_op(txn, &state).unwrap();
+            if facts.has_validation_status {
+                set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+            }
+            if facts.pending {
+                // No need to do anything because status and stage are null already.
+            } else if facts.awaiting_sys_deps {
+                set_validation_stage(
+                    txn,
+                    &hash,
+                    ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
+                )
+                .unwrap();
+            }
+            txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
+            Ok(())
+        })
+        .await
+        .unwrap();
         state
     }
 
-    fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
+    async fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
         let mut results = Vec::new();
         // We **do** expect any of these in the results:
         let facts = Facts {
@@ -192,7 +191,7 @@ mod tests {
             has_validation_status: false,
         };
         for _ in 0..20 {
-            let op = create_and_insert_op(db, facts);
+            let op = create_and_insert_op(db, facts).await;
             results.push(op);
         }
 
@@ -202,7 +201,7 @@ mod tests {
             has_validation_status: false,
         };
         for _ in 0..20 {
-            let op = create_and_insert_op(db, facts);
+            let op = create_and_insert_op(db, facts).await;
             results.push(op);
         }
 
@@ -213,7 +212,7 @@ mod tests {
             has_validation_status: true,
         };
         for _ in 0..20 {
-            create_and_insert_op(db, facts);
+            create_and_insert_op(db, facts).await;
         }
 
         Expected { results }
