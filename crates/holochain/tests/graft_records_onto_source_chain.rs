@@ -51,16 +51,18 @@ async fn grafting() {
 
     // Get the source chain.
     let chain = get_chain(alice.authored_db().clone()).await;
-    let original_records: Vec<_> =
-        alice
-            .authored_db()
-            .read_async(move |txn| -> DatabaseResult<Vec<Record>> {
-                let txn: Txn = (&txn).into();
-                chain
-                    .iter()
-                    .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
-                    .collect()
-            });
+    let query_chain = chain.clone();
+    let original_records: Vec<_> = alice
+        .authored_db()
+        .read_async(move |txn| -> DatabaseResult<Vec<_>> {
+            let txn: Txn = (&txn).into();
+            Ok(query_chain
+                .iter()
+                .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
+                .collect())
+        })
+        .await
+        .unwrap();
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.
