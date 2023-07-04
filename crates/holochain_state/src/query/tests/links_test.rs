@@ -352,7 +352,7 @@ impl TestData {
         td: &'a [Self],
         scratch: &Scratch,
         query: impl Into<LinkTypeFilter>,
-        test: &'static str,
+        test: &str,
     ) {
         // Check all base hash are the same
         for d in td {
@@ -373,6 +373,7 @@ impl TestData {
         let scratch = scratch.clone();
         let val: HashSet<_> = td[0]
             .env
+            .clone()
             .read_async(move |txn| -> DatabaseResult<IntoIter<Link>> {
                 Ok(query
                     .run(DbScratch::new(&[&txn], &scratch))
