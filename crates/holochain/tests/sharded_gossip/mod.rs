@@ -1580,14 +1580,16 @@ async fn mock_network_sharding() {
         let alice_info = alice_info.clone();
         async move {
             loop {
+                let my_alice_kit = alice_kit.clone();
+                let my_alice_info = alice_info.clone();
                 alice_p2p_agents_db
                     .read_async(move |txn| -> DatabaseResult<()> {
-                        let info = txn.p2p_get_agent(&alice_kit).unwrap();
+                        let info = txn.p2p_get_agent(&my_alice_kit).unwrap();
                         {
                             if let Some(info) = &info {
                                 eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
                             }
-                            *alice_info.lock() = info;
+                            *my_alice_info.lock() = info;
                         }
 
                         Ok(())

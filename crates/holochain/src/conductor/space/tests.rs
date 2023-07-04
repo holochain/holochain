@@ -94,7 +94,7 @@ async fn test_region_queries() {
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
-        fill_db(&db, op.clone());
+        fill_db(&db, op.clone()).await;
         ops.push(op.clone());
 
         // also construct ops which are in the recent time window,
@@ -105,7 +105,7 @@ async fn test_region_queries() {
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
-        fill_db(&db, op2);
+        fill_db(&db, op2).await;
     }
     let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
         .await

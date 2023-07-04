@@ -303,6 +303,8 @@ mod tests {
 
                     Ok(())
                 })
+                .await
+                .unwrap()
             };
 
             // Shutdown

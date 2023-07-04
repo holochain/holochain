@@ -298,8 +298,9 @@ async fn publish_loop() {
         .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
         .unwrap();
 
+    let query_op_hash = op_hash.clone();
     db.write_async(move |txn| -> StateMutationResult<()> {
-        mutations::set_last_publish_time(txn, &op_hash, five_mins_ago)
+        mutations::set_last_publish_time(txn, &query_op_hash, five_mins_ago)
     })
     .await
     .unwrap();
@@ -319,8 +320,9 @@ async fn publish_loop() {
     op_published.recv().await.unwrap();
 
     // - Set receipts complete.
+    let query_op_hash = op_hash.clone();
     db.write_async(move |txn| -> StateMutationResult<()> {
-        mutations::set_receipts_complete(txn, &op_hash, true)
+        mutations::set_receipts_complete(txn, &query_op_hash, true)
     })
     .await
     .unwrap();
@@ -352,9 +354,10 @@ async fn publish_loop() {
 
     // - Set the ops last publish time to five mins ago.
     // - Set receipts not complete.
-    db.write_async(|txn| -> StateMutationResult<()> {
-        mutations::set_last_publish_time(txn, &op_hash, five_mins_ago)?;
-        mutations::set_receipts_complete(txn, &op_hash, false)?;
+    let query_op_hash = op_hash.clone();
+    db.write_async(move |txn| -> StateMutationResult<()> {
+        mutations::set_last_publish_time(txn, &query_op_hash, five_mins_ago)?;
+        mutations::set_receipts_complete(txn, &query_op_hash, false)?;
 
         Ok(())
     })
