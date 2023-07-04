@@ -292,7 +292,7 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                db.read_async(move |txn: Transaction| -> DatabaseResult<()> {
+                db.read_async(move |txn| -> DatabaseResult<()> {
                     let unpublished_ops: bool = txn.query_row(
                         "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
                         [],

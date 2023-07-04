@@ -4,7 +4,6 @@ use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
-use ::fixt::prelude::*;
 use hdk::prelude::LinkTag;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
@@ -292,54 +291,6 @@ async fn bob_makes_a_large_link(
     let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
-}
-
-async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
-    let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
-    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_index = call_data
-        .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_index;
-
-    // 11
-    call_data
-        .commit_entry(
-            legit_entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_index, POST_INDEX),
-            EntryVisibility::Public,
-        )
-        .await;
-
-    // Delete a link that doesn't exist buy pushing garbage addresses straight
-    // on to the source chain and flush the workspace.
-    let (_ribosome, call_context, workspace_lock) = call_data.unpack().await;
-    // garbage addresses.
-    let base_address: AnyLinkableHash = EntryHash::from_raw_32([1_u8; 32].to_vec()).into();
-    let link_add_address = ActionHash::from_raw_32([2_u8; 32].to_vec());
-
-    let source_chain = call_context
-        .host_context
-        .workspace_write()
-        .source_chain()
-        .as_ref()
-        .expect("Must have source chain if write_workspace access is given");
-
-    let action_builder = builder::DeleteLink {
-        link_add_address,
-        base_address,
-    };
-    let _action_hash = source_chain
-        .put(action_builder, None, ChainTopOrdering::default())
-        .await
-        .map_err(|source_chain_error| {
-            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
-        })
-        .unwrap();
-    workspace_lock.flush(&call_data.network).await.unwrap();
-
-    // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
-    triggers.publish_dht_ops.trigger(&"dodgy_bob");
 }
 
 //////////////////////
