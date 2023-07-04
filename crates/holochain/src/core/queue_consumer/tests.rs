@@ -4,7 +4,6 @@ use crate::core::workflow::publish_dht_ops_workflow::{
 
 use super::*;
 use arbitrary::Arbitrary;
-use holochain_sqlite::db::WriteManager;
 use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
 
