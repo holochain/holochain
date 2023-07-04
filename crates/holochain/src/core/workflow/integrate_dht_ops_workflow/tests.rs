@@ -9,7 +9,6 @@ use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
-use holochain_state::workspace::WorkspaceError;
 use holochain_trace;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Entry;
@@ -142,8 +141,7 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: DbWrite<DbKindDht>, here: String) {
-        fresh_reader_test(env, |txn| {
-            // print_stmts_test(env, |txn| {
+        env.read_async(move |txn| -> DatabaseResult<()> {
             for expect in expects {
                 match expect {
                     Db::Integrated(op) => {
@@ -314,46 +312,47 @@ impl Db {
                     }
                 }
             }
-        })
+
+            Ok(())
+        }).await.unwrap();
     }
 
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
-        env.conn()
-            .unwrap()
-            .with_commit_sync::<WorkspaceError, _, _>(|txn| {
-                for state in pre_state {
-                    match state {
-                        Db::Integrated(op) => {
-                            let op = DhtOpHashed::from_content_sync(op.clone());
-                            let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, &op).unwrap();
-                            mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
-                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
-                                .unwrap();
-                        }
-                        Db::IntQueue(op) => {
-                            let op = DhtOpHashed::from_content_sync(op.clone());
-                            let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, &op).unwrap();
-                            mutations::set_validation_stage(
-                                txn,
-                                &hash,
-                                ValidationLimboStatus::AwaitingIntegration,
-                            )
+        env.write_async(move |txn| -> DatabaseResult<()> {
+            for state in pre_state {
+                match state {
+                    Db::Integrated(op) => {
+                        let op = DhtOpHashed::from_content_sync(op.clone());
+                        let hash = op.as_hash().clone();
+                        mutations::insert_op(txn, &op).unwrap();
+                        mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+                        mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                             .unwrap();
-                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
-                                .unwrap();
-                        }
-                        _ => {
-                            unimplemented!("Use Db::Integrated");
-                        }
+                    }
+                    Db::IntQueue(op) => {
+                        let op = DhtOpHashed::from_content_sync(op.clone());
+                        let hash = op.as_hash().clone();
+                        mutations::insert_op(txn, &op).unwrap();
+                        mutations::set_validation_stage(
+                            txn,
+                            &hash,
+                            ValidationLimboStatus::AwaitingIntegration,
+                        )
+                        .unwrap();
+                        mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
+                            .unwrap();
+                    }
+                    _ => {
+                        unimplemented!("Use Db::Integrated");
                     }
                 }
-                Ok(())
-            })
-            .unwrap();
+            }
+            Ok(())
+        })
+        .await
+        .unwrap();
     }
 }
 

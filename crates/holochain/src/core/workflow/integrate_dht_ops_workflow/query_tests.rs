@@ -97,7 +97,7 @@ impl Scenario {
 async fn integrate_query() {
     holochain_trace::test_run().ok();
     let db = test_dht_db();
-    let expected = test_data(&db.to_db().into()).await;
+    let expected = test_data(&db.to_db()).await;
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&db.db());
     let test_network = test_network(None, None).await;
@@ -129,7 +129,7 @@ async fn integrate_query() {
 }
 
 async fn create_and_insert_op(
-    db: &DbRead<DbKindDht>,
+    db: &DbWrite<DbKindDht>,
     scenario: Scenario,
     data: &mut SharedData,
 ) -> DhtOpHashed {
@@ -206,6 +206,7 @@ async fn create_and_insert_op(
         DhtOp::from_type(op, SignedAction(action.clone(), fixt!(Signature)), entry).unwrap(),
     );
 
+    // TODO unexpected write in data setup, was a DbRead
     let query_state = state.clone();
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = query_state.as_hash().clone();
@@ -225,7 +226,7 @@ async fn create_and_insert_op(
     state
 }
 
-async fn test_data(db: &DbRead<DbKindDht>) -> Expected {
+async fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 

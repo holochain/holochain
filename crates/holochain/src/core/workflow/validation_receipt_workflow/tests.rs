@@ -54,7 +54,12 @@ async fn test_validation_receipt() {
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let count = fresh_reader_test!(vault, |r| list_receipts(&r, hash).unwrap().len());
+                let count = vault
+                    .read_async(move |r| -> StateQueryResult<Vec<SignedValidationReceipt>> {
+                        Ok(list_receipts(&r, hash).unwrap().len())
+                    })
+                    .await
+                    .unwrap();
                 counts.push(count);
             }
             counts
@@ -64,8 +69,10 @@ async fn test_validation_receipt() {
 
     // Check alice has receipts from both bobbo and carol
     for hash in ops {
-        let receipts: Vec<_> =
-            fresh_reader_test!(vault, |mut r| list_receipts(&mut r, &hash).unwrap());
+        let receipts: Vec<_> = vault
+            .read_async(move |r| list_receipts(&r, &hash))
+            .await
+            .unwrap();
         assert_eq!(receipts.len(), 2);
         for receipt in receipts {
             let SignedValidationReceipt {
@@ -81,16 +88,20 @@ async fn test_validation_receipt() {
     // Check alice has 2 receipts in their authored dht ops table.
     crate::assert_eq_retry_1m!(
         {
-            fresh_reader_test!(vault, |txn: Transaction| {
-                let mut stmt = txn
-                    .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
-                    .unwrap();
-                stmt.query_map([], |row| row.get::<_, Option<u32>>(0))
-                    .unwrap()
-                    .map(Result::unwrap)
-                    .filter_map(|i| i)
-                    .collect::<Vec<u32>>()
-            })
+            vault
+                .read_async(move |txn: Transaction| -> DatabaseResult<Vec<u32>> {
+                    let mut stmt = txn
+                        .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
+                        .unwrap();
+                    Ok(stmt
+                        .query_map([], |row| row.get::<_, Option<u32>>(0))
+                        .unwrap()
+                        .map(Result::unwrap)
+                        .filter_map(|i| i)
+                        .collect::<Vec<u32>>())
+                })
+                .await
+                .unwrap()
         },
         vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
     );

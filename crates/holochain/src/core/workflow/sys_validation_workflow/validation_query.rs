@@ -158,9 +158,10 @@ mod tests {
             fixt!(Action),
         ));
 
+        let query_state = state.clone();
         db.write_async(move |txn| -> DatabaseResult<()> {
-            let hash = state.as_hash().clone();
-            insert_op(txn, &state).unwrap();
+            let hash = query_state.as_hash().clone();
+            insert_op(txn, &query_state).unwrap();
             if facts.has_validation_status {
                 set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             }

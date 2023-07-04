@@ -17,6 +17,7 @@ use holo_hash::*;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use rusqlite::Transaction;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;
@@ -135,7 +136,6 @@ mod tests {
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::*;
-    use rusqlite::Transaction;
     use std::collections::HashMap;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;
@@ -165,23 +165,23 @@ mod tests {
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                for _ in 0..num_hash {
-                    // Create data for op
-                    let sig = sig_fixt.next().unwrap();
-                    let mut link_add = link_add_fixt.next().unwrap();
-                    link_add.author = author.clone();
-                    // Create DhtOp
-                    let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
-                    // Get the hash from the op
-                    let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, &op_hashed)?;
-                }
-                StateMutationResult::Ok(())
-            })
-            .unwrap();
+        let query_author = author.clone();
+        db.write_async(move |txn| -> StateMutationResult<()> {
+            for _ in 0..num_hash {
+                // Create data for op
+                let sig = sig_fixt.next().unwrap();
+                let mut link_add = link_add_fixt.next().unwrap();
+                link_add.author = query_author.clone();
+                // Create DhtOp
+                let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
+                // Get the hash from the op
+                let op_hashed = DhtOpHashed::from_content_sync(op.clone());
+                mutations::insert_op(txn, &op_hashed)?;
+            }
+            Ok(())
+        })
+        .await
+        .unwrap();
 
         // Create cell data
         let dna = fixt!(DnaHash);
@@ -293,15 +293,15 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                fresh_reader_test!(db, |txn: Transaction| {
-                    let unpublished_ops: bool = txn
-                        .query_row(
-                            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
-                            [],
-                            |row| row.get(0),
-                        )
-                        .unwrap();
+                db.read_async(move |txn: Transaction| -> DatabaseResult<()> {
+                    let unpublished_ops: bool = txn.query_row(
+                        "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
+                        [],
+                        |row| row.get(0),
+                    )?;
                     assert!(!unpublished_ops);
+
+                    Ok(())
                 })
             };
 
