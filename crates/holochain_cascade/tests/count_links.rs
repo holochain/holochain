@@ -22,8 +22,8 @@ async fn count_links_not_authority() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&authority.to_db(), td.store_entry_op.clone());
-    fill_db(&authority.to_db(), td.create_link_op.clone());
+    fill_db(&authority.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&authority.to_db(), td.create_link_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
@@ -38,7 +38,7 @@ async fn count_links_not_authority() {
 
     assert_eq!(count, td.links.len());
 
-    fill_db(&authority.to_db(), td.delete_link_op.clone());
+    fill_db(&authority.to_db(), td.delete_link_op.clone()).await;
 
     let count = cascade
         .dht_count_links(td.link_query.clone())
@@ -59,8 +59,8 @@ async fn count_links_authority() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&vault.to_db(), td.store_entry_op.clone());
-    fill_db(&vault.to_db(), td.create_link_op.clone());
+    fill_db(&vault.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&vault.to_db(), td.create_link_op.clone()).await;
 
     // Network
     // - Not expecting any calls to the network.
@@ -80,7 +80,7 @@ async fn count_links_authority() {
 
     assert_eq!(count, td.links.len());
 
-    fill_db(&vault.to_db(), td.delete_link_op.clone());
+    fill_db(&vault.to_db(), td.delete_link_op.clone()).await;
 
     let count = cascade
         .dht_count_links(td.link_query.clone())
@@ -165,8 +165,8 @@ async fn count_links_with_filters() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&authority.to_db(), td.store_entry_op.clone());
-    fill_db(&authority.to_db(), td.create_link_op.clone());
+    fill_db(&authority.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&authority.to_db(), td.create_link_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
