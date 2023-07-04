@@ -3,7 +3,6 @@ use std::collections::HashSet;
 
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;

@@ -108,7 +108,6 @@ mod tests {
     use fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HashableContentExtSync;
-    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
     use holochain_state::validation_db::ValidationLimboStatus;

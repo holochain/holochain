@@ -135,7 +135,6 @@ mod tests {
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_sqlite::db::DbWrite;
-    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;

@@ -9,7 +9,7 @@ use hdk::prelude::LinkTag;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holochain_state::prelude::fresh_reader_test;
+use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
 use holochain_types::prelude::*;
@@ -85,7 +85,7 @@ async fn run_test(
 
     // holochain_state::prelude::dump_tmp(&alice_dht_db);
     // Validation should be empty
-    fresh_reader_test(alice_dht_db, |txn| {
+    alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
         let limbo = show_limbo(&txn);
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
@@ -97,7 +97,9 @@ async fn run_test(
                 |row| row.get(0))
                 .unwrap();
         assert_eq!(num_valid_ops, expected_count);
-    });
+
+        Ok(())
+    }).await.unwrap();
 
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
@@ -115,7 +117,7 @@ async fn run_test(
     .await;
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-    let num_valid_ops = |txn: &Transaction| {
+    let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
         let valid_ops: usize = txn
                 .query_row(
                     "
@@ -153,17 +155,23 @@ async fn run_test(
                 },
                 |row| row.get(0))
                 .unwrap();
-        valid_ops
+
+        Ok(valid_ops)
     };
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        let valid_ops = num_valid_ops(&txn);
-        assert_eq!(valid_ops, expected_count);
-    });
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+    let valid_ops = alice_db.read_async(num_valid_ops.clone()).await.unwrap();
+    assert_eq!(valid_ops, expected_count);
 }
 
 async fn bob_links_in_a_legit_way(

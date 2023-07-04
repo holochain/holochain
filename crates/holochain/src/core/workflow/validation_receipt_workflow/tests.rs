@@ -55,7 +55,7 @@ async fn test_validation_receipt() {
             let mut counts = Vec::new();
             for hash in &ops {
                 let count = vault
-                    .read_async(move |r| -> StateQueryResult<Vec<SignedValidationReceipt>> {
+                    .read_async(move |r| -> StateQueryResult<usize> {
                         Ok(list_receipts(&r, hash).unwrap().len())
                     })
                     .await

@@ -18,7 +18,6 @@ use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::test_utils::test_db_dir;
@@ -26,6 +25,7 @@ use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
+use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasmPair;
 use holochain_wasm_test_utils::TestZomes;
 use holochain_zome_types::Entry;
@@ -36,6 +36,7 @@ use rusqlite::Transaction;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::time::Duration;
+use tracing_subscriber::registry::Data;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "deal with the invalid data that leads to blocks being enforced"]
@@ -469,13 +470,18 @@ async fn run_test(
 
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert_eq!(num_valid(&txn), expected_count);
-    });
+            assert_eq!(num_valid(&txn), expected_count);
+
+            Ok(())
+        })
+        .await
+        .unwrap();
 
     let (invalid_action_hash, invalid_entry_hash) =
         commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
@@ -488,19 +494,24 @@ async fn run_test(
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert!(expected_invalid_entry(
-            &txn,
-            &invalid_action_hash,
-            &invalid_entry_hash
-        ));
-        // Expect having one invalid op for the store entry.
-        assert_eq!(num_valid(&txn), expected_count - 1);
-    });
+            assert!(expected_invalid_entry(
+                &txn,
+                &invalid_action_hash,
+                &invalid_entry_hash
+            ));
+            // Expect having one invalid op for the store entry.
+            assert_eq!(num_valid(&txn), expected_count - 1);
+
+            Ok(())
+        })
+        .await
+        .unwrap();
 
     let invocation = new_zome_call(
         conductors[1].raw_handle().keystore(),
@@ -518,19 +529,24 @@ async fn run_test(
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert!(expected_invalid_entry(
-            &txn,
-            &invalid_action_hash,
-            &invalid_entry_hash
-        ));
-        // Expect having one invalid op for the store entry.
-        assert_eq!(num_valid(&txn), expected_count - 1);
-    });
+            assert!(expected_invalid_entry(
+                &txn,
+                &invalid_action_hash,
+                &invalid_entry_hash
+            ));
+            // Expect having one invalid op for the store entry.
+            assert_eq!(num_valid(&txn), expected_count - 1);
+
+            Ok(())
+        })
+        .await
+        .unwrap();
 
     let invocation = new_invocation(
         conductors[1].raw_handle().keystore(),
@@ -556,20 +572,25 @@ async fn run_test(
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert!(expected_invalid_entry(
-            &txn,
-            &invalid_action_hash,
-            &invalid_entry_hash
-        ));
-        assert!(expected_invalid_link(&txn, &invalid_link_hash));
-        // Expect having two invalid ops for the two store entries.
-        assert_eq!(num_valid(&txn), expected_count - 2);
-    });
+            assert!(expected_invalid_entry(
+                &txn,
+                &invalid_action_hash,
+                &invalid_entry_hash
+            ));
+            assert!(expected_invalid_link(&txn, &invalid_link_hash));
+            // Expect having two invalid ops for the two store entries.
+            assert_eq!(num_valid(&txn), expected_count - 2);
+
+            Ok(())
+        })
+        .await
+        .unwrap();
 
     let invocation = new_invocation(
         conductors[1].raw_handle().keystore(),
@@ -593,20 +614,25 @@ async fn run_test(
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert!(expected_invalid_entry(
-            &txn,
-            &invalid_action_hash,
-            &invalid_entry_hash
-        ));
-        assert!(expected_invalid_link(&txn, &invalid_link_hash));
-        // Expect having two invalid ops for the two store entries.
-        assert_eq!(num_valid(&txn), expected_count - 2);
-    });
+            assert!(expected_invalid_entry(
+                &txn,
+                &invalid_action_hash,
+                &invalid_entry_hash
+            ));
+            assert!(expected_invalid_link(&txn, &invalid_link_hash));
+            // Expect having two invalid ops for the two store entries.
+            assert_eq!(num_valid(&txn), expected_count - 2);
+
+            Ok(())
+        })
+        .await
+        .unwrap();
 
     let invocation = new_invocation(
         conductors[1].raw_handle().keystore(),
@@ -632,21 +658,26 @@ async fn run_test(
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert!(expected_invalid_entry(
-            &txn,
-            &invalid_action_hash,
-            &invalid_entry_hash
-        ));
-        assert!(expected_invalid_link(&txn, &invalid_link_hash));
-        assert!(expected_invalid_remove_link(&txn, &invalid_remove_hash));
-        // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
-        assert_eq!(num_valid(&txn), expected_count - (3 + 1));
-    });
+            assert!(expected_invalid_entry(
+                &txn,
+                &invalid_action_hash,
+                &invalid_entry_hash
+            ));
+            assert!(expected_invalid_link(&txn, &invalid_link_hash));
+            assert!(expected_invalid_remove_link(&txn, &invalid_remove_hash));
+            // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
+            assert_eq!(num_valid(&txn), expected_count - (3 + 1));
+
+            Ok(())
+        })
+        .await
+        .unwrap();
     expected_count
 }
 
@@ -677,19 +708,24 @@ async fn run_test_entry_def_id(
     let alice_db = conductors[0].get_dht_db(&alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt).await;
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        assert!(expected_invalid_entry(
-            &txn,
-            &invalid_action_hash,
-            &invalid_entry_hash
-        ));
-        // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
-        assert_eq!(num_valid(&txn), expected_count - 5);
-    });
+            assert!(expected_invalid_entry(
+                &txn,
+                &invalid_action_hash,
+                &invalid_entry_hash
+            ));
+            // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
+            assert_eq!(num_valid(&txn), expected_count - 5);
+
+            Ok(())
+        })
+        .await
+        .unwrap();
 }
 
 // Need to "hack holochain" because otherwise the invalid
