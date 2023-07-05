@@ -1,5 +1,6 @@
 //! Methods for awaiting consistency between cells of the same DNA
 
+// TODO uses `test_utils`
 use crate::{prelude::*, test_utils::consistency_dbs};
 use std::time::Duration;
 
@@ -84,5 +85,6 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
         .iter()
         .map(|c| (&c.0, &c.1, c.2.as_ref()))
         .collect();
+    // TODO uses `test_utils` from the `holochain` crate
     consistency_dbs(&all_cell_dbs[..], num_attempts, delay).await
 }

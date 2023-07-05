@@ -37,11 +37,13 @@ impl SweetAgents {
         (agents.pop().unwrap(), agents.pop().unwrap())
     }
 
+    // TODO calls a test_utils function from holochain_zome_types
     /// Get the same two AgentPubKeys every time
     pub fn alice_and_bob() -> (AgentPubKey, AgentPubKey) {
         (fake_agent_pubkey_1(), fake_agent_pubkey_2())
     }
 
+    // TODO calls a test_utils function from holochain_zome_types
     /// Return only alice.
     pub fn alice() -> AgentPubKey {
         fake_agent_pubkey_1()

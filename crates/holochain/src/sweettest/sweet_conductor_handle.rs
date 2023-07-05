@@ -68,6 +68,7 @@ impl SweetConductorHandle {
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
+        // TODO requires in process holochain
         self.0
             .easy_call_zome(
                 provenance,
@@ -82,6 +83,7 @@ impl SweetConductorHandle {
 
     /// Get a stream of all Signals emitted since the time of this function call.
     pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
+        // TODO uses `test_utils` from `holochain` crate
         self.0.signal_broadcaster().subscribe_merged()
     }
 

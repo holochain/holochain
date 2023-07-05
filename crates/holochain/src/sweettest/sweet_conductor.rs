@@ -11,6 +11,7 @@ use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
     CellError, Conductor, ConductorBuilder,
 };
+// TODO use `rand` crate directly
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
@@ -86,15 +87,18 @@ impl SweetConductor {
         config: ConductorConfig,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
+        // TODO uses `test_utils` function `add_test_app_interface`
         // Automatically add a test app interface
         handle
             .add_test_app_interface(AppInterfaceId::default())
             .await
             .expect("Couldn't set up test app interface");
 
+        // TODO uses `test_utils` function `subscribe_merged`
         // Get a stream of all signals since conductor startup
         let signal_stream = handle.signal_broadcaster().subscribe_merged();
 
+        // TODO ask maackle about this?
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
         // the per-space databases this way. However, we actually use the TestEnvs
@@ -157,12 +161,14 @@ impl SweetConductor {
         };
 
         tracing::info!(?config);
+        // TODO uses `test_utils` from `holochain_state`
         let dir = TestDir::new(test_db_dir());
         assert!(
             dir.read_dir().unwrap().next().is_none(),
             "Test dir not empty - {:?}",
             dir.to_path_buf()
         );
+        // TODO uses `test_keystore` from `holochain_types` which is under `test_utils`
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
                 .await;
@@ -171,8 +177,10 @@ impl SweetConductor {
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
     pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
+        // TODO uses `test_utils` from `holochain_state`
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
+        // TODO uses `test_utils` within `holochain`
         let handle = builder.test(&db_dir, &[]).await.unwrap();
         Self::new(handle, db_dir, config, None).await
     }
@@ -188,6 +196,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
+            // TODO uses `test_utils` within `holochain`
             .test(db_dir, extra_dnas)
             .await
             .unwrap()
@@ -210,6 +219,7 @@ impl SweetConductor {
 
     /// Make the temp db dir persistent
     pub fn persist(&mut self) -> &Path {
+        // TODO uses `test_utils` feature from `holochain_state`
         self.db_dir.persist();
         &self.db_dir
     }
@@ -233,11 +243,13 @@ impl SweetConductor {
         id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
+        // TODO requires in process holochain
         self.raw_handle().disable_app(id, reason).await
     }
 
     /// Convenience function that uses the internal handle to start an app
     pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
+        // TODO requires in process holochain
         self.raw_handle().start_app(id).await
     }
 
@@ -247,6 +259,7 @@ impl SweetConductor {
         id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
+        // TODO requires in process holochain
         self.raw_handle().pause_app(id, reason).await
     }
 
@@ -255,6 +268,7 @@ impl SweetConductor {
     /// installing many apps with the same dna
     async fn setup_app_1_register_dna(&mut self, dna_files: &[&DnaFile]) -> ConductorApiResult<()> {
         for &dna_file in dna_files {
+            // TODO requires in process holochain
             self.register_dna(dna_file.clone()).await?;
             self.dnas.push(dna_file.clone());
         }
@@ -279,10 +293,13 @@ impl SweetConductor {
                 (InstalledCell::new(cell_id, r.role.clone()), None)
             })
             .collect();
+        // TODO requires in process holochain
+        // TODO uses `test_utils` from `holochain` crate
         self.raw_handle()
             .install_app_legacy(installed_app_id.clone(), installed_cells)
             .await?;
 
+        // TODO requires in process holochain
         self.raw_handle().enable_app(installed_app_id).await?;
         Ok(())
     }
@@ -313,7 +330,9 @@ impl SweetConductor {
     /// Construct a SweetCell for a cell which has already been created
     pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
         let (dna_hash, agent) = cell_id.into_dna_and_agent();
+        // TODO requires in process holochain
         let cell_authored_db = self.raw_handle().get_authored_db(&dna_hash)?;
+        // TODO requires in process holochain
         let cell_dht_db = self.raw_handle().get_dht_db(&dna_hash)?;
         let cell_id = CellId::new(dna_hash, agent);
         Ok(SweetCell {
@@ -341,6 +360,7 @@ impl SweetConductor {
         self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), roles.as_slice())
             .await?;
 
+        // TODO requires in process holochain
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
@@ -401,6 +421,7 @@ impl SweetConductor {
             .await?;
         }
 
+        // TODO requires in process holochain
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
@@ -427,7 +448,9 @@ impl SweetConductor {
         &mut self,
         payload: CreateCloneCellPayload,
     ) -> ConductorApiResult<holochain_conductor_api::ClonedCell> {
+        // TODO requires in process holochain
         let clone = self.raw_handle().create_clone_cell(payload).await?;
+        // TODO requires in process holochain
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
@@ -444,6 +467,7 @@ impl SweetConductor {
             .expect("Can't take the SweetConductor signal stream twice")
     }
 
+    // TODO this is part of what we need to be able to do remote calls
     /// Get a new websocket client which can send requests over the admin
     /// interface. It presupposes that an admin interface has been configured.
     /// (The standard_config includes an admin interface at port 0.)
@@ -461,6 +485,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
+            // TODO requires in process holochain
             handle.shutdown().await.unwrap().unwrap();
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
@@ -513,9 +538,13 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
+            // TODO requires in process holochain
             let iter = handle.running_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
+                // TODO requires in process holochain
                 let db = self.get_authored_db(id.dna_hash()).unwrap();
+                // TODO uses `test_utils from `holochain` crate
+                // TODO requires in process holochain
                 let trigger = self.get_cell_triggers(&id).await.unwrap();
                 (db, trigger)
             });
@@ -525,6 +554,7 @@ impl SweetConductor {
                     // The line below was added when migrating to rust edition 2021, per
                     // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
                     let _ = &triggers;
+                    // TODO uses `test_utils from `holochain` crate
                     crate::test_utils::force_publish_dht_ops(&db, &mut triggers.publish_dht_ops)
                         .await
                         .unwrap();
@@ -541,6 +571,7 @@ impl SweetConductor {
                 all.push(env.clone());
             }
         }
+        // TODO uses `test_utils from `holochain` crate
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
     }
 
@@ -557,6 +588,7 @@ impl SweetConductor {
             }
         }
         let connectivity = covering(rng, all.len(), s);
+        // TODO uses `test_utils from `holochain` crate
         crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
     }
 
@@ -576,6 +608,7 @@ impl SweetConductor {
 
         let wait_start = Instant::now();
         loop {
+            // TODO requires in process holochain
             let (number_of_peers, completed_rounds) = handle
                 .network_info(&NetworkInfoRequestPayload {
                     agent_pub_key: cell.agent_pubkey().clone(),
@@ -618,6 +651,7 @@ impl SweetConductor {
 pub async fn websocket_client_by_port(
     port: u16,
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+    // TODO hard-codes localhost
     holochain_websocket::connect(
         url2::url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),

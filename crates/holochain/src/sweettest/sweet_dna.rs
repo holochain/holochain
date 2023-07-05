@@ -1,6 +1,7 @@
 use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
+// TODO this is referring to our test WASMS, does it make sense to expose this as part of sweettest when used on its own?
 use holochain_wasm_test_utils::TestWasmPair;
 use std::path::Path;
 
@@ -96,6 +97,7 @@ impl SweetDnaFile {
         .await
     }
 
+    // TODO this is referring to our test WASMS, does it make sense to expose this as part of sweettest when used on its own?
     /// Create a DnaFile from a collection of TestWasm
     pub async fn from_test_wasms<W>(
         network_seed: String,
@@ -140,6 +142,7 @@ impl SweetDnaFile {
         .await
     }
 
+    // TODO this is referring to our test WASMS, does it make sense to expose this as part of sweettest when used on its own?
     /// Create a DnaFile from a collection of TestWasm
     /// with a random network seed
     pub async fn unique_from_test_wasms<W>(
@@ -213,6 +216,7 @@ impl SweetDnaFile {
 pub struct SweetDnaDef;
 
 impl SweetDnaDef {
+    // TODO ask maackle about this?
     /// Create a DnaDef with a random network seed, useful for testing
     // TODO: move fully into sweettest when possible
     pub fn unique_from_zomes(

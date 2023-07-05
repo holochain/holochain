@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::{SweetCell, SweetLocalRendezvous};
+// TODO use from `rand` crate
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
@@ -202,6 +203,7 @@ impl SweetConductorBatch {
     pub async fn reveal_peer_info(&self, observer: usize, seen: usize) {
         let observer_conductor = &self.0[observer];
         let mut observer_envs = Vec::new();
+        // TODO requires in process holochain
         for env in observer_conductor
             .spaces
             .get_from_spaces(|s| s.p2p_agents_db.clone())
@@ -209,6 +211,7 @@ impl SweetConductorBatch {
             observer_envs.push(env.clone());
         }
 
+        // TODO requires in process holochain
         let seen_conductor = &self.0[seen];
         let mut seen_envs = Vec::new();
         for env in seen_conductor
@@ -218,6 +221,7 @@ impl SweetConductorBatch {
             seen_envs.push(env.clone());
         }
 
+        // TODO uses `test_utils` from `holochain` crate
         crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
     }
 
