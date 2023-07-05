@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230705.005229
+
+## [holochain\_cli-0.3.0-beta-dev.8](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.8](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain-0.3.0-beta-dev.8](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.7](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.8](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.7](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_cascade-0.3.0-beta-dev.8](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_state-0.3.0-beta-dev.7](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_p2p-0.3.0-beta-dev.7](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_types-0.3.0-beta-dev.7](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_sqlite-0.3.0-beta-dev.7](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [kitsune\_p2p-0.3.0-beta-dev.7](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_keystore-0.3.0-beta-dev.7](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [hdk-0.3.0-beta-dev.7](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.7)
+
+- Add String<TryInto> for Path for easy conversion of Path to string representation
+
+## [holochain\_zome\_types-0.3.0-beta-dev.6](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.6)
+
 # 20230703.184956
 
 ## [holochain\_cli-0.3.0-beta-dev.7](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.7)
