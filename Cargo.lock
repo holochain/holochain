@@ -2642,6 +2642,7 @@ dependencies = [
  "tiny-keccak",
  "tokio",
  "tokio-stream",
+ "tokio-tungstenite 0.13.0",
  "toml 0.5.11",
  "tracing",
  "tracing-futures",
