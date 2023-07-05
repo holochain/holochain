@@ -239,13 +239,16 @@ mod tests {
             ))
         };
 
-        let query_state = state.clone();
-        db.write_async(move |txn| -> DatabaseResult<()> {
-            let hash = query_state.as_hash().clone();
-            insert_op(txn, &query_state).unwrap();
-            set_last_publish_time(txn, &hash, last_publish).unwrap();
-            set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
-            Ok(())
+        db.write_async({
+            let query_state = state.clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let hash = query_state.as_hash().clone();
+                insert_op(txn, &query_state).unwrap();
+                set_last_publish_time(txn, &hash, last_publish).unwrap();
+                set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
+                Ok(())
+            }
         })
         .await
         .unwrap();

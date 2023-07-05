@@ -164,20 +164,23 @@ mod tests {
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
-        let query_author = author.clone();
-        db.write_async(move |txn| -> StateMutationResult<()> {
-            for _ in 0..num_hash {
-                // Create data for op
-                let sig = sig_fixt.next().unwrap();
-                let mut link_add = link_add_fixt.next().unwrap();
-                link_add.author = query_author.clone();
-                // Create DhtOp
-                let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
-                // Get the hash from the op
-                let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                mutations::insert_op(txn, &op_hashed)?;
+        db.write_async({
+            let query_author = author.clone();
+
+            move |txn| -> StateMutationResult<()> {
+                for _ in 0..num_hash {
+                    // Create data for op
+                    let sig = sig_fixt.next().unwrap();
+                    let mut link_add = link_add_fixt.next().unwrap();
+                    link_add.author = query_author.clone();
+                    // Create DhtOp
+                    let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
+                    // Get the hash from the op
+                    let op_hashed = DhtOpHashed::from_content_sync(op.clone());
+                    mutations::insert_op(txn, &op_hashed)?;
+                }
+                Ok(())
             }
-            Ok(())
         })
         .await
         .unwrap();

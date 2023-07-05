@@ -222,19 +222,21 @@ pub mod tests {
 
         // Wait to make sure we've init, but it should have happened for sure.
         while {
-            let alice_pubkey = alice_pubkey.clone();
             !alice_host_fn_caller
                 .authored_db
-                .write_async(move |txn: &mut Transaction| {
-                    let persisted_scheduled_fn = ScheduledFn::new(
-                        TestWasm::Schedule.into(),
-                        "cron_scheduled_fn_init".into(),
-                    );
+                .write_async({
+                    let alice_pubkey = alice_pubkey.clone();
+                    move |txn: &mut Transaction| {
+                        let persisted_scheduled_fn = ScheduledFn::new(
+                            TestWasm::Schedule.into(),
+                            "cron_scheduled_fn_init".into(),
+                        );
 
-                    Result::<bool, DatabaseError>::Ok(
-                        fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey)
-                            .unwrap(),
-                    )
+                        Result::<bool, DatabaseError>::Ok(
+                            fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey)
+                                .unwrap(),
+                        )
+                    }
                 })
                 .await
                 .unwrap()
@@ -315,42 +317,42 @@ pub mod tests {
         // Starting the scheduler should flush ephemeral.
         let _schedule: () = conductor.call(&bob, "schedule", ()).await;
 
-        assert!({
-            let bob_pubkey = bob_pubkey.clone();
-            bob_host_fn_caller
-                .authored_db
-                .write_async(move |txn: &mut Transaction| {
+        assert!(bob_host_fn_caller
+            .authored_db
+            .write_async({
+                let bob_pubkey = bob_pubkey.clone();
+                move |txn: &mut Transaction| {
                     let persisted_scheduled_fn =
                         ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 
                     Result::<bool, DatabaseError>::Ok(
                         fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap(),
                     )
-                })
-                .await
-                .unwrap()
-        });
+                }
+            })
+            .await
+            .unwrap());
 
         conductor
             .raw_handle()
             .start_scheduler(std::time::Duration::from_millis(1000_000_000))
             .await;
 
-        assert!(!{
-            let bob_pubkey = bob_pubkey.clone();
-            bob_host_fn_caller
-                .authored_db
-                .write_async(move |txn: &mut Transaction| {
+        assert!(!bob_host_fn_caller
+            .authored_db
+            .write_async({
+                let bob_pubkey = bob_pubkey.clone();
+                move |txn: &mut Transaction| {
                     let persisted_scheduled_fn =
                         ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 
                     Result::<bool, DatabaseError>::Ok(
                         fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap(),
                     )
-                })
-                .await
-                .unwrap()
-        });
+                }
+            })
+            .await
+            .unwrap());
 
         Ok(())
     }

@@ -128,9 +128,12 @@ pub struct SourceChainJsonRecord {
 /// Writable functions for a source chain with write access.
 impl SourceChain {
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
-        let author = self.author.clone();
         self.vault
-            .write_async(move |txn| unlock_chain(txn, &author))
+            .write_async({
+                let author = self.author.clone();
+
+                move |txn| unlock_chain(txn, &author)
+            })
             .await?;
         Ok(())
     }
@@ -1233,13 +1236,16 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     action_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<ActionHash> {
-    let query_author = author.clone();
     let HeadInfo {
         action: prev_action,
         seq: last_action_seq,
         ..
     } = vault
-        .read_async(move |txn| chain_head_db_nonempty(&txn, query_author.clone()))
+        .read_async({
+            let query_author = author.clone();
+
+            move |txn| chain_head_db_nonempty(&txn, query_author.clone())
+        })
         .await?;
     let action_seq = last_action_seq + 1;
 
@@ -1982,12 +1988,15 @@ pub mod tests {
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
-        let query_author = author.clone();
         vault
-            .read_async(move |txn| -> DatabaseResult<()> {
-                assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+            .read_async({
+                let query_author = author.clone();
 
-                Ok(())
+                move |txn| -> DatabaseResult<()> {
+                    assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+
+                    Ok(())
+                }
             })
             .await
             .unwrap();
@@ -2033,31 +2042,34 @@ pub mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
-        let check_h1 = h1.clone();
-        let check_h2 = h2.clone();
-        let check_author = author.clone();
         vault
-            .read_async(move |txn| -> DatabaseResult<()> {
-                assert_eq!(
-                    chain_head_db_nonempty(&txn, check_author.clone())
-                        .unwrap()
-                        .action,
-                    check_h2
-                );
-                // get the full record
-                let store = Txn::from(&txn);
-                let h1_record_fetched = store
-                    .get_record(&check_h1.clone().into())
-                    .expect("error retrieving")
-                    .expect("entry not found");
-                let h2_record_fetched = store
-                    .get_record(&check_h2.clone().into())
-                    .expect("error retrieving")
-                    .expect("entry not found");
-                assert_eq!(check_h1, *h1_record_fetched.action_address());
-                assert_eq!(check_h2, *h2_record_fetched.action_address());
+            .read_async({
+                let check_h1 = h1.clone();
+                let check_h2 = h2.clone();
+                let check_author = author.clone();
 
-                Ok(())
+                move |txn| -> DatabaseResult<()> {
+                    assert_eq!(
+                        chain_head_db_nonempty(&txn, check_author.clone())
+                            .unwrap()
+                            .action,
+                        check_h2
+                    );
+                    // get the full record
+                    let store = Txn::from(&txn);
+                    let h1_record_fetched = store
+                        .get_record(&check_h1.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    let h2_record_fetched = store
+                        .get_record(&check_h2.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    assert_eq!(check_h1, *h1_record_fetched.action_address());
+                    assert_eq!(check_h2, *h2_record_fetched.action_address());
+
+                    Ok(())
+                }
             })
             .await
             .unwrap();

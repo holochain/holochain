@@ -206,18 +206,22 @@ async fn create_and_insert_op(
     );
 
     // TODO unexpected write in data setup, was a DbRead
-    let query_state = state.clone();
-    db.write_async(move |txn| -> DatabaseResult<()> {
-        let hash = query_state.as_hash().clone();
-        insert_op(txn, &query_state).unwrap();
-        set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
-        if facts.integrated {
-            set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
+    db.write_async({
+        let query_state = state.clone();
+
+        move |txn| -> DatabaseResult<()> {
+            let hash = query_state.as_hash().clone();
+            insert_op(txn, &query_state).unwrap();
+            set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+            if facts.integrated {
+                set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
+            }
+            if facts.awaiting_integration {
+                set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
+                    .unwrap();
+            }
+            Ok(())
         }
-        if facts.awaiting_integration {
-            set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration).unwrap();
-        }
-        Ok(())
     })
     .await
     .unwrap();

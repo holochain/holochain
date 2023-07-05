@@ -157,25 +157,28 @@ mod tests {
             fixt!(Action),
         ));
 
-        let query_state = state.clone();
-        db.write_async(move |txn| -> DatabaseResult<()> {
-            let hash = query_state.as_hash().clone();
-            insert_op(txn, &query_state).unwrap();
-            if facts.has_validation_status {
-                set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+        db.write_async({
+            let query_state = state.clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let hash = query_state.as_hash().clone();
+                insert_op(txn, &query_state).unwrap();
+                if facts.has_validation_status {
+                    set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
+                }
+                if facts.pending {
+                    // No need to do anything because status and stage are null already.
+                } else if facts.awaiting_sys_deps {
+                    set_validation_stage(
+                        txn,
+                        &hash,
+                        ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
+                    )
+                    .unwrap();
+                }
+                txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
+                Ok(())
             }
-            if facts.pending {
-                // No need to do anything because status and stage are null already.
-            } else if facts.awaiting_sys_deps {
-                set_validation_stage(
-                    txn,
-                    &hash,
-                    ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
-                )
-                .unwrap();
-            }
-            txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
-            Ok(())
         })
         .await
         .unwrap();

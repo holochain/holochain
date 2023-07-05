@@ -68,10 +68,13 @@ mod tests {
                 .await;
 
         // Put wasm
-        let put_wasm = wasm.clone();
-        db.write_async(move |txn| put(txn, put_wasm.clone()))
-            .await
-            .unwrap();
+        db.write_async({
+            let put_wasm = wasm.clone();
+
+            move |txn| put(txn, put_wasm.clone())
+        })
+        .await
+        .unwrap();
         db.read_async(move |txn| -> DatabaseResult<()> {
             assert!(contains(&txn, &wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf

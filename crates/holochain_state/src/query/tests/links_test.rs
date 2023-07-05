@@ -107,15 +107,18 @@ impl TestData {
     }
 
     async fn empty<'a>(&'a self, test: &'static str) {
-        let query = self.query.clone();
-        let scratch = self.scratch.clone();
         let val = self
             .env
-            .read_async(move |txn| -> DatabaseResult<bool> {
-                Ok(query
-                    .run(DbScratch::new(&[&txn], &scratch))
-                    .unwrap()
-                    .is_empty())
+            .read_async({
+                let query = self.query.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> DatabaseResult<bool> {
+                    Ok(query
+                        .run(DbScratch::new(&[&txn], &scratch))
+                        .unwrap()
+                        .is_empty())
+                }
             })
             .await
             .unwrap();
@@ -123,12 +126,15 @@ impl TestData {
     }
 
     async fn only_on_full_key<'a>(&'a self, test: &'static str) {
-        let query = self.query_no_tag.clone();
-        let scratch = self.scratch.clone();
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let query = self.query_no_tag.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap();
@@ -136,12 +142,15 @@ impl TestData {
     }
 
     async fn not_on_full_key<'a>(&'a self, test: &'static str) {
-        let query = self.query.clone();
-        let scratch = self.scratch.clone();
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let query = self.query.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap()
@@ -154,12 +163,15 @@ impl TestData {
     }
 
     async fn only_on_base<'a>(&'a self, test: &'static str) {
-        let query_no_tag = self.query_no_tag.clone();
-        let scratch = self.scratch.clone();
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query_no_tag.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let query_no_tag = self.query_no_tag.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query_no_tag.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap();
@@ -173,11 +185,15 @@ impl TestData {
             None,
             GetLinksFilter::default(),
         );
-        let scratch = self.scratch.clone();
+
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap()
@@ -196,11 +212,15 @@ impl TestData {
             None,
             GetLinksFilter::default(),
         );
-        let scratch = self.scratch.clone();
+
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap()
@@ -223,11 +243,15 @@ impl TestData {
             Some(half_tag),
             GetLinksFilter::default(),
         );
-        let scratch = self.scratch.clone();
+
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap();
@@ -245,11 +269,15 @@ impl TestData {
             Some(half_tag),
             GetLinksFilter::default(),
         );
-        let scratch = self.scratch.clone();
+
         let val = self
             .env
-            .read_async(move |txn| -> StateQueryResult<Vec<Link>> {
-                query.run(DbScratch::new(&[&txn], &scratch))
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
             })
             .await
             .unwrap()
@@ -332,14 +360,18 @@ impl TestData {
                 None,
                 GetLinksFilter::default(),
             );
-            let scratch = d.scratch.clone();
+
             val.extend(
                 d.env
-                    .read_async(move |txn| -> DatabaseResult<IntoIter<Link>> {
-                        Ok(query
-                            .run(DbScratch::new(&[&txn], &scratch))
-                            .unwrap()
-                            .into_iter())
+                    .read_async({
+                        let scratch = d.scratch.clone();
+
+                        move |txn| -> DatabaseResult<IntoIter<Link>> {
+                            Ok(query
+                                .run(DbScratch::new(&[&txn], &scratch))
+                                .unwrap()
+                                .into_iter())
+                        }
                     })
                     .await
                     .unwrap(),
@@ -370,15 +402,18 @@ impl TestData {
             GetLinksFilter::default(),
         );
 
-        let scratch = scratch.clone();
         let val: HashSet<_> = td[0]
             .env
             .clone()
-            .read_async(move |txn| -> DatabaseResult<IntoIter<Link>> {
-                Ok(query
-                    .run(DbScratch::new(&[&txn], &scratch))
-                    .unwrap()
-                    .into_iter())
+            .read_async({
+                let scratch = scratch.clone();
+
+                move |txn| -> DatabaseResult<IntoIter<Link>> {
+                    Ok(query
+                        .run(DbScratch::new(&[&txn], &scratch))
+                        .unwrap()
+                        .into_iter())
+                }
             })
             .await
             .unwrap()
@@ -409,15 +444,18 @@ impl TestData {
         );
         let mut val = Vec::new();
         for d in td {
-            let my_query = query.clone();
-            let scratch = d.scratch.clone();
             val.extend(
                 d.env
-                    .read_async(move |txn| -> DatabaseResult<IntoIter<Link>> {
-                        Ok(my_query
-                            .run(DbScratch::new(&[&txn], &scratch))
-                            .unwrap()
-                            .into_iter())
+                    .read_async({
+                        let my_query = query.clone();
+                        let scratch = d.scratch.clone();
+
+                        move |txn| -> DatabaseResult<IntoIter<Link>> {
+                            Ok(my_query
+                                .run(DbScratch::new(&[&txn], &scratch))
+                                .unwrap()
+                                .into_iter())
+                        }
                     })
                     .await
                     .unwrap(),
@@ -451,15 +489,18 @@ impl TestData {
         );
         let mut val = Vec::new();
         for d in td {
-            let my_query = query.clone();
-            let scratch = d.scratch.clone();
             val.extend(
                 d.env
-                    .read_async(move |txn| -> DatabaseResult<IntoIter<Link>> {
-                        Ok(my_query
-                            .run(DbScratch::new(&[&txn], &scratch))
-                            .unwrap()
-                            .into_iter())
+                    .read_async({
+                        let my_query = query.clone();
+                        let scratch = d.scratch.clone();
+
+                        move |txn| -> DatabaseResult<IntoIter<Link>> {
+                            Ok(my_query
+                                .run(DbScratch::new(&[&txn], &scratch))
+                                .unwrap()
+                                .into_iter())
+                        }
                     })
                     .await
                     .unwrap(),

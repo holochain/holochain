@@ -54,10 +54,12 @@ async fn test_validation_receipt() {
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let query_hash = hash.clone();
                 let count = vault
-                    .read_async(move |r| -> StateQueryResult<usize> {
-                        Ok(list_receipts(&r, &query_hash)?.len())
+                    .read_async({
+                        let query_hash = hash.clone();
+                        move |r| -> StateQueryResult<usize> {
+                            Ok(list_receipts(&r, &query_hash)?.len())
+                        }
                     })
                     .await
                     .unwrap();
@@ -70,9 +72,11 @@ async fn test_validation_receipt() {
 
     // Check alice has receipts from both bobbo and carol
     for hash in &ops {
-        let query_hash = hash.clone();
         let receipts: Vec<_> = vault
-            .read_async(move |r| list_receipts(&r, &query_hash))
+            .read_async({
+                let query_hash = hash.clone();
+                move |r| list_receipts(&r, &query_hash)
+            })
             .await
             .unwrap();
         assert_eq!(receipts.len(), 2);

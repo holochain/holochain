@@ -195,20 +195,24 @@ mod tests {
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
-        {
+        env.write_async({
             let put_vr1 = vr1.clone();
             let put_vr2 = vr2.clone();
-            env.write_async(move |txn| {
+
+            move |txn| {
                 add_if_unique(txn, put_vr1.clone())?;
                 add_if_unique(txn, put_vr1.clone())?;
                 add_if_unique(txn, put_vr2.clone())
-            })
-            .await?;
+            }
+        })
+        .await?;
 
+        env.write_async({
             let put_vr1 = vr1.clone();
-            env.write_async(move |txn| add_if_unique(txn, put_vr1))
-                .await?;
-        }
+
+            move |txn| add_if_unique(txn, put_vr1)
+        })
+        .await?;
 
         env.read_async(move |reader| -> DatabaseResult<()> {
             assert_eq!(2, count_valid(&reader, &test_op_hash).unwrap());

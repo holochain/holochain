@@ -425,13 +425,13 @@ async fn create_test_data(
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Extracting data {}", i);
         let db = cell.authored_db().clone();
-        let agent_pk = cell.agent_pubkey().clone();
         let data = db
-            .read_async(
+            .read_async({
+                let agent_pk = cell.agent_pubkey().clone();
                 move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, DhtOpHashed>> {
                     Ok(get_authored_ops(&txn, &agent_pk))
-                },
-            )
+                }
+            })
             .await
             .unwrap();
         let hashes = data.keys().cloned().collect::<Vec<_>>();
