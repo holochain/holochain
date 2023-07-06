@@ -563,6 +563,10 @@ where
         self.add_activity_into_cache(results).await
     }
 
+    #[deprecated(
+        since = "0.3.0-beta-dev.8",
+        note = "must not hold permits for longer than necessary"
+    )]
     /// Get all available databases.
     async fn get_databases(
         &self,
@@ -588,8 +592,10 @@ where
         Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
         <Q as holochain_state::prelude::Query>::Output: Send + 'static,
     {
+        // TODO This is the first point where permits are held
         let conns = self.get_databases().await?;
         let scratch = self.scratch.clone();
+        // TODO spawn blocking launches a thread but each database query is already running on a thread if we use read_async
         let results = tokio::task::spawn_blocking(move || {
             let mut conns = conns
                 .into_iter()
@@ -597,6 +603,7 @@ where
                 .collect::<DatabaseResult<Vec<_>>>()?;
             let mut txns = Vec::with_capacity(conns.len());
             for conn in &mut conns {
+                // TODO the txn is deferred anyway so we aren't actually picking a point in time to start reading from all dbs here
                 let txn = conn.transaction().map_err(StateQueryError::from)?;
                 txns.push(txn);
             }
@@ -618,6 +625,7 @@ where
         T: Send + 'static,
         F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + 'static,
     {
+        // TODO this can trivially be converted to use a `read_async` call
         let find = |permit, conn: Box<dyn PermittedConn + Send>, mut f: F| async move {
             tokio::task::spawn_blocking(move || {
                 let mut conn = conn.with_permit(permit)?;
