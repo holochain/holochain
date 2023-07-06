@@ -76,19 +76,19 @@ pub trait AsP2pStateTxExt {
 
 impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        self.with_reader(move |reader| reader.p2p_get_agent(agent))
+        self.execute_in_read_txn(move |reader| reader.p2p_get_agent(agent))
     }
 
     fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
-        self.with_reader(move |reader| reader.p2p_remove_agent(agent))
+        self.execute_in_read_txn(move |reader| reader.p2p_remove_agent(agent))
     }
 
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.with_reader(move |reader| reader.p2p_list_agents())
+        self.execute_in_read_txn(move |reader| reader.p2p_list_agents())
     }
 
     fn p2p_count_agents(&mut self) -> DatabaseResult<u32> {
-        self.with_reader(move |reader| reader.p2p_count_agents())
+        self.execute_in_read_txn(move |reader| reader.p2p_count_agents())
     }
 
     fn p2p_gossip_query_agents(
@@ -97,7 +97,9 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
         until_ms: u64,
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.with_reader(move |reader| reader.p2p_gossip_query_agents(since_ms, until_ms, arcset))
+        self.execute_in_read_txn(move |reader| {
+            reader.p2p_gossip_query_agents(since_ms, until_ms, arcset)
+        })
     }
 
     fn p2p_query_near_basis(
@@ -105,11 +107,11 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
         basis: u32,
         limit: u32,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
+        self.execute_in_read_txn(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
 
     fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
-        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(dht_arc_set))
+        self.execute_in_read_txn(move |reader| reader.p2p_extrapolated_coverage(dht_arc_set))
     }
 }
 
@@ -290,7 +292,7 @@ pub async fn p2p_put(
     signed: &AgentInfoSigned,
 ) -> DatabaseResult<()> {
     let record = P2pRecord::from_signed(signed)?;
-    db.async_commit(move |txn| tx_p2p_put(txn, record)).await
+    db.write_async(move |txn| tx_p2p_put(txn, record)).await
 }
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
@@ -304,7 +306,7 @@ pub async fn p2p_put_all(
         ns.push(s.clone());
         records.push(P2pRecord::from_signed(s)?);
     }
-    db.async_commit(move |txn| {
+    db.write_async(move |txn| {
         for s in ns {
             cache_get(&*txn)?.put(s)?;
         }
@@ -359,7 +361,7 @@ pub async fn p2p_prune(
         // where the delete doesn't run if the subquery returns no rows
         agent_list.extend_from_slice(&[0; 36]);
     }
-    db.async_commit(move |txn| {
+    db.write_async(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()

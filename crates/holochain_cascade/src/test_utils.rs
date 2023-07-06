@@ -20,7 +20,6 @@ use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindOp;
 use holochain_sqlite::db::DbKindT;
-use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations::insert_op;
@@ -317,55 +316,51 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
-pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = op.as_hash();
-            insert_op(txn, &op).unwrap();
-            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.as_hash();
+        insert_op(txn, &op).unwrap();
+        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
-pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = op.as_hash();
-            insert_op(txn, &op).unwrap();
-            set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
-            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.as_hash();
+        insert_op(txn, &op).unwrap();
+        set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
+        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
-pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = op.as_hash();
-            insert_op(txn, &op).unwrap();
-            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.as_hash();
+        insert_op(txn, &op).unwrap();
+        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 /// Insert ops into the authored database
-pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            insert_op(txn, &op).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        insert_op(txn, &op).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 #[async_trait::async_trait]

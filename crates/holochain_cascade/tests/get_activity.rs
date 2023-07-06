@@ -30,13 +30,13 @@ async fn get_activity() {
     let td = ActivityTestData::valid_chain_scenario();
 
     for hash_op in td.hash_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op);
+        fill_db(&authority.to_db(), hash_op).await;
     }
     for hash_op in td.noise_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op);
+        fill_db(&authority.to_db(), hash_op).await;
     }
     for hash_op in td.store_ops.iter().cloned() {
-        fill_db(&cache.to_db(), hash_op);
+        fill_db(&cache.to_db(), hash_op).await;
     }
 
     let options = holochain_p2p::actor::GetActivityOptions {

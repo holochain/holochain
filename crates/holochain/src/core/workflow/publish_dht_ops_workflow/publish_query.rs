@@ -40,7 +40,7 @@ where
         .unwrap_or(0);
 
     let results = db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let mut stmt = txn.prepare(
                 "
             SELECT
@@ -135,7 +135,6 @@ mod tests {
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_sqlite::db::DbWrite;
-    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;
@@ -172,7 +171,7 @@ mod tests {
     async fn publish_query() {
         holochain_trace::test_run().ok();
         let db = test_authored_db();
-        let expected = test_data(&db.to_db().into());
+        let expected = test_data(&db.to_db().into()).await;
         let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
@@ -188,7 +187,7 @@ mod tests {
         );
     }
 
-    fn create_and_insert_op(
+    async fn create_and_insert_op(
         db: &DbWrite<DbKindAuthored>,
         facts: Facts,
         consistent_data: &Consistent,
@@ -240,20 +239,23 @@ mod tests {
             ))
         };
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                let hash = state.as_hash().clone();
-                insert_op(txn, &state).unwrap();
+        db.write_async({
+            let query_state = state.clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let hash = query_state.as_hash().clone();
+                insert_op(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
-                DatabaseResult::Ok(())
-            })
-            .unwrap();
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
         state
     }
 
-    fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
+    async fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
         let mut results = Vec::new();
         let cd = Consistent {
             this_agent: fixt!(AgentPubKey),
@@ -271,7 +273,7 @@ mod tests {
             is_this_agent: true,
             store_entry: true,
         };
-        let op = create_and_insert_op(db, facts, &cd);
+        let op = create_and_insert_op(db, facts, &cd).await;
         results.push(op);
 
         // All facts are the same unless stated:
@@ -281,29 +283,29 @@ mod tests {
         let mut f = facts;
         f.private = true;
         f.store_entry = false;
-        let op = create_and_insert_op(db, f, &cd);
+        let op = create_and_insert_op(db, f, &cd).await;
         results.push(op);
 
         // We **don't** expect any of these in the results:
         // - Private: true.
         let mut f = facts;
         f.private = true;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         // - WithinMinPeriod: true.
         let mut f = facts;
         f.within_min_period = true;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         // - HasRequireReceipts: true.
         let mut f = facts;
         f.has_required_receipts = true;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         Expected {
             agent: cd.this_agent.clone(),

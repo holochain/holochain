@@ -42,13 +42,13 @@ pub trait AsP2pMetricStoreTxExt {
 
 impl AsP2pMetricStoreConExt for crate::db::PConnGuard {
     fn p2p_log_metrics(&mut self, metrics: Vec<MetricRecord>) -> DatabaseResult<()> {
-        use crate::db::WriteManager;
-        self.with_commit_sync(move |writer| writer.p2p_log_metrics(metrics))
+        // TODO may not call internal implementation!
+        self.execute_in_exclusive_rw_txn(move |writer| writer.p2p_log_metrics(metrics))
     }
 
     fn p2p_prune_metrics(&mut self) -> DatabaseResult<()> {
-        use crate::db::WriteManager;
-        self.with_commit_sync(move |writer| writer.p2p_prune_metrics())
+        // TODO may not call internal implementation!
+        self.execute_in_exclusive_rw_txn(move |writer| writer.p2p_prune_metrics())
     }
 }
 

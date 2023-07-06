@@ -244,7 +244,7 @@ impl Cell {
         let lives = self
             .space
             .authored_db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -320,7 +320,7 @@ impl Cell {
                 let _ = self
                     .space
                     .authored_db
-                    .async_commit(move |txn: &mut Transaction| {
+                    .write_async(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
@@ -732,7 +732,7 @@ impl Cell {
         let action: Option<SignedAction> = self
             .space
             .authored_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let h: Option<Vec<u8>> = txn
                     .query_row(
                         "SELECT Action.blob as action_blob
@@ -780,7 +780,7 @@ impl Cell {
 
         self.space
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 // Get the current count for this dhtop.
                 let receipt_count: usize = txn.query_row(
                     "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",

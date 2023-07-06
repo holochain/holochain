@@ -237,6 +237,7 @@ fn get_encryption_key_shim() -> [u8; 32] {
     ]
 }
 
+// TODO once `conn` has been removed from the public interface, this can be made pub(crate)
 /// Singleton Connection
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]

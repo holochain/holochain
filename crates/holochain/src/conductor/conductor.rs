@@ -583,7 +583,7 @@ mod dna_impls {
 
             // Load out all dna defs
             let (wasms, defs) = db
-                .async_reader(move |txn| {
+                .read_async(move |txn| {
                     // Get all the dna defs.
                     let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
                         .into_iter()
@@ -713,7 +713,7 @@ mod dna_impls {
 
             self.spaces
                 .wasm_db
-                .async_commit({
+                .write_async({
                     let zome_defs = zome_defs.clone();
                     move |txn| {
                         for dna_wasm in wasms {
@@ -920,7 +920,7 @@ mod network_impls {
                     .get_or_create_dht_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let dht_bytes_received = dht_db
-                    .async_reader({
+                    .read_async({
                         move |txn| {
                             txn.query_row_and_then(
                                 SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
@@ -935,7 +935,7 @@ mod network_impls {
                     .get_or_create_cache_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let cache_bytes_received = cache_db
-                    .async_reader(move |txn| {
+                    .read_async(move |txn| {
                         txn.query_row_and_then(
                             SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
                             params![last_time_queried.as_micros()],
@@ -1017,27 +1017,27 @@ mod network_impls {
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
                 authored_data_size_on_disk: authored_db
-                    .async_reader(get_size_on_disk)
+                    .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 authored_data_size: authored_db
-                    .async_reader(get_used_size)
+                    .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 dht_data_size_on_disk: dht_db
-                    .async_reader(get_size_on_disk)
+                    .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 dht_data_size: dht_db
-                    .async_reader(get_used_size)
+                    .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 cache_data_size_on_disk: cache_db
-                    .async_reader(get_size_on_disk)
+                    .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 cache_data_size: cache_db
-                    .async_reader(get_used_size)
+                    .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 used_by: used_by.clone(),
@@ -1900,7 +1900,7 @@ mod app_status_impls {
                 .map(|(cell_id, cell)| async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
+                    let maybe_agent_info = match p2p_agents_db.read_async(move |tx| {
                         tx.p2p_get_agent(&kagent)
                     }).await {
                         Ok(maybe_info) => maybe_info,
@@ -2117,7 +2117,7 @@ mod scheduler_impls {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
             let tasks = self.spaces.get_from_spaces(|space| {
                 let db = space.authored_db.clone();
-                async move { db.async_commit(delete_all_ephemeral_scheduled_fns).await }
+                async move { db.write_async(delete_all_ephemeral_scheduled_fns).await }
             });
 
             futures::future::join_all(tasks).await;
@@ -2547,21 +2547,21 @@ impl Conductor {
                     self.spaces
                         .authored_db(dna_hash)
                         .unwrap()
-                        .async_commit(|txn| {
+                        .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .async_commit(|txn| {
+                        .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .async_commit(|txn| {
+                        .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
@@ -2948,7 +2948,7 @@ pub async fn integration_dump(
     vault: &DbRead<DbKindDht>,
 ) -> ConductorApiResult<IntegrationStateDump> {
     vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let integrated = txn.query_row(
                 "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
                 [],
@@ -2985,7 +2985,7 @@ pub async fn full_integration_dump(
     dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<FullIntegrationStateDump> {
     vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let integrated =
                 query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
 

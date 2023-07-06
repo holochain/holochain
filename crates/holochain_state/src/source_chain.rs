@@ -128,9 +128,12 @@ pub struct SourceChainJsonRecord {
 /// Writable functions for a source chain with write access.
 impl SourceChain {
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
-        let author = self.author.clone();
         self.vault
-            .async_commit(move |txn| unlock_chain(txn, &author))
+            .write_async({
+                let author = self.author.clone();
+
+                move |txn| unlock_chain(txn, &author)
+            })
             .await?;
         Ok(())
     }
@@ -153,7 +156,7 @@ impl SourceChain {
 
         let countersigning_agent_state = self
             .vault
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
@@ -346,7 +349,7 @@ impl SourceChain {
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
         match self
             .vault
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
@@ -471,7 +474,7 @@ where
         let author = Arc::new(author);
         let head_info = Some(
             vault
-                .async_reader({
+                .read_async({
                     let author = author.clone();
                     move |txn| chain_head_db_nonempty(&txn, author)
                 })
@@ -504,7 +507,7 @@ where
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
         let head_info = vault
-            .async_reader({
+            .read_async({
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
             })
@@ -639,7 +642,7 @@ where
         // remote caller
         let maybe_cap_grant: Option<CapGrant> = self
             .vault
-            .async_reader({
+            .read_async({
                 let agent_pubkey = self.agent_pubkey().clone();
                 move |txn| -> Result<_, DatabaseError> {
                     // closure to process resulting rows from query
@@ -733,7 +736,7 @@ where
         let public_only = self.public_only;
         let mut records = self
             .vault
-            .async_reader({
+            .read_async({
                 let query = query.clone();
                 move |txn| {
                     let mut sql = "
@@ -913,7 +916,7 @@ where
         let author = self.author.clone();
         Ok(self
             .vault
-            .async_reader(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
+            .read_async(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
             .await?)
     }
 
@@ -1117,7 +1120,7 @@ pub async fn genesis(
     }
 
     let ops_to_integrate = authored
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
             ops_to_integrate.extend(source_chain::put_raw(
                 txn,
@@ -1237,9 +1240,13 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
         action: prev_action,
         seq: last_action_seq,
         ..
-    } = fresh_reader_test!(vault, |txn| {
-        chain_head_db_nonempty(&txn, author.clone())
-    })?;
+    } = vault
+        .read_async({
+            let query_author = author.clone();
+
+            move |txn| chain_head_db_nonempty(&txn, query_author.clone())
+        })
+        .await?;
     let action_seq = last_action_seq + 1;
 
     let common = ActionBuilderCommon {
@@ -1256,27 +1263,31 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
-    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-        let head_info = chain_head_db_nonempty(txn, author.clone())?;
-        if head_info.action != prev_action {
-            let entries = match (entry, action.action().entry_hash()) {
-                (Some(e), Some(entry_hash)) => {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e,
-                        entry_hash.clone(),
-                    )]
+    vault
+        .write_async(
+            move |txn: &mut Transaction| -> SourceChainResult<Vec<DhtOpHash>> {
+                let head_info = chain_head_db_nonempty(txn, author.clone())?;
+                if head_info.action != prev_action {
+                    let entries = match (entry, action.action().entry_hash()) {
+                        (Some(e), Some(entry_hash)) => {
+                            vec![holochain_types::EntryHashed::with_pre_hashed(
+                                e,
+                                entry_hash.clone(),
+                            )]
+                        }
+                        _ => vec![],
+                    };
+                    return Err(SourceChainError::HeadMoved(
+                        vec![action],
+                        entries,
+                        Some(prev_action),
+                        Some(head_info),
+                    ));
                 }
-                _ => vec![],
-            };
-            return Err(SourceChainError::HeadMoved(
-                vec![action],
-                entries,
-                Some(prev_action),
-                Some(head_info),
-            ));
-        }
-        SourceChainResult::Ok(put_raw(txn, action, ops, entry)?)
-    })?;
+                Ok(put_raw(txn, action, ops, entry)?)
+            },
+        )
+        .await?;
     Ok(hash)
 }
 
@@ -1286,7 +1297,7 @@ pub async fn dump_state(
     author: AgentPubKey,
 ) -> Result<SourceChainJsonDump, SourceChainError> {
     Ok(vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let records = txn
                 .prepare(
                     "
@@ -1439,7 +1450,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1450,7 +1461,7 @@ pub mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1458,7 +1469,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1558,7 +1569,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1571,7 +1582,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 chain_head_db_nonempty(&txn, author_2.clone())
             })
             .await?;
@@ -1580,7 +1591,7 @@ pub mod tests {
         assert_ne!(head.action, old_h2);
         assert_eq!(head.seq, 4);
 
-        fresh_reader_test!(db, |txn| {
+        db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
             let store = Txn::from(&txn);
             let h1_record_entry_fetched = store
@@ -1597,7 +1608,10 @@ pub mod tests {
                 .1;
             assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
             assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
-        });
+
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }
@@ -1974,9 +1988,18 @@ pub mod tests {
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
-        fresh_reader_test!(vault, |txn| {
-            assert_matches!(chain_head_db(&txn, author.clone()), Ok(None));
-        });
+        vault
+            .read_async({
+                let query_author = author.clone();
+
+                move |txn| -> DatabaseResult<()> {
+                    assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
         genesis(
             vault.clone().into(),
             dht_db.to_db(),
@@ -2019,24 +2042,37 @@ pub mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
-        fresh_reader_test!(vault, |txn| {
-            assert_eq!(
-                chain_head_db_nonempty(&txn, author.clone()).unwrap().action,
-                h2
-            );
-            // get the full record
-            let store = Txn::from(&txn);
-            let h1_record_fetched = store
-                .get_record(&h1.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            let h2_record_fetched = store
-                .get_record(&h2.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            assert_eq!(h1, *h1_record_fetched.action_address());
-            assert_eq!(h2, *h2_record_fetched.action_address());
-        });
+        vault
+            .read_async({
+                let check_h1 = h1.clone();
+                let check_h2 = h2.clone();
+                let check_author = author.clone();
+
+                move |txn| -> DatabaseResult<()> {
+                    assert_eq!(
+                        chain_head_db_nonempty(&txn, check_author.clone())
+                            .unwrap()
+                            .action,
+                        check_h2
+                    );
+                    // get the full record
+                    let store = Txn::from(&txn);
+                    let h1_record_fetched = store
+                        .get_record(&check_h1.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    let h2_record_fetched = store
+                        .get_record(&check_h2.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    assert_eq!(check_h1, *h1_record_fetched.action_address());
+                    assert_eq!(check_h2, *h2_record_fetched.action_address());
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
 
         // check that you can iterate on the chain
         let source_chain = SourceChain::new(
