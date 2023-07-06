@@ -49,7 +49,7 @@ pub async fn authored_ops_to_dht_db_without_check(
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
     let ops = authored_db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             for hash in hashes {
                 // This function filters out any private entries from ops
                 // or store entry ops with private entries.
@@ -62,7 +62,7 @@ pub async fn authored_ops_to_dht_db_without_check(
         .await?;
     let mut activity = Vec::new();
     let activity = dht_db
-        .async_commit(|txn| {
+        .write_async(|txn| {
             for op in ops {
                 if let Some(op) = insert_locally_validated_op(txn, op)? {
                     activity.push(op);

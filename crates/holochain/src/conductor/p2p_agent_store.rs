@@ -57,7 +57,7 @@ pub async fn p2p_put_all_batch(
         let mut responses = Vec::with_capacity(batch.len());
         let (tx, rx) = tokio::sync::oneshot::channel();
         let result = env
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 'batch: for P2pBatch {
                     peer_data: batch,
                     result_sender: response,
@@ -106,7 +106,7 @@ pub async fn p2p_put_all_batch(
 pub async fn all_agent_infos(
     env: DbRead<DbKindP2pAgents>,
 ) -> StateQueryResult<Vec<AgentInfoSigned>> {
-    env.async_reader(|r| Ok(r.p2p_list_agents()?)).await
+    env.read_async(|r| Ok(r.p2p_list_agents()?)).await
 }
 
 /// Helper function to get a single agent info
@@ -116,8 +116,7 @@ pub async fn get_single_agent_info(
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
     let agent = agent.to_kitsune();
-    env.async_reader(move |r| Ok(r.p2p_get_agent(&agent)?))
-        .await
+    env.read_async(move |r| Ok(r.p2p_get_agent(&agent)?)).await
 }
 
 /// Share all current agent infos known to all provided peer dbs with each other.

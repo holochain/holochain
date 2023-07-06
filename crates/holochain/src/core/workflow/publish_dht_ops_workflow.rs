@@ -76,7 +76,7 @@ pub async fn publish_dht_ops_workflow(
     tracing::info!("published {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     let continue_publish = db
-        .async_commit(move |writer| {
+        .write_async(move |writer| {
             for hash in success {
                 use holochain_p2p::DhtOpHashExt;
                 let hash = DhtOpHash::from_kitsune(hash.data_ref());
@@ -135,9 +135,7 @@ mod tests {
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::*;
-    use rusqlite::Transaction;
     use std::collections::HashMap;
-    use std::convert::TryInto;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
@@ -166,23 +164,26 @@ mod tests {
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
+        db.write_async({
+            let query_author = author.clone();
+
+            move |txn| -> StateMutationResult<()> {
                 for _ in 0..num_hash {
                     // Create data for op
                     let sig = sig_fixt.next().unwrap();
                     let mut link_add = link_add_fixt.next().unwrap();
-                    link_add.author = author.clone();
+                    link_add.author = query_author.clone();
                     // Create DhtOp
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
                     mutations::insert_op(txn, &op_hashed)?;
                 }
-                StateMutationResult::Ok(())
-            })
-            .unwrap();
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
 
         // Create cell data
         let dna = fixt!(DnaHash);
@@ -294,16 +295,18 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                fresh_reader_test!(db, |txn: Transaction| {
-                    let unpublished_ops: bool = txn
-                        .query_row(
-                            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
-                            [],
-                            |row| row.get(0),
-                        )
-                        .unwrap();
+                db.read_async(move |txn| -> DatabaseResult<()> {
+                    let unpublished_ops: bool = txn.query_row(
+                        "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
+                        [],
+                        |row| row.get(0),
+                    )?;
                     assert!(!unpublished_ops);
+
+                    Ok(())
                 })
+                .await
+                .unwrap()
             };
 
             // Shutdown
@@ -337,13 +340,12 @@ mod tests {
                 setup(db.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
-            db.conn()
-                .unwrap()
-                .with_commit_test(|txn| {
-                    txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
-                        .unwrap();
-                })
-                .unwrap();
+            db.write_async(move |txn| -> DatabaseResult<()> {
+                txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])?;
+                Ok(())
+            })
+            .await
+            .unwrap();
 
             // Call the workflow
             call_workflow(db.clone().into(), dna_network, author).await;
@@ -465,15 +467,13 @@ mod tests {
                     .unwrap();
 
                 source_chain.flush(&dna_network).await.unwrap();
-                let (entry_create_action, entry_update_action) = db
-                    .conn()
-                    .unwrap()
-                    .with_commit_test(|writer| {
+                let (entry_create_action, entry_update_action) = db.write_async(move |writer| -> StateQueryResult<(SignedActionHashed, SignedActionHashed)> {
                         let store = Txn::from(writer);
                         let ech = store.get_action(&original_action_address).unwrap().unwrap();
                         let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
-                        (ech, euh)
+                        Ok((ech, euh))
                     })
+                    .await
                     .unwrap();
 
                 // Gather the expected op hashes, ops and basis

@@ -15,10 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
-use tokio::{
-    sync::{OwnedSemaphorePermit, Semaphore},
-    task,
-};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 mod p2p_agent_store;
 pub use p2p_agent_store::*;
@@ -33,17 +30,11 @@ static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 /// both implement read access.
 pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
     /// Run an async read transaction on a background thread.
-    async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static;
-
-    /// Run an sync read transaction on a the current thread.
-    fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(Transaction) -> Result<R, E>;
 
     /// Access the kind of database.
     fn kind(&self) -> &Kind;
@@ -51,23 +42,14 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
-    async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let db: &DbRead<Kind> = self.as_ref();
-        DbRead::async_reader(db, f).await
-    }
-
-    fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(Transaction) -> Result<R, E>,
-    {
-        let db: &DbRead<Kind> = self.as_ref();
-        db.sync_reader(f)
+        DbRead::read_async(db, f).await
     }
 
     fn kind(&self) -> &Kind {
@@ -77,27 +59,20 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
-    async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        DbRead::async_reader(self, f).await
-    }
-
-    fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(Transaction) -> Result<R, E>,
-    {
-        self.conn()?.with_reader(f)
+        DbRead::read_async(self, f).await
     }
 
     fn kind(&self) -> &Kind {
         &self.kind
     }
 }
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
@@ -107,6 +82,7 @@ pub struct DbRead<Kind: DbKindT> {
     connection_pool: ConnectionPool,
     write_semaphore: Arc<Semaphore>,
     read_semaphore: Arc<Semaphore>,
+    statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
 }
@@ -128,6 +104,10 @@ pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit)
 
 pub struct PConnPermit(OwnedSemaphorePermit);
 
+// #[deprecated(
+//     since = "0.3.0-beta-dev.5",
+//     note = "Use `read_async` or `write_async` instead"
+// )]
 pub trait PermittedConn {
     fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
 }
@@ -145,11 +125,21 @@ impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
 }
 
 impl<Kind: DbKindT> DbRead<Kind> {
-    // TODO should not be public, it is only used internally and by tests
+    // TODO should not be public, it is only used internally and by tests. Tests should just move to use the read/write trait methods.
+    // #[deprecated(
+    //     since = "0.3.0-beta-dev.5",
+    //     note = "Use `read_async` or `write_async` instead"
+    // )]
+    #[cfg(feature = "test_utils")]
     pub fn conn(&self) -> DatabaseResult<PConn> {
-        self.connection_pooled()
+        self.get_connection_from_pool()
     }
 
+    // TODO don't get a permit directly because it must not be held for too long, use the read/write trait methods.
+    // #[deprecated(
+    //     since = "0.3.0-beta-dev.5",
+    //     note = "Use `read_async` or `write_async` instead"
+    // )]
     pub async fn conn_permit<E>(&self) -> Result<PConnPermit, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -168,19 +158,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         &self.path
     }
 
-    /// Get a connection from the pool.
-    /// TODO: We should eventually swap this for an async solution.
-    fn connection_pooled(&self) -> DatabaseResult<PConn> {
-        let now = std::time::Instant::now();
-        let r = Ok(PConn::new(self.connection_pool.get()?));
-        let el = now.elapsed();
-        if el.as_millis() > 20 {
-            tracing::error!("Connection pool took {:?} to be free'd", el);
-        }
-        r
-    }
-
-    pub async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
+    pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
@@ -201,10 +179,26 @@ impl<Kind: DbKindT> DbRead<Kind> {
         let _g = self.acquire_reader_permit().await?;
         self.num_readers
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-        let mut conn = self.conn()?;
-        let r = tokio::task::spawn_blocking(move || conn.with_reader(f))
+
+        let mut conn = self.get_connection_from_pool()?;
+        if self.statement_trace_fn.is_some() {
+            conn.trace(self.statement_trace_fn);
+        }
+        let r = tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
             .await
             .map_err(DatabaseError::from)?;
+        r
+    }
+
+    /// Get a connection from the pool.
+    /// TODO: We should eventually swap this for an async solution.
+    fn get_connection_from_pool(&self) -> DatabaseResult<PConn> {
+        let now = std::time::Instant::now();
+        let r = Ok(PConn::new(self.connection_pool.get()?));
+        let el = now.elapsed();
+        if el.as_millis() > 20 {
+            tracing::error!("Connection pool took {:?} to be free'd", el);
+        }
         r
     }
 
@@ -240,26 +234,21 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
 
-    // TODO this isn't even used?
-    pub async fn conn_write_permit(&self) -> PConnPermit {
-        let g = self.acquire_writer_permit().await;
-        PConnPermit(g)
-    }
-
     pub fn open_with_sync_level(
         path_prefix: &Path,
         kind: Kind,
         sync_level: DbSyncLevel,
     ) -> DatabaseResult<Self> {
         DATABASE_HANDLES.get_or_insert(&kind, path_prefix, |kind| {
-            Self::new(Some(path_prefix), kind, sync_level)
+            Self::new(Some(path_prefix), kind, sync_level, None)
         })
     }
 
-    pub(crate) fn new(
+    pub fn new(
         path_prefix: Option<&Path>,
         kind: Kind,
         sync_level: DbSyncLevel,
+        statement_trace_fn: Option<fn(&str)>,
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
             Some(path_prefix) => {
@@ -327,7 +316,45 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             kind,
             path: path.unwrap_or_default(),
             connection_pool: pool,
+            statement_trace_fn,
         }))
+    }
+
+    pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            self.acquire_writer_permit(),
+        )
+        .await
+        .map_err(DatabaseError::from)?;
+
+        let mut conn = self.get_connection_from_pool()?;
+        let r = tokio::task::spawn_blocking(move || conn.execute_in_exclusive_rw_txn(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    pub fn available_writer_count(&self) -> usize {
+        self.write_semaphore.available_permits()
+    }
+
+    pub fn available_reader_count(&self) -> usize {
+        self.read_semaphore.available_permits()
+    }
+
+    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
+        self.0
+            .write_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
     }
 
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
@@ -352,26 +379,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(Some(path), kind, DbSyncLevel::default())
+        Self::new(Some(path), kind, DbSyncLevel::default(), None)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
-        Self::new(None, kind, DbSyncLevel::default())
-    }
-
-    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
-        R: Send + 'static,
-    {
-        let _g = self.acquire_writer_permit().await;
-        let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
+        Self::new(None, kind, DbSyncLevel::default(), None)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -380,30 +393,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         F: FnOnce(&mut Transaction) -> R,
     {
         let mut conn = self.conn().expect("Failed to open connection");
-        conn.with_commit_test(f)
+        conn.execute_in_exclusive_rw_txn(|w| DatabaseResult::Ok(f(w)))
             .expect("Database transaction failed")
-    }
-
-    // TODO never used and has a warning that you need to be careful with it, remove?
-    /// If possible prefer async_commit as this is slower and can starve chained futures.
-    pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(&mut Transaction) -> Result<R, E>,
-        R: Send,
-    {
-        let _g = self.acquire_writer_permit().await;
-        let mut conn = self.conn()?;
-        task::block_in_place(move || conn.with_commit_sync(f))
-    }
-
-    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
-        self.0
-            .write_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
     }
 }
 
@@ -617,48 +608,8 @@ impl DbKindT for DbKindP2pMetrics {
     }
 }
 
-/// Implementors are able to create a new read-only DB transaction
-pub trait ReadManager<'e> {
-    /// Run a closure, passing in a new read-only transaction
-    fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: 'e + FnOnce(Transaction) -> Result<R, E>;
-
-    #[cfg(feature = "test_utils")]
-    /// Same as with_reader, but with no Results: everything gets unwrapped
-    fn with_reader_test<R, F>(&'e mut self, f: F) -> R
-    where
-        F: 'e + FnOnce(Transaction) -> R;
-}
-
-/// Implementors are able to create a new read-write DB transaction
-pub trait WriteManager<'e> {
-    /// Run a closure, passing in a mutable reference to a read-write
-    /// transaction, and commit the transaction after the closure has run.
-    /// If there is a SQLite error, recover from it and re-run the closure.
-    // FIXME: B-01566: implement write failure detection
-    fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: 'e + FnOnce(&mut Transaction) -> Result<R, E>;
-
-    // /// Get a raw read-write transaction for this environment.
-    // /// It is preferable to use WriterManager::with_commit for database writes,
-    // /// which can properly recover from and manage write failures
-    // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
-
-    #[cfg(any(test, feature = "test_utils"))]
-    fn with_commit_test<R, F>(&'e mut self, f: F) -> Result<R, DatabaseError>
-    where
-        F: 'e + FnOnce(&mut Transaction) -> R,
-    {
-        self.with_commit_sync(|w| DatabaseResult::Ok(f(w)))
-    }
-}
-
 impl<'e> PConn {
-    fn with_reader<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    fn execute_in_read_txn<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(Transaction) -> Result<R, E>,
@@ -674,18 +625,11 @@ impl<'e> PConn {
         f(txn)
     }
 
-    #[cfg(feature = "test_utils")]
-    pub fn with_reader_test<R, F>(&'e mut self, f: F) -> R
-    where
-        F: 'e + FnOnce(Transaction) -> R,
-    {
-        self.with_reader(|r| DatabaseResult::Ok(f(r))).unwrap()
-    }
-}
-
-impl<'e> WriteManager<'e> for PConn {
-    #[cfg(feature = "test_utils")]
-    fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
+    /// Run a closure, passing in a mutable reference to a read-write
+    /// transaction, and commit the transaction after the closure has run.
+    /// If there is a SQLite error, recover from it and re-run the closure.
+    // FIXME: B-01566: implement write failure detection
+    fn execute_in_exclusive_rw_txn<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
         F: 'e + FnOnce(&mut Transaction) -> Result<R, E>,
@@ -693,7 +637,6 @@ impl<'e> WriteManager<'e> for PConn {
         let mut txn = self
             .transaction_with_behavior(TransactionBehavior::Exclusive)
             .map_err(DatabaseError::from)?;
-        // TODO does not offload blocking work
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)

@@ -175,7 +175,7 @@ async fn app_validation_workflow_inner(
         );
         let (t, a, r, activity) = workspace
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut rejected = 0;

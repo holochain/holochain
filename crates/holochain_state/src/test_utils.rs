@@ -14,9 +14,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-use crate::prelude::Store;
-use crate::prelude::Txn;
-
 pub mod mutations_helpers;
 
 #[cfg(test)]
@@ -370,38 +367,6 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
-}
-
-/// Helper to get a [`Store`] from an [`DbRead`].
-pub fn fresh_store_test<F, R, K>(env: &DbRead<K>, f: F) -> R
-where
-    F: FnOnce(&dyn Store) -> R,
-    K: DbKindT,
-{
-    fresh_reader_test!(env, |txn| {
-        let store = Txn::from(&txn);
-        f(&store)
-    })
-}
-
-/// Function to help avoid needing to specify types.
-pub fn fresh_reader_test<E, F, R, K>(env: E, f: F) -> R
-where
-    E: Into<DbRead<K>>,
-    F: FnOnce(Transaction) -> R,
-    K: DbKindT,
-{
-    fresh_reader_test!(&env.into(), f)
-}
-
-/// Function to help avoid needing to specify types.
-pub fn print_stmts_test<E, F, R, K>(env: E, f: F) -> R
-where
-    E: Into<DbRead<K>>,
-    F: FnOnce(Transaction) -> R,
-    K: DbKindT,
-{
-    holochain_sqlite::print_stmts_test!(&env.into(), f)
 }
 
 #[tracing::instrument(skip(txn))]
