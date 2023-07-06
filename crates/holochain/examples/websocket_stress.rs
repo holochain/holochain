@@ -1,19 +1,17 @@
-use holochain::{
-    conductor::{
-        api::{AdminRequest, AdminResponse},
-        Conductor,
-    },
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
+use holochain::conductor::{
+    api::{AdminRequest, AdminResponse},
+    Conductor,
 };
-use tempfile::TempDir;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use holochain_websocket::WireMessage;
+use tempfile::TempDir;
 use tokio_tungstenite::*;
 use tungstenite::Message;
-use futures::sink::SinkExt;
-use futures::stream::StreamExt;
-use holochain_websocket::WireMessage;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -78,16 +76,25 @@ pub async fn main() {
 }
 
 async fn run_client(port: u16, wait: u64, is_bad: bool) {
-    let req: Vec<u8> = hsb::UnsafeBytes::from(hsb::encode(&AdminRequest::ListDnas).unwrap()).try_into().unwrap();
+    let req: Vec<u8> = hsb::UnsafeBytes::from(hsb::encode(&AdminRequest::ListDnas).unwrap())
+        .try_into()
+        .unwrap();
 
     loop {
-        let (mut client, _) = connect_async(format!("ws://127.0.0.1:{}", port)).await.unwrap();
+        let (mut client, _) = connect_async(format!("ws://127.0.0.1:{}", port))
+            .await
+            .unwrap();
         CONS_MADE.fetch_add(1, Ordering::Relaxed);
 
         for _ in 0..5 {
             let this_id = ID.fetch_add(1, Ordering::Relaxed);
-            let msg = WireMessage::Request { id: this_id, data: req.clone() };
-            let msg: Vec<u8> = hsb::UnsafeBytes::from(hsb::encode(&msg).unwrap()).try_into().unwrap();
+            let msg = WireMessage::Request {
+                id: this_id,
+                data: req.clone(),
+            };
+            let msg: Vec<u8> = hsb::UnsafeBytes::from(hsb::encode(&msg).unwrap())
+                .try_into()
+                .unwrap();
 
             client.send(Message::Binary(msg)).await.unwrap();
 
