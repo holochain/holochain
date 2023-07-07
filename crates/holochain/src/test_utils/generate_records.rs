@@ -1,3 +1,4 @@
+use contrafact::Fact;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_types::record::SignedActionHashedExt;
@@ -14,28 +15,26 @@ pub async fn valid_arbitrary_chain<'a>(
 ) -> Vec<Record> {
     let fact = contrafact::facts![
         holochain_zome_types::record::facts::action_and_entry_match(false),
-        contrafact::lens(
+        contrafact::lens1(
             "action is valid",
             |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain(author),
+            holochain_zome_types::action::facts::valid_chain_action(author),
         ),
     ];
 
-    let chain: Vec<Record> =
-        futures::future::join_all(contrafact::build_seq(g, n, fact).into_iter().map(
-            |(a, entry)| {
-                let keystore = keystore.clone();
-                async move {
-                    Record::new(
-                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                            .await
-                            .unwrap(),
-                        entry.into_option(),
-                    )
-                }
-            },
-        ))
-        .await;
+    let pairs = contrafact::vec_of_length(n, fact).build(g);
+    let chain: Vec<Record> = futures::future::join_all(pairs.into_iter().map(|(a, entry)| {
+        let keystore = keystore.clone();
+        async move {
+            Record::new(
+                SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
+                    .await
+                    .unwrap(),
+                entry.into_option(),
+            )
+        }
+    }))
+    .await;
 
     chain
 }

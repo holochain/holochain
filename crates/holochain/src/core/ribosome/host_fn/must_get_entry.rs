@@ -153,13 +153,13 @@ pub mod test {
             record_entry,
         ));
         dht_db
-            .conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)
-                    .unwrap();
-                set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)
+            .write_async(move |txn| -> StateMutationResult<()> {
+                set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)?;
+                set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)?;
+
+                Ok(())
             })
+            .await
             .unwrap();
 
         // Must get entry returns the entry if it exists regardless of the

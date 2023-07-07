@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+- Fixes race condition which caused network instability. Newly joined nodes can get temporarily blocked by other nodes, causing connections to be repeatedly dropped. [\#2534](https://github.com/holochain/holochain/pull/2534)
+
 ## 0.3.0-beta-dev.6
 
 ## 0.3.0-beta-dev.5

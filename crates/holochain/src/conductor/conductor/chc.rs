@@ -25,7 +25,7 @@ impl Conductor {
             let db = self.get_authored_db(cell_id.dna_hash())?;
             let author = cell_id.agent_pubkey().clone();
             let top_hash = db
-                .async_reader(move |txn| {
+                .read_async(move |txn| {
                     SourceChainResult::Ok(chain_head_db(&txn, Arc::new(author))?.map(|h| h.action))
                 })
                 .await?;

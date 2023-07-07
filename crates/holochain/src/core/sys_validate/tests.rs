@@ -46,7 +46,7 @@ use holochain_cascade::MockCascade;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::prelude::fresh_reader_test;
+use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
@@ -671,23 +671,29 @@ async fn incoming_ops_filters_private_entry() {
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(record.clone()).await.unwrap();
-    let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
-            .unwrap()
-    });
+    let num_ops: usize = vault
+        .read_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?)
+        })
+        .await
+        .unwrap();
     assert_eq!(num_ops, 0);
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_record(record.clone()).await.unwrap();
-    let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
-            .unwrap()
-    });
+    let num_ops: usize = vault
+        .read_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?)
+        })
+        .await
+        .unwrap();
     assert_eq!(num_ops, 1);
-    let num_entries: usize = fresh_reader_test(vault.clone(), |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))
-            .unwrap()
-    });
+    let num_entries: usize = vault
+        .read_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))?)
+        })
+        .await
+        .unwrap();
     assert_eq!(num_entries, 0);
 }
 

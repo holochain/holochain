@@ -167,7 +167,7 @@ impl KitsuneHost for KitsuneHostImpl {
         let db = self.spaces.p2p_agents_db(&dna_hash);
         async move {
             Ok(db?
-                .async_commit(move |txn| txn.p2p_remove_agent(&agent))
+                .write_async(move |txn| txn.p2p_remove_agent(&agent))
                 .await?)
         }
         .boxed()
@@ -262,7 +262,7 @@ impl KitsuneHost for KitsuneHostImpl {
         async move {
             let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
             let results = db
-                .async_commit(move |txn| {
+                .write_async(move |txn| {
                     let mut out = Vec::new();
                     for op_hash in op_hash_list {
                         let op_hash = DhtOpHash::from_kitsune(&op_hash);

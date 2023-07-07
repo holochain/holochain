@@ -150,7 +150,11 @@ async fn app_validation_workflow_inner(
     let jh = tokio::spawn(async move {
         while let Some(op) = iter.next().await {
             // Send the result to task that will commit to the database.
-            if tx.send(op).await.is_err() {
+            if tx
+                .send_timeout(op, std::time::Duration::from_secs(10))
+                .await
+                .is_err()
+            {
                 tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
                 break;
             }
@@ -171,7 +175,7 @@ async fn app_validation_workflow_inner(
         );
         let (t, a, r, activity) = workspace
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut rejected = 0;
