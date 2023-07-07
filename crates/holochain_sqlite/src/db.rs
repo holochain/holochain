@@ -361,7 +361,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
-            long_read_semaphore: Self::get_read_semaphore(kind.kind()),
+            long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
             max_readers: num_read_threads() * 2,
             num_readers: Arc::new(AtomicUsize::new(0)),
             kind,
@@ -418,6 +418,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     }
 
     fn get_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
+        static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
+            once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+        MAP.lock()
+            .entry(kind)
+            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .clone()
+    }
+
+    fn get_long_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
         MAP.lock()
