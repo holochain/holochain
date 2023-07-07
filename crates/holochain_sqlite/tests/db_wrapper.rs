@@ -248,7 +248,7 @@ async fn get_read_txn_respects_reader_permit_limits() {
     let check_task = tokio::spawn(async move {
         let tmp_read_txns_spawned = read_txns_spawned.clone();
 
-        // Ensure all `async_reader` tasks have actually started
+        // Ensure all read txn tasks have actually started
         tokio::time::timeout(std::time::Duration::from_secs(1), async move {
             while read_txns_spawned.load(Ordering::SeqCst) < num_readers {
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
