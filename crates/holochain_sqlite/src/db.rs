@@ -265,9 +265,9 @@ impl<Kind: DbKindT> DbRead<Kind> {
             Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => {
                 tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);
-                Err(DatabaseError::Other(e.into()).into())
+                Err(DatabaseError::Other(e.into()))
             }
-            Err(e) => Err(DatabaseError::Timeout(e).into()),
+            Err(e) => Err(DatabaseError::Timeout(e)),
         }
     }
 }
