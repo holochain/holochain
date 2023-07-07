@@ -790,11 +790,11 @@ impl<'borrow, 'txn> DbScratch<'borrow, 'txn> {
         }
     }
 
-    pub fn new_with_handles(, scratch: &'borrow Scratch) -> Self {
+    pub fn new_with_handles(scratch: &'borrow Scratch) -> Self {
         Self {
             // TODO don't hold onto my transactions please
             // This converts raw transactions into Txn types
-            txns: txns.into(),
+            txns: Txns { txns: vec![] },
             scratch,
         }
     }
