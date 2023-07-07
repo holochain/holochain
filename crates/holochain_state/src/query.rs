@@ -115,17 +115,10 @@ pub trait Query: Clone {
         S: Stores<Self>,
         S: Store,
     {
-        // TODO immediately filters the scratch data and prepares statements for the databases. This is about as much checking
-        //      as we could do up front that the queries are good. But really they should all be unit tested.
-        //      How important is this?
         let mut stores_iter = stores.get_initial_data(self.clone())?;
-        // TODO This iterator is sneakily executing the statements and using the `as_map` of the Query
         let iter = stores_iter.iter()?;
         let result = iter.fold(self.init_fold()?, |state, i| self.fold(state, i))?;
-        // TODO what is this actually dropping? The prepared statements and filtered scratch data? I guess that cleans up a bit sooner than it otherwise would.
-        //      Yes it is that, so probably not that important.
         drop(stores_iter);
-        // TODO so this is actually passing the txns forward to the render. Somebody must use that but why and how much refactoring would it be to switch to read_async?
         self.render(result, stores)
     }
 
@@ -158,8 +151,6 @@ pub trait PrivateDataQuery {
     fn without_private_data_access(hash: Self::Hash) -> Self;
 }
 
-// TODO This is used as a transparent query interface that can access one or more stores. `Store` isn't really a good name
-//      for that. Ideally it'd be clearer it's a query interface.
 pub trait Store {
     /// Get an [`Entry`] from this store.
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>>;
@@ -247,8 +238,6 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     }
 }
 
-// TODO this is implemented directly on the Txn type but if that was renamed and held a db handle instead then
-//      this logic should all hold together perfectly well
 impl<'stmt> Store for Txn<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         get_entry_from_db(self.txn, hash)
@@ -683,12 +672,7 @@ where
 
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
         Ok(DbScratchIter {
-            // TODO This is just doing the initial statement prepare on each database. It's probably sensible to do this up front
-            //      but it could be delayed until the first use. Are queries ever run multiple times? Or could the prepare be done right before it's used?
-            //      I'm assuming the state of the database isn't important for the prepare?
             stmts: self.txns.get_initial_data(query.clone())?,
-            // TODO This is applying the query's filter against the in-memory scratch data. This is actually jumping a step ahead
-            //      because we haven't done this for the database yet. The trait is the same, the operation is different.
             filtered_scratch: self.scratch.get_initial_data(query)?,
         })
     }
@@ -783,18 +767,7 @@ where
 impl<'borrow, 'txn> DbScratch<'borrow, 'txn> {
     pub fn new(txns: &'borrow Transactions<'borrow, 'txn>, scratch: &'borrow Scratch) -> Self {
         Self {
-            // TODO don't hold onto my transactions please
-            // This converts raw transactions into Txn types
             txns: txns.into(),
-            scratch,
-        }
-    }
-
-    pub fn new_with_handles(scratch: &'borrow Scratch) -> Self {
-        Self {
-            // TODO don't hold onto my transactions please
-            // This converts raw transactions into Txn types
-            txns: Txns { txns: vec![] },
             scratch,
         }
     }
