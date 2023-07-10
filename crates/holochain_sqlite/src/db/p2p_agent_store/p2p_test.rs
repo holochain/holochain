@@ -154,7 +154,10 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // make sure we can get our example result
     println!("after insert select all count: {}", all.len());
     let signed = db
-        .read_async(move |txn| txn.p2p_get_agent(&example_agent))
+        .read_async({
+            let example_agent = example_agent.clone();
+            move |txn| txn.p2p_get_agent(&example_agent)
+        })
         .await
         .unwrap();
     assert!(signed.is_some());
@@ -262,12 +265,21 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     p2p_prune(&db, vec![]).await.unwrap();
 
     // after prune, make sure all are pruned
-    let all = con.p2p_list_agents().unwrap();
+    let all = db
+        .read_async(move |txn| txn.p2p_list_agents())
+        .await
+        .unwrap();
     assert_eq!(0, all.len());
 
     // make sure our specific get also returns None
     println!("after prune_all select all count: {}", all.len());
-    let signed = con.p2p_get_agent(&example_agent).unwrap();
+    let signed = db
+        .read_async({
+            let example_agent = example_agent.clone();
+            move |txn| txn.p2p_get_agent(&example_agent)
+        })
+        .await
+        .unwrap();
     assert!(signed.is_none());
 
     // clean up temp dir
