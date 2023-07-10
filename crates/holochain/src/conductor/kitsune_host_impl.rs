@@ -129,8 +129,9 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<()> {
         async move {
             let db = self.spaces.p2p_metrics_db(&DnaHash::from_kitsune(&space))?;
-            db.write_async(move |txn| txn.p2p_log_metrics(records))
-                .await
+            Ok(db
+                .write_async(move |txn| txn.p2p_log_metrics(records))
+                .await?)
         }
         .boxed()
         .into()

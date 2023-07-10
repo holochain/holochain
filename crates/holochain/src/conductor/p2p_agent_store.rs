@@ -340,7 +340,8 @@ mod tests {
                 let agent = agent_info_signed.agent.clone();
                 move |txn| txn.p2p_get_agent(&agent)
             })
-            .await?;
+            .await
+            .unwrap();
 
         assert_eq!(ret, Some(agent_info_signed));
     }
@@ -352,7 +353,11 @@ mod tests {
         let db = t_db.to_db();
 
         // - Check no data in the store to start
-        let count = db.read_async(move |txn| txn.p2p_list_agents()).await?.len();
+        let count = db
+            .read_async(move |txn| txn.p2p_list_agents())
+            .await
+            .unwrap()
+            .len();
 
         assert_eq!(count, 0);
 
