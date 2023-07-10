@@ -90,20 +90,23 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
         rand_insert(&db, &space, &example_agent, true).await;
     }
 
-    let permit = db.conn_permit::<DatabaseError>().await.unwrap();
-    let mut con = db.with_permit(permit).unwrap();
-
-    let res = con.p2p_extrapolated_coverage(DhtArcSet::Full).unwrap();
+    let res = db
+        .read_async(move |txn| txn.p2p_extrapolated_coverage(DhtArcSet::Full))
+        .await
+        .unwrap();
     println!("{:?}", res);
     assert_eq!(1, res.len());
 
-    let res = con
-        .p2p_extrapolated_coverage(DhtArcSet::from(
-            &[
-                DhtArcRange::from_bounds(1u32, u32::MAX / 2 - 1),
-                DhtArcRange::from_bounds(u32::MAX / 2 + 1, u32::MAX - 1),
-            ][..],
-        ))
+    let res = db
+        .read_async(move |txn| {
+            txn.p2p_extrapolated_coverage(DhtArcSet::from(
+                &[
+                    DhtArcRange::from_bounds(1u32, u32::MAX / 2 - 1),
+                    DhtArcRange::from_bounds(u32::MAX / 2 + 1, u32::MAX - 1),
+                ][..],
+            ))
+        })
+        .await
         .unwrap();
     println!("{:?}", res);
     assert_eq!(2, res.len());
@@ -134,11 +137,11 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         }
     }
 
-    let permit = db.conn_permit::<DatabaseError>().await.unwrap();
-    let mut con = db.with_permit(permit).unwrap();
-
     // check that we only get 20 results
-    let all = con.p2p_list_agents().unwrap();
+    let all = db
+        .read_async(move |txn| txn.p2p_list_agents())
+        .await
+        .unwrap();
     assert_eq!(20, all.len());
 
     // agents with zero arc lengths will never be returned, so count only the
@@ -150,43 +153,58 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // make sure we can get our example result
     println!("after insert select all count: {}", all.len());
-    let signed = con.p2p_get_agent(&example_agent).unwrap();
+    let signed = db
+        .read_async(move |txn| txn.p2p_get_agent(&example_agent))
+        .await
+        .unwrap();
     assert!(signed.is_some());
 
     // check that gossip query over full range returns 20 results
-    let all = con
-        .p2p_gossip_query_agents(
-            u64::MIN,
-            u64::MAX,
-            DhtArcRange::from_bounds(0, u32::MAX).into(),
-        )
+    let all = db
+        .read_async(move |txn| {
+            txn.p2p_gossip_query_agents(
+                u64::MIN,
+                u64::MAX,
+                DhtArcRange::from_bounds(0, u32::MAX).into(),
+            )
+        })
+        .await
         .unwrap();
     assert_eq!(all.len(), num_nonzero);
 
     // check that gossip query over zero time returns zero results
-    let all = con
-        .p2p_gossip_query_agents(
-            u64::MIN,
-            u64::MIN,
-            DhtArcRange::from_bounds(0, u32::MAX).into(),
-        )
+    let all = db
+        .read_async(move |txn| {
+            txn.p2p_gossip_query_agents(
+                u64::MIN,
+                u64::MIN,
+                DhtArcRange::from_bounds(0, u32::MAX).into(),
+            )
+        })
+        .await
         .unwrap();
     assert_eq!(all.len(), 0);
 
     // check that gossip query over zero arc returns zero results
-    let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
+    let all = db
+        .read_async(move |txn| {
+            txn.p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
+        })
+        .await
         .unwrap();
     assert_eq!(all.len(), 0);
 
     // check that gossip query over half arc returns some but not all results
     // NB: there is a very small probability of this failing
-    let all = con
-        .p2p_gossip_query_agents(
-            u64::MIN,
-            u64::MAX,
-            DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
-        )
+    let all = db
+        .read_async(move |txn| {
+            txn.p2p_gossip_query_agents(
+                u64::MIN,
+                u64::MAX,
+                DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
+            )
+        })
+        .await
         .unwrap();
     // NOTE - not sure this is right with <= num_nonzero... but it breaks
     //        sometimes if we just use '<'
@@ -194,7 +212,10 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // near
     let tgt = u32::MAX / 2;
-    let near = con.p2p_query_near_basis(tgt, 20).unwrap();
+    let near = db
+        .read_async(move |txn| txn.p2p_query_near_basis(tgt, 20))
+        .await
+        .unwrap();
     let mut prev = 0;
     for agent_info_signed in near {
         use kitsune_p2p::KitsuneBinType;

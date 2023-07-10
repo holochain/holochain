@@ -17,7 +17,7 @@ use holochain_p2p::{
     DnaHashExt,
 };
 use holochain_sqlite::error::DatabaseError;
-use holochain_sqlite::prelude::AsP2pStateTxExt;
+use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateTxExt};
 use holochain_types::{
     db::PermittedConn,
     prelude::{DhtOpHash, DnaError},
@@ -113,14 +113,10 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<f64>> {
         async move {
             let db = self.spaces.p2p_agents_db(&DnaHash::from_kitsune(&space))?;
-            use holochain_sqlite::db::AsP2pAgentStoreConExt;
-            let permit = db.conn_permit::<DatabaseError>().await?;
-            let task = tokio::task::spawn_blocking(move || {
-                let mut conn = db.with_permit(permit)?;
-                conn.p2p_extrapolated_coverage(dht_arc_set)
-            })
-            .await;
-            Ok(task??)
+            let coverage = db
+                .read_async(move |txn| txn.p2p_extrapolated_coverage(dht_arc_set))
+                .await?;
+            Ok(coverage)
         }
         .boxed()
         .into()
@@ -133,14 +129,8 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<()> {
         async move {
             let db = self.spaces.p2p_metrics_db(&DnaHash::from_kitsune(&space))?;
-            use holochain_sqlite::db::AsP2pMetricStoreConExt;
-            let permit = db.conn_permit::<DatabaseError>().await?;
-            let task = tokio::task::spawn_blocking(move || {
-                let mut conn = db.with_permit(permit)?;
-                conn.p2p_log_metrics(records)
-            })
-            .await;
-            Ok(task??)
+            db.write_async(move |txn| txn.p2p_log_metrics(records))
+                .await
         }
         .boxed()
         .into()
