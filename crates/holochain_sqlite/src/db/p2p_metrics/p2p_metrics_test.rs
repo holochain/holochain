@@ -32,35 +32,35 @@ async fn test_p2p_metric_store_sanity() {
 
     let db = DbWrite::test(tmp_dir.path(), DbKindP2pMetrics(space.clone())).unwrap();
 
-    let permit = db.conn_permit::<DatabaseError>().await.unwrap();
-    let mut con = db.with_permit(permit).unwrap();
-
-    con.p2p_log_metrics(vec![
-        // -- reachability quotient -- //
-        MetricRecord {
-            kind: MetricRecordKind::ReachabilityQuotient,
-            agent: Some(rand_agent()),
-            recorded_at_utc: Timestamp::MIN,
-            expires_at_utc: Timestamp::MAX,
-            data: serde_json::json!(42.42),
-        },
-        // -- latency micros -- //
-        MetricRecord {
-            kind: MetricRecordKind::LatencyMicros,
-            agent: Some(rand_agent()),
-            recorded_at_utc: Timestamp::MIN,
-            expires_at_utc: Timestamp::MAX,
-            data: serde_json::json!(42.42),
-        },
-        // -- agg extrap cov -- //
-        MetricRecord {
-            kind: MetricRecordKind::AggExtrapCov,
-            agent: None,
-            recorded_at_utc: Timestamp::MIN,
-            expires_at_utc: Timestamp::MAX,
-            data: serde_json::json!(42.42),
-        },
-    ])
+    db.read_async(move |txn| {
+        txn.p2p_log_metrics(vec![
+            // -- reachability quotient -- //
+            MetricRecord {
+                kind: MetricRecordKind::ReachabilityQuotient,
+                agent: Some(rand_agent()),
+                recorded_at_utc: Timestamp::MIN,
+                expires_at_utc: Timestamp::MAX,
+                data: serde_json::json!(42.42),
+            },
+            // -- latency micros -- //
+            MetricRecord {
+                kind: MetricRecordKind::LatencyMicros,
+                agent: Some(rand_agent()),
+                recorded_at_utc: Timestamp::MIN,
+                expires_at_utc: Timestamp::MAX,
+                data: serde_json::json!(42.42),
+            },
+            // -- agg extrap cov -- //
+            MetricRecord {
+                kind: MetricRecordKind::AggExtrapCov,
+                agent: None,
+                recorded_at_utc: Timestamp::MIN,
+                expires_at_utc: Timestamp::MAX,
+                data: serde_json::json!(42.42),
+            },
+        ])
+    })
+    .await
     .unwrap();
 
     // clean up temp dir
