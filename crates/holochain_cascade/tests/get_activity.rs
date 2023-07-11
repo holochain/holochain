@@ -110,15 +110,18 @@ async fn test_must_get_agent_activity(
     let authority = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         authority,
-    );
+    )
+    .await;
     let cache = commit_chain(
         DbKindCache(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         cache,
-    );
+    )
+    .await;
     let authored = commit_chain(
         DbKindAuthored(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         authored,
-    );
+    )
+    .await;
     let sync_scratch = match scratch {
         Some(scratch) => {
             let sync_scratch = Scratch::new().into_sync();

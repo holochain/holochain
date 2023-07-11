@@ -558,7 +558,7 @@ pub fn handle_get_txn(
 }
 
 /// Commit the chain to a test in-memory database, returning a handle to that DB
-pub fn commit_chain<Kind: DbKindT>(
+pub async fn commit_chain<Kind: DbKindT>(
     db_kind: Kind,
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
 ) -> DbWrite<Kind> {
@@ -576,7 +576,7 @@ pub fn commit_chain<Kind: DbKindT>(
         .collect();
     let db = test_in_mem_db(db_kind);
 
-    db.test_commit(|txn| {
+    db.test_write(move |txn| {
         for data in &data {
             for op in data {
                 let op_light = DhtOpLight::RegisterAgentActivity(

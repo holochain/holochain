@@ -912,9 +912,12 @@ pub mod test {
             {
                 let mut count = 0;
                 for env in spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                    let mut conn = env.conn().unwrap();
-                    let txn = conn.transaction().unwrap();
-                    count += txn.p2p_list_agents().unwrap().len();
+                    count += env
+                        .read_async(move |txn| -> DatabaseResult<usize> {
+                            Ok(txn.p2p_list_agents().unwrap().len())
+                        })
+                        .await
+                        .unwrap()
                 }
                 count
             },

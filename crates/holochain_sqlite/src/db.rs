@@ -448,13 +448,19 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test_commit<R, F>(&self, f: F) -> R
+    pub fn test_write<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(&mut Transaction) -> R,
+        F: FnOnce(&mut Transaction) -> R + Send + 'static,
+        R: Send + 'static,
     {
-        let mut conn = self.conn().expect("Failed to open connection");
-        conn.execute_in_exclusive_rw_txn(|w| DatabaseResult::Ok(f(w)))
-            .expect("Database transaction failed")
+        // Necessary to first tell Tokio that we are intentionally blocking on a possibly non-blocking thread
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                    .await
+                    .unwrap()
+            })
+        })
     }
 }
 

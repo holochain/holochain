@@ -167,13 +167,11 @@ mod tests {
             })
             .sum();
 
-        db.test_commit(|txn| {
+        db.test_write(move |txn| {
             for op in ops.iter() {
                 insert_op(txn, op).unwrap()
             }
-            StateMutationResult::Ok(())
-        })
-        .unwrap();
+        });
 
         let regions = query_region_set(db.to_db(), topo, &strat, arcset)
             .await
