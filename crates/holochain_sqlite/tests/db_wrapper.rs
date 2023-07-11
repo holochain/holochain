@@ -257,7 +257,6 @@ async fn get_read_txn_respects_reader_permit_limits() {
         .await
         .unwrap();
 
-
         for _ in 0..3 {
             // Should not be able to get another read txn
             match my_db_handle.get_read_txn().await {
