@@ -210,7 +210,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     /// sequence of reads using `read_async`. You should default to `read_async` and only call this if you have a good
     /// reason.
     ///
-    /// A valid reason for this be holding read transactions across multiple databases as part of a cascade query.
+    /// A valid reason for this is holding read transactions across multiple databases as part of a cascade query.
     pub async fn get_read_txn(&self) -> DatabaseResult<PTxnGuard> {
         let conn = self
             .checkout_connection(self.long_read_semaphore.clone())
