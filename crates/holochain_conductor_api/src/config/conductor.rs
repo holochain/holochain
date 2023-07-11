@@ -55,7 +55,7 @@ pub struct ConductorConfig {
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
     /// If you don't know what this means, leave this setting alone (as `None`)
     #[serde(default)]
-    #[feature = "chc"]
+    #[cfg(feature = "chc")]
     pub chc_url: Option<url2::Url2>,
 
     /// Override the default database synchronous strategy.
@@ -148,7 +148,7 @@ pub mod tests {
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
-                #[feature = "chc"]
+                #[cfg(feature = "chc")]
                 chc_url: None,
             }
         );
@@ -227,7 +227,7 @@ pub mod tests {
                 }]),
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
-                #[feature = "chc"]
+                #[cfg(feature = "chc")]
                 chc_url: None,
             }
         );
@@ -256,7 +256,7 @@ pub mod tests {
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                #[feature = "chc"]
+                #[cfg(feature = "chc")]
                 chc_url: None,
             }
         );
