@@ -585,7 +585,7 @@ where
         let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
         // TODO We may already be on a blocking thread here because this is accessible from a zome call. Ideally we'd have
-        //      a way to check this situation and void spawning a new thread if we're already on an appropriate thread.
+        //      a way to check this situation and avoid spawning a new thread if we're already on an appropriate thread.
         let results = tokio::task::spawn_blocking(move || {
             let mut txns = Vec::with_capacity(txn_guards.len());
             for conn in &mut txn_guards {
