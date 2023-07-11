@@ -257,7 +257,6 @@ async fn get_read_txn_respects_reader_permit_limits() {
         .await
         .unwrap();
 
-        println!("have {:?}", tmp_read_txns_spawned.load(Ordering::SeqCst));
 
         for _ in 0..3 {
             // Should not be able to get another read txn
