@@ -115,7 +115,6 @@ mod tests {
 
     use super::*;
     use holochain_serialized_bytes::UnsafeBytes;
-    use holochain_state::prelude::StateMutationResult;
     use holochain_state::{prelude::insert_op, test_utils::test_dht_db};
     use holochain_types::fixt::*;
     use holochain_types::prelude::{DhtOp, DhtOpHashed, NewEntryAction};

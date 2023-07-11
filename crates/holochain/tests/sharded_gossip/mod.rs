@@ -1076,13 +1076,10 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                let info = alice_p2p_agents_db
-                    .read_async({
-                        let alice_kit = alice_kit.clone();
-                        move |txn| txn.p2p_get_agent(&alice_kit)
-                    })
-                    .await
-                    .unwrap();
+                let info = alice_p2p_agents_db.test_read({
+                    let alice_kit = alice_kit.clone();
+                    move |txn| txn.p2p_get_agent(&alice_kit).unwrap()
+                });
 
                 *alice_info.lock() = info;
 

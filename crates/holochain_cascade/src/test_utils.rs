@@ -558,7 +558,7 @@ pub fn handle_get_txn(
 }
 
 /// Commit the chain to a test in-memory database, returning a handle to that DB
-pub async fn commit_chain<Kind: DbKindT>(
+pub fn commit_chain<Kind: DbKindT>(
     db_kind: Kind,
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
 ) -> DbWrite<Kind> {

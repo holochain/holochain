@@ -48,8 +48,7 @@ async fn returns_full_sequence_from_filter(
     let db = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
-    )
-    .await;
+    );
     let data = must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap();
@@ -107,8 +106,7 @@ async fn test_responses(
     let db = commit_chain(
         DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))),
         chain,
-    )
-    .await;
+    );
     must_get_agent_activity(db.clone().into(), agent.clone(), filter)
         .await
         .unwrap()

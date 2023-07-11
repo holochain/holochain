@@ -270,6 +270,22 @@ impl<Kind: DbKindT> DbRead<Kind> {
             Err(e) => Err(DatabaseError::Timeout(e)),
         }
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test_read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(Transaction) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        // Necessary to first tell Tokio that we are intentionally blocking on a possibly non-blocking thread
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.read_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                    .await
+                    .unwrap()
+            })
+        })
+    }
 }
 
 /// The canonical representation of a (singleton) database.
