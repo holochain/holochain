@@ -879,31 +879,39 @@ mod network_impls {
 
                 // query number of agents from peer db
                 let db = { self.p2p_agents_db(dna) };
-                let permit = db.conn_permit::<DatabaseError>().await?;
-                let mut conn = db.with_permit(permit)?;
-                let current_number_of_peers = conn.p2p_count_agents()?;
 
-                // query arc size and extrapolated coverage and estimate total peers
-                let (arc_size, total_network_peers) = match conn
-                    .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
-                {
-                    None => (0.0, 0),
-                    Some(agent) => {
-                        let arc_size = agent.storage_arc.coverage();
-                        let agents_in_arc = conn.p2p_gossip_query_agents(
-                            u64::MIN,
-                            u64::MAX,
-                            agent.storage_arc.inner().into(),
-                        )?;
-                        let number_of_agents_in_arc = agents_in_arc.len();
-                        let total_network_peers = if number_of_agents_in_arc == 0 {
-                            0
-                        } else {
-                            (number_of_agents_in_arc as f64 / arc_size) as u32
-                        };
-                        (arc_size, total_network_peers)
-                    }
-                };
+                let (current_number_of_peers, arc_size, total_network_peers) = db
+                    .read_async({
+                        let agent_pub_key = agent_pub_key.clone();
+                        move |txn| -> DatabaseResult<(u32, f64, u32)> {
+                            let current_number_of_peers = txn.p2p_count_agents()?;
+
+                            // query arc size and extrapolated coverage and estimate total peers
+                            let (arc_size, total_network_peers) = match txn.p2p_get_agent(
+                                &KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()),
+                            )? {
+                                None => (0.0, 0),
+                                Some(agent) => {
+                                    let arc_size = agent.storage_arc.coverage();
+                                    let agents_in_arc = txn.p2p_gossip_query_agents(
+                                        u64::MIN,
+                                        u64::MAX,
+                                        agent.storage_arc.inner().into(),
+                                    )?;
+                                    let number_of_agents_in_arc = agents_in_arc.len();
+                                    let total_network_peers = if number_of_agents_in_arc == 0 {
+                                        0
+                                    } else {
+                                        (number_of_agents_in_arc as f64 / arc_size) as u32
+                                    };
+                                    (arc_size, total_network_peers)
+                                }
+                            };
+
+                            Ok((current_number_of_peers, arc_size, total_network_peers))
+                        }
+                    })
+                    .await?;
 
                 // get sum of bytes from dht and cache db since last time
                 // request was made or since the beginning of time
@@ -1099,17 +1107,14 @@ mod network_impls {
                     respond,
                     ..
                 } => {
-                    use holochain_sqlite::db::AsP2pAgentStoreConExt;
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let permit = db.conn_permit::<DatabaseError>().await?;
-                    let res = tokio::task::spawn_blocking(move || {
-                        let mut conn = db.with_permit(permit)?;
-                        conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                    })
-                    .await;
-                    let res = res
-                        .map_err(holochain_p2p::HolochainP2pError::other)
-                        .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other));
+                    let res = db
+                        .read_async(move |txn| {
+                            txn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                        })
+                        .await;
+
+                    let res = res.map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryAgentInfoSignedNearBasis {
