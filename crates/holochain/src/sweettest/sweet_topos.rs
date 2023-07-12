@@ -10,6 +10,7 @@ use petgraph::visit::NodeIndexable;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use shrinkwraprs::Shrinkwrap;
+use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
 #[derive(Arbitrary, Clone, Debug, PartialEq, Default)]
@@ -123,6 +124,7 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
 
 struct StrictlyPartitionedNetworkFact {
     partitions: usize,
+    efficiency: f64,
 }
 
 impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
@@ -131,11 +133,12 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
         mut graph: NetworkTopologyGraph,
         g: &mut Generator<'a>,
     ) -> Mutation<NetworkTopologyGraph> {
+        let efficiency_cutoff = (self.efficiency * u64::MAX as f64) as u64;
+
         // Remove edges until the graph is partitioned into the desired number of
         // partitions. The edges are removed randomly, so this is not the most
         // efficient way to do this, but it's simple and it works.
         while connected_components(graph.as_ref()) < self.partitions {
-            dbg!("removing edge");
             let edge_indices = graph.edge_indices().collect::<Vec<_>>();
             let max_edge_index = graph.edge_count() - 1;
             graph.remove_edge(
@@ -155,8 +158,8 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
         // Add edges until the graph is connected up to the desired number of
         // partitions.
         while connected_components(graph.as_ref()) > self.partitions {
-            dbg!("adding edge");
             // Taken from `connected_components` in petgraph.
+            // Builds our view on the partitions as they are.
             let mut vertex_sets = UnionFind::new(graph.node_bound());
             for edge in graph.edge_references() {
                 let (a, b) = (edge.source(), edge.target());
@@ -179,24 +182,104 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
                     "could not select a node to connect".to_string(),
                 ))?;
 
-            // Iterate over all the other nodes in the graph, shuffled. For each
-            // node, if it's not already connected to the node we picked, add an
-            // edge between them and break out of the loop. The RNG is seeded
-            // by the generator, so this should be deterministic per generator.
-            let seed: [u8; 32] = g
+            let efficiency_switch =
+                u64::from_le_bytes(g.bytes(std::mem::size_of::<u64>())?.try_into().map_err(
+                    |_| MutationError::Exception("failed to build bytes for int".into()),
+                )?);
+                // The RNG is seeded
+                // by the generator, so this should be deterministic per generator.
+                let seed: [u8; 32] = g
                 .bytes(32)?
                 .try_into()
                 .map_err(|_| MutationError::Exception("failed to seed the rng".into()))?;
             let mut rng = rand_chacha::ChaCha20Rng::from_seed(seed);
-            let mut other_node_indexes = graph.node_indices().collect::<Vec<_>>();
-            other_node_indexes.shuffle(&mut rng);
 
-            for other_node_index in other_node_indexes {
-                if vertex_sets.find(node_index.index())
-                    != vertex_sets.find(other_node_index.index())
-                {
-                    graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
-                    break;
+            // If the efficiency switch is above the cutoff, we'll reassign an
+            // existing node to a different partition. Otherwise, we'll add a new
+            // edge between two nodes in different partitions.
+            // We can't reassign a node to a different partition if there's only
+            // one desired partition, so we'll just add an edge in that case.
+            if efficiency_switch > efficiency_cutoff && self.partitions > 1 {
+                let labels = vertex_sets
+                    .clone()
+                    .into_labeling()
+                    .into_iter()
+                    .enumerate()
+                    // Filter out the node we picked.
+                    .filter(|(i, _)| *i != node_index.index())
+                    .map(|(_, label)| label)
+                    .collect::<Vec<_>>();
+                let mut m: HashMap<usize, usize> = HashMap::new();
+                for label in &labels {
+                    *m.entry(*label).or_default() += 1;
+                }
+                let representative_of_smallest_partition = m
+                    .into_iter()
+                    .min_by_key(|(_, v)| *v)
+                    .map(|(k, _)| k)
+                    .ok_or(MutationError::Exception(
+                        "could not find smallest partition".to_string(),
+                    ))?;
+
+                let mut nodes_in_smallest_partition = labels
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, label)| **label == representative_of_smallest_partition)
+                    .map(|(i, _)| i)
+                    .collect::<Vec<_>>();
+                nodes_in_smallest_partition.shuffle(&mut rng);
+
+                while let Some(edge) = graph.first_edge(node_index, Direction::Outgoing) {
+                    graph.remove_edge(edge);
+                }
+                while let Some(edge) = graph.first_edge(node_index, Direction::Incoming) {
+                    graph.remove_edge(edge);
+                }
+
+                graph.add_edge(
+                    node_index,
+                    NodeIndex::from(
+                        *nodes_in_smallest_partition
+                            .iter()
+                            .next()
+                            .ok_or::<MutationError>(
+                                MutationError::Exception(
+                                    "There were no nodes in the smallest partition".to_string(),
+                                )
+                                .into(),
+                            )?,
+                    ),
+                    NetworkTopologyEdge,
+                );
+
+                dbg!("reassigning node to smallest partition");
+                // dbg!(vertex_sets.clone().into_labeling());
+                // Find a node that is NOT in the same partition as the node we
+                // picked.
+                // for other_node_index in graph.node_indices() {
+                //     if !vertex_sets.equiv(node_index.index(), other_node_index.index())
+                //     {
+
+                //         graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
+                //         break;
+                //     }
+                // }
+            } else {
+                dbg!("adding edge");
+                // Iterate over all the other nodes in the graph, shuffled. For each
+                // node, if it's not already connected to the node we picked, add an
+                // edge between them and break out of the loop.
+
+                let mut other_node_indexes = graph.node_indices().collect::<Vec<_>>();
+                other_node_indexes.shuffle(&mut rng);
+
+                for other_node_index in other_node_indexes {
+                    if vertex_sets.find(node_index.index())
+                        != vertex_sets.find(other_node_index.index())
+                    {
+                        graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
+                        break;
+                    }
                 }
             }
         }
@@ -280,7 +363,10 @@ pub mod test {
     fn test_sweet_topos_strictly_partitioned_network_one_partition() {
         let mut g = unstructured_noise().into();
         let size_fact = SizedNetworkFact { nodes: 3 };
-        let partition_fact = StrictlyPartitionedNetworkFact { partitions: 1 };
+        let partition_fact = StrictlyPartitionedNetworkFact {
+            partitions: 1,
+            efficiency: 1.0,
+        };
         let facts = facts![size_fact, partition_fact];
         let mut graph = NetworkTopologyGraph::default();
         graph = facts.mutate(graph, &mut g).unwrap();
@@ -304,10 +390,25 @@ pub mod test {
     fn test_sweet_topos_strictly_partitioned_network_dozen_nodes_three_partitions() {
         let mut g = unstructured_noise().into();
         let size_fact = SizedNetworkFact { nodes: 12 };
-        let partition_fact = StrictlyPartitionedNetworkFact { partitions: 3 };
-        let facts = facts![size_fact, partition_fact];
+        let partition_fact = StrictlyPartitionedNetworkFact {
+            partitions: 3,
+            efficiency: 0.2,
+        };
+        // let facts = facts![size_fact, partition_fact];
         let mut graph = NetworkTopologyGraph::default();
-        graph = facts.mutate(graph, &mut g).unwrap();
+        graph = size_fact.mutate(graph, &mut g).unwrap();
+        println!(
+            "{:?}",
+            Dot::with_config(
+                graph.as_ref(),
+                &[
+                    //     Config::GraphContentOnly,
+                    Config::NodeNoLabel,
+                    Config::EdgeNoLabel,
+                ],
+            )
+        );
+        graph = partition_fact.mutate(graph, &mut g).unwrap();
         assert_eq!(connected_components(graph.as_ref()), 3);
 
         println!(
@@ -315,7 +416,7 @@ pub mod test {
             Dot::with_config(
                 graph.as_ref(),
                 &[
-                    Config::GraphContentOnly,
+                    //     Config::GraphContentOnly,
                     Config::NodeNoLabel,
                     Config::EdgeNoLabel,
                 ],
