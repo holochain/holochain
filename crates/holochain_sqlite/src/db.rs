@@ -277,7 +277,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         F: FnOnce(Transaction) -> R + Send + 'static,
         R: Send + 'static,
     {
-        holochain_util::tokio_helper::block_forever_on(|| async {
+        holochain_util::tokio_helper::block_forever_on(async {
             self.read_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
                 .await
                 .unwrap()
@@ -466,7 +466,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         F: FnOnce(&mut Transaction) -> R + Send + 'static,
         R: Send + 'static,
     {
-        holochain_util::tokio_helper::block_forever_on(|| async {
+        holochain_util::tokio_helper::block_forever_on(async {
             self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
                 .await
                 .unwrap()
