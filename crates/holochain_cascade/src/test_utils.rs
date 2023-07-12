@@ -576,7 +576,7 @@ pub fn commit_chain<Kind: DbKindT>(
         .collect();
     let db = test_in_mem_db(db_kind);
 
-    db.test_commit(|txn| {
+    db.test_write(move |txn| {
         for data in &data {
             for op in data {
                 let op_light = DhtOpLight::RegisterAgentActivity(

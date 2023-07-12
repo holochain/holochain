@@ -270,6 +270,19 @@ impl<Kind: DbKindT> DbRead<Kind> {
             Err(e) => Err(DatabaseError::Timeout(e)),
         }
     }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test_read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(Transaction) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        holochain_util::tokio_helper::block_forever_on(async {
+            self.read_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                .await
+                .unwrap()
+        })
+    }
 }
 
 /// The canonical representation of a (singleton) database.
@@ -448,13 +461,16 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test_commit<R, F>(&self, f: F) -> R
+    pub fn test_write<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(&mut Transaction) -> R,
+        F: FnOnce(&mut Transaction) -> R + Send + 'static,
+        R: Send + 'static,
     {
-        let mut conn = self.conn().expect("Failed to open connection");
-        conn.execute_in_exclusive_rw_txn(|w| DatabaseResult::Ok(f(w)))
-            .expect("Database transaction failed")
+        holochain_util::tokio_helper::block_forever_on(async {
+            self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                .await
+                .unwrap()
+        })
     }
 }
 
