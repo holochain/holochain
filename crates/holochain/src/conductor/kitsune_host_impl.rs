@@ -16,10 +16,8 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
-use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateTxExt};
 use holochain_types::{
-    db::PermittedConn,
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };

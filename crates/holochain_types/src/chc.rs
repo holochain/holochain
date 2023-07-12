@@ -44,11 +44,10 @@ pub trait ChainHeadCoordinatorExt:
     /// More convenient way to call `add_records_request`
     fn add_records(self: Arc<Self>, records: Vec<Record>) -> MustBoxFuture<'static, ChcResult<()>> {
         let (keystore, agent) = self.signing_info();
-        let this = self.clone();
         async move {
             let payload = AddRecordPayload::from_records(keystore, agent, records).await?;
             dbg!(serde_json::to_string(&payload).unwrap());
-            this.add_records_request(payload).await
+            self.add_records_request(payload).await
         }
         .boxed()
         .into()
@@ -65,9 +64,8 @@ pub trait ChainHeadCoordinatorExt:
         let payload = GetRecordsPayload { since_hash, nonce };
         // TODO: real signature
         let signature = Signature::from([0; 64]);
-        let this = self.clone();
         async move {
-            this.get_record_data_request(GetRecordsRequest { payload, signature })
+            self.get_record_data_request(GetRecordsRequest { payload, signature })
                 .await?
                 .into_iter()
                 .map(|(a, me)| {
