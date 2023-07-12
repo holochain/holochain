@@ -2436,7 +2436,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "fixt",
  "getrandom 0.2.10",
@@ -2555,7 +2555,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2658,7 +2658,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2693,7 +2693,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "anyhow",
  "clap 4.3.10",
@@ -2708,7 +2708,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -2749,7 +2749,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2780,7 +2780,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "derive_more",
  "directories",
@@ -2873,7 +2873,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2952,7 +2952,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3003,7 +3003,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3051,7 +3051,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "hdk",
  "serde",
@@ -3081,7 +3081,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3158,7 +3158,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "holochain_types",
  "holochain_util",
