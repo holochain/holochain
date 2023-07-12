@@ -381,9 +381,10 @@ async fn check_valid_if_dna_test() {
 
     tmp_dht
         .to_db()
-        .conn()
-        .unwrap()
-        .execute("UPDATE DhtOp SET when_integrated = 0", [])
+        .write_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.execute("UPDATE DhtOp SET when_integrated = 0", [])?)
+        })
+        .await
         .unwrap();
 
     cache
