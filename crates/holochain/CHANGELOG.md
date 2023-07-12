@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 Adds experimental Chain Head Coordinator feature, allowing multiple machines to share the same source chain. Holochain must be built with the `chc` feature flag (disabled by default).
 
+## 0.3.0-beta-dev.9
+
 ## 0.3.0-beta-dev.8
 
 ## 0.3.0-beta-dev.7
