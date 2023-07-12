@@ -18,6 +18,7 @@ pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod chain;
+pub mod chc;
 pub mod combinators;
 pub mod db;
 pub mod db_cache;
@@ -40,8 +41,6 @@ pub mod wasmer_types;
 pub mod web_app;
 pub mod zome_types;
 
-#[cfg(feature = "chc")]
-pub mod chc;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 

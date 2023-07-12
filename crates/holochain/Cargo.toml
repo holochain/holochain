@@ -146,8 +146,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-# TODO: remove chc feature from defaults
-default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5", "chc"]
+default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
@@ -232,7 +231,6 @@ chc = [
   "bytes",
   "reqwest",
   "holochain_conductor_api/chc",
-  "holochain_types/chc",
 ]
 
 # Transitional feature flag for code that is only ready when DPKI integration lands.
