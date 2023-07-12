@@ -202,13 +202,7 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
             if efficiency_switch > efficiency_cutoff && self.partitions > 1 {
                 let labels = vertex_sets
                     .clone()
-                    .into_labeling()
-                    .into_iter()
-                    .enumerate()
-                    // Filter out the node we picked.
-                    .filter(|(i, _)| *i != node_index.index())
-                    .map(|(_, label)| label)
-                    .collect::<Vec<_>>();
+                    .into_labeling();
                 let mut m: HashMap<usize, usize> = HashMap::new();
                 for label in &labels {
                     *m.entry(*label).or_default() += 1;
@@ -235,37 +229,24 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
                 while let Some(edge) = graph.first_edge(node_index, Direction::Incoming) {
                     graph.remove_edge(edge);
                 }
-
-                graph.add_edge(
-                    node_index,
-                    NodeIndex::from(
-                        *nodes_in_smallest_partition
-                            .iter()
-                            .next()
-                            .ok_or::<MutationError>(
-                                MutationError::Exception(
-                                    "There were no nodes in the smallest partition".to_string(),
-                                )
-                                .into(),
-                            )?,
-                    ),
-                    NetworkTopologyEdge,
+                let other_node_index = NodeIndex::from(
+                    *nodes_in_smallest_partition
+                        .iter()
+                        .next()
+                        .ok_or::<MutationError>(
+                            MutationError::Exception(
+                                "There were no nodes in the smallest partition".to_string(),
+                            )
+                            .into(),
+                        )?,
                 );
 
-                dbg!("reassigning node to smallest partition");
-                // dbg!(vertex_sets.clone().into_labeling());
-                // Find a node that is NOT in the same partition as the node we
-                // picked.
-                // for other_node_index in graph.node_indices() {
-                //     if !vertex_sets.equiv(node_index.index(), other_node_index.index())
-                //     {
-
-                //         graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
-                //         break;
-                //     }
-                // }
+                // If the node in the smallest partition is the node we picked,
+                // do nothing this round.
+                if node_index != other_node_index {
+                    graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
+                }
             } else {
-                dbg!("adding edge");
                 // Iterate over all the other nodes in the graph, shuffled. For each
                 // node, if it's not already connected to the node we picked, add an
                 // edge between them and break out of the loop.
