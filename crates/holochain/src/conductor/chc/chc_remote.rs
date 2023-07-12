@@ -106,7 +106,7 @@ pub struct ChcRemoteClient {
 
 impl ChcRemoteClient {
     fn url(&self, path: &str) -> String {
-        assert!(path.chars().nth(0) != Some('/'));
+        assert!(!path.starts_with('/'));
         self.base_url.join(path).expect("invalid URL").to_string()
     }
 

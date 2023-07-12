@@ -16,7 +16,7 @@ pub use chc_remote::*;
 static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
     Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
 
-const CHC_LOCAL_MAGIC_URL: &'static str = "local:";
+const CHC_LOCAL_MAGIC_URL: &str = "local:";
 
 /// Build the appropriate CHC implementation.
 ///
@@ -31,7 +31,7 @@ pub fn build_chc(url: Option<&Url>, keystore: MetaLairClient, cell_id: &CellId) 
             if url.as_str() == CHC_LOCAL_MAGIC_URL {
                 chc_local(keystore, cell_id.clone())
             } else {
-                chc_remote(url.clone().into(), keystore, cell_id)
+                chc_remote(url.clone(), keystore, cell_id)
             }
         })
     } else {
