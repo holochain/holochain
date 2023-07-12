@@ -230,7 +230,8 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 # Enable chain head coordination
 chc = [
   "bytes",
-  "reqwest"
+  "reqwest",
+  "holochain_conductor_api/chc"
 ]
 
 # Transitional feature flag for code that is only ready when DPKI integration lands.
