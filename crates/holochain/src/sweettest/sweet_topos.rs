@@ -275,6 +275,61 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
     }
 }
 
+struct DenseNetworkFact {
+    density: f64,
+}
+
+impl<'a> Fact<'a, NetworkTopologyGraph> for DenseNetworkFact {
+    fn mutate(
+        &self,
+        mut graph: NetworkTopologyGraph,
+        g: &mut Generator<'a>,
+    ) -> Mutation<NetworkTopologyGraph> {
+        let edge_count = graph.edge_count();
+        let max_edge_count = graph.node_count() * (graph.node_count() - 1);
+        let edge_count_delta = (self.density * max_edge_count as f64) as i64 - edge_count as i64;
+
+        if edge_count_delta > 0 {
+            // Add edges until we reach the desired density.
+            for _ in 0..edge_count_delta {
+                let max_node_index = graph.node_count() - 1;
+                let a = g.int_in_range(0..=max_node_index, "could not select a node")?.into();
+                let b = g.int_in_range(0..=max_node_index, "could not select a node")?.into();
+                graph.add_edge(a, b, NetworkTopologyEdge);
+            }
+        } else if edge_count_delta < 0 {
+            // Remove edges until we reach the desired density.
+            for _ in 0..(-edge_count_delta) {
+                let edge_indices = graph.edge_indices().collect::<Vec<_>>();
+                let max_edge_index = graph.edge_count() - 1;
+                graph.remove_edge(
+                    edge_indices
+                        .iter()
+                        .nth(
+                            g.int_in_range(
+                                0..=max_edge_index,
+                                "could not select an edge to remove",
+                            )?
+                            .into(),
+                        )
+                        .ok_or(MutationError::Exception(
+                            "could not select an edge to remove".to_string(),
+                        ))?
+                        .clone(),
+                );
+            }
+        }
+
+        Ok(graph)
+    }
+
+    /// Not sure what a meaningful advance would be as a graph is already a
+    /// collection, so why would we want a sequence of them?
+    fn advance(&mut self, _graph: &NetworkTopologyGraph) {
+        todo!();
+    }
+}
+
 #[cfg(test)]
 pub mod test {
     use super::*;
@@ -392,6 +447,54 @@ pub mod test {
         graph = partition_fact.mutate(graph, &mut g).unwrap();
         assert_eq!(connected_components(graph.as_ref()), 3);
 
+        println!(
+            "{:?}",
+            Dot::with_config(
+                graph.as_ref(),
+                &[
+                    //     Config::GraphContentOnly,
+                    Config::NodeNoLabel,
+                    Config::EdgeNoLabel,
+                ],
+            )
+        );
+    }
+
+    #[test]
+    fn test_sweet_topos_dense_network() {
+        let mut g = unstructured_noise().into();
+        let size_fact = SizedNetworkFact { nodes: 12 };
+        let density_fact = DenseNetworkFact { density: 0.3 };
+        let mut graph = NetworkTopologyGraph::default();
+        graph = size_fact.mutate(graph, &mut g).unwrap();
+        println!(
+            "{:?}",
+            Dot::with_config(
+                graph.as_ref(),
+                &[
+                    //     Config::GraphContentOnly,
+                    Config::NodeNoLabel,
+                    Config::EdgeNoLabel,
+                ],
+            )
+        );
+        graph = density_fact.mutate(graph, &mut g).unwrap();
+        println!(
+            "{:?}",
+            Dot::with_config(
+                graph.as_ref(),
+                &[
+                    //     Config::GraphContentOnly,
+                    Config::NodeNoLabel,
+                    Config::EdgeNoLabel,
+                ],
+            )
+        );
+        let partition_fact = StrictlyPartitionedNetworkFact {
+            partitions: 1,
+            efficiency: 1.0,
+        };
+        graph = partition_fact.mutate(graph, &mut g).unwrap();
         println!(
             "{:?}",
             Dot::with_config(
