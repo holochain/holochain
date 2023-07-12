@@ -640,7 +640,7 @@ where
         }
 
         // remote caller
-        let maybe_cap_grant: Option<CapGrant> = self
+        let maybe_cap_grant = self
             .vault
             .read_async({
                 let agent_pubkey = self.agent_pubkey().clone();
@@ -686,37 +686,18 @@ where
                         .optional()?
                     };
 
-                    Ok(maybe_entry)
+                    let maybe_cap_grant = maybe_entry.and_then(|entry| entry.as_cap_grant());
+                    Ok(maybe_cap_grant)
                 }
             })
-            .await?
-            .and_then(|entry| entry.as_cap_grant());
+            .await?;
 
-        let valid_cap_grant = match maybe_cap_grant {
-            None => None,
-            Some(cap_grant) => {
                 // validate cap grant in itself, especially check if functions are authorized
-                if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
-                    return Ok(None);
-                }
-                match &cap_grant {
-                    CapGrant::RemoteAgent(zome_call_cap_grant) => {
-                        match &zome_call_cap_grant.access {
-                            // transferable and assigned cap grant when cap secret provided
-                            CapAccess::Transferable { .. } => Some(cap_grant),
-                            CapAccess::Assigned { assignees, .. } => {
-                                assignees.contains(&check_agent).then_some(cap_grant)
-                            }
-                            // unrestricted cap grant only possible without cap secret
-                            CapAccess::Unrestricted => Some(cap_grant),
-                        }
-                    }
-                    // chain author cap grant has been handled at the beginning
-                    CapGrant::ChainAuthor(_) => unreachable!(),
-                }
-            }
-        };
-        Ok(valid_cap_grant)
+        Ok(maybe_cap_grant.and_then(|cap_grant| {
+            cap_grant
+                .is_valid(&check_function, &check_agent, check_secret.as_ref())
+                .then_some(cap_grant)
+        }))
     }
 
     /// Query Actions in the source chain.
