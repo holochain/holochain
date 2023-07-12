@@ -232,7 +232,7 @@ chc = [
   "bytes",
   "reqwest",
   "holochain_conductor_api/chc",
-  "types/chc",
+  "holochain_types/chc",
 ]
 
 # Transitional feature flag for code that is only ready when DPKI integration lands.
