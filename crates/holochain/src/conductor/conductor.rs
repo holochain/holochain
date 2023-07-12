@@ -2627,7 +2627,7 @@ impl Conductor {
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
-            let chc = handle.chc(cell_id);
+            let chc = handle.chc(self.keystore().clone(), cell_id);
             async move {
                 let holochain_p2p_cell =
                     handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
@@ -2899,7 +2899,7 @@ pub(crate) async fn genesis_cells(
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
             let conductor = conductor.clone();
-            let chc = conductor.chc(&cell_id);
+            let chc = conductor.chc(conductor.keystore().clone(), &cell_id);
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor
                 .get_ribosome(cell_id.dna_hash())

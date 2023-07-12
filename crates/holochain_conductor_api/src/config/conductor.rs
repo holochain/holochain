@@ -51,11 +51,12 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
-    /// **PLACEHOLDER**: Optional specification of the Cloudflare namespace to use in Chain Head Coordination
-    /// service URLs. This is a placeholder for future work and may even go away.
-    /// Setting this to anything other than `None` will surely lead to no good.
+    /// Optional specification of Chain Head Coordination service URL.
+    /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
+    /// If you don't know what this means, leave this setting alone (as `None`)
     #[serde(default)]
-    pub chc_namespace: Option<String>,
+    #[cfg(feature = "chc")]
+    pub chc_url: Option<url2::Url2>,
 
     /// Override the default database synchronous strategy.
     ///
@@ -147,7 +148,8 @@ pub mod tests {
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
-                chc_namespace: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
@@ -225,7 +227,8 @@ pub mod tests {
                 }]),
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
-                chc_namespace: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
@@ -253,7 +256,8 @@ pub mod tests {
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                chc_namespace: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
