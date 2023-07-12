@@ -277,13 +277,10 @@ impl<Kind: DbKindT> DbRead<Kind> {
         F: FnOnce(Transaction) -> R + Send + 'static,
         R: Send + 'static,
     {
-        // Necessary to first tell Tokio that we are intentionally blocking on a possibly non-blocking thread
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.read_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
-                    .await
-                    .unwrap()
-            })
+        holochain_util::tokio_helper::block_forever_on(|| async {
+            self.read_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                .await
+                .unwrap()
         })
     }
 }
@@ -469,13 +466,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         F: FnOnce(&mut Transaction) -> R + Send + 'static,
         R: Send + 'static,
     {
-        // Necessary to first tell Tokio that we are intentionally blocking on a possibly non-blocking thread
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
-                    .await
-                    .unwrap()
-            })
+        holochain_util::tokio_helper::block_forever_on(|| async {
+            self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                .await
+                .unwrap()
         })
     }
 }
