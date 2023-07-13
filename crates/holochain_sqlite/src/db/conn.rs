@@ -2,7 +2,7 @@ use crate::prelude::*;
 use rusqlite::*;
 use std::ops::{Deref, DerefMut};
 
-pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
+pub(super) type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
 /// Singleton Connection
 pub(super) struct PConn {
