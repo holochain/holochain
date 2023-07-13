@@ -1,14 +1,11 @@
 //! Functions dealing with obtaining and referencing singleton databases
 
-// TODO rename back to db
-
 mod access;
 mod conn;
 mod databases;
 mod guard;
 mod kind;
 mod pool;
-mod retry;
 
 #[cfg(test)]
 mod tests;
