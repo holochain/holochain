@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230712.004839
+
+## [holochain\_cli-0.3.0-beta-dev.9](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.9](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.8](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain-0.3.0-beta-dev.9](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.8](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.9](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.8](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_cascade-0.3.0-beta-dev.9](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_state-0.3.0-beta-dev.8](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_p2p-0.3.0-beta-dev.8](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_types-0.3.0-beta-dev.8](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_sqlite-0.3.0-beta-dev.8](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [hdk-0.3.0-beta-dev.8](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.8)
+
 # 20230705.005229
 
 ## [holochain\_cli-0.3.0-beta-dev.8](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.8)

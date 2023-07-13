@@ -22,7 +22,7 @@ type Pair = (Action, RecordEntry);
 // At least we can use this as a reference to write the same logic for DhtOp and Record,
 // which require the same sort of checks.
 
-pub fn action_and_entry_match(must_be_public: bool) -> impl Fact<'static, Pair> {
+pub fn action_and_entry_match<'a>(must_be_public: bool) -> impl Fact<'a, Pair> {
     facts![
         brute(
             "Action type matches Entry existence, and is public if exists",

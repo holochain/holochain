@@ -116,8 +116,15 @@ pub(crate) fn new_connection_pool(
         None => SqliteConnectionManager::memory(),
     };
     let customizer = Box::new(ConnCustomizer { synchronous_level });
-    // We need the same amount of connections as reader threads plus one for the writer thread.
-    let max_cons = num_read_threads() + 1;
+
+    /*
+     * We want
+     * - num_read_threads connections for standard read limit
+     * - num_read_threads for use in long running read transactions, to allow the normal pool to continue to be used
+     * - 1 connection for writing
+     */
+    let max_cons = num_read_threads() * 2 + 1;
+
     r2d2::Pool::builder()
         // Only up to 20 connections at a time
         .max_size(max_cons as u32)

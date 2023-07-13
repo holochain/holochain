@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,14 +25,14 @@ getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.3.0-beta-dev.4", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "^0.3.0-beta-dev.8", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.3.0-beta-dev.8", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "^0.3.0-beta-dev.9", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.9", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "^0.3.0-beta-dev.7", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.3.0-beta-dev.7", path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.3.0-beta-dev.7", path = "../holochain_sqlite" }
+holochain_p2p = { version = "^0.3.0-beta-dev.8", path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.3.0-beta-dev.8", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "^0.3.0-beta-dev.7", path = "../holochain_state" }
-holochain_types = { version = "^0.3.0-beta-dev.7", path = "../holochain_types" }
+holochain_state = { version = "^0.3.0-beta-dev.8", path = "../holochain_state" }
+holochain_types = { version = "^0.3.0-beta-dev.8", path = "../holochain_types" }
 holochain_util = { version = "^0.2.0", path = "../holochain_util", features = [ "pw" ] }
 holochain_wasmer_host = "=0.0.84"
 holochain_websocket = { version = "^0.3.0-beta-dev.3", path = "../holochain_websocket" }
@@ -73,21 +73,22 @@ toml = "0.5.6"
 tracing = "0.1.37"
 tracing-futures = "0.2.5"
 tracing-subscriber = "0.3.16"
-url = "1.7.2"
+url = "2.4"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.7", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.8", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
 wasmer-middlewares = "2"
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
+contrafact = {version = "0.2.0-dev.3", optional = true }
 diff = {version = "0.1", optional = true }
-hdk = { version = "^0.3.0-beta-dev.7", path = "../hdk", optional = true }
+hdk = { version = "^0.3.0-beta-dev.8", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
-holochain_test_wasm_common = { version = "^0.3.0-beta-dev.7", path = "../test_utils/wasm_common", optional = true  }
+holochain_test_wasm_common = { version = "^0.3.0-beta-dev.8", path = "../test_utils/wasm_common", optional = true  }
 kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.5", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = true }
@@ -110,16 +111,18 @@ assert_cmd = "1.0.1"
 contrafact = "0.2.0-rc.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
+indoc = "1.0"
 isotest = "0"
 maplit = "1"
 pretty_assertions = "0.6.1"
 rand_dalek = {package = "rand", version = "0.7"}
+regex = "1.5"
 reqwest = "0.11.2"
 serial_test = "0.4.0"
 test-case = "1.2.1"
 
 [build-dependencies]
-hdk = { version = "^0.3.0-beta-dev.7", path = "../hdk"}
+hdk = { version = "^0.3.0-beta-dev.8", path = "../hdk"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51" }
 toml = "0.5.6"
@@ -151,6 +154,7 @@ tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
+  "contrafact",
   "diff",
   "ghost_actor/test_utils",
   "hdk/test_utils",
@@ -225,7 +229,8 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 # Enable chain head coordination
 chc = [
   "bytes",
-  "reqwest"
+  "reqwest",
+  "holochain_conductor_api/chc",
 ]
 
 # Transitional feature flag for code that is only ready when DPKI integration lands.

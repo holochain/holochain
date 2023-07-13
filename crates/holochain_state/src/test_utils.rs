@@ -18,9 +18,10 @@ pub mod mutations_helpers;
 
 #[cfg(test)]
 pub mod tests {
-    use holochain_sqlite::conn::PConn;
+    use holochain_sqlite::error::DatabaseResult;
+    use holochain_sqlite::rusqlite::Transaction;
 
-    fn _dbg_db_schema(db_name: &str, conn: PConn) {
+    fn _dbg_db_schema(db_name: &str, conn: Transaction) {
         #[derive(Debug)]
         pub struct Schema {
             pub ty: String,
@@ -50,10 +51,25 @@ pub mod tests {
         println!("~~~ {} END ~~~", &db_name);
     }
 
-    #[test]
-    pub fn dbg_db_schema() {
-        _dbg_db_schema("conductor", super::test_conductor_db().db.conn().unwrap());
-        _dbg_db_schema("p2p_agents", super::test_p2p_agents_db().db.conn().unwrap());
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn dbg_db_schema() {
+        super::test_conductor_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("conductor", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        super::test_p2p_agents_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("p2p_agents", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
     }
 }
 
@@ -207,8 +223,8 @@ impl<Kind: DbKindT> TestDb<Kind> {
     }
 
     /// Dump db into `/tmp/test_dbs`.
-    pub fn dump_tmp(&self) {
-        dump_tmp(&self.db);
+    pub async fn dump_tmp(&self) {
+        dump_tmp(&self.db).await;
     }
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
@@ -220,18 +236,18 @@ impl<Kind: DbKindT> TestDb<Kind> {
 }
 
 /// Dump db into `/tmp/test_dbs`.
-pub fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
+pub async fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
     let mut tmp = std::env::temp_dir();
     tmp.push("test_dbs");
     std::fs::create_dir(&tmp).ok();
     tmp.push("backup.sqlite");
     println!("dumping db to {}", tmp.display());
     std::fs::write(&tmp, b"").unwrap();
-    env.conn()
-        .unwrap()
-        .execute("VACUUM main into ?", [tmp.to_string_lossy()])
-        // .backup(DatabaseName::Main, tmp, None)
-        .unwrap();
+    env.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.execute("VACUUM main into ?", [tmp.to_string_lossy()])?)
+    })
+    .await
+    .unwrap();
 }
 
 /// A container for all three non-cell environments

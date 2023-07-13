@@ -13,6 +13,7 @@ use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -82,6 +83,7 @@ pub struct DbRead<Kind: DbKindT> {
     connection_pool: ConnectionPool,
     write_semaphore: Arc<Semaphore>,
     read_semaphore: Arc<Semaphore>,
+    long_read_semaphore: Arc<Semaphore>,
     statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
@@ -101,6 +103,32 @@ impl<Kind: DbKindT> std::fmt::Debug for DbRead<Kind> {
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
 pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit);
+
+/// This type exists to hand out connections that can only be used for running transactions
+pub struct PTxnGuard(PConnGuard, Instant);
+
+impl PTxnGuard {
+    /// Start a new transaction on the inner connection held by this txn guard.
+    pub fn transaction(&mut self) -> DatabaseResult<Transaction<'_>> {
+        Ok(self.0.transaction()?)
+    }
+}
+
+impl From<PConnGuard> for PTxnGuard {
+    fn from(value: PConnGuard) -> Self {
+        PTxnGuard(value, Instant::now())
+    }
+}
+
+impl Drop for PTxnGuard {
+    fn drop(&mut self) {
+        // TODO record histogram rather than logging a warning on a fixed threshold
+        let elapsed_millis = self.1.elapsed().as_millis();
+        if elapsed_millis > 50 {
+            tracing::warn!("PTxnGuard was held for {:?}ms", elapsed_millis);
+        }
+    }
+}
 
 pub struct PConnPermit(OwnedSemaphorePermit);
 
@@ -144,7 +172,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     where
         E: From<DatabaseError> + Send + 'static,
     {
-        let g = self.acquire_reader_permit::<E>().await?;
+        let g = Self::acquire_reader_permit(self.read_semaphore.clone()).await?;
         Ok(PConnPermit(g))
     }
 
@@ -158,15 +186,40 @@ impl<Kind: DbKindT> DbRead<Kind> {
         &self.path
     }
 
+    /// Execute a read closure on the database by acquiring a connection from the pool, starting a new transaction and
+    /// running the closure with that transaction.
+    ///
+    /// Note that it is not enforced that your closure runs read-only operations or that it finishes quickly so it is
+    /// up to the caller to use this function as intended.
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let waiting = self
-            .num_readers
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut conn = self
+            .checkout_connection(self.read_semaphore.clone())
+            .await?;
+        let r = tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    /// Intended to be used for transactions that need to be kept open for a longer period of time than just running a
+    /// sequence of reads using `read_async`. You should default to `read_async` and only call this if you have a good
+    /// reason.
+    ///
+    /// A valid reason for this is holding read transactions across multiple databases as part of a cascade query.
+    pub async fn get_read_txn(&self) -> DatabaseResult<PTxnGuard> {
+        let conn = self
+            .checkout_connection(self.long_read_semaphore.clone())
+            .await?;
+        Ok(conn.into())
+    }
+
+    async fn checkout_connection(&self, semaphore: Arc<Semaphore>) -> DatabaseResult<PConnGuard> {
+        let waiting = self.num_readers.fetch_add(1, Ordering::Relaxed);
         if waiting > self.max_readers {
             let s = tracing::info_span!("holochain_perf", kind = ?self.kind().kind());
             s.in_scope(|| {
@@ -176,18 +229,16 @@ impl<Kind: DbKindT> DbRead<Kind> {
                 )
             });
         }
-        let _g = self.acquire_reader_permit().await?;
-        self.num_readers
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+
+        let permit = Self::acquire_reader_permit(semaphore).await?;
+        self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
         let mut conn = self.get_connection_from_pool()?;
         if self.statement_trace_fn.is_some() {
             conn.trace(self.statement_trace_fn);
         }
-        let r = tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
+
+        Ok(PConnGuard(conn, permit))
     }
 
     /// Get a connection from the pool.
@@ -202,23 +253,35 @@ impl<Kind: DbKindT> DbRead<Kind> {
         r
     }
 
-    async fn acquire_reader_permit<E>(&self) -> Result<OwnedSemaphorePermit, E>
-    where
-        E: From<DatabaseError> + Send + 'static,
-    {
+    async fn acquire_reader_permit(
+        semaphore: Arc<Semaphore>,
+    ) -> DatabaseResult<OwnedSemaphorePermit> {
         match tokio::time::timeout(
             std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
-            self.read_semaphore.clone().acquire_owned(),
+            semaphore.acquire_owned(),
         )
         .await
         {
             Ok(Ok(s)) => Ok(s),
             Ok(Err(e)) => {
                 tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);
-                Err(DatabaseError::Other(e.into()).into())
+                Err(DatabaseError::Other(e.into()))
             }
-            Err(e) => Err(DatabaseError::Timeout(e).into()),
+            Err(e) => Err(DatabaseError::Timeout(e)),
         }
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test_read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(Transaction) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        holochain_util::tokio_helper::block_forever_on(async {
+            self.read_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                .await
+                .unwrap()
+        })
     }
 }
 
@@ -311,7 +374,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
-            max_readers: num_read_threads(),
+            long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
+            max_readers: num_read_threads() * 2,
             num_readers: Arc::new(AtomicUsize::new(0)),
             kind,
             path: path.unwrap_or_default(),
@@ -375,6 +439,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .clone()
     }
 
+    fn get_long_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
+        static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
+            once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+        MAP.lock()
+            .entry(kind)
+            .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
+            .clone()
+    }
+
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
@@ -388,13 +461,16 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test_commit<R, F>(&self, f: F) -> R
+    pub fn test_write<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(&mut Transaction) -> R,
+        F: FnOnce(&mut Transaction) -> R + Send + 'static,
+        R: Send + 'static,
     {
-        let mut conn = self.conn().expect("Failed to open connection");
-        conn.execute_in_exclusive_rw_txn(|w| DatabaseResult::Ok(f(w)))
-            .expect("Database transaction failed")
+        holochain_util::tokio_helper::block_forever_on(async {
+            self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+                .await
+                .unwrap()
+        })
     }
 }
 
@@ -622,6 +698,7 @@ impl<'e> PConn {
                 || tracing::debug!(file = %file!(), line = %line!(), time = ?start.elapsed()),
             );
         }
+        // TODO It would be possible to prevent the transaction from calling commit here if we passed a reference instead of a move.
         f(txn)
     }
 
