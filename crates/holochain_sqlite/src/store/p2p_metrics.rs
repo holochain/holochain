@@ -1,4 +1,4 @@
-use crate::prelude::{DatabaseError, DatabaseResult};
+use crate::error::{DatabaseError, DatabaseResult};
 use crate::sql::*;
 use holochain_zome_types::prelude::*;
 use kitsune_p2p::event::MetricRecord;
@@ -40,17 +40,17 @@ pub trait AsP2pMetricStoreTxExt {
     fn p2p_prune_metrics(&self) -> DatabaseResult<()>;
 }
 
-impl AsP2pMetricStoreConExt for crate::db::PConnGuard {
-    fn p2p_log_metrics(&mut self, metrics: Vec<MetricRecord>) -> DatabaseResult<()> {
-        // TODO may not call internal implementation!
-        self.execute_in_exclusive_rw_txn(move |writer| writer.p2p_log_metrics(metrics))
-    }
-
-    fn p2p_prune_metrics(&mut self) -> DatabaseResult<()> {
-        // TODO may not call internal implementation!
-        self.execute_in_exclusive_rw_txn(move |writer| writer.p2p_prune_metrics())
-    }
-}
+// impl AsP2pMetricStoreConExt for PConnGuard {
+//     fn p2p_log_metrics(&mut self, metrics: Vec<MetricRecord>) -> DatabaseResult<()> {
+//         // TODO may not call internal implementation!
+//         self.execute_in_exclusive_rw_txn(move |writer| writer.p2p_log_metrics(metrics))
+//     }
+//
+//     fn p2p_prune_metrics(&mut self) -> DatabaseResult<()> {
+//         // TODO may not call internal implementation!
+//         self.execute_in_exclusive_rw_txn(move |writer| writer.p2p_prune_metrics())
+//     }
+// }
 
 impl AsP2pMetricStoreTxExt for Transaction<'_> {
     fn p2p_log_metrics(&self, metrics: Vec<MetricRecord>) -> DatabaseResult<()> {

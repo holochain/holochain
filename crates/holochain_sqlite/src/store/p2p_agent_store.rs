@@ -74,46 +74,46 @@ pub trait AsP2pStateTxExt {
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
 }
 
-impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
-    fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        self.execute_in_read_txn(move |reader| reader.p2p_get_agent(agent))
-    }
-
-    fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
-        self.execute_in_read_txn(move |reader| reader.p2p_remove_agent(agent))
-    }
-
-    fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.execute_in_read_txn(move |reader| reader.p2p_list_agents())
-    }
-
-    fn p2p_count_agents(&mut self) -> DatabaseResult<u32> {
-        self.execute_in_read_txn(move |reader| reader.p2p_count_agents())
-    }
-
-    fn p2p_gossip_query_agents(
-        &mut self,
-        since_ms: u64,
-        until_ms: u64,
-        arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.execute_in_read_txn(move |reader| {
-            reader.p2p_gossip_query_agents(since_ms, until_ms, arcset)
-        })
-    }
-
-    fn p2p_query_near_basis(
-        &mut self,
-        basis: u32,
-        limit: u32,
-    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        self.execute_in_read_txn(move |reader| reader.p2p_query_near_basis(basis, limit))
-    }
-
-    fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
-        self.execute_in_read_txn(move |reader| reader.p2p_extrapolated_coverage(dht_arc_set))
-    }
-}
+// impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
+//     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+//         self.execute_in_read_txn(move |reader| reader.p2p_get_agent(agent))
+//     }
+//
+//     fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+//         self.execute_in_read_txn(move |reader| reader.p2p_remove_agent(agent))
+//     }
+//
+//     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+//         self.execute_in_read_txn(move |reader| reader.p2p_list_agents())
+//     }
+//
+//     fn p2p_count_agents(&mut self) -> DatabaseResult<u32> {
+//         self.execute_in_read_txn(move |reader| reader.p2p_count_agents())
+//     }
+//
+//     fn p2p_gossip_query_agents(
+//         &mut self,
+//         since_ms: u64,
+//         until_ms: u64,
+//         arcset: DhtArcSet,
+//     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+//         self.execute_in_read_txn(move |reader| {
+//             reader.p2p_gossip_query_agents(since_ms, until_ms, arcset)
+//         })
+//     }
+//
+//     fn p2p_query_near_basis(
+//         &mut self,
+//         basis: u32,
+//         limit: u32,
+//     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+//         self.execute_in_read_txn(move |reader| reader.p2p_query_near_basis(basis, limit))
+//     }
+//
+//     fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+//         self.execute_in_read_txn(move |reader| reader.p2p_extrapolated_coverage(dht_arc_set))
+//     }
+// }
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
