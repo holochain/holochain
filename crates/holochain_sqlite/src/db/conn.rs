@@ -1,15 +1,26 @@
 use crate::prelude::*;
 use rusqlite::*;
+use std::ops::{Deref, DerefMut};
 
 pub type PConnInner = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
-// TODO once `conn` has been removed from the public interface, this can be made pub(crate)
 /// Singleton Connection
-#[derive(shrinkwraprs::Shrinkwrap)]
-#[shrinkwrap(mutable)]
-pub struct PConn {
-    #[shrinkwrap(main_field)]
-    pub inner: PConnInner,
+pub(super) struct PConn {
+    inner: PConnInner,
+}
+
+impl Deref for PConn {
+    type Target = PConnInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for PConn {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 impl<'e> PConn {

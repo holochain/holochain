@@ -1,17 +1,29 @@
 use crate::db::conn::PConn;
 use crate::error::DatabaseResult;
 use rusqlite::Transaction;
-use shrinkwraprs::Shrinkwrap;
+use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 use tokio::sync::OwnedSemaphorePermit;
 
-#[derive(Shrinkwrap)]
-#[shrinkwrap(mutable)]
-pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit);
+pub(super) struct PConnGuard(PConn, OwnedSemaphorePermit);
 
 impl PConnGuard {
     pub(super) fn new(conn: PConn, permit: OwnedSemaphorePermit) -> Self {
         PConnGuard(conn, permit)
+    }
+}
+
+impl Deref for PConnGuard {
+    type Target = PConn;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for PConnGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
