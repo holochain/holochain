@@ -28,13 +28,10 @@ use holochain_p2p::{
     dht_arc::{DhtArcRange, DhtArcSet},
     event::FetchOpDataQuery,
 };
-use holochain_sqlite::{
-    conn::{DbSyncLevel, DbSyncStrategy},
-    db::{
-        DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
-        DbKindWasm, DbWrite, ReadAccess,
-    },
-    prelude::DatabaseResult,
+use holochain_sqlite::prelude::{
+    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
+    ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -43,7 +40,6 @@ use holochain_state::{
     query::{map_sql_dht_op_common, StateQueryError},
     source_chain::{SourceChain, SourceChainResult},
 };
-use holochain_types::db::AsP2pStateTxExt;
 use holochain_types::prelude::CellId;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
