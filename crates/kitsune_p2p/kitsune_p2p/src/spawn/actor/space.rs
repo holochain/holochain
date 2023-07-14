@@ -747,6 +747,8 @@ async fn update_single_agent_info(
 }
 
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::GhostControlSender;
+
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
@@ -1438,7 +1440,12 @@ impl Space {
                 ))
                 .await;
                 if let Err(e) = i_s_c.update_agent_info().await {
-                    tracing::error!(failed_to_update_agent_info_for_space = ?e);
+                    if !i_s_c.ghost_actor_is_active() {
+                        // Assume this task has been orphaned when the space was dropped and exit.
+                        break;
+                    } else {
+                        tracing::error!(failed_to_update_agent_info_for_space = ?e);
+                    }
                 }
             }
         });
@@ -1459,7 +1466,6 @@ impl Space {
                 let mut delay_len = START_DELAY;
 
                 loop {
-                    use ghost_actor::GhostControlSender;
                     if !i_s_c.ghost_actor_is_active() {
                         break;
                     }
