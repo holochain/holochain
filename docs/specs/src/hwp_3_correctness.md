@@ -7,7 +7,7 @@ distributed coordination system is analyzed through the lens of "fault
 tolerance". In our frame we take on a broader scope and address the
 question of the many kinds of confidence necessary for a system's adoption
 and continued use. We identify and address the following dimensions
-necessary confidence:
+of confidence:
 
 1.  **Fault Tolerance:** the system's resilience to external
   perturbations, both malicious and natural. Intrinsic integrity.
@@ -65,8 +65,8 @@ malicious action, see the [section on Security](#security).
   that point forward. But, because the publishing protocol requires
   Agents to publish Actions to the neighborhood of their own public
   key, any actions that lead to a forked chain will be easily and
-  immediately detected by simple matching more than one action
-  linked to a previous action.\
+  immediately detected by simply detecting more than one action
+  linked to the same previous action.\
   It is also possible to unintentionally rollback one's chain.
   Imagine a setting where a hard-drive corruption leads to a restore
   from a non-up-to-date backup. If a user starts adding to their
@@ -148,7 +148,7 @@ c.  **Witnessed Authoritative Sequence:** Some applications may require
   Carol and David are both members of the group, and Carol commits a
   change which removes David, and David commits a change which
   removes Carol from the group. With no global time clock to trust,
-  who's change wins? An application can set up a small pool of
+  whose change wins? An application can set up a small pool of
   witnesses and configure their countersigning session to require M
   50% of N) and whichever action the
   witnesses sign first would prevent the other action from getting
@@ -226,7 +226,7 @@ integrity guarantees listed in the formal system description, detail the
 fundamental data safety that Holochain applications provide. Some other
 important facets of system security and safety come from:
 
-1.  Gating access functions that change state, for which Holochain
+1.  Gating access to functions that change state, for which Holochain
   provides a unified and flexible Object Capabilities model
 
 2.  Detecting and Blocking participation of bad actors, for which
@@ -297,7 +297,7 @@ worth mentioning because there​ ​are​ ​a​ ​number​ ​of​ ​att
 collusion between some majority of nodes. ​The​ ​usual
 thinking​ ​is​ ​that​ ​it​ ​takes​ ​a​ ​large​ ​number​ ​of​ ​nodes 
 ​and​ ​massive​ ​amounts​ ​of​ ​computing​ ​power or financial
-incentives46​ ​to prevent​ ​undue​ ​hijacking​ ​of​ ​consensus.​
+incentives​ ​to prevent​ ​undue​ ​hijacking​ ​of​ ​consensus.​
 ​However,​ ​since​ ​Holochain's data coherence doesn't derive from all
 nodes proceeding in consensus​ lockstep,​ ​but​ rather ​on​ determinist
 validation, nobody​ ​ever​ ​needs​ ​to​ ​trust​ ​a​ ​consensus​
@@ -390,7 +390,7 @@ so:
   but crucially in the architecture of app instances having fully
   separate DNAs running on their own separate networks, each also
   having clear and differentiable Integrity and Coordination
-  specifications. This creates a very clear loci of change, both at
+  specifications. This creates very clear loci of change, both at
   the level of when the integrity rules of a DNA need to change, and
   at the level of how one interacts with a DNA. This allows
   applications to evolve exactly in the necessary area by updating
