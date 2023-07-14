@@ -5,7 +5,7 @@ System Correctness: Confidence
 In the frame of the Byzantine Generals problem, the correctness of a
 distributed coordination system is analyzed through the lens of "fault
 tolerance". In our frame we take on a broader scope and address the
-question of the many kinds of confidence necessary for a system adoption
+question of the many kinds of confidence necessary for a system's adoption
 and continued use. We identify and address the following dimensions
 necessary confidence:
 
