@@ -12,7 +12,7 @@ necessary confidence:
 1.  **Fault Tolerance:** the system's resilience to external
   perturbations, both malicious and natural. Intrinsic integrity.
 
-2.  **Completeness/Fit:** the system's apriori design elements that
+2.  **Completeness/Fit:** the system's *a priori* design elements that
   demonstrate fitness for purpose. We demonstrate this by describing
   how Holochain addresses: multi-agent reality binding, scalability,
   and shared-state finality.
