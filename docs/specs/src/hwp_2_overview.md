@@ -98,7 +98,9 @@ Games have these properties:
   key design decision that contributes to the system's overall
   design goals of evolvability. Essentially this creates the pattern of
   game-within-a-game.  For example a chess tournament is really two games:
-  the game of "chess", and the game of "tournament".
+  the game of "chess", and the game of "tournament".  Composition thus happens
+  at the edges of games, which allows each game to remain coherent on its
+  own terms.
 
 In keeping with the metaphor of Game, we also refer to the Integrity
 specification as the Validation rules of the Game.
@@ -106,7 +108,7 @@ specification as the Validation rules of the Game.
 We also refer to both the Integrity and Coordination specifications of a
 Game as its DNA because this evokes the pattern of all the "cells" in
 the social "body" as being built out of the same instruction set, thus
-being the ground of self for that social body.
+being the ground of self for that social body. We also call these specifications generically by the name Zome (short for chromosomes) as they also function as composable units for building larger DNAs.
 
 ### Actions (and Entries and Records)
 
@@ -132,29 +134,30 @@ Actions have these properties:
   will thus be published by the Agent to the network, or declared as
   private, where publishing is limited to just the Action data and
   not the content. Entries are addressed by their hash, and thus for
-  CreateEntry Actions, this hash is included in it. Thus sometimes
-  the Action is considered to be "meta-data" where the Entry is
-  considered "data"[^headers] .
+  CreateEntry Actions, this Entry hash is included in the Action. Thus
+  sometimes the Action may be understood as "meta-data" where the Entry is
+  understood as "data"[^headers].  Note that Actions and Entries are thus independently addressable and retreivable.  This is a valuable property
+  of the system.  Note also that many actions (for example ones taken by different agents) may create the exact same Entry, i.e. a hash-tag may be it's own entry but be created by different people.
 
-2.  UpdateEntry: An Action which adds new Game-specific content onto the
+1.  UpdateEntry: An Action which adds new Game-specific content onto the
   chain that is intended to update previous content.
 
-3.  MarkEntryAsDeleted: An Action which indicates a previous entry
+1.  MarkEntryAsDeleted: An Action which indicates a previous entry
   should be considered deleted.
 
-4.  CreateLink: An Action that unidirectionally links one hash to another
+1.  CreateLink: An Action that unidirectionally links one hash to another
 
-5.  DeleteLink: An Action that indicates a previous link action should
+2.  DeleteLink: An Action that indicates a previous link action should
   be considered deleted.
 
-6.  A Record is just a name for both an Action and, when applicable, 
+1.  A Record is just a name for both an Action and, when applicable, 
   its Entry, taken together. As an implementation detail, note that for 
   actions other than CreateEntry and UpdateEntry we don't need to 
   address the content of the Action separately, in which case the Record 
   contains no Entry and we simply retrieve all the we simply retrieve all the
   data we need from the recorded Action.
 
-7.  Subsets of Agents can mutually consent to a single Action by
+1.  Subsets of Agents can mutually consent to a single Action by
   atomically recording the Action in their history through
   Countersigning. Countersigning can also be seen as an affordance
   in the system for "micro-consensus" when that is necessary.
