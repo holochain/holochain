@@ -37,6 +37,7 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
+use opentelemetry_api::metrics::Histogram;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -189,6 +190,26 @@ pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
 type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;
 
+struct MetricSendGuard {
+    metric: Histogram<f64>,
+    rem_id: tx5::Id,
+    value: f64,
+    is_error: bool,
+}
+
+impl Drop for MetricSendGuard {
+    fn drop(&mut self) {
+        self.metric.record(
+            &opentelemetry_api::Context::new(),
+            self.value,
+            &[
+                opentelemetry_api::KeyValue::new("remId", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("isError", self.is_error),
+            ],
+        );
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
@@ -201,6 +222,7 @@ pub enum MetaNetCon {
         rem_url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
+        metric_msg_out: Histogram<f64>,
     },
 }
 
@@ -282,14 +304,31 @@ impl MetaNetCon {
 
                     #[cfg(feature = "tx5")]
                     {
-                        if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
+                        if let MetaNetCon::Tx5 {
+                            ep,
+                            rem_url,
+                            metric_msg_out,
+                            ..
+                        } = self
+                        {
                             let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                             let wrap = WireWrap::notify(msg_id, WireData(wire));
 
                             let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+
+                            let mut metric_guard = MetricSendGuard {
+                                metric: metric_msg_out.clone(),
+                                rem_id: rem_url.id().unwrap(),
+                                value: data.len() as f64,
+                                is_error: true,
+                            };
+
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
+
+                            metric_guard.is_error = false;
+
                             return Ok(());
                         }
                     }
@@ -341,6 +380,7 @@ impl MetaNetCon {
                             ep,
                             rem_url,
                             res: res_store,
+                            metric_msg_out,
                             ..
                         } = self
                         {
@@ -357,10 +397,21 @@ impl MetaNetCon {
                             let wrap = WireWrap::request(msg_id, WireData(wire));
                             let data = wrap.encode_vec().map_err(KitsuneError::other)?;
 
+                            let mut metric_guard = MetricSendGuard {
+                                metric: metric_msg_out.clone(),
+                                rem_id: rem_url.id().unwrap(),
+                                value: data.len() as f64,
+                                is_error: true,
+                            };
+
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
-                            return r.await.map_err(|_| KitsuneError::other("timeout"));
+
+                            let result = r.await.map_err(|_| KitsuneError::other("timeout"))?;
+
+                            metric_guard.is_error = false;
+                            return Ok(result);
                         }
                     }
 
@@ -420,6 +471,7 @@ pub enum MetaNet {
         url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
+        metric_msg_out: Histogram<f64>,
     },
 }
 
@@ -636,6 +688,14 @@ impl MetaNet {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         signal_url: String,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+        opentelemetry_api::global::meter("kitsune_p2p");
+
+        let metric_msg_out = opentelemetry_api::global::meter("kitsune_p2p")
+            .f64_histogram("kitsune_p2p.msg_out")
+            .with_description("Outgoing p2p network messages")
+            .with_unit(opentelemetry_api::metrics::Unit::new("By"))
+            .init();
+
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
@@ -715,6 +775,7 @@ impl MetaNet {
         let res_store2 = res_store.clone();
         let tuning_params2 = tuning_params.clone();
         let spawn_host = host.clone();
+        let metric_msg_out2 = metric_msg_out.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
                 let evt = match evt {
@@ -736,6 +797,7 @@ impl MetaNet {
                                     rem_url: rem_cli_url,
                                     res: res_store2.clone(),
                                     tun: tuning_params2.clone(),
+                                    metric_msg_out: metric_msg_out2.clone(),
                                 },
                             })
                             .await
@@ -754,6 +816,7 @@ impl MetaNet {
                                     rem_url: rem_cli_url,
                                     res: res_store2.clone(),
                                     tun: tuning_params2.clone(),
+                                    metric_msg_out: metric_msg_out2.clone(),
                                 },
                             })
                             .await
@@ -783,6 +846,7 @@ impl MetaNet {
                                                     rem_url: rem_cli_url,
                                                     res: res_store2.clone(),
                                                     tun: tuning_params2.clone(),
+                                                    metric_msg_out: metric_msg_out2.clone(),
                                                 },
                                                 data,
                                             })
@@ -830,6 +894,7 @@ impl MetaNet {
                                                     rem_url: rem_cli_url,
                                                     res: res_store2.clone(),
                                                     tun: tuning_params2.clone(),
+                                                    metric_msg_out: metric_msg_out2.clone(),
                                                 },
                                                 data,
                                                 respond,
@@ -880,6 +945,7 @@ impl MetaNet {
                 url: cli_url,
                 res: res_store,
                 tun: tuning_params,
+                metric_msg_out,
             },
             evt_recv,
         ))
@@ -981,7 +1047,12 @@ impl MetaNet {
         #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 {
-                host, ep, res, tun, ..
+                host,
+                ep,
+                res,
+                tun,
+                metric_msg_out,
+                ..
             } = self
             {
                 return Ok(MetaNetCon::Tx5 {
@@ -990,6 +1061,7 @@ impl MetaNet {
                     rem_url: tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
                     res: res.clone(),
                     tun: tun.clone(),
+                    metric_msg_out: metric_msg_out.clone(),
                 });
             }
         }
