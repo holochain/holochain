@@ -33,6 +33,16 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub tracing_override: Option<String>,
 
+    /// By default holochain conductor will run a local influxdb instance
+    /// for collecting metrics to help with diagnosing runtime issues.
+    /// This data is only kept locally, and is not automatically
+    /// shared with anyone. Please consider providing it in any bug
+    /// reports you may submit.
+    /// Set this value to `true` if you do not want to collect these local
+    /// metrics.
+    #[serde(default)]
+    pub disable_metrics: Option<bool>,
+
     /// The path to the database for this conductor;
     /// if omitted, chooses a default path.
     pub environment_path: DatabaseRootPath,
@@ -142,6 +152,7 @@ pub mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
+                disable_metrics: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
@@ -216,6 +227,7 @@ pub mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
+                disable_metrics: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
@@ -248,6 +260,7 @@ pub mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
+                disable_metrics: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
