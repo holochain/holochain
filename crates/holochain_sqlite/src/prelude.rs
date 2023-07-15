@@ -3,3 +3,4 @@
 pub use crate::db::*;
 pub use crate::error::*;
 pub use crate::exports::*;
+pub use crate::store::*;
