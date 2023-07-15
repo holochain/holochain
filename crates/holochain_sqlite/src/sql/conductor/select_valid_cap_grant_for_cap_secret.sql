@@ -2,17 +2,19 @@ SELECT
   Entry.blob
 FROM
   Entry
+  INNER JOIN Action ON Action.author = ?2
+  AND Action.entry_hash = Entry.hash
 WHERE
   Entry.cap_secret = ?1
   AND (
     SELECT
-      COUNT(Action.hash)
+      COUNT(UpdateActions.hash)
     FROM
-      Action
+      Action AS UpdateActions
     WHERE
-      Action.author = ?2
+      UpdateActions.author = ?2
       AND (
-        Action.original_entry_hash = Entry.hash
-        OR Action.deletes_entry_hash = Entry.hash
+        UpdateActions.original_entry_hash = Entry.hash
+        OR UpdateActions.deletes_entry_hash = Entry.hash
       )
   ) = 0
