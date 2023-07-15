@@ -1359,7 +1359,6 @@ pub mod tests {
     use super::*;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
     use hdk::prelude::*;
     use holochain_p2p::MockHolochainP2pDnaT;
     use matches::assert_matches;
@@ -1790,6 +1789,39 @@ pub mod tests {
             None
         );
 
+        // Two source chains of the same DNA on the same conductor share DB tables.
+        // That could lead to cap grants looked up by their secret alone being
+        // returned for any agent on the conductor.
+        // in this case for alice trying to access carol's chain
+        {
+            source_chain::genesis(
+                db.clone(),
+                dht_db.to_db(),
+                &dht_db_cache,
+                keystore.clone(),
+                fake_dna_hash(1),
+                carol.clone(),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            let carol_chain = SourceChain::new(
+                db.clone(),
+                dht_db.clone(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                carol.clone(),
+            )
+            .await
+            .unwrap();
+            let maybe_cap_grant = carol_chain
+                .valid_cap_grant(("".into(), "".into()), alice.clone(), secret.clone())
+                .await
+                .unwrap();
+            assert_eq!(maybe_cap_grant, None);
+        }
+
         // delete updated cap grant
         {
             let chain = SourceChain::new(
@@ -1883,6 +1915,43 @@ pub mod tests {
                 .await?,
             Some(unrestricted_grant.clone().into())
         );
+        // but not for bob's chain
+        //
+        // Two source chains of the same DNA on the same conductor share DB tables.
+        // That could lead to cap grants looked up by being unrestricted alone
+        // being returned for any agent on the conductor.
+        // in this case carol should not get an unrestricted cap grant for
+        // bob's chain
+        {
+            {
+                source_chain::genesis(
+                    db.clone(),
+                    dht_db.to_db(),
+                    &dht_db_cache,
+                    keystore.clone(),
+                    fake_dna_hash(1),
+                    bob.clone(),
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+                let bob_chain = SourceChain::new(
+                    db.clone(),
+                    dht_db.clone(),
+                    dht_db_cache.clone(),
+                    keystore.clone(),
+                    bob.clone(),
+                )
+                .await
+                .unwrap();
+                let maybe_cap_grant = bob_chain
+                    .valid_cap_grant(("".into(), "".into()), carol.clone(), None)
+                    .await
+                    .unwrap();
+                assert_eq!(maybe_cap_grant, None);
+            }
+        }
 
         // delete unrestricted cap grant
         {
@@ -2350,104 +2419,5 @@ pub mod tests {
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert_eq!(zomes_initialized, true);
-    }
-
-    // two source chains of the same DNA on the same conductor share DB tables;
-    // that could lead to cap grants looked up by their secret alone being
-    // returned for any agent on the conductor
-    #[tokio::test(flavor = "multi_thread")]
-    async fn cap_grant_by_secret_is_filtered_by_author() {
-        let test_db = test_authored_db();
-        let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
-        let keystore = test_keystore();
-        let vault = test_db.to_db();
-        let dna_hash = fixt!(DnaHash);
-        let alice = keystore.new_sign_keypair_random().await.unwrap();
-        let bob = keystore.new_sign_keypair_random().await.unwrap();
-
-        // create alice's cell
-        genesis(
-            vault.clone().into(),
-            dht_db.to_db(),
-            &dht_db_cache,
-            keystore.clone(),
-            dna_hash.clone(),
-            alice.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        let alice_chain = SourceChain::new(
-            vault.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await
-        .unwrap();
-
-        // create bob's cell
-        genesis(
-            vault.clone().into(),
-            dht_db.to_db(),
-            &dht_db_cache,
-            keystore.clone(),
-            dna_hash.clone(),
-            bob.clone(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        let bob_chain = SourceChain::new(
-            vault.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            bob.clone(),
-        )
-        .await
-        .unwrap();
-
-        // insert a cap grant assigned to alice into alice's source chain
-        let mut buf = arbitrary::Unstructured::new(&[]);
-        let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
-        let mut assignees = BTreeSet::new();
-        assignees.insert(alice.clone());
-        let cap_grant_entry = Entry::CapGrant(ZomeCallCapGrant::new(
-            "".to_string(),
-            CapAccess::Assigned {
-                secret: cap_secret.clone(),
-                assignees,
-            },
-            GrantedFunctions::All,
-        ));
-        let entry_hash = EntryHashed::from_content_sync(cap_grant_entry.clone()).into_hash();
-        let create_cap_grant_action = builder::Create {
-            entry_hash,
-            entry_type: EntryType::CapClaim,
-        };
-        alice_chain
-            .put_weightless(
-                create_cap_grant_action,
-                Some(cap_grant_entry),
-                ChainTopOrdering::Relaxed,
-            )
-            .await
-            .unwrap();
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
-        alice_chain.flush(&mock).await.unwrap();
-
-        // looking up cap grant for alice by secret in bob's source chain should fail
-        let maybe_cap_grant = bob_chain
-            .valid_cap_grant(("".into(), "".into()), alice.clone(), Some(cap_secret))
-            .await
-            .unwrap();
-        assert_eq!(maybe_cap_grant, None);
     }
 }
