@@ -56,6 +56,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let expected_link = Link {
             author: agent_pub_key,
             create_link_hash: link_add_hash.clone(),
+            base: link_add.base_address.clone(),
             target: target_address.clone().into(),
             zome_index,
             link_type,
@@ -739,6 +740,7 @@ async fn links_on_same_base() {
             GetLinksFilter::default(),
         );
         d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
+        d.expected_link.base = d.link_add.base_address.clone();
     }
     {
         // Add
@@ -832,6 +834,7 @@ async fn links_on_same_tag() {
         let (_, link_add_hash): (_, ActionHash) =
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.base = d.link_add.base_address.clone();
         d.expected_link.tag = tag.clone();
         d.expected_link.zome_index = zome_index;
         d.expected_link.link_type = link_type;
@@ -901,6 +904,7 @@ async fn links_on_same_type() {
         let (_, link_add_hash): (_, ActionHash) =
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.base = d.link_add.base_address.clone();
         d.expected_link.link_type = link_type;
     }
 
@@ -964,6 +968,7 @@ async fn link_type_ranges() {
         // Create the new hash
         let link_add_hash = ActionHash::with_data_sync(&Action::CreateLink(d.link_add.clone()));
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.base = d.link_add.base_address.clone();
     }
 
     // Add
