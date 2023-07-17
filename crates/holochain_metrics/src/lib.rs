@@ -17,12 +17,6 @@ pub async fn initialize_metrics(path: std::path::PathBuf) {
                     let _ = influxive.apply(DASH_NETWORK_STATS).await;
                 }
             }
-            if let Ok(cur) = influxive.list_dashboards().await {
-                // only initialize dashboards if the db is new
-                if cur.contains("\"dashboards\": []") {
-                    let _ = influxive.apply(DASH_NETWORK_STATS).await;
-                }
-            }
 
             opentelemetry_api::global::set_meter_provider(
                 influxive_otel::InfluxiveMeterProvider::new(std::sync::Arc::new(influxive)),
