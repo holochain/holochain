@@ -48,7 +48,7 @@ impl RunOpts {
 }
 
 /// The default configured signal server url.
-pub const DEF_SIGNAL_URL: &str = "wss://signal.holotest.net";
+pub const DEF_SIGNAL_URL: &str = "wss://signal.holo.host";
 
 /// The default configured bootstrap server url.
 pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
