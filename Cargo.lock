@@ -3654,9 +3654,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-child-svc"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0335a01e3e17f62a81c9c2b8bc8923a9da7a0bc95c29d8b5a65f7540b29e9e"
+checksum = "6930605a7c09ec55e8512bca7ae84b0f6ee86a82d39d2b523991af53a1adba99"
 dependencies = [
  "flate2",
  "futures",
@@ -3673,9 +3673,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-otel"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bcbfd350caab08b5a73a05853fa9927aa2eaa282a1306f52ef1495306f94f0e"
+checksum = "a3d726f1609a14cbab98f8cec89c75e404572ad708a9ec4f600030ef7ac7d9d4"
 dependencies = [
  "influxive-child-svc",
  "ts_opentelemetry_api",

@@ -191,20 +191,20 @@ pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;
 
 struct MetricSendGuard {
-    byte_metric: Histogram<f64>,
+    byte_metric: Histogram<u64>,
     time_metric: Histogram<f64>,
     rem_id: tx5::Id,
     is_error: bool,
-    byte_count: f64,
+    byte_count: u64,
     start_time: std::time::Instant,
 }
 
 impl MetricSendGuard {
     pub fn new(
-        byte_metric: Histogram<f64>,
+        byte_metric: Histogram<u64>,
         time_metric: Histogram<f64>,
         rem_id: tx5::Id,
-        byte_count: f64,
+        byte_count: u64,
     ) -> Self {
         Self {
             byte_metric,
@@ -255,7 +255,7 @@ pub enum MetaNetCon {
         rem_url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
-        metric_msg_out_byte: Histogram<f64>,
+        metric_msg_out_byte: Histogram<u64>,
         metric_msg_out_time: Histogram<f64>,
     },
 }
@@ -355,7 +355,7 @@ impl MetaNetCon {
                                 metric_msg_out_byte.clone(),
                                 metric_msg_out_time.clone(),
                                 rem_url.id().unwrap(),
-                                data.len() as f64,
+                                data.len() as u64,
                             );
 
                             tracing::warn!(%rem_url, "send data");
@@ -439,7 +439,7 @@ impl MetaNetCon {
                                 metric_msg_out_byte.clone(),
                                 metric_msg_out_time.clone(),
                                 rem_url.id().unwrap(),
-                                data.len() as f64,
+                                data.len() as u64,
                             );
 
                             tracing::warn!(%rem_url, "send data");
@@ -511,7 +511,7 @@ pub enum MetaNet {
         url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
-        metric_msg_out_byte: Histogram<f64>,
+        metric_msg_out_byte: Histogram<u64>,
         metric_msg_out_time: Histogram<f64>,
     },
 }
@@ -732,7 +732,7 @@ impl MetaNet {
         opentelemetry_api::global::meter("kitsune_p2p");
 
         let metric_msg_out_byte = opentelemetry_api::global::meter("kitsune_p2p")
-            .f64_histogram("kitsune_p2p.msg_out_byte_count")
+            .u64_histogram("kitsune_p2p.msg_out_byte_count")
             .with_description("Outgoing p2p network messages byte count")
             .with_unit(opentelemetry_api::metrics::Unit::new("By"))
             .init();
