@@ -1,4 +1,4 @@
-use holochain_sqlite::db::{DbKind, DbKindT};
+use holochain_sqlite::prelude::{DbKind, DbKindT};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]

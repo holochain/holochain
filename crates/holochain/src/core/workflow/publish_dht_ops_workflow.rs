@@ -422,10 +422,9 @@ mod tests {
                 fake_genesis(db.clone(), dht_db.to_db(), keystore.clone())
                     .await
                     .unwrap();
-                db.conn()
-                    .unwrap()
-                    .execute("UPDATE DhtOp SET receipts_complete = 1", [])
-                    .unwrap();
+                db.write_async(move |txn| -> DatabaseResult<usize> {
+                    Ok(txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])?)
+                }).await.unwrap();
                 let author = fake_agent_pubkey_1();
 
                 // Put data in records
