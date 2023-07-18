@@ -1,7 +1,4 @@
 use contrafact::MutationError;
-use crate::sweettest::sweet_topos::NetworkTopologyGraph;
-use crate::sweettest::sweet_topos::NetworkTopologyEdge;
-use petgraph::Graph::NodeIndex;
 use std::collections::HashMap;
 use petgraph::unionfind::UnionFind;
 use contrafact::Mutation;
@@ -9,9 +6,25 @@ use contrafact::Generator;
 use contrafact::Fact;
 use rand::prelude::SliceRandom;
 use rand::SeedableRng;
+use petgraph::prelude::*;
+use crate::sweettest::fact::edge::FullAgentViewFact;
+use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
 
+/// Fact:
+/// - The network has a specific number of partitions.
+/// - The network is partitioned as strictly as possible. This means that there
+///  are no edges between nodes in different partitions.
+/// - The partition generation process has a specific efficiency. More efficient
+/// partitioning means that the partitions heal more quickly which can lead to
+/// one or a few partitions dominating the network. Less efficient partitioning
+/// means that the partitions heal more slowly which can lead to a more even
+/// distribution of partitions.
 struct StrictlyPartitionedNetworkFact {
+    /// The number of partitions in the network.
     partitions: usize,
+    /// The efficiency of the partitioning process. This is a number between 0
+    /// and 1. The higher the number, the more efficient the partitioning
+    /// process.
     efficiency: f64,
 }
 
@@ -45,7 +58,7 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
 
         // Add edges until the graph is connected up to the desired number of
         // partitions.
-        while self.strict_partitions() > self.partitions {
+        while graph.strict_partitions() > self.partitions {
             // Taken from `connected_components` in petgraph.
             // Builds our view on the partitions as they are.
             let mut vertex_sets = UnionFind::new(graph.node_bound());
@@ -132,7 +145,11 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
                 // If the node in the smallest partition is the node we picked,
                 // do nothing this round.
                 if node_index != other_node_index {
-                    graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
+                    let edge = FullAgentViewFact {
+                        origin: node_index,
+                        target: other_node_index,
+                    }.build_fallible(g)?;
+                    graph.add_edge(node_index, other_node_index, edge);
                 }
             } else {
                 // Iterate over all the other nodes in the graph, shuffled. For each
@@ -146,7 +163,11 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
                     if vertex_sets.find(node_index.index())
                         != vertex_sets.find(other_node_index.index())
                     {
-                        graph.add_edge(node_index, other_node_index, NetworkTopologyEdge);
+                        let edge = FullAgentViewFact {
+                            origin: node_index,
+                            target: other_node_index,
+                        }.build_fallible(g)?;
+                        graph.add_edge(node_index, other_node_index, edge);
                         break;
                     }
                 }

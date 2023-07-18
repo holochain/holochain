@@ -6,11 +6,13 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use std::fmt;
+use arbitrary::Arbitrary;
 
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 #[derive(
+    Arbitrary,
     Clone,
     Debug,
     Hash,

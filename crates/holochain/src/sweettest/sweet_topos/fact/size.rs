@@ -1,11 +1,16 @@
-use crate::sweettest::sweet_topos::NetworkTopologyGraph;
-use crate::sweettest::sweet_topos::NetworkTopologyNode;
 use contrafact::Mutation;
 use contrafact::Generator;
 use contrafact::Fact;
 use std::ops::RangeInclusive;
+use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
+use crate::sweettest::sweet_topos::node::NetworkTopologyNode;
 
+/// Fact:
+/// - The network has a specific number of nodes.
+/// - Each node has a specific number of agents.
 struct SizedNetworkFact {
+    /// The number of nodes in the network.
+    /// Ideally this would be a range, but we can't do that yet.
     nodes: usize,
 }
 
@@ -29,7 +34,8 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
     ) -> Mutation<NetworkTopologyGraph> {
         let mut node_count = graph.node_count();
         while node_count < self.nodes {
-            graph.add_node(NetworkTopologyNode);
+            let node = g.arbitrary::<NetworkTopologyNode>("Could not create node")?;
+            graph.add_node(node);
             node_count = graph.node_count();
         }
         while node_count > self.nodes {

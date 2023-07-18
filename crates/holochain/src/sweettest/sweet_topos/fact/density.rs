@@ -1,9 +1,9 @@
-use crate::sweettest::sweet_topos::NetworkTopologyGraph;
+use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
 use contrafact::MutationError;
-use crate::sweettest::sweet_topos::NetworkTopologyEdge;
 use contrafact::Mutation;
 use contrafact::Generator;
 use contrafact::Fact;
+use super::edge::FullAgentViewFact;
 
 struct DenseNetworkFact {
     density: f64,
@@ -47,7 +47,8 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for DenseNetworkFact {
             // Don't add an edge if it already exists or if it's a self edge.
             // Density calculations assume this so we can't introduce any.
             if !graph.contains_edge(a, b) && a != b {
-                graph.add_edge(a, b, NetworkTopologyEdge);
+                let edge = FullAgentViewFact{ target: graph[b] }.build_fallible(g).map_err(|_| MutationError::Exception("Failed to build agent view".into()))?;
+                graph.add_edge(a, b, edge);
             }
         }
 
