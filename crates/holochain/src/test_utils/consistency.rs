@@ -7,17 +7,17 @@ use std::{
 };
 
 use futures::stream::StreamExt;
-use holo_hash::{DhtOpHash, DnaHash};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_p2p::{
     dht_arc::{DhtArc, DhtLocation},
     AgentPubKeyExt, DhtOpHashExt,
 };
-use holochain_sqlite::{
-    db::{AsP2pStateTxExt, DbKindAuthored, DbKindDht, DbKindP2pAgents},
-    prelude::DatabaseResult,
+use holochain_sqlite::prelude::{
+    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
 };
-use holochain_state::prelude::StateQueryResult;
-use holochain_types::{db::DbRead, dht_op::DhtOpType};
+use holochain_state::{prelude::StateQueryResult, query::from_blob};
+use holochain_types::{db::DbRead, dht_op::DhtOpType, prelude::DhtOp};
+use holochain_zome_types::{Entry, EntryVisibility, SignedAction};
 use kitsune_p2p::{KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_types::consistency::*;
 use rusqlite::named_params;
@@ -583,7 +583,7 @@ async fn check_agents<'iter>(
 ) -> DatabaseResult<impl Iterator<Item = &'iter Arc<KitsuneAgent>> + 'iter> {
     // Poll the peer database for the currently held agents.
     let agents_held: HashSet<_> = p2p_agents_db
-        .async_reader(|txn| {
+        .read_async(|txn| {
             DatabaseResult::Ok(
                 txn.p2p_list_agents()?
                     .into_iter()
@@ -615,7 +615,7 @@ async fn check_hashes(
 
     // Poll the vault database for each expected hashes existence.
     let mut r = dht_db
-                .async_reader(move |txn| {
+                .read_async(move |txn| {
                     for hash in &expected {
                         // TODO: This might be too slow, could instead save the holochain hash versions.
                         let h_hash: DhtOpHash = DhtOpHashExt::from_kitsune_raw(hash.clone());
@@ -650,7 +650,11 @@ async fn gather_published_data(
 ) -> StateQueryResult<Vec<PublishedData>> {
     use futures::stream::TryStreamExt;
     let iter = iter.map(|stores| async move {
-        let published_hashes = request_published_ops(&stores.authored_db).await?;
+        let published_hashes = request_published_ops(&stores.authored_db, None)
+            .await?
+            .into_iter()
+            .map(|(l, h, _)| (l, h))
+            .collect();
         let storage_arc = request_arc(&stores.p2p_agents_db, (*stores.agent).clone()).await?;
         Ok(storage_arc.map(|storage_arc| {
             // The line below was added when migrating to rust edition 2021, per
@@ -671,35 +675,96 @@ async fn gather_published_data(
 }
 
 /// Request the published hashes for the given agent.
-async fn request_published_ops(
-    db: &DbRead<DbKindAuthored>,
-) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash)>> {
-    db.async_reader(|txn| {
+pub async fn request_published_ops<AuthorDb>(
+    db: &AuthorDb,
+    author: Option<AgentPubKey>,
+) -> StateQueryResult<Vec<(DhtLocation, KitsuneOpHash, DhtOp)>>
+where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+{
+    db.read_async(|txn| {
         // Collect all ops except StoreEntry's that are private.
-        let r = txn
-            .prepare(
+        let sql_common = "
+        SELECT
+        DhtOp.hash as dht_op_hash,
+        DhtOp.storage_center_loc as loc,
+        DhtOp.type as dht_type,
+        Action.blob as action_blob,
+        Entry.blob as entry_blob
+        FROM DhtOp
+        JOIN
+        Action ON DhtOp.action_hash = Action.hash
+        LEFT JOIN
+        Entry ON Action.entry_hash = Entry.hash
+        WHERE
+        (DhtOp.type != :store_entry OR Action.private_entry = 0)
+        ";
+
+        let r = if let Some(author) = author {
+            txn.prepare(&format!(
                 "
-                    SELECT
-                    DhtOp.hash as dht_op_hash,
-                    DhtOp.storage_center_loc as loc
-                    FROM DhtOp
-                    JOIN
-                    Action ON DhtOp.action_hash = Action.hash
-                    WHERE
-                    (DhtOp.type != :store_entry OR Action.private_entry = 0)
-                ",
-            )?
-            .query_map(
+                        {}
+                        AND
+                        Action.author = :author
+                    ",
+                sql_common
+            ))?
+            .query_and_then(
                 named_params! {
                     ":store_entry": DhtOpType::StoreEntry,
+                    ":author": author,
                 },
                 |row| {
                     let h: DhtOpHash = row.get("dht_op_hash")?;
                     let loc: u32 = row.get("loc")?;
-                    Ok((loc.into(), h.into_kitsune_raw()))
+
+                    let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                    let op_type: DhtOpType = row.get("dht_type")?;
+                    let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                        Some(EntryVisibility::Public) => {
+                            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                            match entry {
+                                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                None => None,
+                            }
+                        }
+                        _ => None,
+                    };
+                    let op = DhtOp::from_type(op_type, action, entry)?;
+
+                    StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
                 },
             )?
-            .collect::<Result<_, _>>()?;
+            .collect::<StateQueryResult<_>>()?
+        } else {
+            txn.prepare(sql_common)?
+                .query_and_then(
+                    named_params! {
+                        ":store_entry": DhtOpType::StoreEntry,
+                    },
+                    |row| {
+                        let h: DhtOpHash = row.get("dht_op_hash")?;
+                        let loc: u32 = row.get("loc")?;
+
+                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let entry = match action.0.entry_type().map(|et| et.visibility()) {
+                            Some(EntryVisibility::Public) => {
+                                let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+                                match entry {
+                                    Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                    None => None,
+                                }
+                            }
+                            _ => None,
+                        };
+                        let op = DhtOp::from_type(op_type, action, entry)?;
+
+                        StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                    },
+                )?
+                .collect::<StateQueryResult<_>>()?
+        };
         StateQueryResult::Ok(r)
     })
     .await
@@ -710,6 +775,6 @@ async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    db.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
+    db.read_async(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
         .await
 }

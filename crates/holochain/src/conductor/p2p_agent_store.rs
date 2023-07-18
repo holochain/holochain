@@ -56,7 +56,7 @@ pub async fn p2p_put_all_batch(
         let mut responses = Vec::with_capacity(batch.len());
         let (tx, rx) = tokio::sync::oneshot::channel();
         let result = env
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 'batch: for P2pBatch {
                     peer_data: batch,
                     result_sender: response,
@@ -105,7 +105,7 @@ pub async fn p2p_put_all_batch(
 pub async fn all_agent_infos(
     env: DbRead<DbKindP2pAgents>,
 ) -> StateQueryResult<Vec<AgentInfoSigned>> {
-    env.async_reader(|r| Ok(r.p2p_list_agents()?)).await
+    env.read_async(|r| Ok(r.p2p_list_agents()?)).await
 }
 
 /// Helper function to get a single agent info
@@ -115,24 +115,27 @@ pub async fn get_single_agent_info(
     agent: AgentPubKey,
 ) -> StateQueryResult<Option<AgentInfoSigned>> {
     let agent = agent.to_kitsune();
-    env.async_reader(move |r| Ok(r.p2p_get_agent(&agent)?))
-        .await
+    env.read_async(move |r| Ok(r.p2p_get_agent(&agent)?)).await
 }
 
-/// Interconnect every provided pair of conductors via their peer store databases
+/// Share all current agent infos known to all provided peer dbs with each other.
 #[cfg(any(test, feature = "test_utils"))]
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
-    for (i, a) in envs.iter().enumerate() {
-        let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
-        for (j, b) in envs.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
+    let mut all_infos: HashSet<AgentInfoSigned> = HashSet::new();
 
-            inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
-            inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();
-        }
+    for env in envs.iter() {
+        let infos: HashSet<AgentInfoSigned> = all_agent_infos(env.clone().into())
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
+        all_infos.extend(infos);
+    }
+
+    for env in envs.iter() {
+        inject_agent_infos(env.clone(), all_infos.iter())
+            .await
+            .unwrap();
     }
 }
 
@@ -178,30 +181,15 @@ pub async fn reveal_peer_info(
     }
 }
 
-async fn run_query<F, R>(db: DbRead<DbKindP2pAgents>, f: F) -> ConductorResult<R>
-where
-    R: Send + 'static,
-    F: FnOnce(PConnGuard) -> ConductorResult<R> + Send + 'static,
-{
-    let permit = db.conn_permit().await;
-    let r = tokio::task::spawn_blocking(move || {
-        let conn = db.with_permit(permit)?;
-        f(conn)
-    })
-    .await??;
-    Ok(r)
-}
-
 /// Get agent info for a single agent
 pub async fn get_agent_info_signed(
     environ: DbRead<DbKindP2pAgents>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
 ) -> ConductorResult<Option<AgentInfoSigned>> {
-    run_query(environ, move |mut conn| {
-        Ok(conn.p2p_get_agent(&kitsune_agent)?)
-    })
-    .await
+    Ok(environ
+        .read_async(move |txn| txn.p2p_get_agent(&kitsune_agent))
+        .await?)
 }
 
 /// Get all agent info for a single space
@@ -209,7 +197,7 @@ pub async fn list_all_agent_info(
     environ: DbRead<DbKindP2pAgents>,
     _kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    run_query(environ, move |mut conn| Ok(conn.p2p_list_agents()?)).await
+    Ok(environ.read_async(move |txn| txn.p2p_list_agents()).await?)
 }
 
 /// Get all agent info for a single space near a basis loc
@@ -219,10 +207,9 @@ pub async fn list_all_agent_info_signed_near_basis(
     basis_loc: u32,
     limit: u32,
 ) -> ConductorResult<Vec<AgentInfoSigned>> {
-    run_query(environ, move |mut conn| {
-        Ok(conn.p2p_query_near_basis(basis_loc, limit)?)
-    })
-    .await
+    Ok(environ
+        .read_async(move |txn| txn.p2p_query_near_basis(basis_loc, limit))
+        .await?)
 }
 
 /// Get the peer density an agent is currently seeing within
@@ -230,11 +217,12 @@ pub async fn list_all_agent_info_signed_near_basis(
 pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
     topology: Topology,
+    strat: PeerStrat,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerView> {
     let now = now();
-    let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
+    let arcs = env.read_async(move |conn| conn.p2p_list_agents()).await?;
     let arcs: Vec<_> = arcs
         .into_iter()
         .filter_map(|v| {
@@ -247,15 +235,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStrat::default().view(topology, dht_arc, arcs.as_slice()))
-}
-
-/// Put single agent info into store
-pub async fn put_agent_info_signed(
-    environ: DbWrite<DbKindP2pAgents>,
-    agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
-) -> ConductorResult<()> {
-    Ok(p2p_put(&environ, &agent_info_signed).await?)
+    Ok(strat.view(topology, dht_arc, arcs.as_slice()))
 }
 
 fn now() -> u64 {
@@ -355,9 +335,11 @@ mod tests {
         p2p_put(&db, &agent_info_signed).await.unwrap();
 
         let ret = db
-            .with_permit(db.conn_permit().await)
-            .unwrap()
-            .p2p_get_agent(&agent_info_signed.agent)
+            .read_async({
+                let agent = agent_info_signed.agent.clone();
+                move |txn| txn.p2p_get_agent(&agent)
+            })
+            .await
             .unwrap();
 
         assert_eq!(ret, Some(agent_info_signed));
@@ -371,9 +353,8 @@ mod tests {
 
         // - Check no data in the store to start
         let count = db
-            .with_permit(db.conn_permit().await)
-            .unwrap()
-            .p2p_list_agents()
+            .read_async(move |txn| txn.p2p_list_agents())
+            .await
             .unwrap()
             .len();
 

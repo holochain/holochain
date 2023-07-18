@@ -19,11 +19,18 @@ jobs:
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input holochain ${{ inputs.repo_path }}"
-          # ensures to keep the cache populated for the most recent stable version on multiple platforms
+            extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+
+          # ensures to keep the cache populated for the supported versions on multiple platforms
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: ""
+            extra_arg: "--override-input versions ./versions/0_2"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_1"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/weekly"
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
@@ -37,7 +44,7 @@ jobs:
                 - build-release-automation-tests
                 - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
-              extra_arg: "--override-input holochain ${{ inputs.repo_path }}"
+              extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
 
@@ -57,6 +64,7 @@ jobs:
       - name: "Test command ${{ matrix.nixCommand }}"
         env:
           system: ${{ matrix.platform.system }}
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -xe
 
@@ -68,7 +76,6 @@ jobs:
           # first build all derivations. this could be enough for test derivations.
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
-            --override-input versions ./versions/0_1 \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
           # TODO: remove this once we've implemented all tests and know that we don't need it

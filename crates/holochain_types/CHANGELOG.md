@@ -7,7 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-## 0.2.1-beta-dev.0
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
+## 0.3.0-beta-dev.5
+
+## 0.3.0-beta-dev.4
+
+- **BREAKING CHANGE**: `DhtOp` now uses a `RecordEntry` instead of `Option<Box<Entry>>` to denote the reason why an Entry was not included, if there is no entry included. You can get an `Option<Entry>` via `RecordEntry::as_option()` or `RecordEntry::into_option()`. `Op` and `FlatOp` (used for validation) are unchanged.
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
 
 ## 0.2.0
 

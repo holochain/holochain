@@ -1,15 +1,19 @@
 use super::EntryError;
 use super::ENTRY_SIZE_LIMIT;
+use holo_hash::bytes_to_hex;
 use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppEntryBytes(pub SerializedBytes);
 
 impl std::fmt::Debug for AppEntryBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_many_bytes("AppEntryBytes", f, self.0.bytes())
+        f.write_fmt(format_args!(
+            "AppEntryBytes({})",
+            many_bytes_string(self.0.bytes())
+        ))
     }
 }
 
@@ -61,40 +65,16 @@ impl From<AppEntryBytes> for SerializedBytes {
 
 /// Helpful pattern for debug formatting many bytes.
 /// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
-pub fn fmt_many_bytes(
-    name: &str,
-    f: &mut std::fmt::Formatter<'_>,
-    bytes: &[u8],
-) -> std::fmt::Result {
+pub fn many_bytes_string(bytes: &[u8]) -> String {
     if bytes.len() <= 32 {
-        let mut t = f.debug_tuple(name);
-        t.field(&bytes).finish()
+        format!("0x{}", bytes_to_hex(bytes, false))
     } else {
-        let mut t = f.debug_struct(name);
         let l = bytes.len();
-        t.field("length", &l);
-        t.field(
-            "bytes",
-            &format!(
-                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
-                bytes[0],
-                bytes[1],
-                bytes[2],
-                bytes[3],
-                bytes[4],
-                bytes[5],
-                bytes[6],
-                bytes[7],
-                bytes[l - 1],
-                bytes[l - 2],
-                bytes[l - 3],
-                bytes[l - 4],
-                bytes[l - 5],
-                bytes[l - 6],
-                bytes[l - 7],
-                bytes[l - 8],
-            ),
+        format!(
+            "[0x{}..{}; len={}]",
+            bytes_to_hex(&bytes[0..8], false),
+            bytes_to_hex(&bytes[l - 8..l], false),
+            l
         )
-        .finish()
     }
 }

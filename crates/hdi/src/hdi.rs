@@ -163,7 +163,7 @@ impl HdiT for HostHdi {
         )
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
-        host_call::<(), DnaInfo>(__hc__dna_info_1, ())
+        host_call::<(), DnaInfo>(__hc__dna_info_2, ())
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         host_call::<(), ZomeInfo>(__hc__zome_info_1, ())

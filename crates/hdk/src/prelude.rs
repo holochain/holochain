@@ -40,6 +40,7 @@ pub use crate::info::agent_info;
 pub use crate::info::call_info;
 pub use crate::info::dna_info;
 pub use crate::info::zome_info;
+pub use crate::link::count_links;
 pub use crate::link::create_link;
 pub use crate::link::delete_link;
 pub use crate::link::get_link_details;
@@ -129,6 +130,7 @@ macro_rules! holochain_externs {
             get_details:1,
             get_links:1,
             get_link_details:1,
+            count_links:1,
             get_agent_activity:1,
             must_get_entry:1,
             must_get_valid_record:1,

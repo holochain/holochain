@@ -117,6 +117,12 @@ pub trait HolochainP2pDnaT: Send + Sync {
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>>;
 
+    /// Get a count of links from the DHT.
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> actor::HolochainP2pResult<CountLinksResponse>;
+
     /// Get agent activity from the DHT.
     async fn get_agent_activity(
         &self,
@@ -169,7 +175,7 @@ pub struct HolochainP2pDna {
 }
 
 /// A CHC implementation
-pub type ChcImpl = Arc<dyn Send + Sync + ChainHeadCoordinator<Item = SignedActionHashed>>;
+pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {
@@ -327,6 +333,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         self.sender
             .get_links((*self.dna_hash).clone(), link_key, options)
+            .await
+    }
+
+    /// Get a count of links from the DHT.
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> actor::HolochainP2pResult<CountLinksResponse> {
+        self.sender
+            .count_links((*self.dna_hash).clone(), query)
             .await
     }
 

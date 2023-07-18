@@ -1,7 +1,7 @@
 use crate::Role;
 
 /// Errors related to the secure primitive macro.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CounterSigningError {
     /// Agent index is out of bounds for the signing session.
     AgentIndexOutOfBounds,

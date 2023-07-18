@@ -21,11 +21,10 @@ pub enum EntryTypes {
 
 #[hdk_extern]
 fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
-    let GenesisSelfCheckData {
-        dna_info: _,
-        membrane_proof: _,
-        agent_key: _,
-    } = data;
+    let GenesisSelfCheckDataV2 {
+        membrane_proof: _maybe_membrane_proof,
+        agent_key: _agent_key,
+     } = data;
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -180,7 +179,12 @@ pub mod test {
                 Ok(DnaInfo {
                     name: "".to_string(),
                     hash: empty_dna_hash.clone(),
-                    properties: UnsafeBytes::from(vec![]).into(),
+                    modifiers: DnaModifiers {
+                        network_seed: String::new(),
+                        properties: UnsafeBytes::from(vec![]).into(),
+                        origin_time: Timestamp(0),
+                        quantum_time: std::time::Duration::new(0, 0),
+                    },
                     zome_names: vec![],
                 })
             }

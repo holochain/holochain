@@ -7,6 +7,7 @@ use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
@@ -704,6 +705,11 @@ async fn update_single_agent_info(
 
     tracing::debug!(?agent_info_signed);
 
+    // Write to the local peer store. The agent info will also be stored via a local broadcast,
+    // except in the case of a zero arc where it gets filtered out, so we store it here too
+    // to be sure it makes it into the local store.
+    put_local_agent_info(evt_sender.clone(), space.clone(), agent_info_signed.clone()).await?;
+
     // Push to the network as well
     match network_type {
         NetworkType::QuicMdns => {
@@ -741,6 +747,8 @@ async fn update_single_agent_info(
 }
 
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::GhostControlSender;
+
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
@@ -925,22 +933,9 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
-        let location = input.basis.get_loc();
-        let local_agents_holding_basis = self
-            .local_joined_agents
-            .keys()
-            .filter(|agent_key| {
-                self.agent_arcs
-                    .get(*agent_key)
-                    .map_or(false, |arc| arc.contains(location))
-            })
-            .cloned()
-            .collect();
-        let fut = rpc_multi_logic::handle_rpc_multi(
-            input,
-            self.ro_inner.clone(),
-            local_agents_holding_basis,
-        );
+        let local_joined_agents = self.local_joined_agents.keys().cloned().collect();
+        let fut =
+            rpc_multi_logic::handle_rpc_multi(input, self.ro_inner.clone(), local_joined_agents);
         Ok(async move { fut.await }.boxed().into())
     }
 
@@ -979,12 +974,11 @@ impl KitsuneP2pHandler for Space {
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let fut = self
-                        .evt_sender
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: self.space.clone(),
-                            peer_data: vec![agent_info.clone()],
-                        });
+                    let fut = put_local_agent_info(
+                        self.evt_sender.clone(),
+                        self.space.clone(),
+                        agent_info.clone(),
+                    );
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
@@ -1009,8 +1003,8 @@ impl KitsuneP2pHandler for Space {
             futures::future::join_all(local_agent_info_events).await;
 
             // NOTE
-            // Holochain currently does all its testing without any remote nodes
-            // if we do this inline, it takes us to the 30 second timeout
+            // Holochain currently does most of its testing without any remote
+            // nodes if we do this inline, it takes us to the 30 second timeout
             // on every one of those... so spawning for now, which means
             // we won't get notified if we are unable to publish to anyone.
             // Also, if conductor spams us with publishes, we could fill
@@ -1383,51 +1377,58 @@ impl Space {
             metrics.clone(),
         );
 
-        let gossip_mod = config
-            .tuning_params
-            .gossip_strategy
-            .split(',')
-            .flat_map(|module| match module {
-                "sharded-gossip" => {
-                    let mut gossips = vec![];
-                    if !config.tuning_params.disable_recent_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedRecent,
-                            crate::gossip::sharded_gossip::recent_factory(
-                                bandwidth_throttles.recent(),
-                            ),
-                        ));
+        let gossip_mod = if config.tuning_params.arc_clamping() == Some(ArqClamping::Empty) {
+            // If arcs are clamped to zero, then completely disable gossip for this node.
+            // Gossip will never resume
+            tracing::info!("Gossip is disabled due to arc_clamping setting");
+            HashMap::new()
+        } else {
+            config
+                .tuning_params
+                .gossip_strategy
+                .split(',')
+                .flat_map(|module| match module {
+                    "sharded-gossip" => {
+                        let mut gossips = vec![];
+                        if !config.tuning_params.disable_recent_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedRecent,
+                                crate::gossip::sharded_gossip::recent_factory(
+                                    bandwidth_throttles.recent(),
+                                ),
+                            ));
+                        }
+                        if !config.tuning_params.disable_historical_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedHistorical,
+                                crate::gossip::sharded_gossip::historical_factory(
+                                    bandwidth_throttles.historical(),
+                                ),
+                            ));
+                        }
+                        gossips
                     }
-                    if !config.tuning_params.disable_historical_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedHistorical,
-                            crate::gossip::sharded_gossip::historical_factory(
-                                bandwidth_throttles.historical(),
-                            ),
-                        ));
+                    "none" => vec![],
+                    _ => {
+                        panic!("unknown gossip strategy: {}", module);
                     }
-                    gossips
-                }
-                "none" => vec![],
-                _ => {
-                    panic!("unknown gossip strategy: {}", module);
-                }
-            })
-            .map(|(module, factory)| {
-                (
-                    module,
-                    factory.spawn_gossip_task(
-                        config.tuning_params.clone(),
-                        space.clone(),
-                        ep_hnd.clone(),
-                        evt_sender.clone(),
-                        host_api.clone(),
-                        metrics.clone(),
-                        fetch_pool.clone(),
-                    ),
-                )
-            })
-            .collect();
+                })
+                .map(|(module, factory)| {
+                    (
+                        module,
+                        factory.spawn_gossip_task(
+                            config.tuning_params.clone(),
+                            space.clone(),
+                            ep_hnd.clone(),
+                            evt_sender.clone(),
+                            host_api.clone(),
+                            metrics.clone(),
+                            fetch_pool.clone(),
+                        ),
+                    )
+                })
+                .collect()
+        };
 
         let i_s_c = i_s.clone();
         let agent_info_update_interval_ms =
@@ -1439,7 +1440,12 @@ impl Space {
                 ))
                 .await;
                 if let Err(e) = i_s_c.update_agent_info().await {
-                    tracing::error!(failed_to_update_agent_info_for_space = ?e);
+                    if !i_s_c.ghost_actor_is_active() {
+                        // Assume this task has been orphaned when the space was dropped and exit.
+                        break;
+                    } else {
+                        tracing::error!(failed_to_update_agent_info_for_space = ?e);
+                    }
                 }
             }
         });
@@ -1449,6 +1455,9 @@ impl Space {
             let i_s_c = i_s.clone();
             let evt_s_c = evt_sender.clone();
             let bootstrap_service = config.bootstrap_service.clone();
+            let bootstrap_check_delay_backoff_multiplier = config
+                .tuning_params
+                .bootstrap_check_delay_backoff_multiplier;
             let space_c = space.clone();
             tokio::task::spawn(async move {
                 const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
@@ -1457,14 +1466,13 @@ impl Space {
                 let mut delay_len = START_DELAY;
 
                 loop {
-                    use ghost_actor::GhostControlSender;
                     if !i_s_c.ghost_actor_is_active() {
                         break;
                     }
 
                     tokio::time::sleep(delay_len).await;
                     if delay_len <= MAX_DELAY {
-                        delay_len *= 2;
+                        delay_len *= bootstrap_check_delay_backoff_multiplier;
                     }
 
                     match super::bootstrap::random(
@@ -1628,9 +1636,28 @@ impl Space {
         //
         // In the case an initial_arc is passend into the join request,
         // handle_join will initialize this agent_arcs map to that value.
-        self.agent_arcs
-            .get(agent)
-            .cloned()
-            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+        self.agent_arcs.get(agent).cloned().unwrap_or_else(|| {
+            match self.config.tuning_params.arc_clamping() {
+                Some(ArqClamping::Empty) => DhtArc::empty(agent.get_loc()),
+                Some(ArqClamping::Full) | None => DhtArc::full(agent.get_loc()),
+            }
+        })
     }
+}
+
+/// Function to add local agent info to the store.
+/// There's nothing special about this method, it's just helpful to
+/// semantically see the situations where local info is being added.
+async fn put_local_agent_info(
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: KSpace,
+    agent_info: AgentInfoSigned,
+) -> KitsuneP2pResult<()> {
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space,
+            peer_data: vec![agent_info],
+        })
+        .await?;
+    Ok(())
 }

@@ -160,12 +160,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Get the hex representation of the hash bytes
     pub fn to_hex(&self) -> String {
-        use std::fmt::Write;
-        let mut s = String::with_capacity(self.hash.len());
-        for b in &self.hash {
-            write!(&mut s, "{:02x}", b).ok();
-        }
-        s
+        bytes_to_hex(&self.hash, false)
     }
 }
 
@@ -255,13 +250,28 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[3] as u32) << 24)
 }
 
+/// Get a hex string representation of two chars per byte
+pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
+    use std::fmt::Write;
+    let mut s = String::with_capacity(bytes.len() + 2);
+    if caps {
+        for b in bytes {
+            write!(&mut s, "{:02X}", b).ok();
+        }
+    } else {
+        for b in bytes {
+            write!(&mut s, "{:02x}", b).ok();
+        }
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "encoding"))]
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
-        assert_eq!(3_688_618_971, h.get_loc());
+        assert_eq!(3_688_618_971, h.get_loc().as_u32());
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
             format!("{:?}", h.get_raw_32()),
@@ -269,7 +279,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",
@@ -291,7 +300,7 @@ mod tests {
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
-        assert_type!(
+        assert_type(
             "ExternalHash",
             ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );

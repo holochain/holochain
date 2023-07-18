@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub fn get<'a>(
                             any_dht_hash,
                             get_options,
                         } = input;
-                        Cascade::from_workspace_and_network(
+                        CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().clone(),
                         )

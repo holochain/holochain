@@ -42,14 +42,6 @@ pub trait OpHelper {
     }
 }
 
-/// [`RecordEntry`]s that takes a reference.
-enum RecordEntryRef<'a> {
-    Present(&'a Entry),
-    Hidden,
-    NotApplicable,
-    NotStored,
-}
-
 /// All possible variants that an [`RegisterAgentActivity`]
 /// with an [`Action`] that has an [`EntryType`] can produce.
 #[derive(Debug)]
@@ -780,15 +772,4 @@ fn deny_other_zome() -> WasmError {
     wasm_error!(WasmErrorInner::Host(
         "Op called for zome it was not defined in. This is a Holochain bug".to_string()
     ))
-}
-
-impl<'a> From<&'a RecordEntry> for RecordEntryRef<'a> {
-    fn from(r: &'a RecordEntry) -> Self {
-        match r {
-            RecordEntry::Present(e) => RecordEntryRef::Present(e),
-            RecordEntry::Hidden => RecordEntryRef::Hidden,
-            RecordEntry::NotApplicable => RecordEntryRef::NotApplicable,
-            RecordEntry::NotStored => RecordEntryRef::NotStored,
-        }
-    }
 }

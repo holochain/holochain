@@ -258,6 +258,19 @@ impl From<String> for Path {
     }
 }
 
+impl TryInto<String> for Path {
+    type Error = SerializedBytesError;
+    fn try_into(self) -> Result<String, Self::Error> {
+        let s = self
+            .as_ref()
+            .iter()
+            .map(String::try_from)
+            .collect::<Result<Vec<String>, Self::Error>>()?;
+
+        Ok(s.join(DELIMITER))
+    }
+}
+
 impl Path {
     /// Attach a [`LinkType`] to this path
     /// so its type is known for [`create_link`] and [`get_links`].
@@ -457,6 +470,13 @@ impl From<TypedPath> for Path {
     }
 }
 
+impl TryInto<String> for TypedPath {
+    type Error = SerializedBytesError;
+    fn try_into(self) -> Result<String, Self::Error> {
+        self.path.try_into()
+    }
+}
+
 #[test]
 #[cfg(test)]
 fn hash_path_delimiter() {
@@ -578,4 +598,8 @@ fn hash_path_path() {
     ] {
         assert_eq!(Path::from(input), Path::from(output),);
     }
+
+    let path = "foo.a.b.c.abcdef.bar";
+    let path_to_string: String = Path::from(path).try_into().unwrap();
+    assert_eq!(path.to_string(), path_to_string,);
 }

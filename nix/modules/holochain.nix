@@ -37,7 +37,7 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go ])
+        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
       };
@@ -60,7 +60,7 @@
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-        passthru.src.rev = inputs.holochain.rev;
+        passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {

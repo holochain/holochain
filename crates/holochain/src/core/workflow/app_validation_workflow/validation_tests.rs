@@ -174,8 +174,8 @@ impl Expected {
 /// are called for each op.
 async fn app_validation_ops() {
     holochain_trace::test_run().ok();
-    let entry_def_a = EntryDef::from_id("a");
-    let entry_def_b = EntryDef::from_id("b");
+    let entry_def_a = EntryDef::default_from_id("a");
+    let entry_def_b = EntryDef::default_from_id("b");
     let call_back_a = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();

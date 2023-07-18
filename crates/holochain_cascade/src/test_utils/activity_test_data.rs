@@ -48,17 +48,20 @@ impl ActivityTestData {
             let op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
                 sig.clone(),
                 h.clone(),
-                Some(Box::new(entry.clone())),
+                entry.clone().into(),
             ));
             let shh = SignedActionHashed::with_presigned(ActionHashed::from_content_sync(h), sig);
             (Record::new(shh, Some(entry.clone())), op)
         };
 
-        let to_record_dna_op = |h: Action| {
+        let to_record_dna_op = |a: Action| {
             let sig = fixt!(Signature);
-            let op =
-                DhtOpHashed::from_content_sync(DhtOp::StoreRecord(sig.clone(), h.clone(), None));
-            let shh = SignedActionHashed::with_presigned(ActionHashed::from_content_sync(h), sig);
+            let op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
+                sig.clone(),
+                a.clone(),
+                RecordEntry::NA,
+            ));
+            let shh = SignedActionHashed::with_presigned(ActionHashed::from_content_sync(a), sig);
             (Record::new(shh, None), op)
         };
 

@@ -81,6 +81,35 @@ fn server_recv(
     })
 }
 
+/// Runs a listener and accepts multiple incoming connections. A task is spawned for each connection
+/// that will listen until the client disconnects.
+#[cfg(feature = "slow_tests")]
+fn server_recv_multi(
+    mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
+) -> tokio::task::JoinHandle<()> {
+    tokio::task::spawn(async move {
+        loop {
+            let (_, mut receiver) = listener
+                .next()
+                .instrument(tracing::debug_span!("next_server_connection"))
+                .await
+                .unwrap()
+                .unwrap() as holochain_websocket::Pair;
+
+            let _ = tokio::task::spawn(async move {
+                while let Some((msg, _)) = receiver
+                    .next()
+                    .instrument(tracing::debug_span!("server_recv_msg"))
+                    .await
+                {
+                    let msg: TestString = msg.try_into().unwrap();
+                    tracing::debug!(server_recv_msg = ?msg);
+                }
+            });
+        }
+    })
+}
+
 fn server_signal(
     mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
     n: usize,
@@ -451,4 +480,60 @@ async fn cancel_response() {
     rh.close();
     c_jh.await.unwrap();
     s_jh.await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
+#[ignore = "takes at least 45s, please run me occasionally"]
+async fn can_handle_many_connections_and_disconnects() {
+    holochain_trace::test_run().ok();
+    let (handle, listener) = server().await;
+    let s_jh = server_recv_multi(listener);
+    let binding = handle.local_addr().clone();
+
+    let b2 = binding.clone();
+    tokio::spawn(async move {
+        // Hold opened senders to avoid immediately dropping them. Otherwise we're not really testing lots of open
+        // connections at once.
+        let mut senders = Vec::new();
+        for i in 0..100_000 {
+            if i % 800 == 0 {
+                // Rather than attempting to exhaust resources by opening 100,000 connections at once, drop/close
+                // connections at intervals. If we are able to keep opening connections up to 100,000 then it's likely
+                // that connection closing is working correctly on both the client and server
+                senders.clear();
+            }
+
+            let (mut sender, _) = connect(b2.clone(), Arc::new(WebsocketConfig::default()))
+                .instrument(tracing::debug_span!("client"))
+                .await
+                .unwrap();
+
+            sender
+                .signal(TestString("Hey from client".to_owned()))
+                .instrument(tracing::debug_span!("client_sending_message"))
+                .await
+                .unwrap();
+
+            senders.push(sender);
+        }
+
+        senders.clear();
+    })
+    .await
+    .unwrap();
+
+    // Check that the listener is still up and healthy after the many connections/disconnects above
+    let (mut sender, _) = connect(binding.clone(), Arc::new(WebsocketConfig::default()))
+        .instrument(tracing::debug_span!("client"))
+        .await
+        .unwrap();
+
+    sender
+        .signal(TestString("Ho from client".to_owned()))
+        .instrument(tracing::debug_span!("client_sending_message"))
+        .await
+        .unwrap();
+
+    s_jh.abort();
 }

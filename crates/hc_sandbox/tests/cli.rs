@@ -1,20 +1,21 @@
 use assert_cmd::prelude::*;
+use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::AppResponse;
 use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
 use matches::assert_matches;
 use once_cell::sync::Lazy;
-use portpicker::pick_unused_port;
 use std::future::Future;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{ChildStdout, Command};
 use url2::url2;
 use which::which;
 
-const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
 static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -53,7 +54,7 @@ static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     out.path().to_path_buf()
 });
 
-async fn websocket_client_by_port(
+async fn new_websocket_client_for_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
@@ -63,11 +64,12 @@ async fn websocket_client_by_port(
     .await?)
 }
 
-async fn call_app_interface(port: u16) {
+async fn get_app_info(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = websocket_client_by_port(port)
-        .await
-        .expect(&format!("Failed to get port {}", port));
+    let (mut app_tx, _) = new_websocket_client_for_port(port).await.expect(&format!(
+        "Failed to connect to conductor on port [{}]",
+        port
+    ));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };
@@ -113,6 +115,7 @@ async fn clean_sandboxes() {
     get_sandbox_command()
         .arg("clean")
         .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .await
         .unwrap();
@@ -125,7 +128,6 @@ async fn generate_sandbox_and_connect() {
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run().ok();
-    let port: u16 = pick_unused_port().expect("No ports free");
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -135,21 +137,24 @@ async fn generate_sandbox_and_connect() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg(format!("--run={}", port))
+        .arg("--run=0")
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .kill_on_drop(true);
 
-    let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
+    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
 
-    let mut child_stdin = hc_admin.stdin.unwrap();
+    let mut child_stdin = hc_admin.stdin.take().unwrap();
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    let mut stdout = hc_admin.stdout.take().unwrap();
+    let launch_info = get_launch_info(&mut stdout).await;
+
     // - Make a call to list app info to the port
-    call_app_interface(port).await;
+    get_app_info(*launch_info.app_ports.first().expect("No app ports found")).await;
 }
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
@@ -159,11 +164,8 @@ async fn generate_sandbox_and_call_list_dna() {
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run().ok();
-    let port: u16 = pick_unused_port().expect("No ports free");
-    let app_port: u16 = pick_unused_port().expect("No ports free");
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!("-f={}", port))
         .arg(format!(
             "--holochain-path={}",
             get_holochain_bin_path().to_str().unwrap()
@@ -171,40 +173,33 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg(format!("--run={}", app_port))
+        .arg("--run=0")
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .kill_on_drop(true);
 
-    let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    let mut child_stdin = hc_admin.stdin.unwrap();
+    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
+    let mut child_stdin = hc_admin.stdin.take().unwrap();
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-    // - Make a call to list app info to the port
-    call_app_interface(app_port).await;
+    let mut stdout = hc_admin.stdout.take().unwrap();
+    let launch_info = get_launch_info(&mut stdout).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
-        .arg(format!("-f={}", port))
-        .arg(format!(
-            "--holochain-path={}",
-            get_holochain_bin_path().to_str().unwrap()
-        ))
-        .arg("--piped")
         .arg("call")
+        .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .kill_on_drop(true);
-    let _hc_call = cmd.spawn().expect("Failed to spawn holochain");
-    let mut child_stdin = _hc_call.stdin.unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+        .stderr(Stdio::inherit());
+    let mut hc_call = cmd.spawn().expect("Failed to spawn holochain");
 
-    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.success());
 }
 
 fn get_hc_command() -> Command {
@@ -226,4 +221,16 @@ fn get_sandbox_command() -> Command {
         Ok(p) => Command::new(p),
         Err(_) => Command::from(std::process::Command::cargo_bin("hc-sandbox").unwrap()),
     }
+}
+
+async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
+    let mut lines = BufReader::new(stdout).lines();
+    while let Ok(Some(line)) = lines.next_line().await {
+        if let Some(index) = line.find("#!0") {
+            let launch_info_str = &line[index + 3..].trim();
+            return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
+        }
+    }
+
+    panic!("Unable to find launch info in sandbox output");
 }

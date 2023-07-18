@@ -1,5 +1,3 @@
-use holochain_p2p::dht::ArqStrat;
-
 use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
@@ -122,7 +120,7 @@ impl ConductorBuilder {
                 cert_priv_key,
                 cert_digest,
             };
-        let strat = ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
+        let strat = network_config.tuning_params.to_arq_strat();
 
         let host = KitsuneHostImpl::new(
             spaces.clone(),
@@ -314,7 +312,7 @@ impl ConductorBuilder {
 
         let network_config = self.config.network.clone().unwrap_or_default();
         let tuning_params = network_config.tuning_params.clone();
-        let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
+        let strat = tuning_params.to_arq_strat();
 
         let ribosome_store = RwShare::new(self.ribosome_store);
         let host = KitsuneHostImpl::new(
