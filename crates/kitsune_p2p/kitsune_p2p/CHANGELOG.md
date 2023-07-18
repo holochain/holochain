@@ -7,24 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-## 0.3.0-beta-dev.7
-
-## 0.3.0-beta-dev.6
-
-## 0.3.0-beta-dev.5
-
-## 0.3.0-beta-dev.4
-
-## 0.3.0-beta-dev.3
-
-## 0.3.0-beta-dev.2
-
-## 0.3.0-beta-dev.1
-
 - Fixes bug where authored data cannot be retrieved locally if the storage arc is not covering that data [\#2425](https://github.com/holochain/holochain/pull/2425)
-
-## 0.3.0-beta-dev.0
-
 - Bump tx5 to include https://github.com/holochain/tx5/pull/31 which should fix the network loop halting on certain error types, like Ban on data send. [\#2315](https://github.com/holochain/holochain/pull/2315)
 - Removes the experimental `gossip_single_storage_arc_per_space` tuning param
 - Fixes sharded gossip issue where storage arcs are not properly quantized in multi-agent-per-node sharded scenarios. [\#2332](https://github.com/holochain/holochain/pull/2332)

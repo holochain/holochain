@@ -7,16 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-## 0.3.0-beta-dev.4
-
-## 0.3.0-beta-dev.3
-
-## 0.3.0-beta-dev.2
-
-## 0.3.0-beta-dev.1
-
-## 0.3.0-beta-dev.0
-
 ## 0.2.0
 
 - Adds more ways to convert between different hash types [\#2283](https://github.com/holochain/holochain/pull/2283)
