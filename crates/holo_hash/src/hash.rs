@@ -272,6 +272,7 @@ mod tests {
 
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc().as_u32());
+        assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
             format!("{:?}", h.get_raw_32()),
