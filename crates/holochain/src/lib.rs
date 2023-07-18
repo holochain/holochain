@@ -36,6 +36,7 @@ pub use tracing;
 #[cfg(test)]
 mod local_network_tests;
 
+#[allow(ambiguous_glob_reexports)]
 pub mod prelude {
     #[cfg(feature = "hdk")]
     pub use hdk::link::GetLinksInputBuilder;
