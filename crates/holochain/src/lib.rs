@@ -36,6 +36,7 @@ pub use tracing;
 #[cfg(test)]
 mod local_network_tests;
 
+#[allow(ambiguous_glob_reexports)]
 pub mod prelude {
     pub use holo_hash;
     pub use holochain_p2p::AgentPubKeyExt;
