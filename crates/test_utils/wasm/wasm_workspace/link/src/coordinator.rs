@@ -237,3 +237,13 @@ fn get_count_base(_: ()) -> ExternResult<AnyLinkableHash> {
 fn get_count(link_query: LinkQuery) -> ExternResult<usize> {
     hdk::prelude::count_links(link_query)
 }
+
+#[hdk_extern]
+fn get_time(_: ()) -> ExternResult<Timestamp> {
+    sys_time()
+}
+
+#[hdk_extern]
+fn get_path_hash(s: String) -> ExternResult<AnyLinkableHash> {
+    path(s.as_str())
+}
