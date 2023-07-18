@@ -19,18 +19,7 @@ jobs:
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
-
-          # ensures to keep the cache populated for the supported versions on multiple platforms
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2"
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_1"
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly"
+            extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
