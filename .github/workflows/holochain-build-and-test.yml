@@ -19,7 +19,7 @@ jobs:
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
+            extra_arg: "--override-input versions 'github:holochain/holochain?dir=versions/0_2' --override-input holochain ${{ inputs.repo_path }}"
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
