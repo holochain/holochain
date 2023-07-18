@@ -6,6 +6,115 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230718.172112
+
+## [holochain\_cli-0.2.1-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Improved documentation in README, code comments, help text, and error messages.
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
+- `hc signal-srv` is now `hc run-local-services` and runs both a webrtc signaling server, and the holochain bootstrap server locally. [\#2353](https://github.com/holochain/holochain/pull/2353)
+
+## [holochain\_cli\_sandbox-0.2.1-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- updated comment in src/cli.rs to clarify use of –force-admin-ports
+- Improved documentation in README, code comments, help text, and error messages.
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
+- **BREAKING**: In the course of updates, a bug was discovered which necessitated a breaking change; the short arg for `--holochain-path` used in `hc sandbox` subcommand has changed from `-h` to `-H` to resolve a conflict with the short arg for `--help`. [\#2125](https://github.com/holochain/holochain/pull/2125)
+
+## [holochain\_cli\_run\_local\_services-0.2.1-beta-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Improved documentation in README, code comments, help text, and error messages.
+- Upated from `structopt` 0.3 to `clap` 4.
+
+## [holochain\_cli\_bundle-0.2.1-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
+
+## [holochain-0.2.1-beta-rc.0](crates/holochain/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Adds experimental Chain Head Coordinator feature, allowing multiple machines to share the same source chain. Holochain must be built with the `chc` feature flag (disabled by default).
+- Fixes race condition which caused network instability. Newly joined nodes can get temporarily blocked by other nodes, causing connections to be repeatedly dropped. [\#2534](https://github.com/holochain/holochain/pull/2534)
+- **BREAKING CHANGE**: The DhtOp validation rules have been significantly expanded upon, and some logic around what ops are produced when has been altered. Your existing app may experience rejected ops due to these more strict rules.
+
+## [holochain\_websocket-0.2.1-beta-rc.0](crates/holochain_websocket/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.1-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_conductor\_api-0.2.1-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Add links to concepts documentation to the conductor API module.
+
+## [holochain\_wasm\_test\_utils-0.2.1-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_cascade-0.2.1-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_state-0.2.1-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_p2p-0.2.1-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.1-beta-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [holochain\_types-0.2.1-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- **BREAKING CHANGE**: `DhtOp` now uses a `RecordEntry` instead of `Option<Box<Entry>>` to denote the reason why an Entry was not included, if there is no entry included. You can get an `Option<Entry>` via `RecordEntry::as_option()` or `RecordEntry::into_option()`. `Op` and `FlatOp` (used for validation) are unchanged.
+
+## [holochain\_sqlite-0.2.1-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p-0.2.1-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Fixes bug where authored data cannot be retrieved locally if the storage arc is not covering that data [\#2425](https://github.com/holochain/holochain/pull/2425)
+- Add `gossip_arc_clamping` Kitsune tuning param, allowing initial options to set all storage arcs to empty or full. [\#2352](https://github.com/holochain/holochain/pull/2352)
+- Changes to arc resizing algorithm to ensure that nodes pick up the slack for freeloading nodes with zero storage arcs. [\#2352](https://github.com/holochain/holochain/pull/2352)
+- Disables gossip when using `gossip_arc_clamping = "empty"`: when the arc is clamped to empty, the gossip module doesn’t even activate. [\#2380](https://github.com/holochain/holochain/pull/2380)
+
+## [kitsune\_p2p\_proxy-0.2.1-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.1-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_mdns-0.2.1-beta-rc.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.1-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_keystore-0.2.1-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_types-0.2.1-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [mr\_bundle-0.2.1-beta-rc.0](crates/mr_bundle/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_util-0.2.1-beta-rc.0](crates/holochain_util/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [hdk-0.2.1-beta-rc.0](crates/hdk/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Add String<TryInto> for Path for easy conversion of Path to string representation
+- New v2 of dna info returns full modifiers not just properties. Removed from genesis self check in favour of hdk call. [\#2366](https://github.com/holochain/holochain/pull/2366).
+- Add new HDK function `count_links` which accepts a filter that can be applied remotely. This is a more optimal alternative to requesting all links and counting them within a zome function.
+
+## [holochain\_zome\_types-0.2.1-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.1-beta-rc.0)
+
+- Changes the `ChainQueryFilter` to support filtering on multiple entry types and actions types in the same query. The query builder interface hasn’t changed but if your code was calling `entry_type` or `action_type` more than once it will now create a logical OR rather than replacing the action or entry type to filter on.
+
+## [kitsune\_p2p\_block-0.2.1-beta-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_bin\_data-0.2.1-beta-rc.0](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [hdi-0.3.1-beta-rc.0](crates/hdi/CHANGELOG.md#0.3.1-beta-rc.0)
+
+## [hdk\_derive-0.2.1-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_integrity\_types-0.2.1-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.1-beta-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.1-beta-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holo\_hash-0.2.1-beta-rc.0](crates/holo_hash/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.2.1-beta-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [holochain\_trace-0.2.1-beta-rc.0](crates/holochain_trace/CHANGELOG.md#0.2.1-beta-rc.0)
+
+## [fixt-0.2.1-beta-rc.0](crates/fixt/CHANGELOG.md#0.2.1-beta-rc.0)
+
 # 20230515.083847
 
 ## [holochain\_cli-0.2.1-beta-dev.0](crates/holochain_cli/CHANGELOG.md#0.2.1-beta-dev.0)
@@ -1898,7 +2007,7 @@ It also introduces new functionality and improves some of the existing:
 ## [holochain-0.0.154](crates/holochain/CHANGELOG.md#0.0.154)
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
+  
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## [holochain\_test\_wasm\_common-0.0.47](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.47)
@@ -3913,7 +4022,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -4067,7 +4176,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
@@ -4676,14 +4785,14 @@ passphrase_service:
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-
+  
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-
+  
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## [hdk\_derive-0.0.5](crates/hdk_derive/CHANGELOG.md#0.0.5)
