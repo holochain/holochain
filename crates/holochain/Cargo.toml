@@ -146,7 +146,8 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5"]
+# TODO: remove chc feature from defaults
+default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5", "chc"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]

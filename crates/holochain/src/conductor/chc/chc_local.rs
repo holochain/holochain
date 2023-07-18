@@ -6,13 +6,13 @@ use holochain_types::prelude::*;
 use crate::core::validate_chain;
 
 /// Mutable wrapper around local CHC
-pub struct ChcLocal<A: ChainItem = SignedActionHashed> {
-    inner: parking_lot::Mutex<ChcLocalInner<A>>,
+pub struct ChcLocal {
+    inner: parking_lot::Mutex<ChcLocalInner>,
     keystore: MetaLairClient,
     agent: AgentPubKey,
 }
 
-impl<A: ChainItem> ChcLocal<A> {
+impl ChcLocal {
     /// Constructor
     pub fn new(keystore: MetaLairClient, agent: AgentPubKey) -> Self {
         Self {
@@ -24,11 +24,21 @@ impl<A: ChainItem> ChcLocal<A> {
 }
 
 /// A local Rust implementation of a CHC, for testing purposes only.
-pub struct ChcLocalInner<A: ChainItem = SignedActionHashed> {
-    records: Vec<AddRecordPayload<A>>,
+pub struct ChcLocalInner {
+    records: Vec<RecordItem>,
 }
 
-impl<A: ChainItem> Default for ChcLocalInner<A> {
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct RecordItem {
+    /// The action
+    action: SignedActionHashed,
+
+    /// The entry, encrypted (TODO: by which key?), with the signature of
+    /// of the encrypted bytes
+    pub encrypted_entry: Option<(Arc<EncryptedEntry>, Signature)>,
+}
+
+impl Default for ChcLocalInner {
     fn default() -> Self {
         Self {
             records: Default::default(),
@@ -46,12 +56,22 @@ impl ChainHeadCoordinator for ChcLocal {
             .records
             .last()
             .map(|r| (r.action.get_hash().clone(), r.action.seq()));
-        let actions = request.iter().map(|r| &r.action);
+        let records: Vec<_> = request
+            .into_iter()
+            .map(|r| {
+                let hashed = holochain_serialized_bytes::decode(&r.action_hashed_msgpack).unwrap();
+                RecordItem {
+                    action: SignedActionHashed::with_presigned(hashed, r.signature),
+                    encrypted_entry: r.encrypted_entry,
+                }
+            })
+            .collect();
+        let actions = records.iter().map(|r| &r.action);
         validate_chain(actions, &head).map_err(|_| {
             let (hash, seq) = head.unwrap();
             ChcError::InvalidChain(seq, hash)
         })?;
-        m.records.extend(request);
+        m.records.extend(records);
         Ok(())
     }
 
@@ -73,7 +93,7 @@ impl ChainHeadCoordinator for ChcLocal {
         Ok(records
             .into_iter()
             .map(
-                |AddRecordPayload {
+                |RecordItem {
                      action,
                      encrypted_entry,
                  }| (action, encrypted_entry),

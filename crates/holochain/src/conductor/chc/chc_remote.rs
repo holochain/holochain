@@ -4,11 +4,8 @@ use std::sync::Arc;
 
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_keystore::MetaLairClient;
-use holochain_types::{
-    chc::{ChainHeadCoordinator, ChcError, ChcResult},
-    prelude::{AddRecordsRequest, ChainHeadCoordinatorExt, EncryptedEntry, GetRecordsRequest},
-};
-use holochain_zome_types::prelude::*;
+use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
+use holochain_types::prelude::*;
 use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation
@@ -124,4 +121,80 @@ impl ChcRemoteClient {
 
 fn extract_string(e: reqwest::Error) -> ChcError {
     ChcError::ServiceUnreachable(e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::test_utils::valid_arbitrary_chain;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "this test requires a remote service, so it should only be run manually"]
+    async fn test_add_records_remote() {
+        let keystore = test_keystore();
+        let agent = fake_agent_pubkey_1();
+        let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
+        let chc = Arc::new(ChcRemote::new(
+            url::Url::parse("http://127.0.0.1:40845/v1/").unwrap(),
+            // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
+            keystore.clone(),
+            &cell_id,
+        ));
+
+        let mut g = random_generator();
+
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+
+        let t0 = &chain[0..3];
+        let t1 = &chain[3..6];
+        let t2 = &chain[6..9];
+        let t11 = &chain[11..=11];
+
+        let hash = |i: usize| chain[i].action_address().clone();
+
+        chc.clone().add_records(t0.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
+
+        chc.clone().add_records(t1.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        // last_hash doesn't match
+        assert!(chc.clone().add_records(t0.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t1.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        chc.clone().add_records(t2.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
+
+        assert_eq!(
+            chc.clone().get_record_data(None).await.unwrap(),
+            &chain[0..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
+            &chain[1..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
+            &chain[4..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
+            &chain[8..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(13))).await.unwrap(),
+            &[]
+        );
+    }
 }

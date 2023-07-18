@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use futures::FutureExt;
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-use holochain_keystore::MetaLairClient;
+use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::prelude::*;
 use must_future::MustBoxFuture;
@@ -62,10 +62,11 @@ pub trait ChainHeadCoordinatorExt:
         let _ = getrandom::getrandom(&mut bytes);
         let nonce = Nonce256Bits::from(bytes);
         let payload = GetRecordsPayload { since_hash, nonce };
-        // TODO: real signature
-        let signature = Signature::from([0; 64]);
+        let this = self.clone();
+        let (keystore, agent) = this.signing_info();
         async move {
-            self.get_record_data_request(GetRecordsRequest { payload, signature })
+            let signature = agent.sign(&keystore, &payload).await?;
+            this.get_record_data_request(GetRecordsRequest { payload, signature })
                 .await?
                 .into_iter()
                 .map(|(a, me)| {
@@ -82,6 +83,7 @@ pub trait ChainHeadCoordinatorExt:
     }
 
     /// Just a convenience for testing. Should not be used otherwise.
+    #[cfg(feature = "test_utils")]
     fn head(self: Arc<Self>) -> MustBoxFuture<'static, ChcResult<Option<ActionHash>>> {
         async move {
             Ok(self
@@ -102,10 +104,20 @@ pub trait ChainHeadCoordinatorExt:
 /// is signed by the agent. This ensures that only the correct agent is adding
 /// records to its CHC. This EncryptedEntry signature is not used anywhere
 /// outside the context of the CHC.
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct AddRecordPayload<A = SignedActionHashed> {
-    /// The signed, hashed Action for the Record
-    pub action: A,
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AddRecordPayload {
+    /// The msgpack-encoded ActionHashed for the Record. This is encoded as such because the CHC
+    /// needs to verify the signature, and these are the exact bytes which are signed, so
+    /// this removes the need to deserialize and then re-serialize.
+    ///
+    /// This must be deserialized as `ActionHashed`.
+    #[serde(with = "serde_bytes")]
+    pub action_hashed_msgpack: Vec<u8>,
+
+    /// The signature of the ActionHashed
+    /// (NOTE: usually signatures are of just the Action, but in this case we want to
+    /// include the hash in the signature so we don't have to recalculate that on the CHC)
+    pub signature: Signature,
 
     /// The entry, encrypted (TODO: by which key?), with the signature of
     /// of the encrypted bytes
@@ -148,8 +160,14 @@ impl AddRecordPayload {
                     } else {
                         None
                     };
+                    let action_hashed_msgpack = holochain_serialized_bytes::encode(&action.hashed)?;
+                    dbg!(&action_hashed_msgpack);
+                    dbg!(&action.signature);
+                    dbg!(&action.action().author());
+                    dbg!(&action.action().author().get_raw_32());
                     ChcResult::Ok(AddRecordPayload {
-                        action,
+                        action_hashed_msgpack,
+                        signature: action.signature,
                         encrypted_entry,
                     })
                 }
@@ -172,7 +190,7 @@ pub type AddRecordsRequest = Vec<AddRecordPayload>;
 ///
 /// Since this payload is signed, including a unique nonce helps prevent replay
 /// attacks.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetRecordsPayload {
     /// Only records beyond and including this hash are returned
     pub since_hash: Option<ActionHash>,
@@ -181,7 +199,7 @@ pub struct GetRecordsPayload {
 }
 
 /// The full request for get_record_data
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetRecordsRequest {
     /// The payload
     pub payload: GetRecordsPayload,
@@ -190,7 +208,7 @@ pub struct GetRecordsRequest {
 }
 
 /// Encrypted bytes of an Entry
-#[derive(serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct EncryptedEntry(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Assemble records from a list of Actions and a map of Entries
