@@ -14,6 +14,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
+use std::collections::HashSet;
 use std::sync::Arc;
 use thiserror::Error;
 
