@@ -18,7 +18,7 @@ pub use crate::chc::*;
 pub use crate::combinators::*;
 pub use crate::db::*;
 pub use crate::dht_op::error::*;
-pub use crate::dht_op::*;
+pub use crate::dht_op::{facts as _, *};
 pub use crate::dna::error::*;
 pub use crate::dna::wasm::*;
 pub use crate::dna::*;

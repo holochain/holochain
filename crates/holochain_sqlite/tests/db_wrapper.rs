@@ -1,3 +1,5 @@
+#![cfg(all(feature = "slow_tests", feature = "test_utils"))]
+
 use common::TestDatabaseKind;
 use holochain_sqlite::conn::set_connection_timeout;
 use holochain_sqlite::db::num_read_threads;
@@ -12,7 +14,7 @@ use std::sync::Arc;
 mod common;
 
 // TODO this test can be removed once `conn` is removed from the public interface
-#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
+
 #[test]
 fn get_connections_from_pool() {
     holochain_trace::test_run().unwrap();
