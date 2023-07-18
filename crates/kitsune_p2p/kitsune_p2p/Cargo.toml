@@ -17,7 +17,7 @@ bloomfilter = { version = "1.0.5", features = ["serde"] }
 bytes = "1.4.0"
 derive_more = "0.99.11"
 futures = "0.3"
-ghost_actor = "=0.3.0-alpha.5"
+ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
 itertools = "0.10"
 kitsune_p2p_fetch = { version = "^0.2.1-beta-dev.0", path = "../fetch" }
@@ -58,12 +58,12 @@ mockall = { version = "0.11.3", optional = true }
 # include self with test_utils feature, to allow integration tests to run properly
 kitsune_p2p = { path = ".", features = ["test_utils", "sqlite"]}
 
-contrafact = { version = "0.1.0-dev.1" }
+contrafact = { version = "0.2.0-rc.1" }
 kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
-mockall = "0.10.2"
+mockall = "0.11.3"
 pretty_assertions = "0.7"
 test-case = "1.0.0"
 tokio = { version = "1.11", features = ["full", "test-util"] }

@@ -34,6 +34,9 @@ unwrap_to = "0.1.0"
 holochain_trace = { version = "^0.2.1-beta-dev.0", path = "../holochain_trace" }
 criterion = "0.3.4"
 
+[features]
+slow_tests = []
+
 [[bench]]
 name = "bench"
 harness = false

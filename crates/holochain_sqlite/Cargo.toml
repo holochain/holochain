@@ -47,7 +47,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
+tokio = { version = "1.27", features = [ "macros", "rt-multi-thread", "io-util", "sync", "time" ] }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 getrandom = "0.2.7"
@@ -65,7 +65,9 @@ rusqlite = { version = "0.29", features = [
 ] }
 
 [dev-dependencies]
-holochain_trace = { version = "^0.2.1-beta-dev.0", path = "../holochain_trace" }
+holochain_sqlite = { version = "0.2.1-beta-dev.0", path = ".", features = ["test_utils", "slow_tests"] }
+holochain_trace = { version = "0.2.1-beta-dev.0", path = "../holochain_trace" }
+nanoid = "0.4.0"
 
 [build-dependencies]
 pretty_assertions = "0.7.2"
@@ -75,6 +77,8 @@ sqlformat = "0.1.6"
 default = [ "test_utils", "sqlite" ]
 
 test_utils = [ ]
+
+slow_tests = []
 
 # Use at-rest encryption of databases
 sqlite-encrypted = [

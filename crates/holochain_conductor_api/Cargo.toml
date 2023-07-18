@@ -32,6 +32,7 @@ matches = {version = "0.1.8"}
 holochain_trace = { version = "^0.2.1-beta-dev.0", path = "../holochain_trace" }
 
 [features]
+chc = []
 sqlite-encrypted = [
     "holo_hash/sqlite-encrypted",
     "kitsune_p2p/sqlite-encrypted",

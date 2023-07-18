@@ -24,25 +24,14 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::{
-    dht::{
-        arq::{power_and_count_from_length, ArqSet},
-        hash::RegionHash,
-        prelude::Topology,
-        region::{RegionBounds, RegionData},
-        region_set::{RegionCoordSetLtcs, RegionSetLtcs},
-        spacetime::TelescopingTimes,
-        ArqBounds, ArqStrat,
-    },
+    dht::region::RegionBounds,
     dht_arc::{DhtArcRange, DhtArcSet},
     event::FetchOpDataQuery,
 };
-use holochain_sqlite::{
-    conn::{DbSyncLevel, DbSyncStrategy},
-    db::{
-        DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
-        DbKindWasm, DbWrite, ReadAccess,
-    },
-    prelude::{DatabaseError, DatabaseResult},
+use holochain_sqlite::prelude::{
+    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
+    ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -51,7 +40,6 @@ use holochain_state::{
     query::{map_sql_dht_op_common, StateQueryError},
     source_chain::{SourceChain, SourceChainResult},
 };
-use holochain_types::db::AsP2pStateTxExt;
 use holochain_types::prelude::CellId;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
@@ -190,7 +178,7 @@ impl Spaces {
             // @todo join_all for these awaits
             agent_lists.push(
                 self.p2p_agents_db(&dna)?
-                    .async_reader(|txn| txn.p2p_list_agents())
+                    .read_async(|txn| txn.p2p_list_agents())
                     .await?,
             );
         }
@@ -241,8 +229,16 @@ impl Spaces {
             }
         };
 
+        // If node_agents_in_spaces is not yet initialized, we can't know anything about
+        // which cells are blocked, so avoid the race condition by returning false
+        // TODO: actually fix the preflight, because this could be a loophole for someone
+        //       to evade a block in some circumstances
+        if cell_ids.is_empty() {
+            return Ok(false);
+        }
+
         self.conductor_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 Ok(
                     // If the target_id is directly blocked then we always return true.
                     holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
@@ -268,7 +264,7 @@ impl Spaces {
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         let state = self
             .conductor_db
-            .async_reader(|txn| {
+            .read_async(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -309,7 +305,7 @@ impl Spaces {
     {
         let output = self
             .conductor_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -458,7 +454,7 @@ impl Spaces {
             )
         };
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(&sql)?;
                 let hashes = stmt
                     .query_map(
@@ -493,67 +489,6 @@ impl Spaces {
         Ok(results)
     }
 
-    /// The network module needs info about various groupings ("regions") of ops
-    ///
-    /// Note that this always includes all ops regardless of integration status.
-    /// This is to avoid the degenerate case of freshly joining a network, and
-    /// having several new peers gossiping with you at once about the same regions.
-    /// If we calculate our region hash only by integrated ops, we will experience
-    /// mismatches for a large number of ops repeatedly until we have integrated
-    /// those ops. Note that when *sending* ops we filter out ops in limbo.
-    pub async fn handle_fetch_op_regions(
-        &self,
-        dna_hash: &DnaHash,
-        topology: Topology,
-        dht_arc_set: DhtArcSet,
-    ) -> ConductorResult<RegionSetLtcs> {
-        let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let max_chunks = ArqStrat::default().max_chunks();
-        let arq_set = ArqSet::new(
-            dht_arc_set
-                .intervals()
-                .into_iter()
-                .map(|i| {
-                    let len = i.length();
-                    let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(&topology, pow, i).0
-                })
-                .collect(),
-        );
-        let times = TelescopingTimes::historical(&topology);
-        let coords = RegionCoordSetLtcs::new(times, arq_set);
-        let coords_clone = coords.clone();
-        let db = self.dht_db(dna_hash)?;
-        db.async_reader(move |txn| {
-            let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-            Ok(coords_clone.into_region_set(|(_, coords)| {
-                let bounds = coords.to_bounds(&topology);
-                let (x0, x1) = bounds.x;
-                let (t0, t1) = bounds.t;
-                stmt.query_row(
-                    named_params! {
-                        ":storage_start_loc": x0,
-                        ":storage_end_loc": x1,
-                        ":timestamp_min": t0,
-                        ":timestamp_max": t1,
-                    },
-                    |row| {
-                        let total_action_size: f64 = row.get("total_action_size")?;
-                        let total_entry_size: f64 = row.get("total_entry_size")?;
-                        let size = total_action_size + total_entry_size;
-                        Ok(RegionData {
-                            hash: RegionHash::from_vec(row.get("xor_hash")?)
-                                .expect("region hash must be 32 bytes"),
-                            size: size.min(u32::MAX as f64) as u32,
-                            count: row.get("count")?,
-                        })
-                    },
-                )
-            })?)
-        })
-        .await
-    }
-
     #[instrument(skip(self, query))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data(
@@ -586,7 +521,7 @@ impl Spaces {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
         Ok(self
             .dht_db(dna_hash)?
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
                 let results = regions
                     .into_iter()
@@ -649,7 +584,7 @@ impl Spaces {
 
         let db = self.dht_db(dna_hash)?;
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 for hash in op_hashes {
                     let mut stmt = txn.prepare_cached(&sql)?;

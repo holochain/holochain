@@ -160,7 +160,7 @@
               --force-tag-creation \
               --force-branch-creation \
               --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-              --allowed-semver-increment-modes="!pre_patch beta-dev" \
+              --disallowed-version-reqs=">=0.4" \
               --steps=CreateReleaseBranch,BumpReleaseVersions
 
           release-automation \

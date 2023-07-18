@@ -6,12 +6,13 @@ use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
 
-pub(super) async fn query_region_op_hashes(
+/// Get all op hashes within a region
+pub async fn query_region_op_hashes(
     db: DbWrite<DbKindDht>,
     bounds: RegionBounds,
 ) -> ConductorResult<Vec<OpHashSized>> {
     Ok(db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let sql = holochain_sqlite::sql::sql_cell::FETCH_REGION_OP_HASHES;
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
             let (x0, x1) = bounds.x;

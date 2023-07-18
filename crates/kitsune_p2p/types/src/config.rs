@@ -10,6 +10,11 @@ pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::f
 /// so the widely used type def can be an Arc<>
 pub mod tuning_params_struct {
     use ghost_actor::dependencies::tracing;
+    use kitsune_p2p_dht::{
+        prelude::{ArqClamping, LocalStorageConfig},
+        ArqStrat,
+    };
+    use kitsune_p2p_dht_arc::DEFAULT_MIN_PEERS;
     use std::collections::HashMap;
 
     macro_rules! mk_tune {
@@ -127,10 +132,13 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         gossip_agent_info_update_interval_ms: u32 = 1000 * 60 * 5,
 
+        /// The timeout for a gossip round if there is no contact.
+        /// [Default: 1 minute]
+        gossip_round_timeout_ms: u64 = 1000 * 60,
 
         /// The target redundancy is the number of peers we expect to hold any
         /// given Op.
-        gossip_redundancy_target: f64 = 100.0,
+        gossip_redundancy_target: f64 = DEFAULT_MIN_PEERS as f64,
 
         /// The max number of bytes of data to send in a single message.
         ///
@@ -144,6 +152,21 @@ pub mod tuning_params_struct {
 
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
+
+        /// By default, Holochain adjusts the gossip_arc to match the
+        /// the current network conditions for the given DNA.
+        /// If unsure, please keep this setting at the default "none",
+        /// meaning no arc clamping. Setting options are:
+        /// - "none" - Keep the default auto-adjust behavior.
+        /// - "empty" - Makes you a freeloader, contributing nothing
+        ///   to the network. Please don't choose this option without
+        ///   a good reason, such as being on a bandwidth constrained
+        ///   mobile device!
+        /// - "full" - Indicates that you commit to serve and hold all
+        ///   all data from all agents, and be a potential target for all
+        ///   get requests. This could be a significant investment of
+        ///   bandwidth. Don't take this responsibility lightly.
+        gossip_arc_clamping: String = "none".to_string(),
 
         /// Default timeout for rpc single. [Default: 60s]
         default_rpc_single_timeout_ms: u32 = 1000 * 60,
@@ -248,6 +271,10 @@ pub mod tuning_params_struct {
         /// Disable historical gossip. Useful for testing Recent gossip in isolation.
         disable_historical_gossip: bool = false,
 
+        /// Control the backoff multiplier for the time delay between checking in with the bootstrap server.
+        /// The default value of `2` causes the delay to grow quickly up to the max time of 1 hour.
+        /// For testing consider using `1` to prevent the delay from growing.
+        bootstrap_check_delay_backoff_multiplier: u32 = 2,
     }
 
     impl KitsuneP2pTuningParams {
@@ -276,6 +303,29 @@ pub mod tuning_params_struct {
         /// based on the `SSLKEYLOGFILE` environment variable
         pub fn use_env_tls_keylog(&self) -> bool {
             self.danger_tls_keylog == "env_keylog"
+        }
+
+        /// The timeout for a gossip round if there is no contact.
+        pub fn gossip_round_timeout(&self) -> std::time::Duration {
+            std::time::Duration::from_millis(self.gossip_round_timeout_ms)
+        }
+
+        /// Parse the gossip_arc_clamping string as a proper type
+        pub fn arc_clamping(&self) -> Option<ArqClamping> {
+            match self.gossip_arc_clamping.to_lowercase().as_str() {
+                "none" => None,
+                "empty" => Some(ArqClamping::Empty),
+                "full" => Some(ArqClamping::Full),
+                other => panic!("Invalid kitsune tuning param: arc_clamping = '{}'", other),
+            }
+        }
+
+        /// Create a standard ArqStrat from the tuning params
+        pub fn to_arq_strat(&self) -> ArqStrat {
+            let local_storage = LocalStorageConfig {
+                arc_clamping: self.arc_clamping(),
+            };
+            ArqStrat::standard(local_storage)
         }
     }
 }

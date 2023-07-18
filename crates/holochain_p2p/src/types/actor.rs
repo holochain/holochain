@@ -323,6 +323,12 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> Vec<WireLinkOps>;
 
+        /// Get a count of links from the DHT.
+        fn count_links(
+            dna_hash: DnaHash,
+            query: WireLinkQuery,
+        ) -> CountLinksResponse;
+
         /// Get agent activity from the DHT.
         fn get_agent_activity(
             dna_hash: DnaHash,

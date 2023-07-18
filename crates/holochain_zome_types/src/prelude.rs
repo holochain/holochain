@@ -47,7 +47,8 @@ pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
 pub use crate::*;
-pub use holochain_integrity_types::UnitEnum;
+
+pub use holochain_integrity_types::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
 pub use crate::zome::inline_zome::error::*;
@@ -59,3 +60,6 @@ pub use crate::fixt::*;
 
 #[cfg(feature = "test_utils")]
 pub use crate::test_utils::*;
+
+#[cfg(all(any(test, feature = "test_utils"), feature = "arbitrary"))]
+pub use crate::entropy::*;

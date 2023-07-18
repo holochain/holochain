@@ -66,8 +66,8 @@ pub(crate) fn incoming_countersigning(
         // Must be a store entry op.
         if let DhtOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
-            if let Entry::CounterSign(session_data, _) = entry.as_ref() {
-                let entry_hash = EntryHash::with_data_sync(&**entry);
+            if let Entry::CounterSign(session_data, _) = entry {
+                let entry_hash = EntryHash::with_data_sync(entry);
                 // Get the required actions for this session.
                 let weight = weigh_placeholder();
                 let action_set = session_data.build_action_set(entry_hash, weight)?;
@@ -216,7 +216,7 @@ pub(crate) async fn countersigning_success(
         }
     };
     let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
-        authored_db.async_reader(reader_closure).await?;
+        authored_db.read_async(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_actions_op_basis_hashes.is_empty() {
@@ -245,7 +245,7 @@ pub(crate) async fn countersigning_success(
         .collect();
 
     let result = authored_db
-        .async_commit({
+        .write_async({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {

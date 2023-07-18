@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use holo_hash::bytes_to_hex;
 use holo_hash::AnyLinkableHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
@@ -35,12 +36,7 @@ impl GetLinksOpsQuery {
         }
     }
     pub fn tag_to_hex(tag: &LinkTag) -> String {
-        use std::fmt::Write;
-        let mut s = String::with_capacity(tag.0.len());
-        for b in &tag.0 {
-            write!(&mut s, "{:02X}", b).ok();
-        }
-        s
+        bytes_to_hex(&tag.0, true)
     }
 }
 

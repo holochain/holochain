@@ -1,5 +1,5 @@
 use holochain_cascade::test_utils::*;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_authored_db;
@@ -19,14 +19,14 @@ async fn links_not_authority() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&authority.to_db(), td.store_entry_op.clone());
-    fill_db(&authority.to_db(), td.create_link_op.clone());
+    fill_db(&authority.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&authority.to_db(), td.create_link_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     let r = cascade
         .dht_get_links(td.link_key_tag.clone(), Default::default())
@@ -42,7 +42,7 @@ async fn links_not_authority() {
 
     assert_eq!(r, vec![(td.create_link_action.clone(), vec![]),]);
 
-    fill_db(&authority.to_db(), td.delete_link_op.clone());
+    fill_db(&authority.to_db(), td.delete_link_op.clone()).await;
 
     let r = cascade
         .dht_get_links(td.link_key.clone(), Default::default())
@@ -75,8 +75,8 @@ async fn links_authority() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&vault.to_db(), td.store_entry_op.clone());
-    fill_db(&vault.to_db(), td.create_link_op.clone());
+    fill_db(&vault.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&vault.to_db(), td.create_link_op.clone()).await;
 
     // Network
     // - Not expecting any calls to the network.
@@ -85,7 +85,7 @@ async fn links_authority() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock, cache.to_db())
         .with_authored(vault.to_db().into());
 
@@ -96,7 +96,7 @@ async fn links_authority() {
 
     assert_eq!(r, td.links);
 
-    fill_db(&vault.to_db(), td.delete_link_op.clone());
+    fill_db(&vault.to_db(), td.delete_link_op.clone()).await;
 
     let r = cascade
         .dht_get_links(td.link_key.clone(), Default::default())
@@ -142,7 +142,7 @@ async fn links_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock.clone(), cache.to_db())
         .with_scratch(scratch.clone().into_sync());
 
@@ -160,7 +160,7 @@ async fn links_authoring() {
     )
     .unwrap();
 
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock, cache.to_db())
         .with_scratch(scratch.into_sync());
 

@@ -25,12 +25,11 @@ pub fn spawn_publish_dht_ops_consumer(
         conductor.task_manager(),
         (tx.clone(), rx),
         move || {
-            let tx = tx.clone();
             let conductor = conductor.clone();
+            let tx = tx.clone();
             let env = env.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
-            let wf = publish_dht_ops_workflow(env, Arc::new(network), tx, agent);
             async move {
                 if conductor
                     .get_config()
@@ -41,7 +40,7 @@ pub fn spawn_publish_dht_ops_consumer(
                 {
                     Ok(WorkComplete::Complete)
                 } else {
-                    wf.await
+                    publish_dht_ops_workflow(env, Arc::new(network), tx, agent).await
                 }
             }
         },

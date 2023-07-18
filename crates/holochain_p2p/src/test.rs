@@ -113,6 +113,14 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
+    fn handle_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        query: WireLinkQuery,
+    ) -> HolochainP2pHandlerResult<CountLinksResponse> {
+        Err("stub".into())
+    }
+
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,

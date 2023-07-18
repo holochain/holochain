@@ -94,6 +94,7 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
@@ -105,8 +106,10 @@ use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::{wasm, *};
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::KitsuneP2pError;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -152,6 +155,20 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
+/// The reason why a cell is waiting to join the network.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingJoinReason {
+    /// The initial state, no attempt has been made to join the network yet.
+    Initial,
+
+    /// The join failed with an error that is safe to retry, such as not being connected to the internet.
+    Retry,
+
+    /// The network join failed and will not be retried. This will impact the status of the associated
+    /// app and require manual intervention from the user.
+    Failed,
+}
+
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CellStatus {
@@ -162,7 +179,7 @@ pub enum CellStatus {
     /// but it is considered not to be fully running from the perspective of
     /// app status, i.e. if any app has a required Cell with this status,
     /// the app is considered to be in the Paused state.
-    PendingJoin,
+    PendingJoin(PendingJoinReason),
 
     /// The Cell is currently in the process of trying to join the network.
     Joining,
@@ -566,7 +583,7 @@ mod dna_impls {
 
             // Load out all dna defs
             let (wasms, defs) = db
-                .async_reader(move |txn| {
+                .read_async(move |txn| {
                     // Get all the dna defs.
                     let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
                         .into_iter()
@@ -696,7 +713,7 @@ mod dna_impls {
 
             self.spaces
                 .wasm_db
-                .async_commit({
+                .write_async({
                     let zome_defs = zome_defs.clone();
                     move |txn| {
                         for dna_wasm in wasms {
@@ -750,6 +767,7 @@ mod network_impls {
     use kitsune_p2p::KitsuneAgent;
     use kitsune_p2p::KitsuneBinType;
     use rusqlite::params;
+    use std::time::Duration;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -861,31 +879,39 @@ mod network_impls {
 
                 // query number of agents from peer db
                 let db = { self.p2p_agents_db(dna) };
-                let permit = db.conn_permit().await;
-                let mut conn = db.with_permit(permit)?;
-                let current_number_of_peers = conn.p2p_count_agents()?;
 
-                // query arc size and extrapolated coverage and estimate total peers
-                let (arc_size, total_network_peers) = match conn
-                    .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
-                {
-                    None => (0.0, 0),
-                    Some(agent) => {
-                        let arc_size = agent.storage_arc.coverage();
-                        let agents_in_arc = conn.p2p_gossip_query_agents(
-                            u64::MIN,
-                            u64::MAX,
-                            agent.storage_arc.inner().into(),
-                        )?;
-                        let number_of_agents_in_arc = agents_in_arc.len();
-                        let total_network_peers = if number_of_agents_in_arc == 0 {
-                            0
-                        } else {
-                            (number_of_agents_in_arc as f64 / arc_size) as u32
-                        };
-                        (arc_size, total_network_peers)
-                    }
-                };
+                let (current_number_of_peers, arc_size, total_network_peers) = db
+                    .read_async({
+                        let agent_pub_key = agent_pub_key.clone();
+                        move |txn| -> DatabaseResult<(u32, f64, u32)> {
+                            let current_number_of_peers = txn.p2p_count_agents()?;
+
+                            // query arc size and extrapolated coverage and estimate total peers
+                            let (arc_size, total_network_peers) = match txn.p2p_get_agent(
+                                &KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()),
+                            )? {
+                                None => (0.0, 0),
+                                Some(agent) => {
+                                    let arc_size = agent.storage_arc.coverage();
+                                    let agents_in_arc = txn.p2p_gossip_query_agents(
+                                        u64::MIN,
+                                        u64::MAX,
+                                        agent.storage_arc.inner().into(),
+                                    )?;
+                                    let number_of_agents_in_arc = agents_in_arc.len();
+                                    let total_network_peers = if number_of_agents_in_arc == 0 {
+                                        0
+                                    } else {
+                                        (number_of_agents_in_arc as f64 / arc_size) as u32
+                                    };
+                                    (arc_size, total_network_peers)
+                                }
+                            };
+
+                            Ok((current_number_of_peers, arc_size, total_network_peers))
+                        }
+                    })
+                    .await?;
 
                 // get sum of bytes from dht and cache db since last time
                 // request was made or since the beginning of time
@@ -902,7 +928,7 @@ mod network_impls {
                     .get_or_create_dht_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let dht_bytes_received = dht_db
-                    .async_reader({
+                    .read_async({
                         move |txn| {
                             txn.query_row_and_then(
                                 SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
@@ -917,7 +943,7 @@ mod network_impls {
                     .get_or_create_cache_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let cache_bytes_received = cache_db
-                    .async_reader(move |txn| {
+                    .read_async(move |txn| {
                         txn.query_row_and_then(
                             SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
                             params![last_time_queried.as_micros()],
@@ -999,27 +1025,27 @@ mod network_impls {
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
                 authored_data_size_on_disk: authored_db
-                    .async_reader(get_size_on_disk)
+                    .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 authored_data_size: authored_db
-                    .async_reader(get_used_size)
+                    .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 dht_data_size_on_disk: dht_db
-                    .async_reader(get_size_on_disk)
+                    .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 dht_data_size: dht_db
-                    .async_reader(get_used_size)
+                    .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 cache_data_size_on_disk: cache_db
-                    .async_reader(get_size_on_disk)
+                    .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 cache_data_size: cache_db
-                    .async_reader(get_used_size)
+                    .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 used_by: used_by.clone(),
@@ -1041,10 +1067,13 @@ mod network_impls {
                     let sender = self.p2p_batch_sender(&dna_hash);
                     let (result_sender, response) = tokio::sync::oneshot::channel();
                     let _ = sender
-                        .send(P2pBatch {
-                            peer_data,
-                            result_sender,
-                        })
+                        .send_timeout(
+                            P2pBatch {
+                                peer_data,
+                                result_sender,
+                            },
+                            Duration::from_secs(10),
+                        )
                         .await;
                     let res = match response.await {
                         Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
@@ -1078,17 +1107,14 @@ mod network_impls {
                     respond,
                     ..
                 } => {
-                    use holochain_sqlite::db::AsP2pAgentStoreConExt;
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let permit = db.conn_permit().await;
-                    let res = tokio::task::spawn_blocking(move || {
-                        let mut conn = db.with_permit(permit)?;
-                        conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                    })
-                    .await;
-                    let res = res
-                        .map_err(holochain_p2p::HolochainP2pError::other)
-                        .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other));
+                    let res = db
+                        .read_async(move |txn| {
+                            txn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                        })
+                        .await;
+
+                    let res = res.map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryAgentInfoSignedNearBasis {
@@ -1126,10 +1152,17 @@ mod network_impls {
                         .get_dna_def(&dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
                         .topology(cutoff);
+                    let tuning = self.get_config().kitsune_tuning_params();
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    let res = query_peer_density(
+                        db.into(),
+                        topo,
+                        tuning.to_arq_strat().into(),
+                        kitsune_space,
+                        dht_arc,
+                    )
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 SignNetworkData {
@@ -1146,6 +1179,7 @@ mod network_impls {
                 | Get { .. }
                 | GetMeta { .. }
                 | GetLinks { .. }
+                | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
                 | ValidationReceiptReceived { .. } => {
@@ -1871,7 +1905,7 @@ mod app_status_impls {
                 .map(|(cell_id, cell)| async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
+                    let maybe_agent_info = match p2p_agents_db.read_async(move |tx| {
                         tx.p2p_get_agent(&kagent)
                     }).await {
                         Ok(maybe_info) => maybe_info,
@@ -1882,11 +1916,17 @@ mod app_status_impls {
                     match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-                            Err(cell_id)
+
+                            if Self::is_p2p_join_error_retryable(&e) {
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
+                            }
+                            else {
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                            }
                         }
                         Err(_) => {
                             tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err(cell_id)
+                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
                         }
                         Ok(Ok(_)) => Ok(cell_id),
                     }
@@ -1902,13 +1942,13 @@ mod app_status_impls {
 
             // These unwraps are both safe because of the partition.
             let cell_ids: Vec<_> = cell_ids.into_iter().map(Result::unwrap).collect();
-            let failed_joins: Vec<_> = failed_joins.into_iter().map(Result::unwrap_err).collect();
+            let failed_joins = failed_joins.into_iter().map(Result::unwrap_err);
 
             // Update the status of the cells which were able to join the network
             // (may or may not be all cells which were added)
-            self.update_cell_status(cell_ids.as_slice(), CellStatus::Joined);
+            self.update_cell_status(cell_ids.iter().map(|c| (c, CellStatus::Joined)));
 
-            self.update_cell_status(failed_joins.as_slice(), CellStatus::PendingJoin);
+            self.update_cell_status(failed_joins);
 
             cell_ids
         }
@@ -1939,6 +1979,9 @@ mod app_status_impls {
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
             let cell_ids: HashSet<CellId> = self.live_cell_ids();
+            let retry_cell_ids = self.running_cell_ids(Some(CellStatusFilter::PendingJoin(
+                PendingJoinReason::Retry,
+            )));
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1959,11 +2002,17 @@ mod app_status_impls {
                                         .filter(|id| !cell_ids.contains(id))
                                         .collect();
                                     if !missing.is_empty() {
-                                        let reason = PausedAppReason::Error(format!(
-                                            "Some cells are missing / not able to run: {:#?}",
-                                            missing
-                                        ));
-                                        app.status.transition(Pause(reason))
+                                        if missing.iter().any(|c| retry_cell_ids.contains(c)) {
+                                            // The spin up needs to be tried again for this app
+                                            warn!(msg = "Some cells did not start", ?app, ?missing);
+                                            AppStatusFx::SpinUp
+                                        } else {
+                                            let reason = PausedAppReason::Error(format!(
+                                                "Some cells are missing / not able to run: {:#?}",
+                                                missing
+                                            ));
+                                            app.status.transition(Pause(reason))
+                                        }
                                     } else {
                                         AppStatusFx::NoChange
                                     }
@@ -1991,13 +2040,27 @@ mod app_status_impls {
 
         /// Change the CellStatus of the given Cells in the Conductor.
         /// Silently ignores Cells that don't exist.
-        pub(crate) fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
-            for cell_id in cell_ids {
+        pub(crate) fn update_cell_status<I, C>(&self, cell_ids: I)
+        where
+            I: Iterator<Item = (C, CellStatus)>,
+            C: Borrow<CellId>,
+        {
+            for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id) {
-                        cell.status = status.clone();
+                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                        cell.status = status;
                     }
                 });
+            }
+        }
+
+        fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
+            match e {
+                // TODO this is brittle because some other network access could fail first if Kitune changes.
+                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Reqwest(e)) => {
+                    e.is_connect()
+                }
+                _ => false,
             }
         }
     }
@@ -2059,7 +2122,7 @@ mod scheduler_impls {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
             let tasks = self.spaces.get_from_spaces(|space| {
                 let db = space.authored_db.clone();
-                async move { db.async_commit(delete_all_ephemeral_scheduled_fns).await }
+                async move { db.write_async(delete_all_ephemeral_scheduled_fns).await }
             });
 
             futures::future::join_all(tasks).await;
@@ -2404,7 +2467,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: CellStatus::PendingJoin,
+                        status: CellStatus::PendingJoin(PendingJoinReason::Initial),
                     },
                 );
             }
@@ -2423,13 +2486,12 @@ impl Conductor {
         self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
-                .filter_map(|(id, item)| {
-                    if item.status == CellStatus::PendingJoin {
+                .filter_map(|(id, item)| match item.status {
+                    CellStatus::PendingJoin(_) => {
                         item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
-                    } else {
-                        None
                     }
+                    _ => None,
                 })
                 .collect()
         })
@@ -2490,21 +2552,21 @@ impl Conductor {
                     self.spaces
                         .authored_db(dna_hash)
                         .unwrap()
-                        .async_commit(|txn| {
+                        .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .async_commit(|txn| {
+                        .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .async_commit(|txn| {
+                        .write_async(|txn| {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
@@ -2565,7 +2627,7 @@ impl Conductor {
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
-            let chc = handle.chc(cell_id);
+            let chc = handle.chc(self.keystore().clone(), cell_id);
             async move {
                 let holochain_p2p_cell =
                     handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
@@ -2837,7 +2899,7 @@ pub(crate) async fn genesis_cells(
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
             let conductor = conductor.clone();
-            let chc = conductor.chc(&cell_id);
+            let chc = conductor.chc(conductor.keystore().clone(), &cell_id);
             let cell_id_inner = cell_id.clone();
             let ribosome = conductor
                 .get_ribosome(cell_id.dna_hash())
@@ -2891,7 +2953,7 @@ pub async fn integration_dump(
     vault: &DbRead<DbKindDht>,
 ) -> ConductorApiResult<IntegrationStateDump> {
     vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let integrated = txn.query_row(
                 "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NOT NULL",
                 [],
@@ -2928,7 +2990,7 @@ pub async fn full_integration_dump(
     dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<FullIntegrationStateDump> {
     vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let integrated =
                 query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
 
@@ -2997,7 +3059,7 @@ async fn p2p_event_task(
 ) {
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
-    const NUM_PARALLEL_EVTS: usize = 100;
+    const NUM_PARALLEL_EVTS: usize = 512;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
     p2p_evt
@@ -3010,12 +3072,20 @@ async fn p2p_event_task(
                     >= NUM_PARALLEL_EVTS)
                     .then(std::time::Instant::now);
 
-                if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
-                    tracing::error!(
-                        message = "error dispatching network event",
-                        error = ?e,
-                    );
+                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
+                match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                                message = "error dispatching network event",
+                                error = ?e,
+                            );
+                    }
+                    Err(_) => {
+                        tracing::error!("timeout while dispatching network event");
+                    }
                 }
+
                 match start {
                     Some(start) => {
                         let el = start.elapsed();

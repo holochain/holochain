@@ -31,7 +31,7 @@ type KOpHash = Arc<KitsuneOpHash>;
 /// This is a very basic in-memory implementation of an event handler similar
 /// to what a Kitsune implementor like Holochain would implement.
 /// It's used to implement nodes in the Switchboard.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SwitchboardEventHandler {
     node: NodeEp,
     sb: Switchboard,

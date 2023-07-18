@@ -346,6 +346,7 @@ impl HolochainP2pMockMsg {
                 | crate::wire::WireMessage::Get { .. }
                 | crate::wire::WireMessage::GetMeta { .. }
                 | crate::wire::WireMessage::GetLinks { .. }
+                | crate::wire::WireMessage::CountLinks { .. }
                 | crate::wire::WireMessage::GetAgentActivity { .. }
                 | crate::wire::WireMessage::PublishCountersign { .. }
                 | crate::wire::WireMessage::MustGetAgentActivity { .. } => next_msg_id().as_req(),
@@ -375,6 +376,7 @@ impl HolochainP2pMockMsg {
                     | crate::wire::WireMessage::Get { .. }
                     | crate::wire::WireMessage::GetMeta { .. }
                     | crate::wire::WireMessage::GetLinks { .. }
+                    | crate::wire::WireMessage::CountLinks { .. }
                     | crate::wire::WireMessage::GetAgentActivity { .. }
                     | crate::wire::WireMessage::MustGetAgentActivity { .. } => true,
                     crate::wire::WireMessage::PublishCountersign { .. }

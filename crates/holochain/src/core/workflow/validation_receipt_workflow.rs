@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use holochain_keystore::MetaLairClient;
@@ -23,7 +24,7 @@ pub async fn pending_receipts(
     validators: Vec<AgentPubKey>,
 ) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
     vault
-        .async_reader({
+        .read_async({
             let validators = validators.clone();
             move |txn| {
                 let mut stmt = txn.prepare(
@@ -102,10 +103,12 @@ pub async fn validation_receipt_workflow(
     // FIXME: Test this query.
     let receipts = pending_receipts(&vault, validators.clone()).await?;
 
+    let validators: HashSet<_> = validators.into_iter().collect();
+
     // Send the validation receipts
     for (receipt, author, _) in &receipts {
         // Don't send receipt to self. Don't block self.
-        if validators.iter().any(|validator| validator == author) {
+        if validators.contains(author) {
             continue;
         }
 
@@ -157,7 +160,7 @@ pub async fn validation_receipt_workflow(
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault
-            .async_commit(move |txn| set_require_receipt(txn, &dht_op_hash, false))
+            .write_async(move |txn| set_require_receipt(txn, &dht_op_hash, false))
             .await?;
     }
 

@@ -30,9 +30,9 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
+use holochain_types::prelude::AddRecordPayload;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
-use holochain_types::EntryHashed;
 use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::Action;
@@ -73,6 +73,8 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
+use holochain_sqlite::rusqlite;
+use holochain_zome_types::EntryType;
 
 mod error;
 
@@ -126,9 +128,12 @@ pub struct SourceChainJsonRecord {
 /// Writable functions for a source chain with write access.
 impl SourceChain {
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
-        let author = self.author.clone();
         self.vault
-            .async_commit(move |txn| unlock_chain(txn, &author))
+            .write_async({
+                let author = self.author.clone();
+
+                move |txn| unlock_chain(txn, &author)
+            })
             .await?;
         Ok(())
     }
@@ -151,7 +156,7 @@ impl SourceChain {
 
         let countersigning_agent_state = self
             .vault
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
@@ -296,22 +301,29 @@ impl SourceChain {
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
-        let (scheduled_fns, actions, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let (actions, ops) =
-                build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+        let (scheduled_fns, actions, ops, entries, records) =
+            self.scratch.apply_and_then(|scratch| {
+                let records: Vec<Record> = scratch.records().collect();
 
-            // Drain out any entries.
-            let entries = scratch.drain_entries().collect::<Vec<_>>();
-            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-            SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
-        })?;
+                let (actions, ops) =
+                    build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+
+                // Drain out any entries.
+                let entries = scratch.drain_entries().collect::<Vec<_>>();
+                let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
+            })?;
 
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
-            chc.add_entries(entries.clone())
-                .await
-                .map_err(SourceChainError::other)?;
-            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_actions(actions.clone()).await
+            let payload = AddRecordPayload::from_records(
+                self.keystore.clone(),
+                (*self.author).clone(),
+                records,
+            )
+            .await
+            .map_err(SourceChainError::other)?;
+            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
             {
                 return Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
@@ -344,7 +356,7 @@ impl SourceChain {
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
         match self
             .vault
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
@@ -469,7 +481,7 @@ where
         let author = Arc::new(author);
         let head_info = Some(
             vault
-                .async_reader({
+                .read_async({
                     let author = author.clone();
                     move |txn| chain_head_db_nonempty(&txn, author)
                 })
@@ -502,7 +514,7 @@ where
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
         let head_info = vault
-            .async_reader({
+            .read_async({
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
             })
@@ -571,7 +583,7 @@ where
             return Ok(true);
         }
         let query_filter = ChainQueryFilter {
-            action_type: Some(ActionType::InitZomesComplete),
+            action_type: Some(vec![ActionType::InitZomesComplete]),
             ..QueryFilter::default()
         };
         let init_zomes_complete_actions = self.query(query_filter).await?;
@@ -637,7 +649,7 @@ where
         // remote caller
         let maybe_cap_grant: Option<CapGrant> = self
             .vault
-            .async_reader({
+            .read_async({
                 let agent_pubkey = self.agent_pubkey().clone();
                 move |txn| -> Result<_, DatabaseError> {
                     // closure to process resulting rows from query
@@ -731,7 +743,7 @@ where
         let public_only = self.public_only;
         let mut records = self
             .vault
-            .async_reader({
+            .read_async({
                 let query = query.clone();
                 move |txn| {
                     let mut sql = "
@@ -787,46 +799,81 @@ where
                             (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                     });
+
+                    let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
+                    let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
+
                     sql.push_str(
-                        "
+                        format!("
                         )
                         AND
-                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        (:entry_type IS NULL OR Action.entry_type IN ({}))
                         AND
-                        (:action_type IS NULL OR Action.type = :action_type)
-                        ORDER BY Action.seq 
-                        ",
+                        (:action_type IS NULL OR Action.type IN ({}))
+                        ORDER BY Action.seq
+                        ", named_param_seq("entry_type", entry_type_filters_count), named_param_seq("action_type", action_type_filters_count)).as_str(),
                     );
                     sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
+
+                    // This type is similar to what `named_params!` from rusqlite creates, escept for the use of boxing to allow references to be passed to the query.
+                    // The reserved capacity here should account for the number of parameters inserted below, including the variable inputs like entry_types and actions_types.
+                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + entry_type_filters_count + action_type_filters_count);
+                    args.push((":author".to_string(), Box::new(author)));
+
+                    match &query.entry_type {
+                        None => {
+                            args.push((":entry_type".to_string(), Box::new(None::<EntryType>.as_sql())))
+                        }
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":entry_type".to_string(), Box::new(types.get(0).unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":entry_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    match &query.action_type {
+                        None => args.push((":action_type".to_string(), Box::new(None::<EntryType>.as_sql()))),
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":action_type".to_string(), Box::new(types.get(0).as_ref().unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":action_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    args.push((":range_start".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
+                        _ => None,
+                    })));
+
+                    args.push((":range_start_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(_, end_hash)
+                        | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_prior_count".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
+                        _ => None,
+                    })));
+
                     let records = stmt
                         .query_and_then(
-                        named_params! {
-                                ":author": author.as_ref(),
-                                ":entry_type": query.entry_type.as_sql(),
-                                ":action_type": query.action_type.as_sql(),
-                                ":range_start": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
-                                    _ => None,
-                                },
-                                ":range_end": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
-                                    _ => None,
-                                },
-                                ":range_start_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_end_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(_, end_hash)
-                                    | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_prior_count": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
-                                    _ => None,
-                                },
-                            },
+                            args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                                 let SignedAction(action, signature) = action;
@@ -876,7 +923,7 @@ where
         let author = self.author.clone();
         Ok(self
             .vault
-            .async_reader(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
+            .read_async(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
             .await?)
     }
 
@@ -900,13 +947,26 @@ where
                             Some(DhtOp::StoreEntry(
                                 shh.signature().clone(),
                                 shh.action().clone().try_into().ok()?,
-                                Box::new((**entry).clone()),
+                                (**entry).clone(),
                             ))
                         })
                 })
         })?;
         Ok(r)
     }
+}
+
+fn named_param_seq(base_name: &str, repeat: usize) -> String {
+    if repeat == 0 {
+        return String::new();
+    }
+
+    let mut seq = format!(":{}", base_name);
+    for i in 1..repeat {
+        seq.push_str(format!(", :{}_{}", base_name, i).as_str());
+    }
+
+    seq
 }
 
 pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
@@ -1005,9 +1065,9 @@ pub async fn genesis(
     let dna_action = ActionHashed::from_content_sync(dna_action);
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
-    let record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_records(vec![&record])?;
-    let (dna_action, _) = record.into_inner();
+    let dna_record = Record::new(dna_action, None);
+    let dna_ops = produce_op_lights_from_records(vec![&dna_record])?;
+    let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
     let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
@@ -1021,9 +1081,9 @@ pub async fn genesis(
     let agent_validation_action =
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
-    let record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_records(vec![&record])?;
-    let (agent_validation_action, _) = record.into_inner();
+    let agent_validation_record = Record::new(agent_validation_action, None);
+    let avh_ops = produce_op_lights_from_records(vec![&agent_validation_record])?;
+    let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
     let agent_action = Action::Create(action::Create {
@@ -1038,27 +1098,22 @@ pub async fn genesis(
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lights_from_records(vec![&record])?;
-    let (agent_action, agent_entry) = record.into_inner();
+    let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
+    let agent_ops = produce_op_lights_from_records(vec![&agent_record])?;
+    let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
 
     if let Some(chc) = chc {
-        chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
-            agent_pubkey,
-        ))])
+        let payload = AddRecordPayload::from_records(
+            keystore.clone(),
+            agent_pubkey.clone(),
+            vec![dna_record, agent_validation_record, agent_record],
+        )
         .await
         .map_err(SourceChainError::other)?;
-        match chc
-            .add_actions(vec![
-                dna_action.clone(),
-                agent_validation_action.clone(),
-                agent_action.clone(),
-            ])
-            .await
-        {
+        match chc.add_records_request(payload).await {
             Err(e @ ChcError::InvalidChain(_, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
             }
@@ -1067,7 +1122,7 @@ pub async fn genesis(
     }
 
     let ops_to_integrate = authored
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
             ops_to_integrate.extend(source_chain::put_raw(
                 txn,
@@ -1187,9 +1242,13 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
         action: prev_action,
         seq: last_action_seq,
         ..
-    } = fresh_reader_test!(vault, |txn| {
-        chain_head_db_nonempty(&txn, author.clone())
-    })?;
+    } = vault
+        .read_async({
+            let query_author = author.clone();
+
+            move |txn| chain_head_db_nonempty(&txn, query_author.clone())
+        })
+        .await?;
     let action_seq = last_action_seq + 1;
 
     let common = ActionBuilderCommon {
@@ -1206,27 +1265,31 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
-    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-        let head_info = chain_head_db_nonempty(txn, author.clone())?;
-        if head_info.action != prev_action {
-            let entries = match (entry, action.action().entry_hash()) {
-                (Some(e), Some(entry_hash)) => {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e,
-                        entry_hash.clone(),
-                    )]
+    vault
+        .write_async(
+            move |txn: &mut Transaction| -> SourceChainResult<Vec<DhtOpHash>> {
+                let head_info = chain_head_db_nonempty(txn, author.clone())?;
+                if head_info.action != prev_action {
+                    let entries = match (entry, action.action().entry_hash()) {
+                        (Some(e), Some(entry_hash)) => {
+                            vec![holochain_types::EntryHashed::with_pre_hashed(
+                                e,
+                                entry_hash.clone(),
+                            )]
+                        }
+                        _ => vec![],
+                    };
+                    return Err(SourceChainError::HeadMoved(
+                        vec![action],
+                        entries,
+                        Some(prev_action),
+                        Some(head_info),
+                    ));
                 }
-                _ => vec![],
-            };
-            return Err(SourceChainError::HeadMoved(
-                vec![action],
-                entries,
-                Some(prev_action),
-                Some(head_info),
-            ));
-        }
-        SourceChainResult::Ok(put_raw(txn, action, ops, entry)?)
-    })?;
+                Ok(put_raw(txn, action, ops, entry)?)
+            },
+        )
+        .await?;
     Ok(hash)
 }
 
@@ -1236,7 +1299,7 @@ pub async fn dump_state(
     author: AgentPubKey,
 ) -> Result<SourceChainJsonDump, SourceChainError> {
     Ok(vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let records = txn
                 .prepare(
                     "
@@ -1389,7 +1452,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1400,7 +1463,7 @@ pub mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1408,7 +1471,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1508,7 +1571,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1521,7 +1584,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 chain_head_db_nonempty(&txn, author_2.clone())
             })
             .await?;
@@ -1530,7 +1593,7 @@ pub mod tests {
         assert_ne!(head.action, old_h2);
         assert_eq!(head.seq, 4);
 
-        fresh_reader_test!(db, |txn| {
+        db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
             let store = Txn::from(&txn);
             let h1_record_entry_fetched = store
@@ -1547,7 +1610,10 @@ pub mod tests {
                 .1;
             assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
             assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
-        });
+
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }
@@ -1924,9 +1990,18 @@ pub mod tests {
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
-        fresh_reader_test!(vault, |txn| {
-            assert_matches!(chain_head_db(&txn, author.clone()), Ok(None));
-        });
+        vault
+            .read_async({
+                let query_author = author.clone();
+
+                move |txn| -> DatabaseResult<()> {
+                    assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
         genesis(
             vault.clone().into(),
             dht_db.to_db(),
@@ -1969,24 +2044,37 @@ pub mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
-        fresh_reader_test!(vault, |txn| {
-            assert_eq!(
-                chain_head_db_nonempty(&txn, author.clone()).unwrap().action,
-                h2
-            );
-            // get the full record
-            let store = Txn::from(&txn);
-            let h1_record_fetched = store
-                .get_record(&h1.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            let h2_record_fetched = store
-                .get_record(&h2.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            assert_eq!(h1, *h1_record_fetched.action_address());
-            assert_eq!(h2, *h2_record_fetched.action_address());
-        });
+        vault
+            .read_async({
+                let check_h1 = h1.clone();
+                let check_h2 = h2.clone();
+                let check_author = author.clone();
+
+                move |txn| -> DatabaseResult<()> {
+                    assert_eq!(
+                        chain_head_db_nonempty(&txn, check_author.clone())
+                            .unwrap()
+                            .action,
+                        check_h2
+                    );
+                    // get the full record
+                    let store = Txn::from(&txn);
+                    let h1_record_fetched = store
+                        .get_record(&check_h1.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    let h2_record_fetched = store
+                        .get_record(&check_h2.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    assert_eq!(check_h1, *h1_record_fetched.action_address());
+                    assert_eq!(check_h2, *h2_record_fetched.action_address());
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
 
         // check that you can iterate on the chain
         let source_chain = SourceChain::new(
@@ -2105,15 +2193,15 @@ pub mod tests {
         let cases = [
             ((None, None, vec![], false), 3),
             ((None, None, vec![], true), 3),
-            ((Some(ActionType::Dna), None, vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
-            ((Some(ActionType::Create), None, vec![], false), 1),
-            ((Some(ActionType::Create), None, vec![], true), 1),
+            ((Some(vec![ActionType::Dna]), None, vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], true), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], false), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], true), 1),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![],
                     false,
                 ),
@@ -2121,9 +2209,28 @@ pub mod tests {
             ),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![records[2].action().entry_hash().unwrap().clone()],
+                    true,
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(vec![ActionType::Create, ActionType::Dna]),
+                    None,
+                    vec![],
+                    true,
+                ),
+                2,
+            ),
+            (
+                (
+                    None,
+                    // Redundant but covers the code that constructs the IN query
+                    Some(vec![EntryType::AgentPubKey, EntryType::AgentPubKey]),
+                    vec![],
                     true,
                 ),
                 1,

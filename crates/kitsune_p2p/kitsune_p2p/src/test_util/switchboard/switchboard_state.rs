@@ -55,7 +55,7 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// spawned to feed incoming network messages to the gossip module, and another
 /// task is spawned which handles the events received, mutating the state
 /// in the process.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Switchboard {
     pub(super) strat: ArqStrat,
     pub(super) topology: Topology,
@@ -136,9 +136,9 @@ impl Switchboard {
         let gossip = ShardedGossip::new(
             tuning_params,
             space.clone(),
-            MetaNet::Tx2(ep_hnd.clone()),
+            MetaNet::Tx2(ep_hnd.clone(), host_api.clone()),
             evt_sender,
-            host_api,
+            host_api.clone(),
             self.gossip_type,
             bandwidth,
             Default::default(),
@@ -161,7 +161,7 @@ impl Switchboard {
                                 let data: Box<[u8]> = data.into_boxed_slice();
 
                                 gossip_module.incoming_gossip(
-                                    MetaNetCon::Tx2(con),
+                                    MetaNetCon::Tx2(con, host_api.clone()),
                                     url.to_string(),
                                     data,
                                 )?
@@ -203,6 +203,7 @@ impl Switchboard {
 /// getting a lock on the state via `Switchboard::share`. This same state is
 /// modified directly by an actively running GossipModule which is processing
 /// messages from other nodes.
+#[derive(Debug)]
 pub struct SwitchboardState {
     space: KSpace,
     pub(super) nodes: HashMap<NodeEp, NodeEntry>,

@@ -35,7 +35,7 @@ pub async fn witness_nonce(
     } else if expires > (now + WITNESSABLE_EXPIRY_DURATION)? {
         Ok(WitnessNonceResult::Future)
     } else {
-        db.async_commit(move |txn| {
+        db.write_async(move |txn| {
             txn.execute(
                 sql_conductor::DELETE_EXPIRED_NONCE,
                 named_params! {":now": now},

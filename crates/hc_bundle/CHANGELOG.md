@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Updated from structopt 0.3 to clap 4. [#2125](https://github.com/holochain/holochain/pull/2125)
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
 
 ## 0.2.1-beta-dev.0
 
