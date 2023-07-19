@@ -153,7 +153,16 @@ mod tests {
 
         let hash = |i: usize| chain[i].action_address().clone();
 
-        chc.clone().add_records(t0.to_vec()).await.unwrap();
+        // dbg!(t0
+        //     .iter()
+        //     .map(|r| (r.action_address(), r.action().prev_action()))
+        //     .collect::<Vec<_>>());
+
+        chc.clone()
+            .add_records(t0.to_vec())
+            .await
+            .map_err(|e| e.to_string()[..1024].to_string())
+            .unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
 
         chc.clone().add_records(t1.to_vec()).await.unwrap();

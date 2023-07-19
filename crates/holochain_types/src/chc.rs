@@ -161,13 +161,22 @@ impl AddRecordPayload {
                         None
                     };
                     let action_hashed_msgpack = holochain_serialized_bytes::encode(&action.hashed)?;
-                    dbg!(&action_hashed_msgpack);
-                    dbg!(&action.signature);
-                    dbg!(&action.action().author());
-                    dbg!(&action.action().author().get_raw_32());
+                    dbg!(action_hashed_msgpack.len());
+                    let author = action.action().author();
+                    let signature = author
+                        .sign_raw(&keystore, action_hashed_msgpack.clone().into())
+                        .await?;
+                    // dbg!(array_u32_xor(&action_hashed_msgpack));
+                    // dbg!(array_u32_xor(&signature.0));
+                    // dbg!(array_u32_xor(&author.get_raw_32()));
+                    assert!(
+                        author
+                            .verify_signature_raw(&signature, action_hashed_msgpack.clone().into())
+                            .await
+                    );
                     ChcResult::Ok(AddRecordPayload {
                         action_hashed_msgpack,
-                        signature: action.signature,
+                        signature,
                         encrypted_entry,
                     })
                 }
@@ -177,6 +186,12 @@ impl AddRecordPayload {
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
     }
+}
+
+fn array_u32_xor(arr: &[u8]) -> u32 {
+    arr.iter()
+        .enumerate()
+        .fold(0, |x, (i, a)| x ^ ((*a as u32) << ((i as u32) % 4)))
 }
 
 /// The request type for `add_records`
