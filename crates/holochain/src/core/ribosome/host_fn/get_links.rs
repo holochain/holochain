@@ -252,13 +252,75 @@ pub mod slow_tests {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
+        let t1: Timestamp = conductor.call(&alice, "get_time", ()).await;
         let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
+        let t2: Timestamp = conductor.call(&alice, "get_time", ()).await;
         let _: ActionHash = conductor.call(&alice, "create_back_link", ()).await;
+        let t3: Timestamp = conductor.call(&alice, "get_time", ()).await;
         let forward_links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
         let back_links: Vec<Link> = conductor.call(&alice, "get_back_links", ()).await;
         let links_bidi: Vec<Vec<Link>> = conductor.call(&alice, "get_links_bidi", ()).await;
+        let hash_path_a: holo_hash::AnyLinkableHash =  conductor.call(&alice, "get_path_hash", "a").await;
+        let hash_path_b: holo_hash::AnyLinkableHash =  conductor.call(&alice, "get_path_hash", "b").await;
 
-        assert_eq!(links_bidi, vec![forward_links, back_links],);
+        const LINK_TYPE: ScopedLinkType = ScopedLinkType {
+            zome_index: ZomeIndex(0),
+            zome_type: LinkType(0),
+        };
+        let forward_link_0 = forward_links.get(0).unwrap();
+        assert_eq!(
+            forward_link_0.base,
+            hash_path_a
+        );
+        assert_eq!(
+            forward_link_0.target,
+            hash_path_b
+        );
+        assert_eq!(
+            forward_link_0.author,
+            alice.cell_id().agent_pubkey().clone()
+        );
+        assert_eq!(
+            forward_link_0.tag,
+            LinkTag::from(())
+        );
+        assert_eq!(
+            forward_link_0.link_type,
+            LinkType(0)
+        );
+        assert_eq!(
+            forward_link_0.zome_index,
+            ZomeIndex(0)
+        );
+        assert!(t1 <= forward_link_0.timestamp && t2 >= forward_link_0.timestamp);
+
+        let back_link_0 = back_links.get(0).unwrap();
+        assert_eq!(
+            back_link_0.base,
+            hash_path_b
+        );
+        assert_eq!(
+            back_link_0.target,
+            hash_path_a
+        );
+        assert_eq!(
+            back_link_0.author,
+            alice.cell_id().agent_pubkey().clone()
+        );
+        assert_eq!(
+            back_link_0.tag,
+            LinkTag::from(())
+        );
+        assert_eq!(
+            back_link_0.link_type,
+            LinkType(0)
+        );
+        assert_eq!(
+            back_link_0.zome_index,
+            ZomeIndex(0)
+        );
+        assert!(t2 <= back_link_0.timestamp && t3 >= back_link_0.timestamp);
+        assert_eq!(links_bidi, vec![forward_links.clone(), back_links.clone()],);
 
         let forward_link_details: LinkDetails =
             conductor.call(&alice, "get_link_details", ()).await;

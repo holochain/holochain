@@ -228,7 +228,7 @@ fn bump_release_versions<'a>(
                     crt.set_version(cmd_args.dry_run, &incremented_version)?;
                     incremented_version.clone()
                 } else {
-                    bail!("neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", &current_version, &incremented_version, previous_release_version);
+                    bail!("[{}] neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", crt.name(), &current_version, &incremented_version, previous_release_version);
                 }
             }
 
