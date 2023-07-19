@@ -297,7 +297,7 @@ async fn check_previous_action() {
         .into_outcome();
 
         let expected = Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot,
+            PrevActionErrorKind::InvalidRoot,
         ));
         assert_eq!(actual, expected);
     }
@@ -360,7 +360,7 @@ async fn check_valid_if_dna_test() {
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
+            ValidationOutcome::PrevActionError(PrevActionErrorKind::InvalidRootOriginTime)
         ))
     );
 
@@ -420,7 +420,7 @@ async fn check_previous_timestamp() {
     assert_matches!(
         r,
         Some(ValidationOutcome::PrevActionError(
-            PrevActionError::Timestamp(_, _)
+            PrevActionErrorKind::Timestamp(_, _)
         ))
     );
 }
@@ -451,7 +451,7 @@ async fn check_previous_seq() {
             .unwrap_err()
             .into_outcome(),
         Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidSeq(2, 2)
+            PrevActionErrorKind::InvalidSeq(2, 2)
         )),
     );
 
@@ -462,7 +462,7 @@ async fn check_previous_seq() {
             .unwrap_err()
             .into_outcome(),
         Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidSeq(2, 3)
+            PrevActionErrorKind::InvalidSeq(2, 3)
         )),
     );
 
@@ -475,7 +475,7 @@ async fn check_previous_seq() {
             .unwrap_err()
             .into_outcome(),
         Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot
+            PrevActionErrorKind::InvalidRoot
         )),
     );
 }
@@ -723,7 +723,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::HashMismatch(_)
+                PrevActionErrorKind::HashMismatch(_)
             ))
         );
 
@@ -734,7 +734,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidSeq(_, _)
+                PrevActionErrorKind::InvalidSeq(_, _)
             ))
         );
 
@@ -748,7 +748,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidRoot
+                PrevActionErrorKind::InvalidRoot
             ))
         );
 
@@ -759,7 +759,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::MissingPrev
+                PrevActionErrorKind::MissingPrev
             ))
         );
 
@@ -769,7 +769,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::MissingPrev
+                PrevActionErrorKind::MissingPrev
             ))
         );
 
@@ -786,7 +786,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidSeq(_, _)
+                PrevActionErrorKind::InvalidSeq(_, _)
             ))
         );
 
@@ -803,7 +803,7 @@ fn valid_chain_test() {
         assert_matches!(
             err,
             SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::HashMismatch(_)
+                PrevActionErrorKind::HashMismatch(_)
             ))
         );
     });
