@@ -92,6 +92,7 @@ async fn async_main() {
     if let Some(true) = &config.disable_metrics {
         tracing::warn!("Running without local metrics");
     } else {
+        #[cfg(feature = "metrics_influxive")]
         holochain_metrics::HolochainMetricsConfig::new_influxive(config.environment_path.as_ref())
             .init()
             .await;

@@ -167,6 +167,7 @@ impl SweetConductor {
         let dir = TestDir::new(test_db_dir());
 
         if with_metrics {
+            #[cfg(feature = "metrics_influxive")]
             holochain_metrics::HolochainMetricsConfig::new_influxive(dir.as_ref())
                 .init()
                 .await;

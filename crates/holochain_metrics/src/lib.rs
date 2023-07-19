@@ -11,11 +11,13 @@ const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json")
 /// Configuration for holochain metrics.
 #[derive(Debug)]
 pub enum HolochainMetricsConfig {
+    #[cfg(feature = "influxive")]
     /// Use influxive to write metrics.
     Influxive(influxive_child_svc::Config),
 }
 
 impl HolochainMetricsConfig {
+    #[cfg(feature = "influxive")]
     /// Initialize a new influxive metrics configuration.
     pub fn new_influxive(root_path: &std::path::Path) -> Self {
         let mut database_path = std::path::PathBuf::from(root_path);
@@ -29,12 +31,14 @@ impl HolochainMetricsConfig {
     /// Initialize holochain metrics based on this configuration.
     pub async fn init(self) {
         match self {
+            #[cfg(feature = "influxive")]
             HolochainMetricsConfig::Influxive(config) => {
                 Self::init_influxive(config).await;
             }
         }
     }
 
+    #[cfg(feature = "influxive")]
     async fn init_influxive(config: influxive_child_svc::Config) {
         tracing::info!(?config, "initializing holochain_metrics");
 
