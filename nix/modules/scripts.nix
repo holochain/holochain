@@ -65,7 +65,7 @@
         git commit -m "chore(flakes): update $VERSIONS_DIR"
       '';
 
-      scripts-cargo-update = pkgs.writeShellScriptBin ''
+      scripts-cargo-update = pkgs.writeShellScriptBin "scripts-cargo-update" ''
         set -xeou pipefail
 
         # Update the Holochain project Cargo.lock
