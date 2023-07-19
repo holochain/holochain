@@ -167,10 +167,9 @@ impl SweetConductor {
         let dir = TestDir::new(test_db_dir());
 
         if with_metrics {
-            let mut path = std::path::PathBuf::from(dir.as_ref());
-            path.push("influxive");
-            tracing::warn!(?path, "Running Sweettest With Metrics");
-            holochain_metrics::initialize_metrics(path).await;
+            holochain_metrics::HolochainMetricsConfig::new_influxive(dir.as_ref())
+                .init()
+                .await;
         }
 
         let config: ConductorConfig = if let Some(r) = rendezvous.clone() {

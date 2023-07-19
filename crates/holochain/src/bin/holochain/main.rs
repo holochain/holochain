@@ -92,9 +92,9 @@ async fn async_main() {
     if let Some(true) = &config.disable_metrics {
         tracing::warn!("Running without local metrics");
     } else {
-        let mut path: std::path::PathBuf = config.environment_path.clone().into();
-        path.push("influxive");
-        holochain_metrics::initialize_metrics(path).await;
+        holochain_metrics::HolochainMetricsConfig::new_influxive(config.environment_path.as_ref())
+            .init()
+            .await;
     }
 
     kitsune_p2p_types::metrics::init_sys_info_poll();

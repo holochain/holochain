@@ -358,8 +358,6 @@ impl MetaNetCon {
                                 data.len() as u64,
                             );
 
-                            tracing::warn!(%rem_url, "send data");
-
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
@@ -442,16 +440,14 @@ impl MetaNetCon {
                                 data.len() as u64,
                             );
 
-                            tracing::warn!(%rem_url, "send data");
-
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
 
-                            let result = r.await.map_err(|_| KitsuneError::other("timeout"))?;
+                            let resp = r.await.map_err(|_| KitsuneError::other("timeout"))?;
 
                             metric_guard.set_is_error(false);
-                            return Ok(result);
+                            return Ok(resp);
                         }
                     }
 
