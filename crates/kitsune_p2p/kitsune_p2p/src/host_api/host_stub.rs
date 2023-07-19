@@ -15,6 +15,7 @@ pub type CheckOpDataImpl = Box<
         + Sync,
 >;
 
+#[derive(Debug)]
 struct HostStubErr;
 
 impl KitsuneHostDefaultError for HostStubErr {
@@ -31,6 +32,13 @@ impl FetchPoolConfig for HostStubErr {
 pub struct HostStub {
     err: HostStubErr,
     check_op_data_impl: Option<CheckOpDataImpl>,
+}
+
+/// Manual implementation of debug to skip over underivable Debug field.
+impl std::fmt::Debug for HostStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HostStub").field("err", &self.err).finish()
+    }
 }
 
 impl HostStub {

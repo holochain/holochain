@@ -747,6 +747,8 @@ async fn update_single_agent_info(
 }
 
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::GhostControlSender;
+
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
@@ -1001,8 +1003,8 @@ impl KitsuneP2pHandler for Space {
             futures::future::join_all(local_agent_info_events).await;
 
             // NOTE
-            // Holochain currently does all its testing without any remote nodes
-            // if we do this inline, it takes us to the 30 second timeout
+            // Holochain currently does most of its testing without any remote
+            // nodes if we do this inline, it takes us to the 30 second timeout
             // on every one of those... so spawning for now, which means
             // we won't get notified if we are unable to publish to anyone.
             // Also, if conductor spams us with publishes, we could fill
@@ -1438,7 +1440,12 @@ impl Space {
                 ))
                 .await;
                 if let Err(e) = i_s_c.update_agent_info().await {
-                    tracing::error!(failed_to_update_agent_info_for_space = ?e);
+                    if !i_s_c.ghost_actor_is_active() {
+                        // Assume this task has been orphaned when the space was dropped and exit.
+                        break;
+                    } else {
+                        tracing::error!(failed_to_update_agent_info_for_space = ?e);
+                    }
                 }
             }
         });
@@ -1459,7 +1466,6 @@ impl Space {
                 let mut delay_len = START_DELAY;
 
                 loop {
-                    use ghost_actor::GhostControlSender;
                     if !i_s_c.ghost_actor_is_active() {
                         break;
                     }

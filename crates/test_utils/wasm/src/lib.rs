@@ -32,6 +32,8 @@ pub enum TestWasm {
     EmitSignal,
     HashEntry,
     Foo,
+    GenesisSelfCheckValidLegacy,
+    GenesisSelfCheckValidV1,
     GenesisSelfCheckInvalid,
     GenesisSelfCheckValid,
     HashPath,
@@ -128,6 +130,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
+            TestWasm::GenesisSelfCheckValidLegacy => "genesis_self_check_legacy",
+            TestWasm::GenesisSelfCheckValidV1 => "genesis_self_check_1",
             TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
             TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
             TestWasm::HashPath => "hash_path",
@@ -191,6 +195,12 @@ impl From<TestWasm> for PathBuf {
             TestWasm::EmitSignal => "wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm",
             TestWasm::HashEntry => "wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm",
             TestWasm::Foo => "wasm32-unknown-unknown/release/test_wasm_foo.wasm",
+            TestWasm::GenesisSelfCheckValidLegacy => {
+                "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_legacy.wasm"
+            }
+            TestWasm::GenesisSelfCheckValidV1 => {
+                "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_1.wasm"
+            }
             TestWasm::GenesisSelfCheckInvalid => {
                 "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_invalid.wasm"
             }

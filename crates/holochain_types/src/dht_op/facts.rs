@@ -13,7 +13,7 @@ pub fn valid_dht_op(
     keystore: MetaLairClient,
     author: AgentPubKey,
     must_be_public: bool,
-) -> Facts<'static, DhtOp> {
+) -> impl Fact<'static, DhtOp> {
     facts![
         brute(
             "Action type matches Entry existence, and is public if exists",
@@ -22,51 +22,56 @@ pub fn valid_dht_op(
                 let h = action.entry_data();
                 let e = op.entry();
                 match (h, e) {
-                    (Some((_entry_hash, entry_type)), Some(_e)) => {
+                    (
+                        Some((_entry_hash, entry_type)),
+                        RecordEntry::Present(_) | RecordEntry::NotStored,
+                    ) => {
                         // Ensure that entries are public
                         !must_be_public || entry_type.visibility().is_public()
                     }
-                    (None, None) => true,
+                    (None, RecordEntry::Present(_)) => false,
+                    (None, _) => true,
                     _ => false,
                 }
             }
         ),
-        mapped(
+        lambda_unit(
             "If there is entry data, the action must point to it",
-            |op: &DhtOp| {
-                if let Some(entry) = op.entry() {
+            |g, op: DhtOp| {
+                if let Some(entry) = op.entry().into_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
-                    facts![prism(
+                    prism(
                         "action's entry hash",
                         |op: &mut DhtOp| op.action_entry_data_mut().map(|(hash, _)| hash),
-                        eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    )]
+                        eq(EntryHash::with_data_sync(entry)),
+                    )
+                    .mutate(g, op)
                 } else {
-                    facts![always()]
+                    Ok(op)
                 }
             }
         ),
-        lens(
+        lens1(
             "The author is the one specified",
             DhtOp::author_mut,
-            eq_(author)
+            eq(author)
         ),
-        mapped("The Signature matches the Action", move |op: &DhtOp| {
+        lambda_unit("The Signature matches the Action", move |g, op: DhtOp| {
             use holochain_keystore::AgentPubKeyExt;
             let action = op.action();
             let agent = action.author();
             let actual = tokio_helper::block_forever_on(agent.sign(&keystore, &action))
                 .expect("Can sign the action");
-            facts![lens("signature", DhtOp::signature_mut, eq_(actual))]
+            lens1("signature", DhtOp::signature_mut, eq(actual)).mutate(g, op)
         })
     ]
 }
 
 #[cfg(test)]
 mod tests {
-    use arbitrary::{Arbitrary, Unstructured};
+    use arbitrary::Arbitrary;
     use holochain_keystore::test_keystore::spawn_test_keystore;
 
     use super::*;
@@ -76,34 +81,45 @@ mod tests {
     async fn test_valid_dht_op() {
         // TODO: Must add constraint on dht op variant wrt action variant
 
-        let mut uu = Unstructured::new(&NOISE);
-        let u = &mut uu;
+        let mut gg = Generator::from(unstructured_noise());
+        let g = &mut gg;
         let keystore = spawn_test_keystore().await.unwrap();
         let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
-        let e = Entry::arbitrary(u).unwrap();
+        let e = Entry::arbitrary(g).unwrap();
 
-        let mut hn = not_(action_facts::is_new_entry_action()).build(u);
-        *hn.author_mut() = agent.clone();
+        let mut a0 = action_facts::is_not_entry_action().build(g);
+        *a0.author_mut() = agent.clone();
 
-        let mut he = action_facts::is_new_entry_action().build(u);
-        *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let mut he = Action::from(he);
-        *he.author_mut() = agent.clone();
+        let mut a1 = action_facts::is_new_entry_action().build(g);
+        *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
+        let mut a1 = Action::from(a1);
+        *a1.author_mut() = agent.clone();
 
-        let se = agent.sign(&keystore, &he).await.unwrap();
-        let sn = agent.sign(&keystore, &hn).await.unwrap();
+        let sn = agent.sign(&keystore, &a0).await.unwrap();
+        let se = agent.sign(&keystore, &a1).await.unwrap();
 
-        let op1 = DhtOp::StoreRecord(se.clone(), he.clone(), Some(Box::new(e.clone())));
-        let op2 = DhtOp::StoreRecord(se.clone(), he.clone(), None);
-        let op3 = DhtOp::StoreRecord(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
-        let op4 = DhtOp::StoreRecord(sn.clone(), hn.clone(), None);
+        let op0a = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Present(e.clone()));
+        let op0b = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Hidden);
+        let op0c = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NA);
+        let op0d = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NotStored);
+
+        let op1a = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Present(e.clone()));
+        let op1b = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Hidden);
+        let op1c = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NA);
+        let op1d = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NotStored);
+
         let fact = valid_dht_op(keystore, agent, false);
 
-        fact.check(&op1).unwrap();
-        assert!(fact.check(&op2).is_err());
-        assert!(fact.check(&op3).is_err());
-        fact.check(&op4).unwrap();
+        assert!(fact.clone().check(&op0a).is_err());
+        fact.clone().check(&op0b).unwrap();
+        fact.clone().check(&op0c).unwrap();
+        fact.clone().check(&op0d).unwrap();
+
+        fact.clone().check(&op1a).unwrap();
+        assert!(fact.clone().check(&op1b).is_err());
+        assert!(fact.clone().check(&op1c).is_err());
+        fact.clone().check(&op1d).unwrap();
     }
 }
 

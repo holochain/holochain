@@ -1,62 +1,101 @@
 //! Defines a client for use with a remote HTTP-based CHC.
-//!
-//! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
-//! as it will change!
 
-use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
-use ::bytes::Bytes;
-use holo_hash::{ActionHash, EntryHash};
-use holochain_serialized_bytes::{decode, encode};
-use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
+use holo_hash::{ActionHash, AgentPubKey};
+use holochain_keystore::MetaLairClient;
+use holochain_types::{
+    chc::{ChainHeadCoordinator, ChcError, ChcResult},
+    prelude::{AddRecordsRequest, ChainHeadCoordinatorExt, EncryptedEntry, GetRecordsRequest},
+};
 use holochain_zome_types::prelude::*;
-use reqwest::Url;
+use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation
 pub struct ChcRemote {
-    actions: ChcRemoteClient,
-    entries: ChcRemoteClient,
+    client: ChcRemoteClient,
+    keystore: MetaLairClient,
+    agent: AgentPubKey,
 }
 
 #[async_trait::async_trait]
 impl ChainHeadCoordinator for ChcRemote {
     type Item = SignedActionHashed;
 
-    async fn head(&self) -> ChcResult<Option<ActionHash>> {
-        let response = self.actions.get("/head").await?;
-        Ok(decode(&response)?)
+    async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
+        let body = serde_json::to_string(&request)
+            .map(|json| json.into_bytes())
+            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
+        let response: reqwest::Response = self.client.post("add_records", body).await?;
+        let status = response.status().as_u16();
+        let bytes = response.bytes().await.map_err(extract_string)?;
+        match status {
+            200 => Ok(()),
+            409 => {
+                let (seq, hash): (u32, ActionHash) = serde_json::from_slice(&bytes)?;
+                Err(ChcError::InvalidChain(seq, hash))
+            }
+            498 => {
+                let msg: String = serde_json::from_slice(&bytes)?;
+                Err(ChcError::NoRecordsAdded(msg))
+            }
+            code => {
+                let msg =
+                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+                Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
+            }
+        }
     }
 
-    async fn add_actions(&self, actions: Vec<Self::Item>) -> ChcResult<()> {
-        let body = encode(&actions)?;
-        let _response = self.actions.post("/add_actions", body).await?;
-        Ok(())
-    }
-
-    async fn add_entries(&self, entries: Vec<EntryHashed>) -> ChcResult<()> {
-        let body = encode(&entries)?;
-        let _response = self.entries.post("/add_entries", body).await?;
-        Ok(())
-    }
-
-    async fn get_actions_since_hash(&self, hash: Option<ActionHash>) -> ChcResult<Vec<Self::Item>> {
-        let body = encode(&hash)?;
-        let response = self.actions.post("/get_actions_since_hash", body).await?;
-        Ok(decode(&response)?)
-    }
-
-    async fn get_entries(
+    async fn get_record_data_request(
         &self,
-        _hashes: HashSet<&EntryHash>,
-    ) -> ChcResult<HashMap<EntryHash, Entry>> {
-        todo!()
+        request: GetRecordsRequest,
+    ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
+        let body = serde_json::to_string(&request)
+            .map(|json| json.into_bytes())
+            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
+        let response = self.client.post("get_record_data", body).await?;
+        let status = response.status().as_u16();
+        let bytes = response.bytes().await.map_err(extract_string)?;
+        match status {
+            200 => Ok(serde_json::from_slice(&bytes)?),
+            498 => {
+                // The since_hash was not found in the CHC,
+                // so we can interpret this as an empty list of records.
+                Ok(vec![])
+            }
+            code => {
+                let msg =
+                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+                Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
+            }
+        }
+    }
+}
+
+impl ChainHeadCoordinatorExt for ChcRemote {
+    fn signing_info(&self) -> (MetaLairClient, holo_hash::AgentPubKey) {
+        (self.keystore.clone(), self.agent.clone())
     }
 }
 
 impl ChcRemote {
     /// Constructor
-    pub fn new(_namespace: &str, _cell_id: &CellId) -> Self {
-        todo!("Implement remote CHC client")
+    pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
+        let client = ChcRemoteClient {
+            base_url: base_url
+                .join(&format!(
+                    "{}/{}/",
+                    cell_id.dna_hash(),
+                    cell_id.agent_pubkey()
+                ))
+                .expect("invalid URL"),
+        };
+        Self {
+            client,
+            keystore,
+            agent: cell_id.agent_pubkey().clone(),
+        }
     }
 }
 
@@ -66,30 +105,20 @@ pub struct ChcRemoteClient {
 }
 
 impl ChcRemoteClient {
-    fn url(&self, path: &str) -> Url {
-        assert!(path.chars().nth(0) == Some('/'));
-        Url::parse(&format!("{}{}", self.base_url, path)).expect("invalid URL")
+    fn url(&self, path: &str) -> String {
+        assert!(!path.starts_with('/'));
+        self.base_url.join(path).expect("invalid URL").to_string()
     }
 
-    async fn get(&self, path: &str) -> ChcResult<Bytes> {
-        let bytes = reqwest::get(self.url(path))
-            .await
-            .map_err(extract_string)?
-            .bytes()
-            .await
-            .map_err(extract_string)?;
-        Ok(bytes)
-    }
-
-    async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<Bytes> {
+    async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
         let client = reqwest::Client::new();
-        let response = client
-            .post(self.url(path))
+        let url = self.url(path);
+        client
+            .post(url)
             .body(body)
             .send()
             .await
-            .map_err(extract_string)?;
-        Ok(response.bytes().await.map_err(extract_string)?)
+            .map_err(extract_string)
     }
 }
 

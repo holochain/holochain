@@ -165,3 +165,15 @@ where
         self.content.cmp(&other.content)
     }
 }
+
+impl<C: HashableContent> HashableContent for HoloHashed<C> {
+    type HashType = C::HashType;
+
+    fn hash_type(&self) -> Self::HashType {
+        C::hash_type(self)
+    }
+
+    fn hashable_content(&self) -> crate::HashableContentBytes {
+        crate::HashableContentBytes::Prehashed39(self.as_hash().get_raw_39().to_vec())
+    }
+}

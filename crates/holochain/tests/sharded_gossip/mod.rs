@@ -14,7 +14,7 @@ use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
 use holochain_p2p::*;
-use holochain_sqlite::db::*;
+use holochain_sqlite::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
@@ -56,7 +56,7 @@ fn make_config(
     recent_threshold: Option<u64>,
 ) -> SweetConductorConfig {
     let tuning = make_tuning(publish, recent, historical, recent_threshold);
-    SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
+    SweetConductorConfig::rendezvous().set_tuning_params(tuning)
 }
 
 #[cfg(feature = "test_utils")]
@@ -197,7 +197,7 @@ async fn test_zero_arc_get_links() {
     // Standard config with arc clamped to zero
     let mut tuning = make_tuning(true, true, true, None);
     tuning.gossip_arc_clamping = "empty".into();
-    let config = SweetConductorConfig::standard().tune(Arc::new(tuning));
+    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
 
     let mut conductor0 = SweetConductor::from_config(config).await;
     let mut conductor1 = SweetConductor::from_standard_config().await;
@@ -231,7 +231,7 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::rendezvous().tune(Arc::new(tuning_1));
+    let config_1 = SweetConductorConfig::rendezvous().set_tuning_params(tuning_1);
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
@@ -281,13 +281,13 @@ async fn test_zero_arc_no_gossip_4way() {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
         },
     ];
 
@@ -413,6 +413,52 @@ async fn test_gossip_shutdown() {
 
     consistency_60s([&cell_0, &cell_1]).await;
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert_eq!(record.unwrap().action_address(), &hash);
+}
+
+/// Test that when a new conductor joins, gossip picks up existing data without needing a publish.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "This test is potentially useful but uses sleeps and has never failed.
+            Run it again in the future to see if it fails, and if so, rewrite it without sleeps."]
+async fn test_gossip_startup() {
+    holochain_trace::test_run().ok();
+    let config = || {
+        SweetConductorConfig::standard().tune(|t| {
+            t.danger_gossip_recent_threshold_secs = 1;
+            t.default_rpc_single_timeout_ms = 3_000;
+        })
+    };
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let mk_conductor = || async {
+        let cfg = config();
+        assert!(cfg.network.as_ref().unwrap().is_tx5());
+        let mut conductor =
+            SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
+        // let mut conductor = SweetConductor::from_config(config()).await;
+        let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
+        let cell = app.into_cells().pop().unwrap();
+        let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+        (conductor, cell, zome)
+    };
+    let (conductor0, cell0, zome0) = mk_conductor().await;
+
+    // Create an entry before the conductors know about each other
+    let hash: ActionHash = conductor0
+        .call(&zome0, "create_string", "hi".to_string())
+        .await;
+
+    // Startup and do peer discovery
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    let (conductor1, cell1, zome1) = mk_conductor().await;
+
+    // Wait a bit so that conductor 0 doesn't publish in the next step.
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
+
+    consistency_60s([&cell0, &cell1]).await;
+    let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
 
@@ -1030,14 +1076,13 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                {
-                    let mut conn = alice_p2p_agents_db.conn().unwrap();
-                    let txn = conn.transaction().unwrap();
-                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
-                    {
-                        *alice_info.lock() = info;
-                    }
-                }
+                let info = alice_p2p_agents_db.test_read({
+                    let alice_kit = alice_kit.clone();
+                    move |txn| txn.p2p_get_agent(&alice_kit).unwrap()
+                });
+
+                *alice_info.lock() = info;
+
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }
@@ -1534,15 +1579,25 @@ async fn mock_network_sharding() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                fresh_reader_test(alice_p2p_agents_db.clone(), |txn| {
-                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
-                    {
-                        if let Some(info) = &info {
-                            eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                alice_p2p_agents_db
+                    .read_async({
+                        let my_alice_kit = alice_kit.clone();
+                        let my_alice_info = alice_info.clone();
+
+                        move |txn| -> DatabaseResult<()> {
+                            let info = txn.p2p_get_agent(&my_alice_kit).unwrap();
+                            {
+                                if let Some(info) = &info {
+                                    eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                                }
+                                *my_alice_info.lock() = info;
+                            }
+
+                            Ok(())
                         }
-                        *alice_info.lock() = info;
-                    }
-                });
+                    })
+                    .await
+                    .unwrap();
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

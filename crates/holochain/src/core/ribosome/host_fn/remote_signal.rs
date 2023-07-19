@@ -2,20 +2,20 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::nonce::fresh_nonce;
 use holochain_types::access::Permission;
+use holochain_types::prelude::AgentPubKey;
+use holochain_types::prelude::CellId;
+use holochain_types::prelude::Signature;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome_io::ZomeCallUnsigned;
+use holochain_zome_types::Timestamp;
 use std::sync::Arc;
 use tracing::Instrument;
-use holochain_types::prelude::Signature;
-use holochain_zome_types::zome_io::ZomeCallUnsigned;
-use holochain_types::prelude::CellId;
-use holochain_types::prelude::AgentPubKey;
-use holochain_zome_types::Timestamp;
-use holochain_keystore::AgentPubKeyExt;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -114,7 +114,7 @@ mod tests {
     use tokio_stream::StreamExt;
 
     fn test_zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineIntegrityZome {
-        let entry_def = EntryDef::from_id("entrydef");
+        let entry_def = EntryDef::default_from_id("entrydef");
 
         InlineIntegrityZome::new_unique(vec![entry_def.clone()], 0)
             .function("signal_others", move |api, ()| {

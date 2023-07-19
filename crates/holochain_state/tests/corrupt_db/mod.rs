@@ -3,10 +3,9 @@ use std::{path::Path, sync::Arc};
 use contrafact::arbitrary;
 use contrafact::arbitrary::Arbitrary;
 use holo_hash::DnaHash;
+use holochain_sqlite::prelude::DatabaseError;
 use holochain_sqlite::rusqlite::Connection;
-use holochain_state::prelude::{
-    fresh_reader_test, mutations_helpers, DbKindAuthored, DbKindCache, DbKindT,
-};
+use holochain_state::prelude::{mutations_helpers, DbKindAuthored, DbKindCache, DbKindT};
 use holochain_types::{
     db::DbWrite,
     dht_op::{DhtOp, DhtOpHashed},
@@ -29,10 +28,13 @@ async fn corrupt_cache_creates_new_db() {
     let db = DbWrite::test(testdir.path(), kind).unwrap();
 
     // - It opens successfully but the data is wiped.
-    let n: usize = fresh_reader_test(db, |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
-            .unwrap()
-    });
+    let n: usize = db
+        .read_async(move |txn| {
+            txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
+                .map_err(DatabaseError::from)
+        })
+        .await
+        .unwrap();
     assert_eq!(n, 0);
 }
 

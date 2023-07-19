@@ -660,7 +660,7 @@ async fn queue_consumer_main_task_impl<
                     tracing::debug!("Work incomplete, retriggering workflow");
                     tx.trigger(&"retrigger")
                 }
-                Err(err) => handle_workflow_error(err)?,
+                Err(err) => handle_workflow_error(&name, err)?,
                 _ => (),
             }
         } else {
@@ -702,11 +702,11 @@ fn queue_consumer_cell_bound<
 /// Does nothing.
 /// Does extra nothing and logs about it if the error shouldn't bail the
 /// workflow.
-fn handle_workflow_error(err: WorkflowError) -> ManagedTaskResult {
+fn handle_workflow_error(workflow_name: &String, err: WorkflowError) -> ManagedTaskResult {
     if err.workflow_should_bail() {
         Err(Box::new(ConductorError::from(err)).into())
     } else {
-        tracing::error!(?err);
+        tracing::error!(?workflow_name, ?err);
         Ok(())
     }
 }

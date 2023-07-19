@@ -23,7 +23,7 @@ pub type KitsuneHostResult<'a, T> =
 
 /// The interface to be implemented by the host, which handles various requests
 /// for data
-pub trait KitsuneHost: 'static + Send + Sync {
+pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     /// We are requesting a block.
     fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
 
