@@ -168,7 +168,7 @@ impl SweetConductor {
 
         if with_metrics {
             #[cfg(feature = "metrics_influxive")]
-            holochain_metrics::HolochainMetricsConfig::new_influxive(dir.as_ref())
+            holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
                 .init()
                 .await;
         }
