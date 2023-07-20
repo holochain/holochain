@@ -1,6 +1,6 @@
 use hdk::prelude::LinkTag;
 use holochain_cascade::test_utils::*;
-use holochain_cascade::CascadeImpl;
+use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_authored_db;
