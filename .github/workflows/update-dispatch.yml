@@ -42,7 +42,7 @@ jobs:
           - source: "nixpkgs"
             cmd: "nix flake lock --update-input nixpkgs"
           - source: "crates-io"
-            cmd: "nix run .#scripts-cargo-update"
+            cmd: "nix develop .#coreDev --command scripts-cargo-update"
 
     runs-on: "ubuntu-latest"
     steps:
