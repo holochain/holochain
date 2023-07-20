@@ -171,16 +171,18 @@ impl ValidationOutcome {
 /// Context information for an invalid action to make it easier to trace in errors.
 #[derive(Error, Debug, Display, PartialEq, Eq)]
 #[display(
-    fmt = "{} - with context seq={}, action_hash={:?}",
+    fmt = "{} - with context seq={}, action_hash={:?}, action=[{}]",
     source,
     seq,
-    action_hash
+    action_hash,
+    action_display
 )]
 pub struct PrevActionError {
     #[source]
     pub source: PrevActionErrorKind,
     pub seq: u32,
     pub action_hash: ActionHash,
+    pub action_display: String,
 }
 
 impl<A: ChainItem> From<(PrevActionErrorKind, &A)> for PrevActionError {
@@ -189,6 +191,7 @@ impl<A: ChainItem> From<(PrevActionErrorKind, &A)> for PrevActionError {
             source: inner,
             seq: action.seq(),
             action_hash: action.get_hash().clone().into(),
+            action_display: action.to_display(),
         }
     }
 }
@@ -199,6 +202,7 @@ impl From<(PrevActionErrorKind, Action)> for PrevActionError {
             source: inner,
             seq: action.action_seq(),
             action_hash: action.to_hash(),
+            action_display: format!("{}", action),
         }
     }
 }
