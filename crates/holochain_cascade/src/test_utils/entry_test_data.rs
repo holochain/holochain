@@ -182,6 +182,7 @@ impl EntryTestData {
 
         let link = Link {
             author: create_link.author,
+            base: create_link.base_address.clone(),
             target: create_link.target_address.clone(),
             timestamp: create_link.timestamp,
             zome_index: create_link.zome_index,

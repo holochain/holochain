@@ -21,7 +21,9 @@ pub use holochain_integrity_types::link::*;
 pub struct Link {
     /// The author of this link
     pub author: holo_hash::AgentPubKey,
-    /// The [`Entry`](crate::entry::Entry) or [`Action`](holochain_integrity_types::action::Action) being linked to
+    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked from
+    pub base: holo_hash::AnyLinkableHash,
+    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked to
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: crate::Timestamp,
