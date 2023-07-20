@@ -131,7 +131,7 @@
               '')
 
               (pkgs.writeShellScriptBin "scripts-cargo-update" ''
-                 set -xeou pipefail
+                 set -xeu -o pipefail
 
                  # Update the Holochain project Cargo.lock
                  cargo update --manifest-path Cargo.toml
