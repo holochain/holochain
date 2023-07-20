@@ -2950,8 +2950,7 @@ dependencies = [
 name = "holochain_metrics"
 version = "0.3.0-beta-dev.1"
 dependencies = [
- "influxive-child-svc",
- "influxive-otel",
+ "influxive",
  "tracing",
  "ts_opentelemetry_api",
 ]
@@ -3653,31 +3652,65 @@ dependencies = [
 ]
 
 [[package]]
-name = "influxive-child-svc"
-version = "0.0.1-alpha.2"
+name = "influxive"
+version = "0.0.1-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6930605a7c09ec55e8512bca7ae84b0f6ee86a82d39d2b523991af53a1adba99"
+checksum = "050b8c33af03de54a9d410cf0c4db21bdd1a224c32cfb55dc2c1dcf269620966"
 dependencies = [
- "flate2",
- "futures",
+ "influxive-child-svc",
+ "influxive-otel",
+]
+
+[[package]]
+name = "influxive-child-svc"
+version = "0.0.1-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fdb2f141111b990dd5a7c45a1963b08a63653fc6d6ab4ed18aa6356d7ed5cb9"
+dependencies = [
  "hex-literal",
  "influxdb",
+ "influxive-core",
+ "influxive-downloader",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "influxive-core"
+version = "0.0.1-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a0cf71ab391932c08d85fe4e0416c85de66494b5519a6d4e32aec7371096da"
+
+[[package]]
+name = "influxive-downloader"
+version = "0.0.1-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fccda792844e479292c4833f2dbf2f4efdd1ad9577a76522b930a9fb0673cafc"
+dependencies = [
+ "base64 0.21.2",
+ "digest 0.10.7",
+ "dirs 5.0.1",
+ "flate2",
+ "futures",
+ "hex",
+ "hex-literal",
+ "influxive-core",
  "reqwest",
  "sha2 0.10.7",
  "tar",
  "tempfile",
  "tokio",
- "tracing",
  "zip",
 ]
 
 [[package]]
 name = "influxive-otel"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3d726f1609a14cbab98f8cec89c75e404572ad708a9ec4f600030ef7ac7d9d4"
+checksum = "eac12842ba459b40942106316c1f2bf9e19be8e56cf9f877f9b299fdde320a94"
 dependencies = [
- "influxive-child-svc",
+ "influxive-core",
  "ts_opentelemetry_api",
 ]
 

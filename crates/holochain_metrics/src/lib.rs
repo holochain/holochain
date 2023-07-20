@@ -6,6 +6,7 @@
 //! metrics collection. Libraries should just use the opentelemetry_api
 //! to report metrics if any collector has been initialized.
 
+#[cfg(feature = "influxive")]
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
 
 /// Configuration for holochain metrics.
@@ -13,7 +14,7 @@ const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json")
 pub enum HolochainMetricsConfig {
     #[cfg(feature = "influxive")]
     /// Use influxive to write metrics.
-    Influxive(influxive_child_svc::Config),
+    Influxive(influxive::Config),
 }
 
 impl HolochainMetricsConfig {
@@ -22,7 +23,7 @@ impl HolochainMetricsConfig {
     pub fn new_influxive(root_path: &std::path::Path) -> Self {
         let mut database_path = std::path::PathBuf::from(root_path);
         database_path.push("influxive");
-        Self::Influxive(influxive_child_svc::Config {
+        Self::Influxive(influxive::Config {
             database_path: Some(database_path),
             ..Default::default()
         })
@@ -39,11 +40,11 @@ impl HolochainMetricsConfig {
     }
 
     #[cfg(feature = "influxive")]
-    async fn init_influxive(config: influxive_child_svc::Config) {
+    async fn init_influxive(config: influxive::Config) {
         tracing::info!(?config, "initializing holochain_metrics");
 
-        match influxive_child_svc::Influxive::new(config).await {
-            Ok(influxive) => {
+        match influxive::influxive_meter_provider(config).await {
+            Ok((influxive, meter_provider)) => {
                 // apply templates
                 if let Ok(cur) = influxive.list_dashboards().await {
                     // only initialize dashboards if the db is new
@@ -55,9 +56,9 @@ impl HolochainMetricsConfig {
                 }
 
                 // setup opentelemetry to use our metrics collector
-                opentelemetry_api::global::set_meter_provider(
-                    influxive_otel::InfluxiveMeterProvider::new(std::sync::Arc::new(influxive)),
-                );
+                opentelemetry_api::global::set_meter_provider(meter_provider);
+
+                tracing::info!(host = %influxive.get_host(), "influxive metrics running");
             }
             Err(err) => {
                 tracing::warn!(?err, "unable to initialize local metrics");
