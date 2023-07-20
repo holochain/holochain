@@ -2,11 +2,11 @@
 set -eux
 
 # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
-if gh release view "${LATEST_HOLOCHAIN_TAG}"; then
+if gh release view "${LATEST_HOLOCHAIN_RELEASE_TAG}"; then
   export RELEASE_TAG=${RELEASE_BRANCH}
   export IS_HOLOCHAIN_RELEASE="false"
 else
-  export RELEASE_TAG=${LATEST_HOLOCHAIN_TAG}
+  export RELEASE_TAG=${LATEST_HOLOCHAIN_RELEASE_TAG}
   export IS_HOLOCHAIN_RELEASE="true"
 fi
 
