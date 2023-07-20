@@ -89,14 +89,9 @@ async fn async_main() {
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 
-    if let Some(true) = &config.disable_metrics {
-        tracing::warn!("Running without local metrics");
-    } else {
-        #[cfg(feature = "metrics_influxive")]
-        holochain_metrics::HolochainMetricsConfig::new_influxive(config.environment_path.as_ref())
-            .init()
-            .await;
-    }
+    holochain_metrics::HolochainMetricsConfig::new(config.environment_path.as_ref())
+        .init()
+        .await;
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
 

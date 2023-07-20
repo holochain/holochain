@@ -12,29 +12,51 @@ const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json")
 /// Configuration for holochain metrics.
 #[derive(Debug)]
 pub enum HolochainMetricsConfig {
+    /// Metrics are disabled.
+    Disabled,
+
     #[cfg(feature = "influxive")]
     /// Use influxive to write metrics.
-    Influxive(influxive::Config),
+    Influxive(Box<influxive::Config>),
 }
 
 impl HolochainMetricsConfig {
-    #[cfg(feature = "influxive")]
-    /// Initialize a new influxive metrics configuration.
-    pub fn new_influxive(root_path: &std::path::Path) -> Self {
-        let mut database_path = std::path::PathBuf::from(root_path);
-        database_path.push("influxive");
-        Self::Influxive(influxive::Config {
-            database_path: Some(database_path),
-            ..Default::default()
-        })
+    /// Initialize a new default metrics config.
+    ///
+    /// Seting the environment variable `HOLOCHAIN_METRICS_DISABLED` to anything
+    /// will result in metrics being disabled, even if compiled with the
+    /// `influxive` feature.
+    pub fn new(root_path: &std::path::Path) -> Self {
+        #[cfg(feature = "influxive")]
+        {
+            if std::env::var_os("HOLOCHAIN_METRICS_DISABLED").is_some() {
+                Self::Disabled
+            } else {
+                let mut database_path = std::path::PathBuf::from(root_path);
+                database_path.push("influxive");
+                Self::Influxive(Box::new(influxive::Config {
+                    database_path: Some(database_path),
+                    ..Default::default()
+                }))
+            }
+        }
+
+        #[cfg(not(feature = "influxive"))]
+        {
+            let _root_path = root_path;
+            Self::Disabled
+        }
     }
 
     /// Initialize holochain metrics based on this configuration.
     pub async fn init(self) {
         match self {
+            Self::Disabled => {
+                tracing::warn!("Running without metrics");
+            }
             #[cfg(feature = "influxive")]
-            HolochainMetricsConfig::Influxive(config) => {
-                Self::init_influxive(config).await;
+            Self::Influxive(config) => {
+                Self::init_influxive(*config).await;
             }
         }
     }
