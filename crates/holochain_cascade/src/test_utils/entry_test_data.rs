@@ -173,11 +173,17 @@ impl EntryTestData {
             base: create_link.base_address.clone(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: Some(create_link.tag.clone()),
+            after: None,
+            before: None,
+            author: None,
         };
 
         let link = Link {

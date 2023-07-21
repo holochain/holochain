@@ -368,8 +368,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
           RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
-          LATEST_HOLOCHAIN_TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
-          LATEST_HOLOCHAIN_VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          LATEST_HOLOCHAIN_RELEASE_TAG: ${{ needs.prepare.outputs.latest_holochain_release_tag }}
+          LATEST_HOLOCHAIN_RELEASE_VERSION: ${{ needs.prepare.outputs.latest_holochain_release_version }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
         run: |
           set -eux
@@ -410,8 +410,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
-          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_release_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_release_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
 
@@ -483,8 +483,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
-          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_release_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_release_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"

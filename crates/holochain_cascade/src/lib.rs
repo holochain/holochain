@@ -896,8 +896,17 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query =
-            GetLinksQuery::new(key.base, key.type_query, key.tag, GetLinksFilter::default());
+        let query = GetLinksQuery::new(
+            key.base,
+            key.type_query,
+            key.tag,
+            GetLinksFilter {
+                after: key.after,
+                before: key.before,
+                author: key.author,
+            },
+        );
+
         let results = self.cascading(query).await?;
         Ok(results)
     }
