@@ -1,6 +1,6 @@
 use hdk::prelude::LinkTag;
 use holochain_cascade::test_utils::*;
-use holochain_cascade::{Cascade, CascadeImpl};
+use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_authored_db;
@@ -209,7 +209,7 @@ async fn test_links_can_match_a_partial_tag() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock.clone(), cache.to_db())
         .with_scratch(scratch.clone().into_sync());
 
