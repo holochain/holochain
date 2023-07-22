@@ -46,7 +46,6 @@ pub trait ChainHeadCoordinatorExt:
         let (keystore, agent) = self.signing_info();
         async move {
             let payload = AddRecordPayload::from_records(keystore, agent, records).await?;
-            serde_json::to_string(&payload).unwrap();
             self.add_records_request(payload).await
         }
         .boxed()
@@ -58,13 +57,13 @@ pub trait ChainHeadCoordinatorExt:
         self: Arc<Self>,
         since_hash: Option<ActionHash>,
     ) -> MustBoxFuture<'static, ChcResult<Vec<Record>>> {
-        let mut bytes = [0; 32];
-        let _ = getrandom::getrandom(&mut bytes);
-        let nonce = Nonce256Bits::from(bytes);
-        let payload = GetRecordsPayload { since_hash, nonce };
         let this = self.clone();
         let (keystore, agent) = this.signing_info();
         async move {
+            let mut bytes = [0; 32];
+            let _ = getrandom::getrandom(&mut bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+            let nonce = Nonce256Bits::from(bytes);
+            let payload = GetRecordsPayload { since_hash, nonce };
             let signature = agent.sign(&keystore, &payload).await?;
             this.get_record_data_request(GetRecordsRequest { payload, signature })
                 .await?
@@ -106,18 +105,18 @@ pub trait ChainHeadCoordinatorExt:
 /// outside the context of the CHC.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AddRecordPayload {
-    /// The msgpack-encoded ActionHashed for the Record. This is encoded as such because the CHC
+    /// The msgpack-encoded SignedActionHashed for the Record. This is encoded as such because the CHC
     /// needs to verify the signature, and these are the exact bytes which are signed, so
     /// this removes the need to deserialize and then re-serialize.
     ///
-    /// This must be deserialized as `ActionHashed`.
+    /// This must be deserialized as `SignedActionHashed`.
     #[serde(with = "serde_bytes")]
-    pub action_hashed_msgpack: Vec<u8>,
+    pub signed_action_msgpack: Vec<u8>,
 
-    /// The signature of the ActionHashed
+    /// The signature of the SignedActionHashed
     /// (NOTE: usually signatures are of just the Action, but in this case we want to
-    /// include the hash in the signature so we don't have to recalculate that on the CHC)
-    pub signature: Signature,
+    /// include the entire struct in the signature so we don't have to recalculate that on the CHC)
+    pub signed_action_signature: Signature,
 
     /// The entry, encrypted (TODO: by which key?), with the signature of
     /// of the encrypted bytes
@@ -140,7 +139,6 @@ impl AddRecordPayload {
                 let keystore = keystore.clone();
                 let agent_pubkey = agent_pubkey.clone();
                 async move {
-                    let action = signed_action;
                     let encrypted_entry_bytes = entry
                         .into_option()
                         .map(|entry| {
@@ -160,23 +158,25 @@ impl AddRecordPayload {
                     } else {
                         None
                     };
-                    let action_hashed_msgpack = holochain_serialized_bytes::encode(&action.hashed)?;
-                    dbg!(action_hashed_msgpack.len());
-                    let author = action.action().author();
-                    let signature = author
-                        .sign_raw(&keystore, action_hashed_msgpack.clone().into())
+                    let signed_action_msgpack = holochain_serialized_bytes::encode(&signed_action)?;
+                    let author = signed_action.action().author();
+                    let signed_action_signature = author
+                        .sign_raw(&keystore, signed_action_msgpack.clone().into())
                         .await?;
                     // dbg!(array_u32_xor(&action_hashed_msgpack));
                     // dbg!(array_u32_xor(&signature.0));
                     // dbg!(array_u32_xor(&author.get_raw_32()));
                     assert!(
                         author
-                            .verify_signature_raw(&signature, action_hashed_msgpack.clone().into())
+                            .verify_signature_raw(
+                                &signed_action_signature,
+                                signed_action_msgpack.clone().into()
+                            )
                             .await
                     );
                     ChcResult::Ok(AddRecordPayload {
-                        action_hashed_msgpack,
-                        signature,
+                        signed_action_msgpack,
+                        signed_action_signature,
                         encrypted_entry,
                     })
                 }

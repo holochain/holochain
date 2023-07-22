@@ -20,10 +20,7 @@ impl ChainHeadCoordinator for ChcRemote {
     type Item = SignedActionHashed;
 
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
-        let body = serde_json::to_string(&request)
-            .map(|json| json.into_bytes())
-            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response: reqwest::Response = self.client.post("add_records", body).await?;
+        let response: reqwest::Response = self.client.post("add_records", &request).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
         match status {
@@ -33,6 +30,7 @@ impl ChainHeadCoordinator for ChcRemote {
                 Err(ChcError::InvalidChain(seq, hash))
             }
             498 => {
+                // TODO: standardize errors as msgpack?
                 let msg: String = serde_json::from_slice(&bytes)?;
                 Err(ChcError::NoRecordsAdded(msg))
             }
@@ -48,14 +46,12 @@ impl ChainHeadCoordinator for ChcRemote {
         &self,
         request: GetRecordsRequest,
     ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
-        let body = serde_json::to_string(&request)
-            .map(|json| json.into_bytes())
-            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response = self.client.post("get_record_data", body).await?;
+        let response = self.client.post("get_record_data", &request).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
+        let bytes = bytes.as_ref();
         match status {
-            200 => Ok(serde_json::from_slice(&bytes)?),
+            200 => Ok(holochain_serialized_bytes::decode(&bytes)?),
             498 => {
                 // The since_hash was not found in the CHC,
                 // so we can interpret this as an empty list of records.
@@ -107,9 +103,13 @@ impl ChcRemoteClient {
         self.base_url.join(path).expect("invalid URL").to_string()
     }
 
-    async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
+    async fn post<T>(&self, path: &str, body: &T) -> ChcResult<reqwest::Response>
+    where
+        T: serde::Serialize + std::fmt::Debug,
+    {
         let client = reqwest::Client::new();
         let url = self.url(path);
+        let body = holochain_serialized_bytes::encode(body)?;
         client
             .post(url)
             .body(body)
@@ -128,6 +128,7 @@ mod tests {
 
     use super::*;
     use crate::test_utils::valid_arbitrary_chain;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "this test requires a remote service, so it should only be run manually"]
@@ -157,11 +158,12 @@ mod tests {
         //     .iter()
         //     .map(|r| (r.action_address(), r.action().prev_action()))
         //     .collect::<Vec<_>>());
+        // dbg!(&t0);
 
         chc.clone()
             .add_records(t0.to_vec())
             .await
-            .map_err(|e| e.to_string()[..1024].to_string())
+            .map_err(|e| e.to_string()[..1024.min(e.to_string().len())].to_string())
             .unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
 

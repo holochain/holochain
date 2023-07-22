@@ -59,9 +59,9 @@ impl ChainHeadCoordinator for ChcLocal {
         let records: Vec<_> = request
             .into_iter()
             .map(|r| {
-                let hashed = holochain_serialized_bytes::decode(&r.action_hashed_msgpack).unwrap();
+                let hashed = holochain_serialized_bytes::decode(&r.signed_action_msgpack).unwrap();
                 RecordItem {
-                    action: SignedActionHashed::with_presigned(hashed, r.signature),
+                    action: SignedActionHashed::with_presigned(hashed, r.signed_action_signature),
                     encrypted_entry: r.encrypted_entry,
                 }
             })
