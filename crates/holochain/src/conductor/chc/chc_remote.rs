@@ -158,7 +158,8 @@ mod tests {
         //     .iter()
         //     .map(|r| (r.action_address(), r.action().prev_action()))
         //     .collect::<Vec<_>>());
-        // dbg!(&t0);
+
+        // dbg!(&t0, &t1, &t2);
 
         chc.clone()
             .add_records(t0.to_vec())
