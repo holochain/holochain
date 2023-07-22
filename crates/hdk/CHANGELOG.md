@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** `get_links` no longer takes `base`, `link_type` and `link_tag` as separate inputs and now takes `GetLinksInput` instead. This can be built using a `GetLinksInputBuilder`.
+  Links can then be filtered by `author` and created timestamp `after` and `before`. This change has been made both to make the `get_links` function consistent with what you see if you use `HDK.with`,
+  which is always supposed to be the case, and also to increase the options for filtering getting links.
+
+## 0.3.0-beta-dev.9
+
 ## 0.3.0-beta-dev.8
 
 ## 0.3.0-beta-dev.7

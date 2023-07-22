@@ -1,5 +1,6 @@
 #![cfg(feature = "test_utils")]
 
+use hdk::prelude::GetLinksInputBuilder;
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
@@ -29,11 +30,12 @@ fn links_zome() -> InlineIntegrityZome {
         .function(
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
-                Ok(api.get_links(vec![GetLinksInput::new(
+                Ok(api.get_links(vec![GetLinksInputBuilder::try_new(
                     base,
                     InlineZomeSet::dep_link_filter(&api),
-                    None,
-                )])?)
+                )
+                .unwrap()
+                .build()])?)
             },
         )
 }
