@@ -57,15 +57,14 @@ pub trait ChainHeadCoordinatorExt:
         self: Arc<Self>,
         since_hash: Option<ActionHash>,
     ) -> MustBoxFuture<'static, ChcResult<Vec<Record>>> {
-        let this = self.clone();
-        let (keystore, agent) = this.signing_info();
+        let (keystore, agent) = self.signing_info();
         async move {
             let mut bytes = [0; 32];
-            let _ = getrandom::getrandom(&mut bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+            getrandom::getrandom(&mut bytes).map_err(|e| ChcError::Other(e.to_string()))?;
             let nonce = Nonce256Bits::from(bytes);
             let payload = GetRecordsPayload { since_hash, nonce };
             let signature = agent.sign(&keystore, &payload).await?;
-            this.get_record_data_request(GetRecordsRequest { payload, signature })
+            self.get_record_data_request(GetRecordsRequest { payload, signature })
                 .await?
                 .into_iter()
                 .map(|(a, me)| {

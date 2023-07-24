@@ -58,8 +58,7 @@ impl ChainHeadCoordinator for ChcRemote {
                 Ok(vec![])
             }
             code => {
-                let msg =
-                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+                let msg = std::str::from_utf8(bytes).map_err(|e| ChcError::Other(e.to_string()))?;
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
         }

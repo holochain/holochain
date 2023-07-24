@@ -24,6 +24,7 @@ impl ChcLocal {
 }
 
 /// A local Rust implementation of a CHC, for testing purposes only.
+#[derive(Default)]
 pub struct ChcLocalInner {
     records: Vec<RecordItem>,
 }
@@ -36,14 +37,6 @@ struct RecordItem {
     /// The entry, encrypted (TODO: by which key?), with the signature of
     /// of the encrypted bytes
     pub encrypted_entry: Option<(Arc<EncryptedEntry>, Signature)>,
-}
-
-impl Default for ChcLocalInner {
-    fn default() -> Self {
-        Self {
-            records: Default::default(),
-        }
-    }
 }
 
 #[async_trait::async_trait]
