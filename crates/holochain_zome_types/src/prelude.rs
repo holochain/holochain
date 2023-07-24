@@ -1,7 +1,6 @@
 //! Common types
 
 pub use crate::action::conversions::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::action::*;
 pub use crate::agent_activity::*;
 pub use crate::block::*;
@@ -15,7 +14,6 @@ pub use crate::crdt::*;
 pub use crate::dna_def::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::genesis::*;
 pub use crate::hash::*;
 pub use crate::info::*;
@@ -24,7 +22,6 @@ pub use crate::judged::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::migrate_agent::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::op::*;
 #[cfg(feature = "properties")]
 pub use crate::properties::*;
@@ -46,11 +43,9 @@ pub use crate::x_salsa20_poly1305::key_ref::*;
 pub use crate::x_salsa20_poly1305::x25519::*;
 pub use crate::x_salsa20_poly1305::*;
 pub use crate::zome::error::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::*;
 
 pub use holochain_integrity_types::prelude::*;

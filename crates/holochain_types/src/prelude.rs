@@ -2,18 +2,15 @@
 
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_serialized_bytes::prelude::*;
-#[allow(ambiguous_glob_reexports)]
 pub use holochain_zome_types::prelude::*;
 pub use holochain_zome_types::zome_io::Nonce256Bits;
 pub use std::convert::TryFrom;
 pub use std::convert::TryInto;
 
 pub use crate::access::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::action::*;
 pub use crate::activity::*;
 pub use crate::app::error::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
