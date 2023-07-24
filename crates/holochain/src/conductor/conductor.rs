@@ -1353,6 +1353,7 @@ mod app_impls {
                 installed_app_id,
                 membrane_proofs,
                 network_seed,
+                ignore_genesis_failure: no_rollback,
             } = payload;
 
             let bundle = {
@@ -1400,15 +1401,23 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
-            crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
+            let genesis_result =
+                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-            let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+            if genesis_result.is_ok() || no_rollback {
+                let roles = ops.role_assignments;
+                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
-            // Update the db
-            let stopped_app = self.add_disabled_app_to_db(app).await?;
+                // Update the db
+                let stopped_app = self.add_disabled_app_to_db(app).await?;
 
-            Ok(stopped_app)
+                // Return the result, which be may an error if no_rollback was specified
+                genesis_result.map(|()| stopped_app)
+            } else if let Err(err) = genesis_result {
+                Err(err)
+            } else {
+                unreachable!()
+            }
         }
 
         /// Uninstall an app
