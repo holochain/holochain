@@ -378,7 +378,7 @@ impl SignedActionHashedExt for SignedActionHashed {
             .action()
             .author()
             .verify_signature(self.signature(), self.action())
-            .await
+            .await?
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),
