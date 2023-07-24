@@ -80,6 +80,6 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        installed_hash: DnaHashB64,
+        installed_hash: Option<DnaHashB64>,
     },
 }
