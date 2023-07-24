@@ -1,9 +1,9 @@
-use contrafact::Mutation;
-use contrafact::Generator;
-use contrafact::Fact;
-use std::ops::RangeInclusive;
 use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
 use crate::sweettest::sweet_topos::node::NetworkTopologyNode;
+use contrafact::Fact;
+use contrafact::Generator;
+use contrafact::Mutation;
+use std::ops::RangeInclusive;
 
 /// Fact:
 /// - The network has a specific number of nodes.

@@ -1,9 +1,9 @@
+// use super::edge::FullAgentViewFact;
 use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
-use contrafact::MutationError;
-use contrafact::Mutation;
-use contrafact::Generator;
 use contrafact::Fact;
-use super::edge::FullAgentViewFact;
+use contrafact::Generator;
+use contrafact::Mutation;
+// use contrafact::MutationError;
 
 struct DenseNetworkFact {
     density: f64,
@@ -37,40 +37,50 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for DenseNetworkFact {
         g: &mut Generator<'a>,
     ) -> Mutation<NetworkTopologyGraph> {
         let target_edge_count = self.target_edge_count(&graph);
+        let mut rng: _ = super::rng_from_generator(g);
 
         // Add edges until we reach the desired density.
         while graph.edge_count() < target_edge_count {
-            let max_node_index = graph.node_count() - 1;
-            let a = g.int_in_range(0..=max_node_index, "could not select a node")?.into();
-            let b = g.int_in_range(0..=max_node_index, "could not select a node")?.into();
+            graph.add_random_simple_edge(&mut rng)?;
+            // let a = graph.random_node(g)?;
+            // // let max_node_index = graph.node_count() - 1;
+            // let b = graph.random_node(g)?;
+            // // let a = g
+            // //     .int_in_range(0..=max_node_index, "could not select a node")?
+            // //     .into();
+            // // let b = g
+            // //     .int_in_range(0..=max_node_index, "could not select a node")?
+            // //     .into();
 
-            // Don't add an edge if it already exists or if it's a self edge.
-            // Density calculations assume this so we can't introduce any.
-            if !graph.contains_edge(a, b) && a != b {
-                let edge = FullAgentViewFact{ target: graph[b] }.build_fallible(g).map_err(|_| MutationError::Exception("Failed to build agent view".into()))?;
-                graph.add_edge(a, b, edge);
-            }
+            // // Don't add an edge if it already exists or if it's a self edge.
+            // // Density calculations assume this so we can't introduce any.
+            // if !graph.contains_edge(a, b) && a != b {
+            //     let edge = FullAgentViewFact {
+            //         target: graph.node_or_err(b)?.target().clone(),
+            //     }
+            //     .build_fallible(g)
+            //     .map_err(|_| MutationError::Exception("Failed to build agent view".into()))?;
+            //     graph.add_edge(a, b, edge);
+            // }
         }
 
         // Remove edges until we reach the desired density.
         while graph.edge_count() > target_edge_count {
-            let edge_indices = graph.edge_indices().collect::<Vec<_>>();
-            let max_edge_index = graph.edge_count() - 1;
-            graph.remove_edge(
-                edge_indices
-                    .iter()
-                    .nth(
-                        g.int_in_range(
-                            0..=max_edge_index,
-                            "could not select an edge to remove",
-                        )?
-                        .into(),
-                    )
-                    .ok_or(MutationError::Exception(
-                        "could not select an edge to remove".to_string(),
-                    ))?
-                    .clone(),
-            );
+            graph.remove_random_edge(&mut rng)?;
+            // let edge_indices = graph.edge_indices().collect::<Vec<_>>();
+            // let max_edge_index = graph.edge_count() - 1;
+            // graph.remove_edge(
+            //     edge_indices
+            //         .iter()
+            //         .nth(
+            //             g.int_in_range(0..=max_edge_index, "could not select an edge to remove")?
+            //                 .into(),
+            //         )
+            //         .ok_or(MutationError::Exception(
+            //             "could not select an edge to remove".to_string(),
+            //         ))?
+            //         .clone(),
+            // );
         }
 
         Ok(graph)
