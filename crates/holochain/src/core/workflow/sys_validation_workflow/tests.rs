@@ -1,4 +1,3 @@
-use crate::holochain_wasmer_host::prelude::*;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
