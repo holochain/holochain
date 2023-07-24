@@ -958,7 +958,7 @@ checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
 
 [[package]]
 name = "hdi"
-version = "0.4.0-beta-dev.6"
+version = "0.4.0-beta-dev.5"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.9"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "getrandom",
  "hdi",
@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.3.0-beta-dev.6"
+version = "0.3.0-beta-dev.5"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1042,7 +1042,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.3.0-beta-dev.5"
+version = "0.3.0-beta-dev.4"
 dependencies = [
  "arbitrary",
  "base64",
@@ -1062,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.6"
+version = "0.3.0-beta-dev.5"
 dependencies = [
  "arbitrary",
  "derive_builder",
@@ -1114,7 +1114,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.9"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "hdk",
  "serde",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.6"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -2318,7 +2318,7 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.24"
+version = "0.9.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "452e67b9c20c37fa79df53201dc03839651086ed9bbe92b3ca585ca9fdaa7d85"
 dependencies = [
