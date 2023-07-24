@@ -296,7 +296,11 @@ fn map_outcome(
         // from the network where unmet dependencies would need to be
         // rescheduled to attempt later due to partitions etc.
         app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-            return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+            return Err(SourceChainError::InvalidCommit(format!(
+                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
+                hashes
+            ))
+            .into());
         }
     }
     Ok(())
