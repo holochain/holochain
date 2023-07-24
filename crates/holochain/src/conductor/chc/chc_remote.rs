@@ -127,10 +127,7 @@ mod tests {
 
     use super::*;
     use crate::test_utils::valid_arbitrary_chain;
-<<<<<<< HEAD
     use pretty_assertions::assert_eq;
-=======
->>>>>>> 46a7eb2ac (WIP get signatures lined up)
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "this test requires a remote service, so it should only be run manually"]
@@ -156,7 +153,6 @@ mod tests {
 
         let hash = |i: usize| chain[i].action_address().clone();
 
-<<<<<<< HEAD
         // dbg!(t0
         //     .iter()
         //     .map(|r| (r.action_address(), r.action().prev_action()))
@@ -169,9 +165,6 @@ mod tests {
             .await
             .map_err(|e| e.to_string()[..1024.min(e.to_string().len())].to_string())
             .unwrap();
-=======
-        chc.clone().add_records(t0.to_vec()).await.unwrap();
->>>>>>> 46a7eb2ac (WIP get signatures lined up)
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
 
         chc.clone().add_records(t1.to_vec()).await.unwrap();

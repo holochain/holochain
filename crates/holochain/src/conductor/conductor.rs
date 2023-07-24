@@ -1353,7 +1353,7 @@ mod app_impls {
                 installed_app_id,
                 membrane_proofs,
                 network_seed,
-                ignore_genesis_failure: no_rollback,
+                ignore_genesis_failure,
             } = payload;
 
             let bundle = {
@@ -1401,10 +1401,15 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
+            let cell_ids: Vec<_> = cells_to_create
+                .iter()
+                .map(|(cell_id, _)| cell_id.clone())
+                .collect();
+
             let genesis_result =
                 crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-            if genesis_result.is_ok() || no_rollback {
+            if genesis_result.is_ok() || ignore_genesis_failure {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
@@ -1414,6 +1419,8 @@ mod app_impls {
                 // Return the result, which be may an error if no_rollback was specified
                 genesis_result.map(|()| stopped_app)
             } else if let Err(err) = genesis_result {
+                // Rollback created cells on error
+                self.remove_cells(&cell_ids).await;
                 Err(err)
             } else {
                 unreachable!()

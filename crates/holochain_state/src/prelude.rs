@@ -1,6 +1,5 @@
 pub use crate::mutations::*;
 pub use crate::query::prelude::*;
-#[allow(ambiguous_glob_reexports)]
 pub use crate::source_chain::*;
 pub use crate::validation_db::*;
 pub use crate::validation_receipts::*;

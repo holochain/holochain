@@ -108,7 +108,6 @@ impl ChainHeadCoordinatorExt for ChcLocal {
 #[cfg(test)]
 mod tests {
     use holochain_conductor_api::conductor::ConductorConfig;
-    use isotest::Iso;
 
     use crate::{
         conductor::chc::{ChcRemote, CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
@@ -120,69 +119,67 @@ mod tests {
     use ChainHeadCoordinatorExt;
 
     use ::fixt::prelude::*;
-    use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_records_local() {
+        let mut g = random_generator();
         let keystore = test_keystore();
         let agent = fake_agent_pubkey_1();
-        let chc = Arc::new(ChcLocal::new(keystore, agent));
+        let chc = Arc::new(ChcLocal::new(keystore.clone(), agent.clone()));
 
         assert_eq!(chc.clone().head().await.unwrap(), None);
 
-        let hash = |x| TestChainHash(x).real();
-        let item = |x| Record::new(TestChainItem::new(x).real(), None);
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        let hash = |i: usize| chain[i].action_address().clone();
 
-        let items = |i: &[u32]| i.into_iter().copied().map(item).collect::<Vec<_>>();
+        let t0 = &chain[0..3];
+        let t1 = &chain[3..6];
+        let t2 = &chain[6..9];
+        let t11 = &chain[11..=11];
 
-        let t0 = items(&[0, 1, 2]);
-        let t1 = items(&[3, 4, 5]);
-        let t2 = items(&[6, 7, 8]);
-        let t99 = items(&[99]);
-
-        chc.clone().add_records(t0.clone()).await.unwrap();
+        chc.clone().add_records(t0.to_vec()).await.unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
-        chc.clone().add_records(t1.clone()).await.unwrap();
+        chc.clone().add_records(t1.to_vec()).await.unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
 
         // last_hash doesn't match
-        assert!(chc.clone().add_records(t0.clone()).await.is_err());
-        assert!(chc.clone().add_records(t1.clone()).await.is_err());
-        assert!(chc.clone().add_records(t99).await.is_err());
+        assert!(chc.clone().add_records(t0.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t1.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
 
-        chc.clone().add_records(t2.clone()).await.unwrap();
+        chc.clone().add_records(t2.to_vec()).await.unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
 
         assert_eq!(
             chc.clone().get_record_data(None).await.unwrap(),
-            items(&[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            &chain[0..9]
         );
         assert_eq!(
             chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
-            items(&[1, 2, 3, 4, 5, 6, 7, 8])
+            &chain[1..9]
         );
         assert_eq!(
             chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
-            items(&[4, 5, 6, 7, 8])
+            &chain[4..9]
         );
         assert_eq!(
             chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
-            items(&[8])
+            &chain[8..9]
         );
         assert_eq!(
             chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
-            items(&[])
+            &[]
         );
         assert_eq!(
             chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
-            items(&[])
+            &[]
         );
         assert_eq!(
-            chc.clone().get_record_data(Some(hash(33))).await.unwrap(),
-            items(&[])
+            chc.clone().get_record_data(Some(hash(13))).await.unwrap(),
+            &[]
         );
     }
 
