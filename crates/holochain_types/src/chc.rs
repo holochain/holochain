@@ -186,12 +186,6 @@ impl AddRecordPayload {
     }
 }
 
-fn array_u32_xor(arr: &[u8]) -> u32 {
-    arr.iter()
-        .enumerate()
-        .fold(0, |x, (i, a)| x ^ ((*a as u32) << ((i as u32) % 4)))
-}
-
 /// The request type for `add_records`
 pub type AddRecordsRequest = Vec<AddRecordPayload>;
 
