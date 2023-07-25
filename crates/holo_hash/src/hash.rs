@@ -160,7 +160,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Get the hex representation of the hash bytes
     pub fn to_hex(&self) -> String {
-        bytes_to_hex(&self.hash, false)
+        holochain_util::hex::bytes_to_hex(&self.hash, false)
     }
 }
 
@@ -248,22 +248,6 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[1] as u32) << 8)
         + ((bytes[2] as u32) << 16)
         + ((bytes[3] as u32) << 24)
-}
-
-/// Get a hex string representation of two chars per byte
-pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
-    use std::fmt::Write;
-    let mut s = String::with_capacity(bytes.len() + 2);
-    if caps {
-        for b in bytes {
-            write!(&mut s, "{:02X}", b).ok();
-        }
-    } else {
-        for b in bytes {
-            write!(&mut s, "{:02x}", b).ok();
-        }
-    }
-    s
 }
 
 #[cfg(test)]

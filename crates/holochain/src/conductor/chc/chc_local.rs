@@ -106,9 +106,14 @@ impl ChainHeadCoordinatorExt for ChcLocal {
 #[cfg(test)]
 mod tests {
     use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_wasm_test_utils::TestWasm;
 
     use crate::{
-        conductor::chc::{ChcRemote, CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
+        conductor::{
+            api::error::ConductorApiError,
+            chc::{ChcRemote, CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
+            error::ConductorError,
+        },
         sweettest::*,
         test_utils::valid_arbitrary_chain,
     };
@@ -255,16 +260,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
-        use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
-
         let mut config = ConductorConfig::default();
-        // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/v1/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
-        let mut conductors =
-            SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
-                .await;
+        let mut conductors = SweetConductorBatch::from_config(4, config).await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (c0,) = conductors[0]
@@ -275,11 +275,28 @@ mod tests {
 
         let cell_id = c0.cell_id();
 
+        // Install two apps with ignore_genesis_failure and one without
+        let mk_payload = |ignore: bool| {
+            let agent = agent.clone();
+            let dna_file = dna_file.clone();
+            async move {
+                let mut payload = install_app_payload_from_dnas("app", agent, [&dna_file]).await;
+                payload.ignore_genesis_failure = ignore;
+                payload
+            }
+        };
+
         let install_result_1 = conductors[1]
-            .setup_app_for_agent("app", agent.clone(), [&dna_file])
+            .raw_handle()
+            .install_app_bundle(mk_payload(true).await)
             .await;
         let install_result_2 = conductors[2]
-            .setup_app_for_agent("app", agent.clone(), [&dna_file])
+            .raw_handle()
+            .install_app_bundle(mk_payload(true).await)
+            .await;
+        let install_result_3 = conductors[3]
+            .raw_handle()
+            .install_app_bundle(mk_payload(false).await)
             .await;
 
         // It's not ideal to match on a string, but it seems like the only option:
@@ -288,6 +305,7 @@ mod tests {
 
         dbg!(&install_result_1);
         dbg!(&install_result_2);
+        dbg!(&install_result_3);
 
         regex::Regex::new(
             r#".*ChcHeadMoved\("genesis", InvalidChain\(2, ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
@@ -295,9 +313,31 @@ mod tests {
         .unwrap()
         .captures(&format!("{:?}", install_result_1))
         .unwrap();
+
         assert_eq!(
             format!("{:?}", install_result_1),
             format!("{:?}", install_result_2)
+        );
+        assert_eq!(
+            format!("{:?}", install_result_2),
+            format!("{:?}", install_result_3)
+        );
+
+        assert!(conductors[1]
+            .get_app_info(&"app".into())
+            .await
+            .unwrap()
+            .is_some());
+        assert!(conductors[2]
+            .get_app_info(&"app".into())
+            .await
+            .unwrap()
+            .is_some());
+
+        // This one will not have app info, since it was installed without `ignore_genesis_failure`
+        assert_eq!(
+            conductors[3].get_app_info(&"app".into()).await.unwrap(),
+            None
         );
 
         // TODO: sync conductors 1 and 2 to match conductor 0
@@ -312,6 +352,15 @@ mod tests {
             .await
             .unwrap();
 
+        // Sync is not be possible since the installation was rolled back and the cell was removed
+        assert!(matches!(
+            conductors[3]
+                .raw_handle()
+                .chc_sync(cell_id.clone(), None)
+                .await,
+            Err(ConductorApiError::ConductorError(ConductorError::CellMissing(id))) if id == *cell_id
+        ));
+
         let dump1 = conductors[1]
             .dump_full_cell_state(&cell_id, None)
             .await
@@ -319,48 +368,30 @@ mod tests {
 
         assert_eq!(dump1.source_chain_dump.records.len(), 3);
 
-        let _apps1 = conductors[1]
-            .setup_app_for_agent("app", agent.clone(), [&dna_file])
-            .await
-            .unwrap();
-        let _apps2 = conductors[2]
-            .setup_app_for_agent("app", agent.clone(), [&dna_file])
-            .await
-            .unwrap();
-
         let c1: SweetCell = conductors[1].get_sweet_cell(cell_id.clone()).unwrap();
         let c2: SweetCell = conductors[2].get_sweet_cell(cell_id.clone()).unwrap();
 
         let _: ActionHash = conductors[0]
-            .call(
-                &c0.zome(SweetInlineZomes::COORDINATOR),
-                "create_string",
-                AppString::new("zero"),
-            )
+            .call(&c0.zome(TestWasm::Create), "create_entry", ())
             .await;
+
+        conductors[1].enable_app("app".into()).await.unwrap();
+        conductors[2].enable_app("app".into()).await.unwrap();
 
         // This should fail and require triggering a CHC sync
         let hash1: Result<ActionHash, _> = conductors[1]
-            .call_fallible(
-                &c1.zome(SweetInlineZomes::COORDINATOR),
-                "create_string",
-                AppString::new("one"),
-            )
+            .call_fallible(&c1.zome(TestWasm::Create), "create_entry", ())
             .await;
 
         dbg!(&hash1);
 
         regex::Regex::new(
-            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\(4, ActionHash\([a-zA-Z0-9-_]+\).*"#
+            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\(5, ActionHash\([a-zA-Z0-9-_]+\).*"#
         ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
 
         // This should trigger a CHC sync
         let hash2: Result<ActionHash, _> = conductors[2]
-            .call_fallible(
-                &c2.zome(SweetInlineZomes::COORDINATOR),
-                "create_string",
-                AppString::new("two"),
-            )
+            .call_fallible(&c2.zome(TestWasm::Create), "create_entry", ())
             .await;
 
         assert_eq!(format!("{:?}", hash1), format!("{:?}", hash2));
@@ -390,7 +421,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(dump0.source_chain_dump.records.len(), 5);
+        assert_eq!(dump0.source_chain_dump.records.len(), 6);
         assert_eq!(
             dump0.source_chain_dump.records,
             dump1.source_chain_dump.records

@@ -5,3 +5,5 @@ pub mod tokio_helper;
 
 #[cfg(feature = "pw")]
 pub mod pw;
+
+pub mod hex;
