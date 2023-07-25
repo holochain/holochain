@@ -6,6 +6,7 @@ FROM
   AND Action.entry_hash = Entry.hash
 WHERE
   Entry.cap_secret = ?1
+  -- cap grant must not have been updated or deleted
   AND (
     SELECT
       COUNT(UpdateActions.hash)
