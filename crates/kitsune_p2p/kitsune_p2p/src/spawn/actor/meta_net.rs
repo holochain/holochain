@@ -219,16 +219,16 @@ impl Drop for MetricSendGuard {
             &cx,
             self.byte_count,
             &[
-                opentelemetry_api::KeyValue::new("remId", self.rem_id.to_string()),
-                opentelemetry_api::KeyValue::new("isError", self.is_error),
+                opentelemetry_api::KeyValue::new("remote.id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is.error", self.is_error),
             ],
         );
         crate::metrics::METRIC_MSG_OUT_TIME.record(
             &cx,
             self.start_time.elapsed().as_secs_f64(),
             &[
-                opentelemetry_api::KeyValue::new("remId", self.rem_id.to_string()),
-                opentelemetry_api::KeyValue::new("isError", self.is_error),
+                opentelemetry_api::KeyValue::new("remote.id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is.error", self.is_error),
             ],
         );
     }
