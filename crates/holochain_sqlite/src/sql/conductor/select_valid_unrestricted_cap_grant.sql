@@ -6,8 +6,8 @@ FROM
   AND Action.entry_hash = Entry.hash
 WHERE
   access_type = ?1
-  -- cap grant must not have been updated or deleted
   AND (
+    -- cap grant must not have been updated or deleted
     SELECT
       COUNT(UpdateActions.hash)
     FROM
