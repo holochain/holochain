@@ -203,7 +203,7 @@ impl AppBundle {
                         role_name,
                         dna_store,
                         &location,
-                        Some(&installed_hash),
+                        installed_hash.as_ref(),
                         modifiers,
                     )
                     .await?;

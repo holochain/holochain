@@ -265,10 +265,10 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep.clone()),
-        ValidationOutcome::PrevActionError(PrevActionError::MissingMeta(dep)) => {
-            AwaitingOpDep(dep.clone().into())
-        }
-        ValidationOutcome::PrevActionError(_) => Rejected,
+        ValidationOutcome::PrevActionError(PrevActionError { source: inner, .. }) => match inner {
+            PrevActionErrorKind::MissingMeta(dep) => AwaitingOpDep(dep.clone().into()),
+            _ => Rejected,
+        },
         ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
