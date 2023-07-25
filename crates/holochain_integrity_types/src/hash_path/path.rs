@@ -2,9 +2,12 @@ use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
 use crate::link::GetLinksInputBuilder;
 use crate::prelude::*;
-use holochain_wasmer_guest::*;
+use holochain_wasmer_common::WasmError;
+use holochain_wasmer_common::wasm_error;
 use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
+use holochain_serialized_bytes::prelude::*;
+use holo_hash::AnyLinkableHash;
 
 #[cfg(all(test, feature = "mock"))]
 mod test;

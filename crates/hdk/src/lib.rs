@@ -443,11 +443,7 @@ pub mod hash;
 /// - We never need to fetch _all_ messages because we can start as deeply down the tree as is appropriate and
 /// - We avoid DHT hotspots because each branch of the tree has its own hash and set of links, therefore a different neighbourhood of agents
 ///
-/// The [`hash_path`] module includes 3 submodules to help build and navigate these tree structures efficiently:
-///
-/// - [`hash_path::path`] is the basic general purpose implementation of tree structures as `Vec<Vec<u8>>`
-/// - [`hash_path::shard`] is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
-/// - [`hash_path::anchor`] implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
+/// The [`hash_path`] module includes functions to help build and navigate these tree structures efficiently:
 pub mod hash_path;
 
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.

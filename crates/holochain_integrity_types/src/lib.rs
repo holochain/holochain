@@ -37,6 +37,7 @@ pub mod x_salsa20_poly1305;
 pub mod zome;
 #[allow(missing_docs)]
 pub mod zome_io;
+pub mod hash_path;
 
 pub mod trace;
 

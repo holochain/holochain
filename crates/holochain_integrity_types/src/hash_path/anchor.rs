@@ -1,7 +1,11 @@
 use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use crate::prelude::*;
-use holochain_wasmer_guest::*;
+use holo_hash::AnyLinkableHash;
+use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
+use holochain_wasmer_common::WasmErrorInner;
+use holochain_wasmer_common::wasm_error;
 
 /// This is the root of the [ `Path` ] tree.
 ///
