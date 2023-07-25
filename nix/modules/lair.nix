@@ -39,7 +39,7 @@
       deps = craneLib.buildDepsOnly (commonArgs // { });
 
       # derivation with the main crates
-      package = craneLib.buildPackage (commonArgs // {
+      package = lib.makeOverridable craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
       });
 

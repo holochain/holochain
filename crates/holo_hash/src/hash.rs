@@ -270,7 +270,7 @@ pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
 mod tests {
     use crate::*;
 
-    fn assert_type<T: HashType>(_t: &str, h: HoloHash<T>) {
+    fn assert_type<T: HashType>(_: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc().as_u32());
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",

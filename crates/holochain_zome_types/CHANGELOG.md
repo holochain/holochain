@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Added the `base` field to the `Link` struct for easy access after a `get_links` call.
+
+## 0.3.0-beta-dev.7
 
 ## 0.3.0-beta-dev.6
 
