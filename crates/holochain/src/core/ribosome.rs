@@ -361,7 +361,7 @@ impl ZomeCallInvocation {
                     &self.signature,
                     ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
                 )
-                .await
+                .await?
             {
                 ZomeCallAuthorization::Authorized
             } else {
