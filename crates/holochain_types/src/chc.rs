@@ -159,13 +159,13 @@ impl AddRecordPayload {
                     };
                     let signed_action_msgpack = holochain_serialized_bytes::encode(&signed_action)?;
                     let author = signed_action.action().author();
-                    dbg!(&author);
+
+                    dbg!(&signed_action);
+
                     let signed_action_signature = author
                         .sign_raw(&keystore, signed_action_msgpack.clone().into())
                         .await?;
-                    // dbg!(array_u32_xor(&action_hashed_msgpack));
-                    // dbg!(array_u32_xor(&signature.0));
-                    // dbg!(array_u32_xor(&author.get_raw_32()));
+
                     assert!(author
                         .verify_signature_raw(
                             &signed_action_signature,

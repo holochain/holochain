@@ -684,7 +684,7 @@ impl RealRibosome {
             let (can_cache, result) = match result {
                 Err(runtime_error) => {
                     // This will bubble up and be logged later but capture zome/function that was called while the context is available
-                    tracing::info!(?runtime_error, ?zome, ?to_call);
+                    tracing::error!(?runtime_error, ?zome, ?to_call);
                     match runtime_error.downcast::<WasmError>() {
                         Ok(wasm_error) => {
                             (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
