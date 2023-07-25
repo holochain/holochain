@@ -835,6 +835,13 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
         .await
         .unwrap();
 
+    // - the app DOES exist because genesis failed (currently FAILS!)
+    assert!(conductor
+        .get_app_info(app.installed_app_id())
+        .await
+        .unwrap()
+        .is_none());
+
     let (_, cell_bad) = app.into_tuple();
 
     let result: ConductorApiResult<ActionHash> = conductor
@@ -852,6 +859,12 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
         },
         (1, 0)
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "can't write this test yet"]
+async fn test_empty_app_is_installed_with_ignore_genesis_failure() {
+    todo!("FIXME: currently genesis does NOT validate its commits and hence doesn't fail on an invalid entry!!")
 }
 
 // NB: currently the pre-genesis and post-genesis handling of panics is the same.
