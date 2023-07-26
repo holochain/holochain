@@ -166,6 +166,12 @@ impl SweetConductor {
         let rendezvous = rendezvous.map(|r| r.into());
         let dir = TestDir::new(test_db_dir());
 
+        assert!(
+            dir.read_dir().unwrap().next().is_none(),
+            "Test dir not empty - {:?}",
+            dir.to_path_buf()
+        );
+
         if with_metrics {
             #[cfg(feature = "metrics_influxive")]
             holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
@@ -180,16 +186,6 @@ impl SweetConductor {
         };
 
         tracing::info!(?config);
-
-        if !with_metrics {
-            // this check doesn't work with metrics enabled,
-            // because the metrics database is in there...
-            assert!(
-                dir.read_dir().unwrap().next().is_none(),
-                "Test dir not empty - {:?}",
-                dir.to_path_buf()
-            );
-        }
 
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
