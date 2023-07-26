@@ -43,7 +43,7 @@
 //!
 //! Generic naming convention rules:
 //!
-//! - Dot notation logical module hierarchy. This need not, and perhash should
+//! - Dot notation logical module hierarchy. This need not, and perhaps should
 //!   not, match the rust crate/module hierarchy. As we may rearange crates
 //!   and modules, but the metric names themselves should remain more
 //!   consistant.
@@ -187,7 +187,7 @@ impl HolochainMetricsConfig {
     pub async fn init(self) {
         match self {
             Self::Disabled => {
-                tracing::warn!("Running without metrics");
+                tracing::info!("Running without metrics");
             }
             #[cfg(feature = "influxive")]
             Self::InfluxiveExternal {
