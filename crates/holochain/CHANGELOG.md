@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.3.0-beta-dev.11
+
 - Improves error messages when validation fails with an InvalidCommit error
-- Fixed bug where if signature verification fails due to the lair service being unavailable, validation could fail. Now, that failure is treated as a normal error, so validation cannot proceed. [#2604](https://github.com/holochain/holochain/pull/2604)
+- Fixed bug where if signature verification fails due to the lair service being unavailable, validation could fail. Now, that failure is treated as a normal error, so validation cannot proceed. [\#2604](https://github.com/holochain/holochain/pull/2604)
 
 ## 0.3.0-beta-dev.10
 

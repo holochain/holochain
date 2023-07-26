@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230726.004038
+
+## [holochain\_cli-0.3.0-beta-dev.11](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.11](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.10](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain-0.3.0-beta-dev.11](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.11)
+
+- Improves error messages when validation fails with an InvalidCommit error
+- Fixed bug where if signature verification fails due to the lair service being unavailable, validation could fail. Now, that failure is treated as a normal error, so validation cannot proceed. [\#2604](https://github.com/holochain/holochain/pull/2604)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.10](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.11](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.10](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_cascade-0.3.0-beta-dev.11](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [holochain\_state-0.3.0-beta-dev.10](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.10)
+
+- fix: in a scenario where two agents create a cell from the same DNA in the same conductor, cap grant lookup for zome calls succeeded erroneously for any calling agent. The cap grant author was not taken into consideration for the lookup, only the cap secret or the unrestricted cap entry. Fixed by filtering the lookup by cap grant author.
+
+## [holochain\_p2p-0.3.0-beta-dev.10](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_types-0.3.0-beta-dev.10](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.10)
+
+- In the CloneOnly provisioning strategy, `installed_hash` is no longer required (it’s now optional). [\#2600](https://github.com/holochain/holochain/pull/2600)
+
+## [holochain\_sqlite-0.3.0-beta-dev.10](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_keystore-0.3.0-beta-dev.9](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [hdk-0.3.0-beta-dev.10](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.10)
+
+- **BREAKING CHANGE** `get_links` no longer takes `base`, `link_type` and `link_tag` as separate inputs and now takes `GetLinksInput` instead. This can be built using a `GetLinksInputBuilder`. Links can then be filtered by `author` and created timestamp `after` and `before`. This change has been made both to make the `get_links` function consistent with what you see if you use `HDK.with`, which is always supposed to be the case, and also to increase the options for filtering getting links.
+
+## [holochain\_zome\_types-0.3.0-beta-dev.8](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.8)
+
+- Added the `base` field to the `Link` struct for easy access after a `get_links` call.
+
+## [hdi-0.4.0-beta-dev.7](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.7)
+
+## [hdk\_derive-0.3.0-beta-dev.7](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.7](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holo\_hash-0.3.0-beta-dev.6](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.6)
+
 # 20230719.011122
 
 ## [holochain\_cli-0.3.0-beta-dev.10](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.10)
