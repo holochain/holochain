@@ -1421,7 +1421,6 @@ mod app_impls {
                 genesis_result.map(|()| stopped_app)
             } else if let Err(err) = genesis_result {
                 // Rollback created cells on error
-                dbg!("removed cells");
                 self.remove_cells(&cell_ids).await;
                 Err(err)
             } else {
