@@ -223,59 +223,6 @@ impl InclusiveTimestampInterval {
     }
 }
 
-// impl<'de> serde::Deserialize<'de> for Timestamp {
-//     fn deserialize<D>(deserializer: D) -> Result<Timestamp, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         deserializer.deserialize_any(TimestampVisitor)
-//     }
-// }
-
-// struct TimestampVisitor;
-
-// impl<'de> serde::de::Visitor<'de> for TimestampVisitor {
-//     type Value = Timestamp;
-
-//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         formatter.write_str("a Timestamp of i64 (or f64)")
-//     }
-
-//     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
-//     where
-//         E: serde::de::Error,
-//     {
-//         Ok(Timestamp::from_micros(v))
-//     }
-
-//     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-//     where
-//         E: serde::de::Error,
-//     {
-//         if v <= i64::MAX as u64 {
-//             Ok(Timestamp::from_micros(v as i64))
-//         } else {
-//             Err(serde::de::Error::custom(format!(
-//                 "u64 is out of Timestamp range: {v}"
-//             )))
-//         }
-//     }
-
-//     fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
-//     where
-//         E: serde::de::Error,
-//     {
-//         let v = v.floor();
-//         if v <= i64::MAX as f64 && v >= i64::MIN as f64 {
-//             Ok(Timestamp::from_micros(v as i64))
-//         } else {
-//             Err(serde::de::Error::custom(format!(
-//                 "float is out of Timestamp range: {v}"
-//             )))
-//         }
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
@@ -330,19 +277,9 @@ mod tests {
     fn test_timestamp_alternate_forms() {
         use holochain_serialized_bytes::prelude::*;
 
-        decode::<_, Timestamp>(&encode(&(-8923023754601894000f64)).unwrap()).unwrap();
         decode::<_, Timestamp>(&encode(&(0u64)).unwrap()).unwrap();
         decode::<_, Timestamp>(&encode(&(i64::MAX as u64)).unwrap()).unwrap();
         assert!(decode::<_, Timestamp>(&encode(&(i64::MAX as u64 + 1)).unwrap()).is_err());
-
-        decode::<_, Timestamp>(&encode(&(i64::MIN as f64 - 1000.4)).unwrap()).unwrap();
-        decode::<_, Timestamp>(&encode(&(i64::MAX as f64 + 1000.4)).unwrap()).unwrap();
-        assert!(
-            decode::<_, Timestamp>(&encode(&(i64::MIN as f64 - 1000000000.0)).unwrap()).is_err()
-        );
-        assert!(
-            decode::<_, Timestamp>(&encode(&(i64::MAX as f64 + 1000000000.0)).unwrap()).is_err()
-        );
     }
 
     #[test]
