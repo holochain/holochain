@@ -25,6 +25,7 @@ thiserror = "1.0.22"
 tracing = "0.1"
 tracing-core = "0.1"
 mockall = { version = "0.11.3", optional = true }
+holochain_serialized_bytes = "=0.0.51"
 
 # When building for the WASM target, we need to configure getrandom
 # to use the host system for the source of crypto-secure randomness.

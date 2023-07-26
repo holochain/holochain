@@ -33,6 +33,7 @@ impl ShardStrategy {
     }
 }
 
+/// Errors for parsing a string into a sharded path
 #[derive(Debug)]
 pub enum ParseShardStrategyError {
     /// Could not parse the shard depth.

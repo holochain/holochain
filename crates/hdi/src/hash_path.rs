@@ -1,14 +1,4 @@
-/// The anchor pattern implemented in terms of [ `path::Path` ]
-///
-/// The anchor pattern predates the path crate.
-///
-/// It is conceptually:
-///
-/// - A two level Path tree
-/// - Each level of the path is defined as strings not binary data
-/// - The top level is the "type" and the second level is the "text"
-/// - The second level is optional as `Option<String>`
-pub mod anchor;
+
 
 /// The generic [ `path::Path` ] pattern.
 ///

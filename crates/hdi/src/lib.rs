@@ -291,3 +291,5 @@ pub mod flat_op;
 
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;
+
+pub mod hash_path;
