@@ -355,7 +355,7 @@ async fn create_test_data(
     let rng = rand::thread_rng();
     let mut rand_entry = rng.sample_iter(&Standard);
     let rand_entry = rand_entry.by_ref();
-    let start = std::time::Instant::now();
+
     loop {
         let d: Vec<u8> = rand_entry.take(10).collect();
         let d = UnsafeBytes::from(d);
@@ -375,8 +375,6 @@ async fn create_test_data(
             break;
         }
     }
-    dbg!(bucket_counts);
-    dbg!(start.elapsed());
 
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -391,7 +389,7 @@ async fn create_test_data(
     };
     let mut conductor = SweetConductor::from_config(config).await;
     let mut agents = Vec::new();
-    dbg!("generating agents");
+
     for i in 0..num_agents {
         eprintln!("generating agent {}", i);
         let agent = conductor
@@ -402,8 +400,6 @@ async fn create_test_data(
             .unwrap();
         agents.push(agent);
     }
-
-    dbg!("Installing apps");
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file.clone()])
@@ -438,9 +434,9 @@ async fn create_test_data(
         authored.insert(Arc::new(cell.agent_pubkey().clone()), hashes);
         ops.extend(data);
     }
-    dbg!("Getting agent info");
+
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
-    dbg!("Done");
+
     GeneratedData {
         integrity_uuid,
         coordinator_uuid,
