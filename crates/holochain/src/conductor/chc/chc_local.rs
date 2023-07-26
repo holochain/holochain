@@ -111,7 +111,7 @@ mod tests {
     use crate::{
         conductor::{
             api::error::ConductorApiError,
-            chc::{ChcRemote, CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
+            chc::{CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
             error::ConductorError,
         },
         sweettest::*,
@@ -120,8 +120,6 @@ mod tests {
 
     use super::*;
     use ChainHeadCoordinatorExt;
-
-    use ::fixt::prelude::*;
 
     use pretty_assertions::assert_eq;
 
