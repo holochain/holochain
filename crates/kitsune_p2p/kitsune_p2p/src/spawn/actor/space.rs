@@ -21,6 +21,7 @@ const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
 mod metric_exchange;
 use metric_exchange::*;
 
+mod agent_info_update;
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
@@ -746,6 +747,7 @@ async fn update_single_agent_info(
     Ok(agent_info_signed)
 }
 
+use crate::spawn::actor::space::agent_info_update::AgentInfoUpdateTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use ghost_actor::GhostControlSender;
 
@@ -1430,25 +1432,12 @@ impl Space {
                 .collect()
         };
 
-        let i_s_c = i_s.clone();
-        let agent_info_update_interval_ms =
-            config.tuning_params.gossip_agent_info_update_interval_ms as u64;
-        tokio::task::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    agent_info_update_interval_ms,
-                ))
-                .await;
-                if let Err(e) = i_s_c.update_agent_info().await {
-                    if !i_s_c.ghost_actor_is_active() {
-                        // Assume this task has been orphaned when the space was dropped and exit.
-                        break;
-                    } else {
-                        tracing::error!(failed_to_update_agent_info_for_space = ?e);
-                    }
-                }
-            }
-        });
+        AgentInfoUpdateTask::spawn(
+            i_s.clone(),
+            std::time::Duration::from_millis(
+                config.tuning_params.gossip_agent_info_update_interval_ms as u64,
+            ),
+        );
 
         if let NetworkType::QuicBootstrap = &config.network_type {
             // spawn the periodic bootstrap pull
