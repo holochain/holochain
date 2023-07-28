@@ -192,6 +192,9 @@ fn bump_release_versions<'a>(
         .context("consistency checks failed")?;
     }
 
+    check_dev_dependencies_on_ws_crates(ws, &selection)
+        .context("Dev dependencies on workspace crates found with versions specified")?;
+
     let mut changed_crate_changelogs = vec![];
 
     for crt in &selection {
@@ -879,6 +882,41 @@ pub fn do_publish_to_crates_io<'a>(
     }
 
     do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr)
+}
+
+pub fn check_dev_dependencies_on_ws_crates<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    crates: &[&'a Crate<'a>],
+) -> Fallible<()> {
+    let members = ws
+        .members()?
+        .into_iter()
+        .map(|crt| crt.name())
+        .collect::<HashSet<_>>();
+
+    let mut error_messages = vec![];
+    for crt in crates {
+        for dep in crt.package().dependencies() {
+            if members.contains(&dep.package_name().to_string())
+                && dep.kind() == cargo::core::dependency::DepKind::Development
+                && !dep.is_transitive()
+                && dep.specified_req()
+            {
+                let error_message = format!(
+                    "crate '{}' has a development dependency on workspace member '{}' with a version specified but should only be a path",
+                    crt.name(),
+                    dep.package_name()
+                );
+                error_messages.push(error_message);
+            }
+        }
+    }
+
+    if !error_messages.is_empty() {
+        bail!(error_messages.join("\n"));
+    }
+
+    Ok(())
 }
 
 /// create a tag for each crate which will be used to identify its latest release
