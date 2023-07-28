@@ -71,6 +71,7 @@ mod tests {
 
         tokio::time::timeout(Duration::from_millis(30), async {
             loop {
+                tokio::time::sleep(Duration::from_millis(1)).await;
                 if test_sender.get_called_count().await.unwrap() >= 3 {
                     break;
                 }
@@ -113,6 +114,7 @@ mod tests {
 
         tokio::time::timeout(Duration::from_millis(30), async {
             loop {
+                tokio::time::sleep(Duration::from_millis(1)).await;
                 if test_sender.get_errored_count().await.unwrap() >= 3 {
                     break;
                 }
