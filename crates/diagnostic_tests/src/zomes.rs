@@ -55,11 +55,12 @@ pub fn basic_zome() -> InlineIntegrityZome {
             "link_count",
             |api, (base, entries): (AnyLinkableHash, bool)| {
                 let links = api
-                    .get_links(vec![GetLinksInput::new(
+                    .get_links(vec![GetLinksInputBuilder::try_new(
                         base,
                         LinkTypeFilter::single_dep(0.into()),
-                        None,
-                    )])
+                    )
+                    .unwrap()
+                    .build()])
                     .unwrap();
                 let links = links.first().unwrap();
                 if entries {

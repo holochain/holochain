@@ -13,7 +13,7 @@ pub fn valid_dht_op(
     keystore: MetaLairClient,
     author: AgentPubKey,
     must_be_public: bool,
-) -> Facts<DhtOp> {
+) -> impl Fact<'static, DhtOp> {
     facts![
         brute(
             "Action type matches Entry existence, and is public if exists",
@@ -35,35 +35,36 @@ pub fn valid_dht_op(
                 }
             }
         ),
-        mapped(
+        lambda_unit(
             "If there is entry data, the action must point to it",
-            |op: &DhtOp| {
+            |g, op: DhtOp| {
                 if let Some(entry) = op.entry().into_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
-                    facts![prism(
+                    prism(
                         "action's entry hash",
                         |op: &mut DhtOp| op.action_entry_data_mut().map(|(hash, _)| hash),
-                        eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    )]
+                        eq(EntryHash::with_data_sync(entry)),
+                    )
+                    .mutate(g, op)
                 } else {
-                    facts![always()]
+                    Ok(op)
                 }
             }
         ),
-        lens(
+        lens1(
             "The author is the one specified",
             DhtOp::author_mut,
-            eq_(author)
+            eq(author)
         ),
-        mapped("The Signature matches the Action", move |op: &DhtOp| {
+        lambda_unit("The Signature matches the Action", move |g, op: DhtOp| {
             use holochain_keystore::AgentPubKeyExt;
             let action = op.action();
             let agent = action.author();
             let actual = tokio_helper::block_forever_on(agent.sign(&keystore, &action))
                 .expect("Can sign the action");
-            facts![lens("signature", DhtOp::signature_mut, eq_(actual))]
+            lens1("signature", DhtOp::signature_mut, eq(actual)).mutate(g, op)
         })
     ]
 }
@@ -110,15 +111,15 @@ mod tests {
 
         let fact = valid_dht_op(keystore, agent, false);
 
-        assert!(fact.check(&op0a).is_err());
-        fact.check(&op0b).unwrap();
-        fact.check(&op0c).unwrap();
-        fact.check(&op0d).unwrap();
+        assert!(fact.clone().check(&op0a).is_err());
+        fact.clone().check(&op0b).unwrap();
+        fact.clone().check(&op0c).unwrap();
+        fact.clone().check(&op0d).unwrap();
 
-        fact.check(&op1a).unwrap();
-        assert!(fact.check(&op1b).is_err());
-        assert!(fact.check(&op1c).is_err());
-        fact.check(&op1d).unwrap();
+        fact.clone().check(&op1a).unwrap();
+        assert!(fact.clone().check(&op1b).is_err());
+        assert!(fact.clone().check(&op1c).is_err());
+        fact.clone().check(&op1d).unwrap();
     }
 }
 

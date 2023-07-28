@@ -143,7 +143,7 @@ async fn sys_validation_workflow_inner(
         tracing::debug!("Committing {} ops", num_ops);
         let (t, a, m, r) = space
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut missing = 0;
@@ -265,10 +265,10 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep.clone()),
-        ValidationOutcome::PrevActionError(PrevActionError::MissingMeta(dep)) => {
-            AwaitingOpDep(dep.clone().into())
-        }
-        ValidationOutcome::PrevActionError(_) => Rejected,
+        ValidationOutcome::PrevActionError(PrevActionError { source: inner, .. }) => match inner {
+            PrevActionErrorKind::MissingMeta(dep) => AwaitingOpDep(dep.clone().into()),
+            _ => Rejected,
+        },
         ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
@@ -719,7 +719,7 @@ impl SysValidationWorkspace {
         let author = author.clone();
         let chain_not_empty = self
             .authored_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare(
                     "
                 SELECT
@@ -761,7 +761,7 @@ impl SysValidationWorkspace {
         let hash = ActionHash::with_data_sync(action);
         let action_seq_is_not_empty = self
             .dht_db
-            .async_reader({
+            .read_async({
                 let hash = hash.clone();
                 move |txn| {
                     DatabaseResult::Ok(txn.query_row(

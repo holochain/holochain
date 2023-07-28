@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.10
+
+- fix: in a scenario where two agents create a cell from the same DNA in the same conductor, cap grant lookup for zome calls succeeded erroneously for any calling agent. The cap grant author was not taken into consideration for the lookup, only the cap secret or the unrestricted cap entry. Fixed by filtering the lookup by cap grant author.
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
 ## 0.3.0-beta-dev.5
 
 ## 0.3.0-beta-dev.4

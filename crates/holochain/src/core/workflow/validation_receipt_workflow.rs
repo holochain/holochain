@@ -24,7 +24,7 @@ pub async fn pending_receipts(
     validators: Vec<AgentPubKey>,
 ) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
     vault
-        .async_reader({
+        .read_async({
             let validators = validators.clone();
             move |txn| {
                 let mut stmt = txn.prepare(
@@ -116,7 +116,6 @@ pub async fn validation_receipt_workflow(
         if matches!(receipt.validation_status, ValidationStatus::Rejected) {
             // Block BEFORE we integrate the outcome because this is not atomic
             // and if something goes wrong we know the integration will retry.
-            dbg!("block!");
             conductor
                 .block(Block::new(
                     BlockTarget::Cell(
@@ -161,7 +160,7 @@ pub async fn validation_receipt_workflow(
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault
-            .async_commit(move |txn| set_require_receipt(txn, &dht_op_hash, false))
+            .write_async(move |txn| set_require_receipt(txn, &dht_op_hash, false))
             .await?;
     }
 

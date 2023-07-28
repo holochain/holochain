@@ -19,7 +19,7 @@ pub async fn query_size_limited_regions(
     size_limit: u32,
 ) -> ConductorResult<Vec<Region>> {
     Ok(db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
 

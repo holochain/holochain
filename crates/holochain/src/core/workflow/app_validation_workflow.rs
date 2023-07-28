@@ -175,7 +175,7 @@ async fn app_validation_workflow_inner(
         );
         let (t, a, r, activity) = workspace
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let mut total = 0;
                 let mut awaiting = 0;
                 let mut rejected = 0;
@@ -584,7 +584,7 @@ pub async fn check_app_entry_def(
     // Check the visibility and return
     match entry_def {
         Some(entry_def) => {
-            if dbg!(entry_def).visibility == *dbg!(app_entry_def).visibility() {
+            if entry_def.visibility == *app_entry_def.visibility() {
                 Ok(())
             } else {
                 Err(ValidationOutcome::EntryVisibility(app_entry_def.clone()).into())

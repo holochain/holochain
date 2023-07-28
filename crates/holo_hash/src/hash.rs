@@ -270,9 +270,8 @@ pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "encoding"))]
-    fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
-        assert_eq!(3_688_618_971, h.get_loc());
+    fn assert_type<T: HashType>(_: &str, h: HoloHash<T>) {
+        assert_eq!(3_688_618_971, h.get_loc().as_u32());
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
             format!("{:?}", h.get_raw_32()),
@@ -280,7 +279,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",
@@ -302,7 +300,7 @@ mod tests {
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
-        assert_type!(
+        assert_type(
             "ExternalHash",
             ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );

@@ -27,12 +27,16 @@ pub fn get_link_details<'a>(
                             base_address,
                             link_type,
                             tag_prefix,
+                            ..
                         } = input;
 
                         let key = WireLinkKey {
                             base: base_address,
                             type_query: link_type,
                             tag: tag_prefix,
+                            after: None,
+                            before: None,
+                            author: None,
                         };
                         Ok(CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),

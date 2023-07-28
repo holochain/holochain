@@ -34,7 +34,6 @@ use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
-use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -58,6 +57,9 @@ pub mod network_simulation;
 
 mod wait_for;
 pub use wait_for::*;
+
+mod generate_records;
+pub use generate_records::*;
 
 pub use crate::sweettest::sweet_consistency::*;
 
@@ -505,7 +507,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     let num_published = published.len();
     let mut num_integrated = 0;
     for i in 0..num_attempts {
-        num_integrated = get_integrated_count(db);
+        num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
@@ -522,7 +524,11 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     // Timeout has been reached at this point, so print a helpful report
 
     let mut published: Vec<_> = published.iter().map(display_op).collect();
-    let mut integrated: Vec<_> = get_integrated_ops(db).iter().map(display_op).collect();
+    let mut integrated: Vec<_> = get_integrated_ops(db)
+        .await
+        .iter()
+        .map(display_op)
+        .collect();
     published.sort();
     integrated.sort();
 
@@ -572,7 +578,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     }
 
     for i in 0..num_attempts {
-        let num_integrated = get_integrated_count(db);
+        let num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
@@ -591,9 +597,9 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
 
 #[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
-pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
+pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {
-        fresh_reader_test(db.clone(), |txn| {
+        db.read_async(move |txn| -> DatabaseResult<()> {
             txn.prepare("SELECT DISTINCT Action.seq, Action.type, Action.entry_hash FROM Action JOIN DhtOp ON Action.hash = DhtOp.hash")
             .unwrap()
             .query_map([], |row| {
@@ -607,7 +613,9 @@ pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
                 let (action_type, seq, entry) = r.unwrap();
                 tracing::debug!(chain = %i, %seq, ?action_type, ?entry);
             });
-        });
+
+            Ok(())
+        }).await.unwrap();
     }
 }
 
@@ -630,20 +638,21 @@ pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> Integratio
         .unwrap()
 }
 
-fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
-    fresh_reader_test(db.clone(), |txn| {
-        txn.query_row(
+async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+    db.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
             [],
             |row| row.get(0),
-        )
-        .unwrap()
+        )?)
     })
+    .await
+    .unwrap()
 }
 
 /// Get all [`DhtOps`] integrated by this node
-pub fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
-    fresh_reader_test(db.clone(), |txn| {
+pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
+    db.read_async(move |txn| -> StateQueryResult<Vec<DhtOp>> {
         txn.prepare(
             "
             SELECT
@@ -671,8 +680,9 @@ pub fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()
-        .unwrap()
     })
+    .await
+    .unwrap()
 }
 
 /// Helper for displaying agent infos stored on a conductor
@@ -810,7 +820,7 @@ pub async fn force_publish_dht_ops(
     publish_trigger: &mut TriggerSender,
 ) -> DatabaseResult<()> {
     vault
-        .async_commit(|txn| {
+        .write_async(|txn| {
             DatabaseResult::Ok(txn.execute(
                 "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
                 [],

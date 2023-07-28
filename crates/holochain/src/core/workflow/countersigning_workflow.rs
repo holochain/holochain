@@ -216,7 +216,7 @@ pub(crate) async fn countersigning_success(
         }
     };
     let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
-        authored_db.async_reader(reader_closure).await?;
+        authored_db.read_async(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_actions_op_basis_hashes.is_empty() {
@@ -226,7 +226,7 @@ pub(crate) async fn countersigning_success(
     // Verify signatures of actions.
     let mut i_am_an_author = false;
     for SignedAction(action, signature) in &signed_actions {
-        if !action.author().verify_signature(signature, action).await {
+        if !action.author().verify_signature(signature, action).await? {
             return Ok(());
         }
         if action.author() == &author {
@@ -245,7 +245,7 @@ pub(crate) async fn countersigning_success(
         .collect();
 
     let result = authored_db
-        .async_commit({
+        .write_async({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {

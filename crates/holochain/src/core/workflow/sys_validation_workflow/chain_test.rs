@@ -30,8 +30,8 @@ async fn sys_validation_agent_activity_test() {
 
     let changed = cell_1
         .dht_db()
-        .async_commit(|txn| {
-            DatabaseResult::Ok(txn.execute(
+        .write_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.execute(
                 "UPDATE Action SET seq = 4 WHERE hash = ? OR hash = ?",
                 [a, b],
             )?)

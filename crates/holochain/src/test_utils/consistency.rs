@@ -12,9 +12,8 @@ use holochain_p2p::{
     dht_arc::{DhtArc, DhtLocation},
     AgentPubKeyExt, DhtOpHashExt,
 };
-use holochain_sqlite::{
-    db::{AsP2pStateTxExt, DbKindAuthored, DbKindDht, DbKindP2pAgents},
-    prelude::{DatabaseResult, ReadAccess},
+use holochain_sqlite::prelude::{
+    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
 };
 use holochain_state::{prelude::StateQueryResult, query::from_blob};
 use holochain_types::{db::DbRead, dht_op::DhtOpType, prelude::DhtOp};
@@ -584,7 +583,7 @@ async fn check_agents<'iter>(
 ) -> DatabaseResult<impl Iterator<Item = &'iter Arc<KitsuneAgent>> + 'iter> {
     // Poll the peer database for the currently held agents.
     let agents_held: HashSet<_> = p2p_agents_db
-        .async_reader(|txn| {
+        .read_async(|txn| {
             DatabaseResult::Ok(
                 txn.p2p_list_agents()?
                     .into_iter()
@@ -616,7 +615,7 @@ async fn check_hashes(
 
     // Poll the vault database for each expected hashes existence.
     let mut r = dht_db
-                .async_reader(move |txn| {
+                .read_async(move |txn| {
                     for hash in &expected {
                         // TODO: This might be too slow, could instead save the holochain hash versions.
                         let h_hash: DhtOpHash = DhtOpHashExt::from_kitsune_raw(hash.clone());
@@ -683,7 +682,7 @@ pub async fn request_published_ops<AuthorDb>(
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
 {
-    db.async_reader(|txn| {
+    db.read_async(|txn| {
         // Collect all ops except StoreEntry's that are private.
         let sql_common = "
         SELECT
@@ -776,6 +775,6 @@ async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    db.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
+    db.read_async(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
         .await
 }

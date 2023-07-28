@@ -7,7 +7,6 @@ use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::prelude::block::BlockTargetId;
 use holochain_types::prelude::*;
@@ -37,10 +36,13 @@ async fn test_validation_receipt() {
     consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let vault = alice.dht_db().clone().into();
-    let record = fresh_store_test(&vault, |store| {
-        store.get_record(&hash.clone().into()).unwrap().unwrap()
-    });
+    let vault = alice.dht_db();
+    let record = vault
+        .read_async(move |txn| -> StateQueryResult<Record> {
+            Ok(Txn::from(&txn).get_record(&hash.clone().into())?.unwrap())
+        })
+        .await
+        .unwrap();
     let ops = produce_ops_from_record(&record)
         .unwrap()
         .into_iter()
@@ -52,7 +54,15 @@ async fn test_validation_receipt() {
         {
             let mut counts = Vec::new();
             for hash in &ops {
-                let count = fresh_reader_test!(vault, |r| list_receipts(&r, hash).unwrap().len());
+                let count = vault
+                    .read_async({
+                        let query_hash = hash.clone();
+                        move |r| -> StateQueryResult<usize> {
+                            Ok(list_receipts(&r, &query_hash)?.len())
+                        }
+                    })
+                    .await
+                    .unwrap();
                 counts.push(count);
             }
             counts
@@ -61,9 +71,14 @@ async fn test_validation_receipt() {
     );
 
     // Check alice has receipts from both bobbo and carol
-    for hash in ops {
-        let receipts: Vec<_> =
-            fresh_reader_test!(vault, |mut r| list_receipts(&mut r, &hash).unwrap());
+    for hash in &ops {
+        let receipts: Vec<_> = vault
+            .read_async({
+                let query_hash = hash.clone();
+                move |r| list_receipts(&r, &query_hash)
+            })
+            .await
+            .unwrap();
         assert_eq!(receipts.len(), 2);
         for receipt in receipts {
             let SignedValidationReceipt {
@@ -72,23 +87,27 @@ async fn test_validation_receipt() {
             } = receipt;
             let validator = receipt.validators[0].clone();
             assert!(validator == *bobbo.agent_pubkey() || validator == *carol.agent_pubkey());
-            assert!(validator.verify_signature(&sigs[0], receipt).await);
+            assert!(validator.verify_signature(&sigs[0], receipt).await.unwrap());
         }
     }
 
     // Check alice has 2 receipts in their authored dht ops table.
     crate::assert_eq_retry_1m!(
         {
-            fresh_reader_test!(vault, |txn: Transaction| {
-                let mut stmt = txn
-                    .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
-                    .unwrap();
-                stmt.query_map([], |row| row.get::<_, Option<u32>>(0))
-                    .unwrap()
-                    .map(Result::unwrap)
-                    .filter_map(|i| i)
-                    .collect::<Vec<u32>>()
-            })
+            vault
+                .read_async(move |txn: Transaction| -> DatabaseResult<Vec<u32>> {
+                    let mut stmt = txn
+                        .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
+                        .unwrap();
+                    Ok(stmt
+                        .query_map([], |row| row.get::<_, Option<u32>>(0))
+                        .unwrap()
+                        .map(Result::unwrap)
+                        .filter_map(|i| i)
+                        .collect::<Vec<u32>>())
+                })
+                .await
+                .unwrap()
         },
         vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
     );

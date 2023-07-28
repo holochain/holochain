@@ -171,7 +171,7 @@ mod tests {
                 chain.push(ActionHash::with_data_sync(&action));
                 let op = DhtOp::RegisterAgentActivity(fixt!(Signature), action.into());
                 let op = DhtOpHashed::from_content_sync(op);
-                fill_db(&db, op);
+                fill_db(&db, op).await;
             }
             chains.push(chain);
         }
