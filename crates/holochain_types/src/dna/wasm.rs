@@ -11,9 +11,10 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 use tracing::*;
+use arbitrary::Arbitrary;
 
 /// Represents web assembly code.
-#[derive(Serialize, Deserialize, Clone, Eq)]
+#[derive(Serialize, Deserialize, Clone, Eq, Arbitrary)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     #[allow(clippy::redundant_allocation)]
