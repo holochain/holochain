@@ -69,8 +69,15 @@ mod tests {
     async fn update_agent_info() {
         let (test_sender, _) = setup(DummySpaceInternalImpl::new()).await;
 
-        // It should be possible to set this as low as 4ms but the update_agent_info calls take a bit of time
-        tokio::time::sleep(Duration::from_millis(6)).await;
+        tokio::time::timeout(Duration::from_millis(30), async {
+            loop {
+                if test_sender.get_called_count().await.unwrap() >= 3 {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("Timed out before seeing 3 task runs");
 
         let called_count = test_sender.get_called_count().await.unwrap();
         assert!(
@@ -104,8 +111,15 @@ mod tests {
         space_internal_impl.respond_with_error = true;
         let (test_sender, _) = setup(space_internal_impl).await;
 
-        // It should be possible to set this as low as 4ms but the update_agent_info calls take a bit of time
-        tokio::time::sleep(Duration::from_millis(6)).await;
+        tokio::time::timeout(Duration::from_millis(30), async {
+            loop {
+                if test_sender.get_errored_count().await.unwrap() >= 3 {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("Timed out before seeing 3 errors");
 
         let errored_count = test_sender.get_errored_count().await.unwrap();
         assert!(
