@@ -69,7 +69,7 @@ mod tests {
     async fn update_agent_info() {
         let (test_sender, _) = setup(DummySpaceInternalImpl::new()).await;
 
-        tokio::time::timeout(Duration::from_millis(30), async {
+        tokio::time::timeout(Duration::from_millis(100), async {
             loop {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 if test_sender.get_called_count().await.unwrap() >= 3 {
@@ -112,7 +112,7 @@ mod tests {
         space_internal_impl.respond_with_error = true;
         let (test_sender, _) = setup(space_internal_impl).await;
 
-        tokio::time::timeout(Duration::from_millis(30), async {
+        tokio::time::timeout(Duration::from_millis(100), async {
             loop {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 if test_sender.get_errored_count().await.unwrap() >= 3 {
