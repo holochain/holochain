@@ -1,7 +1,6 @@
 use contrafact::Generator;
-use std::ops::RangeInclusive;
 use contrafact::Mutation;
-
+use std::ops::RangeInclusive;
 
 /// A contrafact fact for generating a network node with a given number of agents.
 pub struct SizedNodeFact {

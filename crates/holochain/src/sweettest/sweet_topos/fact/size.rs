@@ -1,4 +1,4 @@
-use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
+use crate::sweettest::sweet_topos::network::NetworkTopology;
 use crate::sweettest::sweet_topos::node::NetworkTopologyNode;
 use contrafact::Fact;
 use contrafact::Generator;
@@ -29,26 +29,26 @@ impl SizedNetworkFact {
     }
 }
 
-impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
+impl<'a> Fact<'a, NetworkTopology> for SizedNetworkFact {
     fn mutate(
         &mut self,
         g: &mut Generator<'a>,
-        mut graph: NetworkTopologyGraph,
-    ) -> Mutation<NetworkTopologyGraph> {
-        let mut node_count = graph.node_count();
+        mut network_topology: NetworkTopology,
+    ) -> Mutation<NetworkTopology> {
+        let mut node_count = network_topology.node_count();
         while node_count < self.nodes {
             let node: NetworkTopologyNode = g.arbitrary(|| "Could not create node")?;
-            graph.add_node(node);
-            node_count = graph.node_count();
+            network_topology.add_node(node);
+            node_count = network_topology.node_count();
         }
         while node_count > self.nodes {
-            graph.remove_node(
+            network_topology.remove_node_index(
                 g.int_in_range(0..=node_count, || "could not remove node")?
                     .into(),
             );
-            node_count = graph.node_count();
+            node_count = network_topology.node_count();
         }
-        Ok(graph)
+        Ok(network_topology)
     }
 
     fn label(&self) -> String {

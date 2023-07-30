@@ -1,25 +1,72 @@
+use super::network::NetworkTopologyConductor;
 use super::node::NetworkTopologyNode;
 use arbitrary::Arbitrary;
 use holochain_zome_types::prelude::CellId;
+use rand::Rng;
+use std::hash::{Hash, Hasher};
 
 /// A network edge in a network topology. Represents a network connection.
 /// Edges are directed, so if you want a bidirectional connection you need two
 /// edges.
-#[derive(Arbitrary, Clone, Debug, PartialEq, Default)]
+#[derive(Arbitrary, Clone, Debug, Default, Eq)]
 pub struct NetworkTopologyEdge {
+    id: [u8; 32],
+    source_conductor: NetworkTopologyConductor,
+    target_conductor: NetworkTopologyConductor,
     cells: Vec<CellId>,
 }
 
+/// ID based hashing means we can use edges as keys in a hashmap and they'll
+/// be treated as duplicate even if mutated.
+impl Hash for NetworkTopologyEdge {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+/// ID based equality is good for topology edges so we can track them
+/// independently no matter what kind of mutations/state might eventuate.
+impl PartialEq for NetworkTopologyEdge {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
 impl NetworkTopologyEdge {
-    /// Create a new edge with the given cells.
-    pub fn new(cells: Vec<CellId>) -> Self {
-        Self { cells }
+    /// Get the cells in this edge.
+    /// MAY disagree with the cells in the conductor.
+    /// This is because the conductor may have been mutated since the edge was
+    /// created or vice vesa re: apply.
+    pub fn cells(&self) -> Vec<CellId> {
+        self.cells.clone()
     }
 
-    /// Create a new edge with a full view on the given node.
-    pub fn new_full_view_on_node(node: &NetworkTopologyNode) -> Self {
+    /// Get the source conductor for this edge.
+    pub fn source_conductor(&self) -> &NetworkTopologyConductor {
+        &self.source_conductor
+    }
+
+    /// Get the target conductor for this edge.
+    pub fn target_conductor(&self) -> &NetworkTopologyConductor {
+        &self.target_conductor
+    }
+
+    /// Apply the edge state to its associated conductor.
+    pub async fn apply(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Create a new edge with a full view on the given target node.
+    pub fn new_full_view_on_node(
+        source: &NetworkTopologyNode,
+        target: &NetworkTopologyNode,
+    ) -> Self {
+        let mut rng = rand::thread_rng();
         Self {
-            cells: node.cells().clone(),
+            id: rng.gen(),
+            source_conductor: source.conductor().clone(),
+            target_conductor: target.conductor().clone(),
+            cells: target.cells().clone(),
         }
     }
 }

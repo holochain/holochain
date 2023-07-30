@@ -5,7 +5,7 @@ pub mod edge;
 pub mod fact;
 
 /// Defines and implements the overall graph of a network topology.
-pub mod graph;
+pub mod network;
 
 /// Defines and implements a node in a network topology.
 pub mod node;

@@ -1,50 +1,21 @@
+use super::network::NetworkTopologyConductor;
 use crate::sweettest::SweetAgents;
-use crate::sweettest::SweetConductor;
 use arbitrary::Arbitrary;
-use arbitrary::Unstructured;
-use async_once_cell::OnceCell;
 use holo_hash::HasHash;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DnaFile;
-use holochain_types::share::RwShare;
 use holochain_util::tokio_helper;
 use holochain_zome_types::prelude::CellId;
 use rand::Rng;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::sync::Arc;
-
-/// Some orphan rule hoop jumping.
-#[derive(Clone, Debug)]
-struct NetworkTopologyNodeConductor(Arc<OnceCell<RwShare<SweetConductor>>>);
-
-impl NetworkTopologyNodeConductor {
-    pub async fn get_share(&self) -> &RwShare<SweetConductor> {
-        self.0
-            .get_or_init(async { RwShare::new(SweetConductor::from_standard_config().await) })
-            .await
-    }
-
-    pub fn new() -> Self {
-        Self(Arc::new(OnceCell::new()))
-    }
-}
 
 /// A node in a network topology. Represents a conductor.
 #[derive(Arbitrary, Clone, Debug)]
 pub struct NetworkTopologyNode {
     id: [u8; 32],
     agents: HashMap<DnaFile, HashSet<AgentPubKey>>,
-    conductor: NetworkTopologyNodeConductor,
-}
-
-/// This implementation exists so that the parent NetworkTopologyNode can itself
-/// implement Arbitrary. It creates an empty once cell which will be filled in
-/// by `get` and then ultimately needs to have the parent node apply its state.
-impl<'a> Arbitrary<'a> for NetworkTopologyNodeConductor {
-    fn arbitrary(_u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(NetworkTopologyNodeConductor::new())
-    }
+    conductor: NetworkTopologyConductor,
 }
 
 /// ID based equality is good for topology nodes so we can track them
@@ -62,8 +33,13 @@ impl NetworkTopologyNode {
         Self {
             id: rng.gen(),
             agents: HashMap::new(),
-            conductor: NetworkTopologyNodeConductor::new(),
+            conductor: NetworkTopologyConductor::new(),
         }
+    }
+
+    /// Get the conductor for this node.
+    pub fn conductor(&self) -> &NetworkTopologyConductor {
+        &self.conductor
     }
 
     /// Get the cells in this node. MAY disagree with the cells in the conductor.
