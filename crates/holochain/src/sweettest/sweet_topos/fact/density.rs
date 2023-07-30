@@ -5,11 +5,20 @@ use contrafact::Generator;
 use contrafact::Mutation;
 // use contrafact::MutationError;
 
-struct DenseNetworkFact {
+/// Fact:
+/// - The network has a specific density according to graph theory.
+/// This is the number of edges divided by the maximum number of edges.
+/// This is a number between 0 and 1. 0 means no edges. 1 means every node
+/// is connected to every other node.
+/// This is a directed graph, so the maximum number of edges is n * (n - 1).
+/// This measument only makes sense for simple graphs, so we assume that.
+#[derive(Clone, Debug)]
+pub struct DenseNetworkFact {
     density: f64,
 }
 
 impl DenseNetworkFact {
+    /// Create a new fact with the given density.
     pub fn new(density: f64) -> Self {
         Self { density }
     }
@@ -25,6 +34,9 @@ impl DenseNetworkFact {
         node_count * (node_count - 1)
     }
 
+    /// This is the number of edges that we want to have in the graph. It is
+    /// a truncation of the density times the maximum number of edges, so we're
+    /// rounding down.
     pub fn target_edge_count(&self, graph: &NetworkTopologyGraph) -> usize {
         (self.density * Self::max_edge_count(&graph) as f64) as usize
     }
@@ -32,9 +44,9 @@ impl DenseNetworkFact {
 
 impl<'a> Fact<'a, NetworkTopologyGraph> for DenseNetworkFact {
     fn mutate(
-        &self,
-        mut graph: NetworkTopologyGraph,
+        &mut self,
         g: &mut Generator<'a>,
+        mut graph: NetworkTopologyGraph,
     ) -> Mutation<NetworkTopologyGraph> {
         let target_edge_count = self.target_edge_count(&graph);
         let mut rng: _ = super::rng_from_generator(g);
@@ -86,15 +98,27 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for DenseNetworkFact {
         Ok(graph)
     }
 
-    /// Not sure what a meaningful advance would be as a graph is already a
-    /// collection, so why would we want a sequence of them?
-    fn advance(&mut self, _graph: &NetworkTopologyGraph) {
-        todo!();
+    fn label(&self) -> String {
+        format!("DenseNetworkFact {{ density: {} }}", self.density)
+    }
+
+    fn labeled(self, _: impl ToString) -> Self {
+        todo!()
     }
 }
 
 #[cfg(test)]
 pub mod test {
+    use super::*;
+
+    /// Test that we can build a dense network fact with `DenseNetworkFact::new`.
+    #[test]
+    fn test_dense_network_fact_new() {
+        let a = DenseNetworkFact::new(0.5);
+        let b = DenseNetworkFact { density: 0.5 };
+        assert_eq!(a, b);
+    }
+
     #[test]
     fn test_sweet_topos_dense_network() {
         let mut g = unstructured_noise().into();

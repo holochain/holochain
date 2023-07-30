@@ -1,10 +1,10 @@
 use super::error::DnaError;
 use crate::prelude::*;
+use arbitrary::Arbitrary;
 use holo_hash::*;
 use holochain_zome_types::ZomeName;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use arbitrary::Arbitrary;
 
 #[cfg(test)]
 mod test;

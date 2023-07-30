@@ -8,39 +8,42 @@ use std::ops::RangeInclusive;
 /// Fact:
 /// - The network has a specific number of nodes.
 /// - Each node has a specific number of agents.
-struct SizedNetworkFact {
+#[derive(Clone, Debug)]
+pub struct SizedNetworkFact {
     /// The number of nodes in the network.
     /// Ideally this would be a range, but we can't do that yet.
     nodes: usize,
 }
 
 impl SizedNetworkFact {
+    /// Create a new fact with the given number of nodes.
     pub fn new(nodes: usize) -> Self {
         Self { nodes }
     }
 
+    /// Create a new fact with a number of nodes in the given range.
     pub fn from_range(g: &mut Generator, nodes: RangeInclusive<usize>) -> Mutation<Self> {
         Ok(Self {
-            nodes: g.int_in_range(nodes, "Couldn't build a fact in the range.")?,
+            nodes: g.int_in_range(nodes, || "Couldn't build a fact in the range.")?,
         })
     }
 }
 
 impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
     fn mutate(
-        &self,
-        mut graph: NetworkTopologyGraph,
+        &mut self,
         g: &mut Generator<'a>,
+        mut graph: NetworkTopologyGraph,
     ) -> Mutation<NetworkTopologyGraph> {
         let mut node_count = graph.node_count();
         while node_count < self.nodes {
-            let node = g.arbitrary::<NetworkTopologyNode>("Could not create node")?;
+            let node: NetworkTopologyNode = g.arbitrary(|| "Could not create node")?;
             graph.add_node(node);
             node_count = graph.node_count();
         }
         while node_count > self.nodes {
             graph.remove_node(
-                g.int_in_range(0..=node_count, "could not remove node")?
+                g.int_in_range(0..=node_count, || "could not remove node")?
                     .into(),
             );
             node_count = graph.node_count();
@@ -48,15 +51,27 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
         Ok(graph)
     }
 
-    /// Not sure what a meaningful advance would be as a graph is already a
-    /// collection, so why would we want a sequence of them?
-    fn advance(&mut self, _graph: &NetworkTopologyGraph) {
-        todo!();
+    fn label(&self) -> String {
+        todo!()
+    }
+
+    fn labeled(self, _label: impl ToString) -> Self {
+        todo!()
     }
 }
 
 #[cfg(test)]
 pub mod test {
+    use super::*;
+
+    /// Test that we can build a sized network fact with `SizedNetworkFact::new`.
+    #[test]
+    fn test_sized_network_fact_new() {
+        let a = SizedNetworkFact::new(3);
+        let b = SizedNetworkFact { nodes: 3 };
+        assert_eq!(a, b);
+    }
+
     /// Test that we can build a network with zero nodes.
     #[test]
     fn test_sweet_topos_sized_network_zero_nodes() {

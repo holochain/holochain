@@ -20,6 +20,7 @@ use crate::sweettest::sweet_topos::graph::NetworkTopologyGraph;
 /// one or a few partitions dominating the network. Less efficient partitioning
 /// means that the partitions heal more slowly which can lead to a more even
 /// distribution of partitions.
+#[derive(Clone, Debug)]
 struct StrictlyPartitionedNetworkFact {
     /// The number of partitions in the network.
     partitions: usize,
@@ -31,9 +32,9 @@ struct StrictlyPartitionedNetworkFact {
 
 impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
     fn mutate(
-        &self,
-        mut graph: NetworkTopologyGraph,
+        &mut self,
         g: &mut Generator<'a>,
+        mut graph: NetworkTopologyGraph,
     ) -> Mutation<NetworkTopologyGraph> {
         let mut rng: _ = super::rng_from_generator(g);
         let efficiency_cutoff = (self.efficiency * u64::MAX as f64) as u64;
@@ -186,10 +187,12 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for StrictlyPartitionedNetworkFact {
         Ok(graph)
     }
 
-    /// Not sure what a meaningful advance would be as a graph is already a
-    /// collection, so why would we want a sequence of them?
-    fn advance(&mut self, _graph: &NetworkTopologyGraph) {
-        todo!();
+    fn label(&self) -> String {
+        todo!()
+    }
+
+    fn labeled(self, _: impl ToString) -> Self {
+        todo!()
     }
 }
 

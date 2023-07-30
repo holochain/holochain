@@ -55,11 +55,16 @@ impl ToString for NetworkTopologyGraphError {
 
 impl From<NetworkTopologyGraphError> for MutationError {
     fn from(e: NetworkTopologyGraphError) -> Self {
-        MutationError::Exception(e.to_string())
+        MutationError::User(e.to_string())
     }
 }
 
 impl NetworkTopologyGraph {
+    /// Get the DnaHashes that are in this graph.
+    pub fn dnas(&self) -> &[DnaHash] {
+        &self.dnas
+    }
+
     /// Return a node by its index or error. This is useful because commonly we
     /// know the index of a node, because we just retrieved it, but we need to
     /// get the node itself. An error in this case is a bug, because we should
@@ -203,7 +208,7 @@ impl NetworkTopologyGraph {
         let mut nodes_in_smallest_partition = labels
             .iter()
             .enumerate()
-            .filter(|(i, label)| **label == representative_of_smallest_partition)
+            .filter(|(_i, label)| **label == representative_of_smallest_partition)
             .map(|(i, _)| i)
             .collect::<Vec<_>>();
         nodes_in_smallest_partition.shuffle(rng);
@@ -241,17 +246,19 @@ impl NetworkTopologyGraph {
     /// Add a simple edge to the graph. A simple edge is an edge that does not
     /// already exist in the graph and does not create a self edge. If the edge
     /// already exists or would create a self edge, then do nothing.
+    /// Returns true if the edge was added, false if it was not.
     pub fn add_simple_edge(
         &mut self,
         origin: usize,
         target: usize,
         edge: NetworkTopologyEdge,
-    ) -> Result<(), NetworkTopologyGraphError> {
+    ) -> Result<bool, NetworkTopologyGraphError> {
         if !self.contains_edge(origin.into(), target.into()) && origin != target {
-            let edge = NetworkTopologyEdge::default();
             self.add_edge(origin.into(), target.into(), edge);
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     /// Add a random simple edge to the graph. A simple edge is an edge that does
@@ -260,7 +267,7 @@ impl NetworkTopologyGraph {
     pub fn add_random_simple_edge<R: rand::Rng>(
         &mut self,
         rng: &mut R,
-    ) -> Result<(), NetworkTopologyGraphError> {
+    ) -> Result<bool, NetworkTopologyGraphError> {
         let a = self.random_node_index(rng)?;
         let b = self.random_node_index(rng)?;
 

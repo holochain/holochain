@@ -5,6 +5,7 @@ use contrafact::Generator;
 use contrafact::Mutation;
 
 /// Fact: The origin node can see every agent on the target node.
+#[derive(Clone, Debug)]
 pub struct FullAgentViewFact {
     /// The target node. This node is fully visible to the origin node.
     target: NetworkTopologyNode,
@@ -12,15 +13,19 @@ pub struct FullAgentViewFact {
 
 impl<'a> Fact<'a, NetworkTopologyEdge> for FullAgentViewFact {
     fn mutate(
-        &self,
-        mut edge: NetworkTopologyEdge,
-        g: &mut Generator<'a>,
+        &mut self,
+        _g: &mut Generator<'a>,
+        mut _edge: NetworkTopologyEdge,
     ) -> Mutation<NetworkTopologyEdge> {
-        edge = NetworkTopologyEdge::new_full_view_on_node(&self.target);
-        Ok(edge)
+        let new_edge = NetworkTopologyEdge::new_full_view_on_node(&self.target);
+        Ok(new_edge)
     }
 
-    fn advance(&mut self, _edge: &NetworkTopologyEdge) {
-        todo!();
+    fn label(&self) -> String {
+        todo!()
+    }
+
+    fn labeled(self, _: impl ToString) -> Self {
+        todo!()
     }
 }
