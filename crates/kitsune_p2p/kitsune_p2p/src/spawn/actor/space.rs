@@ -22,6 +22,7 @@ mod metric_exchange;
 use metric_exchange::*;
 
 mod agent_info_update;
+mod bootstrap_task;
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
