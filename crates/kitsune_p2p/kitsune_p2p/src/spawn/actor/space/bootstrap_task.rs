@@ -17,16 +17,16 @@ pub(super) struct BootstrapTask {
 }
 
 // Trait for the bootstrap query to allow mocking in tests
-trait BootstrapQuery: Send {
+trait BootstrapService: Send {
     fn random(&self, query: RandomQuery) -> BoxFuture<KitsuneP2pResult<Vec<AgentInfoSigned>>>;
 }
 
-struct DefaultBootstrapQuery {
+struct DefaultBootstrapService {
     url: Option<Url2>,
     net: BootstrapNet,
 }
 
-impl BootstrapQuery for DefaultBootstrapQuery {
+impl BootstrapService for DefaultBootstrapService {
     fn random(&self, query: RandomQuery) -> BoxFuture<KitsuneP2pResult<Vec<AgentInfoSigned>>> {
         super::bootstrap::random(self.url.clone(), query, self.net).boxed()
     }
@@ -42,7 +42,7 @@ impl BootstrapTask {
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(BootstrapTask { is_finished: false }));
-        let bootstrap_query = DefaultBootstrapQuery {
+        let bootstrap_query = DefaultBootstrapService {
             url: bootstrap_service,
             net: bootstrap_net,
         };
@@ -63,7 +63,7 @@ impl BootstrapTask {
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
         space: Arc<KitsuneSpace>,
-        bootstrap_query: Box<impl BootstrapQuery + Send + Sync + 'static>,
+        bootstrap_query: Box<impl BootstrapService + Send + Sync + 'static>,
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
@@ -134,8 +134,9 @@ impl BootstrapTask {
 #[cfg(test)]
 mod tests {
     use crate::event::{KitsuneP2pEvent, PutAgentInfoSignedEvt};
+    use crate::fixt::AgentInfoSignedFixturator;
     use crate::fixt::KitsuneSpaceFixturator;
-    use crate::spawn::actor::space::bootstrap_task::{BootstrapQuery, BootstrapTask};
+    use crate::spawn::actor::space::bootstrap_task::{BootstrapService, BootstrapTask};
     use crate::spawn::actor::space::DhtArc;
     use crate::spawn::actor::space::{
         KAgent, KBasis, KSpace, MaybeDelegate, OpHashList, Payload, SpaceInternal,
@@ -165,7 +166,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn update_agent_info_from_bootstrap_server() {
-        let (test_sender, mut host_receiver, _) = setup(DummySpaceInternalImpl::new()).await;
+        let agents = vec![fixt!(AgentInfoSigned)];
+        let (test_sender, mut host_receiver, _) =
+            setup(DummySpaceInternalImpl::new(), agents).await;
 
         let msg = tokio::time::timeout(Duration::from_secs(5), host_receiver.next())
             .await
@@ -182,13 +185,14 @@ mod tests {
         }
 
         let found_agents = response.get(0).unwrap();
-        assert_eq!(0, found_agents.peer_data.len());
+        assert_eq!(1, found_agents.peer_data.len());
 
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
     }
 
     async fn setup(
         task: DummySpaceInternalImpl,
+        agents: Vec<AgentInfoSigned>,
     ) -> (
         GhostSender<TestChan>,
         Receiver<KitsuneP2pEvent>,
@@ -220,7 +224,7 @@ mod tests {
             internal_sender,
             host_sender,
             Arc::new(space),
-            Box::new(TestBootstrapService {}),
+            Box::new(TestBootstrapService { agents }),
             2,
         );
 
@@ -369,10 +373,12 @@ mod tests {
         }
     }
 
-    struct TestBootstrapService {}
-    impl BootstrapQuery for TestBootstrapService {
+    struct TestBootstrapService {
+        agents: Vec<AgentInfoSigned>,
+    }
+    impl BootstrapService for TestBootstrapService {
         fn random(&self, _query: RandomQuery) -> BoxFuture<KitsuneP2pResult<Vec<AgentInfoSigned>>> {
-            async move { Ok(vec![]) }.boxed().into()
+            async move { Ok(self.agents.clone()) }.boxed().into()
         }
     }
 }
