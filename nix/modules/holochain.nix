@@ -10,7 +10,10 @@
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
-      opensslStatic = pkgs.pkgsStatic.openssl;
+      opensslStatic = if system == "x86_64-darwin"
+                      then pkgs.openssl # pkgsStatic is considered a cross build
+                                        # and this is not yet supported
+                      else pkgs.pkgsStatic.openssl;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
