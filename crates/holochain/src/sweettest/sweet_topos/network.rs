@@ -177,6 +177,11 @@ impl NetworkTopology {
     pub async fn apply(&mut self) -> anyhow::Result<()> {
         self.integrity_check()?;
 
+        // Push all self DnaFiles into every node.
+        for node in self.graph.node_weights_mut() {
+            node.ensure_dnas(self.dnas.clone());
+        }
+
         // Apply the state of the nodes.
         for node in self.graph.node_weights_mut() {
             node.apply().await?;
@@ -418,7 +423,8 @@ impl NetworkTopology {
         let a = self.random_node_index(rng)?;
         let b = self.random_node_index(rng)?;
 
-        let edge = NetworkTopologyEdge::new_full_view_on_node(self.node_or_err(a)?, self.node_or_err(b)?);
+        let edge =
+            NetworkTopologyEdge::new_full_view_on_node(self.node_or_err(a)?, self.node_or_err(b)?);
 
         Ok(self.add_simple_edge(a, b, edge))
     }

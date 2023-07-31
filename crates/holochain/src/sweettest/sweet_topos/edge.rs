@@ -1,6 +1,8 @@
 use super::network::NetworkTopologyConductor;
 use super::node::NetworkTopologyNode;
+use crate::sweettest::SweetConductor;
 use arbitrary::Arbitrary;
+use holochain_types::share::RwShare;
 use holochain_zome_types::prelude::CellId;
 use rand::Rng;
 use std::hash::{Hash, Hasher};
@@ -53,6 +55,29 @@ impl NetworkTopologyEdge {
 
     /// Apply the edge state to its associated conductor.
     pub async fn apply(&mut self) -> anyhow::Result<()> {
+        let envs_from_share = |rw_share: &RwShare<SweetConductor>| {
+            rw_share.share_ref(|c| {
+                let mut envs = Vec::new();
+                for env in c
+                    .raw_handle()
+                    .spaces
+                    .get_from_spaces(|s| s.p2p_agents_db.clone())
+                    .clone()
+                {
+                    envs.push(env.clone());
+                }
+                envs
+            })
+        };
+
+        let source_envs = envs_from_share(self.source_conductor.get_share().await);
+        let target_envs = envs_from_share(self.target_conductor.get_share().await);
+
+        // @todo This reveals all peers to the source, but in reality we'd only
+        // want to reveal the list of agents specified by the edge.
+        crate::conductor::p2p_agent_store::reveal_peer_info(source_envs, target_envs)
+            .await;
+
         Ok(())
     }
 
