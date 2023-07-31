@@ -256,9 +256,11 @@ mod tests {
         );
     }
 
+    // TODO: run this remotely too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync() {
         let mut config = ConductorConfig::default();
+        // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors = SweetConductorBatch::from_config(4, config).await;
 
@@ -306,11 +308,12 @@ mod tests {
         dbg!(&install_result_3);
 
         regex::Regex::new(
-            r#".*ChcHeadMoved\("genesis", InvalidChain\(2, ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
+            r#".*ChcHeadMoved\("genesis", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
         )
         .unwrap()
         .captures(&format!("{:?}", install_result_1))
         .unwrap();
+        // TODO: check sequence and hash
 
         assert_eq!(
             format!("{:?}", install_result_1),
@@ -384,8 +387,9 @@ mod tests {
         dbg!(&hash1);
 
         regex::Regex::new(
-            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\(5, ActionHash\([a-zA-Z0-9-_]+\).*"#
+            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\).*"#
         ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
+        // TODO: check sequence and hash
 
         // This should trigger a CHC sync
         let hash2: Result<ActionHash, _> = conductors[2]

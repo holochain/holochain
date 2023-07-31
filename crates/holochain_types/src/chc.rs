@@ -264,8 +264,8 @@ pub enum ChcError {
     /// - Vec<AddRecordPayload> must be sorted by `seq_number`
     /// - There is a gap between the first action and the current CHC head
     /// - The `Vec<AddRecordPayload>` does not constitute a valid chain (prev_action must be correct)
-    #[error("Invalid `add_records` payload. Reason: {0}")]
-    NoRecordsAdded(String),
+    #[error("Invalid `add_records` payload. Seq number: {0}")]
+    NoRecordsAdded(u32),
 
     /// An Action which has an entry was returned without the Entry
     #[error("Missing Entry for ActionHash: {0}")]
