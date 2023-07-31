@@ -23,7 +23,8 @@ mod sweet_conductor_handle;
 pub mod sweet_consistency;
 mod sweet_dna;
 mod sweet_network;
-mod sweet_topos;
+/// Generation of network topologies.
+pub mod sweet_topos;
 mod sweet_zome;
 
 pub use sweet_agents::*;

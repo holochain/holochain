@@ -14,13 +14,13 @@ use rand::Rng;
 /// means that the partitions heal more slowly which can lead to a more even
 /// distribution of partitions.
 #[derive(Clone, Debug)]
-struct StrictlyPartitionedNetworkFact {
+pub struct StrictlyPartitionedNetworkFact {
     /// The number of partitions in the network.
-    partitions: usize,
+    pub partitions: usize,
     /// The efficiency of the partitioning process. This is a number between 0
     /// and 1. The higher the number, the more efficient the partitioning
     /// process.
-    efficiency: f64,
+    pub efficiency: f64,
 }
 
 impl<'a> Fact<'a, NetworkTopology> for StrictlyPartitionedNetworkFact {
@@ -69,6 +69,13 @@ impl<'a> Fact<'a, NetworkTopology> for StrictlyPartitionedNetworkFact {
 
 #[cfg(test)]
 pub mod test {
+    use super::*;
+    use contrafact::facts;
+    use petgraph::dot::{Dot, Config};
+    use crate::prelude::unstructured_noise;
+    use crate::sweettest::fact::size::SizedNetworkFact;
+    use petgraph::algo::connected_components;
+
     /// Test that we can build a network with one partition.
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_one_partition() {
@@ -78,9 +85,9 @@ pub mod test {
             partitions: 1,
             efficiency: 1.0,
         };
-        let facts = facts![size_fact, partition_fact];
+        let mut facts = facts![size_fact, partition_fact];
         let mut graph = NetworkTopology::default();
-        graph = facts.mutate(graph, &mut g).unwrap();
+        graph = facts.mutate(&mut g, graph).unwrap();
         assert_eq!(graph.strict_partitions(), 1);
     }
 
@@ -88,14 +95,14 @@ pub mod test {
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_dozen_nodes_three_partitions() {
         let mut g = unstructured_noise().into();
-        let size_fact = SizedNetworkFact { nodes: 12 };
-        let partition_fact = StrictlyPartitionedNetworkFact {
+        let mut size_fact = SizedNetworkFact { nodes: 12 };
+        let mut partition_fact = StrictlyPartitionedNetworkFact {
             partitions: 3,
             efficiency: 0.2,
         };
         // let facts = facts![size_fact, partition_fact];
         let mut graph = NetworkTopology::default();
-        graph = size_fact.mutate(graph, &mut g).unwrap();
+        graph = size_fact.mutate(&mut g, graph).unwrap();
         println!(
             "{:?}",
             Dot::with_config(
@@ -107,7 +114,7 @@ pub mod test {
                 ],
             )
         );
-        graph = partition_fact.mutate(graph, &mut g).unwrap();
+        graph = partition_fact.mutate(&mut g, graph).unwrap();
         assert_eq!(connected_components(graph.as_ref()), 3);
 
         println!(

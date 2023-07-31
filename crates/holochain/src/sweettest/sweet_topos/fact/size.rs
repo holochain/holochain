@@ -8,11 +8,11 @@ use std::ops::RangeInclusive;
 /// Fact:
 /// - The network has a specific number of nodes.
 /// - Each node has a specific number of agents.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SizedNetworkFact {
     /// The number of nodes in the network.
     /// Ideally this would be a range, but we can't do that yet.
-    nodes: usize,
+    pub nodes: usize,
 }
 
 impl SizedNetworkFact {
@@ -63,6 +63,7 @@ impl<'a> Fact<'a, NetworkTopology> for SizedNetworkFact {
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use crate::prelude::unstructured_noise;
 
     /// Test that we can build a sized network fact with `SizedNetworkFact::new`.
     #[test]
@@ -76,7 +77,7 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_zero_nodes() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact { nodes: 0 };
+        let fact = SizedNetworkFact { nodes: 0 };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 0);
         assert_eq!(graph.edge_count(), 0);
@@ -87,7 +88,7 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_single_node() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact { nodes: 1 };
+        let fact = SizedNetworkFact { nodes: 1 };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 1);
         assert_eq!(graph.edge_count(), 0);
@@ -98,7 +99,7 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_dozen_nodes() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact { nodes: 12 };
+        let fact = SizedNetworkFact { nodes: 12 };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 12);
         assert_eq!(graph.edge_count(), 0);
@@ -109,8 +110,8 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_range() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact::from_range(&mut g, 1..=10).unwrap();
-        let graph = fact.build_fallible(&mut g).unwrap();
+        let fact = SizedNetworkFact::from_range(&mut g, 1..=10).unwrap();
+        let graph = fact.clone().build_fallible(&mut g).unwrap();
         assert!(graph.node_count() >= 1);
         assert!(graph.node_count() <= 10);
         assert_eq!(graph.node_count(), fact.nodes);

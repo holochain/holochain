@@ -119,6 +119,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasmPair;
     use holochain_trace;
     use std::sync::Arc;
+    use crate::sweettest::sweet_topos::network::NetworkTopology;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
@@ -191,6 +192,17 @@ pub mod wasm_test {
         assert_eq!(vec![163, 102, 111, 111], bytes);
 
         assert_eq!(round_twice, vec![round.clone(), round],);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_create_entry_network_test() {
+        holochain_trace::test_run().ok();
+
+        let mut network_topology = NetworkTopology::default();
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+        network_topology.add_dnas(vec![dna_file]);
     }
 
     #[tokio::test(flavor = "multi_thread")]

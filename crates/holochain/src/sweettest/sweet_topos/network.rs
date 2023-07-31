@@ -195,9 +195,14 @@ impl NetworkTopology {
         Ok(())
     }
 
-    /// Get the DnaHashes that are in this graph.
+    /// Get the DnaFiles that are in this graph.
     pub fn dnas(&self) -> &[DnaFile] {
         &self.dnas
+    }
+
+    /// Add dnas to the graph.
+    pub fn add_dnas(&mut self, dnas: Vec<DnaFile>) {
+        self.dnas.extend(dnas);
     }
 
     /// Return a node by its index or error. This is useful because commonly we

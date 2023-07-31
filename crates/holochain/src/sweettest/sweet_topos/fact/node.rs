@@ -3,6 +3,7 @@ use contrafact::Mutation;
 use std::ops::RangeInclusive;
 
 /// A contrafact fact for generating a network node with a given number of agents.
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct SizedNodeFact {
     /// The number of agents in the node.
     agents: usize,
@@ -30,10 +31,8 @@ impl SizedNodeFact {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sweettest::sweet_topos::node::NetworkTopologyNode;
-    use contrafact::Fact;
     use contrafact::Generator;
-    use contrafact::Mutation;
+    use crate::prelude::unstructured_noise;
 
     // Test that we can build a sized node fact with `SizedNodeFact::new`.
     #[test]
@@ -46,7 +45,7 @@ mod test {
     // Test that we can build a sized node fact from a range with `SizedNodeFact::from_range`.
     #[test]
     fn test_sized_node_fact_from_range() {
-        let mut g = Generator::new();
+        let mut g = Generator::from(unstructured_noise());
         let a = SizedNodeFact::from_range(&mut g, 1..=3).unwrap();
         assert!(a.agents >= 1 && a.agents <= 3);
     }
