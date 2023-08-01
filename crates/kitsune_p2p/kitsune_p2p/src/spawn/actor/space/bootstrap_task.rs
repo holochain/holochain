@@ -147,7 +147,7 @@ impl BootstrapTask {
                 }
             }
 
-            tracing::info!(?space, "bootstrap fetch loop ending for space");
+            tracing::warn!(?space, "bootstrap fetch loop ending for space");
             task_this.write().is_finished = true;
         });
 
