@@ -75,6 +75,12 @@ impl BootstrapTask {
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
         tokio::spawn(async move {
+            let backoff_multiplier = if bootstrap_check_delay_backoff_multiplier < 2 {
+                2
+            } else {
+                bootstrap_check_delay_backoff_multiplier
+            };
+
             let max_delay = task_this.read().max_delay;
 
             loop {
@@ -86,10 +92,8 @@ impl BootstrapTask {
                 tokio::time::sleep(current_delay).await;
                 if current_delay <= max_delay {
                     // Backoff but don't exceed the configured max delay
-                    task_this.write().current_delay = std::cmp::min(
-                        current_delay * bootstrap_check_delay_backoff_multiplier,
-                        max_delay,
-                    );
+                    task_this.write().current_delay =
+                        std::cmp::min(current_delay * backoff_multiplier, max_delay);
                 }
 
                 match bootstrap_query
@@ -212,9 +216,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn bootstrap_task_handles_bootstrap_query_errors() {
         let agents = vec![fixt!(AgentInfoSigned)];
-        // Set delay multiplier to 1 to keep the time down for this one
         let (test_sender, mut host_stub, _) =
-            setup(DummySpaceInternalImpl::new(HashSet::new()), agents, 1, true).await;
+            setup(DummySpaceInternalImpl::new(HashSet::new()), agents, 2, true).await;
 
         let receives = Arc::new(AtomicUsize::new(0));
         tokio::time::timeout(Duration::from_secs(30), {
@@ -244,7 +247,7 @@ mod tests {
         let (test_sender, mut host_stub, task) = setup(
             DummySpaceInternalImpl::new(HashSet::new()),
             agents,
-            2,
+            3,
             false,
         )
         .await;
@@ -265,15 +268,50 @@ mod tests {
         let durations = receiver.map(|d| d.as_millis()).collect::<Vec<u128>>().await;
 
         assert_eq!(
-            vec![2, 4, 8],
+            vec![3, 9, 10],
             durations,
             "Expected durations to increase exponentially"
         );
         assert!(
-            // It's 7 not 14 because the task actually slept for 1 + 2 + 4 milliseconds and we are reading the delay
+            // It's 15 not 22 because the task actually slept for 1 + 3 + 9 milliseconds and we are reading the delay
             // after it has been updated.
-            start_time.elapsed() >= Duration::from_millis(7),
+            start_time.elapsed() >= Duration::from_millis(15),
             "Bootstrap task should have slept for at least as long as the delay values we saw"
+        );
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_prevents_sleep_disable_via_multiplier() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        let (test_sender, mut host_stub, task) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            // Set to 0 to try and force skipping the sleep
+            0,
+            false,
+        )
+        .await;
+
+        let (mut sender, receiver) = channel(3);
+        tokio::time::timeout(Duration::from_secs(30), {
+            async move {
+                for _ in 0..3 {
+                    host_stub.next_event(Duration::from_secs(5)).await;
+                    sender.send(task.read().current_delay).await.unwrap();
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        let durations = receiver.map(|d| d.as_millis()).collect::<Vec<u128>>().await;
+
+        assert_eq!(
+            vec![2, 4, 8],
+            durations,
+            "Expected durations to increase exponentially"
         );
 
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
@@ -360,9 +398,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn bootstrap_task_handles_errors_sending_to_host() {
         let agents = vec![fixt!(AgentInfoSigned)];
-        // Set delay multiplier to 1 to keep the time down for this one
         let (test_sender, mut host_stub, _) =
-            setup(DummySpaceInternalImpl::new(HashSet::new()), agents, 1, true).await;
+            setup(DummySpaceInternalImpl::new(HashSet::new()), agents, 2, true).await;
 
         // Ask the host to respond with an error on each call, then wait a while and clear the flag
         host_stub.respond_with_error.store(true, Ordering::SeqCst);
