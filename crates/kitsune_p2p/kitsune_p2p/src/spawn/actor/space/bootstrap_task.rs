@@ -509,7 +509,7 @@ mod tests {
         let task_config = BootstrapTask {
             is_finished: false,
             current_delay: Duration::from_millis(1),
-            max_delay: Duration::from_millis(1000),
+            max_delay: Duration::from_millis(10),
         };
 
         let space = fixt!(KitsuneSpace);
