@@ -54,9 +54,8 @@ impl BootstrapTask {
             net: bootstrap_net,
         };
 
-        let task_this = this.clone();
         BootstrapTask::spawn_inner(
-            task_this,
+            this,
             internal_sender,
             host_sender,
             space,
