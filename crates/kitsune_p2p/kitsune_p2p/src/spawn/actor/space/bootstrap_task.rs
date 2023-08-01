@@ -115,7 +115,6 @@ impl BootstrapTask {
                         }
                         let mut peer_data = Vec::with_capacity(list.len());
                         for item in list {
-                            // TODO - @neonphog someday some validation here
                             match internal_sender.is_agent_local(item.agent.clone()).await {
                                 Err(err) => tracing::error!(?err),
                                 Ok(is_local) => {
