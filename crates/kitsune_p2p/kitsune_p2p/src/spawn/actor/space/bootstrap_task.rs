@@ -67,7 +67,7 @@ impl BootstrapTask {
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
-        tokio::task::spawn(async move {
+        tokio::spawn(async move {
             const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
             const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
@@ -145,12 +145,12 @@ mod tests {
     use crate::spawn::actor::MetaNetCon;
     use crate::types::actor::BroadcastData;
     use crate::wire::Wire;
-    use crate::GossipModuleType;
     use crate::KitsuneP2pResult;
+    use crate::{GossipModuleType, KitsuneP2pError};
     use fixt::prelude::*;
     use futures::channel::mpsc::{channel, Receiver};
     use futures::future::BoxFuture;
-    use futures::{FutureExt, StreamExt};
+    use futures::{FutureExt, SinkExt, StreamExt};
     use ghost_actor::actor_builder::GhostActorBuilder;
     use ghost_actor::{
         GhostControlHandler, GhostControlSender, GhostError, GhostHandler, GhostSender,
@@ -161,31 +161,61 @@ mod tests {
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
     use std::collections::HashSet;
+    use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn update_agent_info_from_bootstrap_server() {
         let agents = vec![fixt!(AgentInfoSigned)];
-        let (test_sender, mut host_receiver, _) =
-            setup(DummySpaceInternalImpl::new(), agents).await;
+        let (test_sender, mut host_stub, _) =
+            setup(DummySpaceInternalImpl::new(), agents, 2, false).await;
 
-        let msg = tokio::time::timeout(Duration::from_secs(5), host_receiver.next())
-            .await
-            .expect("Timeout while waiting for new agents")
-            .expect("Error getting new agents");
+        let evt = host_stub.next_event(Duration::from_secs(5)).await;
 
-        let mut response = vec![];
-        match msg {
-            KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
-                response.push(input);
-                respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+        assert_eq!(1, evt.peer_data.len());
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn task_shuts_down_cleanly() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        let (test_sender, _, task) = setup(DummySpaceInternalImpl::new(), agents, 2, false).await;
+
+        test_sender.ghost_actor_shutdown().await.unwrap();
+
+        assert!(
+            task.read().is_finished,
+            "Task should have been marked finished after the ghost actor shut down"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn task_handles_bootstrap_errors() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        // Set delay multiplier to 1 to keep the time down for this one
+        let (test_sender, mut host_stub, _) =
+            setup(DummySpaceInternalImpl::new(), agents, 1, true).await;
+
+        let receives = Arc::new(AtomicUsize::new(0));
+        tokio::time::timeout(Duration::from_secs(30), {
+            let task_receives = receives.clone();
+            async move {
+                for _ in 0..3 {
+                    host_stub.next_event(Duration::from_secs(5)).await;
+                    task_receives.fetch_add(1, Ordering::SeqCst);
+                }
             }
-            _ => panic!("Unexpected message type - {:?}", msg),
-        }
+        })
+        .await
+        .unwrap();
 
-        let found_agents = response.get(0).unwrap();
-        assert_eq!(1, found_agents.peer_data.len());
+        assert_eq!(
+            3,
+            receives.load(Ordering::SeqCst),
+            "Expected 3 calls to have succeeded"
+        );
 
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
     }
@@ -193,11 +223,9 @@ mod tests {
     async fn setup(
         task: DummySpaceInternalImpl,
         agents: Vec<AgentInfoSigned>,
-    ) -> (
-        GhostSender<TestChan>,
-        Receiver<KitsuneP2pEvent>,
-        Arc<RwLock<BootstrapTask>>,
-    ) {
+        delay_multiplier: u32,
+        bootstrap_every_other_call_fails: bool,
+    ) -> (GhostSender<TestChan>, HostStub, Arc<RwLock<BootstrapTask>>) {
         let builder = GhostActorBuilder::new();
 
         let internal_sender = builder
@@ -224,11 +252,16 @@ mod tests {
             internal_sender,
             host_sender,
             Arc::new(space),
-            Box::new(TestBootstrapService { agents }),
-            2,
+            Box::new(TestBootstrapService::new(
+                agents,
+                bootstrap_every_other_call_fails,
+            )),
+            delay_multiplier,
         );
 
-        (test_sender, host_receiver, task)
+        let host_stub = HostStub::start(host_receiver);
+
+        (test_sender, host_stub, task)
     }
 
     struct DummySpaceInternalImpl {}
@@ -374,11 +407,69 @@ mod tests {
     }
 
     struct TestBootstrapService {
+        every_other_call_fails: bool,
+        call_count: AtomicU32,
         agents: Vec<AgentInfoSigned>,
     }
+
+    impl TestBootstrapService {
+        fn new(agents: Vec<AgentInfoSigned>, every_other_call_fails: bool) -> Self {
+            TestBootstrapService {
+                agents,
+                call_count: AtomicU32::new(0),
+                every_other_call_fails,
+            }
+        }
+    }
+
     impl BootstrapService for TestBootstrapService {
         fn random(&self, _query: RandomQuery) -> BoxFuture<KitsuneP2pResult<Vec<AgentInfoSigned>>> {
+            let calls = self.call_count.fetch_add(1, Ordering::SeqCst);
+
+            if self.every_other_call_fails && calls % 2 == 1 {
+                return async move {
+                    Err(KitsuneP2pError::Bootstrap(
+                        "test error".to_string().into_boxed_str(),
+                    ))
+                }
+                .boxed()
+                .into();
+            }
+
             async move { Ok(self.agents.clone()) }.boxed().into()
+        }
+    }
+
+    struct HostStub {
+        put_events: Receiver<PutAgentInfoSignedEvt>,
+    }
+
+    impl HostStub {
+        fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
+            let (mut sender, receiver) = channel(1);
+
+            tokio::spawn(async move {
+                while let Some(evt) = host_receiver.next().await {
+                    match evt {
+                        KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
+                            sender.send(input).await.unwrap();
+                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                        }
+                        _ => panic!("Unexpected event - {:?}", evt),
+                    }
+                }
+            });
+
+            HostStub {
+                put_events: receiver,
+            }
+        }
+
+        async fn next_event(&mut self, timeout: Duration) -> PutAgentInfoSignedEvt {
+            tokio::time::timeout(timeout, self.put_events.next())
+                .await
+                .unwrap()
+                .unwrap()
         }
     }
 }
