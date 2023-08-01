@@ -207,6 +207,17 @@ mod tests {
 
         test_sender.ghost_actor_shutdown().await.unwrap();
 
+        tokio::time::timeout(Duration::from_secs(5), {
+            let shutdown_wait_task = task.clone();
+            async move {
+                while !shutdown_wait_task.read().is_finished {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            }
+        })
+        .await
+        .ok();
+
         assert!(
             task.read().is_finished,
             "Task should have been marked finished after the ghost actor shut down"
@@ -650,7 +661,7 @@ mod tests {
 
     impl HostStub {
         fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
-            let (mut sender, receiver) = channel(1);
+            let (mut sender, receiver) = channel(10);
 
             let respond_with_error = Arc::new(AtomicBool::new(false));
             tokio::spawn({
