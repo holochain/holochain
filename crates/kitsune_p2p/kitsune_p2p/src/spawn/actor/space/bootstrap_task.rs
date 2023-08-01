@@ -10,10 +10,13 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use std::time::Duration;
 use url2::Url2;
 
 pub(super) struct BootstrapTask {
-    pub is_finished: bool,
+    is_finished: bool,
+    current_delay: Duration,
+    max_delay: Duration,
 }
 
 // Trait for the bootstrap query to allow mocking in tests
@@ -41,7 +44,11 @@ impl BootstrapTask {
         bootstrap_net: BootstrapNet,
         bootstrap_check_delay_backoff_multiplier: u32,
     ) -> Arc<RwLock<Self>> {
-        let this = Arc::new(RwLock::new(BootstrapTask { is_finished: false }));
+        let this = Arc::new(RwLock::new(BootstrapTask {
+            is_finished: false,
+            current_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(60 * 60),
+        }));
         let bootstrap_query = DefaultBootstrapService {
             url: bootstrap_service,
             net: bootstrap_net,
@@ -68,19 +75,21 @@ impl BootstrapTask {
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
         tokio::spawn(async move {
-            const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-            const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-            let mut delay_len = START_DELAY;
+            let max_delay = task_this.read().max_delay;
 
             loop {
                 if !internal_sender.ghost_actor_is_active() {
                     break;
                 }
 
-                tokio::time::sleep(delay_len).await;
-                if delay_len <= MAX_DELAY {
-                    delay_len *= bootstrap_check_delay_backoff_multiplier;
+                let current_delay = task_this.read().current_delay;
+                tokio::time::sleep(current_delay).await;
+                if current_delay <= max_delay {
+                    // Backoff but don't exceed the configured max delay
+                    task_this.write().current_delay = std::cmp::min(
+                        current_delay * bootstrap_check_delay_backoff_multiplier,
+                        max_delay,
+                    );
                 }
 
                 match bootstrap_query
@@ -123,7 +132,7 @@ impl BootstrapTask {
                 }
             }
 
-            tracing::warn!("bootstrap fetch loop ending");
+            tracing::info!(?space, "bootstrap fetch loop ending for space");
             task_this.write().is_finished = true;
         });
 
@@ -152,24 +161,27 @@ mod tests {
     use futures::future::BoxFuture;
     use futures::{FutureExt, SinkExt, StreamExt};
     use ghost_actor::actor_builder::GhostActorBuilder;
-    use ghost_actor::{
-        GhostControlHandler, GhostControlSender, GhostError, GhostHandler, GhostSender,
-    };
+    use ghost_actor::{GhostControlHandler, GhostControlSender, GhostHandler, GhostSender};
     use kitsune_p2p_fetch::FetchContext;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
     use kitsune_p2p_types::bootstrap::RandomQuery;
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
     use std::collections::HashSet;
-    use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
     use std::sync::Arc;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn update_agent_info_from_bootstrap_server() {
+    async fn bootstrap_task_relays_agent_info_from_boostrap_server_to_host() {
         let agents = vec![fixt!(AgentInfoSigned)];
-        let (test_sender, mut host_stub, _) =
-            setup(DummySpaceInternalImpl::new(), agents, 2, false).await;
+        let (test_sender, mut host_stub, _) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            2,
+            false,
+        )
+        .await;
 
         let evt = host_stub.next_event(Duration::from_secs(5)).await;
 
@@ -179,9 +191,15 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn task_shuts_down_cleanly() {
+    async fn bootstrap_task_shuts_down_cleanly() {
         let agents = vec![fixt!(AgentInfoSigned)];
-        let (test_sender, _, task) = setup(DummySpaceInternalImpl::new(), agents, 2, false).await;
+        let (test_sender, _, task) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            2,
+            false,
+        )
+        .await;
 
         test_sender.ghost_actor_shutdown().await.unwrap();
 
@@ -192,12 +210,166 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn task_handles_bootstrap_errors() {
+    async fn bootstrap_task_handles_bootstrap_query_errors() {
         let agents = vec![fixt!(AgentInfoSigned)];
         // Set delay multiplier to 1 to keep the time down for this one
         let (test_sender, mut host_stub, _) =
-            setup(DummySpaceInternalImpl::new(), agents, 1, true).await;
+            setup(DummySpaceInternalImpl::new(HashSet::new()), agents, 1, true).await;
 
+        let receives = Arc::new(AtomicUsize::new(0));
+        tokio::time::timeout(Duration::from_secs(30), {
+            let task_receives = receives.clone();
+            async move {
+                for _ in 0..3 {
+                    host_stub.next_event(Duration::from_secs(5)).await;
+                    task_receives.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(
+            3,
+            receives.load(Ordering::SeqCst),
+            "Expected 3 calls to have succeeded"
+        );
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_query_delay_increases_exponentially() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        let (test_sender, mut host_stub, task) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            2,
+            false,
+        )
+        .await;
+
+        let start_time = Instant::now();
+        let (mut sender, receiver) = channel(3);
+        tokio::time::timeout(Duration::from_secs(30), {
+            async move {
+                for _ in 0..3 {
+                    host_stub.next_event(Duration::from_secs(5)).await;
+                    sender.send(task.read().current_delay).await.unwrap();
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        let durations = receiver.map(|d| d.as_millis()).collect::<Vec<u128>>().await;
+
+        assert_eq!(
+            vec![2, 4, 8],
+            durations,
+            "Expected durations to increase exponentially"
+        );
+        assert!(
+            // It's 7 not 14 because the task actually slept for 1 + 2 + 4 milliseconds and we are reading the delay
+            // after it has been updated.
+            start_time.elapsed() >= Duration::from_millis(7),
+            "Bootstrap task should have slept for at least as long as the delay values we saw"
+        );
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_query_delay_increase_respects_max() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        // Set a high delay multiplier so that a multiplication with no max check would move the delay to 1s from 1ms,
+        // instead of the actual max at 10ms.
+        let (test_sender, mut host_stub, task) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            1000,
+            false,
+        )
+        .await;
+
+        let (mut sender, receiver) = channel(3);
+        tokio::time::timeout(Duration::from_secs(30), {
+            async move {
+                for _ in 0..3 {
+                    host_stub.next_event(Duration::from_secs(5)).await;
+                    sender.send(task.read().current_delay).await.unwrap();
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        let durations = receiver.map(|d| d.as_millis()).collect::<Vec<u128>>().await;
+
+        assert_eq!(
+            vec![10, 10, 10],
+            durations,
+            "Expected durations to increase exponentially"
+        );
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    // TODO should this be trusted? It's an external call
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_query_agent_limit_is_trusted() {
+        // The code expects a max of 8 agents, send more
+        let agents = std::iter::repeat_with(|| fixt!(AgentInfoSigned))
+            .take(30)
+            .collect::<Vec<_>>();
+        let (test_sender, mut host_stub, _) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            2,
+            false,
+        )
+        .await;
+
+        let evt = host_stub.next_event(Duration::from_secs(5)).await;
+
+        // TODO This should probably be an error rather than being forwarded to the host
+        assert_eq!(30, evt.peer_data.len());
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_local_agents_in_response_are_filtered() {
+        // The code expects a max of 8 agents, send more
+        let agents = std::iter::repeat_with(|| fixt!(AgentInfoSigned))
+            .take(10)
+            .collect::<Vec<_>>();
+
+        let local_agents = agents.iter().take(3).cloned().collect::<HashSet<_>>();
+
+        let (test_sender, mut host_stub, _) =
+            setup(DummySpaceInternalImpl::new(local_agents), agents, 2, false).await;
+
+        let evt = host_stub.next_event(Duration::from_secs(5)).await;
+
+        assert_eq!(7, evt.peer_data.len());
+
+        test_sender.ghost_actor_shutdown_immediate().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_handles_errors_sending_to_host() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        // Set delay multiplier to 1 to keep the time down for this one
+        let (test_sender, mut host_stub, _) =
+            setup(DummySpaceInternalImpl::new(HashSet::new()), agents, 1, true).await;
+
+        // Ask the host to respond with an error on each call, then wait a while and clear the flag
+        host_stub.respond_with_error.store(true, Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        host_stub.respond_with_error.store(false, Ordering::SeqCst);
+
+        // Now expect to receive from the task as usual
         let receives = Arc::new(AtomicUsize::new(0));
         tokio::time::timeout(Duration::from_secs(30), {
             let task_receives = receives.clone();
@@ -225,7 +397,11 @@ mod tests {
         agents: Vec<AgentInfoSigned>,
         delay_multiplier: u32,
         bootstrap_every_other_call_fails: bool,
-    ) -> (GhostSender<TestChan>, HostStub, Arc<RwLock<BootstrapTask>>) {
+    ) -> (
+        GhostSender<SpaceInternal>,
+        HostStub,
+        Arc<RwLock<BootstrapTask>>,
+    ) {
         let builder = GhostActorBuilder::new();
 
         let internal_sender = builder
@@ -234,22 +410,20 @@ mod tests {
             .await
             .unwrap();
 
-        let test_sender = builder
-            .channel_factory()
-            .create_channel::<TestChan>()
-            .await
-            .unwrap();
-
         let (host_sender, host_receiver) = channel(10);
 
         tokio::spawn(builder.spawn(task));
 
-        let task_config = BootstrapTask { is_finished: false };
+        let task_config = BootstrapTask {
+            is_finished: false,
+            current_delay: Duration::from_millis(1),
+            max_delay: Duration::from_millis(10),
+        };
 
         let space = fixt!(KitsuneSpace);
         let task = BootstrapTask::spawn_inner(
             Arc::new(RwLock::new(task_config)),
-            internal_sender,
+            internal_sender.clone(),
             host_sender,
             Arc::new(space),
             Box::new(TestBootstrapService::new(
@@ -261,14 +435,18 @@ mod tests {
 
         let host_stub = HostStub::start(host_receiver);
 
-        (test_sender, host_stub, task)
+        (internal_sender, host_stub, task)
     }
 
-    struct DummySpaceInternalImpl {}
+    struct DummySpaceInternalImpl {
+        local_agents: HashSet<KAgent>,
+    }
 
     impl DummySpaceInternalImpl {
-        fn new() -> Self {
-            DummySpaceInternalImpl {}
+        fn new(local_agents: HashSet<AgentInfoSigned>) -> Self {
+            DummySpaceInternalImpl {
+                local_agents: local_agents.into_iter().map(|a| a.agent.clone()).collect(),
+            }
         }
     }
 
@@ -308,9 +486,10 @@ mod tests {
             unreachable!()
         }
 
-        fn handle_is_agent_local(&mut self, _agent: KAgent) -> SpaceInternalHandlerResult<bool> {
-            // TODO configurable
-            Ok(async move { Ok(false) }.boxed().into())
+        fn handle_is_agent_local(&mut self, agent: KAgent) -> SpaceInternalHandlerResult<bool> {
+            let is_local = self.local_agents.contains(&agent);
+
+            Ok(async move { Ok(is_local) }.boxed().into())
         }
 
         fn handle_update_agent_arc(
@@ -393,19 +572,6 @@ mod tests {
         }
     }
 
-    ghost_actor::ghost_chan! {
-        pub chan TestChan<GhostError> {
-            fn will_call() -> u32;
-        }
-    }
-
-    impl GhostHandler<TestChan> for DummySpaceInternalImpl {}
-    impl TestChanHandler for DummySpaceInternalImpl {
-        fn handle_will_call(&mut self) -> TestChanHandlerResult<u32> {
-            todo!()
-        }
-    }
-
     struct TestBootstrapService {
         every_other_call_fails: bool,
         call_count: AtomicU32,
@@ -441,6 +607,7 @@ mod tests {
     }
 
     struct HostStub {
+        respond_with_error: Arc<AtomicBool>,
         put_events: Receiver<PutAgentInfoSignedEvt>,
     }
 
@@ -448,19 +615,33 @@ mod tests {
         fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
             let (mut sender, receiver) = channel(1);
 
-            tokio::spawn(async move {
-                while let Some(evt) = host_receiver.next().await {
-                    match evt {
-                        KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
-                            sender.send(input).await.unwrap();
-                            respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+            let respond_with_error = Arc::new(AtomicBool::new(false));
+            tokio::spawn({
+                let task_respond_with_error = respond_with_error.clone();
+                async move {
+                    while let Some(evt) = host_receiver.next().await {
+                        match evt {
+                            KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
+                                if task_respond_with_error.load(Ordering::SeqCst) {
+                                    respond.respond(Ok(async move {
+                                        Err(KitsuneP2pError::other("a test error"))
+                                    }
+                                    .boxed()
+                                    .into()));
+                                    continue;
+                                }
+
+                                sender.send(input).await.unwrap();
+                                respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                            }
+                            _ => panic!("Unexpected event - {:?}", evt),
                         }
-                        _ => panic!("Unexpected event - {:?}", evt),
                     }
                 }
             });
 
             HostStub {
+                respond_with_error,
                 put_events: receiver,
             }
         }
