@@ -1,11 +1,11 @@
 use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender, PutAgentInfoSignedEvt};
 use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalSender};
-use crate::{KitsuneP2pResult, KitsuneSpace};
+use crate::{KitsuneP2pError, KitsuneP2pResult, KitsuneSpace};
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use ghost_actor::{GhostControlSender, GhostSender};
+use ghost_actor::{GhostControlSender, GhostError, GhostSender};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use parking_lot::RwLock;
@@ -126,6 +126,7 @@ impl BootstrapTask {
                                 }
                             }
                         }
+
                         if let Err(err) = host_sender
                             .put_agent_info_signed(PutAgentInfoSignedEvt {
                                 space: space.clone(),
@@ -133,7 +134,15 @@ impl BootstrapTask {
                             })
                             .await
                         {
-                            tracing::error!(?err, "error storing bootstrap agent_info");
+                            match err {
+                                KitsuneP2pError::GhostError(GhostError::Disconnected) => {
+                                    tracing::error!(?err, "Bootstrap task cannot communicate with the host, shutting down");
+                                    break;
+                                }
+                                _ => {
+                                    tracing::error!(?err, "error storing bootstrap agent_info");
+                                }
+                            }
                         }
                     }
                 }
@@ -178,6 +187,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::{Duration, Instant};
+    use tokio::task::AbortHandle;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn bootstrap_task_relays_agent_info_from_boostrap_server_to_host() {
@@ -443,6 +453,37 @@ mod tests {
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bootstrap_task_shuts_down_if_host_closes() {
+        let agents = vec![fixt!(AgentInfoSigned)];
+        let (_, host_stub, task) = setup(
+            DummySpaceInternalImpl::new(HashSet::new()),
+            agents,
+            2,
+            false,
+        )
+        .await;
+
+        // Shuts down the stub task which will cause the host receiver to drop
+        host_stub.abort();
+
+        tokio::time::timeout(Duration::from_secs(5), {
+            let shutdown_wait_task = task.clone();
+            async move {
+                while !shutdown_wait_task.read().is_finished {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            }
+        })
+        .await
+        .ok();
+
+        assert!(
+            task.read().is_finished,
+            "Task should have been marked finished after the host closed"
+        );
+    }
+
     async fn setup(
         task: DummySpaceInternalImpl,
         agents: Vec<AgentInfoSigned>,
@@ -468,7 +509,7 @@ mod tests {
         let task_config = BootstrapTask {
             is_finished: false,
             current_delay: Duration::from_millis(1),
-            max_delay: Duration::from_millis(10),
+            max_delay: Duration::from_millis(1000),
         };
 
         let space = fixt!(KitsuneSpace);
@@ -660,6 +701,7 @@ mod tests {
     struct HostStub {
         respond_with_error: Arc<AtomicBool>,
         put_events: Receiver<PutAgentInfoSignedEvt>,
+        abort_handle: AbortHandle,
     }
 
     impl HostStub {
@@ -667,12 +709,14 @@ mod tests {
             let (mut sender, receiver) = channel(10);
 
             let respond_with_error = Arc::new(AtomicBool::new(false));
-            tokio::spawn({
+            let handle = tokio::spawn({
                 let task_respond_with_error = respond_with_error.clone();
                 async move {
                     while let Some(evt) = host_receiver.next().await {
                         match evt {
                             KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
+                                println!("Responding to requests");
+
                                 if task_respond_with_error.load(Ordering::SeqCst) {
                                     respond.respond(Ok(async move {
                                         Err(KitsuneP2pError::other("a test error"))
@@ -694,6 +738,7 @@ mod tests {
             HostStub {
                 respond_with_error,
                 put_events: receiver,
+                abort_handle: handle.abort_handle(),
             }
         }
 
@@ -702,6 +747,10 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap()
+        }
+
+        fn abort(&self) {
+            self.abort_handle.abort();
         }
     }
 }
