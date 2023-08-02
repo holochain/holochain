@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.10"
+version = "0.3.0-beta-dev.11"
 dependencies = [
  "getrandom",
  "hdi",
@@ -1114,7 +1114,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.10"
+version = "0.3.0-beta-dev.11"
 dependencies = [
  "hdk",
  "serde",
