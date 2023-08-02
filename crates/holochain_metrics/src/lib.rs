@@ -90,9 +90,10 @@
 
 #[cfg(feature = "influxive")]
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
+#[cfg(feature = "influxive")]
+const DASH_TX5: &[u8] = include_bytes!("dashboards/tx5.json");
 
 /// Configuration for holochain metrics.
-#[derive(Debug)]
 pub enum HolochainMetricsConfig {
     /// Metrics are disabled.
     Disabled,
@@ -102,7 +103,10 @@ pub enum HolochainMetricsConfig {
     /// NOTE: this means we cannot initialize any dashboards.
     InfluxiveExternal {
         /// The writer config for connecting to the external influxdb instance.
-        config: influxive::InfluxiveWriterConfig,
+        writer_config: influxive::InfluxiveWriterConfig,
+
+        /// The meter provider config for setting up opentelemetry.
+        otel_config: influxive::InfluxiveMeterProviderConfig,
 
         /// The url for the external influxdb instance.
         host: String,
@@ -117,7 +121,13 @@ pub enum HolochainMetricsConfig {
 
     #[cfg(feature = "influxive")]
     /// Use influxive as a child service to write metrics.
-    InfluxiveChildSvc(Box<influxive::InfluxiveChildSvcConfig>),
+    InfluxiveChildSvc {
+        /// The child service config for running the influxd server.
+        child_svc_config: Box<influxive::InfluxiveChildSvcConfig>,
+
+        /// The meter provider config for setting up opentelemetry.
+        otel_config: influxive::InfluxiveMeterProviderConfig,
+    },
 }
 
 const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
@@ -138,10 +148,13 @@ impl HolochainMetricsConfig {
             if std::env::var_os(E_CHILD_SVC).is_some() {
                 let mut database_path = std::path::PathBuf::from(root_path);
                 database_path.push("influxive");
-                return Self::InfluxiveChildSvc(Box::new(influxive::InfluxiveChildSvcConfig {
-                    database_path: Some(database_path),
-                    ..Default::default()
-                }));
+                return Self::InfluxiveChildSvc {
+                    child_svc_config: Box::new(
+                        influxive::InfluxiveChildSvcConfig::default()
+                            .with_database_path(Some(database_path)),
+                    ),
+                    otel_config: influxive::InfluxiveMeterProviderConfig::default(),
+                };
             }
 
             if std::env::var_os(E_EXTERNAL).is_some() {
@@ -167,7 +180,8 @@ impl HolochainMetricsConfig {
                     }
                 };
                 return Self::InfluxiveExternal {
-                    config: influxive::InfluxiveWriterConfig::default(),
+                    writer_config: influxive::InfluxiveWriterConfig::default(),
+                    otel_config: influxive::InfluxiveMeterProviderConfig::default(),
                     host,
                     bucket,
                     token,
@@ -191,47 +205,64 @@ impl HolochainMetricsConfig {
             }
             #[cfg(feature = "influxive")]
             Self::InfluxiveExternal {
-                config,
+                writer_config,
+                otel_config,
                 host,
                 bucket,
                 token,
             } => {
-                Self::init_influxive_external(config, host, bucket, token);
+                Self::init_influxive_external(writer_config, otel_config, host, bucket, token);
             }
             #[cfg(feature = "influxive")]
-            Self::InfluxiveChildSvc(config) => {
-                Self::init_influxive_child_svc(*config).await;
+            Self::InfluxiveChildSvc {
+                child_svc_config,
+                otel_config,
+            } => {
+                Self::init_influxive_child_svc(*child_svc_config, otel_config).await;
             }
         }
     }
 
     #[cfg(feature = "influxive")]
     fn init_influxive_external(
-        config: influxive::InfluxiveWriterConfig,
+        writer_config: influxive::InfluxiveWriterConfig,
+        otel_config: influxive::InfluxiveMeterProviderConfig,
         host: String,
         bucket: String,
         token: String,
     ) {
-        tracing::info!(?config, %host, %bucket, "initializing holochain_metrics");
+        tracing::info!(?writer_config, %host, %bucket, "initializing holochain_metrics");
 
-        let meter_provider =
-            influxive::influxive_external_meter_provider_token_auth(config, host, bucket, token);
+        let meter_provider = influxive::influxive_external_meter_provider_token_auth(
+            writer_config,
+            otel_config,
+            host,
+            bucket,
+            token,
+        );
 
         // setup opentelemetry to use our metrics collector
         opentelemetry_api::global::set_meter_provider(meter_provider);
     }
 
     #[cfg(feature = "influxive")]
-    async fn init_influxive_child_svc(config: influxive::InfluxiveChildSvcConfig) {
-        tracing::info!(?config, "initializing holochain_metrics");
+    async fn init_influxive_child_svc(
+        child_svc_config: influxive::InfluxiveChildSvcConfig,
+        otel_config: influxive::InfluxiveMeterProviderConfig,
+    ) {
+        tracing::info!(?child_svc_config, "initializing holochain_metrics");
 
-        match influxive::influxive_child_process_meter_provider(config).await {
+        match influxive::influxive_child_process_meter_provider(child_svc_config, otel_config).await
+        {
             Ok((influxive, meter_provider)) => {
                 // apply templates
                 if let Ok(cur) = influxive.list_dashboards().await {
                     // only initialize dashboards if the db is new
                     if cur.contains("\"dashboards\": []") {
                         if let Err(err) = influxive.apply(DASH_NETWORK_STATS).await {
+                            tracing::warn!(?err, "failed to initialize dashboard");
+                        }
+                        if let Err(err) = influxive.apply(DASH_TX5).await {
                             tracing::warn!(?err, "failed to initialize dashboard");
                         }
                     }
