@@ -1088,7 +1088,7 @@ impl KitsuneP2pHandler for Space {
                     });
                 }
 
-                futures::future::join_all(all).await;
+                // futures::future::join_all(all).await;
 
                 drop(task_permit);
                 KitsuneP2pResult::Ok(())
