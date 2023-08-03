@@ -7978,7 +7978,7 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.1-alpha.18"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "bytes",
  "futures",
@@ -7987,6 +7987,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "rand 0.8.5",
  "rand-utf8",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",
@@ -8000,7 +8001,7 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8017,7 +8018,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.11"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -8029,7 +8030,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.12"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8047,7 +8048,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8064,7 +8065,7 @@ dependencies = [
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.10"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8092,7 +8093,7 @@ dependencies = [
 [[package]]
 name = "tx5-signal-srv"
 version = "0.0.1-alpha.9"
-source = "git+https://github.com/holochain/tx5.git?rev=47cba455b6a91dd15cd76f02d43ef7cb1600fdd4#47cba455b6a91dd15cd76f02d43ef7cb1600fdd4"
+source = "git+https://github.com/holochain/tx5.git?rev=995073bbb4ec0e5769acfe5464550237787167e4#995073bbb4ec0e5769acfe5464550237787167e4"
 dependencies = [
  "clap 4.3.11",
  "dirs 5.0.1",
