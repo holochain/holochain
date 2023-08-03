@@ -19,9 +19,9 @@ fallible-iterator = "0.2.0"
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.6"}
 holochain_serialized_bytes = "=0.0.51"
-holochain_util = { version = "^0.2.0", path = "../holochain_util", features = ["backtrace"] }
+holochain_util = { version = "^0.2.0", path = "../holochain_util", features = ["backtrace"], optional = true }
 holochain_zome_types = { version = "^0.3.0-beta-dev.8", path = "../holochain_zome_types" }
-kitsune_p2p_types = { version = "0.3.0-beta-dev.5", path = "../kitsune_p2p/types" }
+kitsune_p2p_types = { version = "0.3.0-beta-dev.5", path = "../kitsune_p2p/types", optional = true }
 kitsune_p2p_dht_arc = { version = "0.3.0-beta-dev.3", path = "../kitsune_p2p/dht_arc" }
 kitsune_p2p_bin_data = { version = "0.3.0-beta-dev.4", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_dht = { version = "0.3.0-beta-dev.3", path = "../kitsune_p2p/dht" }
@@ -56,7 +56,7 @@ rusqlite = { version = "0.29", features = [
 ] }
 
 [dev-dependencies]
-holochain_sqlite = { version = "0.3.0-beta-dev.8", path = ".", features = ["test_utils", "slow_tests"] }
+holochain_sqlite = { path = ".", default-features = false, features = ["test_utils", "slow_tests"] }
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
 nanoid = "0.4.0"
 rand = "0.8.5"
@@ -67,9 +67,10 @@ sqlformat = "0.1.6"
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.6", features = ["futures", "checkpoint"] }
+holochain_sqlite = { path = ".", default-features = false, features = ["test_utils"] }
 
 [features]
-default = [ "test_utils", "sqlite" ]
+default = [ "test_utils", "sqlite", "kitsune_p2p_types", "holochain_util" ]
 
 test_utils = [ ]
 
