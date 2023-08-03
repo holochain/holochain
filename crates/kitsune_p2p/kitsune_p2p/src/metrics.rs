@@ -10,13 +10,13 @@ use tokio::time::Instant;
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;
-use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use num_traits::*;
 
+use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
 use once_cell::sync::Lazy;
 
 pub(crate) static METRIC_MSG_OUT_BYTE: Lazy<opentelemetry_api::metrics::Histogram<u64>> =

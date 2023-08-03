@@ -1,5 +1,5 @@
 use holo_hash::DnaHash;
-use kitsune_p2p::KitsuneSpace;
+use kitsune_p2p_bin_data::KitsuneSpace;
 use std::path::PathBuf;
 use std::sync::Arc;
 

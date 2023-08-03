@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p::event::*;
-use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
+use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
 use rand::Rng;
 use std::sync::Arc;
 
