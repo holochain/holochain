@@ -12,6 +12,10 @@ pub enum KeystoreError {
     #[error("Invalid signature {0:?}, for {1}")]
     InvalidSignature(Signature, String),
 
+    /// Error from Lair
+    #[error(transparent)]
+    LairError(one_err::OneErr),
+
     /// Used in TryFrom implementations for some zome types.
     #[error("Secure primitive error: {0}")]
     SecurePrimitiveError(
@@ -22,6 +26,9 @@ pub enum KeystoreError {
     #[error("Other: {0}")]
     Other(String),
 }
+
+/// alias
+pub type KeystoreResult<T> = Result<T, KeystoreError>;
 
 impl std::cmp::PartialEq for KeystoreError {
     fn eq(&self, o: &Self) -> bool {

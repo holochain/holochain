@@ -72,7 +72,7 @@ pub mod tests {
         // Create a link for Alice
         let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
-        let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
+        let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
 
         let count: usize = conductor
             .call(
@@ -113,7 +113,7 @@ pub mod tests {
         // Create a link for Alice
         let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
-        let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
+        let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
 
         let count: usize = conductor
             .call(
@@ -182,7 +182,7 @@ pub mod tests {
         // Create a link for Alice
         let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
-        let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
+        let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
 
         let count: usize = conductor
             .call(

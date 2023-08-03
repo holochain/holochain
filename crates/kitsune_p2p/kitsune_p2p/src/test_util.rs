@@ -65,9 +65,6 @@ pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
     ))
 }
 
-mod switchboard;
-pub use switchboard::*;
-
 mod harness_event;
 pub(crate) use harness_event::*;
 

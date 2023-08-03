@@ -656,6 +656,9 @@ mod tests {
             base: hash.into(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
 
         let res = p2p

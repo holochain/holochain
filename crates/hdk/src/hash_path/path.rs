@@ -1,5 +1,6 @@
 use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
+use crate::link::GetLinksInputBuilder;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
@@ -81,12 +82,14 @@ impl From<&str> for Component {
         Self::from(bytes)
     }
 }
+
 /// Alias From<&str>
 impl From<&String> for Component {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
+
 /// Alias From<&str>
 impl From<String> for Component {
     fn from(s: String) -> Self {
@@ -245,12 +248,14 @@ impl From<&str> for Path {
         )
     }
 }
+
 /// Alias From<&str>
 impl From<&String> for Path {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
+
 /// Alias From<&str>
 impl From<String> for Path {
     fn from(s: String) -> Self {
@@ -338,9 +343,15 @@ impl TypedPath {
         } else if self.is_root() {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                root_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-                Some(self.make_tag()?),
+                GetLinksInputBuilder::try_new(
+                    root_hash()?,
+                    LinkTypeFilter::single_type(
+                        self.link_type.zome_index,
+                        self.link_type.zome_type,
+                    ),
+                )?
+                .tag_prefix(self.make_tag()?)
+                .build(),
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
@@ -351,9 +362,15 @@ impl TypedPath {
                 .expect("Must have parent if not empty or root");
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                parent.path_entry_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-                Some(self.make_tag()?),
+                GetLinksInputBuilder::try_new(
+                    parent.path_entry_hash()?,
+                    LinkTypeFilter::single_type(
+                        self.link_type.zome_index,
+                        self.link_type.zome_type,
+                    ),
+                )?
+                .tag_prefix(self.make_tag()?)
+                .build(),
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
@@ -400,9 +417,11 @@ impl TypedPath {
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
-            self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-            None,
+            GetLinksInputBuilder::try_new(
+                self.path_entry_hash()?,
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+            )?
+            .build(),
         )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
@@ -501,7 +520,7 @@ fn hash_path_component() {
 
     assert_eq!(
         String::try_from(&Component::from(vec![
-            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0
+            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0,
         ]))
         .unwrap(),
         String::from("foo"),

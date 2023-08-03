@@ -12,9 +12,8 @@ use holochain_p2p::{
     dht_arc::{DhtArc, DhtLocation},
     AgentPubKeyExt, DhtOpHashExt,
 };
-use holochain_sqlite::{
-    db::{AsP2pStateTxExt, DbKindAuthored, DbKindDht, DbKindP2pAgents},
-    prelude::{DatabaseResult, ReadAccess},
+use holochain_sqlite::prelude::{
+    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
 };
 use holochain_state::{prelude::StateQueryResult, query::from_blob};
 use holochain_types::{db::DbRead, dht_op::DhtOpType, prelude::DhtOp};

@@ -2,8 +2,7 @@ use std::ops::RangeInclusive;
 
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::DbRead;
+use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;

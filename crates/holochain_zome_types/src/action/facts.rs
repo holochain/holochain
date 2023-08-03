@@ -45,11 +45,11 @@ pub fn is_not_entry_action<'a>() -> impl Fact<'a, Action> {
 /// - constrain seq num
 /// - constrain prev_hashes
 /// ...but, this does it all in one Fact
-pub fn valid_chain(len: usize, author: AgentPubKey) -> impl Fact<'static, Vec<Action>> {
+pub fn valid_chain<'a>(len: usize, author: AgentPubKey) -> impl Fact<'a, Vec<Action>> {
     vec_of_length(len, valid_chain_action(author))
 }
 
-pub fn valid_chain_action(author: AgentPubKey) -> impl Fact<'static, Action> {
+pub fn valid_chain_action<'a>(author: AgentPubKey) -> impl Fact<'a, Action> {
     lambda(
         "valid_chain_action",
         ValidChainFactState::default(),

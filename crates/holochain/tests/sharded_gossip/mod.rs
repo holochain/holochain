@@ -14,7 +14,7 @@ use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
 use holochain_p2p::*;
-use holochain_sqlite::db::*;
+use holochain_sqlite::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
@@ -1076,14 +1076,13 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                {
-                    let mut conn = alice_p2p_agents_db.conn().unwrap();
-                    let txn = conn.transaction().unwrap();
-                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
-                    {
-                        *alice_info.lock() = info;
-                    }
-                }
+                let info = alice_p2p_agents_db.test_read({
+                    let alice_kit = alice_kit.clone();
+                    move |txn| txn.p2p_get_agent(&alice_kit).unwrap()
+                });
+
+                *alice_info.lock() = info;
+
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

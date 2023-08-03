@@ -33,6 +33,9 @@ use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::test_utils::fake_genesis_for_agent;
+use crate::test_utils::rebuild_record;
+use crate::test_utils::sign_record;
+use crate::test_utils::valid_arbitrary_chain;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
@@ -52,24 +55,6 @@ use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::time::Duration;
-
-async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
-    Record::new(
-        SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
-            .await
-            .unwrap(),
-        entry,
-    )
-}
-
-pub async fn rebuild_record(record: Record, keystore: &MetaLairClient) -> Record {
-    let (action, entry) = record.into_inner();
-    let mut action = action.into_inner().0.into_content();
-    if let (Some(ed), Some(entry)) = (action.entry_data_mut(), entry.as_option()) {
-        *ed.0 = EntryHash::with_data_sync(entry);
-    }
-    sign_record(keystore, action, entry.into_option()).await
-}
 
 fn matching_record(g: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
@@ -311,10 +296,11 @@ async fn check_previous_action() {
         .unwrap_err()
         .into_outcome();
 
-        let expected = Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot,
-        ));
-        assert_eq!(actual, expected);
+        let actual = match actual {
+            Some(ValidationOutcome::PrevActionError(pae)) => pae.source,
+            v => panic!("Expected PrevActionError, got {:?}", v),
+        };
+        assert_eq!(actual, PrevActionErrorKind::InvalidRoot);
     }
 
     // Dna is always ok because of the type system
@@ -375,7 +361,10 @@ async fn check_valid_if_dna_test() {
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
+            ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidRootOriginTime,
+                ..
+            })
         ))
     );
 
@@ -396,9 +385,10 @@ async fn check_valid_if_dna_test() {
 
     tmp_dht
         .to_db()
-        .conn()
-        .unwrap()
-        .execute("UPDATE DhtOp SET when_integrated = 0", [])
+        .write_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.execute("UPDATE DhtOp SET when_integrated = 0", [])?)
+        })
+        .await
         .unwrap();
 
     cache
@@ -433,9 +423,10 @@ async fn check_previous_timestamp() {
 
     assert_matches!(
         r,
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::Timestamp(_, _)
-        ))
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::Timestamp(_, _),
+            ..
+        }))
     );
 }
 
@@ -459,38 +450,41 @@ async fn check_previous_seq() {
     );
 
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 2;
-    assert_eq!(
+    assert_matches!(
         sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
             .await
             .unwrap_err()
             .into_outcome(),
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidSeq(2, 2)
-        )),
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::InvalidSeq(2, 2),
+            ..
+        }))
     );
 
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 3;
-    assert_eq!(
+    assert_matches!(
         sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
             .await
             .unwrap_err()
             .into_outcome(),
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidSeq(2, 3)
-        )),
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::InvalidSeq(2, 3),
+            ..
+        }))
     );
 
     *record.as_action_mut().action_seq_mut().unwrap() = 0;
     let record = rebuild_record(record, &keystore).await;
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 0;
-    assert_eq!(
+    assert_matches!(
         sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
             .await
             .unwrap_err()
             .into_outcome(),
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot
-        )),
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::InvalidRoot,
+            ..
+        }))
     );
 }
 
@@ -736,9 +730,10 @@ fn valid_chain_test() {
         let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::HashMismatch(_)
-            ))
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::HashMismatch(_),
+                ..
+            }))
         );
 
         // Test a chain with the wrong seq.
@@ -747,8 +742,11 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidSeq(_, _)
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidSeq(_, _),
+                ..
+            }
+
             ))
         );
 
@@ -761,8 +759,11 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidRoot
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidRoot,
+                ..
+            }
+
             ))
         );
 
@@ -772,8 +773,11 @@ fn valid_chain_test() {
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::MissingPrev
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::MissingPrev,
+                ..
+            }
+
             ))
         );
 
@@ -782,8 +786,11 @@ fn valid_chain_test() {
         let err = validate_chain(actions.iter(), &Some((hash, 0))).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::MissingPrev
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::MissingPrev,
+                ..
+            }
+
             ))
         );
 
@@ -799,8 +806,11 @@ fn valid_chain_test() {
         .expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidSeq(_, _)
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidSeq(_, _),
+                ..
+            }
+
             ))
         );
 
@@ -816,8 +826,11 @@ fn valid_chain_test() {
         let err = validate_chain(correct_seq.iter(), &Some((hash, 0))).expect_err("Hash is wrong");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::HashMismatch(_)
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::HashMismatch(_),
+                ..
+            }
+
             ))
         );
     });
@@ -972,35 +985,9 @@ async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
-
-    let fact = contrafact::facts![
-        holochain_zome_types::record::facts::action_and_entry_match(false),
-        contrafact::lens1(
-            "action is valid",
-            |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain_action(author),
-        ),
-    ];
-
     let mut g = random_generator();
 
-    let mut chain: Vec<Record> = futures::future::join_all(
-        contrafact::vec_of_length(n, fact)
-            .build(&mut g)
-            .into_iter()
-            .map(|(a, entry)| {
-                let keystore = keystore.clone();
-                async move {
-                    Record::new(
-                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                            .await
-                            .unwrap(),
-                        entry.into_option(),
-                    )
-                }
-            }),
-    )
-    .await;
+    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n).await;
 
     validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
 

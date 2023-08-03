@@ -236,7 +236,7 @@ impl LaunchInfo {
     }
 }
 
-async fn run_n(
+pub async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
     app_ports: Vec<u16>,
@@ -282,7 +282,7 @@ async fn run_n(
     Ok(())
 }
 
-async fn generate(
+pub async fn generate(
     holochain_path: &Path,
     happ: Option<PathBuf>,
     create: Create,

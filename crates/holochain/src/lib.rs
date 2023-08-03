@@ -37,6 +37,8 @@ pub use tracing;
 mod local_network_tests;
 
 pub mod prelude {
+    #[cfg(feature = "hdk")]
+    pub use hdk::link::GetLinksInputBuilder;
     pub use holo_hash;
     pub use holochain_p2p::AgentPubKeyExt;
     pub use holochain_p2p::*;
