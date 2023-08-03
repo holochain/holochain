@@ -56,7 +56,7 @@
 //!   name. The thing that can be charted should be the actual metric. Related
 //!   context that may want to be filtered for the chart should be attributes.
 //!   For example, a "request" may have two separate metrics, "duration", and
-//!   "byte.count", which both may have the filtering attribute "remote.id".
+//!   "byte.count", which both may have the filtering attribute "remote_id".
 //!   - Examples
 //!     - ```
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
@@ -66,7 +66,7 @@
 //!             .with_unit(Unit::new("s"))
 //!             .init();
 //!         req_dur.record(&Context::new(), 0.42, &[
-//!             KeyValue::new("remote.id", "abcd"),
+//!             KeyValue::new("remote_id", "abcd"),
 //!         ]);
 //!       ```
 //!     - ```
@@ -77,7 +77,7 @@
 //!             .with_unit(Unit::new("By"))
 //!             .init();
 //!         req_size.record(&Context::new(), 42, &[
-//!             KeyValue::new("remote.id", "abcd"),
+//!             KeyValue::new("remote_id", "abcd"),
 //!         ]);
 //!       ```
 //!
@@ -85,8 +85,8 @@
 //!
 //! | Full Metric Name | Type | Unit (optional) | Description | Attributes |
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
-//! | `kitsune.peer.send.duration` | `f64_histogram` | `s` | When kitsune sends data to a remote peer. |- `remote.id`: the base64 remote peer id.<br />- `is.error`: if the send failed. |
-//! | `kitsune.peer.send.byte.count` | `u64_histogram` | `By` | When kitsune sends data to a remote peer. |- `remote.id`: the base64 remote peer id.<br />- `is.error`: if the send failed. |
+//! | `kitsune.peer.send.duration` | `f64_histogram` | `s` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
+//! | `kitsune.peer.send.byte.count` | `u64_histogram` | `By` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
 //! | `tx5.conn.ice.send` | `u64_observable_counter` | `By` | Bytes sent on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.ice.recv` | `u64_observable_counter` | `By` | Bytes received on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.send` | `u64_observable_counter` | `By` | Bytes sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
