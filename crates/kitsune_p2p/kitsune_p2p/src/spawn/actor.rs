@@ -1435,7 +1435,7 @@ mod tests {
     async fn create_tx5_with_mdns_meta_net() {
         let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: "wss://not-a-host.test".to_string(),
+                signal_url: "wss://signal.holo.host".to_string(),
             }],
             bootstrap_service: None,
             tuning_params: Default::default(),
@@ -1452,7 +1452,7 @@ mod tests {
     async fn create_tx5_with_bootstrap_meta_net() {
         let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: "wss://not-a-host.test".to_string(),
+                signal_url: "wss://signal.holo.host".to_string(),
             }],
             bootstrap_service: Some(url2!("wss://not-a-bootstrap.test")),
             tuning_params: Default::default(),
