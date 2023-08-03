@@ -87,6 +87,12 @@
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
 //! | `kitsune.peer.send.duration` | `f64_histogram` | `s` | When kitsune sends data to a remote peer. |- `remote.id`: the base64 remote peer id.<br />- `is.error`: if the send failed. |
 //! | `kitsune.peer.send.byte.count` | `u64_histogram` | `By` | When kitsune sends data to a remote peer. |- `remote.id`: the base64 remote peer id.<br />- `is.error`: if the send failed. |
+//! | `tx5.conn.ice.send` | `u64_observable_counter` | `By` | Bytes sent on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `tx5.conn.ice.recv` | `u64_observable_counter` | `By` | Bytes received on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `tx5.conn.data.send` | `u64_observable_counter` | `By` | Bytes sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `tx5.conn.data.recv` | `u64_observable_counter` | `By` | Bytes received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `tx5.conn.data.send.message.count` | `u64_observable_counter` | | Message count sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `tx5.conn.data.recv.message.count` | `u64_observable_counter` | | Message count received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 
 #[cfg(feature = "influxive")]
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
