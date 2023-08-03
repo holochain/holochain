@@ -1,3 +1,5 @@
+#![cfg(feature = "glacial_tests")]
+
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use holochain::conductor::{
@@ -29,8 +31,8 @@ static MSGS: AtomicU64 = AtomicU64::new(0);
 static GOOD_CLOSE: AtomicU64 = AtomicU64::new(0);
 static BAD_CLOSE: AtomicU64 = AtomicU64::new(0);
 
-#[tokio::main(flavor = "multi_thread")]
-pub async fn main() {
+#[tokio::test(flavor = "multi_thread")]
+pub async fn websocket_stress() {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = ConductorConfig {
@@ -62,7 +64,7 @@ pub async fn main() {
         tokio::task::spawn(run_client(port, 1, true));
     }
 
-    loop {
+    for _ in 0..(6 * 4/* 4 minutes */) {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
         println!(
