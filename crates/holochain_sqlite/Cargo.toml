@@ -56,7 +56,7 @@ rusqlite = { version = "0.29", features = [
 ] }
 
 [dev-dependencies]
-holochain_sqlite = { path = ".", default-features = false, features = ["test_utils", "slow_tests"] }
+holochain_sqlite = { path = ".", features = ["test_utils", "slow_tests"] }
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
 nanoid = "0.4.0"
 rand = "0.8.5"
