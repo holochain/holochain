@@ -53,7 +53,7 @@ struct Action {
   ...
 }
 ```
-Additionally the HDI MUST provide an signed `Action` data structure that allows integrity checking in validation:
+Additionally the HDI MUST provide a signed `Action` data structure that allows integrity checking in validation:
 ``` rust
 struct SignedActionEnvelope {
   signature: Signature,
@@ -89,7 +89,8 @@ struct CreateAction {
     entry_hash: EntryHash,
 }
 ```
-- `Update`: indicates the creation of a change record for an application defined entry
+
+- `Update`: indicates the creation of a change record for an application defined entry.  Action data points to old action and entry as well as new entry and type
 ``` rust
 struct UpdateAction {
   ...
@@ -113,7 +114,7 @@ struct CreateLinkAction {
   ...
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
-    zome_id: ZomeId,
+    zome_index: ZomeIndex,
     link_type: LinkType,
     tag: LinkTag,
 }
@@ -122,14 +123,26 @@ struct CreateLinkAction {
 ``` rust
 struct DeleteLinkAction {
   ...
-    deletes_address: ActionHash,
-    deletes_entry_address: EntryHash,
+    base_address: AnyLinkableHash,
+    link_add_address: ActionHash,
+}
+```
+- `CloseChain`: indicates the creation of final chain entry with data about a new DNA version to migrate to
+``` rust
+struct CloseChainAction {
+  ...
+    new_dna_hash: DnaHash,
 }
 ```
 - `OpenChain`: indicates the creation of entry with data for migrating from a previous DNA version
-- `CloseChain`: indicates the creation of final chain entry with data about a new DNA version to migrate to
+``` rust
+struct OpenChainAction {
+  ...
+    prev_dna_hash: DnaHash,
+}
+```
 
-All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network action.  In our implementation we provide [WP-TODO: ACB]:
+All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network actions.  In our implementation we provide [WP-TODO: ACB]:
 
 ##### The `Entry` Data Type
 
@@ -144,10 +157,15 @@ struct AgentEntry {
 
 Capability Grant entries which record in a chain the granting of an access token by access type and function name(s) (see above for a discussion on the Capability security model):
 ``` rust
+pub enum GrantedFunctions {
+    All,
+    Listed(BTreeSet<(ZomeName, FunctionName), Global>),
+}
+
 struct CapGrantEntry {
   tag: String,
   access: CapAccess,
-  functions: BTreeSet<(ZomeName, FunctionName)>,
+  functions: GrantedFunctions,
 }
 
 enum CapAccess {
@@ -204,12 +222,12 @@ struct Record {
 
 ##### The `Link` Data Type
 
-A link entry holds the relational graph information.  Note that links are typed for performance purposes such that when requesting links they can be retrieved by type.  Additionally links have tags that can be used as arbitrary labels on graph as per the application's needs. The `zome_id` is necessary so that the system can run the correct validation routines for that link as a DNA may have multiple integrity zomes.
+A link entry holds the relational graph information.  Note that links are typed for performance purposes such that when requesting links they can be retrieved by type.  Additionally links have tags that can be used as arbitrary labels on graph as per the application's needs. The `zome_index` is necessary so that the system can find and run the correct validation routines for that link as a DNA may have multiple integrity zomes.
 ``` rust
 struct Link {
   base_address: AnyLinkableHash,
   target_address: AnyLinkableHash,
-  zome_id: ZomeId,
+  zome_index: ZomeIndex,
   link_type: LinkType,
   tag: LinkTag,
 }
@@ -275,7 +293,7 @@ struct DnaInfo {
 ``` rust
 struct ZomeInfo {
     name: ZomeName,
-    id: ZomeId,
+    id: ZomeIndex,
     properties: SerializedBytes,
     entry_defs: EntryDefs,
     extern_fns: Vec<FunctionName>,
