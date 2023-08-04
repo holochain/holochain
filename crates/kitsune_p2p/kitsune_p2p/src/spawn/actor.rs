@@ -1413,6 +1413,8 @@ mod tests {
     use ghost_actor::actor_builder::GhostActorBuilder;
     use kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
+    use std::net::SocketAddr;
+    use tokio::task::AbortHandle;
     use url2::url2;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1433,9 +1435,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
-        let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
+        let (signal_addr, abort_handle) = start_signal_srv();
+
+        let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: "wss://not-a-host.test".to_string(),
+                signal_url: format!("wss://{:?}", signal_addr),
             }],
             bootstrap_service: None,
             tuning_params: Default::default(),
@@ -1446,13 +1450,18 @@ mod tests {
 
         // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
+
+        meta_net.close(0, "test").await;
+        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_bootstrap_meta_net() {
-        let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
+        let (signal_addr, abort_handle) = start_signal_srv();
+
+        let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: "wss://not-a-host.test".to_string(),
+                signal_url: format!("wss://{:?}", signal_addr),
             }],
             bootstrap_service: Some(url2!("wss://not-a-bootstrap.test")),
             tuning_params: Default::default(),
@@ -1463,6 +1472,9 @@ mod tests {
 
         // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
+
+        meta_net.close(0, "test").await;
+        abort_handle.abort();
     }
 
     async fn test_create_meta_net(
@@ -1489,5 +1501,24 @@ mod tests {
             Tx2ApiMetrics::new(),
         )
         .await
+    }
+
+    fn start_signal_srv() -> (SocketAddr, AbortHandle) {
+        let mut config = tx5_signal_srv::Config::default();
+        config.interfaces = "127.0.0.1".to_string();
+        config.port = 0;
+        config.demo = false;
+        let (sig_driver, addr_list, err_list) =
+            tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+
+        assert!(err_list.is_empty());
+        assert_eq!(1, addr_list.len());
+
+        let abort_handle = tokio::spawn(async move {
+            sig_driver.await;
+        })
+        .abort_handle();
+
+        (addr_list.first().unwrap().clone(), abort_handle)
     }
 }
