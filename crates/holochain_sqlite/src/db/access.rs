@@ -189,7 +189,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         }
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
+    #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(Transaction) -> R + Send + 'static,
@@ -378,7 +378,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::new(None, kind, DbSyncLevel::default(), None)
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
+    #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut Transaction) -> R + Send + 'static,

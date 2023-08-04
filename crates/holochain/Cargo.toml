@@ -121,6 +121,7 @@ regex = "1.5"
 reqwest = "0.11.2"
 serial_test = "0.4.0"
 test-case = "1.2.1"
+tokio-tungstenite = "0.13"
 
 [build-dependencies]
 hdk = { version = "^0.3.0-beta-dev.11", path = "../hdk"}

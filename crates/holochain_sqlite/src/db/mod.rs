@@ -7,7 +7,7 @@ mod guard;
 mod kind;
 mod pool;
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests;
 
 pub use access::{DbRead, DbWrite, ReadAccess};
