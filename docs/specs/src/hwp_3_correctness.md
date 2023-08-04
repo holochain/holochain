@@ -184,7 +184,7 @@ e.  **Generalized Micro-Consensus Consent: Entwined multi-agent state
   While that agent and its validating peers are engaged with the creation and validation of a particular change to the state of the authors chain, in parallel, other agents are able to author state changes to their own chain and have these validated by the validating peers for each of those changes.  This bottle-neck free architecture allows users to continue interacting with the system without waiting for global agreement.
   With singular actions by any particular agent (and the validation of those actions by a small number of other agents) able to occur simultaneous with singular actions by other agents as well as countersigned actions by particular groups of agents. The network is not updating state globally (as blockchains typically do) but is instead creating, validating, storing and serving changes of the state of particular agents in parallel. 
   c. Multiple networks: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data heavy, or processing heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
-  \[TODO: ACB REVIEW could we add in any O(n) notation here?\] 
+  \[WP-TODO: ACB REVIEW could we add in any O(n) notation here?\] 
   d. Order of Complexity: "Big O" notation is usually only applied to local computation based on handling `n` number of inputs. However, if we consider a new type of O-notation for decentralized systems which includes two inputs `n` as the number transactions/inputs/actions, and `m` as the number of nodes/peers/agents/users. Most blockchain's are some variant of $O\ n^2*m$ in their order of complexity. Every node must gossip all state changes and perform all validate them all. However, Holochain retains $O\ \frac{log(n)}{m}$ complexity because of sharding storage and validation, as the number of nodes in the network grows, each node performs a smaller portion of the workload.
 
 1.  **Shared-state Finality:** Many blockchains approximate chain
@@ -317,7 +317,7 @@ We generally suggest that applications may want to enforce some kind of membrane
 
 #### Spamming Attacks
 
-Holochain includes a native rate-limiting on entry creation \[TODO:
+Holochain includes a native rate-limiting on entry creation \[WP-TODO:
 ACB\]
 
 
@@ -349,7 +349,7 @@ This is a standard vulnerability for DHTs. How do you know you are
 talking to honest nodes so that you are getting an honest picture of the
 network. If all the nodes you are talking to are falsifying data...
 (then what?) If the first node you talk to is malicious you may never
-get any honest node. We are proposing the following solution: \[TODO:
+get any honest node. We are proposing the following solution: \[WP-TODO:
 ACB\]
 
 ### Human​ ​Error
@@ -365,7 +365,7 @@ significant tooling to support key management in the form of its ​core​
 on that infrastructure. Among other things, this tooling ​provides​
 ​assistance​ ​in​ ​managing​ ​keys,​ ​managing​ ​revocation​ ​methods,​
 ​and reclaiming​ ​control​ ​of​ ​applications​ ​when​ ​keys​ ​or​
-​devices​ ​have​ ​become​ ​compromised. \[TODO: ACB\] \[Need to be able
+​devices​ ​have​ ​become​ ​compromised. \[WP-TODO: ACB\] \[Need to be able
 to refer to external docs on DeepKey and DPKI\]
 
 Evolvability
@@ -413,7 +413,7 @@ so:
   are already building off of this deep level capacity for
   evolvability that's built into the system's architecture[^evolvability].
 
-3.  **Membranics:** \[todo: EHB\]
+3.  **Membranics:** \[WP-TODO: EHB\]
 
-[^evolvability]: We, Neighborhoods, Ad4m (https://ad4m.dev/) \[TODO: insert links
+[^evolvability]: We, Neighborhoods, Ad4m (https://ad4m.dev/) \[WP-TODO: insert links
     here\]

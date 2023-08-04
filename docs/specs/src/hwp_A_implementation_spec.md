@@ -1,5 +1,5 @@
 \onecolumngrid
-# Appendix A: Holochain Implementation Spec v0.1.0 Beta
+# Appendix A: Holochain Implementation Spec v0.3.0 Beta
 
 So far we have described the necessary components of a scalable
 coordination and collaboration system. We have built an "industrial
@@ -129,7 +129,7 @@ struct DeleteLinkAction {
 - `OpenChain`: indicates the creation of entry with data for migrating from a previous DNA version
 - `CloseChain`: indicates the creation of final chain entry with data about a new DNA version to migrate to
 
-All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network action.  In our implementation we provide [TODO: ACB]:
+All of the CRUD actions SHOULD include data to implement rate-limiting so as to prevent malicious network action.  In our implementation we provide [WP-TODO: ACB]:
 
 ##### The `Entry` Data Type
 
@@ -506,10 +506,10 @@ The State Manager MUST be able to manage the peristence of the following data el
 - `ConductorState`: the state of all installed DNAs and their status
 ![](workflows.png)
 
-### State Manager Subsystems [TODO: ACB (name and sketch out missing subsystems)]
+### State Manager Subsystems [WP-TODO: ACB (name and sketch out missing subsystems)]
 
-#### Validation Queue [TODO: ACB]
-####  [TODO: ACB]
+#### Validation Queue [WP-TODO: ACB]
+####  [WP-TODO: ACB]
 
 ## Shared Data (rrDHT)
 
@@ -571,7 +571,7 @@ impl DHTOp {
 }
 ```
 
-#### Uniquely hashing transform ops when they are redundant [TODO: ACB (convert to MAY or SHOULD)]
+#### Uniquely hashing transform ops when they are redundant [WP-TODO: ACB (convert to MAY or SHOULD)]
 
 We then use a carefully crafted hash to uniquely identify the DHT transform. There are a few important requirements in producing this hash. These hashes are keys in the Integrated DHT Ops database, which includes all authored or held entries that have gone through validation and are stored in the CAS. (Note: We don't need to store the entires/headers in this DB since it contains the addresses for pulling them from the CAS.)
 
@@ -614,14 +614,14 @@ fn unique_hash(op: &DHTOp) -> HashReadyForm<'_> {
 
 
 ### Fast Push vs. Slow Heal
-[TODO: ACB  any implementation details here?  The main idea was described above]
+[WP-TODO: ACB  any implementation details here?  The main idea was described above]
 Publish(multicast) --> author collects validation receipts
 Gossip(direct) --> ongoing aliveness & resilience based on uptime data
 
 
 ### DHT-Transform-Status Worklow:
 
-See workflows with state data across multiple LMDB tables. [TODO: ACB fixme no more LMDB]
+See workflows with state data across multiple LMDB tables. [WP-TODO: ACB fixme no more LMDB]
 
 
 ```graphviz
@@ -663,7 +663,7 @@ AwaitingDeps->{Valid Rejected Abandoned}
  1. It has stayed in our validation queue too long without being able to resolve dependencies. That means we've been creating network traffic every few minutes for some long period of time (week? month?) trying to resolve dependencies, and we are no longer going to waste our compute time and generate network noise for this.
  2. The app validation code used more resources (CPU, memory, bandwidth) than we allocate for validation. This lets us address the halting problem of validation with infinite loops.
 
-#### Integration State Diagram [TODO: ACB ( here in implementation or up in formalization?)]
+#### Integration State Diagram [WP-TODO: ACB ( here in implementation or up in formalization?)]
 All elements that complete the validation process need to be integrated into the data store with their associated validation result. Note: We do not store or gossip the Entries** which were Abandoned (only the Actions).
 ```graphviz
 digraph {
@@ -681,7 +681,7 @@ Rejected->SendingWarrants
 }
 ```
 
-#### Using EntryDhtStatus to Track Liveness of Data [TODO: ACB ( here in implementation or up in formalization?)]
+#### Using EntryDhtStatus to Track Liveness of Data [WP-TODO: ACB ( here in implementation or up in formalization?)]
 You can see these EntryDhtStatuses generated from the validation states above. The later states happen when an entry is updated/deleted or when a partition conflict is detected.
 
 Once a header/element has been deleted...
@@ -863,7 +863,7 @@ Thus, Holochain implements its both it's node-to-node messaging and it's graphin
 #### Architecture
 Kitsune runs as a set of actor chanels that receive network events and delegates them to local handlers or "implementor" handlers.  Additionally Kitusune provides the implementor with an Api for sending messages and getting information about agents that exist in a given space.
 
-[TODO:? some sort of Kitsune high level system diagram?]
+[WP-TODO:? some sort of Kitsune high level system diagram?]
 
 
 #### Message Types
@@ -941,7 +941,7 @@ enum Wire {
 
 #### Gossip
 
-Kitsune MUST provide a way for the DHT data to be gossiped among peers in a space.  We assume that there will be many gossip implementations that are added over time.  We have implemented full-sync gossip protocol and and a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go from the network.  The full description that gossip algorithm is beyond the scope of this document and details on this algorithim can be found here: [TODO: ACB link?]. 
+Kitsune MUST provide a way for the DHT data to be gossiped among peers in a space.  We assume that there will be many gossip implementations that are added over time.  We have implemented full-sync gossip protocol and and a novel "quantized gossip" algorithm that effeciently shards and redistributes data as nodes come and go from the network.  The full description that gossip algorithm is beyond the scope of this document and details on this algorithim can be found here: [WP-TODO: ACB link?]. 
 
 Any gossip algorithm to be used in the Holochain context MUST be able to handle the following constraints:
 
@@ -1406,4 +1406,4 @@ Holochain implementations MUST provide a secure way to create, manage and use pu
 - `Encrypt(Vec<u8>, PubKey) -> Vec<u8>`
 - `Decrypt(Vec<u8>, PubKey) -> Vec<u8>`
 
-[TODO: ACB]
+[WP-TODO: ACB]

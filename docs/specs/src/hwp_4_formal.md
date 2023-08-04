@@ -227,7 +227,7 @@ Here is a high level summary of how a countersigning flows:
 6. involved entry neighbours proceed with entry validation and then move to the store and serve phase for themselves
 
 ### Natural Architectural Constraints in Source Chain Workflow
-[TODO: ACB, should we really have this section here, or should it be in the implementation doc.]
+[WP-TODO: ACB, should we really have this section here, or should it be in the implementation doc.]
 
 Since we can only have one open write handle to a file or a single write transaction committing to the database, the step where these kinds of final state changes are written serves as a natural bottleneck to concurrency. However, there are other things (such as read access, network connections, UI requests) which can safely happen in paralell / concurrently. We address these patterns of linearity and concurrency here.
 
@@ -346,8 +346,8 @@ The rrDHT storage arc defines the range of entries stored and guarantee rapid re
 So far we have described the topological transformation between the agentic holding of state on a source chain into the shape of the shared data for making that state visible via the DHT.  Additionally we have described an addressing scheme that makes data deterministically retreivable.  Now we must describe the communication protocols that allow agents to come and go on the network while still maintaining the necessary data redundancy.  The Holochain DHT ...
 
 ##### Fast Push vs. Slow Heal
-Publish(multicast) --> author collects validation receipts [TODO: ACB]
-Gossip(direct) --> ongoing aliveness & resilience based on uptime data [TODO: ACB]
+Publish(multicast) --> author collects validation receipts [WP-TODO: ACB]
+Gossip(direct) --> ongoing aliveness & resilience based on uptime data [WP-TODO: ACB]
 
 ## Security & Safety
 
@@ -370,7 +370,7 @@ Access is thus mediated by Capability grants of 4 types:
 All zome calls must be signed and also take a required capabilty claim parameter that MUST be checked by the system for making the call. Agents record capability grants on their source chains and distribute them as necessary according to the applications needs.  Receviers of grants can record them as claims (usually as a private entry) on their chains for later lookup.  The "agent" type grant is just the agent's public key.
 
 ### Warrants
-[TODO: ACB REVIEW should we expand on this by adding in https://hackmd.io/nmv6PARCRCmx9PrUI-LtLw?edit]
+[WP-TODO: ACB REVIEW should we expand on this by adding in https://hackmd.io/nmv6PARCRCmx9PrUI-LtLw?edit]
 We take that by definition, in a fully distributed system, there is no way for a single agent to control the actions of other agents that comprise the system, i.e. what makes an agent an agent is it's ability to act independantly.  This provides the challenge of how agents deal with "bad-actor" agents, as they can not be controlled directly.  In Holochain "bad-action" is primarily defined by attempts by agents to act outside of a DNAs Validation rules.  Because a DNA's network ID is defined by the hash of its integrity zomes (which includes the validation rules) we can assume that every agent has these rules, and thus can deterministicly run these rules to know if any action is a "bad-action".  Note that some of these validation rules that reveal bad actions may not just be about the structure or content of data commitited to chains, but can also be about behavior, for example about the rate of committing entries, which allows protection against denial of service attacks.
 
 Once a bad-action had been identified by validation, it is an app-specific concern about what should be done given that specific bad-action.  In some contexts, warnings with escalating responses may make sense, in others, immediate expulsion may make sense.  The underlying affordance that Holochain provides for this, is the emmission and distribution of Warrants.  A Warrant must include proof-of-behavior, that is the claim about which the warrant is being issued.  This might be, for example, a signed `Action` that fails validation, or it might be two signed `Actions` that are issued for commit with timestamps below the rate-limit.
@@ -389,7 +389,7 @@ Holochain is designed to be used to build hosts of micro-services that can be as
 Additionally we define a standard by which to refer to entries in DNAs called the Holochain Resource Locator (HRL) for application developers to use in passing around references to application data.
 
 [DRAFT OF SPEC TO BE MOVED HERE](https://hackmd.io/@hololtd/HyWnqhTnY)
-[TODO:ACB/EHB]
+[WP-TODO:ACB/EHB]
 
 ## Holochain Implementation
 
