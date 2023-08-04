@@ -1439,7 +1439,7 @@ mod tests {
 
         let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: format!("wss://{:?}", signal_addr),
+                signal_url: format!("ws://{:?}", signal_addr),
             }],
             bootstrap_service: None,
             tuning_params: Default::default(),
@@ -1461,9 +1461,9 @@ mod tests {
 
         let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: format!("wss://{:?}", signal_addr),
+                signal_url: format!("ws://{:?}", signal_addr),
             }],
-            bootstrap_service: Some(url2!("wss://not-a-bootstrap.test")),
+            bootstrap_service: Some(url2!("ws://not-a-bootstrap.test")),
             tuning_params: Default::default(),
             network_type: NetworkType::QuicBootstrap,
         })
