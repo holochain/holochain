@@ -3698,9 +3698,9 @@ dependencies = [
 
 [[package]]
 name = "influxive"
-version = "0.0.1-alpha.6"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d93c3f91fbffb5c1aae95f69098cde41430a432164d0738af535284b0626a119"
+checksum = "8e751ac3b2c3a7943237d176f43d051e81611ab60927ee0de778eef8eb8a9946"
 dependencies = [
  "influxive-child-svc",
  "influxive-otel",
