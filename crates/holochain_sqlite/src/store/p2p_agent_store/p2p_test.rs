@@ -1,7 +1,8 @@
 use crate::prelude::*;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::{DhtArcRange, DhtArcSet};
-use kitsune_p2p::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_bin_data::KitsuneBinType;
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rand::Rng;
 use std::sync::Arc;
 
@@ -221,7 +222,6 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .unwrap();
     let mut prev = 0;
     for agent_info_signed in near {
-        use kitsune_p2p::KitsuneBinType;
         let loc = agent_info_signed.agent.get_loc();
         let record = super::P2pRecord::from_signed(&agent_info_signed).unwrap();
         let mut dist = u32::MAX;

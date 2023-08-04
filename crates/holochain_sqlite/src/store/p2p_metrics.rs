@@ -1,7 +1,7 @@
 use crate::error::DatabaseResult;
 use crate::sql::*;
 use holochain_zome_types::prelude::*;
-use kitsune_p2p::event::MetricRecord;
+use kitsune_p2p_types::metrics::MetricRecord;
 use rusqlite::*;
 
 #[cfg(test)]
