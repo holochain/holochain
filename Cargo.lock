@@ -3638,9 +3638,9 @@ dependencies = [
 
 [[package]]
 name = "influxive"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49904748d8528d78cf774f75ffa4c0b8d24ec6dffe7273c1aa26ac05f3c8c936"
+checksum = "8e751ac3b2c3a7943237d176f43d051e81611ab60927ee0de778eef8eb8a9946"
 dependencies = [
  "influxive-child-svc",
  "influxive-otel",
@@ -3649,9 +3649,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-child-svc"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f21c46789a982e6815f9466e7bbd9a75a22df55570a7865a58ddd46ff7893db9"
+checksum = "3304096e465620b1e8b8f126e385050d8a0071f20ad09d1dae240474fde52bb9"
 dependencies = [
  "hex-literal",
  "influxive-core",
@@ -3664,15 +3664,15 @@ dependencies = [
 
 [[package]]
 name = "influxive-core"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1db8794452cead467232acc42cf861e87b29aa134ab7a2e94c94071cb7882af9"
+checksum = "361ab244896d34c02cdfb4fb90a0cf11d1db7e140f6d0f9eb872c335e3f7f602"
 
 [[package]]
 name = "influxive-downloader"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06ee0b71edbd92359b55d5e41da77f8c9ab6fcbed7ae553c6a2957964ca9bb27"
+checksum = "bc2575384f9b4e5f94f316c69844f0a31e139694a530ffcc9cea6c98ce81627f"
 dependencies = [
  "base64 0.21.2",
  "digest 0.10.7",
@@ -3692,9 +3692,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-otel"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86b50abb6356772f3110d9f3eb4a5372e677f499cde58fa458a1ab960811881f"
+checksum = "9a29ee9911b66e6f433734c900ed1d95b3cffeab1ea7dace3ecd3a3dd224e8be"
 dependencies = [
  "influxive-core",
  "tokio",
@@ -3703,18 +3703,18 @@ dependencies = [
 
 [[package]]
 name = "influxive-otel-atomic-obs"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "559aff32773b0959f64958a980a3d584553f888830a5abf1c7afca19b23b032e"
+checksum = "b07bcce79167d27b8b2d639cf026029506ed3dfa7bf7ee402c29cab03a7afd16"
 dependencies = [
  "ts_opentelemetry_api",
 ]
 
 [[package]]
 name = "influxive-writer"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "496b34373611546e484ca9fd45c0acc0cacc85e2424744068c2b5ded198037a3"
+checksum = "ee73e5486492eafd6c50790545df7b73c81edf69b299f96183bdcb9371619951"
 dependencies = [
  "influxdb",
  "influxive-core",
@@ -7968,8 +7968,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.18"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+version = "0.0.1-alpha.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b9dcc0a2b0b0dc28f32200c30b838e58b0737bbe4b25ce4369f9396acc4f339"
 dependencies = [
  "bytes",
  "futures",
@@ -7992,7 +7993,8 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6de3181cafaf2cd7d1cd60c3367db5daf53a818159afa596f420bc2da1d7243d"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8009,7 +8011,8 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.11"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15d7118da8a1353717e9a42b21d922933097c069e13ef8547c7be07efa8ea8a8"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -8021,7 +8024,8 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.12"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b249cfddf59d1a7593017785f9b73cb396145166c0a3fd1bc39214757a416d7a"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8039,7 +8043,8 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "925f258966cedc265cb2e1ba5a19be3007b562b203068d0c33967458695a680a"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8056,7 +8061,8 @@ dependencies = [
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.10"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e26fee2c1c3e227c8bae711545c7536d17a508af0a5e317296cce18afaff5b7"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8084,7 +8090,8 @@ dependencies = [
 [[package]]
 name = "tx5-signal-srv"
 version = "0.0.1-alpha.9"
-source = "git+https://github.com/holochain/tx5.git?rev=3549bb75ac8ddd08a7b0fefe11e77788611fad68#3549bb75ac8ddd08a7b0fefe11e77788611fad68"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8359558d90ae7c4b2ff885619fcd75186cccdb62f575252c95c0c06484ce7de0"
 dependencies = [
  "clap 4.3.11",
  "dirs 5.0.1",
