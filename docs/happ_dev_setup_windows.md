@@ -37,7 +37,7 @@ Building some of Holochain's dependencies from source on Windows requires Perl, 
 A good option for Perl on Windows is [Strawberry Perl](https://strawberryperl.com/). Any Perl distribution will do though,
 if you would prefer something else or already have Perl.
 
-Holochain also depends on SQLite and OpenSSL but these are supposed to be built for you by default. This means you should 
+Holochain also depends on SQLite and OpenSSL, but these are supposed to be built for you by default. This means you should 
 not need to provide either of these when building Holochain. If you get errors about these it's likely an issue with the 
 build configuration of Holochain so please let us [know](https://github.com/holochain/holochain/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=%5BBUG%5D).
 
