@@ -43,7 +43,7 @@ build configuration of Holochain, so please [let us know](https://github.com/hol
 
 #### 3. Install Holochain 
 
-Install Holochain and the other binaries you'll need to work with it
+Install Holochain and the other binaries you'll need to work with it:
 
 ```shell
 cargo install --version 0.1.5 holochain
