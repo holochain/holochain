@@ -15,7 +15,7 @@ preferable to use the same version that Holochain is using. You can optionally i
 rustup toolchain install 1.66.1
 ```
 
-Find the installed toolchain with `rustup toolchain list` then select it using a command like this, with your toolchain 
+Find the installed toolchain with `rustup toolchain list`, then select it using a command like this, with your toolchain 
 in place of the example given here.
 
 ```shell
