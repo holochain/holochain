@@ -2,7 +2,7 @@
 
 The recommended way to develop hApps on Holochain if you're a Windows user is to use WSL2. If you need to build on Windows
 then this guide will give you the steps we know are needed. However, we don't have reproducible automated builds to ensure
-that these steps stay up-to-date so please be prepared to encounter problems. You are welcome raise an 
+that these steps stay up-to-date so please be prepared to encounter problems. You are invited to raise an 
 [issue](https://github.com/holochain/holochain/issues/new?assignees=&labels=&projects=&template=bug_report.md&title=%5BBUG%5D) 
 if you do!
 
