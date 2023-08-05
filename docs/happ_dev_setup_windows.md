@@ -8,7 +8,7 @@ if you do!
 
 #### 1. Install the Rust toolchain
 
-Get `rustup` from [here](https://www.rust-lang.org/tools/install). This will set up the latest version of Rust but it is 
+Get `rustup` from [here](https://www.rust-lang.org/tools/install). This will set up the latest version of Rust, but it is 
 preferable to use the same version that Holochain is using. You can optionally install a specific version of rust using
 
 ```shell
