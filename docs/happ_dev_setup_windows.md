@@ -32,7 +32,7 @@ rustup target add wasm32-unknown-unknown
 
 #### 2. Set up build dependencies
 
-Building some of Holochain's dependencies from source on Windows requires Perl which is used for configuration scripts.
+Building some of Holochain's dependencies from source on Windows requires Perl, which is used for configuration scripts.
 
 A good option for Perl on Windows is [Strawberry Perl](https://strawberryperl.com/). Any Perl distribution will do though,
 if you would prefer something else or already have Perl.
