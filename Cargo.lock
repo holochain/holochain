@@ -3779,6 +3779,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tx5",
+ "tx5-signal-srv",
  "url2",
 ]
 
