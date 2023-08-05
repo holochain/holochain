@@ -3930,6 +3930,7 @@ dependencies = [
  "tracing-subscriber",
  "ts_opentelemetry_api",
  "tx5",
+ "tx5-signal-srv",
  "url2",
 ]
 
