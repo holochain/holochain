@@ -69,6 +69,6 @@ hc launch --version
 #### 4. Get started!
 
 You should now be able to develop with Holochain using the tools installed in the previous section. You will need to ignore
-the Nix commands in guides and use the CLI tools directly by otherwise you shouldn't need to do anything special.
+the Nix commands in guides and use the CLI tools directly. Otherwise you shouldn't need to do anything special.
 
 Get started [here](https://developer.holochain.org/get-building/).
