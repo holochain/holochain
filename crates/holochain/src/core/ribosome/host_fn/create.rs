@@ -207,13 +207,9 @@ pub mod wasm_test {
 
         let mut network_topology = NetworkTopology::default();
 
-        dbg!(&network_topology);
-
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         network_topology.add_dnas(vec![dna_file.clone()]);
-
-        dbg!(&network_topology);
 
         let size_fact = SizedNetworkFact { nodes: 7, agents: 1..=3 };
         let partition_fact = StrictlyPartitionedNetworkFact {
@@ -228,22 +224,30 @@ pub mod wasm_test {
         let mut rng = rng_from_generator(&mut g);
         network_topology = facts.mutate(&mut g, network_topology).unwrap();
 
-        dbg!("foo");
-
-        dbg!(&network_topology);
         network_topology.apply().await.unwrap();
 
         let random_node = network_topology.random_node(&mut rng).unwrap();
         let random_cell = random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
         // let random_cell = cells.next().unwrap();
         // dbg!(&cells);
+        let cell = random_cell.clone();
         let action_hash: ActionHash = random_node.conductor().get_share().await.share_ref(|c| {
+            let sweet_cell = c.get_sweet_cell(cell).unwrap();
             tokio_helper::block_forever_on(async move {
-                c.call(random_cell, "create_entry", ()).await
+                c.call(&sweet_cell.zome(TestWasm::Create), "create_entry", ()).await
             })
         });
 
         dbg!(action_hash);
+
+        let record: Option<Record> = random_node.conductor().get_share().await.share_ref(|c| {
+            let sweet_cell = c.get_sweet_cell(random_cell).unwrap();
+            tokio_helper::block_forever_on(async move {
+                c.call(&sweet_cell.zome(TestWasm::Create), "get_entry", ()).await
+            })
+        });
+
+        dbg!(record);
     }
 
     #[tokio::test(flavor = "multi_thread")]
