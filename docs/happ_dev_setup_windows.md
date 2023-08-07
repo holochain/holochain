@@ -72,3 +72,11 @@ You should now be able to develop with Holochain using the tools installed in th
 the Nix commands in guides and use the CLI tools directly. Otherwise you shouldn't need to do anything special.
 
 Get started [here](https://developer.holochain.org/get-building/).
+
+#### 5. Find other projects using Windows
+
+Most projects are using MacOS and Linux development environments, including WSL2. There are projects being built on Windows 
+and you may want to learn from their experiences and documentation:
+
+- https://github.com/NextGenSoftwareUK/OASIS-Holochain-hApp
+- https://github.com/holochain-open-dev/wiki/wiki/Installing-Holochain--&-Building-hApps-Natively-On-Windows
