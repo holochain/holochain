@@ -62,16 +62,16 @@ pub trait FetchPoolConfig: 'static + Send + Sync {
     /// since that is the maximum amount of time a successful response can take.
     /// Lower values will give up early and may result in duplicate data sent if the
     /// response takes a long time to come back.
-    fn item_retry_delay(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(90)
+    fn item_retry_delay(&self) -> Duration {
+        Duration::from_secs(90)
     }
 
     /// How long between successive fetches from a particular source, for a particular item?
     /// This protects us from wasting resources on a source which may be offline.
     /// This will eventually be replaced with an exponential backoff which will be
     /// tracked for this source across all items.
-    fn source_retry_delay(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(5 * 60)
+    fn source_retry_delay(&self) -> Duration {
+        Duration::from_secs(5 * 60)
     }
 
     /// When a fetch key is added twice, this determines how the two different contexts
@@ -79,30 +79,21 @@ pub trait FetchPoolConfig: 'static + Send + Sync {
     fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
 }
 
-/// The actual inner state of the FetchPool, from which items can be obtained
-#[derive(Debug)]
-pub struct State {
-    /// Items ready to be fetched
-    queue: LinkedHashMap<FetchKey, FetchPoolItem>,
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            queue: Default::default(),
-        }
-    }
-}
-
 // TODO: move this to host, but for now, for convenience, we just use this one config
-// for every queue
+//       for every queue
 struct FetchPoolConfigBitwiseOr;
 
 impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
     fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
         a | b
     }
+}
+
+/// The actual inner state of the FetchPool, from which items can be obtained
+#[derive(Debug, Default)]
+pub struct State {
+    /// Items ready to be fetched
+    queue: LinkedHashMap<FetchKey, FetchPoolItem>,
 }
 
 impl FetchPool {
@@ -277,16 +268,20 @@ impl<'a> Iterator for StateIter<'a> {
             .state
             .queue
             .keys()
-            .take(NUM_ITEMS_PER_POLL)
+            .take(NUM_ITEMS_PER_POLL) // TODO no tests of limiting
             .cloned()
             .collect();
+
         for key in keys {
+            // All the keys we look at get pushed down the queue so with a large queue, they won't be visible on the following
+            // `next` call. But as soon as we find an item we haven't fetched for a while we can go ahead and return it.
             let item = self.state.queue.get_refresh(&key)?;
             let item_not_recently_fetched = item
                 .last_fetch
                 .map(|t| t.elapsed() >= self.config.item_retry_delay())
-                .unwrap_or(true);
+                .unwrap_or(true); // true on the first fetch before `last_fetch` is set
             if item_not_recently_fetched {
+                // Sources are tested separately, no need to retest here
                 if let Some(source) = item.sources.next(self.config.source_retry_delay()) {
                     let space = item.space.clone();
                     item.last_fetch = Some(Instant::now());
@@ -294,6 +289,7 @@ impl<'a> Iterator for StateIter<'a> {
                 }
             }
         }
+
         None
     }
 }
@@ -329,10 +325,7 @@ impl SourceRecord {
     }
 
     fn agent(agent: KAgent) -> Self {
-        Self {
-            source: FetchSource::Agent(agent),
-            last_request: None,
-        }
+        Self::new(FetchSource::Agent(agent))
     }
 }
 
@@ -354,6 +347,7 @@ impl Sources {
             .map(|(i, s)| (i, s.source.clone()))
         {
             self.0[i].last_request = Some(Instant::now());
+            // Rotate the sources so we search the ones we didn't consider this time first next time
             self.0.rotate_left(i + 1);
             Some(agent)
         } else {
@@ -371,7 +365,6 @@ pub enum FetchSource {
 
 #[cfg(test)]
 mod tests {
-
     use pretty_assertions::assert_eq;
     use std::{sync::Arc, time::Duration};
 
@@ -382,16 +375,16 @@ mod tests {
     pub(super) struct Config(pub u32, pub u32);
 
     impl FetchPoolConfig for Config {
-        fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
-            (a + b).min(1)
-        }
-
         fn item_retry_delay(&self) -> Duration {
             Duration::from_secs(self.0 as u64)
         }
 
         fn source_retry_delay(&self) -> Duration {
             Duration::from_secs(self.1 as u64)
+        }
+
+        fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+            (a + b).min(1)
         }
     }
 
@@ -441,9 +434,26 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn single_source() {
+        let source_delay = Duration::from_secs(10);
+        let mut sources = Sources(vec![SourceRecord {
+            source: source(1),
+            last_request: None,
+        }
+        .into()]);
+
+        assert_eq!(sources.next(source_delay), Some(source(1)));
+
+        tokio::time::advance(source_delay).await;
+
+        assert_eq!(sources.next(source_delay), Some(source(1)));
+        assert_eq!(sources.next(source_delay), None);
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn source_rotation() {
-        let sec1 = Duration::from_secs(10);
-        let mut ss = Sources(vec![
+        let source_delay = Duration::from_secs(10);
+        let mut sources = Sources(vec![
             SourceRecord {
                 source: source(1),
                 last_request: Some(Instant::now()),
@@ -458,25 +468,58 @@ mod tests {
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(ss.next(sec1), Some(source(2)));
-        assert_eq!(ss.next(sec1), None);
+        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), None);
 
         tokio::time::advance(Duration::from_secs(9)).await;
 
-        assert_eq!(ss.next(sec1), Some(source(1)));
+        assert_eq!(sources.next(source_delay), Some(source(1)));
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(ss.next(sec1), Some(source(2)));
-        // source 1 has already had its delay backed off to 20s
+        assert_eq!(sources.next(source_delay), Some(source(2)));
+        // source 1 has already had its delay backed off another 10s
         // due to a retry, so it returns None
-        assert_eq!(ss.next(sec1), None);
+        assert_eq!(sources.next(source_delay), None);
 
-        tokio::time::advance(Duration::from_secs(20)).await;
+        tokio::time::advance(Duration::from_secs(10)).await;
 
-        assert_eq!(ss.next(sec1), Some(source(1)));
-        assert_eq!(ss.next(sec1), Some(source(2)));
-        assert_eq!(ss.next(sec1), None);
+        assert_eq!(sources.next(source_delay), Some(source(1)));
+        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn source_rotation_prioritises_less_recently_tried() {
+        let source_delay = Duration::from_secs(10);
+        let mut sources = Sources(vec![
+            SourceRecord {
+                source: source(1),
+                last_request: Some(Instant::now()), // recently tried
+            }
+            .into(),
+            SourceRecord {
+                source: source(2),
+                last_request: None, // never checked
+            }
+            .into(),
+            SourceRecord {
+                source: source(3),
+                last_request: None, // never checked
+            }
+            .into(),
+        ]);
+
+        assert_eq!(sources.next(source_delay), Some(source(2)));
+
+        // All sources now past their retry delay
+        tokio::time::advance(source_delay).await;
+
+        // Would expect source 1 to be tried next but trying 2 first rotated 1 and 2 to the end of the list
+        assert_eq!(sources.next(source_delay), Some(source(3)));
+        assert_eq!(sources.next(source_delay), Some(source(1)));
+        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), None);
     }
 
     #[test]
@@ -545,5 +588,21 @@ mod tests {
         tokio::time::advance(Duration::from_secs(4)).await;
 
         assert_eq!(q.iter_mut(&cfg).count(), 3);
+    }
+
+    #[test]
+    fn default_fetch_context_merge_maintains_flags_from_both_contexts() {
+        const FLAG_1: u32 = 1 << 5;
+        const FLAG_2: u32 = 1 << 10;
+
+        let context_1 = FetchContext(FLAG_1);
+        let context_2 = FetchContext(FLAG_2);
+
+        let pool = FetchPool::new_bitwise_or();
+        let merged = pool.config.merge_fetch_contexts(*context_1, *context_2);
+
+        assert_eq!(FLAG_1, merged & FLAG_1);
+        assert_eq!(FLAG_2, merged & FLAG_2);
+        assert_eq!(0, merged ^ (FLAG_1 | FLAG_2)); // Clear FLAG_1 and FLAG_2 to check no other bits are set
     }
 }
