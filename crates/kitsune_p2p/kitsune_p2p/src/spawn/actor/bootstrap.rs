@@ -264,9 +264,13 @@ mod tests {
         .unwrap();
 
         // We should get back an error if we don't have a good signature.
+        let bad = fixt!(AgentInfoSigned);
+        let mut bad = Arc::try_unwrap(bad.0).unwrap();
+        bad.signature = Arc::new(vec![].into());
+        let bad = AgentInfoSigned(Arc::new(bad));
         let res = put(
             Some(url2::url2!("http://{:?}", addr)),
-            fixt!(AgentInfoSigned),
+            bad,
             BootstrapNet::Tx5,
         )
         .await;
