@@ -28,7 +28,7 @@ impl PartialEq for NetworkTopologyNode {
 
 impl NetworkTopologyNode {
     /// Create a new node with a new conductor, and no cells.
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         let mut rng = rand::thread_rng();
         Self {
             id: rng.gen(),
@@ -96,7 +96,7 @@ impl NetworkTopologyNode {
                     conductor_share.share_mut(|conductor| {
                         tokio_helper::block_forever_on(async move {
                             conductor
-                                .setup_app_for_agent("app-", key.clone(), [&dna_file.clone()])
+                                .setup_app_for_agent(&format!("{}", &cell_id), key.clone(), [&dna_file.clone()])
                                 .await
                         })
                     })?;

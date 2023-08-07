@@ -2659,6 +2659,7 @@ dependencies = [
  "async-once-cell",
  "async-recursion",
  "async-trait",
+ "backtrace",
  "base64 0.13.1",
  "byteorder",
  "bytes",

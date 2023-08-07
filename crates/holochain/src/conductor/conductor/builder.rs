@@ -230,19 +230,26 @@ impl ConductorBuilder {
         outcome_receiver: OutcomeReceiver,
         no_print_setup: bool,
     ) -> ConductorResult<ConductorHandle> {
+        dbg!("ConductorBuilder::finish");
+
+        dbg!("ConductorBuilder::finish - start scheduler");
         conductor
             .clone()
             .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
             .await;
 
+        dbg!("ConductorBuilder::finish - spawn p2p_event_task");
+
         tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
 
+        dbg!("ConductorBuilder::finish - spawn post_commit_receiver");
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
         tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
             Self::spawn_post_commit(conductor2, post_commit_receiver, stop).map(Ok)
         });
 
+        dbg!("ConductorBuilder::finish - spawn outcome_receiver");
         let configs = conductor_config.admin_interfaces.unwrap_or_default();
         let cell_startup_errors = conductor
             .clone()
@@ -257,10 +264,12 @@ impl ConductorBuilder {
             );
         }
 
+        dbg!("ConductorBuilder::finish - print_setup");
         if !no_print_setup {
             conductor.print_setup();
         }
 
+        dbg!("ConductorBuilder::finish - finish");
         Ok(conductor)
     }
 
@@ -296,6 +305,7 @@ impl ConductorBuilder {
         env_path: &std::path::Path,
         extra_dnas: &[DnaFile],
     ) -> ConductorResult<ConductorHandle> {
+        dbg!("ConductorBuilder::test");
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_types::prelude::test_keystore);
@@ -358,6 +368,8 @@ impl ConductorBuilder {
                 .await
                 .expect("Could not install DNA");
         }
+
+        dbg!("ConductorBuilder::test - finish");
 
         Self::finish(
             handle,

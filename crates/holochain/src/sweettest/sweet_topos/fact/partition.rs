@@ -74,13 +74,15 @@ pub mod test {
     use petgraph::dot::{Dot, Config};
     use crate::prelude::unstructured_noise;
     use crate::sweettest::fact::size::SizedNetworkFact;
+    use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
     use petgraph::algo::connected_components;
+    use contrafact::Fact;
 
     /// Test that we can build a network with one partition.
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_one_partition() {
         let mut g = unstructured_noise().into();
-        let size_fact = SizedNetworkFact { nodes: 3 };
+        let size_fact = SizedNetworkFact { nodes: 3, agents: 3..=5 };
         let partition_fact = StrictlyPartitionedNetworkFact {
             partitions: 1,
             efficiency: 1.0,
@@ -95,7 +97,7 @@ pub mod test {
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_dozen_nodes_three_partitions() {
         let mut g = unstructured_noise().into();
-        let mut size_fact = SizedNetworkFact { nodes: 12 };
+        let mut size_fact = SizedNetworkFact { nodes: 12, agents: 1..=2 };
         let mut partition_fact = StrictlyPartitionedNetworkFact {
             partitions: 3,
             efficiency: 0.2,

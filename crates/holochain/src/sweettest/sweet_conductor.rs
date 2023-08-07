@@ -206,9 +206,13 @@ impl SweetConductor {
 
         tracing::info!(?config);
 
+        // let bt = backtrace::Backtrace::new();
+        // dbg!("bt: {:?}", bt);
+
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
                 .await;
+        dbg!("handle_from_existing done");
         Self::new(handle, dir, config, rendezvous).await
     }
 
@@ -227,6 +231,7 @@ impl SweetConductor {
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
+        dbg!("handle_from_existing");
         Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)

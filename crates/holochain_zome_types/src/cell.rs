@@ -2,7 +2,6 @@
 //! can track its source chain and service network requests / responses.
 
 use crate::RoleName;
-use arbitrary::Arbitrary;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
@@ -12,7 +11,6 @@ use std::fmt;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 #[derive(
-    Arbitrary,
     Clone,
     Debug,
     Hash,
@@ -24,6 +22,7 @@ use std::fmt;
     Ord,
     PartialOrd,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct CellId(DnaHash, AgentPubKey);
 
 /// Delimiter in a clone id that separates the base cell's role name from the

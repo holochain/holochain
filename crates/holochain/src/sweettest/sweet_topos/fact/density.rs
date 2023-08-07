@@ -13,7 +13,9 @@ use contrafact::Mutation;
 /// This measument only makes sense for simple graphs, so we assume that.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DenseNetworkFact {
-    density: f64,
+    /// The density of the network. Number of edges divided by the maximum
+    /// number of edges. Only makes sense for simple graphs.
+    pub density: f64,
 }
 
 impl DenseNetworkFact {
@@ -93,7 +95,7 @@ pub mod test {
     #[test]
     fn test_sweet_topos_dense_network() {
         let mut g = unstructured_noise().into();
-        let mut size_fact = SizedNetworkFact { nodes: 12 };
+        let mut size_fact = SizedNetworkFact { nodes: 12, agents: 1..=2 };
         let mut density_fact = DenseNetworkFact { density: 0.3 };
         let mut graph = NetworkTopology::default();
         graph = size_fact.mutate(&mut g, graph).unwrap();

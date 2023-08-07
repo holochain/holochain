@@ -120,6 +120,13 @@ pub mod wasm_test {
     use holochain_trace;
     use std::sync::Arc;
     use crate::sweettest::sweet_topos::network::NetworkTopology;
+    use crate::sweettest::fact::size::SizedNetworkFact;
+    use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
+    use crate::sweettest::fact::density::DenseNetworkFact;
+    use crate::sweettest::fact::rng_from_generator;
+    use contrafact::Generator;
+    use contrafact::facts;
+    use contrafact::Fact;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
@@ -200,9 +207,43 @@ pub mod wasm_test {
 
         let mut network_topology = NetworkTopology::default();
 
+        dbg!(&network_topology);
+
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        network_topology.add_dnas(vec![dna_file]);
+        network_topology.add_dnas(vec![dna_file.clone()]);
+
+        dbg!(&network_topology);
+
+        let size_fact = SizedNetworkFact { nodes: 7, agents: 1..=3 };
+        let partition_fact = StrictlyPartitionedNetworkFact {
+            partitions: 1,
+            efficiency: 1.0,
+        };
+        let density_fact = DenseNetworkFact { density: 0.8 };
+
+        let mut facts = facts![size_fact, partition_fact, density_fact];
+
+        let mut g: Generator = unstructured_noise().into();
+        let mut rng = rng_from_generator(&mut g);
+        network_topology = facts.mutate(&mut g, network_topology).unwrap();
+
+        dbg!("foo");
+
+        dbg!(&network_topology);
+        network_topology.apply().await.unwrap();
+
+        let random_node = network_topology.random_node(&mut rng).unwrap();
+        let random_cell = random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+        // let random_cell = cells.next().unwrap();
+        // dbg!(&cells);
+        let action_hash: ActionHash = random_node.conductor().get_share().await.share_ref(|c| {
+            tokio_helper::block_forever_on(async move {
+                c.call(random_cell, "create_entry", ()).await
+            })
+        });
+
+        dbg!(action_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]

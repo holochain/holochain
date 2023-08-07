@@ -17,6 +17,8 @@ use shrinkwraprs::Shrinkwrap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use crate::sweettest::SweetConductorConfig;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 
 /// Some orphan rule hoop jumping.
 #[derive(Clone, Debug, Default)]
@@ -45,8 +47,11 @@ impl NetworkTopologyConductor {
     /// Get the conductor share for this node. This is an async function because
     /// it needs to initialize the conductor if it hasn't been initialized yet.
     pub async fn get_share(&self) -> &RwShare<SweetConductor> {
+        dbg!("get_share");
+        let mut config = SweetConductorConfig::standard();
+        config.keystore = KeystoreConfig::DangerTestKeystore;
         self.0
-            .get_or_init(async { RwShare::new(SweetConductor::from_standard_config().await) })
+            .get_or_init(async { dbg!("get or init"); RwShare::new(SweetConductor::from_config(config).await) })
             .await
     }
 }
