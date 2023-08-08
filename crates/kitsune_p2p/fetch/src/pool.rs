@@ -532,7 +532,7 @@ mod tests {
         rand::thread_rng().fill_bytes(&mut noise);
         let mut u = Unstructured::new(&noise);
 
-        let source_delay = Duration::from_secs(rand::thread_rng().gen_range(1..100));
+        let source_delay = Duration::from_secs(rand::thread_rng().gen_range(1..50));
 
         let v = std::iter::repeat_with(|| Duration::arbitrary(&mut u).unwrap())
             .take(100)
@@ -556,7 +556,6 @@ mod tests {
                 }
             }
 
-            // All sources now past their retry delay
             tokio::time::advance(source_delay).await;
         }
 
