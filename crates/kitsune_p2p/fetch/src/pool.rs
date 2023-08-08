@@ -274,7 +274,6 @@ impl<'a> Iterator for StateIter<'a> {
                 .map(|t| t.elapsed() >= self.config.item_retry_delay())
                 .unwrap_or(true); // true on the first fetch before `last_fetch` is set
             if item_not_recently_fetched {
-                // Sources are tested separately, no need to retest here
                 if let Some(source) = item.sources.next(self.config.source_retry_delay()) {
                     // TODO what if we're recently tried to use this source and it's not available? The retry delay does not apply across items
                     let space = item.space.clone();
