@@ -144,15 +144,8 @@ impl FetchPool {
 
     /// Get a list of the next items that should be fetched.
     pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
-        self.state.share_mut(|s| {
-            let mut out = Vec::new();
-
-            for (key, space, source, context) in s.iter_mut(&*self.config) {
-                out.push((key, space, source, context));
-            }
-
-            out
-        })
+        self.state
+            .share_mut(|s| s.iter_mut(&*self.config).collect())
     }
 }
 
@@ -174,6 +167,8 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = if let Some(author) = author {
+                    // TODO This is currently dead code, no callers provide the author. Even if they do, that's the only thing that the
+                    //      `source` can contain. The author field could actually be removed from the input type.
                     Sources(vec![SourceRecord::new(source), SourceRecord::agent(author)])
                 } else {
                     Sources(vec![SourceRecord::new(source)])
@@ -192,7 +187,7 @@ impl State {
                 v.sources.0.insert(0, SourceRecord::new(source));
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
-                    (a, b) => a.and(b),
+                    _ => None,
                 }
             }
         }
@@ -215,7 +210,7 @@ impl State {
     }
 
     /// Get a string summary of the queue's contents
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     pub fn summary(&self) -> String {
         use human_repr::HumanCount;
 
@@ -248,7 +243,7 @@ impl State {
     }
 
     /// The heading to go along with the summary
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     pub fn summary_heading() -> String {
         format!("{:10}  {:>6} {:>6} {}", "key", "#src", "last", "size")
     }
@@ -268,13 +263,11 @@ impl<'a> Iterator for StateIter<'a> {
             .state
             .queue
             .keys()
-            .take(NUM_ITEMS_PER_POLL) // TODO no tests of limiting
+            .take(NUM_ITEMS_PER_POLL)
             .cloned()
             .collect();
 
         for key in keys {
-            // All the keys we look at get pushed down the queue so with a large queue, they won't be visible on the following
-            // `next` call. But as soon as we find an item we haven't fetched for a while we can go ahead and return it.
             let item = self.state.queue.get_refresh(&key)?;
             let item_not_recently_fetched = item
                 .last_fetch
@@ -283,6 +276,7 @@ impl<'a> Iterator for StateIter<'a> {
             if item_not_recently_fetched {
                 // Sources are tested separately, no need to retest here
                 if let Some(source) = item.sources.next(self.config.source_retry_delay()) {
+                    // TODO what if we're recently tried to use this source and it's not available? The retry delay does not apply across items
                     let space = item.space.clone();
                     item.last_fetch = Some(Instant::now());
                     return Some((key, space, source, item.context));
@@ -433,6 +427,10 @@ mod tests {
         ix.into_iter().map(source).collect()
     }
 
+    fn arbitrary_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
+        sources(std::iter::repeat_with(|| u8::arbitrary(u).unwrap()).take(count))
+    }
+
     pub(super) fn ctx(c: u32) -> Option<FetchContext> {
         Some(c.into())
     }
@@ -563,6 +561,32 @@ mod tests {
     }
 
     #[test]
+    fn state_removes_context_on_merge_if_new_is_none() {
+        let mut q = State::default();
+        let cfg = Config(1, 1);
+
+        q.push(&cfg, req(1, ctx(1), source(1)));
+        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+
+        // Same key but difference source so that it will merge, but wipe out the context
+        q.push(&cfg, req(1, None, source(0)));
+        assert_eq!(None, q.queue.front().unwrap().1.context);
+    }
+
+    #[test]
+    fn state_ignores_duplicate_sources_on_merge() {
+        let mut q = State::default();
+        let cfg = Config(1, 1);
+
+        q.push(&cfg, req(1, ctx(1), source(1)));
+        assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
+
+        // Set a different context but otherwise the same operation as above
+        q.push(&cfg, req(1, ctx(2), source(1)));
+        assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
+    }
+
+    #[test]
     fn queue_push() {
         let mut q = State::default();
         let c = Config(1, 1);
@@ -628,6 +652,179 @@ mod tests {
         tokio::time::advance(Duration::from_secs(4)).await;
 
         assert_eq!(q.iter_mut(&cfg).count(), 3);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn state_iter_sees_all_items() {
+        let cfg = Config(1, 10);
+        let num_items = 2 * NUM_ITEMS_PER_POLL; // Must be great than NUM_ITEMS_PER_POLL
+
+        let mut q = {
+            let mut queue = vec![];
+            for i in 0..(num_items) {
+                queue.push((
+                    key_op(i as u8),
+                    item(&cfg, sources([(i % 100) as u8]), ctx(1)),
+                ))
+            }
+
+            State {
+                queue: queue.into_iter().collect(),
+            }
+        };
+
+        // None fetched initially, should see all items
+        assert_eq!(num_items, q.iter_mut(&cfg).count());
+
+        // Everything seen, no time elapsed
+        assert_eq!(0, q.iter_mut(&cfg).count());
+
+        // Move time forwards so everything will be ready to retry
+        tokio::time::advance(Duration::from_secs(30)).await;
+
+        assert_eq!(num_items, q.iter_mut(&cfg).count());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn state_iter_uses_all_sources() {
+        let cfg = Config(1, 10);
+        let num_items = 10;
+
+        let mut q = {
+            let mut queue = vec![];
+            for i in 0..num_items {
+                queue.push((
+                    key_op(i as u8),
+                    // Give each item a different set of sources
+                    item(
+                        &cfg,
+                        sources((i * num_items) as u8..(i * num_items + num_items) as u8),
+                        ctx(1),
+                    ),
+                ))
+            }
+
+            State {
+                queue: queue.into_iter().collect(),
+            }
+        };
+
+        let mut seen_sources = HashSet::new();
+        for _ in 0..num_items {
+            q.iter_mut(&cfg)
+                .map(|item| match item.2 {
+                    FetchSource::Agent(a) => a.0.clone(),
+                })
+                .for_each(|source| {
+                    seen_sources.insert(source);
+                });
+
+            // Move time forwards so everything will be ready to retry
+            tokio::time::advance(Duration::from_secs(30)).await;
+        }
+
+        assert_eq!(num_items * num_items, seen_sources.len());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn remove_fetch_item() {
+        let cfg = Config(1, 10);
+        let mut q = {
+            let queue = [(key_op(1), item(&cfg, sources([1]), ctx(1)))];
+
+            let queue = queue.into_iter().collect();
+            State { queue }
+        };
+
+        assert_eq!(1, q.iter_mut(&cfg).count());
+        q.remove(&key_op(1));
+
+        // Move time forwards to be able to retry the item
+        tokio::time::advance(Duration::from_secs(30)).await;
+
+        assert_eq!(0, q.iter_mut(&cfg).count());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn fetch_pool() {
+        // Use a nearly real fetch config.
+        struct TestFetchConfig {}
+        impl FetchPoolConfig for TestFetchConfig {
+            // Don't really care about this, but the default trait functions for timeouts are wanted for this test
+            fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+                a | b
+            }
+        }
+
+        // Prepare random inputs
+        let mut noise = [0; 1_000];
+        rand::thread_rng().fill_bytes(&mut noise);
+        let mut u = Unstructured::new(&noise);
+
+        // Create a fetch pool to test
+        let fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}));
+
+        // Some sources will be unavailable for blocks of time
+        let unavailable_sources: HashSet<FetchSource> =
+            arbitrary_sources(&mut u, 10).into_iter().collect();
+
+        // Add one item that will never send
+        fetch_pool.push(FetchPoolPush {
+            key: key_op(220),
+            space: space(u8::arbitrary(&mut u).unwrap()),
+            source: unavailable_sources.iter().last().cloned().unwrap(),
+            size: None,   // Not important for this test
+            author: None, // Unused field, ignore
+            context: ctx(u32::arbitrary(&mut u).unwrap()),
+        });
+
+        let mut failed_count = 0;
+        for i in (0..200).step_by(5) {
+            // Add five items to fetch
+            for _ in 0..5 {
+                fetch_pool.push(FetchPoolPush {
+                    key: key_op(i),
+                    space: space(u8::arbitrary(&mut u).unwrap()),
+                    source: source(u8::arbitrary(&mut u).unwrap()),
+                    size: None,   // Not important for this test
+                    author: None, // Unused field, ignore
+                    context: ctx(u32::arbitrary(&mut u).unwrap()),
+                });
+            }
+
+            // Try to process all items (because that's how this is used in practice)
+            let items = fetch_pool.get_items_to_fetch();
+            for item in items {
+                // If the source is available the fetch succeeds and we remove the item, otherwise leave it in the pool
+                if !unavailable_sources.contains(&item.2) {
+                    fetch_pool.remove(&item.0);
+                } else {
+                    failed_count += 1;
+                }
+            }
+
+            // Advance time to allow items retry with a difference source if necessary
+            tokio::time::advance(fetch_pool.config.item_retry_delay()).await;
+        }
+
+        // We created an item that will always fail, so should have at least one left
+        assert!(
+            fetch_pool.get_items_to_fetch().len() >= 1,
+            "Pool should have had at least one item but got \n {}",
+            fetch_pool.state.share_ref(|s| format!(
+                "{}\n{}",
+                State::summary_heading(),
+                s.summary()
+            ))
+        );
+
+        // 10 accounted for by the item we've set up to never succeed, possible to get more but not guaranteed to not
+        // asserting
+        assert!(
+            failed_count >= 10,
+            "At least 10 items should have failed to be fetched but was {}",
+            failed_count
+        );
     }
 
     #[test]
