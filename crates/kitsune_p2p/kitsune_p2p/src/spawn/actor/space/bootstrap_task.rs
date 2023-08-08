@@ -13,6 +13,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use url2::Url2;
 
+const MAX_AGENTS_PER_QUERY: u32 = 8;
+
 pub(super) struct BootstrapTask {
     is_finished: bool,
     current_delay: Duration,
@@ -102,7 +104,7 @@ impl BootstrapTask {
                 match bootstrap_query
                     .random(RandomQuery {
                         space: space.clone(),
-                        limit: 8.into(),
+                        limit: MAX_AGENTS_PER_QUERY.into(),
                     })
                     .await
                 {
@@ -110,6 +112,11 @@ impl BootstrapTask {
                         tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
                     }
                     Ok(list) => {
+                        if list.len() > MAX_AGENTS_PER_QUERY as usize {
+                            tracing::warn!("Expected no more than {} agents from the bootstrap server but got {}", MAX_AGENTS_PER_QUERY, list.len());
+                            continue;
+                        }
+
                         if !internal_sender.ghost_actor_is_active() {
                             break;
                         }
@@ -187,6 +194,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
     use tokio::task::AbortHandle;
+    use tokio::time::error::Elapsed;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn bootstrap_task_relays_agent_info_from_boostrap_server_to_host() {
@@ -376,9 +384,8 @@ mod tests {
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
     }
 
-    // TODO should this be trusted? It's an external call
     #[tokio::test(flavor = "multi_thread")]
-    async fn bootstrap_task_query_agent_limit_is_trusted() {
+    async fn bootstrap_task_query_agent_limit_is_checked() {
         // The code expects a max of 8 agents, send more
         let agents = std::iter::repeat_with(|| fixt!(AgentInfoSigned))
             .take(30)
@@ -391,10 +398,10 @@ mod tests {
         )
         .await;
 
-        let evt = host_stub.next_event(Duration::from_secs(5)).await;
+        let r = host_stub.try_next_event(Duration::from_secs(1)).await;
 
-        // TODO This should probably be an error rather than being forwarded to the host
-        assert_eq!(30, evt.peer_data.len());
+        // The error has to be an 'elapsed' error so that means nothing was sent to the host.
+        assert!(r.is_err());
 
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
     }
@@ -403,7 +410,7 @@ mod tests {
     async fn bootstrap_task_local_agents_in_response_are_filtered() {
         // The code expects a max of 8 agents, send more
         let agents = std::iter::repeat_with(|| fixt!(AgentInfoSigned))
-            .take(10)
+            .take(8)
             .collect::<Vec<_>>();
 
         let local_agents = agents.iter().take(3).cloned().collect::<HashSet<_>>();
@@ -413,7 +420,7 @@ mod tests {
 
         let evt = host_stub.next_event(Duration::from_secs(5)).await;
 
-        assert_eq!(7, evt.peer_data.len());
+        assert_eq!(5, evt.peer_data.len());
 
         test_sender.ghost_actor_shutdown_immediate().await.unwrap();
     }
@@ -746,6 +753,13 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap()
+        }
+
+        async fn try_next_event(
+            &mut self,
+            timeout: Duration,
+        ) -> Result<Option<PutAgentInfoSignedEvt>, Elapsed> {
+            tokio::time::timeout(timeout, self.put_events.next()).await
         }
 
         fn abort(&self) {
