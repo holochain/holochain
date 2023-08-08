@@ -365,7 +365,11 @@ pub enum FetchSource {
 
 #[cfg(test)]
 mod tests {
+    use arbitrary::Arbitrary;
+    use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;
+    use rand::{Rng, RngCore};
+    use std::collections::HashSet;
     use std::{sync::Arc, time::Duration};
 
     use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
@@ -520,6 +524,43 @@ mod tests {
         assert_eq!(sources.next(source_delay), Some(source(1)));
         assert_eq!(sources.next(source_delay), Some(source(2)));
         assert_eq!(sources.next(source_delay), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn source_rotation_uses_all_sources() {
+        let mut noise = [0; 1_000];
+        rand::thread_rng().fill_bytes(&mut noise);
+        let mut u = Unstructured::new(&noise);
+
+        let source_delay = Duration::from_secs(rand::thread_rng().gen_range(1..100));
+
+        let v = std::iter::repeat_with(|| Duration::arbitrary(&mut u).unwrap())
+            .take(100)
+            .enumerate()
+            .map(|(i, duration)| SourceRecord {
+                source: source(i as u8),
+                last_request: Instant::now().checked_sub(duration),
+            })
+            .collect();
+        let mut sources = Sources(v);
+
+        let mut seen_sources: HashSet<u8> = HashSet::new();
+        for _ in 0..100 {
+            if let Some(s) = sources.next(source_delay) {
+                match s {
+                    FetchSource::Agent(a) => {
+                        // The source agent key is a repeating byte array of the source number, so we can retrieve any
+                        // byte here to get the source number
+                        seen_sources.insert(a.0[0]);
+                    }
+                }
+            }
+
+            // All sources now past their retry delay
+            tokio::time::advance(source_delay).await;
+        }
+
+        assert_eq!(100, seen_sources.len());
     }
 
     #[test]
