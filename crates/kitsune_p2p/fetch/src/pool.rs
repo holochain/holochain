@@ -656,7 +656,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn state_iter_sees_all_items() {
         let cfg = Config(1, 10);
-        let num_items = 2 * NUM_ITEMS_PER_POLL; // Must be great than NUM_ITEMS_PER_POLL
+        let num_items = 2 * NUM_ITEMS_PER_POLL; // Must be greater than NUM_ITEMS_PER_POLL
 
         let mut q = {
             let mut queue = vec![];
