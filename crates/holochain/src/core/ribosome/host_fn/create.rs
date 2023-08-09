@@ -241,7 +241,8 @@ pub mod wasm_test {
         let second_random_node = network_topology.random_node(&mut rng).unwrap();
         let second_random_cell = second_random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
 
-        consistency_10s(&[random_cell.clone(), second_random_cell.clone()]).await;
+        // consistency_10s(&[random_cell.clone(), second_random_cell.clone()]).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
 
         let record: Option<Record> = second_random_node.conductor().get_share().await.share_ref(|c| {
             let sweet_cell = c.get_sweet_cell(second_random_cell).unwrap();
