@@ -13,7 +13,7 @@
 use std::sync::Arc;
 use tokio::time::{Duration, Instant};
 
-use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace /*, Tx2Cert*/};
+use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt};
@@ -169,9 +169,23 @@ impl State {
                 let sources = if let Some(author) = author {
                     // TODO This is currently dead code, no callers provide the author. Even if they do, that's the only thing that the
                     //      `source` can contain. The author field could actually be removed from the input type.
-                    Sources(vec![SourceRecord::new(source), SourceRecord::agent(author)])
+                    Sources(
+                        [
+                            (source.clone(), SourceRecord::new(source)),
+                            (
+                                FetchSource::Agent(author.clone()),
+                                SourceRecord::agent(author),
+                            ),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    )
                 } else {
-                    Sources(vec![SourceRecord::new(source)])
+                    Sources(
+                        [(source.clone(), SourceRecord::new(source))]
+                            .into_iter()
+                            .collect(),
+                    )
                 };
                 let item = FetchPoolItem {
                     sources,
@@ -184,10 +198,14 @@ impl State {
             }
             Entry::Occupied(mut e) => {
                 let v = e.get_mut();
-                v.sources.0.insert(0, SourceRecord::new(source));
+                v.sources
+                    .0
+                    .insert(source.clone(), SourceRecord::new(source));
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
-                    _ => None,
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
                 }
             }
         }
@@ -324,28 +342,25 @@ impl SourceRecord {
 
 /// Fetch item within the fetch queue state.
 #[derive(Debug, PartialEq, Eq)]
-struct Sources(Vec<SourceRecord>);
+struct Sources(LinkedHashMap<FetchSource, SourceRecord>);
 
 impl Sources {
     fn next(&mut self, interval: Duration) -> Option<FetchSource> {
-        if let Some((i, agent)) = self
-            .0
-            .iter()
-            .enumerate()
-            .find(|(_, s)| {
-                s.last_request
+        let source_keys: Vec<FetchSource> = self.0.keys().cloned().collect();
+        for source in source_keys {
+            if let Some(sr) = self.0.get_refresh(&source) {
+                if sr
+                    .last_request
                     .map(|t| t.elapsed() >= interval)
                     .unwrap_or(true)
-            })
-            .map(|(i, s)| (i, s.source.clone()))
-        {
-            self.0[i].last_request = Some(Instant::now());
-            // Rotate the sources so we search the ones we didn't consider this time first next time
-            self.0.rotate_left(i + 1);
-            Some(agent)
-        } else {
-            None
+                {
+                    sr.last_request = Some(Instant::now());
+                    return Some(source);
+                }
+            }
         }
+
+        None
     }
 }
 
@@ -406,7 +421,12 @@ mod tests {
         context: Option<FetchContext>,
     ) -> FetchPoolItem {
         FetchPoolItem {
-            sources: Sources(sources.into_iter().map(|s| SourceRecord::new(s)).collect()),
+            sources: Sources(
+                sources
+                    .into_iter()
+                    .map(|s| (s.clone(), SourceRecord::new(s)))
+                    .collect(),
+            ),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
             size: None,
@@ -437,11 +457,17 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn single_source() {
         let source_delay = Duration::from_secs(10);
-        let mut sources = Sources(vec![SourceRecord {
-            source: source(1),
-            last_request: None,
-        }
-        .into()]);
+        let mut sources = Sources(
+            [(
+                source(1),
+                SourceRecord {
+                    source: source(1),
+                    last_request: None,
+                },
+            )]
+            .into_iter()
+            .collect(),
+        );
 
         assert_eq!(sources.next(source_delay), Some(source(1)));
 
@@ -454,18 +480,26 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn source_rotation() {
         let source_delay = Duration::from_secs(10);
-        let mut sources = Sources(vec![
-            SourceRecord {
-                source: source(1),
-                last_request: Some(Instant::now()),
-            }
-            .into(),
-            SourceRecord {
-                source: source(2),
-                last_request: None,
-            }
-            .into(),
-        ]);
+        let mut sources = Sources(
+            [
+                (
+                    source(1),
+                    SourceRecord {
+                        source: source(1),
+                        last_request: Some(Instant::now()),
+                    },
+                ),
+                (
+                    source(2),
+                    SourceRecord {
+                        source: source(2),
+                        last_request: None,
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
@@ -493,23 +527,33 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn source_rotation_prioritises_less_recently_tried() {
         let source_delay = Duration::from_secs(10);
-        let mut sources = Sources(vec![
-            SourceRecord {
-                source: source(1),
-                last_request: Some(Instant::now()), // recently tried
-            }
-            .into(),
-            SourceRecord {
-                source: source(2),
-                last_request: None, // never checked
-            }
-            .into(),
-            SourceRecord {
-                source: source(3),
-                last_request: None, // never checked
-            }
-            .into(),
-        ]);
+        let mut sources = Sources(
+            [
+                (
+                    source(1),
+                    SourceRecord {
+                        source: source(1),
+                        last_request: Some(Instant::now()), // recently tried
+                    },
+                ),
+                (
+                    source(2),
+                    SourceRecord {
+                        source: source(2),
+                        last_request: None, // never checked
+                    },
+                ),
+                (
+                    source(3),
+                    SourceRecord {
+                        source: source(3),
+                        last_request: None, // never checked
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
 
         assert_eq!(sources.next(source_delay), Some(source(2)));
 
@@ -534,9 +578,14 @@ mod tests {
         let v = std::iter::repeat_with(|| Duration::arbitrary(&mut u).unwrap())
             .take(100)
             .enumerate()
-            .map(|(i, duration)| SourceRecord {
-                source: source(i as u8),
-                last_request: Instant::now().checked_sub(duration),
+            .map(|(i, duration)| {
+                (
+                    source(i as u8),
+                    SourceRecord {
+                        source: source(i as u8),
+                        last_request: Instant::now().checked_sub(duration),
+                    },
+                )
             })
             .collect();
         let mut sources = Sources(v);
@@ -560,16 +609,48 @@ mod tests {
     }
 
     #[test]
-    fn state_removes_context_on_merge_if_new_is_none() {
+    fn state_keeps_context_on_merge_if_new_is_none() {
         let mut q = State::default();
         let cfg = Config(1, 1);
 
         q.push(&cfg, req(1, ctx(1), source(1)));
         assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
 
-        // Same key but difference source so that it will merge, but wipe out the context
+        // Same key but different source so that it will merge and no context set to check how that is merged
         q.push(&cfg, req(1, None, source(0)));
+        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+    }
+
+    #[test]
+    fn state_adds_context_on_merge_if_current_is_none() {
+        let mut q = State::default();
+        let cfg = Config(1, 1);
+
+        // Initially have no context
+        q.push(&cfg, req(1, None, source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
+
+        // Now merge with a context
+        q.push(&cfg, req(1, ctx(1), source(0)));
+        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+    }
+
+    #[test]
+    fn state_can_merge_two_items_without_contexts() {
+        let mut q = State::default();
+        let cfg = Config(1, 1);
+
+        // Initially have no context
+        q.push(&cfg, req(1, None, source(1)));
+        assert_eq!(None, q.queue.front().unwrap().1.context);
+
+        // Now merge with no context
+        q.push(&cfg, req(1, None, source(0)));
+
+        // Still no context
+        assert_eq!(None, q.queue.front().unwrap().1.context);
+        // but both sources are present
+        assert_eq!(2, q.queue.front().unwrap().1.sources.0.len());
     }
 
     #[test]
@@ -590,9 +671,9 @@ mod tests {
         let mut q = State::default();
         let c = Config(1, 1);
 
-        // note: new sources get added to the front of the list
-        q.push(&c, req(1, ctx(1), source(1)));
+        // note: new sources get added to the back of the list
         q.push(&c, req(1, ctx(0), source(0)));
+        q.push(&c, req(1, ctx(1), source(1)));
 
         q.push(&c, req(2, ctx(0), source(0)));
 
@@ -617,7 +698,13 @@ mod tests {
             ];
             // Set the last_fetch time of one of the sources to something a bit earlier,
             // so it won't show up in next() right away
-            queue[1].1.sources.0[1].last_request = Some(Instant::now() - Duration::from_secs(3));
+            queue[1]
+                .1
+                .sources
+                .0
+                .get_mut(&source(2))
+                .unwrap()
+                .last_request = Some(Instant::now() - Duration::from_secs(3));
 
             let queue = queue.into_iter().collect();
             State { queue }
