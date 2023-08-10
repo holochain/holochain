@@ -167,8 +167,8 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = if let Some(author) = author {
-                    // TODO This is currently dead code, no callers provide the author. Even if they do, that's the only thing that the
-                    //      `source` can contain. The author field could actually be removed from the input type.
+                    // TODO This is currently not used. The idea is that the author will always be a valid alternative to fetch
+                    //      this data from. See one of the call sites for `push` to see where this was intended to be used from.
                     Sources(
                         [
                             (source.clone(), SourceRecord::new(source)),
