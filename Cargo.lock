@@ -7973,7 +7973,8 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.1-alpha.20"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afa82ed55446bdde187ffab3c5bfe23951bf1ed278d5c76f364034143e44822a"
 dependencies = [
  "bytes",
  "futures",
@@ -7996,7 +7997,8 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6de3181cafaf2cd7d1cd60c3367db5daf53a818159afa596f420bc2da1d7243d"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8013,7 +8015,8 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.12"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf314b4df2e2cff9823fe29d4c59055b9148d6452db0b2391bee144c8db42633"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -8025,7 +8028,8 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.13"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d6d4042550dd820769412782b4edb75aa0cd7de236ff89280c5fc4ceda69a13"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8043,7 +8047,8 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "925f258966cedc265cb2e1ba5a19be3007b562b203068d0c33967458695a680a"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8060,7 +8065,8 @@ dependencies = [
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.10"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e26fee2c1c3e227c8bae711545c7536d17a508af0a5e317296cce18afaff5b7"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8088,7 +8094,8 @@ dependencies = [
 [[package]]
 name = "tx5-signal-srv"
 version = "0.0.1-alpha.9"
-source = "git+https://github.com/holochain/tx5.git?rev=f0f009f77a84c96c2acded6b27df27ece3f7dbbb#f0f009f77a84c96c2acded6b27df27ece3f7dbbb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8359558d90ae7c4b2ff885619fcd75186cccdb62f575252c95c0c06484ce7de0"
 dependencies = [
  "clap 4.3.11",
  "dirs 5.0.1",
