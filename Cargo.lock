@@ -4049,7 +4049,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "test-case 1.2.3",
- "thiserror",
  "tokio",
  "tracing",
 ]
