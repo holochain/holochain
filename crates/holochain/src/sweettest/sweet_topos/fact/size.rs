@@ -3,8 +3,8 @@ use crate::sweettest::sweet_topos::node::NetworkTopologyNode;
 use contrafact::Fact;
 use contrafact::Generator;
 use contrafact::Mutation;
-use std::ops::RangeInclusive;
 use holochain_util::tokio_helper;
+use std::ops::RangeInclusive;
 
 /// Fact:
 /// - The network has a specific number of nodes.
@@ -20,7 +20,11 @@ pub struct SizedNetworkFact {
 
 impl SizedNetworkFact {
     /// Create a new fact with a number of nodes in the given range.
-    pub fn from_range(g: &mut Generator, nodes: RangeInclusive<usize>, agents: RangeInclusive<usize>) -> Mutation<Self> {
+    pub fn from_range(
+        g: &mut Generator,
+        nodes: RangeInclusive<usize>,
+        agents: RangeInclusive<usize>,
+    ) -> Mutation<Self> {
         Ok(Self {
             nodes: g.int_in_range(nodes, || "Couldn't build a fact in the range.")?,
             agents,
@@ -39,9 +43,7 @@ impl<'a> Fact<'a, NetworkTopology> for SizedNetworkFact {
             let mut node = NetworkTopologyNode::new();
             node.ensure_dnas(network_topology.dnas().to_vec());
             let n = g.int_in_range(self.agents.clone(), || "could not generate cells")?;
-            tokio_helper::block_forever_on(async {
-                node.generate_cells(n).await
-            });
+            tokio_helper::block_forever_on(async { node.generate_cells(n).await });
             network_topology.add_node(node);
             node_count = network_topology.node_count();
         }
@@ -73,7 +75,10 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_zero_nodes() {
         let mut g = unstructured_noise().into();
-        let fact = SizedNetworkFact { nodes: 0, agents: 1..=1 };
+        let fact = SizedNetworkFact {
+            nodes: 0,
+            agents: 1..=1,
+        };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 0);
         assert_eq!(graph.edge_count(), 0);
@@ -84,7 +89,10 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_single_node() {
         let mut g = unstructured_noise().into();
-        let fact = SizedNetworkFact { nodes: 1, agents: 1..=1 };
+        let fact = SizedNetworkFact {
+            nodes: 1,
+            agents: 1..=1,
+        };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 1);
         assert_eq!(graph.edge_count(), 0);
@@ -95,7 +103,10 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_dozen_nodes() {
         let mut g = unstructured_noise().into();
-        let fact = SizedNetworkFact { nodes: 12, agents: 1..=2 };
+        let fact = SizedNetworkFact {
+            nodes: 12,
+            agents: 1..=2,
+        };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 12);
         assert_eq!(graph.edge_count(), 0);

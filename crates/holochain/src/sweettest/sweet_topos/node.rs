@@ -4,7 +4,6 @@ use arbitrary::Arbitrary;
 use holo_hash::HasHash;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DnaFile;
-use holochain_util::tokio_helper;
 use holochain_zome_types::prelude::CellId;
 use rand::Rng;
 use std::collections::HashMap;
@@ -64,8 +63,7 @@ impl NetworkTopologyNode {
     /// Generate cells by generating agents under dna files. Currently only
     /// supports adding each generated agent to EVERY dna file.
     pub async fn generate_cells(&mut self, count: usize) {
-        let conductor_share = self.conductor.get_share().await;
-        let keystore = conductor_share.share_ref(|conductor| conductor.keystore());
+        let keystore = self.conductor.lock().await.read().keystore();
         let agents = SweetAgents::get(keystore, count).await;
 
         let dnas = self.agents.keys().cloned().collect::<Vec<_>>();
@@ -80,26 +78,30 @@ impl NetworkTopologyNode {
     pub async fn apply(&mut self) -> anyhow::Result<()> {
         let node_cells = self.cells().into_iter().collect::<HashSet<_>>();
 
-        let conductor_share = self.conductor.get_share().await;
-        let conductor_cells = conductor_share.share_ref(|conductor| {
-            conductor
-                .live_cell_ids()
-                .iter()
-                .cloned()
-                .collect::<HashSet<_>>()
-        });
+        let conductor_cells = self
+            .conductor
+            .lock()
+            .await
+            .read()
+            .live_cell_ids()
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
 
         for (dna_file, keys) in &self.agents {
             for key in keys {
                 let cell_id = CellId::new(dna_file.dna().as_hash().to_owned(), key.clone());
                 if !conductor_cells.contains(&cell_id) {
-                    conductor_share.share_mut(|conductor| {
-                        tokio_helper::block_forever_on(async move {
-                            conductor
-                                .setup_app_for_agent(&format!("{}", &cell_id), key.clone(), [&dna_file.clone()])
-                                .await
-                        })
-                    })?;
+                    self.conductor
+                        .lock()
+                        .await
+                        .write()
+                        .setup_app_for_agent(
+                            &format!("{}", &cell_id),
+                            key.clone(),
+                            [&dna_file.clone()],
+                        )
+                        .await?;
                 }
             }
         }
@@ -108,11 +110,13 @@ impl NetworkTopologyNode {
             .difference(&node_cells)
             .cloned()
             .collect::<Vec<_>>();
-        conductor_share.share_mut(|conductor| {
-            tokio_helper::block_forever_on(async move {
-                conductor.raw_handle().remove_cells(&cells_to_remove).await;
-            })
-        });
+        self.conductor
+            .lock()
+            .await
+            .write()
+            .raw_handle()
+            .remove_cells(&cells_to_remove)
+            .await;
 
         Ok(())
     }

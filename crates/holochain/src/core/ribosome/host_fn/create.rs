@@ -226,30 +226,39 @@ pub mod wasm_test {
 
         network_topology.apply().await.unwrap();
 
-        let random_node = network_topology.random_node(&mut rng).unwrap();
-        let random_cell = random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
-        // let random_cell = cells.next().unwrap();
-        // dbg!(&cells);
-        let cell = random_cell.clone();
-        let action_hash: ActionHash = random_node.conductor().get_share().await.share_ref(|c| {
-            let sweet_cell = c.get_sweet_cell(cell).unwrap();
-            tokio_helper::block_forever_on(async move {
-                c.call(&sweet_cell.zome(TestWasm::Create), "create_entry", ()).await
-            })
-        });
+        let alice_node = network_topology.random_node(&mut rng).unwrap();
+        let alice_cell = alice_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+        let alice = alice_node.conductor().lock().await.read().get_sweet_cell(alice_cell).unwrap();
 
-        let second_random_node = network_topology.random_node(&mut rng).unwrap();
-        let second_random_cell = second_random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+        let bob_node = network_topology.random_node(&mut rng).unwrap();
+        let bob_cell = bob_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+        let bob = bob_node.conductor().lock().await.read().get_sweet_cell(bob_cell).unwrap();
+
+        let _action_hash: ActionHash = alice_node.conductor().lock().await.write().call(&alice.zome(TestWasm::Create), "create_entry", ()).await;
+
+        consistency_10s(&[alice.clone(), bob.clone()]).await;
+
+        let record: Option<Record> = bob_node.conductor().lock().await.write().call(&bob.zome(TestWasm::Create), "get_entry", ()).await;
+
+        // let action_hash: ActionHash = random_node.conductor().get_share().await.share_ref(|c| {
+        //     let sweet_cell = c.get_sweet_cell(cell).unwrap();
+        //     tokio_helper::block_forever_on(async move {
+        //         c.call(&sweet_cell.zome(TestWasm::Create), "create_entry", ()).await
+        //     })
+        // });
+
+        // let second_random_node = network_topology.random_node(&mut rng).unwrap();
+        // let second_random_cell = second_random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
 
         // consistency_10s(&[random_cell.clone(), second_random_cell.clone()]).await;
-        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+        // tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
 
-        let record: Option<Record> = second_random_node.conductor().get_share().await.share_ref(|c| {
-            let sweet_cell = c.get_sweet_cell(second_random_cell).unwrap();
-            tokio_helper::block_forever_on(async move {
-                c.call(&sweet_cell.zome(TestWasm::Create), "get_entry", ()).await
-            })
-        });
+        // let record: Option<Record> = second_random_node.conductor().get_share().await.share_ref(|c| {
+        //     let sweet_cell = c.get_sweet_cell(second_random_cell).unwrap();
+        //     tokio_helper::block_forever_on(async move {
+        //         c.call(&sweet_cell.zome(TestWasm::Create), "get_entry", ()).await
+        //     })
+        // });
 
         dbg!(record);
     }

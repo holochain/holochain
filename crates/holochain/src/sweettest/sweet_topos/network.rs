@@ -1,12 +1,14 @@
 use crate::sweettest::sweet_topos::edge::NetworkTopologyEdge;
 use crate::sweettest::sweet_topos::node::NetworkTopologyNode;
 use crate::sweettest::SweetConductor;
+use crate::sweettest::SweetConductorConfig;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use async_once_cell::OnceCell;
 use contrafact::MutationError;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_types::prelude::DnaFile;
-use holochain_types::share::RwShare;
+use parking_lot::RwLock;
 use petgraph::algo::connected_components;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
@@ -17,18 +19,18 @@ use shrinkwraprs::Shrinkwrap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
-use crate::sweettest::SweetConductorConfig;
-use holochain_conductor_api::config::conductor::KeystoreConfig;
 
 /// Some orphan rule hoop jumping.
 #[derive(Clone, Debug, Default)]
-pub struct NetworkTopologyConductor(Arc<OnceCell<RwShare<SweetConductor>>>);
+pub struct NetworkTopologyConductor(Arc<OnceCell<RwLock<SweetConductor>>>);
 
 impl PartialEq for NetworkTopologyConductor {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.get(), other.0.get()) {
-            (Some(self_share), Some(other_share)) => {
-                self_share.share_ref(|c| c.id()) == other_share.share_ref(|c| c.id())
+            (Some(self_lock), Some(other_lock)) => {
+                let self_id = self_lock.read().id();
+                let other_id = other_lock.read().id();
+                self_id == other_id
             }
             _ => false,
         }
@@ -46,12 +48,11 @@ impl NetworkTopologyConductor {
 
     /// Get the conductor share for this node. This is an async function because
     /// it needs to initialize the conductor if it hasn't been initialized yet.
-    pub async fn get_share(&self) -> &RwShare<SweetConductor> {
-        dbg!("get_share");
+    pub async fn lock(&self) -> &RwLock<SweetConductor> {
         let mut config = SweetConductorConfig::standard();
         config.keystore = KeystoreConfig::DangerTestKeystore;
         self.0
-            .get_or_init(async { dbg!("get or init"); RwShare::new(SweetConductor::from_config(config).await) })
+            .get_or_init(async { RwLock::new(SweetConductor::from_config(config).await) })
             .await
     }
 }

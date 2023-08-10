@@ -31,8 +31,8 @@ impl SizedNodeFact {
 #[cfg(test)]
 mod test {
     use super::*;
-    use contrafact::Generator;
     use crate::prelude::unstructured_noise;
+    use contrafact::Generator;
 
     // Test that we can build a sized node fact with `SizedNodeFact::new`.
     #[test]

@@ -76,13 +76,13 @@ impl<'a> Fact<'a, NetworkTopology> for DenseNetworkFact {
 
 #[cfg(test)]
 pub mod test {
-    use petgraph::dot::{Dot, Config};
-    use crate::prelude::unstructured_noise;
-    use crate::sweettest::fact::size::SizedNetworkFact;
-    use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
     use super::DenseNetworkFact;
+    use crate::prelude::unstructured_noise;
+    use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
+    use crate::sweettest::fact::size::SizedNetworkFact;
     use crate::sweettest::sweet_topos::network::NetworkTopology;
     use contrafact::Fact;
+    use petgraph::dot::{Config, Dot};
 
     /// Test that we can build a dense network fact with `DenseNetworkFact::new`.
     #[test]
@@ -95,7 +95,10 @@ pub mod test {
     #[test]
     fn test_sweet_topos_dense_network() {
         let mut g = unstructured_noise().into();
-        let mut size_fact = SizedNetworkFact { nodes: 12, agents: 1..=2 };
+        let mut size_fact = SizedNetworkFact {
+            nodes: 12,
+            agents: 1..=2,
+        };
         let mut density_fact = DenseNetworkFact { density: 0.3 };
         let mut graph = NetworkTopology::default();
         graph = size_fact.mutate(&mut g, graph).unwrap();
