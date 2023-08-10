@@ -4032,6 +4032,7 @@ dependencies = [
 name = "kitsune_p2p_fetch"
 version = "0.3.0-beta-dev.6"
 dependencies = [
+ "arbitrary",
  "derive_more",
  "futures",
  "holochain_serialized_bytes 0.0.51",
@@ -4044,10 +4045,10 @@ dependencies = [
  "must_future",
  "num-traits",
  "pretty_assertions 0.7.2",
+ "rand 0.8.5",
  "serde",
  "serde_bytes",
  "test-case 1.2.3",
- "thiserror",
  "tokio",
  "tracing",
 ]
