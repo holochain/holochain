@@ -146,7 +146,10 @@ pub enum AdminRequest {
         /// The app ID to disable
         installed_app_id: InstalledAppId,
     },
-
+    StartApp {
+        /// The app ID to (re)start
+        installed_app_id: InstalledAppId,
+    },
     /// Open up a new websocket for processing [`AppRequest`]s.
     ///
     /// Any active app will be callable via the attached app interface.
@@ -417,7 +420,14 @@ pub enum AdminResponse {
     ///
     /// It means the app was disabled successfully.
     AppDisabled,
-
+    
+    /// The successful response to an [`AdminRequest::StartApp`].
+    ///
+    /// The boolean determines whether or not the app was actually started.
+    /// If `false`, it was because the app was in a disabled state, or the app
+    /// failed to start.
+    /// TODO: add reason why app couldn't start
+    AppStarted(bool),
     /// The successful response to an [`AdminRequest::DumpState`].
     ///
     /// The result contains a string of serialized JSON data which can be deserialized to access the
