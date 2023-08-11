@@ -647,10 +647,10 @@ where
         }
 
         // remote caller
-        let maybe_cap_grant: Option<CapGrant> = self
+        let maybe_cap_grant = self
             .vault
             .read_async({
-                let agent_pubkey = self.agent_pubkey().clone();
+                let author = self.agent_pubkey().clone();
                 move |txn| -> Result<_, DatabaseError> {
                     // closure to process resulting rows from query
                     let query_row_fn = |row: &Row| {
@@ -678,7 +678,7 @@ where
                         })?;
                         txn.query_row(
                             SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET,
-                            params![cap_secret_blob, agent_pubkey],
+                            params![cap_secret_blob, author],
                             query_row_fn,
                         )
                         .optional()?
@@ -687,43 +687,24 @@ where
                         // that has not been updated or deleted
                         txn.query_row(
                             SELECT_VALID_UNRESTRICTED_CAP_GRANT,
-                            params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
+                            params![CapAccess::Unrestricted.as_sql(), author],
                             query_row_fn,
                         )
                         .optional()?
                     };
 
-                    Ok(maybe_entry)
+                    let maybe_cap_grant = maybe_entry.and_then(|entry| entry.as_cap_grant());
+                    Ok(maybe_cap_grant)
                 }
             })
-            .await?
-            .and_then(|entry| entry.as_cap_grant());
+            .await?;
 
-        let valid_cap_grant = match maybe_cap_grant {
-            None => None,
-            Some(cap_grant) => {
-                // validate cap grant in itself, especially check if functions are authorized
-                if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
-                    return Ok(None);
-                }
-                match &cap_grant {
-                    CapGrant::RemoteAgent(zome_call_cap_grant) => {
-                        match &zome_call_cap_grant.access {
-                            // transferable and assigned cap grant when cap secret provided
-                            CapAccess::Transferable { .. } => Some(cap_grant),
-                            CapAccess::Assigned { assignees, .. } => {
-                                assignees.contains(&check_agent).then_some(cap_grant)
-                            }
-                            // unrestricted cap grant only possible without cap secret
-                            CapAccess::Unrestricted => Some(cap_grant),
-                        }
-                    }
-                    // chain author cap grant has been handled at the beginning
-                    CapGrant::ChainAuthor(_) => unreachable!(),
-                }
-            }
-        };
-        Ok(valid_cap_grant)
+        // check if assignees and functions are granted
+        Ok(maybe_cap_grant.and_then(|cap_grant| {
+            cap_grant
+                .is_valid(&check_function, &check_agent, check_secret.as_ref())
+                .then_some(cap_grant)
+        }))
     }
 
     /// Query Actions in the source chain.
@@ -1808,6 +1789,39 @@ pub mod tests {
             None
         );
 
+        // Two source chains of the same DNA on the same conductor share DB tables.
+        // That could lead to cap grants looked up by their secret alone being
+        // returned for any agent on the conductor.
+        // in this case for alice trying to access carol's chain
+        {
+            source_chain::genesis(
+                db.clone(),
+                dht_db.to_db(),
+                &dht_db_cache,
+                keystore.clone(),
+                fake_dna_hash(1),
+                carol.clone(),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            let carol_chain = SourceChain::new(
+                db.clone(),
+                dht_db.clone(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                carol.clone(),
+            )
+            .await
+            .unwrap();
+            let maybe_cap_grant = carol_chain
+                .valid_cap_grant(("".into(), "".into()), alice.clone(), secret.clone())
+                .await
+                .unwrap();
+            assert_eq!(maybe_cap_grant, None);
+        }
+
         // delete updated cap grant
         {
             let chain = SourceChain::new(
@@ -1901,6 +1915,43 @@ pub mod tests {
                 .await?,
             Some(unrestricted_grant.clone().into())
         );
+        // but not for bob's chain
+        //
+        // Two source chains of the same DNA on the same conductor share DB tables.
+        // That could lead to cap grants looked up by being unrestricted alone
+        // being returned for any agent on the conductor.
+        // in this case carol should not get an unrestricted cap grant for
+        // bob's chain
+        {
+            {
+                source_chain::genesis(
+                    db.clone(),
+                    dht_db.to_db(),
+                    &dht_db_cache,
+                    keystore.clone(),
+                    fake_dna_hash(1),
+                    bob.clone(),
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+                let bob_chain = SourceChain::new(
+                    db.clone(),
+                    dht_db.clone(),
+                    dht_db_cache.clone(),
+                    keystore.clone(),
+                    bob.clone(),
+                )
+                .await
+                .unwrap();
+                let maybe_cap_grant = bob_chain
+                    .valid_cap_grant(("".into(), "".into()), carol.clone(), None)
+                    .await
+                    .unwrap();
+                assert_eq!(maybe_cap_grant, None);
+            }
+        }
 
         // delete unrestricted cap grant
         {
