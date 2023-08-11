@@ -82,7 +82,10 @@ impl<C: FetchResponseConfig> FetchResponseQueue<C> {
             let _byte_permit = byte_permit;
 
             let _c_permit = match c_limit.acquire_owned().await {
-                Err(_) => panic!("Unexpected closed semaphore for concurrent_send_limit"),
+                Err(_) => {
+                    tracing::error!("Unexpected closed semaphore for concurrent_send_limit");
+                    return;
+                }
                 Ok(permit) => permit,
             };
 
