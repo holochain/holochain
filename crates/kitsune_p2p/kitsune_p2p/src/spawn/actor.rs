@@ -28,6 +28,7 @@ mod bootstrap;
 mod discover;
 pub(crate) mod meta_net;
 use meta_net::*;
+mod fetch;
 mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
@@ -164,46 +165,8 @@ impl KitsuneP2pActor {
         )
         .await?;
 
-        struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
-
-        impl kitsune_p2p_fetch::FetchResponseConfig for FetchResponseConfig {
-            type User = (
-                MetaNetCon,
-                String,
-                Option<(dht::prelude::RegionCoords, bool)>,
-            );
-
-            fn respond(
-                &self,
-                space: KSpace,
-                user: Self::User,
-                completion_guard: kitsune_p2p_fetch::FetchResponseGuard,
-                op: KOpData,
-            ) {
-                let timeout = self.0.implicit_timeout();
-                tokio::task::spawn(async move {
-                    let _completion_guard = completion_guard;
-
-                    // MAYBE: open a new connection if the con was closed??
-                    let (con, _url, region) = user;
-
-                    let item = wire::PushOpItem {
-                        op_data: op,
-                        region,
-                    };
-                    tracing::debug!("push_op_data: {:?}", item);
-                    let payload = wire::Wire::push_op_data(vec![(space, vec![item])]);
-
-                    if let Err(err) = con.notify(&payload, timeout).await {
-                        tracing::warn!(?err, "error responding to op fetch");
-                    }
-                });
-            }
-        }
-
-        let fetch_response_queue = kitsune_p2p_fetch::FetchResponseQueue::new(FetchResponseConfig(
-            config.tuning_params.clone(),
-        ));
+        let fetch_response_queue =
+            FetchResponseQueue::new(FetchResponseConfig::new(config.tuning_params.clone()));
 
         // TODO - use a real config
         let fetch_pool = FetchPool::new_bitwise_or();
@@ -764,7 +727,9 @@ async fn create_meta_net(
     }
 }
 
+use crate::spawn::actor::fetch::FetchResponseConfig;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+
 impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         use futures::sink::SinkExt;
