@@ -749,6 +749,7 @@ async fn update_single_agent_info(
 
 use crate::spawn::actor::space::bootstrap_task::BootstrapTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::GhostControlSender;
 
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
