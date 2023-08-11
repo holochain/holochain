@@ -180,7 +180,7 @@ mod tests {
     use crate::KitsuneP2pResult;
     use crate::{GossipModuleType, KitsuneP2pError};
     use fixt::prelude::*;
-    use futures::channel::mpsc::{channel, Receiver};
+    use futures::channel::mpsc::channel;
     use futures::future::BoxFuture;
     use futures::{FutureExt, SinkExt, StreamExt};
     use ghost_actor::actor_builder::GhostActorBuilder;
@@ -191,11 +191,9 @@ mod tests {
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
     use std::collections::HashSet;
-    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::{Duration, Instant};
-    use tokio::task::AbortHandle;
-    use tokio::time::error::Elapsed;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn bootstrap_task_relays_agent_info_from_boostrap_server_to_host() {

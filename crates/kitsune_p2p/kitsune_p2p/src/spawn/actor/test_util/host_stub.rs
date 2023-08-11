@@ -1,8 +1,8 @@
-use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender, PutAgentInfoSignedEvt};
+use crate::event::{KitsuneP2pEvent, PutAgentInfoSignedEvt};
 use crate::KitsuneP2pError;
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{FutureExt, SinkExt, StreamExt};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::AbortHandle;
