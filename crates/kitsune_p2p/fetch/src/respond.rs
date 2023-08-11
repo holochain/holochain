@@ -57,7 +57,7 @@ impl<C: FetchResponseConfig> FetchResponseQueue<C> {
     pub fn enqueue_op(&self, space: KSpace, user: C::User, op: KOpData) -> bool {
         let len = op.size();
 
-        // Don't try to take more permits than the byte_limit has. That would panic!
+        // Don't try to take more permits than the byte_limit has.
         if len > self.config.byte_limit() as usize {
             tracing::error!(
                 "op size is over configured limit {}",
