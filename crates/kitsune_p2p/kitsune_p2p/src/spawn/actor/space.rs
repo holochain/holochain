@@ -21,6 +21,7 @@ const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
 mod metric_exchange;
 use metric_exchange::*;
 
+mod bootstrap_task;
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
@@ -746,6 +747,7 @@ async fn update_single_agent_info(
     Ok(agent_info_signed)
 }
 
+use crate::spawn::actor::space::bootstrap_task::BootstrapTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use ghost_actor::GhostControlSender;
 
@@ -1452,73 +1454,16 @@ impl Space {
 
         if let NetworkType::QuicBootstrap = &config.network_type {
             // spawn the periodic bootstrap pull
-            let i_s_c = i_s.clone();
-            let evt_s_c = evt_sender.clone();
-            let bootstrap_service = config.bootstrap_service.clone();
-            let bootstrap_check_delay_backoff_multiplier = config
-                .tuning_params
-                .bootstrap_check_delay_backoff_multiplier;
-            let space_c = space.clone();
-            tokio::task::spawn(async move {
-                const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-                const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-                let mut delay_len = START_DELAY;
-
-                loop {
-                    if !i_s_c.ghost_actor_is_active() {
-                        break;
-                    }
-
-                    tokio::time::sleep(delay_len).await;
-                    if delay_len <= MAX_DELAY {
-                        delay_len *= bootstrap_check_delay_backoff_multiplier;
-                    }
-
-                    match super::bootstrap::random(
-                        bootstrap_service.clone(),
-                        kitsune_p2p_types::bootstrap::RandomQuery {
-                            space: space_c.clone(),
-                            limit: 8.into(),
-                        },
-                        bootstrap_net,
-                    )
-                    .await
-                    {
-                        Err(e) => {
-                            tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
-                        }
-                        Ok(list) => {
-                            if !i_s_c.ghost_actor_is_active() {
-                                break;
-                            }
-                            let mut peer_data = Vec::with_capacity(list.len());
-                            for item in list {
-                                // TODO - someday some validation here
-                                match i_s_c.is_agent_local(item.agent.clone()).await {
-                                    Err(err) => tracing::error!(?err),
-                                    Ok(is_local) => {
-                                        if !is_local {
-                                            // we got a result - let's add it to our store for the future
-                                            peer_data.push(item);
-                                        }
-                                    }
-                                }
-                            }
-                            if let Err(err) = evt_s_c
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space_c.clone(),
-                                    peer_data,
-                                })
-                                .await
-                            {
-                                tracing::error!(?err, "error storing bootstrap agent_info");
-                            }
-                        }
-                    }
-                }
-                tracing::warn!("bootstrap fetch loop ending");
-            });
+            BootstrapTask::spawn(
+                i_s.clone(),
+                evt_sender.clone(),
+                space.clone(),
+                config.bootstrap_service.clone(),
+                bootstrap_net,
+                config
+                    .tuning_params
+                    .bootstrap_check_delay_backoff_multiplier,
+            );
         }
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {
