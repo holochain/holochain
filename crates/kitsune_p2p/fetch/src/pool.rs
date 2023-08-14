@@ -154,6 +154,11 @@ impl FetchPool {
     pub fn len(&self) -> usize {
         self.state.share_ref(|s| s.queue.len())
     }
+
+    /// Check whether the fetch pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.state.share_ref(|s| s.queue.is_empty())
+    }
 }
 
 impl State {
