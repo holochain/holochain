@@ -367,6 +367,7 @@ impl<Network> CascadeImpl<Network>
 where
     Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
             op_light,
@@ -387,6 +388,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
         let RenderedOps { ops, entry } = ops;
         if let Some(entry) = entry {
@@ -399,6 +401,7 @@ where
     }
 
     /// Insert a set of agent activity into the Cache.
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_activity(
         txn: &mut Transaction,
         ops: Vec<RegisterAgentActivity>,
@@ -1144,6 +1147,7 @@ where
         Ok(r)
     }
 
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn am_i_authoring(&self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)

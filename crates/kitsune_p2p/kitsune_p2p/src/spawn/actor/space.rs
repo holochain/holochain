@@ -314,7 +314,6 @@ impl SpaceInternalHandler for Space {
         let agent_infos: Vec<AgentInfoSigned> = self
             .local_joined_agents
             .values()
-            .into_iter()
             .filter_map(|maybe_agent_info| maybe_agent_info.as_ref())
             .cloned()
             .collect();
@@ -846,7 +845,7 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_leave(
@@ -939,7 +938,7 @@ impl KitsuneP2pHandler for Space {
         let local_joined_agents = self.local_joined_agents.keys().cloned().collect();
         let fut =
             rpc_multi_logic::handle_rpc_multi(input, self.ro_inner.clone(), local_joined_agents);
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_broadcast(

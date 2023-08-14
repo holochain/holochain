@@ -1,9 +1,9 @@
-///! Crate for discovering Holochain peers over MDNS
-///! Works by broadcasting a service named `HC_SERVICE_NAME`
-///! and adding base64 encoded data in a TXT record
-///!
-///! Uses libmdns crate for broadcasting
-///! Uses mdns crate for discovery
+//! Crate for discovering Holochain peers over MDNS
+//! Works by broadcasting a service named `HC_SERVICE_NAME`
+//! and adding base64 encoded data in a TXT record
+//!
+//! Uses libmdns crate for broadcasting
+//! Uses mdns crate for discovery
 use err_derive::Error;
 use mdns::RecordKind;
 use std::time::Duration;
@@ -152,7 +152,6 @@ pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsRespon
                         //println!("PTR = {}", ptr);
                         service_name = ptr
                             .split('.')
-                            .into_iter()
                             .next()
                             .expect("Found service without a name")
                             .to_string();

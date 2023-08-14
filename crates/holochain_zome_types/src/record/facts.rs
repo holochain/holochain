@@ -79,7 +79,7 @@ mod tests {
             let a0 = action_facts::is_not_entry_action().build(g);
             let mut a1 = action_facts::is_new_entry_action().build(g);
             *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-            let a1 = Action::from(a1);
+            let a1 = a1;
 
             let pair1: Pair = (a0.clone(), RecordEntry::NA);
             let pair2: Pair = (a0.clone(), RecordEntry::Present(e.clone()));

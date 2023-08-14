@@ -118,10 +118,10 @@ impl<Kind: DbKindT> DbRead<Kind> {
         let mut conn = self
             .checkout_connection(self.read_semaphore.clone())
             .await?;
-        let r = tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
+
+        tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
             .await
-            .map_err(DatabaseError::from)?;
-        r
+            .map_err(DatabaseError::from)?
     }
 
     /// Intended to be used for transactions that need to be kept open for a longer period of time than just running a
@@ -316,10 +316,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         .map_err(DatabaseError::from)?;
 
         let mut conn = self.get_connection_from_pool()?;
-        let r = tokio::task::spawn_blocking(move || conn.execute_in_exclusive_rw_txn(f))
+
+        tokio::task::spawn_blocking(move || conn.execute_in_exclusive_rw_txn(f))
             .await
-            .map_err(DatabaseError::from)?;
-        r
+            .map_err(DatabaseError::from)?
     }
 
     pub fn available_writer_count(&self) -> usize {
