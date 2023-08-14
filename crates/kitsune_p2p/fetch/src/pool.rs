@@ -149,7 +149,7 @@ impl FetchPool {
     }
 
     /// Get the current size of the fetch pool. This is the number of outstanding items
-    /// and may be different to the size of response from [get_items_to_fetch] because it
+    /// and may be different to the size of response from `get_items_to_fetch` because it
     /// ignores retry delays.
     pub fn len(&self) -> usize {
         self.state.share_ref(|s| s.queue.len())
