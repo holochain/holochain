@@ -90,7 +90,7 @@ mod tests {
         let fetched = wait_for_fetch_n(internal_sender_test.clone(), 1).await;
 
         // The item should get fetched
-        assert_eq!(1, fetched.len());
+        assert_eq!(1, fetched.iter().flatten().count());
 
         // Simulate the requested item being sent back
         held_op_data.lock().insert(test_key_hash(1));
@@ -118,7 +118,7 @@ mod tests {
 
         let fetched = wait_for_fetch_n(internal_sender_test.clone(), 1).await;
 
-        assert_eq!(1, fetched.len());
+        assert_eq!(1, fetched.iter().flatten().count());
 
         // TODO No way to mark this as fetched?
 
@@ -169,6 +169,28 @@ mod tests {
         .expect("Task should have shut down but is reporting that it is still running");
 
         assert!(task.read().is_finished);
+    }
+
+    // TODO the API supports batch queries, why not query in batch? We are pushing extra requests through a bottleneck
+    #[tokio::test(start_paused = true)]
+    async fn fetch_checks_op_status_one_by_one_to_host() {
+        let (_task, fetch_pool, internal_sender_test, _held_op_data) =
+            setup(InternalStub::new()).await;
+
+        fetch_pool.push(test_req_op(1, None, test_source(1)));
+        fetch_pool.push(test_req_op(2, None, test_source(2)));
+        fetch_pool.push(test_req_op(3, None, test_source(3)));
+        wait_for_pool_n(&fetch_pool, 3).await;
+
+        // If this was a batch call we'd get 1 here and still 3 below
+        let fetched = wait_for_fetch_n(internal_sender_test.clone(), 3).await;
+
+        assert_eq!(3, fetched.iter().flatten().count());
+
+        internal_sender_test
+            .ghost_actor_shutdown_immediate()
+            .await
+            .unwrap();
     }
 
     async fn setup(
@@ -243,15 +265,15 @@ mod tests {
     async fn wait_for_fetch_n(
         internal_sender_test: GhostSender<InternalStubTest>,
         n: usize,
-    ) -> Vec<(FetchKey, KSpace, FetchSource)> {
+    ) -> Vec<Vec<(FetchKey, KSpace, FetchSource)>> {
         tokio::time::timeout(Duration::from_secs(1), async move {
             let mut all_calls = vec![];
 
             loop {
                 let calls = internal_sender_test.drain_fetch_calls().await.unwrap();
 
-                all_calls.extend(calls);
-                if all_calls.len() == n {
+                all_calls.push(calls);
+                if all_calls.iter().flatten().count() == n {
                     return all_calls;
                 }
             }
