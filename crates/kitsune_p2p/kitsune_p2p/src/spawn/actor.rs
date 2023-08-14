@@ -350,7 +350,7 @@ impl KitsuneP2pActor {
                                                     data => {
                                                         // one might be tempted to notify here
                                                         // as in Broadcast below... but we
-                                                        // notify all relevent agents inside
+                                                        // notify all relevant agents inside
                                                         // the space incoming_delegate_broadcast
                                                         // handler.
                                                         if let Err(err) = i_s
