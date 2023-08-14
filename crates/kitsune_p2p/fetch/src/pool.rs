@@ -147,6 +147,13 @@ impl FetchPool {
         self.state
             .share_mut(|s| s.iter_mut(&*self.config).collect())
     }
+
+    /// Get the current size of the fetch pool. This is the number of outstanding items
+    /// and may be different to the size of response from [get_items_to_fetch] because it
+    /// ignores retry delays.
+    pub fn len(&self) -> usize {
+        self.state.share_ref(|s| s.queue.len())
+    }
 }
 
 impl State {
@@ -583,11 +590,11 @@ mod tests {
         let mut q = State::default();
         let cfg = Config(1, 1);
 
-        q.push(&cfg, test_req(1, test_ctx(1), test_source(1)));
+        q.push(&cfg, test_req_op(1, test_ctx(1), test_source(1)));
         assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
 
         // Same key but different source so that it will merge and no context set to check how that is merged
-        q.push(&cfg, test_req(1, None, test_source(0)));
+        q.push(&cfg, test_req_op(1, None, test_source(0)));
         assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
     }
 
@@ -597,11 +604,11 @@ mod tests {
         let cfg = Config(1, 1);
 
         // Initially have no context
-        q.push(&cfg, test_req(1, None, test_source(1)));
+        q.push(&cfg, test_req_op(1, None, test_source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
 
         // Now merge with a context
-        q.push(&cfg, test_req(1, test_ctx(1), test_source(0)));
+        q.push(&cfg, test_req_op(1, test_ctx(1), test_source(0)));
         assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
     }
 
@@ -611,11 +618,11 @@ mod tests {
         let cfg = Config(1, 1);
 
         // Initially have no context
-        q.push(&cfg, test_req(1, None, test_source(1)));
+        q.push(&cfg, test_req_op(1, None, test_source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
 
         // Now merge with no context
-        q.push(&cfg, test_req(1, None, test_source(0)));
+        q.push(&cfg, test_req_op(1, None, test_source(0)));
 
         // Still no context
         assert_eq!(None, q.queue.front().unwrap().1.context);
@@ -628,11 +635,11 @@ mod tests {
         let mut q = State::default();
         let cfg = Config(1, 1);
 
-        q.push(&cfg, test_req(1, test_ctx(1), test_source(1)));
+        q.push(&cfg, test_req_op(1, test_ctx(1), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
 
         // Set a different context but otherwise the same operation as above
-        q.push(&cfg, test_req(1, test_ctx(2), test_source(1)));
+        q.push(&cfg, test_req_op(1, test_ctx(2), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
     }
 
@@ -642,10 +649,10 @@ mod tests {
         let c = Config(1, 1);
 
         // note: new sources get added to the back of the list
-        q.push(&c, test_req(1, test_ctx(0), test_source(0)));
-        q.push(&c, test_req(1, test_ctx(1), test_source(1)));
+        q.push(&c, test_req_op(1, test_ctx(0), test_source(0)));
+        q.push(&c, test_req_op(1, test_ctx(1), test_source(1)));
 
-        q.push(&c, test_req(2, test_ctx(0), test_source(0)));
+        q.push(&c, test_req_op(2, test_ctx(0), test_source(0)));
 
         let expected_ready = [
             (test_key_op(1), item(&c, test_sources(0..=1), test_ctx(1))),
