@@ -696,7 +696,7 @@ dependencies = [
 [[package]]
 name = "crates-index-helper"
 version = "0.1.0"
-source = "git+https://github.com/holochain/holochain-nixpkgs?rev=f6b9b4d9894996ad85643cb312a1e63b216d01b4#f6b9b4d9894996ad85643cb312a1e63b216d01b4"
+source = "git+https://github.com/holochain/holochain-nixpkgs?rev=04457444688f4a761062c05f35bd71c071053a72#04457444688f4a761062c05f35bd71c071053a72"
 dependencies = [
  "anyhow",
  "crates-index",
@@ -1554,6 +1554,7 @@ dependencies = [
  "gix-sec 0.8.4",
  "gix-tempfile 7.0.2",
  "gix-trace",
+ "gix-transport 0.34.2",
  "gix-traverse 0.30.1",
  "gix-url 0.21.1",
  "gix-utils",
@@ -1873,6 +1874,7 @@ version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "882695cccf38da4c3cc7ee687bdb412cf25e37932d7f8f2c306112ea712449f1"
 dependencies = [
+ "bytes",
  "crc32fast",
  "crossbeam-channel",
  "flate2",
@@ -2545,8 +2547,11 @@ version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "640cf03acc506e0350bc434dd6d7093d91343ed508d2c2166a41da856ab6e5e3"
 dependencies = [
+ "base64 0.21.2",
  "bstr 1.6.0",
+ "curl",
  "gix-command",
+ "gix-credentials 0.17.1",
  "gix-features 0.32.1",
  "gix-packetline 0.16.4",
  "gix-quote",

@@ -39,7 +39,7 @@ toml_edit = "0.2"
 thiserror = "1"
 regex = "1.5"
 itertools = "0.10"
-crates-index-helper = { git = "https://github.com/holochain/holochain-nixpkgs", rev = "f6b9b4d9894996ad85643cb312a1e63b216d01b4" }
+crates-index-helper = { git = "https://github.com/holochain/holochain-nixpkgs", rev = "04457444688f4a761062c05f35bd71c071053a72" }
 
 # used for the example clippy fix-json
 rustfix = "0.6"
