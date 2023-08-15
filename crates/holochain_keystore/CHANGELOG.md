@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - **breaking** Update to latest version of Lair keystore. This comes with a minor API change and some dependency 
-  changes but is otherwise compatible with the 0.2 series.
+  changes but is otherwise compatible with the 0.2 series. 
 
 ## 0.1.5
 
