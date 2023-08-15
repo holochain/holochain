@@ -76,12 +76,13 @@ mod tests {
     use kitsune_p2p_types::KOpHash;
     use parking_lot::{Mutex, RwLock};
     use std::collections::HashSet;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test(start_paused = true)]
     async fn fetch_single_op() {
-        let (_task, fetch_pool, internal_sender_test, held_op_data) =
+        let (_task, fetch_pool, internal_sender_test, held_op_data, _) =
             setup(InternalStub::new()).await;
 
         fetch_pool.push(test_req_op(1, None, test_source(1)));
@@ -110,7 +111,7 @@ mod tests {
     #[ignore = "open question"]
     #[tokio::test(start_paused = true)]
     async fn fetch_single_region() {
-        let (_task, fetch_pool, internal_sender_test, _held_op_data) =
+        let (_task, fetch_pool, internal_sender_test, _held_op_data, _) =
             setup(InternalStub::new()).await;
 
         fetch_pool.push(test_req_region(1, None, test_source(1)));
@@ -136,7 +137,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn fetch_task_shuts_down_if_internal_sender_closes() {
-        let (task, fetch_pool, internal_sender_test, _held_op_data) =
+        let (task, fetch_pool, internal_sender_test, _held_op_data, _) =
             setup(InternalStub::new()).await;
 
         // Do enough testing to prove the loop is up and running
@@ -174,7 +175,7 @@ mod tests {
     // TODO the API supports batch queries, why not query in batch? We are pushing extra requests through a bottleneck
     #[tokio::test(start_paused = true)]
     async fn fetch_checks_op_status_one_by_one_to_host() {
-        let (_task, fetch_pool, internal_sender_test, _held_op_data) =
+        let (_task, fetch_pool, internal_sender_test, _held_op_data, check_op_data_call_count) =
             setup(InternalStub::new()).await;
 
         fetch_pool.push(test_req_op(1, None, test_source(1)));
@@ -182,10 +183,12 @@ mod tests {
         fetch_pool.push(test_req_op(3, None, test_source(3)));
         wait_for_pool_n(&fetch_pool, 3).await;
 
-        // If this was a batch call we'd get 1 here and still 3 below
         let fetched = wait_for_fetch_n(internal_sender_test.clone(), 3).await;
 
         assert_eq!(3, fetched.iter().flatten().count());
+
+        // This should be 1 if we passed all the ops to check at once.
+        assert_eq!(3, check_op_data_call_count.load(Ordering::SeqCst));
 
         internal_sender_test
             .ghost_actor_shutdown_immediate()
@@ -200,6 +203,7 @@ mod tests {
         FetchPool,
         GhostSender<InternalStubTest>,
         Arc<Mutex<HashSet<KOpHash>>>,
+        Arc<AtomicUsize>,
     ) {
         let builder = GhostActorBuilder::new();
 
@@ -220,12 +224,15 @@ mod tests {
         let fetch_pool = FetchPool::new_bitwise_or();
 
         let op_data = Arc::new(Mutex::new(HashSet::<KOpHash>::new()));
+        let check_op_data_call_count = Arc::new(AtomicUsize::new(0));
 
         // TODO this logic should just be common, and the HostStub can expose a hashset instead that
         //      tests can add to as required.
         let host_stub = HostStub::with_check_op_data({
             let op_data = op_data.clone();
+            let check_op_data_call_count = check_op_data_call_count.clone();
             Box::new(move |_space, op_hashes, _ctx| {
+                check_op_data_call_count.fetch_add(1, Ordering::SeqCst);
                 let op_data = op_data.lock();
 
                 let held_hashes = op_hashes
@@ -238,7 +245,13 @@ mod tests {
         });
         let task = FetchTask::spawn(fetch_pool.clone(), host_stub, internal_sender);
 
-        (task, fetch_pool, internal_test_sender, op_data)
+        (
+            task,
+            fetch_pool,
+            internal_test_sender,
+            op_data,
+            check_op_data_call_count,
+        )
     }
 
     async fn wait_for_pool_n(fetch_pool: &FetchPool, n: usize) {
