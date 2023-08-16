@@ -2415,9 +2415,9 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63bba5629a49d90007bb81a27a9ba8f9c597a82246d44e73126130617f11c52b"
+checksum = "ded13e388a81713db6919cd750e6113acf2fe5afbaedf8aff79780ec4fc47425"
 dependencies = [
  "futures",
  "one_err",
@@ -3114,7 +3114,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3519,6 +3519,15 @@ dependencies = [
  "quick-xml",
  "rgb",
  "str_stack",
+]
+
+[[package]]
+name = "influxive-otel-atomic-obs"
+version = "0.0.1-alpha.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07bcce79167d27b8b2d639cf026029506ed3dfa7bf7ee402c29cab03a7afd16"
+dependencies = [
+ "ts_opentelemetry_api",
 ]
 
 [[package]]
@@ -3961,9 +3970,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.2.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d453c328fa04779277f6f4b8e4a71f2bd20e0f0566cb837e6f800bc58777e4a8"
+checksum = "843c7dbcbc8d75eef0b30397a7eb0d04549aabeff4ea69ebd272aea991555746"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions 1.4.0",
@@ -3977,9 +3986,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.2.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b379baacc103ee1939976fb8f32e6b8ae887a245fbde78bf1ef95e95b3035216"
+checksum = "5829f25d0eab6309ae4307aa645f123a64e568a41ec17c358dcbd65dec207e10"
 dependencies = [
  "base64 0.13.1",
  "dunce",
@@ -3992,6 +4001,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "time 0.3.23",
  "tokio",
  "toml 0.5.11",
  "toml 0.7.6",
@@ -7642,6 +7652,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ts_opentelemetry_api"
+version = "0.20.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d186495330f646b5881aeb3b83bac75b8a462d7ef32fda06a2a68f3869d5ba82"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "indexmap 1.9.3",
+ "js-sys",
+ "once_cell",
+ "pin-project-lite",
+ "thiserror",
+ "urlencoding",
+]
+
+[[package]]
 name = "tui"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7697,21 +7723,23 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.18"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54f5df4bf08ddcfd702f1b6a46f7ba81feaa55c4dc53685d02cb29c3fc1a0f2d"
+checksum = "a76decf02d813606a817a33793aa5b7bf3cbf8d85d1623157ca7b05ef939c5e1"
 dependencies = [
  "bytes",
  "futures",
+ "influxive-otel-atomic-obs",
  "once_cell",
  "parking_lot 0.12.1",
- "prometheus",
  "rand 0.8.5",
  "rand-utf8",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",
- "tx5-core",
+ "ts_opentelemetry_api",
+ "tx5-core 0.0.2-alpha",
  "tx5-go-pion",
  "tx5-signal",
  "url 2.4.0",
@@ -7736,10 +7764,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "tx5-go-pion"
-version = "0.0.1-alpha.11"
+name = "tx5-core"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15d7118da8a1353717e9a42b21d922933097c069e13ef8547c7be07efa8ea8a8"
+checksum = "062c8fa9036a5f4e2795e5d6abe1b2e4591f36d0480732ddc0e7405a7489d01f"
+dependencies = [
+ "base64 0.13.1",
+ "dirs 5.0.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.7",
+ "tempfile",
+ "tracing",
+ "url 2.4.0",
+]
+
+[[package]]
+name = "tx5-go-pion"
+version = "0.0.2-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fc0ceeb67c3c846ea7bb6f5d30088f75359a5a55646d80f6a01a3ec235a2eb5"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7750,9 +7796,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.1-alpha.12"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b249cfddf59d1a7593017785f9b73cb396145166c0a3fd1bc39214757a416d7a"
+checksum = "a12b039d7f78e57ab84b7db1293cd194147895b7b43a6a8910f1e82268756fbe"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -7763,7 +7809,7 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.7",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "zip",
 ]
 
@@ -7781,15 +7827,15 @@ dependencies = [
  "sha2 0.10.7",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.7",
  "zip",
 ]
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.1-alpha.10"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e26fee2c1c3e227c8bae711545c7536d17a508af0a5e317296cce18afaff5b7"
+checksum = "7698b18a456f298ae7c4bb3c2a5e76c7193242f0a53d91866cc9507e1ff4373b"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7809,7 +7855,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.18.0",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "url 2.4.0",
  "webpki-roots",
 ]
@@ -7831,7 +7877,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.7",
  "warp",
 ]
 
@@ -7993,6 +8039,12 @@ dependencies = [
  "serde",
  "url 1.7.2",
 ]
+
+[[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "utf-8"
