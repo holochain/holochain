@@ -2720,7 +2720,7 @@ dependencies = [
  "tracing-futures",
  "tracing-subscriber",
  "tx5-go-pion-turn",
- "tx5-signal-srv",
+ "tx5-signal-srv 0.0.2-alpha",
  "unwrap_to",
  "url 2.4.0",
  "url2",
@@ -2817,7 +2817,7 @@ dependencies = [
  "kitsune_p2p_bootstrap",
  "tokio",
  "tracing",
- "tx5-signal-srv",
+ "tx5-signal-srv 0.0.2-alpha",
 ]
 
 [[package]]
@@ -3932,7 +3932,7 @@ dependencies = [
  "tracing-subscriber",
  "ts_opentelemetry_api",
  "tx5",
- "tx5-signal-srv",
+ "tx5-signal-srv 0.0.1-alpha.9",
  "url2",
 ]
 
@@ -8002,13 +8002,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6de3181cafaf2cd7d1cd60c3367db5daf53a818159afa596f420bc2da1d7243d"
 dependencies = [
  "base64 0.13.1",
- "dirs 5.0.1",
  "once_cell",
  "rand 0.8.5",
  "serde",
  "serde_json",
- "sha2 0.10.7",
- "tempfile",
  "tracing",
  "url 2.4.0",
 ]
@@ -8065,9 +8062,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.1-alpha.7"
+version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "925f258966cedc265cb2e1ba5a19be3007b562b203068d0c33967458695a680a"
+checksum = "8e0194742195d3676fa8c2907995676604cd3ebf8e17fe7f0e9a50495092b945"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8077,7 +8074,7 @@ dependencies = [
  "sha2 0.10.7",
  "tokio",
  "tracing",
- "tx5-core 0.0.1-alpha.7",
+ "tx5-core 0.0.2-alpha",
  "zip",
 ]
 
@@ -8128,6 +8125,27 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tx5-core 0.0.1-alpha.7",
+ "warp",
+]
+
+[[package]]
+name = "tx5-signal-srv"
+version = "0.0.2-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dd44a26819757459b14994e728adeeb05931ca95605e54eb7733d01f3f130f8"
+dependencies = [
+ "clap 4.3.11",
+ "dirs 5.0.1",
+ "futures",
+ "if-addrs 0.10.1",
+ "once_cell",
+ "prometheus",
+ "rand 0.8.5",
+ "sodoken",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tx5-core 0.0.2-alpha",
  "warp",
 ]
 
