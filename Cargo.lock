@@ -2624,7 +2624,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.13"
+version = "0.3.0-beta-dev.14"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2731,7 +2731,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.13"
+version = "0.3.0-beta-dev.14"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2766,7 +2766,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.3.0-beta-dev.13"
+version = "0.3.0-beta-dev.14"
 dependencies = [
  "anyhow",
  "clap 4.3.11",
@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.3.0-beta-dev.13"
+version = "0.3.0-beta-dev.14"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2853,7 +2853,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.3.0-beta-dev.13"
+version = "0.3.0-beta-dev.14"
 dependencies = [
  "derive_more",
  "directories",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.3.0-beta-dev.12"
+version = "0.3.0-beta-dev.13"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3081,7 +3081,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.3.0-beta-dev.12"
+version = "0.3.0-beta-dev.13"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3883,7 +3883,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.10"
+version = "0.3.0-beta-dev.11"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4030,7 +4030,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.3.0-beta-dev.6"
+version = "0.3.0-beta-dev.7"
 dependencies = [
  "arbitrary",
  "derive_more",
