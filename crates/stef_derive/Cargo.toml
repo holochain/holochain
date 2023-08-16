@@ -1,0 +1,21 @@
+[package]
+name = "stef_derive"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+heck = "*"
+proc-macro2 = "1"
+proc-macro-error = "*"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+
+[dev-dependencies]
+stef = { path = "../stef" }
+
+[lib]
+proc-macro = true
+
+# [workspace]
