@@ -51,6 +51,8 @@ members = [
 [profile.release]
 opt-level = "z"
 
+[workspace.dependencies]
+serde = "<=0.1.166"
 
 [patch.crates-io]
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }
