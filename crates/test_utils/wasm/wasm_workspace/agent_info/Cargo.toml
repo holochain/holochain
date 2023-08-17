@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hdk = { path = "../../../../hdk", optional = true }
-serde = "1.0"
+serde = "=1.0.166"
 hdi = { path = "../../../../hdi" }
 
 [dev-dependencies]
