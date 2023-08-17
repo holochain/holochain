@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 
+## 0.3.0-beta-dev.14
+
 ## 0.3.0-beta-dev.13
 
 ## 0.3.0-beta-dev.12

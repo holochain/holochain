@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230816.003329
+
+## [holochain\_cli-0.3.0-beta-dev.14](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.14](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain-0.3.0-beta-dev.14](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.14](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_cascade-0.3.0-beta-dev.14](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_state-0.3.0-beta-dev.13](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_p2p-0.3.0-beta-dev.13](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [kitsune\_p2p-0.3.0-beta-dev.11](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.7](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.7)
+
+- Fix an issue with merging fetch contexts where merging an item with a context with an item that did not could result in the removal of the context.
+- Fix an issue where duplicate fetch sources would be permitted for a single item.
+
 # 20230809.004243
 
 ## [holochain\_cli-0.3.0-beta-dev.13](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.13)
