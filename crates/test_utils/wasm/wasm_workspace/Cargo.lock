@@ -124,7 +124,7 @@ version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
 dependencies = [
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -226,7 +226,7 @@ version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c59e92b5a388f549b863a7bea62612c09f24c8393560709a54558a9abdfb3b9c"
 dependencies = [
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -235,7 +235,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cfa25e60aea747ec7e1124f238816749faa93759c6ff5b31f1ccdda137f4479"
 dependencies = [
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -247,7 +247,7 @@ dependencies = [
  "camino",
  "cargo-platform",
  "semver 1.0.18",
- "serde 1.0.183",
+ "serde",
  "serde_json",
  "thiserror",
 ]
@@ -282,7 +282,7 @@ dependencies = [
  "android-tzdata",
  "iana-time-zone",
  "num-traits",
- "serde 1.0.183",
+ "serde",
  "time",
  "winapi",
 ]
@@ -750,7 +750,7 @@ dependencies = [
  "paste",
  "rand 0.8.5",
  "rand_core 0.6.4",
- "serde 1.0.183",
+ "serde",
  "strum",
  "strum_macros 0.18.0",
 ]
@@ -960,7 +960,7 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_wasmer_guest",
  "paste",
- "serde 0.9.15",
+ "serde",
  "serde_bytes",
  "tracing",
  "tracing-core",
@@ -978,7 +978,7 @@ dependencies = [
  "holochain_zome_types",
  "mockall",
  "paste",
- "serde 0.9.15",
+ "serde",
  "serde_bytes",
  "thiserror",
  "tracing",
@@ -1040,7 +1040,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "rand 0.8.5",
- "serde 1.0.183",
+ "serde",
  "serde_bytes",
  "thiserror",
 ]
@@ -1054,7 +1054,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
  "paste",
- "serde 1.0.183",
+ "serde",
  "serde_bytes",
  "subtle",
  "tracing",
@@ -1077,7 +1077,7 @@ dependencies = [
  "arbitrary",
  "holochain_serialized_bytes_derive",
  "rmp-serde",
- "serde 1.0.183",
+ "serde",
  "serde-transcode",
  "serde_bytes",
  "serde_json",
@@ -1099,7 +1099,7 @@ name = "holochain_test_wasm_common"
 version = "0.1.3"
 dependencies = [
  "hdk",
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -1109,7 +1109,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce2c50cfaf43ccfaf9c584eae3864dffb3f010f140dad6e52368f0969ce680d7"
 dependencies = [
  "holochain_serialized_bytes",
- "serde 1.0.183",
+ "serde",
  "serde_bytes",
  "test-fuzz",
  "thiserror",
@@ -1127,7 +1127,7 @@ dependencies = [
  "holochain_wasmer_common",
  "parking_lot 0.12.1",
  "paste",
- "serde 1.0.183",
+ "serde",
  "tracing",
 ]
 
@@ -1146,7 +1146,7 @@ dependencies = [
  "nanoid",
  "paste",
  "rand 0.8.5",
- "serde 1.0.183",
+ "serde",
  "serde_bytes",
  "serde_yaml",
  "shrinkwraprs",
@@ -1208,7 +1208,7 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg 1.1.0",
  "hashbrown 0.12.3",
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -1294,7 +1294,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "rand 0.8.5",
- "serde 1.0.183",
+ "serde",
  "statrs",
  "thiserror",
  "tracing",
@@ -1308,7 +1308,7 @@ dependencies = [
  "gcollections",
  "intervallum",
  "num-traits",
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -1318,7 +1318,7 @@ dependencies = [
  "arbitrary",
  "chrono",
  "derive_more",
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -2117,7 +2117,7 @@ checksum = "723ecff9ad04f4ad92fe1c8ca6c20d2196d9286e9c60727c4cb5511629260e9d"
 dependencies = [
  "byteorder",
  "rmp",
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -2202,7 +2202,7 @@ version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
 dependencies = [
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -2216,21 +2216,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "0.0.0"
+version = "1.0.166"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1bb2d9926b9bd18e51fc8edd663e311ff3b1fb96c9d4689854f8686f7c6c216"
-
-[[package]]
-name = "serde"
-version = "0.9.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34b623917345a631dc9608d5194cc206b3fe6c3554cd1c75b937e55e285254af"
-
-[[package]]
-name = "serde"
-version = "1.0.183"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32ac8da02677876d532745a130fc9d8e6edfa81a269b107c5b00829b91d8eb3c"
+checksum = "d01b7404f9d441d3ad40e6a636a7782c377d2abdbe4fa2440e2edcc2f4f10db8"
 dependencies = [
  "serde_derive",
 ]
@@ -2241,7 +2229,7 @@ version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "590c0e25c2a5bb6e85bf5c1bce768ceb86b316e7a01bdf07d2cb4ec2271990e2"
 dependencies = [
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -2250,14 +2238,14 @@ version = "0.11.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab33ec92f677585af6d88c65593ae2375adde54efdbf16d597f2cbc7a6d368ff"
 dependencies = [
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.183"
+version = "1.0.166"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aafe972d60b0b9bee71a91b92fee2d4fb3c9d7e8f6b179aa99f27203d99a4816"
+checksum = "5dd83d6dde2b6b2d466e14d9d1acce8816dedee94f735eac6395808b3483c6d6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2273,7 +2261,7 @@ dependencies = [
  "indexmap 2.0.0",
  "itoa",
  "ryu",
- "serde 1.0.183",
+ "serde",
 ]
 
 [[package]]
@@ -2285,7 +2273,7 @@ dependencies = [
  "indexmap 2.0.0",
  "itoa",
  "ryu",
- "serde 1.0.183",
+ "serde",
  "unsafe-libyaml",
 ]
 
@@ -2483,7 +2471,7 @@ version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "125df852011c4f8f31df5620f4aea38ecddb5dfb4d9bc569b30485b15ffc3d4e"
 dependencies = [
- "serde 1.0.183",
+ "serde",
  "test-fuzz-internal",
  "test-fuzz-macro",
  "test-fuzz-runtime",
@@ -2498,7 +2486,7 @@ dependencies = [
  "cargo_metadata",
  "proc-macro2",
  "quote",
- "serde 1.0.183",
+ "serde",
  "strum_macros 0.24.3",
 ]
 
@@ -2529,7 +2517,7 @@ dependencies = [
  "bincode",
  "hex",
  "num-traits",
- "serde 1.0.183",
+ "serde",
  "sha-1",
  "test-fuzz-internal",
 ]
@@ -2541,7 +2529,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2551,7 +2539,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2560,7 +2548,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2568,7 +2556,7 @@ name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2577,7 +2565,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
  "test_wasm_integrity_zome",
 ]
 
@@ -2587,7 +2575,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
  "test_wasm_integrity_zome",
 ]
 
@@ -2598,7 +2586,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2609,7 +2597,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2619,7 +2607,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2629,7 +2617,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2638,7 +2626,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
  "tracing",
  "tracing-core",
 ]
@@ -2649,7 +2637,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2658,7 +2646,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2667,7 +2655,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2676,7 +2664,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2685,7 +2673,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2695,7 +2683,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2704,7 +2692,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2713,7 +2701,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2721,7 +2709,7 @@ name = "test_wasm_init_fail"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2729,7 +2717,7 @@ name = "test_wasm_init_pass"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2738,7 +2726,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "holochain_mock_hdi",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2748,7 +2736,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2756,7 +2744,7 @@ name = "test_wasm_migrate_agent_fail"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2764,7 +2752,7 @@ name = "test_wasm_migrate_agent_pass"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2774,7 +2762,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2784,7 +2772,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
  "thiserror",
 ]
 
@@ -2793,7 +2781,7 @@ name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2802,7 +2790,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2811,7 +2799,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2821,7 +2809,7 @@ dependencies = [
  "fixt",
  "hdk",
  "rand 0.8.5",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2831,7 +2819,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2841,7 +2829,7 @@ dependencies = [
  "derive_more",
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2850,7 +2838,7 @@ version = "0.0.1"
 dependencies = [
  "fixt",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2858,7 +2846,7 @@ name = "test_wasm_sys_time"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2867,7 +2855,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2877,7 +2865,7 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2886,7 +2874,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2895,7 +2883,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2904,7 +2892,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2913,7 +2901,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2922,7 +2910,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2931,7 +2919,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2940,7 +2928,7 @@ version = "0.0.1"
 dependencies = [
  "hdk",
  "holochain_test_wasm_common",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2948,7 +2936,7 @@ name = "test_wasm_x_salsa20_poly1305"
 version = "0.0.1"
 dependencies = [
  "hdk",
- "serde 0.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -2958,7 +2946,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
- "serde 0.0.0",
+ "serde",
  "serde_yaml",
 ]
 
@@ -3260,7 +3248,7 @@ dependencies = [
  "enumset",
  "loupe",
  "rkyv",
- "serde 1.0.183",
+ "serde",
  "serde_bytes",
  "smallvec",
  "target-lexicon",
@@ -3314,7 +3302,7 @@ dependencies = [
  "memmap2",
  "more-asserts",
  "rustc-demangle",
- "serde 1.0.183",
+ "serde",
  "serde_bytes",
  "target-lexicon",
  "thiserror",
@@ -3338,7 +3326,7 @@ dependencies = [
  "loupe",
  "object 0.28.4",
  "rkyv",
- "serde 1.0.183",
+ "serde",
  "tempfile",
  "tracing",
  "wasmer-artifact",
@@ -3410,7 +3398,7 @@ dependencies = [
  "loupe",
  "more-asserts",
  "rkyv",
- "serde 1.0.183",
+ "serde",
  "thiserror",
 ]
 
@@ -3435,7 +3423,7 @@ dependencies = [
  "region",
  "rkyv",
  "scopeguard",
- "serde 1.0.183",
+ "serde",
  "thiserror",
  "wasmer-artifact",
  "wasmer-types",
