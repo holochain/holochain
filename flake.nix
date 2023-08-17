@@ -25,6 +25,12 @@
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # lib to build nix packages from rust crates
+    crane-release-automation = {
+      url = "github:ipetkov/crane";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # filter out all .nix files to not affect the input hash
     # when these are changes
     nix-filter.url = "github:numtide/nix-filter";
