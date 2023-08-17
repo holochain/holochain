@@ -104,35 +104,219 @@ pub fn must_get_agent_activity(
 
 #[cfg(test)]
 pub mod test {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use std::sync::Arc;
+
+    use crate::{
+        core::ribosome::wasm_test::RibosomeTestFixture,
+        sweettest::{SweetConductor, SweetZome},
+    };
+    use anyhow::Result as Fallible;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+
+    use self::utils::shared_values::SharedValues;
+
+    mod utils {
+        use anyhow::{bail, Result as Fallible};
+        use std::{collections::HashMap, sync::Arc};
+
+        pub(crate) mod shared_values {
+            use std::{
+                f32::consts::E,
+                sync::{Condvar, Mutex},
+            };
+
+            use serde::{Deserialize, Serialize};
+
+            use super::*;
+
+            static TEST_SHARED_VALUES_TYPE: &str = "TEST_SHARED_VALUES_TYPE";
+            static TEST_SHARED_VALUES_TYPE_LOCALV1: &str = "localv1";
+            static TEST_SHARED_VALUES_TYPE_REMOTEV1: &str = "remotev1";
+            static TEST_SHARED_VALUES_REMOTEV1_URL: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
+
+            #[derive(Clone, Default)]
+            pub(crate) struct LocalV1 {
+                notification: Arc<HashMap<String, Arc<Condvar>>>,
+                data: HashMap<String, Arc<Mutex<Option<String>>>>,
+            }
+
+            #[derive(Clone)]
+            pub(crate) struct RemoteV1 {
+                url: String,
+            }
+
+            /// Represents the message bus used by the agents to exchange information at runtime.
+            #[derive(Clone)]
+            pub(crate) enum SharedValues {
+                LocalV1(LocalV1),
+                RemoteV1(RemoteV1),
+            }
+
+            impl SharedValues {
+                /// Returns a new MessageBus by respecting the environment variables:
+                /// TEST_SHARED_VALUES_TYPE: can be either of
+                /// - `in`: creates a message bus for in-process messaging
+                /// - `remotev1`: creates a message bus for inter-process messaging. relies on another environment variable:
+                ///     - TEST_SHARED_VALUES_REMOTEV1_URL: a URL for the remote endpoint to connect the message bus to
+                pub(crate) fn new_from_env() -> Fallible<Self> {
+                    let bus_type = std::env::var(TEST_SHARED_VALUES_TYPE)
+                        .unwrap_or(TEST_SHARED_VALUES_TYPE_LOCALV1.to_string());
+
+                    if &bus_type == TEST_SHARED_VALUES_TYPE_LOCALV1 {
+                        Ok(Self::LocalV1(LocalV1::default()))
+                    } else if &bus_type == TEST_SHARED_VALUES_TYPE_REMOTEV1 {
+                        unimplemented!()
+                    } else {
+                        bail!("unknown message bus type: {bus_type}")
+                    }
+                }
+
+                /// Gets the `value` for `key`; waits for it to become available if necessary.
+                pub(crate) fn get<T: for<'a> Deserialize<'a>>(&mut self, key: &str) -> Fallible<T> {
+                    match self {
+                        SharedValues::LocalV1(localv1) => {
+                            let mut maybe_value = localv1
+                                .data
+                                .entry(key.to_string())
+                                .or_default()
+                                .lock()
+                                .expect("mutex poisened");
+
+                            while maybe_value.is_none() {
+                                dbg!("waiting for signal on {}", key);
+                                maybe_value = localv1
+                                    .notification
+                                    .entry(key.to_string())
+                                    .or_default()
+                                    .wait(maybe_value)
+                                    .expect("mutex poisoned");
+                            }
+                            dbg!("got signal on {}", key);
+
+                            if let Some(value) = &*maybe_value {
+                                Ok(serde_json::from_str(value)?)
+                            } else {
+                                unreachable!();
+                            }
+                        }
+                        SharedValues::RemoteV1(_) => unimplemented!(),
+                    }
+                }
+
+                /// Puts the `value` for `key` and sends it to a receiver if there is one waiting for it.
+                pub(crate) fn put<T: Serialize + for<'a> Deserialize<'a>>(
+                    &mut self,
+                    key: String,
+                    value: T,
+                ) -> Fallible<Option<T>> {
+                    match self {
+                        SharedValues::LocalV1(localv1) => {
+                            dbg!("putting in value for {}", &key);
+
+                            let mut maybe_value = localv1
+                                .data
+                                .entry(key.clone())
+                                .or_default()
+                                .lock()
+                                .expect("mutex poisoned");
+
+                            let maybe_previous_value = if let Some(previous_value) = &*maybe_value {
+                                serde_json::from_str(previous_value.as_str())?
+                            } else {
+                                None
+                            };
+
+                            *maybe_value = Some(serde_json::to_string(&value)?);
+
+                            if let Some(condvar) = localv1.notification.get(&key) {
+                                dbg!("notifying waiters on {}", &key);
+                                condvar.notify_all();
+                            } else {
+                                dbg!("no waiters for {}", &key);
+                            }
+
+                            Ok(maybe_previous_value)
+                        }
+                        SharedValues::RemoteV1(_) => unimplemented!(),
+                    }
+                }
+            }
+        }
+    }
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_must_get_agent_activity() {
-        holochain_trace::test_run().ok();
-        let RibosomeTestFixture {
-            conductor,
-            alice,
-            bob,
-            ..
-        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
+    static A_KEY: &str = "A";
+    static B_KEY: &str = "B";
+    static C_KEY: &str = "C";
+    static D_KEY: &str = "D";
+    static BOB_AGENT_PUBKEY_KEY: &str = "bobagentpubkey";
 
-        let a: ActionHash = conductor
-            .call(&bob, "commit_something", Something(vec![1]))
+    async fn bob_fn(
+        bob: SweetZome,
+        conductor: Arc<SweetConductor>,
+        mut shared_values: SharedValues,
+    ) -> Fallible<()> {
+        shared_values.put(
+            BOB_AGENT_PUBKEY_KEY.to_string(),
+            bob.cell_id().agent_pubkey().clone(),
+        )?;
+
+        shared_values
+            .put(
+                A_KEY.to_string(),
+                conductor
+                    .call::<_, ActionHash, _>(&bob, "commit_something", Something(vec![1]))
+                    .await,
+            )
+            .unwrap();
+
+        shared_values
+            .put(
+                B_KEY.to_string(),
+                conductor
+                    .call::<_, ActionHash, _>(&bob, "commit_something", Something(vec![2]))
+                    .await,
+            )
+            .unwrap();
+
+        shared_values
+            .put(
+                C_KEY.to_string(),
+                conductor
+                    .call::<_, ActionHash, _>(&bob, "commit_something", Something(vec![3]))
+                    .await,
+            )
+            .unwrap();
+
+        for i in 3..30 {
+            let _: ActionHash = conductor
+                .call(&bob, "commit_something", Something(vec![i]))
+                .await;
+        }
+
+        let d: ActionHash = conductor
+            .call(&bob, "commit_something", Something(vec![21]))
             .await;
 
-        let b: ActionHash = conductor
-            .call(&bob, "commit_something", Something(vec![2]))
-            .await;
+        shared_values.put(D_KEY.to_string(), d).unwrap();
 
-        let c: ActionHash = conductor
-            .call(&bob, "commit_something", Something(vec![3]))
-            .await;
+        Ok(())
+    }
+
+    async fn alice_fn(
+        alice: SweetZome,
+        conductor: Arc<SweetConductor>,
+        mut shared_values: SharedValues,
+    ) -> Fallible<()> {
+        let bob_agent_pubkey: ActionHash = shared_values.get(&BOB_AGENT_PUBKEY_KEY.to_string())?;
+
+        let a: ActionHash = shared_values.get(&A_KEY.to_string())?;
+        let b: ActionHash = shared_values.get(&B_KEY.to_string())?;
+        let c: ActionHash = shared_values.get(&C_KEY.to_string())?;
 
         let filter = ChainFilter::new(a.clone());
 
@@ -140,7 +324,7 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain",
-                (bob.cell_id().agent_pubkey().clone(), filter.clone()),
+                (bob_agent_pubkey.clone(), filter.clone()),
             )
             .await;
 
@@ -160,25 +344,17 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain_recursive",
-                (bob.cell_id().agent_pubkey().clone(), c.clone()),
+                (bob_agent_pubkey.clone(), c.clone()),
             )
             .await;
 
-        for i in 3..30 {
-            let _: ActionHash = conductor
-                .call(&bob, "commit_something", Something(vec![i]))
-                .await;
-        }
-
-        let d: ActionHash = conductor
-            .call(&bob, "commit_something", Something(vec![21]))
-            .await;
+        let d: ActionHash = shared_values.get(&D_KEY.to_string())?;
 
         let _: ActionHash = conductor
             .call(
                 &alice,
                 "commit_require_agents_chain_recursive",
-                (bob.cell_id().agent_pubkey().clone(), d.clone()),
+                (bob_agent_pubkey.clone(), d.clone()),
             )
             .await;
 
@@ -188,7 +364,7 @@ pub mod test {
             .call(
                 &alice,
                 "call_must_get_agent_activity",
-                (bob.cell_id().agent_pubkey().clone(), filter.clone()),
+                (bob_agent_pubkey.clone(), filter.clone()),
             )
             .await;
 
@@ -197,6 +373,69 @@ pub mod test {
                 .map(|op| op.action.hashed.hash)
                 .collect::<Vec<_>>(),
             vec![c, b, a]
-        )
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_must_get_agent_activity() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
+
+        let conductor = Arc::new(conductor);
+        let shared_values = utils::shared_values::SharedValues::new_from_env().unwrap();
+
+        let mut handles = vec![];
+
+        // TODO: introduce an env var that specifies a different conductor config
+        // TODO: introduce an env var that chooses to selects only one agent to run
+
+        // for (zome, closure) in [(bob, Box::new(bob_fn)), (alice, Box::new(alice_fn))]
+        //     as [(_, Box<fn(_, _, _) -> _>); 2]
+        // {
+        //     let conductor = Arc::clone(&conductor);
+        //     let shared_values = shared_values.clone();
+        //     handles.push(std::thread::spawn(move || {
+        //         holochain_util::tokio_helper::block_forever_on(closure(
+        //             zome,
+        //             conductor,
+        //             shared_values,
+        //         ))
+        //     }));
+        // }
+
+        {
+            let conductor = Arc::clone(&conductor);
+            let shared_values = shared_values.clone();
+            handles.push(std::thread::spawn(move || {
+                holochain_util::tokio_helper::block_forever_on(bob_fn(
+                    bob,
+                    conductor,
+                    shared_values,
+                ))
+            }));
+        }
+
+        {
+            let conductor = Arc::clone(&conductor);
+            let shared_values = shared_values.clone();
+            handles.push(std::thread::spawn(move || {
+                holochain_util::tokio_helper::block_forever_on(alice_fn(
+                    alice,
+                    conductor,
+                    shared_values,
+                ))
+            }));
+        }
+
+        for handle in handles {
+            let _ = handle.join().unwrap();
+        }
     }
 }
