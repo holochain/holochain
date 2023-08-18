@@ -155,6 +155,8 @@ fn state_impl(
 
     let mut fns = vec![];
 
+    let generics = &item.generics;
+
     for item in item.items {
         match item {
             syn::ImplItem::Type(ty) => {

@@ -1,0 +1,25 @@
+[package]
+name = "kitsune_p2p_gossip"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.3", path = "../dht" }
+kitsune_p2p_fetch = { version = "^0.3.0-beta-dev.5", path = "../fetch" }
+kitsune_p2p_host_api = { version = "^0.1.0", path = "../host_api" }
+kitsune_p2p_timestamp = { version = "^0.2.0", path = "../timestamp" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.5", path = "../types" }
+
+arrayref = "0.3.6"
+bloomfilter = { version = "1.0.5", features = ["serde"] }
+derive_more = "0.99"
+futures = "0.3"
+num-traits = "0.2"
+once_cell = "1"
+parking_lot = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1" }
+stef = { path = "../../stef" }
+thiserror = "1.0"
+tracing = "0.1"
+tokio = { version = "1.27", features = ["full"] }
