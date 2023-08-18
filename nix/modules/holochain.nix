@@ -10,10 +10,11 @@
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
-      opensslStatic = if system == "x86_64-darwin"
-                      then pkgs.openssl # pkgsStatic is considered a cross build
-                                        # and this is not yet supported
-                      else pkgs.pkgsStatic.openssl;
+      opensslStatic =
+        if system == "x86_64-darwin"
+        then pkgs.openssl # pkgsStatic is considered a cross build
+        # and this is not yet supported
+        else pkgs.pkgsStatic.openssl;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -159,6 +160,26 @@
         '';
       });
 
+      build-holochain-tests-coverage = craneLib.cargoTarpaulin (commonArgs // {
+        __noChroot = pkgs.stdenv.isLinux;
+        cargoArtifacts = holochainNextestDeps;
+
+        pname = "holochain-tests-coverage";
+
+        preCheck = ''
+          export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
+        '';
+
+        cargoExtraArgs = ''
+          ${import ../../.config/test-args.nix}
+        '';
+
+        dontPatchELF = true;
+        dontFixup = true;
+
+        nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ holochain ];
+      });
+
       holochainWasmArgs = (commonArgs // {
         pname = "holochain-tests-wasm";
 
@@ -226,6 +247,7 @@
             build-holochain-tests-static-doc
             build-holochain-tests-static-fmt
             build-holochain-tests-static-clippy
+            build-holochain-tests-coverage
             build-holochain-tests-static-all
 
             build-holochain-tests-all

@@ -44,6 +44,7 @@ jobs:
                 - build-release-automation-tests
                 - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
+                - build-holochain-tests-coverage
               extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
