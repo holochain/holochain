@@ -1,9 +1,9 @@
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
-use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::metrics::MetricRecord;
+use kitsune_p2p_types::{box_fut, KAgent, KSpace};
 
 use super::*;
 
@@ -37,7 +37,8 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
 
     fn get_agent_info_signed(
         &self,
-        _input: GetAgentInfoSignedEvt,
+        _space: KSpace,
+        _agent: KAgent,
     ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -47,7 +48,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         .into()))
     }
 
-    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+    fn remove_agent_info_signed(&self, space: KSpace, agent: KAgent) -> KitsuneHostResult<bool> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "remove_agent_info_signed",
@@ -167,13 +168,14 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
 
     fn get_agent_info_signed(
         &self,
-        input: GetAgentInfoSignedEvt,
+        space: KSpace,
+        agent: KAgent,
     ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
-        KitsuneHostDefaultError::get_agent_info_signed(self, input)
+        KitsuneHostDefaultError::get_agent_info_signed(self, space, agent)
     }
 
-    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
-        KitsuneHostDefaultError::remove_agent_info_signed(self, input)
+    fn remove_agent_info_signed(&self, space: KSpace, agent: KAgent) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(self, space, agent)
     }
 
     fn peer_extrapolated_coverage(

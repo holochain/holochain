@@ -127,5 +127,3 @@ kitsune_p2p_types::write_codec_enum! {
         },
     }
 }
-
-impl stef::ActionCompact for GossipMsg {}

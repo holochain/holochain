@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
-use kitsune_p2p_dht::region_set::RegionSetLtcs;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneOpHash};
-use kitsune_p2p_types::TimeWindow;
+
+/// An exclusive range of timestamps, measured in microseconds
+type TimeWindow = std::ops::Range<Timestamp>;
 
 pub use bloomfilter;
 use kitsune_p2p_types::tx2::tx2_utils::PoolBuf;

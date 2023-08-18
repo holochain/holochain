@@ -13,9 +13,8 @@ use kitsune_p2p_types::{
         spacetime::Topology,
     },
     dht_arc::DhtArcSet,
-    events::*,
     metrics::MetricRecord,
-    KOpData, KOpHash,
+    KAgent, KOpData, KOpHash, KSpace,
 };
 
 /// A boxed future result with dynamic error type
@@ -41,11 +40,12 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,
-        input: GetAgentInfoSignedEvt,
+        space: KSpace,
+        agent: KAgent,
     ) -> KitsuneHostResult<Option<AgentInfoSigned>>;
 
     /// Remove an agent info from storage
-    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool>;
+    fn remove_agent_info_signed(&self, space: KSpace, agent: KAgent) -> KitsuneHostResult<bool>;
 
     /// Extrapolated Peer Coverage.
     fn peer_extrapolated_coverage(
