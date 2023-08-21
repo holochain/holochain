@@ -80,3 +80,7 @@ and you may want to learn from their experiences and documentation:
 
 - https://github.com/NextGenSoftwareUK/OASIS-Holochain-hApp
 - https://github.com/holochain-open-dev/wiki/wiki/Installing-Holochain--&-Building-hApps-Natively-On-Windows
+
+There is also the c# client HoloNET which you may want to check out:
+
+https://github.com/holochain-open-dev/holochain-client-csharp
