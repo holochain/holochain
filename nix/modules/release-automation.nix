@@ -25,7 +25,7 @@
         track = "stable";
         version = "latest";
       };
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = inputs.crane-release-automation.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
         pname = "release-automation";
