@@ -2924,7 +2924,6 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_serialized_bytes 0.0.51",
- "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
  "paste",
  "serde",
