@@ -18,7 +18,7 @@ derive_more = "0.99.3"
 fallible-iterator = "0.2.0"
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.6"}
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.52"
 holochain_util = { version = "^0.2.0", path = "../holochain_util", features = ["backtrace"], optional = true }
 holochain_zome_types = { version = "^0.3.0-beta-dev.9", path = "../holochain_zome_types" }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.6", path = "../kitsune_p2p/types", optional = true }

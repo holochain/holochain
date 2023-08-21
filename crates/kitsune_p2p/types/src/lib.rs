@@ -14,6 +14,11 @@ pub mod dependencies {
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub use ::proptest;
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub use ::proptest_derive;
 }
 
 /// Typedef for result of `proc_count_now()`.
@@ -94,7 +99,7 @@ impl From<Tx2Cert> for Arc<[u8; 32]> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::from(u.bytes(32)?.to_vec()))

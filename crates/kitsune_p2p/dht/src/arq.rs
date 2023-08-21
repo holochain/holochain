@@ -117,6 +117,7 @@ impl ArqStart for SpaceOffset {
 /// In this case, there is no definite location associated, so we want to forget
 /// about the original Location data associated with each Arq.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct Arq<S: ArqStart = Loc> {
     /// The "start" defines the left edge of the arq
     pub start: S,

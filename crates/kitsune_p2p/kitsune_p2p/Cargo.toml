@@ -48,8 +48,10 @@ tx5 = { version = "=0.0.2-alpha", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.2.0"}
 
-# arbitrary could be made optional
-arbitrary = { version = "1.0", features = ["derive"] }
+# fuzzing
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
 
 blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
@@ -76,6 +78,13 @@ rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 [features]
 default = [ "tx2", "tx5" ]
 
+fuzzing = [
+  "arbitrary",
+  "proptest",
+  "proptest-derive",
+  "kitsune_p2p_timestamp/fuzzing",
+]
+
 test_utils = [
   "blake2b_simd",
   "tokio/test-util",
@@ -83,7 +92,7 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "maplit",
   "mockall",
-  "kitsune_p2p_timestamp/arbitrary",
+  "fuzzing",
 ]
 mock_network = [
   "kitsune_p2p_types/test_utils",

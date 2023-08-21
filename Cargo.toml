@@ -72,6 +72,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+proptest = { path = "/home/michael/gitfork/proptest/proptest" }
+
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
@@ -87,7 +89,11 @@ codegen-units = 16
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
+holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
+holochain_wasmer_common = { path = "../holochain-wasmer/crates/common" }
+holochain_serialized_bytes = { path = "../holochain-serialization/crates/holochain_serialized_bytes" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }

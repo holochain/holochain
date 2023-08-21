@@ -9,6 +9,9 @@ mod human;
 #[cfg(feature = "chrono")]
 pub use human::*;
 
+mod util;
+pub use util::*;
+
 use core::ops::{Add, Sub};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
@@ -43,7 +46,8 @@ pub const MM: i64 = 1_000_000;
 /// Supports +/- `chrono::Duration` directly.  There is no `Timestamp::now()` method, since this is not
 /// supported by WASM; however, `holochain_types` provides a `Timestamp::now()` method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(not(feature = "chrono"), derive(Debug))]
 pub struct Timestamp(
     /// Microseconds from UNIX Epoch, positive or negative
