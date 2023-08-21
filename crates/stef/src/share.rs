@@ -43,7 +43,7 @@ impl<S: State> State for Share<S> {
     type Effect = S::Effect;
 
     fn transition(&mut self, t: Self::Action) -> Self::Effect {
-        Share::transition(&self, t)
+        Share::transition(self, t)
     }
 }
 
