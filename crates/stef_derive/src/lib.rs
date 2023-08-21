@@ -51,11 +51,9 @@ pub fn state(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    if let Some(i) = item.clone().into_iter().next() {
-        if let proc_macro::TokenTree::Ident(i) = i {
-            if i.to_string() == "impl".to_string() {
-                return state_impl(attr, item);
-            }
+    if let Some(proc_macro::TokenTree::Ident(i)) = item.clone().into_iter().next() {
+        if &i.to_string() == "impl" {
+            return state_impl(attr, item);
         }
     }
     item
@@ -125,10 +123,7 @@ fn state_impl(
             syn::Ident::new(&self.f.sig.ident.to_string(), self.f.span())
         }
         fn impl_name(&self) -> Ident {
-            syn::Ident::new(
-                &format!("_stef_impl_{}", self.f.sig.ident.to_string()),
-                self.f.span(),
-            )
+            syn::Ident::new(&format!("_stef_impl_{}", self.f.sig.ident), self.f.span())
         }
         fn variant_name(&self) -> Ident {
             syn::Ident::new(
@@ -238,7 +233,7 @@ fn state_impl(
             }
         };
         original_func.sig.ident = syn::Ident::new(
-            &format!("_stef_impl_{}", original_func.sig.ident.to_string()),
+            &format!("_stef_impl_{}", original_func.sig.ident),
             f.f.span(),
         );
         original_func.sig.output = syn::ReturnType::Type(*rarr, output_type);
@@ -326,7 +321,6 @@ fn state_impl(
         }
         _ => todo!(),
     };
-    let effect_name = effect_name.clone();
 
     let define_transitions = delim::<_, Token!(,)>(fns.iter().map(|f| {
         let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
@@ -360,7 +354,7 @@ fn state_impl(
     )
     .expect("problem 8!");
 
-    define_state_impl.generics = item.generics.clone();
+    define_state_impl.generics = item.generics;
 
     let expanded = quote! {
         #define_action_enum

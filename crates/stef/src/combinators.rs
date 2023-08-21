@@ -42,9 +42,7 @@ impl<S: State> StoreEffects<S> {
     /// Drain and return all effects.
     /// Useful if you want to defer execution of some effects.
     pub fn drain_effects(&mut self) -> Vec<S::Effect> {
-        std::mem::replace(&mut self.effects, VecDeque::new())
-            .into_iter()
-            .collect()
+        std::mem::take(&mut self.effects).into_iter().collect()
     }
 }
 
