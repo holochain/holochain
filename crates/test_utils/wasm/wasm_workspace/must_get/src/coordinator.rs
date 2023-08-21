@@ -62,3 +62,8 @@ fn commit_require_self_prev_agents_chain(_: ()) -> ExternResult<()> {
     create_entry(EntryTypes::SelfPrevAgentsChain(SelfPrevAgentsChain))?;
     Ok(())
 }
+
+#[hdk_extern]
+fn noop(_: ()) -> ExternResult<()> {
+    Ok(())
+}
