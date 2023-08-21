@@ -248,9 +248,43 @@ pub(crate) fn search_remotes_covering_basis(
     }
 }
 
+pub(crate) trait GetCachedRemotesNearBasisSpace: 'static + Send + Sync {
+    fn space(&self) -> Arc<KitsuneSpace>;
+
+    fn query_agents(
+        &self,
+        query: QueryAgentsEvt,
+    ) -> MustBoxFuture<'static, KitsuneP2pResult<Vec<AgentInfoSigned>>>;
+
+    fn is_agent_local(
+        &self,
+        agent: Arc<KitsuneAgent>,
+    ) -> MustBoxFuture<'static, KitsuneP2pResult<bool>>;
+}
+
+impl GetCachedRemotesNearBasisSpace for Arc<SpaceReadOnlyInner> {
+    fn space(&self) -> Arc<KitsuneSpace> {
+        self.space.clone()
+    }
+
+    fn query_agents(
+        &self,
+        query: QueryAgentsEvt,
+    ) -> MustBoxFuture<'static, KitsuneP2pResult<Vec<AgentInfoSigned>>> {
+        self.evt_sender.query_agents(query)
+    }
+
+    fn is_agent_local(
+        &self,
+        agent: Arc<KitsuneAgent>,
+    ) -> MustBoxFuture<'static, KitsuneP2pResult<bool>> {
+        self.i_s.is_agent_local(agent)
+    }
+}
+
 /// local search for remote (non-local) agents closest to basis
-pub(crate) fn get_cached_remotes_near_basis(
-    inner: Arc<SpaceReadOnlyInner>,
+pub(crate) fn get_cached_remotes_near_basis<S: GetCachedRemotesNearBasisSpace>(
+    inner: S,
     basis_loc: DhtLocation,
     _timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
@@ -261,12 +295,11 @@ pub(crate) fn get_cached_remotes_near_basis(
     async move {
         let mut nodes = Vec::new();
 
-        let query = QueryAgentsEvt::new(inner.space.clone())
+        let query = QueryAgentsEvt::new(inner.space())
             .near_basis(basis_loc)
             .limit(LIMIT);
-        for node in inner.evt_sender.query_agents(query).await? {
+        for node in inner.query_agents(query).await? {
             if !inner
-                .i_s
                 .is_agent_local(node.agent.clone())
                 .await
                 .unwrap_or(true)
@@ -282,3 +315,6 @@ pub(crate) fn get_cached_remotes_near_basis(
         Ok(nodes)
     }
 }
+
+#[cfg(test)]
+mod test_get_cached_remotes_near_basis;
