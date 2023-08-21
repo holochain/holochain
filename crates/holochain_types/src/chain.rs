@@ -175,6 +175,20 @@ pub enum MustGetAgentActivityResponse {
     EmptyRange,
 }
 
+impl MustGetAgentActivityResponse {
+    /// Sort by the chain seq.
+    /// Dedupe by action hash.
+    pub fn normalize(&mut self) {
+        match self {
+            Self::Activity(activity) => {
+                activity.sort_unstable_by_key(|a| a.action.action().action_seq());
+                activity.dedup_by_key(|a| a.action.as_hash().clone());
+            }
+            _ => (),
+        }
+    }
+}
+
 impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
     /// Create an iterator that filters an iterator of actions
     /// with a [`ChainFilter`].
