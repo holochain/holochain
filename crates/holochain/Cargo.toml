@@ -56,7 +56,7 @@ rand = "0.8.5"
 rand-utf8 = "0.0.1"
 rpassword = "5.0.1"
 rusqlite = { version = "0.29" }
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = ">= 1.0, <= 1.0.166", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
@@ -92,8 +92,8 @@ holochain_test_wasm_common = { version = "^0.2.1", path = "../test_utils/wasm_co
 kitsune_p2p_bootstrap = { version = "^0.1.1", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = true }
-tx5-go-pion-turn = { version = "=0.0.1-alpha.7", optional = true }
-tx5-signal-srv = { version = "=0.0.1-alpha.9", optional = true }
+tx5-go-pion-turn = { version = "=0.0.2-alpha", optional = true }
+tx5-signal-srv = { version = "=0.0.2-alpha", optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
