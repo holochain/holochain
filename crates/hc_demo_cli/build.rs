@@ -18,9 +18,8 @@ fn main() {
 
 #[cfg(build_wasm)]
 fn find_target_dir() -> std::path::PathBuf {
-    let mut target_dir = std::path::PathBuf::from(
-        std::env::var_os("OUT_DIR").expect("failed getting out_dir"),
-    );
+    let mut target_dir =
+        std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("failed getting out_dir"));
     target_dir.pop(); // "out"
     target_dir.pop(); // "crate-[hash]"
     target_dir.pop(); // "build"
