@@ -62,22 +62,22 @@ pub fn state(
 }
 
 struct Options {
-    parameterized: Option<syn::Path>,
+    _parameterized: Option<syn::Path>,
 }
 
 impl syn::parse::Parse for Options {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut parameterized = None;
+        let mut _parameterized = None;
 
         while !input.is_empty() {
             let key: syn::Path = input.parse()?;
             if key.is_ident("parameterized") {
-                parameterized = Some(input.parse()?);
+                _parameterized = Some(input.parse()?);
             }
             let _: syn::Result<syn::Token![,]> = input.parse();
         }
 
-        Ok(Self { parameterized })
+        Ok(Self { _parameterized })
     }
 }
 
@@ -102,7 +102,7 @@ fn state_impl(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let Options { parameterized } = parse_macro_input!(attr as Options);
+    let Options { _parameterized: _ } = parse_macro_input!(attr as Options);
 
     let mut action_name = None;
     let mut effect_name = None;
@@ -121,7 +121,7 @@ fn state_impl(
     }
 
     impl F {
-        fn name(&self) -> Ident {
+        fn _name(&self) -> Ident {
             syn::Ident::new(&self.f.sig.ident.to_string(), self.f.span())
         }
         fn impl_name(&self) -> Ident {
@@ -319,7 +319,7 @@ fn state_impl(
     //     }
     //     _ => todo!(),
     // };
-    let action_name_nogeneric = match action_name.clone() {
+    let _action_name_nogeneric = match action_name.clone() {
         Type::Path(mut path) => {
             path.path.segments.last_mut().expect("problem 6!").arguments = Default::default();
             path

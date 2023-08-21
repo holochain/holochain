@@ -15,11 +15,6 @@ pub struct StoreEffects<S: State> {
     effects: VecDeque<S::Effect>,
 }
 
-pub enum Act<Ax: Action> {
-    Push(Ax),
-    Pop,
-}
-
 impl<S: State> State for StoreEffects<S> {
     type Action = S::Action;
     type Effect = ();
@@ -32,7 +27,7 @@ impl<S: State> State for StoreEffects<S> {
 
 impl<S: State> StoreEffects<S> {
     /// Constructor
-    pub fn new(state: S, capacity: usize) -> Self {
+    pub fn new(state: S, _capacity: usize) -> Self {
         Self {
             state,
             effects: VecDeque::new(),

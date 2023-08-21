@@ -1,14 +1,23 @@
+//! Experimental feature for producing "Monte-Carlo state diagrams" from
+//! random walks through state machines.
+//!
+//! TODO: more documentation and context
+
 use std::collections::{HashMap, HashSet};
 
 use crate::State;
 use petgraph::graph::DiGraph;
 use proptest::prelude::Arbitrary;
 
+/// A State which is capable of producing a "Monte-Carlo state diagram"
+/// from random walks through the state
 pub trait StateDiagrammable: State + Clone + Into<Self::Node>
 where
     Self::Action: Clone + Arbitrary,
 {
+    /// The type representing a node in the graph
     type Node: Clone + Eq + ToString + std::hash::Hash;
+    /// The type representing an edge in the graph
     type Edge: Clone + Eq + std::hash::Hash + From<Self::Action>;
 
     /// Generate a "Monte Carlo state diagram" of this state machine.

@@ -1,5 +1,3 @@
-use must_future::MustBoxFuture;
-
 /// The effect from a [`State::transition`].
 ///
 /// Effects must be deterministically produced, meaning that for a given
