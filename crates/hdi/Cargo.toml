@@ -18,7 +18,7 @@ holochain_wasmer_guest = "=0.0.84"
 # features, both here AND in hdk_derive, to reduce code bloat
 holochain_integrity_types = { version = "^0.3.0-beta-dev.8", path = "../holochain_integrity_types", default-features = false }
 paste = "1.0"
-serde = ">= 1.0, <= 1.0.166"
+serde = "1.0"
 serde_bytes = "0.11"
 # thiserror = "1.0.22"
 tracing = { version = "0.1", optional = true }
