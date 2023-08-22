@@ -230,9 +230,93 @@ impl stef::ParamState for GossipRound {
                 }
             }
             (Stage::Finished, msg) => {
-                todo!()
+                tracing::debug!("message received after round finished: {:?}", msg);
+                (Stage::Finished, vec![])
             }
-            _ => unexpected(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::Initiate(_)) => todo!(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::Accept(_)) => todo!(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::AgentDiff(_)) => todo!(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::AgentData(_)) => todo!(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::OpBloom(_)) => todo!(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::OpRegions(_)) => todo!(),
+            (GossipRoundStage::AwaitingAccept(_), Ax::OpData(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::Initiate(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::Accept(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::AgentDiff(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::AgentData(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::OpBloom(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::OpRegions(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentBlooms, Ax::OpData(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::Initiate(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::Accept(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::AgentDiff(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::AgentData(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::OpBloom(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::OpRegions(_)) => todo!(),
+            (GossipRoundStage::ExchangingAgentData, Ax::OpData(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::Initiate(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::Accept(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::AgentDiff(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::AgentData(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::OpBloom(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::OpRegions(_)) => todo!(),
+            (GossipRoundStage::ExchangingOpBlooms, Ax::OpData(_)) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::Initiate(_),
+            ) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::Accept(_),
+            ) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::AgentDiff(_),
+            ) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::AgentData(_),
+            ) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::OpBloom(_),
+            ) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::OpRegions(_),
+            ) => todo!(),
+            (
+                GossipRoundStage::ExchangingOpRegions {
+                    our_regions,
+                    their_regions,
+                },
+                Ax::OpData(_),
+            ) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::Initiate(_)) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::Accept(_)) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::AgentDiff(_)) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::AgentData(_)) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::OpBloom(_)) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::OpRegions(_)) => todo!(),
+            (GossipRoundStage::CollectingOpData, Ax::OpData(_)) => todo!(),
         })
     }
 }
