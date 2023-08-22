@@ -54,7 +54,13 @@ pub type NetworkSeed = String;
 
 #[allow(dead_code)]
 const fn standard_quantum_time() -> Duration {
-    kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
+    // TODO - put this in a common place that is imported
+    //        from both this crate and kitsune_p2p_dht
+    //        we do *not* want kitsune_p2p_dht imported into
+    //        this crate, because that pulls getrandom into
+    //        something that is supposed to be compiled
+    //        into integrity wasms.
+    Duration::from_secs(60 * 5)
 }
 
 /// Modifiers of this DNA - the network seed, properties and origin time - as

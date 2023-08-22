@@ -19,5 +19,5 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = "0.3.16"
 
-crossterm = "*"
-tui = "*"
+crossterm = "0.26"
+tui = "0.19"

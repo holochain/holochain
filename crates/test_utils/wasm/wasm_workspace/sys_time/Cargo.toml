@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hdk = { path = "../../../../hdk" }
-serde = "1.0"
+serde = { workspace = true }
 
 [dev-dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators"] }
