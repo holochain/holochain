@@ -56,6 +56,41 @@ async fn happy_path() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn is_agent_local_err() {
+    struct T;
+
+    impl GetCachedRemotesNearBasisSpace for T {
+        fn space(&self) -> Arc<KitsuneSpace> {
+            Arc::new(KitsuneSpace::new(vec![0x11; 32]))
+        }
+
+        fn query_agents(
+            &self,
+            _query: QueryAgentsEvt,
+        ) -> MustBoxFuture<'static, KitsuneP2pResult<Vec<AgentInfoSigned>>> {
+            async move { Ok(vec![mk_agent_info(1).await]) }
+                .boxed()
+                .into()
+        }
+
+        fn is_agent_local(
+            &self,
+            _agent: Arc<KitsuneAgent>,
+        ) -> MustBoxFuture<'static, KitsuneP2pResult<bool>> {
+            async move { Err(KitsuneP2pError::other("yo")) }
+                .boxed()
+                .into()
+        }
+    }
+
+    assert!(
+        get_cached_remotes_near_basis(T, 0.into(), KitsuneTimeout::from_millis(100))
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn removes_locals() {
     struct T;
 
