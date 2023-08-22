@@ -231,7 +231,7 @@ fn promote_addr(base_addr: &TxUrl, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
     Ok(ProxyUrl::new(base_addr.as_str(), cert.as_digest().clone())
         .map_err(KitsuneError::other)?
         .as_str()
-        .into())
+        .try_into()?)
 }
 
 #[derive(Clone)]
@@ -420,7 +420,7 @@ impl AsEpHnd for ProxyEpHnd {
             )
             .map_err(KitsuneError::other)?
             .as_str()
-            .into();
+            .try_into()?;
             Ok(proxy_addr)
         } else {
             let local_addr = self.sub_ep_hnd.local_addr()?;
@@ -428,7 +428,7 @@ impl AsEpHnd for ProxyEpHnd {
                 ProxyUrl::new(local_addr.as_str(), self.local_cert.as_digest().clone())
                     .map_err(KitsuneError::other)?
                     .as_str()
-                    .into();
+                    .try_into()?;
             Ok(proxy_addr)
         }
     }
@@ -472,13 +472,13 @@ impl AsEpHnd for ProxyEpHnd {
             }.boxed();
         }
 
-        let base_url: TxUrl = purl.as_base().as_str().into();
-
         let local_cert = self.local_cert.clone();
         let logic_hnd = self.logic_hnd.clone();
-        let con_fut = self.sub_ep_hnd.get_connection(base_url, timeout);
+        let sub_ep_hnd = self.sub_ep_hnd.clone();
         let inner = self.inner.clone();
         async move {
+            let base_url: TxUrl = purl.as_base().as_str().try_into()?;
+            let con_fut = sub_ep_hnd.get_connection(base_url, timeout);
             let sub_con = con_fut.await?;
             get_con_hnd(&inner, logic_hnd, sub_con, local_cert, peer_cert, true).await
         }
@@ -1023,7 +1023,7 @@ mod tests {
         conf.allow_proxy_fwd = true;
         let f = tx2_proxy(f, conf).unwrap();
 
-        let mut ep = f.bind("none:".into(), t).await.unwrap();
+        let mut ep = f.bind("none:".try_into().unwrap(), t).await.unwrap();
         let ephnd = ep.handle().clone();
         let addr = ephnd.local_addr().unwrap();
 
@@ -1072,10 +1072,11 @@ mod tests {
         let digest = ProxyUrl::from(nurl.as_str());
         let digest = digest.digest();
         let purl = ProxyUrl::from(purl.as_str());
-        ProxyUrl::new(purl.as_base().as_str(), digest)
-            .unwrap()
-            .as_str()
-            .into()
+        TxUrl::from_str_unsafe(
+            ProxyUrl::new(purl.as_base().as_str(), digest)
+                .unwrap()
+                .as_str(),
+        )
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1093,7 +1094,7 @@ mod tests {
             fake_tgt.into(),
         )
         .unwrap();
-        let fake_tgt = fake_tgt.as_str().into();
+        let fake_tgt = TxUrl::from_str_unsafe(fake_tgt.as_str());
         println!("Fake Tgt: {:?}", fake_tgt);
 
         let (s_done, r_done) = tokio::sync::oneshot::channel();

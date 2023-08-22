@@ -68,7 +68,7 @@ impl ShardedGossipLocal {
                             Node {
                                 agent_info_list: vec![info],
                                 cert,
-                                url: url.into(),
+                                url: url.try_into()?,
                             },
                         );
                     }
@@ -209,7 +209,6 @@ mod tests {
             .map(|_| {
                 let info = random_agent_info(&mut rng);
                 let url = info.url_list.get(0).unwrap().clone();
-                let url = TxUrl::from(url.as_str());
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],

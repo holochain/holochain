@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use proptest::strategy::{BoxedStrategy, Strategy};
 
+use crate::{tx2::tx2_pool::EpHnd, KitsuneError, KitsuneErrorKind, KitsuneResult};
+
 /// New-type for sync ref-counted Urls
 /// to make passing around tx2 more efficient.
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -11,6 +13,12 @@ impl TxUrl {
     /// reference this txurl as a Url2.
     pub fn as_url2(&self) -> &url2::Url2 {
         &self.0
+    }
+
+    /// Construct from a string which is known to be a valid URL.
+    /// Panics if the URL is not parseable.
+    pub fn from_str_unsafe(s: &str) -> Self {
+        url2::Url2::parse(s).into()
     }
 }
 
@@ -58,28 +66,61 @@ impl From<url2::Url2> for TxUrl {
     }
 }
 
-impl From<String> for TxUrl {
-    fn from(r: String) -> Self {
-        Self(Arc::new(url2::Url2::parse(r)))
+impl TryFrom<String> for TxUrl {
+    type Error = KitsuneError;
+
+    fn try_from(r: String) -> KitsuneResult<Self> {
+        Ok(Self(Arc::new(url2::Url2::try_parse(r.clone()).map_err(
+            |e| KitsuneError::from(KitsuneErrorKind::BadInput(Box::new(e), r)),
+        )?)))
     }
 }
 
-impl From<&String> for TxUrl {
-    fn from(r: &String) -> Self {
-        Self(Arc::new(url2::Url2::parse(r)))
+impl TryFrom<&String> for TxUrl {
+    type Error = KitsuneError;
+
+    fn try_from(r: &String) -> KitsuneResult<Self> {
+        Ok(Self(Arc::new(url2::Url2::try_parse(r).map_err(|e| {
+            KitsuneError::from(KitsuneErrorKind::BadInput(Box::new(e), r.clone()))
+        })?)))
     }
 }
 
-impl From<&str> for TxUrl {
-    fn from(r: &str) -> Self {
-        Self(Arc::new(url2::Url2::parse(r)))
+impl TryFrom<&str> for TxUrl {
+    type Error = KitsuneError;
+
+    fn try_from(r: &str) -> KitsuneResult<Self> {
+        Ok(Self(Arc::new(url2::Url2::try_parse(r).map_err(|e| {
+            KitsuneError::from(KitsuneErrorKind::BadInput(Box::new(e), r.to_string()))
+        })?)))
     }
 }
+
+// #[cfg(any(test, feature = "test_utils"))]
+// impl From<String> for TxUrl {
+//     fn from(r: String) -> Self {
+//         Self(Arc::new(url2::Url2::parse(r)))
+//     }
+// }
+
+// #[cfg(any(test, feature = "test_utils"))]
+// impl From<&String> for TxUrl {
+//     fn from(r: &String) -> Self {
+//         Self(Arc::new(url2::Url2::parse(r)))
+//     }
+// }
+
+// #[cfg(any(test, feature = "test_utils"))]
+// impl From<&str> for TxUrl {
+//     fn from(r: &str) -> Self {
+//         Self(Arc::new(url2::Url2::parse(r)))
+//     }
+// }
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl<'a> arbitrary::Arbitrary<'a> for TxUrl {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        String::arbitrary(u).map(Into::into)
+        todo!()
     }
 }
 
@@ -91,7 +132,7 @@ impl proptest::arbitrary::Arbitrary for TxUrl {
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
         proptest::string::string_regex(r"http://[a-z][a-z0-9-_]")
             .unwrap()
-            .prop_map(|s| TxUrl::from(s))
+            .prop_map(|s| TxUrl::try_from(s).unwrap())
             .boxed()
     }
 }

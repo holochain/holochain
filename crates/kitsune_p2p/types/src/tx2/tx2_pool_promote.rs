@@ -866,7 +866,7 @@ mod tests {
         // as old connections complete, new ones will be accepted
         let fact = tx2_pool_promote(fact, Default::default());
 
-        let mut tgt = fact.bind("none:".into(), t).await.unwrap();
+        let mut tgt = fact.bind("none:".try_into().unwrap(), t).await.unwrap();
         let tgt_hnd = tgt.handle().clone();
         let tgt_addr = tgt_hnd.local_addr().unwrap();
 
@@ -890,7 +890,7 @@ mod tests {
 
         let mut all_fut = Vec::new();
         for _ in 0..COUNT {
-            let ep_fut = fact.bind("none:".into(), t);
+            let ep_fut = fact.bind("none:".try_into().unwrap(), t);
             let w_send = w_send.clone();
             let tgt_addr = tgt_addr.clone();
             all_fut.push(async move {
