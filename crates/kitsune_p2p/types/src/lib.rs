@@ -249,6 +249,11 @@ pub enum KitsuneErrorKind {
     #[error("Unauthorized")]
     Unauthorized,
 
+    /// Bad external input.
+    /// Can't proceed, but we don't have to shut everything down, either.
+    #[error("Bad external input. Error: {0}  Input: {1}")]
+    BadInput(Box<dyn std::error::Error + Send + Sync>, String),
+
     /// Unspecified error.
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -281,6 +286,11 @@ impl KitsuneError {
     /// the "kind" of this KitsuneError
     pub fn kind(&self) -> &KitsuneErrorKind {
         &self.0
+    }
+
+    /// Create a bad_input error
+    pub fn bad_input(e: impl Into<Box<dyn std::error::Error + Send + Sync>>, i: String) -> Self {
+        Self(Arc::new(KitsuneErrorKind::BadInput(e.into(), i)))
     }
 
     /// promote a custom error type to a KitsuneError

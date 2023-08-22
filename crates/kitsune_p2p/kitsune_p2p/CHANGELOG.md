@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- There were some places where parsing an invalid URL would crash kitsune. This is now fixed.
+
 ## 0.3.0-beta-dev.11
 
 ## 0.3.0-beta-dev.10

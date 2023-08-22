@@ -24,6 +24,7 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::*;
 
@@ -491,6 +492,8 @@ impl MetaNet {
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         metrics: Tx2ApiMetrics,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+        use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
+
         let tuning_params = config.tuning_params.clone();
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
@@ -509,7 +512,7 @@ impl MetaNet {
                     tx2_mem_adapter(conf)
                         .await
                         .map_err(KitsuneP2pError::other)?,
-                    "none:".into(),
+                    TxUrl::from_str_unsafe("none:"),
                 )
             }
             /*
@@ -527,7 +530,7 @@ impl MetaNet {
             */
             KitsuneP2pTx2Backend::Mock { mock_network } => {
                 is_mock = true;
-                (mock_network, "none:".into())
+                (mock_network, TxUrl::from_str_unsafe("none:"))
             }
         };
 
