@@ -11,6 +11,7 @@ use std::collections::HashMap;
 /// nodes, and processes incoming messages from other nodes, routing them
 /// to the correct [`GossipRound`], and passing the side effects back to the
 /// gossip module so that new messages get sent and received data gets persisted.
+#[derive(Default)]
 pub struct GossipMux {
     rounds: HashMap<PeerId, GossipRound>,
 }
@@ -29,7 +30,7 @@ impl stef::State for GossipMux {
             round.transition(ax)
         } else if let round::Ax::Initiate(AxInitiate { msg, .. }) = ax {
             let params = round::GossipRoundParams::new(msg.plan, false);
-            let (mut round, fx) = GossipRound::new(params);
+            let (round, fx) = GossipRound::new(params);
             self.rounds.insert(peer_id.clone(), round);
             vec![fx]
         } else {

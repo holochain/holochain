@@ -5,7 +5,7 @@ use kitsune_p2p_types::{
 };
 
 use crate::{
-    bloom::{generate_agent_bloom, BloomFilter, EncodedBloom, MetaOpKey},
+    bloom::{generate_agent_bloom, EncodedBloom, MetaOpKey},
     codec::{self as msgs, GossipMsg},
 };
 
@@ -24,6 +24,7 @@ impl GossipRound {
 }
 
 #[derive(Debug, derive_more::Constructor)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct GossipRoundParams {
     /// The agreed-upon plan during handshake
     plan: GossipPlan,
@@ -82,6 +83,7 @@ impl GossipRoundStage {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct GossipPlan {
     pub exchange_agents: bool,
     pub diff_type: GossipDiffType,
@@ -98,12 +100,14 @@ impl GossipPlan {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub enum GossipDiffType {
     Bloom,
     Regions,
 }
 
-#[derive(derive_more::From)]
+#[derive(Debug, derive_more::From)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub enum Ax {
     Initiate(AxInitiate),
     Accept(AxAccept),
@@ -114,35 +118,49 @@ pub enum Ax {
     OpData(AxOpData),
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxInitiate {
     pub msg: msgs::Initiate,
     pub local_agents: Vec<KAgent>,
     pub local_arcset: DhtArcSet,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxAccept {
     pub msg: msgs::Accept,
     pub local_agents: Vec<KAgent>,
     pub local_arcset: Vec<DhtArcRange>,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxAgentDiff {
     pub msg: msgs::AgentDiff,
     pub local_agents: Vec<KAgentInfo>,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxAgentData {
     pub msg: msgs::AgentData,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxOpBloom {
     pub msg: msgs::OpBloom,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxOpRegions {
     pub msg: msgs::OpRegions,
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AxOpData {
     pub msg: msgs::OpData,
 }

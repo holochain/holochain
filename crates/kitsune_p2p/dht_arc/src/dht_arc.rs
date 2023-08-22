@@ -3,8 +3,6 @@
 use std::ops::Bound;
 use std::ops::RangeBounds;
 
-use kitsune_p2p_timestamp::ArbitraryFuzzing;
-
 use crate::*;
 
 pub const FULL_LEN: u64 = 2u64.pow(32);

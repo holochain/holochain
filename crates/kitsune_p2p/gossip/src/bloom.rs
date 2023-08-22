@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bloomfilter::Bloom;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneOpHash};
@@ -11,7 +12,24 @@ pub use bloomfilter;
 use kitsune_p2p_types::tx2::tx2_utils::PoolBuf;
 
 /// A bloom filter of Kitsune hash types
-pub type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
+#[derive(Debug, derive_more::Deref, derive_more::DerefMut, derive_more::From)]
+pub struct BloomFilter(bloomfilter::Bloom<MetaOpKey>);
+
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for BloomFilter {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::prelude::*;
+
+        (1usize.., 1usize.., any::<[u8; 32]>())
+            .prop_map(|(size, count, seed)| {
+                Self(bloomfilter::Bloom::new_with_seed(size, count, &seed))
+            })
+            .boxed()
+    }
+}
 
 const TGT_FP: f64 = 0.01;
 
@@ -36,6 +54,7 @@ pub enum MetaOpData {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct TimedBloomFilter {
     /// The bloom filter for the time window.
     /// If this is none then we have no hashes
@@ -45,8 +64,9 @@ pub struct TimedBloomFilter {
     pub time: TimeWindow,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 /// An encoded timed bloom filter of missing op hashes.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub enum EncodedTimedBloomFilter {
     /// I have no overlap with your agents
     /// Please don't send any ops.
@@ -79,6 +99,7 @@ impl EncodedTimedBloomFilter {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, derive_more::Deref)]
 #[serde(transparent)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct EncodedBloom(PoolBuf);
 
 impl EncodedBloom {
@@ -102,7 +123,7 @@ pub(crate) fn generate_agent_bloom(agents: Vec<AgentInfoSigned>) -> BloomFilter 
         bloom.set(&key);
     }
 
-    bloom
+    bloom.into()
 }
 
 fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
@@ -143,5 +164,5 @@ fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
     let k3 = u64::from_le_bytes(*arrayref::array_ref![bloom, 28, 8]);
     let k4 = u64::from_le_bytes(*arrayref::array_ref![bloom, 36, 8]);
     let sip_keys = [(k1, k2), (k3, k4)];
-    bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys)
+    bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys).into()
 }

@@ -6,9 +6,9 @@ pub mod error;
 pub mod gossip_type;
 pub mod metrics;
 
-mod module;
-mod mux;
-mod round;
+pub mod module;
+pub mod mux;
+pub mod round;
 
 mod traits;
 pub use traits::*;
