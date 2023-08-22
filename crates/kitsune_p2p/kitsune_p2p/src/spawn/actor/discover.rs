@@ -299,11 +299,7 @@ pub(crate) fn get_cached_remotes_near_basis<S: GetCachedRemotesNearBasisSpace>(
             .near_basis(basis_loc)
             .limit(LIMIT);
         for node in inner.query_agents(query).await? {
-            if !inner
-                .is_agent_local(node.agent.clone())
-                .await
-                .unwrap_or(true)
-            {
+            if !inner.is_agent_local(node.agent.clone()).await? {
                 nodes.push(node);
             }
         }
