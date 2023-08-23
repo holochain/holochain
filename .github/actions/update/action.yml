@@ -67,7 +67,6 @@ runs:
           autorebase:opt-in
         draft: false
         delete-branch: true
-        reviewers: steveej
     - name: Enable Pull Request Automerge
       if: steps.cpr1.outputs.pull-request-operation == 'created' || steps.cpr1.outputs.pull-request-operation == 'updated'
       uses: peter-evans/enable-pull-request-automerge@v3
