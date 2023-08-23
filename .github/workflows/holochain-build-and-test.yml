@@ -80,7 +80,7 @@ jobs:
   # ensures the cache is regularly updated for the supported versions on multiple platforms
   cache-update:
     # This only runs on develop because it points at develop anyway, no need for maintenance branches to do the same job
-    if: github.ref == 'refs/heads/develop'
+    # if: github.ref == 'refs/heads/develop'
     strategy:
       fail-fast: false
       matrix:
