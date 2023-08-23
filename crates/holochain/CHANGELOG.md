@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.1.6-beta-rc.0
+
 - Remove the preview tx5 feature, if you need tx5 please upgrade to the 0.2 series of Holochain or later.
 
 ## 0.1.5
