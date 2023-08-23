@@ -26,19 +26,16 @@ impl ChainHeadCoordinator for ChcRemote {
             200 => Ok(()),
             409 => {
                 let bytes = response.bytes().await.map_err(extract_string)?;
-                dbg!(bytes.as_ref());
                 let (seq, hash): (u32, ActionHash) = holochain_serialized_bytes::decode(&bytes)?;
                 Err(ChcError::InvalidChain(seq, hash))
             }
             498 => {
                 let bytes = response.bytes().await.map_err(extract_string)?;
-                dbg!(bytes.as_ref());
                 let seq: u32 = holochain_serialized_bytes::decode(&bytes)?;
                 Err(ChcError::NoRecordsAdded(seq))
             }
             code => {
                 let msg = response.text().await.map_err(extract_string)?;
-                dbg!(&msg);
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
         }
@@ -53,7 +50,6 @@ impl ChainHeadCoordinator for ChcRemote {
         match status {
             200 => {
                 let bytes = response.bytes().await.map_err(extract_string)?;
-                dbg!(bytes.as_ref());
                 Ok(holochain_serialized_bytes::decode(&bytes)?)
             }
             498 => {
@@ -63,7 +59,6 @@ impl ChainHeadCoordinator for ChcRemote {
             }
             code => {
                 let msg = response.text().await.map_err(extract_string)?;
-                dbg!(&msg);
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
         }
