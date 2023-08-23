@@ -12,7 +12,7 @@ edition = "2021"
 [dependencies]
 holo_hash = { version = "^0.3.0-beta-dev.6", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_util = { version = "^0.2.0", path = "../holochain_util" }
+holochain_util = { version = "^0.2.0", path = "../holochain_util", default-features = false }
 paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
