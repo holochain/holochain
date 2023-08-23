@@ -70,7 +70,7 @@ jobs:
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
-          CACHIX_AUTH_TOKEN: "${{ secrets.TS_CACHIX_TOKEN }}"
+          CACHIX_AUTH_TOKEN: "${{ secrets.TS_CACHIX_TOKENnoexist }}"
         run: |
           set -xe
 
@@ -101,5 +101,6 @@ jobs:
           
             ls -al
             
+            echo $CACHIX_AUTH_TOKEN
             cachix push thetasinner-testing $profile_name
           fi
