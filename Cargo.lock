@@ -3003,6 +3003,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.52"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=proptest#b1ab125e6310ecc53712c118bef0d582fd858a9b"
 dependencies = [
  "arbitrary",
  "holochain_serialized_bytes_derive",
@@ -3019,6 +3020,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.52"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=proptest#b1ab125e6310ecc53712c118bef0d582fd858a9b"
 dependencies = [
  "quote 1.0.33",
  "syn 1.0.109",
@@ -3242,6 +3244,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.84"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-hsb#1f87aadaa4335d1f09eb9aaa07f1cc801692bf1e"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -3255,6 +3258,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.84"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-hsb#1f87aadaa4335d1f09eb9aaa07f1cc801692bf1e"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -3267,6 +3271,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.84"
+source = "git+https://github.com/holochain/holochain-wasmer.git?branch=bump-hsb#1f87aadaa4335d1f09eb9aaa07f1cc801692bf1e"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes",
@@ -5663,6 +5668,7 @@ dependencies = [
 [[package]]
 name = "proptest"
 version = "1.2.0"
+source = "git+https://github.com/maackle/proptest?branch=arbitrary-pathbuf#0736d405d7545d585141e439ee7cae8271533741"
 dependencies = [
  "bit-set",
  "bitflags 2.4.0",

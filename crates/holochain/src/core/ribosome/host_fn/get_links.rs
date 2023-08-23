@@ -95,7 +95,6 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::ribosome::host_fn::hash::hash;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
@@ -204,7 +203,6 @@ pub mod slow_tests {
             .call(&alice, "list_anchor_addresses", "foo".to_string())
             .await;
 
-        // should be 2 anchors under "foo" sorted by hash
         assert_eq!(list_anchor_addresses_output.0.len(), 2);
         assert_eq!(
             (list_anchor_addresses_output.0)[0].get_raw_32().to_vec(),
