@@ -8,6 +8,9 @@ on:
         required: false
         type: string
         default: "."
+    secrets:
+      TS_CACHIX_TOKEN:
+        required: true
 
 jobs:
   "test":
@@ -98,9 +101,7 @@ jobs:
             nix develop --profile $profile_name -c true \
               ${{ matrix.cmd.extra_arg }} \
               .#devShells.${system}.holonix
-          
-            ls -al
-            
+
             cachix authtoken $CACHIX_AUTH_TOKEN
             cachix push thetasinner-testing $profile_name
           fi
