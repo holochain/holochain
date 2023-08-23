@@ -75,8 +75,6 @@ rec {
     ]);
   });
 
-
-
   ci = hcMkShell {
     inputsFrom = [
       (builtins.removeAttrs coreDev [ "shellHook" ])
@@ -102,4 +100,8 @@ rec {
       rustup
     ];
   });
+
+  holonix = mkShell {
+    inputsFrom = [ holonix.main ];
+  };
 }

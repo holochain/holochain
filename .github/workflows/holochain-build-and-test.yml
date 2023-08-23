@@ -19,18 +19,22 @@ jobs:
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+            extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/weekly\" --override-input holochain ${{ inputs.repo_path }}"
+            cache_push: false
 
           # ensures to keep the cache populated for the supported versions on multiple platforms
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2"
+            extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/0_2\""
+            cache_push: true
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_1"
+            extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/0_1\""
+            cache_push: true
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly"
+            extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/weekly\""
+            cache_push: true
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
@@ -44,7 +48,8 @@ jobs:
                 - build-release-automation-tests
                 - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
-              extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
+              extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/weekly\" --override-input holochain ${{ inputs.repo_path }}"
+              cache_push: false
             platform:
               system: x86_64-linux
 
@@ -65,6 +70,7 @@ jobs:
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          CACHIX_AUTH_TOKEN: "${{ secrets.TS_CACHIX_TOKEN }}"
         run: |
           set -xe
 
@@ -84,3 +90,14 @@ jobs:
           #   export basecmd="nix run -L --show-trace .#packages.${system}."
           #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
           # fi
+          
+          if [[ ${{ matrix.cmd.cache_push }} == "true" ]]; then
+            # See https://docs.cachix.org/pushing#id1
+          
+            profile_name=holonix-cache-${system}
+            nix develop --profile $profile_name -c true \
+              ${{ matrix.cmd.extra_arg }} \
+              .#devShells.${system}.holonix
+          
+            cachix push thetasinner-testing $profile_name
+          fi
