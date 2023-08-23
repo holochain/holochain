@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230823.003418
+
+## [holochain\_cli-0.3.0-beta-dev.15](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.7](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.13](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain-0.3.0-beta-dev.15](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.15)
+
+- **BREAKING CHANGE** updating the project lock file to use the latest version of `serde` at `1.0.185` has changed how enums get serialized and as a knock on effect it has changed some hashes. This will make databases from previous versions incompatible with the next version of Holochain.
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.13](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.15](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.13](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_cascade-0.3.0-beta-dev.15](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_state-0.3.0-beta-dev.14](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.7](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.7)
+
+## [holochain\_p2p-0.3.0-beta-dev.14](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [kitsune\_p2p-0.3.0-beta-dev.12](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.12)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.7](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.7](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.8](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.8)
+
+## [holochain\_types-0.3.0-beta-dev.13](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_sqlite-0.3.0-beta-dev.13](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_keystore-0.3.0-beta-dev.11](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.7](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.7)
+
+## [hdk-0.3.0-beta-dev.13](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.10](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [hdi-0.4.0-beta-dev.9](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.9)
+
+## [hdk\_derive-0.3.0-beta-dev.9](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.9](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.9)
+
 # 20230816.003329
 
 ## [holochain\_cli-0.3.0-beta-dev.14](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.14)
