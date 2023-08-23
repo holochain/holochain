@@ -99,6 +99,7 @@ jobs:
               ${{ matrix.cmd.extra_arg }} \
               .#devShells.${system}.holonix
           
-            cachix use thetasinner-testing
+            ls -al
+            
             cachix push thetasinner-testing $profile_name
           fi
