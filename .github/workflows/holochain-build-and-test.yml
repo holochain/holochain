@@ -101,6 +101,6 @@ jobs:
           
             ls -al
             
-            echo $CACHIX_AUTH_TOKEN
+            cachix authtoken $CACHIX_AUTH_TOKEN
             cachix push thetasinner-testing $profile_name
           fi
