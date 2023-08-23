@@ -34,7 +34,7 @@ runs:
       with:
         ref: ${{ inputs.branch }}
     - name: Install nix
-      uses: cachix/install-nix-action@v18
+      uses: cachix/install-nix-action@v22
       with:
         install_url: https://releases.nixos.org/nix/nix-2.12.0/install
         extra_nix_config: |
@@ -48,7 +48,7 @@ runs:
     - name: set up git config
       shell: bash
       run: |
-        git config --global user.email "hrabot@holochain.org"
+        git config --global user.email "hra+gh@holochain.org"
         git config --global user.name "Holochain Release Automation"
     - name: update source ${{ inputs.update_source }}
       shell: bash
@@ -57,7 +57,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.HRA_GITHUB_TOKEN }}
     - name: create pull request
-      uses: peter-evans/create-pull-request@v3
+      uses: peter-evans/create-pull-request@v5
       id: cpr1
       with:
         token: ${{ inputs.HRA_GITHUB_TOKEN }}
@@ -67,10 +67,9 @@ runs:
           autorebase:opt-in
         draft: false
         delete-branch: true
-        reviewers: steveej
     - name: Enable Pull Request Automerge
       if: steps.cpr1.outputs.pull-request-operation == 'created' || steps.cpr1.outputs.pull-request-operation == 'updated'
-      uses: peter-evans/enable-pull-request-automerge@v2
+      uses: peter-evans/enable-pull-request-automerge@v3
       with:
         token: ${{ inputs.HRA_GITHUB_TOKEN}}
         pull-request-number: ${{ steps.cpr1.outputs.pull-request-number }}

@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 derive_more = "0.99.11"
-serde = "1.0"
+serde = { workspace = true }
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }
 

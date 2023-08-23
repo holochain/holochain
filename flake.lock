@@ -347,11 +347,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1690338181,
-        "narHash": "sha256-Sz2oQ9aNS3MVncnCMndr0302G26UrFUfPynoH2iLjsg=",
+        "lastModified": 1692756590,
+        "narHash": "sha256-VnktafFl+0U9wdYO8vGSFOYSSQ+GFd+MiMA0cTZ8mHg=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "b7f0b7b58b3c6f14a1377ec31a3d78b23ab843ec",
+        "rev": "a9e9946645fcf892c850f8e654a5e675a6fd14d8",
         "type": "github"
       },
       "original": {
@@ -363,11 +363,11 @@
     "scaffolding": {
       "flake": false,
       "locked": {
-        "lastModified": 1686617155,
-        "narHash": "sha256-ZeWnh27JNb/abu/ii8e3u4DHns49MOFMNXGPGFPqS0k=",
+        "lastModified": 1692137048,
+        "narHash": "sha256-YfW4pthiUXJbP0ribr0fvCo9P/cB7xfhpB8MwfQ/JLI=",
         "owner": "holochain",
         "repo": "scaffolding",
-        "rev": "861397c975542306be6d8529e5c6bdb21c7ba6a6",
+        "rev": "104a269d91c8935ded04c44f950b055b0ad39f94",
         "type": "github"
       },
       "original": {
@@ -400,8 +400,8 @@
         "scaffolding": "scaffolding"
       },
       "locked": {
-        "lastModified": 1686618210,
-        "narHash": "sha256-lXY9ob0WAekcoEgWcFL3cJiPkwoKlsR2OMqG0S3vXzA=",
+        "lastModified": 1692137279,
+        "narHash": "sha256-6cUX1wMVEx3zQPhCYbPYKAHM92LYYr5lzjiVP36nl2o=",
         "path": "./versions/0_1",
         "type": "path"
       },

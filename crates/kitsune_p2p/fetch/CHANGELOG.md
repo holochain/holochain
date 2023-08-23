@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+- Fix an issue with merging fetch contexts where merging an item with a context with an item that did not could result in the removal of the context.
+- Fix an issue where duplicate fetch sources would be permitted for a single item.
+
+## 0.3.0-beta-dev.6
+
 ## 0.3.0-beta-dev.5
 
 ## 0.3.0-beta-dev.4

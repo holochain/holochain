@@ -9,11 +9,14 @@ pub mod error;
 pub mod exports;
 pub mod fatal;
 pub mod functions;
+#[cfg(not(loom))]
 pub mod nonce;
 pub mod prelude;
 pub mod schema;
+#[cfg(not(loom))]
 pub mod sql;
 pub mod stats;
+#[cfg(not(loom))]
 pub mod store;
 pub mod swansong;
 

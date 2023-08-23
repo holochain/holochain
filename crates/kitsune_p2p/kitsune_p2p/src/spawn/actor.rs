@@ -32,6 +32,9 @@ mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
 
+#[cfg(test)]
+pub mod test_util;
+
 type EvtRcv = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
@@ -151,44 +154,15 @@ impl KitsuneP2pActor {
             KitsuneMetrics::count(t, l);
         });
 
-        let mut ep_hnd = None;
-        let mut ep_evt = None;
-        let mut bootstrap_net = None;
-
-        #[cfg(feature = "tx2")]
-        if ep_hnd.is_none() && config.is_tx2() {
-            tracing::trace!("tx2");
-            let (h, e) =
-                MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
-            ep_hnd = Some(h);
-            ep_evt = Some(e);
-            bootstrap_net = Some(BootstrapNet::Tx2);
-        }
-
-        #[cfg(feature = "tx5")]
-        if ep_hnd.is_none() && config.is_tx5() {
-            tracing::trace!("tx5");
-            let signal_url = match config.transport_pool.get(0).unwrap() {
-                TransportConfig::WebRTC { signal_url } => signal_url.clone(),
-                _ => unreachable!(),
-            };
-            let (h, e) = MetaNet::new_tx5(
-                config.tuning_params.clone(),
-                host.clone(),
-                internal_sender.clone(),
-                evt_sender.clone(),
-                signal_url,
-            )
-            .await?;
-            ep_hnd = Some(h);
-            ep_evt = Some(e);
-            bootstrap_net = Some(BootstrapNet::Tx5);
-        }
-
-        let (ep_hnd, ep_evt, bootstrap_net) = match (ep_hnd, ep_evt, bootstrap_net) {
-            (Some(h), Some(e), Some(n)) => (h, e, n),
-            _ => return Err("tx2 or tx5 feature must be enabled".into()),
-        };
+        let (ep_hnd, ep_evt, bootstrap_net) = create_meta_net(
+            &config,
+            tls_config,
+            internal_sender.clone(),
+            evt_sender.clone(),
+            host.clone(),
+            metrics,
+        )
+        .await?;
 
         struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
 
@@ -740,6 +714,53 @@ impl KitsuneP2pActor {
             parallel_notify_permit,
             fetch_pool,
         })
+    }
+}
+
+async fn create_meta_net(
+    config: &KitsuneP2pConfig,
+    tls_config: tls::TlsConfig,
+    internal_sender: ghost_actor::GhostSender<Internal>,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    host: HostApi,
+    metrics: Tx2ApiMetrics,
+) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
+    let mut ep_hnd = None;
+    let mut ep_evt = None;
+    let mut bootstrap_net = None;
+
+    #[cfg(feature = "tx2")]
+    if ep_hnd.is_none() && config.is_tx2() {
+        tracing::trace!("tx2");
+        let (h, e) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
+        ep_hnd = Some(h);
+        ep_evt = Some(e);
+        bootstrap_net = Some(BootstrapNet::Tx2);
+    }
+
+    #[cfg(feature = "tx5")]
+    if ep_hnd.is_none() && config.is_tx5() {
+        tracing::trace!("tx5");
+        let signal_url = match config.transport_pool.get(0).unwrap() {
+            TransportConfig::WebRTC { signal_url } => signal_url.clone(),
+            _ => unreachable!(),
+        };
+        let (h, e) = MetaNet::new_tx5(
+            config.tuning_params.clone(),
+            host.clone(),
+            internal_sender.clone(),
+            evt_sender.clone(),
+            signal_url,
+        )
+        .await?;
+        ep_hnd = Some(h);
+        ep_evt = Some(e);
+        bootstrap_net = Some(BootstrapNet::Tx5);
+    }
+
+    match (ep_hnd, ep_evt, bootstrap_net) {
+        (Some(h), Some(e), Some(n)) => Ok((h, e, n)),
+        _ => Err("tx2 or tx5 feature must be enabled".into()),
     }
 }
 
@@ -1377,3 +1398,127 @@ mockall::mock! {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for MockKitsuneP2pEventHandler {}
 #[cfg(any(test, feature = "test_utils"))]
 impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::KitsuneP2pConfig;
+    use crate::spawn::actor::bootstrap::BootstrapNet;
+    use crate::spawn::actor::create_meta_net;
+    use crate::spawn::actor::MetaNet;
+    use crate::spawn::actor::MetaNetEvtRecv;
+    use crate::spawn::test_util::InternalStub;
+    use crate::spawn::Internal;
+    use crate::KitsuneP2pResult;
+    use crate::{HostStub, NetworkType, TransportConfig};
+    use ghost_actor::actor_builder::GhostActorBuilder;
+    use kitsune_p2p_types::tls::TlsConfig;
+    use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
+    use std::net::SocketAddr;
+    use tokio::task::AbortHandle;
+    use url2::url2;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn create_tx2_with_mdns_meta_net() {
+        let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
+            // Anything other than WebRTC will do here but the tx2 transport isn't available any more
+            transport_pool: vec![TransportConfig::Mem {}],
+            bootstrap_service: None,
+            tuning_params: Default::default(),
+            network_type: NetworkType::QuicMdns,
+        })
+        .await
+        .unwrap();
+
+        // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
+        assert_eq!(BootstrapNet::Tx2, bootstrap_net);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn create_tx5_with_mdns_meta_net() {
+        let (signal_addr, abort_handle) = start_signal_srv();
+
+        let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
+            transport_pool: vec![TransportConfig::WebRTC {
+                signal_url: format!("ws://{:?}", signal_addr),
+            }],
+            bootstrap_service: None,
+            tuning_params: Default::default(),
+            network_type: NetworkType::QuicMdns,
+        })
+        .await
+        .unwrap();
+
+        // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
+        assert_eq!(BootstrapNet::Tx5, bootstrap_net);
+
+        meta_net.close(0, "test").await;
+        abort_handle.abort();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn create_tx5_with_bootstrap_meta_net() {
+        let (signal_addr, abort_handle) = start_signal_srv();
+
+        let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
+            transport_pool: vec![TransportConfig::WebRTC {
+                signal_url: format!("ws://{:?}", signal_addr),
+            }],
+            bootstrap_service: Some(url2!("ws://not-a-bootstrap.test")),
+            tuning_params: Default::default(),
+            network_type: NetworkType::QuicBootstrap,
+        })
+        .await
+        .unwrap();
+
+        // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
+        assert_eq!(BootstrapNet::Tx5, bootstrap_net);
+
+        meta_net.close(0, "test").await;
+        abort_handle.abort();
+    }
+
+    async fn test_create_meta_net(
+        config: KitsuneP2pConfig,
+    ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
+        let builder = GhostActorBuilder::new();
+
+        let internal_sender = builder
+            .channel_factory()
+            .create_channel::<Internal>()
+            .await
+            .unwrap();
+
+        tokio::spawn(builder.spawn(InternalStub::new()));
+
+        let (sender, _) = futures::channel::mpsc::channel(10);
+
+        create_meta_net(
+            &config,
+            TlsConfig::new_ephemeral().await.unwrap(),
+            internal_sender,
+            sender,
+            HostStub::new(),
+            Tx2ApiMetrics::new(),
+        )
+        .await
+    }
+
+    fn start_signal_srv() -> (SocketAddr, AbortHandle) {
+        let mut config = tx5_signal_srv::Config::default();
+        config.interfaces = "127.0.0.1".to_string();
+        config.port = 0;
+        config.demo = false;
+        let (sig_driver, addr_list, err_list) =
+            tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+
+        assert!(err_list.is_empty());
+        assert_eq!(1, addr_list.len());
+
+        let abort_handle = tokio::spawn(async move {
+            sig_driver.await;
+        })
+        .abort_handle();
+
+        (addr_list.first().unwrap().clone(), abort_handle)
+    }
+}

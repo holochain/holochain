@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use futures::FutureExt;
-use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::traits::AsLairClient;
+use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::client_traits::AsLairClient;
 use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 

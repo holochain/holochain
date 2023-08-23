@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.10
+
+## 0.3.0-beta-dev.9
+
 ## 0.3.0-beta-dev.8
 
 - Added the `base` field to the `Link` struct for easy access after a `get_links` call.
