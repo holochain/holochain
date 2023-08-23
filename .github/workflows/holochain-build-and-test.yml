@@ -70,7 +70,7 @@ jobs:
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
-          CACHIX_AUTH_TOKEN: "${{ secrets.TS_CACHIX_TOKENnoexist }}"
+          CACHIX_AUTH_TOKEN: "${{ secrets.TS_CACHIX_TOKEN }}"
         run: |
           set -xe
 
