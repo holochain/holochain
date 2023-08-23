@@ -104,6 +104,7 @@ fn state_impl(
 
     let mut action_name = None;
     let mut effect_name = None;
+    // let mut parameterized = None;
 
     let item = parse_macro_input!(input as syn::ItemImpl);
 
@@ -168,6 +169,7 @@ fn state_impl(
 
                 let mut match_pat = None;
                 for attr in f.attrs.iter() {
+                    // panic!("{:?} != {:?}", attr.path(), stef_attr.path());
                     if attr.path().segments.last().map(|s| s.ident.to_string())
                         == Some("state".to_string())
                     {
@@ -301,6 +303,21 @@ fn state_impl(
     .expect("problem 5!");
     define_public_fns.generics = item.generics.clone();
 
+    let define_transitions = delim::<_, Token!(,)>(fns.iter().map(|f| {
+        let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
+        let variant_name = f.variant_name();
+        let impl_name = f.impl_name();
+        if args.is_empty() {
+            quote! {
+                Self::Action::#variant_name => self.#impl_name().into()
+            }
+        } else {
+            quote! {
+                Self::Action::#variant_name(#args) => self.#impl_name(#args).into()
+            }
+        }
+    }));
+
     // let action_name_generic = match action_name.clone() {
     //     Type::Path(mut path) => {
     //         path.path.segments.last_mut().expect("problem 6!").arguments = struct_path
@@ -322,21 +339,7 @@ fn state_impl(
         _ => todo!(),
     };
 
-    let define_transitions = delim::<_, Token!(,)>(fns.iter().map(|f| {
-        let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
-        let variant_name = f.variant_name();
-        let impl_name = f.impl_name();
-        if args.is_empty() {
-            quote! {
-                Self::Action::#variant_name => self.#impl_name().into()
-            }
-        } else {
-            quote! {
-                Self::Action::#variant_name(#args) => self.#impl_name(#args).into()
-            }
-        }
-    }));
-
+    // let define_state_impl =
     let mut define_state_impl: syn::ItemImpl = syn::parse(
         quote! {
             impl stef::State for #struct_path {

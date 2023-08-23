@@ -32,7 +32,7 @@ pub enum FetchKey {
 }
 
 /// A fetch "unit" that can be de-duplicated.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FetchPoolPush {
     /// Description of what to fetch.
     pub key: FetchKey,

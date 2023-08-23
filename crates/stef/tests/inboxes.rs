@@ -186,7 +186,7 @@ mod convo {
         derive_more::From,
         Arbitrary,
     )]
-    pub enum Action<S: Eq = String> {
+    pub enum Action<S: Eq + Send + Sync = String> {
         Msg(Msg<S>),
         Initiate,
     }
@@ -212,7 +212,7 @@ mod convo {
         serde::Deserialize,
         Arbitrary,
     )]
-    pub enum Msg<S: Eq = String> {
+    pub enum Msg<S: Eq + Send + Sync = String> {
         Hi,
         HowAreYou,
         ImFine,

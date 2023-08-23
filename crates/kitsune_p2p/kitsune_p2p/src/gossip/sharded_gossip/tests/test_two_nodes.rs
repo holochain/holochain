@@ -797,3 +797,53 @@ async fn initiate_times_out() {
         })
         .unwrap();
 }
+
+mod fuzzed {
+    use std::{collections::HashSet, sync::Arc};
+
+    use kitsune_p2p_types::{agent_info::AgentInfoSigned, KAgent};
+    use test_strategy::proptest;
+
+    use ::proptest::{collection, prelude::*, sample::SizeRange, strategy::BoxedStrategy};
+
+    use crate::gossip::sharded_gossip::{
+        self as msgs, tests::common::setup_standard_player, ShardedGossipLocalState,
+        ShardedGossipWire,
+    };
+
+    fn gossip_msgs(len: impl Into<SizeRange>) -> BoxedStrategy<Vec<ShardedGossipWire>> {
+        collection::vec(any::<ShardedGossipWire>(), len).boxed()
+    }
+
+    #[proptest(async = "tokio", cases = 2)]
+    async fn sharded_gossip_fuzz(
+        // #[strategy(gossip_msgs(3..12))]
+        msgs: Vec<ShardedGossipWire>,
+        initiate: msgs::Initiate,
+        local_agent: KAgent,
+        // local_agents: HashSet<KAgent>,
+        agents: Vec<(KAgent, AgentInfoSigned)>,
+        peer_cert: Arc<[u8; 32]>,
+    ) {
+        let mut alice = setup_standard_player(
+            ShardedGossipLocalState {
+                local_agents: maplit::hashset! { local_agent },
+                ..Default::default()
+            },
+            agents,
+        )
+        .await;
+
+        let mut outgoing = vec![];
+        alice
+            .process_incoming(peer_cert.clone(), ShardedGossipWire::Initiate(initiate))
+            .await;
+        for msg in msgs {
+            let out = match alice.process_incoming(peer_cert.clone(), msg).await {
+                Ok(out) => out,
+                Err(_) => vec![],
+            };
+            outgoing.extend(out);
+        }
+    }
+}

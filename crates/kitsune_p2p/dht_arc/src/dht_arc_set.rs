@@ -20,6 +20,21 @@ pub enum DhtArcSet {
     Partial(IntervalSet<DhtLocation>),
 }
 
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for DhtArcSet {
+    type Parameters = ();
+    type Strategy = proptest::prelude::BoxedStrategy<Self>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::collection::vec;
+        use proptest::prelude::*;
+
+        vec(any::<DhtArcRange>(), 0..=3)
+            .prop_map(Self::from)
+            .boxed()
+    }
+}
+
 impl std::fmt::Debug for DhtArcSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -69,6 +69,7 @@ pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
 }
 
 use ::ghost_actor::dependencies::tracing;
+use agent_info::AgentInfoSigned;
 use futures::future::BoxFuture;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
@@ -367,6 +368,8 @@ pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
 pub type KSpace = Arc<bin_types::KitsuneSpace>;
 /// KitsuneOpData in an Arc
 pub type KOpData = Arc<bin_types::KitsuneOpData>;
+/// AgentInfoSigned in an Arc
+pub type KAgentInfo = Arc<AgentInfoSigned>;
 
 use metrics::metric_task;
 

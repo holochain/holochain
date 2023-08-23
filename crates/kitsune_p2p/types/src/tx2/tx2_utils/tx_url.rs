@@ -89,7 +89,7 @@ impl proptest::arbitrary::Arbitrary for TxUrl {
     type Strategy = BoxedStrategy<TxUrl>;
 
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        proptest::string::string_regex(r"http://\w+")
+        proptest::string::string_regex(r"http://[a-z][a-z0-9-_]")
             .unwrap()
             .prop_map(|s| TxUrl::from(s))
             .boxed()
