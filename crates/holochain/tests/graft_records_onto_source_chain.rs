@@ -198,6 +198,12 @@ async fn grafting() {
     // The dna needs to be installed first.
     conductor.register_dna(dna_file.clone()).await.unwrap();
 
+    // The app needs to be installed so that there is a cell to graft onto.
+    let apps = conductor
+        .setup_app_for_agent("cold_start", alice.agent_pubkey().clone(), &[dna_file])
+        .await
+        .unwrap();
+
     // Insert the chain from the original conductor.
     conductor
         .clone()
@@ -205,10 +211,6 @@ async fn grafting() {
         .await
         .expect("Can cold start");
 
-    let apps = conductor
-        .setup_app_for_agent("cold_start", alice.agent_pubkey().clone(), &[dna_file])
-        .await
-        .unwrap();
     let (alice_backup,) = apps.into_tuple();
     let chain = get_chain(alice_backup.authored_db().clone()).await;
     // Chain should be 4 long.
