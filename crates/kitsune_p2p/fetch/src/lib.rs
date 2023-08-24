@@ -10,6 +10,9 @@ mod pool;
 mod respond;
 mod rough_sized;
 
+#[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils;
+
 pub use pool::*;
 pub use respond::*;
 pub use rough_sized::*;

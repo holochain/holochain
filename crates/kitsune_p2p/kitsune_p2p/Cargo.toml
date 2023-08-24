@@ -59,6 +59,7 @@ mockall = { version = "0.11.3", optional = true }
 # include self with test_utils feature, to allow integration tests to run properly
 kitsune_p2p = { path = ".", features = ["test_utils", "sqlite"]}
 
+kitsune_p2p_fetch = { path = "../fetch", features = ["test_utils"] }
 contrafact = { version = "0.2.0-rc.1" }
 kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
