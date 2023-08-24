@@ -3,10 +3,9 @@ use std::sync::Arc;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash},
-    tx2::tx2_utils::PoolBuf,
 };
 
-use crate::gossip::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};
+use crate::gossip::MetaOpKey;
 
 use super::*;
 
@@ -14,7 +13,7 @@ use super::*;
 pub fn create_agent_bloom<'a>(
     agents: impl Iterator<Item = &'a AgentInfoSigned>,
     filter: Option<&AgentInfoSigned>,
-) -> Option<PoolBuf> {
+) -> Option<BloomFilter> {
     let agents: Vec<_> = match filter {
         Some(filter) => agents
             .filter(|a| filter.storage_arc.contains(a.agent.get_loc()))
@@ -32,12 +31,12 @@ pub fn create_agent_bloom<'a>(
     if empty {
         None
     } else {
-        Some(encode_bloom_filter(&bloom))
+        Some(BloomFilter::from(bloom))
     }
 }
 
 /// Create an ops bloom for testing.
-pub fn create_op_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
+pub fn create_op_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> BloomFilter {
     let len = ops.len();
     let bloom = ops.into_iter().fold(
         bloomfilter::Bloom::new_for_fp_rate(len, 0.01),
@@ -48,7 +47,7 @@ pub fn create_op_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
         },
     );
 
-    encode_bloom_filter(&bloom)
+    bloom.into()
 }
 
 /// Check an ops bloom for testing.
@@ -65,25 +64,22 @@ pub fn check_ops_bloom<'a>(
         EncodedTimedBloomFilter::HaveHashes {
             filter,
             time_window,
-        } => {
-            let filter = decode_bloom_filter(&filter);
-            ops.filter(|(t, _)| time_window.contains(t))
-                .map(|(_, h)| h)
-                .filter(|op| !filter.check(&MetaOpKey::Op((**op).clone())))
-                .collect()
-        }
+        } => ops
+            .filter(|(t, _)| time_window.contains(t))
+            .map(|(_, h)| h)
+            .filter(|op| !filter.check(&MetaOpKey::Op((**op).clone())))
+            .collect(),
     }
 }
 
 /// Check an ops bloom for testing.
 pub fn check_agent_boom<'a>(
     agents: impl Iterator<Item = (&'a Arc<KitsuneAgent>, &'a AgentInfoSigned)>,
-    bloom: &[u8],
+    bloom: &BloomFilter,
 ) -> Vec<&'a Arc<KitsuneAgent>> {
-    let filter = decode_bloom_filter(bloom);
     agents
         .filter(|(agent, info)| {
-            !filter.check(&MetaOpKey::Agent((*agent).clone(), info.signed_at_ms))
+            !bloom.check(&MetaOpKey::Agent((*agent).clone(), info.signed_at_ms))
         })
         .map(|(a, _)| a)
         .collect()

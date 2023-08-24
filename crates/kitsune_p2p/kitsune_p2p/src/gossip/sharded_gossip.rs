@@ -3,7 +3,6 @@
 #![warn(missing_docs)]
 
 use crate::agent_store::AgentInfoSigned;
-use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
 use crate::meta_net::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
@@ -34,6 +33,7 @@ use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
 use crate::metrics::MetricsSync;
 
+use super::BloomFilter;
 use super::{HowToConnect, MetaOpKey};
 
 pub use bandwidth::BandwidthThrottles;
@@ -76,7 +76,6 @@ pub(crate) mod tests;
 ///    16384 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
-type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug)]
@@ -908,7 +907,6 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&peer_cert)? {
-                    let filter = decode_bloom_filter(&filter);
                     self.incoming_agents(state, filter).await?
                 } else {
                     Vec::with_capacity(0)
@@ -944,7 +942,7 @@ impl ShardedGossipLocal {
                             time_window,
                         } => {
                             let filter = TimedBloomFilter {
-                                bloom: Some(decode_bloom_filter(&filter)),
+                                bloom: Some(filter),
                                 time: time_window,
                             };
                             self.incoming_op_bloom(state, filter, None).await?
@@ -1168,21 +1166,21 @@ pub enum EncodedTimedBloomFilter {
     /// Please send any missing ops.
     HaveHashes {
         /// The encoded bloom filter.
-        filter: PoolBuf,
+        filter: BloomFilter,
         /// The time window these hashes are for.
         time_window: TimeWindow,
     },
 }
 
-impl EncodedTimedBloomFilter {
-    /// Get the size in bytes of the bloom filter, if one exists
-    pub fn size(&self) -> usize {
-        match self {
-            Self::HaveHashes { filter, .. } => filter.len(),
-            _ => 0,
-        }
-    }
-}
+// impl EncodedTimedBloomFilter {
+//     /// Get the size in bytes of the bloom filter, if one exists
+//     pub fn size(&self) -> usize {
+//         match self {
+//             Self::HaveHashes { filter, .. } => filter.len(),
+//             _ => 0,
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Copy)]
 /// The possible states when receiving missing ops.
@@ -1226,7 +1224,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Agent Info Bloom
         Agents(0x30) {
             /// The bloom filter for agent data
-            filter.0: PoolBuf,
+            filter.0: BloomFilter,
         },
 
         /// Any agents that were missing from the remote bloom.

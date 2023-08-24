@@ -825,7 +825,7 @@ mod fuzzed {
         agents: Vec<(KAgent, AgentInfoSigned)>,
         peer_cert: Arc<[u8; 32]>,
     ) {
-        let mut alice = setup_standard_player(
+        let alice = setup_standard_player(
             ShardedGossipLocalState {
                 local_agents: maplit::hashset! { local_agent },
                 ..Default::default()
@@ -835,7 +835,7 @@ mod fuzzed {
         .await;
 
         let mut outgoing = vec![];
-        alice
+        let _r = alice
             .process_incoming(peer_cert.clone(), ShardedGossipWire::Initiate(initiate))
             .await;
         for msg in msgs {

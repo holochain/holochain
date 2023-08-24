@@ -35,7 +35,7 @@ impl ShardedGossipLocal {
             let key = MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms);
             bloom.set(&key);
         }
-        Ok(Some(bloom))
+        Ok(Some(bloom.into()))
     }
 
     /// Generate a bloom filter of all ops.
@@ -121,7 +121,7 @@ impl ShardedGossipLocal {
                                 tokio::task::yield_now().await;
                             }
                             TimedBloomFilter {
-                                bloom: Some(bloom),
+                                bloom: Some(BloomFilter::from(bloom)),
                                 time: window,
                             }
                         };

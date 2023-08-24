@@ -237,7 +237,6 @@ impl ShardedGossipLocal {
         if let GossipType::Recent = self.gossip_type {
             let bloom = self.generate_agent_bloom(state.clone()).await?;
             if let Some(bloom) = bloom {
-                let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
             }
 
@@ -303,13 +302,10 @@ impl ShardedGossipLocal {
             let time_window = bloom.time;
             let bloom = match bloom.bloom {
                 // We have some hashes so request all missing from the bloom.
-                Some(bloom) => {
-                    let bytes = encode_bloom_filter(&bloom);
-                    EncodedTimedBloomFilter::HaveHashes {
-                        filter: bytes,
-                        time_window,
-                    }
-                }
+                Some(bloom) => EncodedTimedBloomFilter::HaveHashes {
+                    filter: bloom,
+                    time_window,
+                },
                 // We have no hashes for this time window but we do have agents
                 // that hold the arc so request all the ops the remote holds.
                 None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
