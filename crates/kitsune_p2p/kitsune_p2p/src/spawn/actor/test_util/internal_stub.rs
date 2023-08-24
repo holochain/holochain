@@ -1,18 +1,26 @@
 use crate::actor::BroadcastData;
-use crate::spawn::actor::{EvtRcv, InternalHandlerResult, MaybeDelegate, OpHashList, VecMXM};
+use crate::spawn::actor::{
+    EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
+};
 use crate::spawn::meta_net::MetaNetCon;
 use crate::spawn::{Internal, InternalHandler};
 use crate::GossipModuleType;
+use futures::FutureExt;
+use ghost_actor::GhostError;
 use ghost_actor::{GhostControlHandler, GhostHandler};
 use kitsune_p2p_fetch::{FetchContext, FetchKey, FetchSource};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::KOpHash;
 
-pub struct InternalStub {}
+pub struct InternalStub {
+    fetch_calls: Vec<(FetchKey, KSpace, FetchSource)>,
+}
 
 impl InternalStub {
     pub fn new() -> Self {
-        InternalStub {}
+        InternalStub {
+            fetch_calls: vec![],
+        }
     }
 }
 
@@ -84,16 +92,33 @@ impl InternalHandler for InternalStub {
 
     fn handle_fetch(
         &mut self,
-        _key: FetchKey,
-        _space: crate::spawn::actor::KSpace,
-        _source: FetchSource,
+        key: FetchKey,
+        space: crate::spawn::actor::KSpace,
+        source: FetchSource,
     ) -> InternalHandlerResult<()> {
-        todo!()
+        self.fetch_calls.push((key, space, source));
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_get_all_local_joined_agent_infos(
         &mut self,
     ) -> InternalHandlerResult<Vec<AgentInfoSigned>> {
         todo!()
+    }
+}
+
+ghost_actor::ghost_chan! {
+    pub chan InternalStubTest<GhostError> {
+        fn drain_fetch_calls() -> Vec<(FetchKey, crate::spawn::actor::KSpace, FetchSource)>;
+    }
+}
+
+impl GhostHandler<InternalStubTest> for InternalStub {}
+impl InternalStubTestHandler for InternalStub {
+    fn handle_drain_fetch_calls(
+        &mut self,
+    ) -> InternalStubTestHandlerResult<Vec<(FetchKey, KSpace, FetchSource)>> {
+        let calls = self.fetch_calls.drain(..).collect();
+        Ok(async move { Ok(calls) }.boxed().into())
     }
 }

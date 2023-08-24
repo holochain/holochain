@@ -28,6 +28,7 @@ mod bootstrap;
 mod discover;
 pub(crate) mod meta_net;
 use meta_net::*;
+mod fetch;
 mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
@@ -164,81 +165,14 @@ impl KitsuneP2pActor {
         )
         .await?;
 
-        struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
-
-        impl kitsune_p2p_fetch::FetchResponseConfig for FetchResponseConfig {
-            type User = (
-                MetaNetCon,
-                String,
-                Option<(dht::prelude::RegionCoords, bool)>,
-            );
-
-            fn respond(
-                &self,
-                space: KSpace,
-                user: Self::User,
-                completion_guard: kitsune_p2p_fetch::FetchResponseGuard,
-                op: KOpData,
-            ) {
-                let timeout = self.0.implicit_timeout();
-                tokio::task::spawn(async move {
-                    let _completion_guard = completion_guard;
-
-                    // MAYBE: open a new connection if the con was closed??
-                    let (con, _url, region) = user;
-
-                    let item = wire::PushOpItem {
-                        op_data: op,
-                        region,
-                    };
-                    tracing::debug!("push_op_data: {:?}", item);
-                    let payload = wire::Wire::push_op_data(vec![(space, vec![item])]);
-
-                    if let Err(err) = con.notify(&payload, timeout).await {
-                        tracing::warn!(?err, "error responding to op fetch");
-                    }
-                });
-            }
-        }
-
-        let fetch_response_queue = kitsune_p2p_fetch::FetchResponseQueue::new(FetchResponseConfig(
-            config.tuning_params.clone(),
-        ));
+        let fetch_response_queue =
+            FetchResponseQueue::new(FetchResponseConfig::new(config.tuning_params.clone()));
 
         // TODO - use a real config
         let fetch_pool = FetchPool::new_bitwise_or();
 
         // Start a loop to handle our fetch queue fetch items.
-        {
-            let fetch_pool = fetch_pool.clone();
-            let i_s = internal_sender.clone();
-            let host = host.clone();
-            tokio::task::spawn(async move {
-                loop {
-                    let list = fetch_pool.get_items_to_fetch();
-
-                    for (key, space, source, context) in list {
-                        if let FetchKey::Op(op_hash) = &key {
-                            if let Ok(mut res) = host
-                                .check_op_data(space.clone(), vec![op_hash.clone()], context)
-                                .await
-                            {
-                                if res.len() == 1 && res.remove(0) {
-                                    fetch_pool.remove(&key);
-                                    continue;
-                                }
-                            }
-                        }
-
-                        if let Err(err) = i_s.fetch(key, space, source).await {
-                            tracing::debug!(?err);
-                        }
-                    }
-
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                }
-            });
-        }
+        FetchTask::spawn(fetch_pool.clone(), host.clone(), internal_sender.clone());
 
         let i_s = internal_sender.clone();
 
@@ -416,7 +350,7 @@ impl KitsuneP2pActor {
                                                     data => {
                                                         // one might be tempted to notify here
                                                         // as in Broadcast below... but we
-                                                        // notify all relevent agents inside
+                                                        // notify all relevant agents inside
                                                         // the space incoming_delegate_broadcast
                                                         // handler.
                                                         if let Err(err) = i_s
@@ -764,7 +698,9 @@ async fn create_meta_net(
     }
 }
 
+use crate::spawn::actor::fetch::{FetchResponseConfig, FetchTask};
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+
 impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         use futures::sink::SinkExt;
