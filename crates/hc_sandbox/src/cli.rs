@@ -236,6 +236,7 @@ impl LaunchInfo {
     }
 }
 
+/// Run a conductor for each path
 pub async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
@@ -282,6 +283,7 @@ pub async fn run_n(
     Ok(())
 }
 
+/// Perform the `generate` subcommand
 pub async fn generate(
     holochain_path: &Path,
     happ: Option<PathBuf>,
