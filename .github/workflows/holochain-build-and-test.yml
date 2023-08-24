@@ -120,7 +120,7 @@ jobs:
 
           # See https://docs.cachix.org/pushing#id1 for pushing shell environments
           profile_name=holonix-cache-${system}
-          nix develop --profile $profile_name -c true \
+          nix build --profile $profile_name \
             ${{ matrix.cmd.extra_arg }} \
             .#devShells.${system}.holonix
 
