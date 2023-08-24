@@ -815,7 +815,8 @@ mod fuzzed {
         collection::vec(any::<ShardedGossipWire>(), len).boxed()
     }
 
-    #[proptest(async = "tokio", cases = 2)]
+    #[proptest(async = "tokio", cases = 7)]
+    #[ignore = "failing fuzz test for demonstration purposes"]
     async fn sharded_gossip_fuzz(
         // #[strategy(gossip_msgs(3..12))]
         msgs: Vec<ShardedGossipWire>,

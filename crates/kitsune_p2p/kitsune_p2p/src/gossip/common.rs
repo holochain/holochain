@@ -71,9 +71,20 @@ impl proptest::arbitrary::Arbitrary for BloomFilter {
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
         use proptest::prelude::*;
 
-        (1usize.., 1usize.., any::<[u8; 32]>())
-            .prop_map(|(size, count, seed)| {
-                Self(bloomfilter::Bloom::new_with_seed(size, count, &seed))
+        (
+            // proptest::collection::vec(any::<u8>(), 1..65536),
+            any::<Vec<u8>>(),
+            // any::<u64>(),
+            any::<u32>(),
+            any::<[(u64, u64); 2]>(),
+        )
+            .prop_map(|(bloom, num, keys)| {
+                Self(bloomfilter::Bloom::from_existing(
+                    &bloom,
+                    bloom.len() as u64,
+                    num,
+                    keys,
+                ))
             })
             .boxed()
     }
@@ -82,9 +93,10 @@ impl proptest::arbitrary::Arbitrary for BloomFilter {
 #[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for BloomFilter {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let size = 1 + u.choose_index(usize::MAX / 8 - 1)?;
         Ok(Self(bloomfilter::Bloom::new_with_seed(
-            u.arbitrary()?,
-            u.arbitrary()?,
+            size,
+            1usize.saturating_add(u.arbitrary()?),
             &u.arbitrary()?,
         )))
     }
@@ -143,6 +155,8 @@ impl<'de> serde::de::Visitor<'de> for BloomBytesVisitor {
         let k3 = u64::from_le_bytes(*arrayref::array_ref![bloom, 28, 8]);
         let k4 = u64::from_le_bytes(*arrayref::array_ref![bloom, 36, 8]);
         let sip_keys = [(k1, k2), (k3, k4)];
+
+        // TODO: check for invalid settings when decoding over the wire
         Ok(bloomfilter::Bloom::from_existing(
             &bloom[44..],
             bitmap_bits,
