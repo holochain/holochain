@@ -108,33 +108,6 @@ mod tests {
             .unwrap();
     }
 
-    #[ignore = "open question"]
-    #[tokio::test(start_paused = true)]
-    async fn fetch_single_region() {
-        let (_task, fetch_pool, internal_sender_test, _held_op_data, _) =
-            setup(InternalStub::new()).await;
-
-        fetch_pool.push(test_req_region(1, None, test_source(1)));
-        wait_for_pool_n(&fetch_pool, 1).await;
-
-        let fetched = wait_for_fetch_n(internal_sender_test.clone(), 1).await;
-
-        assert_eq!(1, fetched.iter().flatten().count());
-
-        // TODO No way to mark this as fetched?
-
-        // Move forwards by 5 minutes so that the item will be retried
-        tokio::time::advance(Duration::from_secs(5 * 60)).await;
-
-        // Never removed after fetched
-        wait_for_pool_n(&fetch_pool, 0).await;
-
-        internal_sender_test
-            .ghost_actor_shutdown_immediate()
-            .await
-            .unwrap();
-    }
-
     #[tokio::test(start_paused = true)]
     async fn fetch_task_shuts_down_if_internal_sender_closes() {
         let (task, fetch_pool, internal_sender_test, _held_op_data, _) =
