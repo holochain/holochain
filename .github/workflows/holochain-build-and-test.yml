@@ -85,9 +85,9 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/0_2\""
-          - extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/0_1\""
-          - extra_arg: "--override-input versions \"github:holochain/holochain?dir=versions/weekly\""
+          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
+          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
+          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
