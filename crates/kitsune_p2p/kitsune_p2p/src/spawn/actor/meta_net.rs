@@ -247,6 +247,9 @@ pub enum MetaNetCon {
         res: ResStore,
         tun: KitsuneP2pTuningParams,
     },
+
+    #[cfg(test)]
+    Test { notify_succeed: bool },
 }
 
 impl PartialEq for MetaNetCon {
@@ -308,6 +311,8 @@ impl MetaNetCon {
             MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
                 nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
             }
+            #[cfg(test)]
+            MetaNetCon::Test { .. } => MetaNetAuth::Authorized,
         }
     }
 
@@ -318,6 +323,17 @@ impl MetaNetCon {
         let result = (move || async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
+                    #[cfg(test)]
+                    {
+                        if let MetaNetCon::Test { notify_succeed } = self {
+                            return if *notify_succeed {
+                                Ok(())
+                            } else {
+                                Err("Test error while notifying".into())
+                            };
+                        }
+                    }
+
                     #[cfg(feature = "tx2")]
                     {
                         if let MetaNetCon::Tx2(con, _) = self {
