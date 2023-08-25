@@ -184,7 +184,8 @@ jobs:
     with:
       repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
     secrets:
-      TS_CACHIX_TOKEN: ${{ secrets.TS_CACHIX_TOKEN }}
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI }}
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
 
   finalize:
     if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && (needs.prepare.outputs.releasable_crates == 'true' || needs.vars.outputs.skip_prepare_logic == 'true') }}

@@ -9,7 +9,11 @@ on:
         type: string
         default: "."
     secrets:
-      TS_CACHIX_TOKEN:
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI:
+        description: "The Cachix token for `holochain-ci` to be used for caching Holonix"
+        required: true
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
+        description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
         required: true
 
 jobs:
@@ -23,6 +27,17 @@ jobs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+
+          # ensure that any Nix changes on this branch don't cause problems for maintenance versions
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_1"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_2"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/weekly"
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
@@ -57,6 +72,8 @@ jobs:
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          # TODO Want to be able to choose between internal/external when building external PRs
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
         run: |
           set -xe
 
@@ -66,9 +83,12 @@ jobs:
           fi
 
           # first build all derivations. this could be enough for test derivations.
-          nix build -L --show-trace \
+          nix build -L --show-trace --profile test-command \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+
+          # TODO Want to be able to choose between internal/external when building external PRs
+          cachix push holochain-ci-internal $profile_name
 
           # TODO: remove this once we've implemented all tests and know that we don't need it
           # if there's something to run we generate separate commands
@@ -79,14 +99,12 @@ jobs:
 
   # ensures the cache is regularly updated for the supported versions on multiple platforms
   cache-update:
-    # This only runs on develop because it points at develop anyway, no need for maintenance branches to do the same job
-    # if: github.ref == 'refs/heads/develop'
     strategy:
       fail-fast: false
       matrix:
         cmd:
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
           - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
+          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
           - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
         platform:
           - system: x86_64-darwin
@@ -109,7 +127,7 @@ jobs:
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
-          CACHIX_AUTH_TOKEN: "${{ secrets.TS_CACHIX_TOKEN }}"
+          CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI }}"
         run: |
           set -xe
 
@@ -119,9 +137,8 @@ jobs:
           fi
 
           # See https://docs.cachix.org/pushing#id1 for pushing shell environments
-          profile_name=holonix-cache-${system}
-          nix build --profile $profile_name \
+          nix build --profile holonix \
             ${{ matrix.cmd.extra_arg }} \
             .#devShells.${system}.holonix
 
-          cachix push thetasinner-testing $profile_name
+          cachix push holochain-ci holonix
