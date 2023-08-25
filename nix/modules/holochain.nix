@@ -10,8 +10,6 @@
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
-      opensslStatic = pkgs.pkgsStatic.openssl;
-
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
         RUST_SODIUM_SHARED = "1";
@@ -23,11 +21,7 @@
 
         CARGO_PROFILE = "";
 
-        OPENSSL_NO_VENDOR = "1";
-        OPENSSL_LIB_DIR = "${opensslStatic.out}/lib";
-        OPENSSL_INCLUDE_DIR = "${opensslStatic.dev}/include";
-
-        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher ])
+        buildInputs = [ ]
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
