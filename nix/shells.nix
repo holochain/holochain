@@ -100,8 +100,4 @@ rec {
       rustup
     ];
   });
-
-  holonix = mkShell {
-    inputsFrom = [ holonix.main ];
-  };
 }
