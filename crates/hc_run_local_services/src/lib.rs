@@ -76,6 +76,7 @@ impl AOut {
 }
 
 impl HcRunLocalServices {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         bootstrap_address_path: Option<std::path::PathBuf>,
         bootstrap_interface: String,
