@@ -453,6 +453,7 @@ impl HcWebAppBundleSubcommand {
     }
 }
 
+/// Load a [ValidatedDnaManifest] manifest from the given path and return its `name` field.
 pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
     let manifest_path = manifest_path.join(ValidatedDnaManifest::path());
@@ -461,6 +462,7 @@ pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     Ok(manifest.name())
 }
 
+/// Load an [AppManifest] manifest from the given path and return its `app_name` field.
 pub async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
     let manifest_path = manifest_path.join(AppManifest::path());
@@ -469,6 +471,7 @@ pub async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     Ok(manifest.app_name().to_string())
 }
 
+/// Load a [WebAppManifest] manifest from the given path and return its `app_name` field.
 pub async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
     let manifest_path = manifest_path.join(WebAppManifest::path());
@@ -477,7 +480,7 @@ pub async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     Ok(manifest.app_name().to_string())
 }
 
-// Pack the app's manifest and all its DNAs if their location is bundled
+/// Pack the app's manifest and all its DNAs if their location is bundled
 pub async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::Result<()> {
     let canonical_web_app_workdir_path = ffs::canonicalize(web_app_workdir_path).await?;
 
@@ -510,7 +513,7 @@ pub async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::R
     Ok(())
 }
 
-// Pack all the app's DNAs if their location is bundled
+/// Pack all the app's DNAs if their location is bundled
 pub async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
     let app_workdir_path = ffs::canonicalize(app_workdir_path).await?;
 
@@ -535,7 +538,7 @@ pub async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()
     Ok(())
 }
 
-// Returns all the locations of the workdirs for the bundled DNAs in the given app manifest
+/// Returns all the locations of the workdirs for the bundled DNAs in the given app manifest
 pub async fn bundled_dnas_workdir_locations(
     app_manifest_path: &Path,
     app_manifest: &AppManifest,
