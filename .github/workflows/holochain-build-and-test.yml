@@ -88,7 +88,7 @@ jobs:
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
           # TODO Want to be able to choose between internal/external when building external PRs
-          cachix push holochain-ci-internal $profile_name
+          cachix push holochain-ci-internal test-command
 
           # TODO: remove this once we've implemented all tests and know that we don't need it
           # if there's something to run we generate separate commands
@@ -137,8 +137,8 @@ jobs:
           fi
 
           # See https://docs.cachix.org/pushing#id1 for pushing shell environments
-          nix build --profile holonix \
+          nix build --profile holonix-profile \
             ${{ matrix.cmd.extra_arg }} \
             .#devShells.${system}.holonix
 
-          cachix push holochain-ci holonix
+          cachix push holochain-ci holonix-profile
