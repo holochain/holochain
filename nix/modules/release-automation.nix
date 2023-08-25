@@ -122,6 +122,7 @@
             cd ''${TEST_WORKSPACE:?}
             ${../../scripts/ci-git-config.sh}
             git status
+            git switch -c repo-test
 
             ${script}/bin/${script.name} ''${TEST_WORKSPACE:?}
 
