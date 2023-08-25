@@ -199,14 +199,14 @@ async fn grafting() {
         .expect("Should restore original chain");
 
     // Start a second conductor.
-    let mut conductor =
+    let conductor =
         SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
             .await;
 
     // The dna needs to be installed first.
     conductor.register_dna(dna_file.clone()).await.unwrap();
 
-    let mut payload = holochain::sweettest::install_app_payload_from_dnas(
+    let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
         "app",
         alice.agent_pubkey().clone(),
         [&dna_file],
@@ -218,7 +218,6 @@ async fn grafting() {
     payload.ignore_genesis_failure = true;
     let install_result = conductor.raw_handle().install_app_bundle(payload).await;
     assert!(install_result.is_err());
-
 
     // Insert the chain from the original conductor.
     conductor
