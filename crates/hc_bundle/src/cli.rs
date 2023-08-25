@@ -475,3 +475,9 @@ async fn bundled_dnas_workdir_locations(
 
     Ok(dna_locations)
 }
+
+nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+default_semver_increment_mode: !pre_patch beta-rc
+semver_increment_mode: !minor
+EOF
+)
