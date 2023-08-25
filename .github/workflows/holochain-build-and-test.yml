@@ -80,7 +80,7 @@ jobs:
         run: |
           set -xe
 
-          git show-ref HEAD
+          git status
 
           # if a nix store path was passed, ensure it exists locally
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
