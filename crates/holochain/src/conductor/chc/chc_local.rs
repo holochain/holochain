@@ -34,7 +34,7 @@ struct RecordItem {
     /// The action
     action: SignedActionHashed,
 
-    /// The entry, encrypted (TODO: by which key?), with the signature of
+    /// The entry, encrypted (TODO: by which key?), with the signature
     /// of the encrypted bytes
     pub encrypted_entry: Option<(Arc<EncryptedEntry>, Signature)>,
 }
@@ -353,7 +353,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Sync is not be possible since the installation was rolled back and the cell was removed
+        // Sync is not possible since the installation was rolled back and the cell was removed
         assert!(matches!(
             conductors[3]
                 .raw_handle()
