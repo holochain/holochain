@@ -24,6 +24,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tokio = { version = "1.27", features = ["full"] }
 
+arbitrary = { version = "1", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 test-strategy = { version = "0", optional = true }
@@ -33,6 +34,7 @@ kitsune_p2p_gossip = { path = ".", features = ["test_utils"] }
 
 [features]
 fuzzing = [
+    "arbitrary",
     "proptest",
     "proptest-derive",
     "test-strategy",

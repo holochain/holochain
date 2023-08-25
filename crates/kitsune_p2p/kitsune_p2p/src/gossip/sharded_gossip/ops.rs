@@ -81,7 +81,7 @@ impl ShardedGossipLocal {
             bloom::Batch::Partial { cursor, data } => {
                 // If a partial batch of hashes was found for this bloom then adjust
                 // the remote blooms time window to the cursor and queue it for future processing.
-                remote_bloom.time.start = cursor;
+                remote_bloom.window.start = cursor;
 
                 // Queue this bloom using the unique id if there is one.
                 let id = state.ops_batch_queue.0.share_mut(|queue, _| {

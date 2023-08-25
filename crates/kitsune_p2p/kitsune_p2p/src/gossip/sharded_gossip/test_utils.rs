@@ -53,21 +53,18 @@ pub fn create_op_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> BloomFilter {
 /// Check an ops bloom for testing.
 pub fn check_ops_bloom<'a>(
     ops: impl Iterator<Item = (kitsune_p2p_timestamp::Timestamp, &'a Arc<KitsuneOpHash>)>,
-    bloom: EncodedTimedBloomFilter,
+    bloom: TimedBloomFilter,
 ) -> Vec<&'a Arc<KitsuneOpHash>> {
     match bloom {
-        EncodedTimedBloomFilter::NoOverlap => vec![],
-        EncodedTimedBloomFilter::MissingAllHashes { time_window } => ops
-            .filter(|(t, _)| time_window.contains(t))
+        TimedBloomFilter::NoOverlap => vec![],
+        TimedBloomFilter::MissingAllHashes { window } => ops
+            .filter(|(t, _)| window.contains(t))
             .map(|(_, h)| h)
             .collect(),
-        EncodedTimedBloomFilter::HaveHashes {
-            filter,
-            time_window,
-        } => ops
-            .filter(|(t, _)| time_window.contains(t))
+        TimedBloomFilter::HaveHashes { bloom, window } => ops
+            .filter(|(t, _)| window.contains(t))
             .map(|(_, h)| h)
-            .filter(|op| !filter.check(&MetaOpKey::Op((**op).clone())))
+            .filter(|op| !bloom.check(&MetaOpKey::Op((**op).clone())))
             .collect(),
     }
 }

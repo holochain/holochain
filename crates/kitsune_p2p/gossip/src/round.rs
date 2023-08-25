@@ -5,7 +5,7 @@ use kitsune_p2p_types::{
 };
 
 use crate::{
-    bloom::{generate_agent_bloom, EncodedBloom, MetaOpKey},
+    bloom::{BloomFilter, MetaOpKey},
     codec::{self as msgs, GossipMsg},
 };
 
@@ -341,7 +341,7 @@ impl GossipRoundStage {
             let agent_bloom = generate_agent_bloom(local_agents_within_arcset);
             (
                 Stage::ExchangingAgentBlooms,
-                GossipMsg::agent_diff(EncodedBloom::encode(&agent_bloom)),
+                GossipMsg::agent_diff(agent_bloom),
             )
         } else {
             match plan.diff_type {
@@ -365,7 +365,7 @@ impl GossipRoundStage {
     /// ### Effects
     /// - Send agent data
     fn incoming_agent_bloom(&self, ax: AxAgentDiff) -> (GossipRoundStage, Vec<Fx>) {
-        let bloom = ax.msg.bloom_filter.decode();
+        let bloom = ax.msg.bloom_filter;
         let missing: Vec<_> = ax
             .local_agents
             .into_iter()
@@ -407,6 +407,10 @@ impl GossipRoundStage {
     fn incoming_op_regions(&self, ax: AxOpRegions) -> (GossipRoundStage, Vec<Fx>) {
         todo!()
     }
+}
+
+fn generate_agent_bloom(agents: Vec<KAgent>) -> BloomFilter {
+    todo!()
 }
 
 fn unexpected() -> (GossipRoundStage, Vec<Fx>) {

@@ -24,7 +24,7 @@ async fn bloom_windows() {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 1);
             let r = v.first().unwrap();
-            let TimedBloomFilter { bloom, time } = r;
+            let TimedBloomFilter { bloom, window } = r;
             assert!(bloom.is_some());
             assert_eq!(*time, search_window);
         }
@@ -41,7 +41,7 @@ async fn bloom_windows() {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 1);
             let r = v.first().unwrap();
-            let TimedBloomFilter { bloom, time } = r;
+            let TimedBloomFilter { bloom, window } = r;
             assert!(bloom.is_none());
             assert_eq!(*time, search_window);
         }
@@ -61,7 +61,7 @@ async fn bloom_windows() {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 1);
             let r = v.first().unwrap();
-            let TimedBloomFilter { bloom, time } = r;
+            let TimedBloomFilter { bloom, window } = r;
             assert!(bloom.is_some());
             assert_eq!(*time, search_window);
         }
@@ -81,7 +81,7 @@ async fn bloom_windows() {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 2);
             let r = v.get(0).unwrap();
-            let TimedBloomFilter { bloom, time } = r;
+            let TimedBloomFilter { bloom, window } = r;
             assert!(bloom.is_some());
             assert_eq!(
                 *time,
@@ -94,7 +94,7 @@ async fn bloom_windows() {
                     .end
             );
             let r = v.get(1).unwrap();
-            let TimedBloomFilter { bloom, time } = r;
+            let TimedBloomFilter { bloom, window } = r;
             assert!(bloom.is_some());
             assert_eq!(
                 *time,
@@ -141,7 +141,7 @@ async fn bloom_windows() {
             last_cursor = cursor;
 
             let mut expected_window = search_window.clone();
-            for (i, TimedBloomFilter { bloom, time }) in v.into_iter().enumerate() {
+            for (i, TimedBloomFilter { bloom, window }) in v.into_iter().enumerate() {
                 assert!(bloom.is_some());
 
                 expected_window.end = get_time_bounds(
@@ -176,7 +176,7 @@ async fn bloom_windows() {
         Batch::Complete(v) => {
             assert_eq!(v.len(), 1);
             let r = v.get(0).unwrap();
-            let TimedBloomFilter { bloom, time } = r;
+            let TimedBloomFilter { bloom, window } = r;
             assert!(bloom.is_some());
             assert_eq!(*time, last_cursor..search_window.end);
         }

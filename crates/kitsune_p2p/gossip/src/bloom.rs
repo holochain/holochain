@@ -1,37 +1,31 @@
-use std::sync::Arc;
-
-use bloomfilter::Bloom;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneOpHash};
+use kitsune_p2p_types::tx2::tx2_utils::*;
+use std::sync::Arc;
+
+type BloomInner = bloomfilter::Bloom<MetaOpKey>;
 
 /// An exclusive range of timestamps, measured in microseconds
-type TimeWindow = std::ops::Range<Timestamp>;
-
-pub use bloomfilter;
-use kitsune_p2p_types::tx2::tx2_utils::PoolBuf;
+pub type TimeWindow = std::ops::Range<Timestamp>;
 
 /// A bloom filter of Kitsune hash types
-#[derive(Debug, derive_more::Deref, derive_more::DerefMut, derive_more::From)]
-pub struct BloomFilter(bloomfilter::Bloom<MetaOpKey>);
-
-#[cfg(feature = "fuzzing")]
-impl proptest::arbitrary::Arbitrary for BloomFilter {
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<Self>;
-
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::prelude::*;
-
-        (1usize.., 1usize.., any::<[u8; 32]>())
-            .prop_map(|(size, count, seed)| {
-                Self(bloomfilter::Bloom::new_with_seed(size, count, &seed))
-            })
-            .boxed()
-    }
-}
-
-const TGT_FP: f64 = 0.01;
+#[derive(
+    Debug,
+    Clone,
+    derive_more::From,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct BloomFilter(
+    #[serde(
+        serialize_with = "encode_bloom_filter",
+        deserialize_with = "decode_bloom_filter"
+    )]
+    BloomInner,
+);
 
 /// The key to use for referencing items in a bloom filter
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -53,80 +47,78 @@ pub enum MetaOpData {
     Agent(AgentInfoSigned),
 }
 
-#[derive(Debug)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-pub struct TimedBloomFilter {
-    /// The bloom filter for the time window.
-    /// If this is none then we have no hashes
-    /// for this time window.
-    pub bloom: Option<BloomFilter>,
-    /// The time window for this bloom filter.
-    pub time: TimeWindow,
+impl PartialEq for BloomFilter {
+    fn eq(&self, other: &Self) -> bool {
+        self.bit_vec() == other.bit_vec()
+            && self.number_of_bits() == other.number_of_bits()
+            && self.number_of_hash_functions() == other.number_of_hash_functions()
+            && self.sip_keys() == other.sip_keys()
+    }
 }
 
-/// An encoded timed bloom filter of missing op hashes.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-pub enum EncodedTimedBloomFilter {
-    /// I have no overlap with your agents
-    /// Please don't send any ops.
+impl Eq for BloomFilter {}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub enum TimedBloomFilter {
     NoOverlap,
-    /// I have overlap and I have no hashes.
-    /// Please send all your ops.
+
     MissingAllHashes {
-        /// The time window that we are missing hashes for.
-        time_window: TimeWindow,
+        window: TimeWindow,
     },
-    /// I have overlap and I have some hashes.
-    /// Please send any missing ops.
+
     HaveHashes {
-        /// The encoded bloom filter.
-        bloom: EncodedBloom,
-        /// The time window these hashes are for.
-        time_window: TimeWindow,
+        window: TimeWindow,
+        bloom: BloomFilter,
     },
 }
 
-impl EncodedTimedBloomFilter {
-    /// Get the size in bytes of the bloom filter, if one exists
-    pub fn size(&self) -> usize {
-        match self {
-            Self::HaveHashes { bloom, .. } => bloom.len(),
-            _ => 0,
-        }
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for BloomFilter {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::prelude::*;
+
+        (
+            // proptest::collection::vec(any::<u8>(), 1..65536),
+            any::<Vec<u8>>(),
+            // any::<u64>(),
+            any::<u32>(),
+            any::<[(u64, u64); 2]>(),
+        )
+            .prop_map(|(bloom, num, keys)| {
+                Self(bloomfilter::Bloom::from_existing(
+                    &bloom,
+                    bloom.len() as u64,
+                    num,
+                    keys,
+                ))
+            })
+            .boxed()
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, derive_more::Deref)]
-#[serde(transparent)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-pub struct EncodedBloom(PoolBuf);
-
-impl EncodedBloom {
-    pub fn encode(bloom: &BloomFilter) -> Self {
-        Self(encode_bloom_filter(bloom))
-    }
-
-    pub fn decode(self) -> BloomFilter {
-        decode_bloom_filter(&self.0)
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for BloomFilter {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let size = 1 + u.choose_index(usize::MAX / 8 - 1)?;
+        Ok(Self(bloomfilter::Bloom::new_with_seed(
+            size,
+            1usize.saturating_add(u.arbitrary()?),
+            &u.arbitrary()?,
+        )))
     }
 }
 
-pub(crate) fn generate_agent_bloom(agents: Vec<AgentInfoSigned>) -> BloomFilter {
-    // Create a new bloom with the correct size.
-    let mut bloom = bloomfilter::Bloom::new_for_fp_rate(agents.len(), TGT_FP);
-
-    for info in agents {
-        let signed_at_ms = info.signed_at_ms;
-        // The key is the agent hash + the signed at.
-        let key = MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms);
-        bloom.set(&key);
-    }
-
-    bloom.into()
-}
-
-fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
+fn encode_bloom_filter<S: serde::Serializer>(
+    bloom: &BloomInner,
+    ser: S,
+) -> Result<S::Ok, S::Error> {
     let bitmap: Vec<u8> = bloom.bitmap();
     let bitmap_bits: u64 = bloom.number_of_bits();
     let k_num: u32 = bloom.number_of_hash_functions();
@@ -153,16 +145,40 @@ fn encode_bloom_filter(bloom: &BloomFilter) -> PoolBuf {
     buf.extend_from_slice(&k4.to_le_bytes());
     buf.extend_from_slice(&bitmap);
 
-    buf
+    ser.serialize_bytes(&buf)
 }
 
-fn decode_bloom_filter(bloom: &[u8]) -> BloomFilter {
-    let bitmap_bits = u64::from_le_bytes(*arrayref::array_ref![bloom, 0, 8]);
-    let k_num = u32::from_le_bytes(*arrayref::array_ref![bloom, 8, 4]);
-    let k1 = u64::from_le_bytes(*arrayref::array_ref![bloom, 12, 8]);
-    let k2 = u64::from_le_bytes(*arrayref::array_ref![bloom, 20, 8]);
-    let k3 = u64::from_le_bytes(*arrayref::array_ref![bloom, 28, 8]);
-    let k4 = u64::from_le_bytes(*arrayref::array_ref![bloom, 36, 8]);
-    let sip_keys = [(k1, k2), (k3, k4)];
-    bloomfilter::Bloom::from_existing(&bloom[44..], bitmap_bits, k_num, sip_keys).into()
+fn decode_bloom_filter<'de, D: serde::Deserializer<'de>>(de: D) -> Result<BloomInner, D::Error> {
+    de.deserialize_bytes(BloomBytesVisitor)
+}
+
+struct BloomBytesVisitor;
+
+impl<'de> serde::de::Visitor<'de> for BloomBytesVisitor {
+    type Value = BloomInner;
+
+    fn visit_bytes<E>(self, bloom: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let bitmap_bits = u64::from_le_bytes(*arrayref::array_ref![bloom, 0, 8]);
+        let k_num = u32::from_le_bytes(*arrayref::array_ref![bloom, 8, 4]);
+        let k1 = u64::from_le_bytes(*arrayref::array_ref![bloom, 12, 8]);
+        let k2 = u64::from_le_bytes(*arrayref::array_ref![bloom, 20, 8]);
+        let k3 = u64::from_le_bytes(*arrayref::array_ref![bloom, 28, 8]);
+        let k4 = u64::from_le_bytes(*arrayref::array_ref![bloom, 36, 8]);
+        let sip_keys = [(k1, k2), (k3, k4)];
+
+        // TODO: check for invalid settings when decoding over the wire
+        Ok(bloomfilter::Bloom::from_existing(
+            &bloom[44..],
+            bitmap_bits,
+            k_num,
+            sip_keys,
+        ))
+    }
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("kitsune-encoded bloom filter")
+    }
 }

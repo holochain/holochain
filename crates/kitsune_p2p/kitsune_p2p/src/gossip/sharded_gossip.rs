@@ -12,6 +12,7 @@ use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
 use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
+use kitsune_p2p_gossip::bloom::TimedBloomFilter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -77,16 +78,6 @@ pub(crate) mod tests;
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
-
-#[derive(Debug)]
-struct TimedBloomFilter {
-    /// The bloom filter for the time window.
-    /// If this is none then we have no hashes
-    /// for this time window.
-    bloom: Option<BloomFilter>,
-    /// The time window for this bloom filter.
-    time: TimeWindow,
-}
 
 /// Gossip has two distinct variants which share a lot of similarities but
 /// are fundamentally different and serve different purposes
@@ -929,24 +920,8 @@ impl ShardedGossipLocal {
                 };
                 match state {
                     Some(state) => match missing_hashes {
-                        EncodedTimedBloomFilter::NoOverlap => Vec::with_capacity(0),
-                        EncodedTimedBloomFilter::MissingAllHashes { time_window } => {
-                            let filter = TimedBloomFilter {
-                                bloom: None,
-                                time: time_window,
-                            };
-                            self.incoming_op_bloom(state, filter, None).await?
-                        }
-                        EncodedTimedBloomFilter::HaveHashes {
-                            filter,
-                            time_window,
-                        } => {
-                            let filter = TimedBloomFilter {
-                                bloom: Some(filter),
-                                time: time_window,
-                            };
-                            self.incoming_op_bloom(state, filter, None).await?
-                        }
+                        TimedBloomFilter::NoOverlap => vec![],
+                        bloom => self.incoming_op_bloom(state, bloom, None).await?,
                     },
                     None => Vec::with_capacity(0),
                 }
@@ -1146,42 +1121,6 @@ fn time_range(start: Duration, end: Duration) -> TimeWindow {
     start..end
 }
 
-/// An encoded timed bloom filter of missing op hashes.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
-pub enum EncodedTimedBloomFilter {
-    /// I have no overlap with your agents
-    /// Please don't send any ops.
-    NoOverlap,
-    /// I have overlap and I have no hashes.
-    /// Please send all your ops.
-    MissingAllHashes {
-        /// The time window that we are missing hashes for.
-        time_window: TimeWindow,
-    },
-    /// I have overlap and I have some hashes.
-    /// Please send any missing ops.
-    HaveHashes {
-        /// The encoded bloom filter.
-        filter: BloomFilter,
-        /// The time window these hashes are for.
-        time_window: TimeWindow,
-    },
-}
-
-// impl EncodedTimedBloomFilter {
-//     /// Get the size in bytes of the bloom filter, if one exists
-//     pub fn size(&self) -> usize {
-//         match self {
-//             Self::HaveHashes { filter, .. } => filter.len(),
-//             _ => 0,
-//         }
-//     }
-// }
-
 #[derive(Debug, Clone, Copy)]
 /// The possible states when receiving missing ops.
 /// Note this is not sent over the wire and is instead
@@ -1236,7 +1175,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Op Bloom filter
         OpBloom(0x50) {
             /// The bloom filter for op data
-            missing_hashes.0: EncodedTimedBloomFilter,
+            missing_hashes.0: TimedBloomFilter,
             /// Is this the last bloom to be sent?
             finished.1: bool,
         },

@@ -5,7 +5,7 @@ use kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht_arc::DhtArcRange, KAgent};
 
 use crate::{
-    bloom::{EncodedBloom, EncodedTimedBloomFilter},
+    bloom::{BloomFilter, TimedBloomFilter},
     round::GossipPlan,
 };
 
@@ -44,7 +44,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Agent Info Bloom
         AgentDiff(0x30) {
             /// The bloom filter for agent data
-            bloom_filter.0: EncodedBloom,
+            bloom_filter.0: BloomFilter,
         },
 
         /// Any agents that were missing from the remote bloom.
@@ -56,7 +56,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Send Op Bloom filter
         OpBloom(0x50) {
             /// The bloom filter for op data
-            bloom_filter.0: EncodedTimedBloomFilter,
+            bloom_filter.0: TimedBloomFilter,
             /// Is this the last bloom to be sent?
             finished.1: bool,
         },

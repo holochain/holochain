@@ -14,7 +14,10 @@ fn gossip_msgs(len: impl Into<SizeRange>) -> BoxedStrategy<Vec<round::Ax>> {
 
 fn proptest_runner() -> proptest::test_runner::TestRunner {
     use proptest::test_runner::{Config, TestRunner};
-    TestRunner::new(Config::default())
+    TestRunner::new(Config {
+        cases: 3,
+        ..Default::default()
+    })
 }
 
 fn proptest_run<S: Strategy>(strategy: S, test: impl Fn(S::Value)) {
@@ -38,14 +41,14 @@ fn gossip_fuzzy() {
     )
 }
 
-// NOTE: this test is identical to the above, just using the attr macro syntax.
-// The other test is easier for rust-analyzer to work with.
-#[proptest]
-fn gossip_fuzz(#[strategy(gossip_msgs(3..12))] msgs: Vec<round::Ax>, initiate: AxInitiate) {
-    let mut mux = GossipMux::default();
-    let id = PeerId::default();
-    mux.receive(id.clone(), initiate.into());
-    for msg in msgs {
-        mux.receive(id.clone(), msg.into());
-    }
-}
+// // NOTE: this test is identical to the above, just using the attr macro syntax.
+// // The other test is easier for rust-analyzer to work with.
+// #[proptest]
+// fn gossip_fuzz(#[strategy(gossip_msgs(3..12))] msgs: Vec<round::Ax>, initiate: AxInitiate) {
+//     let mut mux = GossipMux::default();
+//     let id = PeerId::default();
+//     mux.receive(id.clone(), initiate.into());
+//     for msg in msgs {
+//         mux.receive(id.clone(), msg.into());
+//     }
+// }

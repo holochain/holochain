@@ -264,8 +264,8 @@ pub fn cert_from_info(info: AgentInfoSigned) -> Tx2Cert {
     Tx2Cert::from(digest)
 }
 
-pub fn empty_bloom() -> EncodedTimedBloomFilter {
-    EncodedTimedBloomFilter::MissingAllHashes {
-        time_window: full_time_window(),
+pub fn empty_bloom() -> TimedBloomFilter {
+    TimedBloomFilter::MissingAllHashes {
+        window: full_time_window(),
     }
 }

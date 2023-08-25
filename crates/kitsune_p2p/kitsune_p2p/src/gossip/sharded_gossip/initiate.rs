@@ -290,7 +290,7 @@ impl ShardedGossipLocal {
         if blooms.is_empty() {
             // Check if this is the final time window.
             gossip.push(ShardedGossipWire::op_bloom(
-                EncodedTimedBloomFilter::NoOverlap,
+                TimedBloomFilter::NoOverlap,
                 true,
             ));
         }
@@ -299,17 +299,6 @@ impl ShardedGossipLocal {
 
         // Encode each bloom found for this time window.
         for (i, bloom) in blooms.into_iter().enumerate() {
-            let time_window = bloom.time;
-            let bloom = match bloom.bloom {
-                // We have some hashes so request all missing from the bloom.
-                Some(bloom) => EncodedTimedBloomFilter::HaveHashes {
-                    filter: bloom,
-                    time_window,
-                },
-                // We have no hashes for this time window but we do have agents
-                // that hold the arc so request all the ops the remote holds.
-                None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
-            };
             state.increment_expected_op_blooms();
 
             // Check if this is the final time window and the final bloom for this window.

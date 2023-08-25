@@ -3897,6 +3897,7 @@ dependencies = [
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_fetch",
+ "kitsune_p2p_gossip",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
  "kitsune_p2p_timestamp",
@@ -4064,6 +4065,7 @@ dependencies = [
 name = "kitsune_p2p_gossip"
 version = "0.1.0"
 dependencies = [
+ "arbitrary",
  "arrayref",
  "bloomfilter",
  "derive_more",

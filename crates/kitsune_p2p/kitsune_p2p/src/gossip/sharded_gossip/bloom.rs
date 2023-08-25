@@ -100,10 +100,7 @@ impl ShardedGossipLocal {
                         // empty bloom filter for this time window.
 
                         let bloom = if hashes.is_empty() {
-                            TimedBloomFilter {
-                                bloom: None,
-                                time: window,
-                            }
+                            TimedBloomFilter::MissingAllHashes { window }
                         } else {
                             // Otherwise create the bloom filter from the hashes.
                             let mut bloom =
@@ -120,9 +117,9 @@ impl ShardedGossipLocal {
                                 // tasks so they don't starve.
                                 tokio::task::yield_now().await;
                             }
-                            TimedBloomFilter {
-                                bloom: Some(BloomFilter::from(bloom)),
-                                time: window,
+                            TimedBloomFilter::HaveHashes {
+                                bloom: BloomFilter::from(bloom),
+                                window,
                             }
                         };
                         match batch {
@@ -172,7 +169,7 @@ impl ShardedGossipLocal {
         use futures::TryStreamExt;
         let TimedBloomFilter {
             bloom: remote_bloom,
-            time,
+            window: time,
         } = remote_bloom;
         let end = time.end;
         let mut stream = store::hash_chunks_query(
