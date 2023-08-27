@@ -17,6 +17,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 // The PartialEq impl by subtle *should* be compatible with default Hash impl
 #[allow(clippy::derive_hash_xor_eq)]
 #[derive(Clone, Copy, Hash, SerializedBytes)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct CapSecret(CapSecretBytes);
 
 #[cfg(feature = "arbitrary")]

@@ -29,6 +29,7 @@ mod error;
 /// Every countersigning session must complete a full set of actions between the start and end times to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct CounterSigningSessionTimes {
     /// The earliest allowable time for countersigning session responses to be valid.
     pub start: Timestamp,
@@ -86,12 +87,14 @@ impl CounterSigningSessionTimes {
 /// Every preflight request can have optional arbitrary bytes that can be agreed to.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct PreflightBytes(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct Role(pub u8);
 
 impl Role {
@@ -109,6 +112,7 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 /// Every preflight must be identical and signed by every agent for a session to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct PreflightRequest {
     /// The hash of the app entry, as if it were not countersigned.
     /// The final entry hash will include the countersigning session.
@@ -346,6 +350,7 @@ pub enum PreflightRequestAcceptance {
 /// The chain must be frozen until each agent decides to sign or exit the session.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct CounterSigningAgentState {
     /// The index of the agent in the preflight request agent vector.
     agent_index: u8,
@@ -403,6 +408,7 @@ impl CounterSigningAgentState {
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub enum ActionBase {
     /// Mirrors Action::Create.
     Create(CreateBase),
@@ -477,6 +483,7 @@ impl Action {
 /// All the data required for a countersigning session.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct CounterSigningSessionData {
     /// The preflight request that was agreed upon by all parties for the session.
     pub preflight_request: PreflightRequest,

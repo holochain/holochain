@@ -14,6 +14,7 @@ use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainFilters;
 use holochain_zome_types::RegisterAgentActivity;
 use holochain_zome_types::SignedActionHashed;
+use proptest_derive::Arbitrary;
 
 #[cfg(all(test, feature = "test_utils"))]
 pub mod test;
@@ -162,7 +163,7 @@ pub enum Sequences {
     EmptyRange,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize, Arbitrary)]
 /// Response to a `must_get_agent_activity` call.
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.

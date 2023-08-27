@@ -960,39 +960,9 @@ where
         Ok(links.len())
     }
 
-    /// Request a hash bounded chain query.
-    pub async fn must_get_agent_activity(
-        &self,
-        author: AgentPubKey,
-        filter: ChainFilter,
-    ) -> CascadeResult<MustGetAgentActivityResponse> {
-        // Get the available databases.
-        let mut txn_guards = self.get_txn_guards().await?;
-        let scratch = self.scratch.clone();
-
-        // For each store try to get the bounded activity.
-        let results = tokio::task::spawn_blocking({
-            let author = author.clone();
-            let filter = filter.clone();
-            move || {
-                let mut results = Vec::with_capacity(txn_guards.len() + 1);
-                for txn_guard in &mut txn_guards {
-                    let mut txn = txn_guard.transaction()?;
-                    let r = match &scratch {
-                        Some(scratch) => {
-                            scratch.apply_and_then(|scratch| {
-                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
-                            })?
-                        }
-                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
-                    };
-                    results.push(r);
-                }
-                CascadeResult::Ok(results)
-            }
-        })
-            .await??;
-
+    fn merge_agent_activity_results(
+        results: Vec<(MustGetAgentActivityResponse, Option<ChainFilterRange>)>,
+    ) -> (MustGetAgentActivityResponse, Option<ChainFilterRange>) {
         let mut merged_results = (MustGetAgentActivityResponse::EmptyRange, None);
 
         for result in &results {
@@ -1026,6 +996,77 @@ where
                 }
             }
         }
+        merged_results
+    }
+
+    /// Request a hash bounded chain query.
+    pub async fn must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: ChainFilter,
+    ) -> CascadeResult<MustGetAgentActivityResponse> {
+        // Get the available databases.
+        let mut txn_guards = self.get_txn_guards().await?;
+        let scratch = self.scratch.clone();
+
+        // For each store try to get the bounded activity.
+        let results = tokio::task::spawn_blocking({
+            let author = author.clone();
+            let filter = filter.clone();
+            move || {
+                let mut results = Vec::with_capacity(txn_guards.len() + 1);
+                for txn_guard in &mut txn_guards {
+                    let mut txn = txn_guard.transaction()?;
+                    let r = match &scratch {
+                        Some(scratch) => {
+                            scratch.apply_and_then(|scratch| {
+                                authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
+                            })?
+                        }
+                        None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
+                    };
+                    results.push(r);
+                }
+                CascadeResult::Ok(results)
+            }
+        })
+            .await??;
+
+        let merged_results = Self::merge_agent_activity_results(results);
+
+        // let mut merged_results = (MustGetAgentActivityResponse::EmptyRange, None);
+
+        // for result in &results {
+        //     match (&merged_results, result) {
+        //         ((_, None), (_, Some(_))) => {
+        //             merged_results = result.to_owned();
+        //         }
+        //         (
+        //             (MustGetAgentActivityResponse::Activity(responses), chain_filter),
+        //             (MustGetAgentActivityResponse::Activity(more_responses), other_chain_filter),
+        //         ) => {
+        //             if chain_filter == other_chain_filter {
+        //                 let mut merged_responses = responses.clone();
+        //                 merged_responses.extend(more_responses.to_owned());
+        //                 let mut merged_activity =
+        //                     MustGetAgentActivityResponse::Activity(merged_responses);
+        //                 merged_activity.normalize();
+        //                 merged_results = (merged_activity, chain_filter.clone());
+        //             }
+        //             // If the chain filters disagree on what the filter is we
+        //             // have a problem.
+        //             else {
+        //                 merged_results = (MustGetAgentActivityResponse::IncompleteChain, None);
+        //             }
+        //         }
+        //         ((MustGetAgentActivityResponse::Activity(_), _), _) => {
+        //             // Noop.
+        //         }
+        //         _ => {
+        //             merged_results = result.to_owned();
+        //         }
+        //     }
+        // }
 
         let result =
             authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(

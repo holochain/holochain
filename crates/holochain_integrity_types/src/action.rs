@@ -35,6 +35,7 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(tag = "type")]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
@@ -472,6 +473,7 @@ pub struct AgentValidationPkg {
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

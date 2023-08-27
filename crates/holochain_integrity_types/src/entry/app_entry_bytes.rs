@@ -6,6 +6,7 @@ use holochain_serialized_bytes::prelude::*;
 /// Newtype for the bytes comprising an App entry
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct AppEntryBytes(pub SerializedBytes);
 
 impl std::fmt::Debug for AppEntryBytes {

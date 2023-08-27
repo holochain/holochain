@@ -16,6 +16,8 @@ use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
 use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
+#[cfg(feature = "proptest")]
+use proptest::prelude::*;
 
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
@@ -167,10 +169,12 @@ impl AsRef<SignedActionHashed> for SignedActionHashed {
 }
 
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 /// Any content that has been hashed and signed.
-pub struct SignedHashed<T>
-where
-    T: HashableContent,
+pub struct SignedHashed<
+    #[cfg(not(feature = "proptest"))] T: HashableContent,
+    #[cfg(feature = "proptest")] T: HashableContent + proptest::prelude::Arbitrary,
+>
 {
     /// The hashed content.
     pub hashed: HoloHashed<T>,

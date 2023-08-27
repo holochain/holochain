@@ -13,7 +13,11 @@ use crate::PrimitiveHashType;
 /// Provides an easy constructor which consumes the content.
 // MAYBE: consider making lazy with OnceCell
 #[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
-pub struct HoloHashed<C: HashableContent> {
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
+pub struct HoloHashed<
+ #[cfg(not(feature = "proptest"))] C: HashableContent,
+ #[cfg(feature = "proptest")] C: HashableContent + proptest::Arbitrary,
+> {
     /// The content which is hashed of type C.
     pub content: C,
     /// The hash of the content C.

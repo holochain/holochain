@@ -188,6 +188,7 @@ pub struct RegisterDelete {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "test_utils", derive(proptest_derive::Arbitrary))]
 /// Registers a new [`Action`] on an agent source chain.
 /// This is the act of creating any [`Action`] and
 /// publishing it to the DHT.

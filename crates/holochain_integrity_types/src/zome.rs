@@ -13,6 +13,7 @@ use holochain_serialized_bytes::prelude::*;
 /// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
 #[repr(transparent)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct ZomeName(pub Cow<'static, str>);
 
 #[cfg(feature = "arbitrary")]
@@ -56,6 +57,7 @@ impl From<String> for ZomeName {
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 pub struct FunctionName(pub String);
 
 impl FunctionName {

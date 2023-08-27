@@ -17,6 +17,7 @@ use holochain_zome_types::ChainFilter;
 use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainStatus;
 use test_case::test_case;
+use proptest::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity() {
@@ -138,4 +139,13 @@ async fn test_must_get_agent_activity(
         .must_get_agent_activity(author, filter)
         .await
         .unwrap()
+}
+
+proptest! {
+    #[test]
+    fn test_merge_agent_activity_response(
+        responses in prop::collection::vec(any::<MustGetAgentActivityResponse>())
+    ) {
+        merged_responses = holochain_cascade::merge_agent_activity_responses(responses.clone());
+    }
 }

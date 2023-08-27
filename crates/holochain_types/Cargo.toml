@@ -62,6 +62,8 @@ tracing = "0.1.26"
 wasmer-middlewares = "2"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
+proptest = "1"
+proptest-derive = { version = "0.3"}
 isotest = { version = "0", optional = true }
 
 
