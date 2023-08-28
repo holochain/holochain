@@ -99,7 +99,8 @@
         # and then the test derivation is built it relies on that input being the local repo path. see the "holochain-build-and-test.yml" workflow.
         build-release-automation-tests-repo =
           let
-            script = self'.packages.scripts-release-automation-check-and-bump;
+            release-script = self'.packages.scripts-release-automation-check-and-bump;
+            readmes-script = self'.packages.scripts-ci-generate-readmes;
           in
           pkgs.runCommand
             "release-automation-tests-repo"
@@ -124,7 +125,8 @@
             git status
             git switch -c repo-test
 
-            ${script}/bin/${script.name} ''${TEST_WORKSPACE:?}
+            ${readmes-script}/bin/${readmes-script.name}
+            ${release-script}/bin/${release-script.name} ''${TEST_WORKSPACE:?}
 
             set +e
             git clean -ffdx

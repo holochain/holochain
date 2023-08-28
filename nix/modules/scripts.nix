@@ -101,7 +101,8 @@
           pathPrefix = lib.makeBinPath [
             self'.packages.cargo-rdme
             pkgs.cargo
-            pkgs.git
+            pkgs.rustc
+            pkgs.gitFull
           ];
 
           crates = [
@@ -124,7 +125,10 @@
           done
 
           # have any READMEs been updated?
-          changed_readmes=$(git diff --name-only | grep -i README)
+          changed_readmes=$(
+            set +e
+            git --exit-code diff --name-only | grep -i README
+          )
           if [[ "$?" == 0 ]]; then
             echo 'READMEs have been updated, committing changes'
             ${../../scripts/ci-git-config.sh}
