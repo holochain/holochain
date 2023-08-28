@@ -1,5 +1,6 @@
 use std::hash::Hash;
 
+use kitsune_p2p_timestamp::ArbitraryFuzzing;
 use kitsune_p2p_types::KOpHash;
 
 /// The granularity once we're > i16::MAX
@@ -13,6 +14,10 @@ const GRAN: usize = 4096;
 
 /// Roughly track an approximate integer value.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct RoughInt(i16);
 
 impl std::fmt::Debug for RoughInt {
@@ -66,7 +71,8 @@ pub type OpHashSized = RoughSized<KOpHash>;
     derive_more::Constructor,
     derive_more::Deref,
 )]
-pub struct RoughSized<T> {
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+pub struct RoughSized<T: ArbitraryFuzzing> {
     /// The data to be sized
     #[deref]
     data: T,
@@ -75,7 +81,7 @@ pub struct RoughSized<T> {
     size: Option<RoughInt>,
 }
 
-impl<T> RoughSized<T> {
+impl<T: ArbitraryFuzzing> RoughSized<T> {
     /// Break into constituent parts
     pub fn into_inner(self) -> (T, Option<RoughInt>) {
         (self.data, self.size)
@@ -97,25 +103,37 @@ impl<T> RoughSized<T> {
     }
 }
 
-impl<T: Clone> RoughSized<T> {
+impl<T: Clone + ArbitraryFuzzing> RoughSized<T> {
     /// Accessor
     pub fn data(&self) -> T {
         self.data.clone()
     }
 }
 
-impl<T: Hash> Hash for RoughSized<T> {
+impl<T: Hash + ArbitraryFuzzing> Hash for RoughSized<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // size is omitted from the hash
         self.data.hash(state);
     }
 }
 
-impl<T: PartialEq> PartialEq for RoughSized<T> {
+impl<T: PartialEq + ArbitraryFuzzing> PartialEq for RoughSized<T> {
     fn eq(&self, other: &Self) -> bool {
         // size is omitted from the equality
         self.data == other.data
     }
 }
 
-impl<T: Eq> Eq for RoughSized<T> {}
+impl<T: Eq + ArbitraryFuzzing> Eq for RoughSized<T> {}
+
+#[cfg(feature = "fuzzing")]
+impl<'a, T: ArbitraryFuzzing + arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a>
+    for RoughSized<T>
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            data: arbitrary::Arbitrary::arbitrary(u)?,
+            size: arbitrary::Arbitrary::arbitrary(u)?,
+        })
+    }
+}

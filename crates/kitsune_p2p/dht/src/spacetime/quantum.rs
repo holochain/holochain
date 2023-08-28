@@ -48,6 +48,7 @@ impl SpaceQuantum {
     serde::Serialize,
     serde::Deserialize,
 )]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct TimeQuantum(u32);
 
 impl TimeQuantum {

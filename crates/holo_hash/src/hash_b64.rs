@@ -4,6 +4,8 @@
 //! array or a base-64 string. This type just specifies how serialization should
 //! be done.
 
+use proptest::strategy::{BoxedStrategy, Strategy};
+
 use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
@@ -45,10 +47,24 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(HoloHash::arbitrary(u)?.into())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl<T: HashType + proptest::arbitrary::Arbitrary + 'static> proptest::arbitrary::Arbitrary
+    for HoloHashB64<T>
+where
+    T::Strategy: 'static,
+{
+    type Parameters = ();
+    type Strategy = BoxedStrategy<HoloHashB64<T>>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        HoloHash::arbitrary().prop_map(Into::into).boxed()
     }
 }
 

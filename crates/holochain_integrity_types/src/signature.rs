@@ -7,14 +7,14 @@ pub const SIGNATURE_BYTES: usize = 64;
 
 /// The raw bytes of a signature.
 #[derive(Clone, PartialOrd, Hash, Ord)]
-#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 // The equality is not different, it's just constant time, so we can derive a hash.
 // For an actually secure thing we wouldn't want to just assume a safe default hashing
 // But that is not what clippy is complaining about here.
 #[allow(clippy::derive_hash_xor_eq)]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Signature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; SIGNATURE_BYTES];

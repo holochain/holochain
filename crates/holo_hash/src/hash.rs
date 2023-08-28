@@ -24,13 +24,13 @@
 //! The complete 39 bytes together are known as the "full" hash
 
 use kitsune_p2p_dht_arc::DhtLocation;
+use proptest::strategy::BoxedStrategy;
+use proptest::strategy::Strategy;
 
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
-#[cfg(feature = "proptest")]
-use proptest::Arbitrary;
 
 #[cfg(feature = "hashing")]
 use crate::encode;
@@ -70,16 +70,12 @@ macro_rules! assert_length {
 ///
 /// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
-pub struct HoloHash<
-    #[cfg(not(feature = "proptest"))] T: HashType,
-    #[cfg(feature = "proptest")] T: HashType + Arbitrary
-> {
+pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
     hash_type: T,
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; HOLO_HASH_FULL_LEN];
@@ -90,6 +86,30 @@ impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
             hash: buf.to_vec(),
             hash_type: P::new(),
         })
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl<T: HashType + proptest::arbitrary::Arbitrary> proptest::arbitrary::Arbitrary for HoloHash<T>
+where
+    T::Strategy: 'static,
+{
+    type Parameters = ();
+    type Strategy = BoxedStrategy<HoloHash<T>>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        let strat = T::arbitrary().prop_flat_map(move |hash_type| {
+            let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
+            gen_strat.prop_map(move |mut buf| {
+                assert_eq!(buf.len(), 39);
+                buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
+                HoloHash {
+                    hash: buf.to_vec(),
+                    hash_type,
+                }
+            })
+        });
+        strat.boxed()
     }
 }
 

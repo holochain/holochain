@@ -5,7 +5,7 @@ use crate::HoloHashOf;
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 use crate::PrimitiveHashType;
 
 /// Represents some piece of content along with its hash representation, so that
@@ -13,11 +13,7 @@ use crate::PrimitiveHashType;
 /// Provides an easy constructor which consumes the content.
 // MAYBE: consider making lazy with OnceCell
 #[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
-#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
-pub struct HoloHashed<
- #[cfg(not(feature = "proptest"))] C: HashableContent,
- #[cfg(feature = "proptest")] C: HashableContent + proptest::Arbitrary,
-> {
+pub struct HoloHashed<C: HashableContent> {
     /// The content which is hashed of type C.
     pub content: C,
     /// The hash of the content C.
@@ -34,7 +30,7 @@ impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, C> arbitrary::Arbitrary<'a> for HoloHashed<C>
 where
     C: HashableContent + arbitrary::Arbitrary<'a>,

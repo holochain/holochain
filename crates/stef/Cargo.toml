@@ -1,0 +1,45 @@
+[package]
+name = "stef"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { version = "*" }
+derive_more = { version = "*" }
+futures = { version = "*" }
+must_future = { version = "*" }
+parking_lot = { version = "*" }
+serde = { version = "*", features = ["derive"] }
+
+# derive
+stef_derive = { path = "../stef_derive", optional = true }
+
+# diagramming
+petgraph = { version = "*", optional = true }
+proptest = { version = "*", optional = true }
+
+[dev-dependencies]
+either = { version = "*" }
+proptest = { version = "*" }
+proptest-derive = { version = "*" }
+tokio = { version = "*", features = ["full"] }
+
+[features]
+default = ["derive", "diagramming"]
+
+derive = [
+    "stef_derive",
+]
+
+diagramming = [
+    "petgraph",
+    "proptest",
+]
+
+invariants = [
+    "proptest",
+]
+
+# [workspace]

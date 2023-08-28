@@ -177,4 +177,5 @@ pub mod prelude {
     pub use super::region::*;
     pub use super::region_set::*;
     pub use super::spacetime::*;
+    pub use ::kitsune_p2p_timestamp::ArbitraryFuzzing;
 }
