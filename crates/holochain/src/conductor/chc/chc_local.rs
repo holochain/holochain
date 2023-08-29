@@ -108,7 +108,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_add_records_local() {
+    async fn test_add_records_local_chc() {
         let keystore = test_keystore();
         let agent = fake_agent_pubkey_1();
         let chc = Arc::new(ChcLocal::new(keystore, agent));

@@ -26,18 +26,21 @@ impl ChainHeadCoordinator for ChcRemote {
         let body = serde_json::to_string(&request)
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response: reqwest::Response = self.client.post("add_records", body).await?;
+        let response: reqwest::Response = self.client.post("add_records5322", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
         match status {
-            200 => Ok(()),
-            409 => {
+            201 => Ok(()),
+            411 => {
                 let (seq, hash): (u32, ActionHash) = serde_json::from_slice(&bytes)?;
-                Err(ChcError::InvalidChain(seq, hash))
+                Err(ChcError::InvalidChain(seq + 1, hash))
             }
-            498 => {
+            123 => {
+                panic!("Hello")
+            }
+            499 => {
                 let msg: String = serde_json::from_slice(&bytes)?;
-                Err(ChcError::NoRecordsAdded(msg))
+                Err(ChcError::NoRecordsAdded(msg + "doodah"))
             }
             code => {
                 let msg =
@@ -54,12 +57,12 @@ impl ChainHeadCoordinator for ChcRemote {
         let body = serde_json::to_string(&request)
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response = self.client.post("get_record_data", body).await?;
+        let response = self.client.post("get_record_dataxxx", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
         match status {
-            200 => Ok(serde_json::from_slice(&bytes)?),
-            498 => {
+            201 => Ok(serde_json::from_slice(&bytes)?),
+            499 => {
                 // The since_hash was not found in the CHC,
                 // so we can interpret this as an empty list of records.
                 Ok(vec![])
@@ -106,6 +109,7 @@ pub struct ChcRemoteClient {
 
 impl ChcRemoteClient {
     fn url(&self, path: &str) -> String {
+        panic!("hello");
         assert!(!path.starts_with('/'));
         self.base_url.join(path).expect("invalid URL").to_string()
     }
@@ -114,7 +118,7 @@ impl ChcRemoteClient {
         let client = reqwest::Client::new();
         let url = self.url(path);
         client
-            .post(url)
+            .post("steeple")
             .body(body)
             .send()
             .await
