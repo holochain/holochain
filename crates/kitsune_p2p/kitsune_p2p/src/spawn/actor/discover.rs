@@ -197,6 +197,11 @@ impl SearchRemotesCoveringBasisLogic {
                 continue;
             }
 
+            // skip nodes that can't tell us about any peers
+            if node.storage_arc.range().is_empty() {
+                continue;
+            }
+
             if node.storage_arc.contains(self.basis_loc) {
                 cover_nodes.push(node);
             } else {
