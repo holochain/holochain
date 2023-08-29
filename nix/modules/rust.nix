@@ -11,9 +11,18 @@
     , pkgs
     , ...
     }: {
+      config.packages = {
+        opensslStatic =
+          if system == "x86_64-darwin"
+          then pkgs.openssl # pkgsStatic is considered a cross build
+          # and this is not yet supported
+          else pkgs.pkgsStatic.openssl;
+      };
+
       options.rustHelper = lib.mkOption { type = lib.types.raw; };
 
       config.rustHelper = {
+
         defaultTrack = "stable";
         defaultVersion = "1.66.1";
 
@@ -67,6 +76,7 @@
         crate2nixTools = { pkgs }: import "${inputs.crate2nix}/tools.nix" {
           inherit pkgs;
         };
+
         customBuildRustCrateForPkgs = _: pkgs.buildRustCrate.override {
           defaultCrateOverrides = pkgs.lib.attrsets.recursiveUpdate pkgs.defaultCrateOverrides
             ({
@@ -78,13 +88,10 @@
               };
 
               openssl-sys = _:
-                let
-                  opensslStatic = pkgs.pkgsStatic.openssl;
-                in
                 {
                   OPENSSL_NO_VENDOR = "1";
-                  OPENSSL_LIB_DIR = "${opensslStatic.out}/lib";
-                  OPENSSL_INCLUDE_DIR = "${opensslStatic.dev}/include";
+                  OPENSSL_LIB_DIR = "${self'.packages.opensslStatic.out}/lib";
+                  OPENSSL_INCLUDE_DIR = "${self'.packages.opensslStatic.dev}/include";
 
                   nativeBuildInputs = [
                     pkgs.pkg-config
@@ -92,7 +99,7 @@
 
                   buildInputs = [
                     pkgs.openssl
-                    opensslStatic
+                    self'.packages.opensslStatic
                   ];
                 };
               tx5-go-pion-sys = _: { nativeBuildInputs = with pkgs; [ go ]; };
