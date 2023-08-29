@@ -83,12 +83,14 @@ jobs:
           fi
 
           # first build all derivations. this could be enough for test derivations.
-          nix build -L --show-trace --profile test-command \
-            ${{ matrix.cmd.extra_arg }} \
-            .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+          for pkg in ${{ matrix.cmd.pkgs }}; do
+            nix build -L --show-trace --profile test-command \
+              ${{ matrix.cmd.extra_arg }} \
+              .#packages.${system}.${pkg}
 
-          # TODO Want to be able to choose between internal/external when building external PRs
-          cachix push holochain-ci-internal test-command
+            # TODO Want to be able to choose between internal/external when building external PRs
+            cachix push holochain-ci-internal test-command
+          done
 
           # TODO: remove this once we've implemented all tests and know that we don't need it
           # if there's something to run we generate separate commands
