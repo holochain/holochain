@@ -83,7 +83,7 @@ jobs:
           fi
 
           # first build all derivations. this could be enough for test derivations.
-          pkgs=${{ join(matrix.cmd.pkgs, ' ') }}
+          pkgs="${{ join(matrix.cmd.pkgs, ' ') }}"
           for pkg in ${pkgs//,/ }; do
             nix build -L --show-trace --profile test-command \
               ${{ matrix.cmd.extra_arg }} \
