@@ -113,7 +113,7 @@
           ];
         in
         pkgs.writeShellScriptBin "scripts-ci-generate-readmes" ''
-          set -xeu -o pipefail
+          set -xeu
 
           export PATH=${pathPrefix}:$PATH
 
@@ -125,10 +125,7 @@
           done
 
           # have any READMEs been updated?
-          changed_readmes=$(
-            set +e
-            git --exit-code diff --name-only | grep -i README
-          )
+          changed_readmes=$(git diff --name-only | grep -i README)
           if [[ "$?" == 0 ]]; then
             echo 'READMEs have been updated, committing changes'
             ${../../scripts/ci-git-config.sh}
