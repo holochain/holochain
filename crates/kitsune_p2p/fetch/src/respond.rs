@@ -4,6 +4,14 @@ use std::sync::Arc;
 /// Drop this when response sending is complete.
 pub struct FetchResponseGuard(tokio::sync::oneshot::Sender<()>);
 
+#[cfg(any(test, feature = "test_utils"))]
+impl FetchResponseGuard {
+    /// Create a new FetchResponseGuard for testing.
+    pub fn new(inner: tokio::sync::oneshot::Sender<()>) -> Self {
+        Self(inner)
+    }
+}
+
 /// Customization by code making use of the FetchResponseQueue.
 pub trait FetchResponseConfig: 'static + Send + Sync {
     /// Data that is forwarded.
