@@ -130,7 +130,7 @@
             echo 'READMEs have been updated, committing changes'
             ${../../scripts/ci-git-config.sh}
             git commit -m "docs(crate-level): generate readmes from doc comments" $changed_readmes
-          fi 
+          fi
         '';
     };
 
