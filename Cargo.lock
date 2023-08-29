@@ -2696,7 +2696,7 @@ dependencies = [
  "human-panic",
  "indoc",
  "isotest",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "kitsune_p2p",
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
@@ -3213,7 +3213,7 @@ dependencies = [
  "holochain_wasmer_host",
  "holochain_zome_types",
  "isotest",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "kitsune_p2p_dht",
  "lazy_static",
  "maplit",
@@ -3854,6 +3854,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3925,7 +3934,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.6",
  "governor",
  "holochain_trace",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "kitsune_p2p",
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",

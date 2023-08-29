@@ -34,7 +34,7 @@ holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.13
 holochain_wasmer_host = { version = "0.0.84", features = ["dylib"] }
 holochain_util = { version = "^0.2.0", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.10", features = ["full"] }
-itertools = { version = "0.10" }
+itertools = { version = "0.11" }
 kitsune_p2p_dht = { version = "^0.3.0-beta-dev.4", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"

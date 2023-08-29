@@ -105,7 +105,6 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::{wasm, *};
-use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
@@ -120,6 +119,9 @@ use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
+
+#[cfg(any(test, feature = "test_utils"))]
+use itertools::Itertools;
 
 pub use holochain_types::share;
 
