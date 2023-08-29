@@ -4,7 +4,10 @@
       cargoNix = config.rustHelper.mkCargoNix {
         name = "holochain-generated-crate2nix";
         src = flake.config.srcCleanedHolochain;
-        pkgs = config.rustHelper.mkRustPkgs { };
+        pkgs = config.rustHelper.mkRustPkgs {
+          track = "stable";
+          version = "1.66.1";
+        };
       };
     in
     {

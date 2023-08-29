@@ -22,7 +22,6 @@
       options.rustHelper = lib.mkOption { type = lib.types.raw; };
 
       config.rustHelper = {
-
         defaultTrack = "stable";
         defaultVersion = "1.66.1";
 
