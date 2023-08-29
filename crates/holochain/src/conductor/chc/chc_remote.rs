@@ -23,13 +23,16 @@ impl ChainHeadCoordinator for ChcRemote {
         let response: reqwest::Response = self.client.post("add_records", &request).await?;
         let status = response.status().as_u16();
         match status {
-            200 => Ok(()),
-            409 => {
+            201 => Ok(()),
+            411 => {
                 let bytes = response.bytes().await.map_err(extract_string)?;
                 let (seq, hash): (u32, ActionHash) = holochain_serialized_bytes::decode(&bytes)?;
                 Err(ChcError::InvalidChain(seq, hash))
             }
-            498 => {
+            486 => {
+                panic!("hello")
+            }
+            499 => {
                 let bytes = response.bytes().await.map_err(extract_string)?;
                 let seq: u32 = holochain_serialized_bytes::decode(&bytes)?;
                 Err(ChcError::NoRecordsAdded(seq))
@@ -45,14 +48,17 @@ impl ChainHeadCoordinator for ChcRemote {
         &self,
         request: GetRecordsRequest,
     ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
-        let response = self.client.post("get_record_data", &request).await?;
+        let response = self.client.post("get_record_dataxxx", &request).await?;
         let status = response.status().as_u16();
         match status {
-            200 => {
+            201 => {
                 let bytes = response.bytes().await.map_err(extract_string)?;
                 Ok(holochain_serialized_bytes::decode(&bytes)?)
             }
-            498 => {
+            260 => {
+                panic!("hello")
+            }
+            499 => {
                 // The since_hash was not found in the CHC,
                 // so we can interpret this as an empty list of records.
                 Ok(vec![])
@@ -77,11 +83,11 @@ impl ChcRemote {
         let client = ChcRemoteClient {
             base_url: base_url
                 .join(&format!(
-                    "{}/{}/",
+                    "{}/{}/ddd",
                     cell_id.dna_hash(),
                     cell_id.agent_pubkey()
                 ))
-                .expect("invalid URL"),
+                .expect("invalid URL panicked"),
         };
         Self {
             client,
@@ -99,7 +105,10 @@ pub struct ChcRemoteClient {
 impl ChcRemoteClient {
     fn url(&self, path: &str) -> String {
         assert!(!path.starts_with('/'));
-        self.base_url.join(path).expect("invalid URL").to_string()
+        self.base_url
+            .join(path)
+            .expect("invalid URL panicked")
+            .to_string()
     }
 
     async fn post<T>(&self, path: &str, body: &T) -> ChcResult<reqwest::Response>
@@ -120,6 +129,7 @@ impl ChcRemoteClient {
 }
 
 fn extract_string(e: reqwest::Error) -> ChcError {
+    panic!("Will not extract string");
     ChcError::ServiceUnreachable(e.to_string())
 }
 

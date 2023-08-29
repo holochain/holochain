@@ -124,7 +124,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_add_records_local() {
+    async fn test_add_records_local_chc() {
         let mut g = random_generator();
         let keystore = test_keystore();
         let agent = fake_agent_pubkey_1();
