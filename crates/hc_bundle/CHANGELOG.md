@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Export packing, unpacking & utility functions of `mr_bundle` in lib exports [\#2705](https://github.com/holochain/holochain/pull/2705)
+
 ## 0.3.0-beta-dev.13
 
 ## 0.3.0-beta-dev.12
