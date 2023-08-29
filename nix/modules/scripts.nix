@@ -113,7 +113,7 @@
           ];
         in
         pkgs.writeShellScriptBin "scripts-ci-generate-readmes" ''
-          set -xeu
+          set -xeuo pipefail
 
           export PATH=${pathPrefix}:$PATH
 
@@ -125,12 +125,12 @@
           done
 
           # have any READMEs been updated?
-          changed_readmes=$(git diff --name-only | grep -i README)
-          if [[ "$?" == 0 ]]; then
+          changed_readmes=$(git diff --exit-code --name-only '**README.md' || :)
+          if [[ -n "$changed_readmes" ]]; then
             echo 'READMEs have been updated, committing changes'
             ${../../scripts/ci-git-config.sh}
             git commit -m "docs(crate-level): generate readmes from doc comments" $changed_readmes
-          fi
+          fi 
         '';
     };
 

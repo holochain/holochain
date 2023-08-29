@@ -119,18 +119,19 @@
             export HOME="$(mktemp -d)"
             export TEST_WORKSPACE="''${HOME:?}/src"
 
-            git clone --single-branch ${inputs.repo-git} ''${TEST_WORKSPACE:?}
+            git clone --single-branch ${inputs.repo-git} ''${TEST_WORKSPACE}
+
             cd ''${TEST_WORKSPACE:?}
             ${../../scripts/ci-git-config.sh}
             git status
             git switch -c repo-test
 
             ${readmes-script}/bin/${readmes-script.name}
-            ${release-script}/bin/${release-script.name} ''${TEST_WORKSPACE:?}
+            ${release-script}/bin/${release-script.name} ''${TEST_WORKSPACE}
 
             set +e
             git clean -ffdx
-            mv ''${TEST_WORKSPACE:?} $out
+            mv ''${TEST_WORKSPACE} $out
             echo use "nix-store --realise $out" to retrieve the result.
           '';
       };
