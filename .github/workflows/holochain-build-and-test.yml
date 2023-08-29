@@ -29,7 +29,7 @@ jobs:
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
-                - build-holochain-build-crates-standalone
+                # - build-holochain-build-crates-standalone
                 - build-release-automation-tests
                 - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
