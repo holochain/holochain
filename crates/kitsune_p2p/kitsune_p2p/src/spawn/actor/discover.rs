@@ -147,6 +147,90 @@ pub(crate) fn peer_connect(
     })
 }
 
+pub(crate) enum SearchRemotesCoveringBasisLogicResult {
+    Success(Vec<AgentInfoSigned>),
+    Error(KitsuneP2pError),
+    ShouldWait,
+    QueryPeers(Vec<AgentInfoSigned>),
+}
+
+pub(crate) struct SearchRemotesCoveringBasisLogic {
+    timeout: KitsuneTimeout,
+    backoff: KitsuneBackoff,
+    check_node_count: usize,
+    basis_loc: DhtLocation,
+}
+
+impl SearchRemotesCoveringBasisLogic {
+    pub fn new(
+        initial_delay_ms: u64,
+        max_delay_ms: u64,
+        check_node_count: usize,
+        basis_loc: DhtLocation,
+        timeout: KitsuneTimeout,
+    ) -> Self {
+        let backoff = timeout.backoff(initial_delay_ms, max_delay_ms);
+        Self {
+            timeout,
+            backoff,
+            check_node_count,
+            basis_loc,
+        }
+    }
+
+    pub async fn wait(&self) {
+        self.backoff.wait().await;
+    }
+
+    pub fn check_nodes(
+        &mut self,
+        nodes: Vec<AgentInfoSigned>,
+    ) -> SearchRemotesCoveringBasisLogicResult {
+        let mut cover_nodes = Vec::new();
+        let mut near_nodes = Vec::new();
+
+        // first check our local peer store,
+        // sort into nodes covering the basis and otherwise
+        for node in nodes {
+            // skip offline nodes
+            if node.url_list.is_empty() {
+                continue;
+            }
+
+            if node.storage_arc.contains(self.basis_loc) {
+                cover_nodes.push(node);
+            } else {
+                near_nodes.push(node);
+            }
+
+            if cover_nodes.len() + near_nodes.len() >= self.check_node_count {
+                break;
+            }
+        }
+
+        // if we have any nodes covering the basis, return them
+        if !cover_nodes.is_empty() {
+            return SearchRemotesCoveringBasisLogicResult::Success(cover_nodes);
+        }
+
+        // if we've exhausted our timeout, we should exit
+        if let Err(err) = self.timeout.ok("search_remotes_covering_basis") {
+            return SearchRemotesCoveringBasisLogicResult::Error(err.into());
+        }
+
+        if near_nodes.is_empty() {
+            // maybe just wait and try again?
+            return SearchRemotesCoveringBasisLogicResult::ShouldWait;
+        }
+
+        // shuffle the returned nodes so we don't keep hammering the same one
+        use rand::prelude::*;
+        near_nodes.shuffle(&mut rand::thread_rng());
+
+        SearchRemotesCoveringBasisLogicResult::QueryPeers(near_nodes)
+    }
+}
+
 /// looping search for agents covering basis_loc
 /// by requesting closer agents from remote nodes
 pub(crate) fn search_remotes_covering_basis(
@@ -154,52 +238,37 @@ pub(crate) fn search_remotes_covering_basis(
     basis_loc: DhtLocation,
     timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
-    const INITIAL_DELAY: u64 = 100;
-    const MAX_DELAY: u64 = 1000;
+    const INITIAL_DELAY_MS: u64 = 100;
+    const MAX_DELAY_MS: u64 = 1000;
     const CHECK_NODE_COUNT: usize = 8;
 
+    let mut logic = SearchRemotesCoveringBasisLogic::new(
+        INITIAL_DELAY_MS,
+        MAX_DELAY_MS,
+        CHECK_NODE_COUNT,
+        basis_loc,
+        timeout,
+    );
+
     async move {
-        let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
         loop {
-            //let s_remain = timeout.time_remaining().as_secs_f64();
-            //tracing::trace!(%s_remain, "search_remotes_covering_basis iteration");
-
-            let mut cover_nodes = Vec::new();
-            let mut near_nodes = Vec::new();
-
-            // first check our local peer store,
-            // sort into nodes covering the basis and otherwise
-            for node in get_cached_remotes_near_basis(inner.clone(), basis_loc, timeout)
+            let nodes = get_cached_remotes_near_basis(inner.clone(), basis_loc, timeout)
                 .await
-                .unwrap_or_else(|_| Vec::new())
-            {
-                if node.storage_arc.contains(basis_loc) {
-                    cover_nodes.push(node);
-                } else {
-                    near_nodes.push(node);
+                .unwrap_or_else(|_| Vec::new());
+
+            let near_nodes = match logic.check_nodes(nodes) {
+                SearchRemotesCoveringBasisLogicResult::Success(out) => {
+                    return Ok(out);
                 }
-                if cover_nodes.len() + near_nodes.len() >= CHECK_NODE_COUNT {
-                    break;
+                SearchRemotesCoveringBasisLogicResult::Error(err) => {
+                    return Err(err);
                 }
-            }
-
-            // if we have any nodes covering the basis, return them
-            if !cover_nodes.is_empty() {
-                return Ok(cover_nodes);
-            }
-
-            // if we've exhausted our timeout, we should exit
-            timeout.ok("search_remotes_covering_basis")?;
-
-            if near_nodes.is_empty() {
-                // maybe just wait and try again?
-                backoff.wait().await;
-                continue;
-            }
-
-            // shuffle the returned nodes so we don't keep hammering the same one
-            use rand::prelude::*;
-            near_nodes.shuffle(&mut rand::thread_rng());
+                SearchRemotesCoveringBasisLogicResult::ShouldWait => {
+                    logic.wait().await;
+                    continue;
+                }
+                SearchRemotesCoveringBasisLogicResult::QueryPeers(nodes) => nodes,
+            };
 
             let mut added_data = false;
             for node in near_nodes {
@@ -242,7 +311,7 @@ pub(crate) fn search_remotes_covering_basis(
             }
 
             if !added_data {
-                backoff.wait().await;
+                logic.wait().await;
             }
         }
     }
@@ -311,6 +380,9 @@ pub(crate) fn get_cached_remotes_near_basis<S: GetCachedRemotesNearBasisSpace>(
         Ok(nodes)
     }
 }
+
+#[cfg(test)]
+mod test_search_remotes_covering_basis;
 
 #[cfg(test)]
 mod test_get_cached_remotes_near_basis;
