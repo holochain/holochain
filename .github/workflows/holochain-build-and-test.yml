@@ -101,7 +101,8 @@ jobs:
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
           
           # Don't exit if this fails so we can clean up the profile
-          cachix push holochain-ci-internal result || true
+          
+          ls result/ | xargs -L 1 cachix push holochain-ci-internal || true
           
           rm result*
 
@@ -157,6 +158,6 @@ jobs:
             .#devShells.${system}.holonix
 
           # Don't exit if this fails so we can clean up the profile
-          cachix push holochain-ci result || true
+          ls result/ | xargs -L 1 cachix push holochain-ci || true
           
           rm result*
