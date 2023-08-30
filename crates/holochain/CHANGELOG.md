@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Change `GenesisFailed` error to include `CellId` so that genesis failures can be correlated with the cells that failed. [2616](https://github.com/holochain/holochain/pull/2616)
 
+## 0.3.0-beta-dev.16
+
 ## 0.3.0-beta-dev.15
 
 - **BREAKING CHANGE** updating the project lock file to use the latest version of `serde` at `1.0.185` has changed how enums get serialized and as a knock on effect it has changed some hashes. This will make databases from previous versions incompatible with the next version of Holochain.

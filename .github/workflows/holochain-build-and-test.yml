@@ -8,11 +8,16 @@ on:
         required: false
         type: string
         default: "."
+      fail_fast:
+        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
-  "test":
+  test:
     strategy:
-      fail-fast: false
+      fail-fast: ${{ inputs.fail_fast }}
       matrix:
         cmd:
           # ensure functionality on multiple platforms
@@ -41,10 +46,17 @@ jobs:
           - cmd:
               pkgs:
                 - build-holochain-build-crates-standalone
-                - build-release-automation-tests
-                - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
-              extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
+                - build-release-automation-tests-unit
+              extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
+            platform:
+              system: x86_64-linux
+
+          # TODO: can this be skipped during a release run because it duplicates the release-prepare job?
+          - cmd:
+              pkgs:
+                - build-release-automation-tests-repo
+              extra_arg: "--override-input repo-git 'path:.git'"
             platform:
               system: x86_64-linux
 
@@ -68,19 +80,13 @@ jobs:
         run: |
           set -xe
 
+          git status
+
           # if a nix store path was passed, ensure it exists locally
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
             nix-store --realise ${{inputs.repo_path }}
           fi
 
-          # first build all derivations. this could be enough for test derivations.
-          nix build -L --show-trace \
+          nix build --no-link -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
-
-          # TODO: remove this once we've implemented all tests and know that we don't need it
-          # if there's something to run we generate separate commands
-          # if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
-          #   export basecmd="nix run -L --show-trace .#packages.${system}."
-          #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
-          # fi
