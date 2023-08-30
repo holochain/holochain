@@ -97,7 +97,7 @@ jobs:
           fi
 
           # first build all derivations. this could be enough for test derivations.
-          nix build --no-link -L --show-trace \
+          nix build -L --show-trace \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
           
           # Don't exit if this fails so we can clean up the profile
