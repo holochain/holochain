@@ -18,6 +18,7 @@
 mod region_coords;
 mod region_data;
 
+use kitsune_p2p_timestamp::ArbitraryFuzzing;
 pub use region_coords::*;
 pub use region_data::*;
 
@@ -51,6 +52,7 @@ pub trait RegionDataConstraints:
     + std::fmt::Debug
     + serde::Serialize
     + serde::de::DeserializeOwned
+    + ArbitraryFuzzing
 {
     /// The number of ops in this region
     fn count(&self) -> u32;

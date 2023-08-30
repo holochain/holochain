@@ -8,6 +8,11 @@ use kitsune_p2p_types::*;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+
 /// The type of gossip module running this gossip.
 pub enum GossipModuleType {
     /// Recent sharded gossip.

@@ -66,6 +66,9 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+# proptest = { path = "/home/michael/gitfork/proptest/proptest" }
+proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
+
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
@@ -78,10 +81,10 @@ codegen-units = 16
 # tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-hsb" }
+holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-hsb" }
+holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "bump-hsb" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }

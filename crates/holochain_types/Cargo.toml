@@ -29,7 +29,7 @@ getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
 holo_hash = { version = "^0.3.0-beta-dev.6", path = "../holo_hash", features = ["encoding"] }
 holochain_keystore = { version = "^0.3.0-beta-dev.11", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.13"}
 holochain_wasmer_host = { version = "0.0.84", features = ["dylib"] }
 holochain_util = { version = "^0.2.0", path = "../holochain_util", features = ["backtrace"] }
@@ -63,6 +63,8 @@ wasmer-middlewares = "2"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
 
 
 # contrafact
@@ -85,13 +87,19 @@ default = ["fixturators", "test_utils"]
 
 fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
-  "arbitrary",
   "contrafact",
-  "holochain_zome_types/arbitrary",
-  "holo_hash/arbitrary",
+  "fuzzing",
+  "holochain_zome_types/fuzzing",
+  "holo_hash/fuzzing",
   "isotest",
-  "mr_bundle/arbitrary",
+  "mr_bundle/fuzzing",
   "holochain_zome_types/test_utils",
+]
+
+fuzzing = [
+  "arbitrary",
+  "proptest",
+  "proptest-derive",
 ]
 
 sqlite-encrypted = [

@@ -25,19 +25,27 @@ tracing = "0.1.29"
 linked-hash-map = "0.5.6"
 
 human-repr = { version = "1", optional = true}
+arbitrary = { version = "1", optional = true }
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
 
 [dev-dependencies]
 kitsune_p2p_fetch = { path = ".", features = ["test_utils", "sqlite"]}
-holochain_serialized_bytes = "0.0.51"
+holochain_serialized_bytes = "0.0.53"
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"
 test-case = "1.2"
 tokio = { version = "1.27", features = [ "full", "test-util" ] }
-arbitrary = "1"
 rand = "0.8.5"
 
 [features]
-test_utils = ["human-repr"]
+fuzzing = [
+    "arbitrary",
+    "proptest",
+    "proptest-derive",
+    "kitsune_p2p_types/fuzzing"
+]
+test_utils = ["human-repr", "fuzzing", "kitsune_p2p_types/test_utils"]
 default = ["test_utils"]
 sqlite-encrypted = [
     "kitsune_p2p_timestamp/sqlite-encrypted",

@@ -1,5 +1,3 @@
-use once_cell::sync::OnceCell;
-
 use crate::{
     arq::*,
     error::{GossipError, GossipResult},
@@ -17,6 +15,7 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 /// LTCS stands for Logarithmic Time, Constant Space.
 #[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
     pub(super) arq_set: ArqSet,
@@ -110,14 +109,10 @@ impl RegionCoordSetLtcs {
 #[derive(serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub coords: RegionCoordSetLtcs,
-
-    /// the actual coordinates as generated
-    #[derivative(PartialEq = "ignore")]
-    #[serde(skip)]
-    pub(crate) _region_coords: OnceCell<Vec<RegionCoords>>,
 
     /// The outermost vec corresponds to arqs in the ArqSet;
     /// The middle vecs correspond to the spatial segments per arq;
@@ -143,18 +138,13 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         Self {
             coords: RegionCoordSetLtcs::empty(),
             data: vec![],
-            _region_coords: OnceCell::new(),
         }
     }
 
     /// Construct the region set from existing data.
     /// The data must match the coords!
     pub fn from_data(coords: RegionCoordSetLtcs, data: Vec<Vec<Vec<D>>>) -> Self {
-        Self {
-            coords,
-            data,
-            _region_coords: OnceCell::new(),
-        }
+        Self { coords, data }
     }
 
     /// The total number of regions represented in this region set
