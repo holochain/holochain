@@ -1,7 +1,7 @@
 # Contained Jobs
 # - vars: processes the input
 # - prepare: imported from ./release-prepare.yml
-# - test: currently unimplemented
+# - test: calls ./holochain-build-and-test.yml
 # - finalize:
 #   - restore repo from cache
 #   - push to the target branch
@@ -60,8 +60,6 @@ on:
         required: false
         default: "false"
         type: string
-
-  pull_request: {}
 
 concurrency:
   group: release-${{ github.ref_name }}-${{ github.event_name }}
@@ -248,10 +246,7 @@ jobs:
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
-          # regenerate the nix sources
-          git config --global user.email "devcore@holochain.org"
-          git config --global user.name "Holochain Core Dev Team"
-
+          ./scripts/ci-git-config.sh
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 

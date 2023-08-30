@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: "."
+      fail_fast:
+        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        required: false
+        type: boolean
+        default: false
     secrets:
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI:
         description: "The Cachix token for `holochain-ci` to be used for caching Holonix"
@@ -19,7 +24,7 @@ on:
 jobs:
   test:
     strategy:
-      fail-fast: false
+      fail-fast: ${{ inputs.fail_fast }}
       matrix:
         cmd:
           # ensure functionality on multiple platforms
@@ -48,10 +53,17 @@ jobs:
           - cmd:
               pkgs:
                 - build-holochain-build-crates-standalone
-                - build-release-automation-tests
-                - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
-              extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+                - build-release-automation-tests-unit
+              extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
+            platform:
+              system: x86_64-linux
+
+          # TODO: can this be skipped during a release run because it duplicates the release-prepare job?
+          - cmd:
+              pkgs:
+                - build-release-automation-tests-repo
+              extra_arg: "--override-input repo-git 'path:.git'"
             platform:
               system: x86_64-linux
 
@@ -77,6 +89,8 @@ jobs:
         run: |
           set -xe
 
+          git status
+
           # if a nix store path was passed, ensure it exists locally
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
             nix-store --realise ${{inputs.repo_path }}
@@ -85,7 +99,7 @@ jobs:
           # first build all derivations. this could be enough for test derivations.
           pkgs="${{ join(matrix.cmd.pkgs, ' ') }}"
           for pkg in ${pkgs//,/ }; do
-            nix build -L --show-trace --profile test-command \
+            nix build --no-link -L --show-trace --profile test-command \
               ${{ matrix.cmd.extra_arg }} \
               .#packages.${system}.${pkg}
 
