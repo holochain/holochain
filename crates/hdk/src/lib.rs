@@ -1,5 +1,4 @@
 //! The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
-//! a change
 //!
 //! Holochain is built as a client-server architecture. The Conductor, Holochain's runtime, acts as the server.
 //! Its [Conductor API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api) can be queried

@@ -1,6 +1,5 @@
 //! Holochain Deterministic Integrity (HDI) is Holochain's data model and integrity toolset for
 //! writing zomes.
-//! another change
 //!
 //! The logic of a Holochain DNA can be divided into two parts: integrity and coordination.
 //! Integrity is the part of the hApp that defines the data types and validates data
