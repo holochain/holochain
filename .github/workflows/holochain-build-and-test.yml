@@ -102,7 +102,9 @@ jobs:
           
           # Don't exit if this fails so we can clean up the profile
           
-          ls result/ | xargs -L 1 cachix push holochain-ci-internal || true
+          for i in result*; do
+            cachix push holochain-ci-internal $i || true
+          done
           
           rm result*
 
@@ -158,6 +160,8 @@ jobs:
             .#devShells.${system}.holonix
 
           # Don't exit if this fails so we can clean up the profile
-          ls result/ | xargs -L 1 cachix push holochain-ci || true
+          for i in result*; do
+            cachix push holochain-ci $i || true
+          done
           
           rm result*
