@@ -21,9 +21,9 @@
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
 
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "latest";
+        version = "1.67.0";
       };
       craneLib = inputs.crane-release-automation.lib.${system}.overrideToolchain rustToolchain;
 

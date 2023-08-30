@@ -3,18 +3,12 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
         version = "1.71.1";
       };
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
-
-      opensslStatic =
-        if system == "x86_64-darwin"
-        then pkgs.openssl # pkgsStatic is considered a cross build
-        # and this is not yet supported
-        else pkgs.pkgsStatic.openssl;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -28,10 +22,10 @@
         CARGO_PROFILE = "";
 
         OPENSSL_NO_VENDOR = "1";
-        OPENSSL_LIB_DIR = "${opensslStatic.out}/lib";
-        OPENSSL_INCLUDE_DIR = "${opensslStatic.dev}/include";
+        OPENSSL_LIB_DIR = "${self'.packages.opensslStatic.out}/lib";
+        OPENSSL_INCLUDE_DIR = "${self'.packages.opensslStatic.dev}/include";
 
-        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher ])
+        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit

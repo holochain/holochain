@@ -249,7 +249,9 @@ pub enum MetaNetCon {
     },
 
     #[cfg(test)]
-    Test { notify_succeed: bool },
+    Test {
+        state: Arc<parking_lot::RwLock<MetaNetConTest>>,
+    },
 }
 
 impl PartialEq for MetaNetCon {
@@ -325,8 +327,11 @@ impl MetaNetCon {
                 MetaNetAuth::Authorized => {
                     #[cfg(test)]
                     {
-                        if let MetaNetCon::Test { notify_succeed } = self {
-                            return if *notify_succeed {
+                        if let MetaNetCon::Test { state } = self {
+                            let mut state = state.write();
+                            state.notify_call_count += 1;
+
+                            return if state.notify_succeed {
                                 Ok(())
                             } else {
                                 Err("Test error while notifying".into())
@@ -477,6 +482,23 @@ impl MetaNetCon {
         }
 
         panic!("invalid features");
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub struct MetaNetConTest {
+    pub notify_succeed: bool,
+    pub notify_call_count: usize,
+}
+
+#[cfg(test)]
+impl Default for MetaNetConTest {
+    fn default() -> Self {
+        Self {
+            notify_succeed: true,
+            notify_call_count: 0,
+        }
     }
 }
 
