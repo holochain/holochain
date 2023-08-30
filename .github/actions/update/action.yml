@@ -48,8 +48,7 @@ runs:
     - name: set up git config
       shell: bash
       run: |
-        git config --global user.email "hrabot@holochain.org"
-        git config --global user.name "Holochain Release Automation"
+        ./scripts/ci-git-config.sh
     - name: update source ${{ inputs.update_source }}
       shell: bash
       run: |
