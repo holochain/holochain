@@ -6,10 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-- Updating the default version of Holochain 0.1 to be 0.1.6 and bumping Lair to 0.3.0. This is a maintenance release that resolves [PR#2712](https://github.com/holochain/holochain/pull/2712)
-  an issue with serde serialisation that was leading to the error `"invalid type: map, expected variant identifier"`. There were also
-  some updated dependencies of the Lair keystore that weren't building on Rust 1.66.1 which is the reason for bumping the Lair keystore version.
-  Please run `nix flake update` to take this change and update your HDI/HDK versions.
+# 20230830.003423
+
+- Updating the default version of Holochain 0.1 to be 0.1.6 and bumping Lair to 0.3.0. This is a maintenance release that resolves [PR\#2712](https://github.com/holochain/holochain/pull/2712) an issue with serde serialisation that was leading to the error `"invalid type: map, expected variant identifier"`. There were also some updated dependencies of the Lair keystore that weren’t building on Rust 1.66.1 which is the reason for bumping the Lair keystore version. Please run `nix flake update` to take this change and update your HDI/HDK versions.
+
+## [holochain\_cli-0.3.0-beta-dev.16](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.16](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.8](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.8)
+
+- Adds function `new()` to `HcRunLocalServices` allowing consumption of `hc_run_local_services` as a lib [\#2705](https://github.com/holochain/holochain/pull/2705)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.14](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.14)
+
+- Export packing, unpacking & utility functions of `mr_bundle` in lib exports [\#2705](https://github.com/holochain/holochain/pull/2705)
+
+## [holochain-0.3.0-beta-dev.16](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.16](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.14](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_cascade-0.3.0-beta-dev.16](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_state-0.3.0-beta-dev.15](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_p2p-0.3.0-beta-dev.15](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p-0.3.0-beta-dev.13](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.9](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.9)
 
 # 20230823.003418
 
