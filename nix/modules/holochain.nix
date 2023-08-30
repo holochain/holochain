@@ -63,7 +63,7 @@
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
         pname = "holochain-tests-nextest";
-        CARGO_PROFILE = "fast-test";
+        CARGO_PROFILE = "dev";
         nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.cargo-nextest ];
         buildPhase = ''
           cargo nextest run --no-run \
