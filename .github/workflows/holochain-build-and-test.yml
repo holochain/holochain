@@ -97,18 +97,13 @@ jobs:
           fi
 
           # first build all derivations. this could be enough for test derivations.
-          pkgs="${{ join(matrix.cmd.pkgs, ' ') }}"
-          for pkg in ${pkgs//,/ }; do
-            nix build --no-link -L --show-trace --profile test-command \
-              ${{ matrix.cmd.extra_arg }} \
-              .#packages.${system}.${pkg}
-
-            # TODO Want to be able to choose between internal/external when building external PRs
-            # Don't exit if this fails so we can clean up the profile
-            cachix push holochain-ci-internal test-command || true
+          nix build --no-link -L --show-trace \
+            .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
           
-            rm test-command*
-          done
+          # Don't exit if this fails so we can clean up the profile
+          cachix push holochain-ci-internal result || true
+          
+          rm result*
 
           # TODO: remove this once we've implemented all tests and know that we don't need it
           # if there's something to run we generate separate commands
@@ -156,12 +151,12 @@ jobs:
             nix-store --realise ${{inputs.repo_path }}
           fi
 
-          # See https://docs.cachix.org/pushing#id1 for pushing shell environments
-          nix build --profile holonix-profile \
+          # See https://docs.cachix.org/pushing#id1
+          nix build -L \
             ${{ matrix.cmd.extra_arg }} \
             .#devShells.${system}.holonix
 
           # Don't exit if this fails so we can clean up the profile
-          cachix push holochain-ci holonix-profile || true
+          cachix push holochain-ci result || true
           
-          rm holonix-profile*
+          rm result*
