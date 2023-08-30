@@ -6,6 +6,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230830.151554
+
+## [holochain\_cli-0.2.2-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.2-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_cli\_run\_local\_services-0.2.2-beta-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.2-beta-rc.0)
+
+- Adds function `new()` to `HcRunLocalServices` allowing consumption of `hc_run_local_services` as a lib [\#2705](https://github.com/holochain/holochain/pull/2705)
+
+## [holochain\_cli\_bundle-0.2.2-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.2-beta-rc.0)
+
+- Export packing, unpacking & utility functions of `mr_bundle` in lib exports [\#2705](https://github.com/holochain/holochain/pull/2705)
+
+## [holochain-0.2.2-beta-rc.0](crates/holochain/CHANGELOG.md#0.2.2-beta-rc.0)
+
+- Improves error messages when validation fails with an InvalidCommit error
+
+## [holochain\_test\_wasm\_common-0.2.2-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_conductor\_api-0.2.2-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.2-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_cascade-0.2.2-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_state-0.2.2-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.2.2-beta-rc.0)
+
+- fix: in a scenario where two agents create a cell from the same DNA in the same conductor, cap grant lookup for zome calls succeeded erroneously for any calling agent. The cap grant author was not taken into consideration for the lookup, only the cap secret or the unrestricted cap entry. Fixed by filtering the lookup by cap grant author.
+
+## [holochain\_p2p-0.2.2-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.2-beta-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.2-beta-rc.0)
+
+## [holochain\_types-0.2.2-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_sqlite-0.2.2-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [kitsune\_p2p-0.2.2-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [kitsune\_p2p\_proxy-0.2.2-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.2-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.2-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.2-beta-rc.0)
+
+- Fix an issue with merging fetch contexts where merging an item with a context with an item that did not could result in the removal of the context.
+- Fix an issue where duplicate fetch sources would be permitted for a single item.
+
+## [holochain\_keystore-0.2.2-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.2-beta-rc.0)
+
+- Update to latest version of Lair keystore. This comes with a minor API change and some dependency changes but is otherwise compatible with the 0.2 series of Lair.
+
+## [kitsune\_p2p\_types-0.2.2-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [hdk-0.2.2-beta-rc.0](crates/hdk/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_zome\_types-0.2.2-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [hdi-0.3.2-beta-rc.0](crates/hdi/CHANGELOG.md#0.3.2-beta-rc.0)
+
+## [hdk\_derive-0.2.2-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.2-beta-rc.0)
+
+## [holochain\_integrity\_types-0.2.2-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.2-beta-rc.0)
+
 # 20230724.194148
 
 ## [holochain\_cli-0.2.1](crates/holochain_cli/CHANGELOG.md#0.2.1)
