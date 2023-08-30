@@ -104,7 +104,10 @@ jobs:
               .#packages.${system}.${pkg}
 
             # TODO Want to be able to choose between internal/external when building external PRs
-            cachix push holochain-ci-internal test-command
+            # Don't exit if this fails so we can clean up the profile
+            cachix push holochain-ci-internal test-command || true
+          
+            rm test-command*
           done
 
           # TODO: remove this once we've implemented all tests and know that we don't need it
@@ -158,4 +161,7 @@ jobs:
             ${{ matrix.cmd.extra_arg }} \
             .#devShells.${system}.holonix
 
-          cachix push holochain-ci holonix-profile
+          # Don't exit if this fails so we can clean up the profile
+          cachix push holochain-ci holonix-profile || true
+          
+          rm holonix-profile*
