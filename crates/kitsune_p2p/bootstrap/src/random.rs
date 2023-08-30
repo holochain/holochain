@@ -18,7 +18,9 @@ pub(crate) fn random(
 async fn random_info(query: Bytes, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     let query: RandomQuery =
         rmp_decode(&mut AsRef::<[u8]>::as_ref(&query)).map_err(|_| warp::reject())?;
-    let result = store.random(query);
+    #[derive(serde::Serialize)]
+    struct Bin(#[serde(with = "serde_bytes")] Vec<u8>);
+    let result = store.random(query).into_iter().map(Bin).collect::<Vec<_>>();
     let mut buf = Vec::with_capacity(result.len());
     rmp_encode(&mut buf, result).map_err(|_| warp::reject())?;
     RANDOM.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
