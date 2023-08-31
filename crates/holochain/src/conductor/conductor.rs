@@ -1753,10 +1753,8 @@ mod app_status_impls {
         pub async fn reconcile_cell_status_with_app_status(
             self: Arc<Self>,
         ) -> ConductorResult<CellStartupErrors> {
-            dbg!("reconcile_cell_status_with_app_status remove_dangling_cells");
             self.remove_dangling_cells().await?;
 
-            dbg!("reconcile_cell_status_with_app_status create_cells_for_running_apps");
             let results = self
                 .create_and_add_initialized_cells_for_running_apps(None)
                 .await?;
