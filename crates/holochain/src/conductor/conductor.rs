@@ -368,9 +368,7 @@ mod startup_shutdown_impls {
             // be spun up
             let _ = self.start_paused_apps().await?;
 
-            let ret = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
-
-            ret
+            self.process_app_status_fx(AppStatusFx::SpinUp, None).await
         }
     }
 }
