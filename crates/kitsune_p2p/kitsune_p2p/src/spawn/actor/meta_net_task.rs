@@ -10,13 +10,16 @@ use crate::spawn::actor::{
 use crate::spawn::meta_net::{
     nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv,
 };
-use crate::{wire, HostApi, KitsuneP2pConfig};
+use crate::{wire, HostApi, KitsuneP2pConfig, KitsuneP2pError};
 use futures::channel::mpsc::Sender;
 use futures::StreamExt;
 use ghost_actor::GhostSender;
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
+use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::task::AbortHandle;
 
 pub struct MetaNetTask {
     evt_sender: Sender<KitsuneP2pEvent>,
@@ -26,6 +29,8 @@ pub struct MetaNetTask {
     fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
     ep_evt: Option<MetaNetEvtRecv>,
     i_s: GhostSender<Internal>,
+    shutdown_signal: Option<futures::channel::oneshot::Sender<()>>,
+    is_finished: Arc<AtomicBool>,
 }
 
 impl MetaNetTask {
@@ -46,11 +51,18 @@ impl MetaNetTask {
             fetch_response_queue,
             ep_evt: Some(ep_evt),
             i_s,
+            shutdown_signal: None,
+            is_finished: Arc::new(AtomicBool::new(false)),
         }
     }
 
     pub fn spawn(mut self) {
-        tokio::task::spawn({
+        let (shutdown_send, shutdown_recv) = futures::channel::oneshot::channel();
+        self.shutdown_signal = Some(shutdown_send);
+
+        let is_finished = self.is_finished.clone();
+
+        let join_handle = tokio::task::spawn({
             let tuning_params = self.config.tuning_params.clone();
             async move {
                 let ep_evt = self
@@ -60,12 +72,12 @@ impl MetaNetTask {
 
                 let this = Arc::new(self);
 
-                ep_evt
+                let ep_evt_run = ep_evt
                     .for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                         let evt_sender = this.evt_sender.clone();
                         let host = this.host.clone();
                         let i_s = this.i_s.clone();
-                        let this = this.clone();
+                        let mut this = this.clone();
 
                         async move {
                             let evt_sender = &evt_sender;
@@ -496,20 +508,44 @@ impl MetaNetTask {
                                 }
                             }
                         }
-                    })
-                    .await;
+                    });
 
+                tokio::select! {
+                    _ = ep_evt_run => {
+                        // This will happen if all senders close
+                    }
+                    _ = shutdown_recv => {
+                        // Got a shutdown signal
+                    }
+                }
+
+                println!("Shutting down task");
                 tracing::error!(
                     "KitsuneP2p: networking poll shutdown. Networking will no longer work!
                 You can ignore this is if it happened during node shutdown.
                 Otherwise please restart your node and report this error."
-                )
+                );
+                is_finished.fetch_or(true, Ordering::SeqCst)
             }
         });
     }
 
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) {
-        let _ = self.i_s.new_con(remote_url, con.clone()).await;
+        match self.i_s.new_con(remote_url, con.clone()).await {
+            Err(KitsuneP2pError::GhostError(ghost_actor::GhostError::Disconnected)) => {
+                println!("Got a disconnected error");
+                self.shutdown();
+            }
+            _ => {
+                // Do nothing for other errors or a success
+            }
+        }
+    }
+
+    fn shutdown(&self) {
+        if let Some(signal) = self.shutdown_signal.take() {
+            let _ = signal.send(());
+        }
     }
 }
 
@@ -519,13 +555,77 @@ mod tests {
     use crate::spawn::actor::meta_net_task::MetaNetTask;
     use crate::spawn::actor::test_util::InternalStub;
     use crate::spawn::actor::Internal;
+    use crate::spawn::meta_net::{MetaNetCon, MetaNetEvt};
     use crate::HostStub;
-    use futures::channel::mpsc::channel;
+    use futures::channel::mpsc::{channel, Sender};
+    use futures::SinkExt;
     use ghost_actor::actor_builder::GhostActorBuilder;
+    use ghost_actor::{GhostControlSender, GhostSender};
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect() {
+        let (mut ep_evt_send, internal_stub, _, _) = setup().await;
+
+        assert_eq!(0, internal_stub.connections.read().len());
+
+        ep_evt_send
+            .send(MetaNetEvt::Connected {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(100), async {
+            while internal_stub.connections.read().is_empty() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for connection to be added");
+
+        assert_eq!(1, internal_stub.connections.read().len());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn handle_connect_stops_task_if_internal_sender_closes() {
+        let (mut ep_evt_send, internal_stub, internal_sender, meta_net_task_finished) =
+            setup().await;
+
+        internal_sender
+            .ghost_actor_shutdown_immediate()
+            .await
+            .unwrap();
+
+        ep_evt_send
+            .send(MetaNetEvt::Connected {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while !meta_net_task_finished.load(Ordering::Acquire) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for task to shut down");
+
+        assert!(meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    async fn setup() -> (
+        Sender<MetaNetEvt>,
+        InternalStub,
+        GhostSender<Internal>,
+        Arc<AtomicBool>,
+    ) {
         let task = InternalStub::new();
 
         let builder = GhostActorBuilder::new();
@@ -538,7 +638,7 @@ mod tests {
 
         let (host_sender, host_receiver) = channel(10);
 
-        tokio::spawn(builder.spawn(task));
+        tokio::spawn(builder.spawn(task.clone()));
 
         let host_stub = HostStub::new();
 
@@ -549,14 +649,25 @@ mod tests {
 
         let (ep_evt_send, ep_evt_rcv) = channel(10);
 
-        MetaNetTask::new(
+        let meta_net_task = MetaNetTask::new(
             host_sender,
             host_stub,
             Default::default(),
             fetch_pool,
             fetch_response_queue,
             ep_evt_rcv,
-            internal_sender,
+            internal_sender.clone(),
         );
+        let meta_net_task_finished = meta_net_task.is_finished.clone();
+
+        meta_net_task.spawn();
+
+        (ep_evt_send, task, internal_sender, meta_net_task_finished)
+    }
+
+    fn mk_test_con() -> MetaNetCon {
+        MetaNetCon::Test {
+            state: Default::default(),
+        }
     }
 }
