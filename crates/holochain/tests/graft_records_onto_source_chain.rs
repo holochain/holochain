@@ -3,8 +3,10 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetInlineZomes};
+use holochain::conductor::chc::CHC_LOCAL_MAGIC_URL;
+use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
@@ -15,7 +17,11 @@ use holochain_types::record::SignedActionHashedExt;
 /// Test that records can be manually grafted onto a source chain.
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut config = ConductorConfig::default();
+    config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
+    let mut conductor = SweetConductor::from_config(config.clone()).await;
+    let keystore = conductor.keystore();
+
     let apps = conductor
         .setup_app("app", &[dna_file.clone()])
         .await
@@ -193,10 +199,25 @@ async fn grafting() {
         .expect("Should restore original chain");
 
     // Start a second conductor.
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let conductor =
+        SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
+            .await;
 
     // The dna needs to be installed first.
     conductor.register_dna(dna_file.clone()).await.unwrap();
+
+    let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
+        "app",
+        alice.agent_pubkey().clone(),
+        [&dna_file],
+    )
+    .await;
+
+    // This results in an error since the CHC already contains genesis, but this
+    // is just to create the necessary cell for grafting onto.
+    payload.ignore_genesis_failure = true;
+    let install_result = conductor.raw_handle().install_app_bundle(payload).await;
+    assert!(install_result.is_err());
 
     // Insert the chain from the original conductor.
     conductor
@@ -205,12 +226,7 @@ async fn grafting() {
         .await
         .expect("Can cold start");
 
-    let apps = conductor
-        .setup_app_for_agent("cold_start", alice.agent_pubkey().clone(), &[dna_file])
-        .await
-        .unwrap();
-    let (alice_backup,) = apps.into_tuple();
-    let chain = get_chain(alice_backup.authored_db().clone()).await;
+    let chain = get_chain(alice.authored_db().clone()).await;
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.
