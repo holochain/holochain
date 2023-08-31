@@ -206,9 +206,6 @@ impl SweetConductor {
 
         tracing::info!(?config);
 
-        // let bt = backtrace::Backtrace::new();
-        // dbg!("bt: {:?}", bt);
-
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
                 .await;
