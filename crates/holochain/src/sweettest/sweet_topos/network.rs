@@ -8,7 +8,7 @@ use async_once_cell::OnceCell;
 use contrafact::MutationError;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_types::prelude::DnaFile;
-use parking_lot::RwLock;
+use holochain_util::tokio_helper;
 use petgraph::algo::connected_components;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
@@ -19,6 +19,7 @@ use shrinkwraprs::Shrinkwrap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Some orphan rule hoop jumping.
 #[derive(Clone, Debug, Default)]
@@ -27,11 +28,11 @@ pub struct NetworkTopologyConductor(Arc<OnceCell<RwLock<SweetConductor>>>);
 impl PartialEq for NetworkTopologyConductor {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.get(), other.0.get()) {
-            (Some(self_lock), Some(other_lock)) => {
-                let self_id = self_lock.read().id();
-                let other_id = other_lock.read().id();
+            (Some(self_lock), Some(other_lock)) => tokio_helper::block_forever_on(async {
+                let self_id = self_lock.read().await.id();
+                let other_id = other_lock.read().await.id();
                 self_id == other_id
-            }
+            }),
             _ => false,
         }
     }

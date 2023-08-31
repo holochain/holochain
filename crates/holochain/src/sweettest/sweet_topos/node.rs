@@ -63,7 +63,7 @@ impl NetworkTopologyNode {
     /// Generate cells by generating agents under dna files. Currently only
     /// supports adding each generated agent to EVERY dna file.
     pub async fn generate_cells(&mut self, count: usize) {
-        let keystore = self.conductor.lock().await.read().keystore();
+        let keystore = self.conductor.lock().await.read().await.keystore();
         let agents = SweetAgents::get(keystore, count).await;
 
         let dnas = self.agents.keys().cloned().collect::<Vec<_>>();
@@ -83,6 +83,7 @@ impl NetworkTopologyNode {
             .lock()
             .await
             .read()
+            .await
             .live_cell_ids()
             .iter()
             .cloned()
@@ -96,6 +97,7 @@ impl NetworkTopologyNode {
                         .lock()
                         .await
                         .write()
+                        .await
                         .setup_app_for_agent(
                             &format!("{}", &cell_id),
                             key.clone(),
@@ -114,6 +116,7 @@ impl NetworkTopologyNode {
             .lock()
             .await
             .write()
+            .await
             .raw_handle()
             .remove_cells(&cells_to_remove)
             .await;

@@ -54,11 +54,14 @@ impl NetworkTopologyEdge {
 
     /// Apply the edge state to its associated conductor.
     pub async fn apply(&mut self) -> anyhow::Result<()> {
-        let envs_from_conductor = |conductor: &parking_lot::RwLock<SweetConductor>| {
+        async fn envs_from_conductor(
+            conductor: &tokio::sync::RwLock<SweetConductor>,
+        ) -> Vec<holochain_types::db::DbWrite<holochain_types::db::DbKindP2pAgents>> {
             let mut envs = Vec::new();
 
             for env in conductor
                 .read()
+                .await
                 .raw_handle()
                 .spaces
                 .get_from_spaces(|s| s.p2p_agents_db.clone())
@@ -67,10 +70,26 @@ impl NetworkTopologyEdge {
                 envs.push(env.clone());
             }
             envs
-        };
+        }
 
-        let source_envs = envs_from_conductor(self.source_conductor().lock().await);
-        let target_envs = envs_from_conductor(self.target_conductor().lock().await);
+        // let envs_from_conductor = async |conductor: &tokio::sync::RwLock<SweetConductor>| {
+        //     let mut envs = Vec::new();
+
+        //     for env in conductor
+        //         .read()
+        //         .await
+        //         .raw_handle()
+        //         .spaces
+        //         .get_from_spaces(|s| s.p2p_agents_db.clone())
+        //         .clone()
+        //     {
+        //         envs.push(env.clone());
+        //     }
+        //     envs
+        // };
+
+        let source_envs = envs_from_conductor(self.source_conductor().lock().await).await;
+        let target_envs = envs_from_conductor(self.target_conductor().lock().await).await;
 
         // @todo This reveals all peers to the source, but in reality we'd only
         // want to reveal the list of agents specified by the edge.

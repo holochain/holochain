@@ -201,66 +201,63 @@ pub mod wasm_test {
         assert_eq!(round_twice, vec![round.clone(), round],);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_create_entry_network_test() {
-        holochain_trace::test_run().ok();
+    #[test]
+    fn ribosome_create_entry_network_test() {
+        tokio::runtime::Builder::new_multi_thread()
+            // Need a bigger stack for this test for some reason.
+            .thread_stack_size(4_000_000)
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async move {
+                // This spawn is required so that the thread size config takes
+                // effect because a block_on doesn't count as a worker.
+                let handle = tokio::spawn(async move {
+                holochain_trace::test_run().ok();
 
-        let mut network_topology = NetworkTopology::default();
+                let mut network_topology = NetworkTopology::default();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+                let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        network_topology.add_dnas(vec![dna_file.clone()]);
+                network_topology.add_dnas(vec![dna_file.clone()]);
 
-        let size_fact = SizedNetworkFact { nodes: 7, agents: 1..=3 };
-        let partition_fact = StrictlyPartitionedNetworkFact {
-            partitions: 1,
-            efficiency: 1.0,
-        };
-        let density_fact = DenseNetworkFact { density: 0.8 };
+                let size_fact = SizedNetworkFact { nodes: 7, agents: 1..=3 };
+                let partition_fact = StrictlyPartitionedNetworkFact {
+                    partitions: 1,
+                    efficiency: 1.0,
+                };
+                let density_fact = DenseNetworkFact { density: 0.8 };
 
-        let mut facts = facts![size_fact, partition_fact, density_fact];
+                let mut facts = facts![size_fact, partition_fact, density_fact];
 
-        let mut g: Generator = unstructured_noise().into();
-        let mut rng = rng_from_generator(&mut g);
-        network_topology = facts.mutate(&mut g, network_topology).unwrap();
+                let mut g: Generator = unstructured_noise().into();
+                let mut rng = rng_from_generator(&mut g);
+                network_topology = facts.mutate(&mut g, network_topology).unwrap();
 
-        network_topology.apply().await.unwrap();
+                network_topology.apply().await.unwrap();
 
-        let alice_node = network_topology.random_node(&mut rng).unwrap();
-        let alice_cell = alice_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
-        let alice = alice_node.conductor().lock().await.read().get_sweet_cell(alice_cell).unwrap();
+                let alice_node = network_topology.random_node(&mut rng).unwrap();
+                let alice_cell = alice_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+                let alice = alice_node.conductor().lock().await.read().await.get_sweet_cell(alice_cell).unwrap();
 
-        let bob_node = network_topology.random_node(&mut rng).unwrap();
-        let bob_cell = bob_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
-        let bob = bob_node.conductor().lock().await.read().get_sweet_cell(bob_cell).unwrap();
+                let bob_node = network_topology.random_node(&mut rng).unwrap();
+                let bob_cell = bob_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+                let bob = bob_node.conductor().lock().await.read().await.get_sweet_cell(bob_cell).unwrap();
 
-        let _action_hash: ActionHash = alice_node.conductor().lock().await.write().call(&alice.zome(TestWasm::Create), "create_entry", ()).await;
+                let action_hash: ActionHash = alice_node.conductor().lock().await.write().await.call(&alice.zome(TestWasm::Create), "create_entry", ()).await;
 
-        consistency_10s(&[alice.clone(), bob.clone()]).await;
+                crate::wait_for_10s!(
+                    bob_node.conductor().lock().await.write().await.call::<_, Option<Record>, _>(&bob.zome(TestWasm::Create), "get_entry", ()).await,
+                    |x: &Option<Record>| x.is_some(),
+                    |x| true
+                );
 
-        let record: Option<Record> = bob_node.conductor().lock().await.write().call(&bob.zome(TestWasm::Create), "get_entry", ()).await;
+                let record: Option<Record> = bob_node.conductor().lock().await.write().await.call(&bob.zome(TestWasm::Create), "get_entry", ()).await;
 
-        // let action_hash: ActionHash = random_node.conductor().get_share().await.share_ref(|c| {
-        //     let sweet_cell = c.get_sweet_cell(cell).unwrap();
-        //     tokio_helper::block_forever_on(async move {
-        //         c.call(&sweet_cell.zome(TestWasm::Create), "create_entry", ()).await
-        //     })
-        // });
-
-        // let second_random_node = network_topology.random_node(&mut rng).unwrap();
-        // let second_random_cell = second_random_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
-
-        // consistency_10s(&[random_cell.clone(), second_random_cell.clone()]).await;
-        // tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
-
-        // let record: Option<Record> = second_random_node.conductor().get_share().await.share_ref(|c| {
-        //     let sweet_cell = c.get_sweet_cell(second_random_cell).unwrap();
-        //     tokio_helper::block_forever_on(async move {
-        //         c.call(&sweet_cell.zome(TestWasm::Create), "get_entry", ()).await
-        //     })
-        // });
-
-        dbg!(record);
+                assert_eq!(record.unwrap().action_address(), &action_hash);
+                });
+                handle.await.unwrap();
+            })
     }
 
     #[tokio::test(flavor = "multi_thread")]
