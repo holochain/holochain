@@ -219,16 +219,16 @@ impl Drop for MetricSendGuard {
             &cx,
             self.byte_count,
             &[
-                opentelemetry_api::KeyValue::new("remote.id", self.rem_id.to_string()),
-                opentelemetry_api::KeyValue::new("is.error", self.is_error),
+                opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is_error", self.is_error),
             ],
         );
         crate::metrics::METRIC_MSG_OUT_TIME.record(
             &cx,
             self.start_time.elapsed().as_secs_f64(),
             &[
-                opentelemetry_api::KeyValue::new("remote.id", self.rem_id.to_string()),
-                opentelemetry_api::KeyValue::new("is.error", self.is_error),
+                opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is_error", self.is_error),
             ],
         );
     }
@@ -246,6 +246,11 @@ pub enum MetaNetCon {
         rem_url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
+    },
+
+    #[cfg(test)]
+    Test {
+        state: Arc<parking_lot::RwLock<MetaNetConTest>>,
     },
 }
 
@@ -308,6 +313,8 @@ impl MetaNetCon {
             MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
                 nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
             }
+            #[cfg(test)]
+            MetaNetCon::Test { .. } => MetaNetAuth::Authorized,
         }
     }
 
@@ -318,6 +325,20 @@ impl MetaNetCon {
         let result = (move || async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
+                    #[cfg(test)]
+                    {
+                        if let MetaNetCon::Test { state } = self {
+                            let mut state = state.write();
+                            state.notify_call_count += 1;
+
+                            return if state.notify_succeed {
+                                Ok(())
+                            } else {
+                                Err("Test error while notifying".into())
+                            };
+                        }
+                    }
+
                     #[cfg(feature = "tx2")]
                     {
                         if let MetaNetCon::Tx2(con, _) = self {
@@ -461,6 +482,23 @@ impl MetaNetCon {
         }
 
         panic!("invalid features");
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub struct MetaNetConTest {
+    pub notify_succeed: bool,
+    pub notify_call_count: usize,
+}
+
+#[cfg(test)]
+impl Default for MetaNetConTest {
+    fn default() -> Self {
+        Self {
+            notify_succeed: true,
+            notify_call_count: 0,
+        }
     }
 }
 

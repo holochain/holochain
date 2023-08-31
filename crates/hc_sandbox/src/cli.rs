@@ -236,7 +236,7 @@ impl LaunchInfo {
     }
 }
 
-/// Internal run function used by `hc sandbox run` and `hc sandbox generate --run`.
+/// Run a conductor for each path
 pub async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
@@ -283,7 +283,7 @@ pub async fn run_n(
     Ok(())
 }
 
-/// Internal generate function used by `hc sandbox generate`.
+/// Perform the `generate` subcommand
 pub async fn generate(
     holochain_path: &Path,
     happ: Option<PathBuf>,

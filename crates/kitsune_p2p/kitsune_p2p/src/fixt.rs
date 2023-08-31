@@ -21,7 +21,8 @@ fixturator!(
         let mut ret = vec![];
 
         for _ in 0..vec_len {
-            ret.push(url2!("https://example.com/{}", fixt!(String)).into());
+            let s = fixt!(String).chars().take(10).collect::<String>();
+            ret.push(url2!("https://example.com/{}", s).into());
         }
         ret
     };
@@ -31,7 +32,8 @@ fixturator!(
         let mut ret = vec![];
 
         for _ in 0..vec_len {
-            ret.push(url2!("https://example.com/{}", fixt!(String, Predictable)).into());
+            let s = fixt!(String, Predictable).chars().take(10).collect::<String>();
+            ret.push(url2!("https://example.com/{}", s).into());
         }
         ret
     };
