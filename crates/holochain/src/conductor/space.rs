@@ -262,7 +262,6 @@ impl Spaces {
 
     /// Get the holochain conductor state
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
-        dbg!("get state 1");
         let state = self
             .conductor_db
             .read_async(|txn| {
