@@ -2662,7 +2662,6 @@ impl Conductor {
             last = match last.0 {
                 NoChange => break,
                 SpinDown => {
-                    dbg!("SPIN DOWN");
                     // Reconcile cell status so that dangling cells can leave the network and be removed
                     let errors = self.clone().reconcile_cell_status_with_app_status().await?;
 
@@ -2670,16 +2669,12 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to stop app(s)", ?errors);
                     }
-                    dbg!("SPIN DOWN END");
                     (NoChange, errors)
                 }
                 SpinUp | Both => {
-                    dbg!("SPIN UP");
-                    dbg!("SPIN UP: reconcile cell status with app status");
                     // Reconcile cell status so that missing/pending cells can become fully joined
                     let errors = self.clone().reconcile_cell_status_with_app_status().await?;
 
-                    dbg!("SPIN UP: reconcile app status with cell status");
                     // Reconcile app status in case some cells failed to join, so the app can be paused
                     let delta = self
                         .clone()
@@ -2690,7 +2685,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to start app(s)", ?errors);
                     }
-                    dbg!("SPIN UP END");
                     (delta, errors)
                 }
             };
