@@ -5,14 +5,15 @@ use crate::event::{
 };
 use crate::spawn::actor::fetch::FetchResponseConfig;
 use crate::spawn::actor::{
-    Internal, InternalSender, UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON,
+    Internal, InternalResult, InternalSender, UNAUTHORIZED_DISCONNECT_CODE,
+    UNAUTHORIZED_DISCONNECT_REASON,
 };
 use crate::spawn::meta_net::{
     nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv,
 };
 use crate::{wire, HostApi, KitsuneP2pConfig, KitsuneP2pError};
 use futures::channel::mpsc::Sender;
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use ghost_actor::GhostSender;
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
@@ -29,9 +30,19 @@ pub struct MetaNetTask {
     fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
     ep_evt: Option<MetaNetEvtRecv>,
     i_s: GhostSender<Internal>,
-    shutdown_signal: Option<futures::channel::oneshot::Sender<()>>,
     is_finished: Arc<AtomicBool>,
 }
+
+#[derive(thiserror::Error, Debug)]
+enum MetaNetTaskError {
+    #[error("Ghost actor closed")]
+    GhostActorClosed(#[from] ghost_actor::GhostError),
+
+    #[error("This error should be ignored")]
+    Ignored,
+}
+
+type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
 
 impl MetaNetTask {
     pub fn new(
@@ -51,14 +62,13 @@ impl MetaNetTask {
             fetch_response_queue,
             ep_evt: Some(ep_evt),
             i_s,
-            shutdown_signal: None,
             is_finished: Arc::new(AtomicBool::new(false)),
         }
     }
 
     pub fn spawn(mut self) {
-        let (shutdown_send, shutdown_recv) = futures::channel::oneshot::channel();
-        self.shutdown_signal = Some(shutdown_send);
+        // Use an mpsc channel rather than a oneshot so no locking is needed in this code to sync the sender.
+        let (shutdown_send, mut shutdown_recv) = futures::channel::mpsc::channel(1);
 
         let is_finished = self.is_finished.clone();
 
@@ -78,16 +88,32 @@ impl MetaNetTask {
                         let host = this.host.clone();
                         let i_s = this.i_s.clone();
                         let mut this = this.clone();
+                        let mut shutdown_send = shutdown_send.clone();
 
                         async move {
                             let evt_sender = &evt_sender;
 
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
-                                    this.handle_connect(remote_url, con).await;
+                                    // TODO can this match be shared once everything is tested?
+                                    match this.handle_connect(remote_url, con).await {
+                                        Err(MetaNetTaskError::GhostActorClosed(_)) => {
+                                            let _ = shutdown_send.send(()).await;
+                                        }
+                                        _ => {
+                                            // Ignore anything else
+                                        }
+                                    }
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
-                                    let _ = i_s.del_con(remote_url).await;
+                                    match this.handle_disconnect(remote_url).await {
+                                        Err(MetaNetTaskError::GhostActorClosed(_)) => {
+                                            let _ = shutdown_send.send(()).await;
+                                        }
+                                        _ => {
+                                            // Ignore anything else
+                                        }
+                                    }
                                 }
                                 MetaNetEvt::Request {
                                     remote_url: _,
@@ -514,12 +540,11 @@ impl MetaNetTask {
                     _ = ep_evt_run => {
                         // This will happen if all senders close
                     }
-                    _ = shutdown_recv => {
+                    _ = shutdown_recv.next() => {
                         // Got a shutdown signal
                     }
                 }
 
-                println!("Shutting down task");
                 tracing::error!(
                     "KitsuneP2p: networking poll shutdown. Networking will no longer work!
                 You can ignore this is if it happened during node shutdown.
@@ -530,21 +555,25 @@ impl MetaNetTask {
         });
     }
 
-    async fn handle_connect(&self, remote_url: String, con: MetaNetCon) {
+    async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {
         match self.i_s.new_con(remote_url, con.clone()).await {
-            Err(KitsuneP2pError::GhostError(ghost_actor::GhostError::Disconnected)) => {
-                println!("Got a disconnected error");
-                self.shutdown();
-            }
-            _ => {
-                // Do nothing for other errors or a success
-            }
+            Err(KitsuneP2pError::GhostError(e)) => match e {
+                ghost_actor::GhostError::Disconnected => Err(e.into()),
+                _ => Err(MetaNetTaskError::Ignored),
+            },
+            Err(_) => Err(MetaNetTaskError::Ignored),
+            Ok(_) => Ok(()),
         }
     }
 
-    fn shutdown(&self) {
-        if let Some(signal) = self.shutdown_signal.take() {
-            let _ = signal.send(());
+    async fn handle_disconnect(&self, remote_url: String) -> MetaNetTaskResult<()> {
+        match self.i_s.del_con(remote_url).await {
+            Err(KitsuneP2pError::GhostError(e)) => match e {
+                ghost_actor::GhostError::Disconnected => Err(e.into()),
+                _ => Err(MetaNetTaskError::Ignored),
+            },
+            Err(_) => Err(MetaNetTaskError::Ignored),
+            Ok(_) => Ok(()),
         }
     }
 }
@@ -603,6 +632,66 @@ mod tests {
 
         ep_evt_send
             .send(MetaNetEvt::Connected {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while !meta_net_task_finished.load(Ordering::Acquire) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for task to shut down");
+
+        assert!(meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn handle_disconnect() {
+        let (mut ep_evt_send, internal_stub, _, _) = setup().await;
+
+        ep_evt_send
+            .send(MetaNetEvt::Connected {
+                remote_url: "x".to_string(),
+                con: mk_test_con(),
+            })
+            .await
+            .unwrap();
+
+        ep_evt_send
+            .send(MetaNetEvt::Disconnected {
+                remote_url: "x".to_string(),
+                con: mk_test_con(),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(100), async {
+            while !internal_stub.connections.read().is_empty() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for connection to be removed");
+
+        assert_eq!(0, internal_stub.connections.read().len());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn handle_disconnect_stops_task_if_internal_sender_closes() {
+        let (mut ep_evt_send, internal_stub, internal_sender, meta_net_task_finished) =
+            setup().await;
+
+        internal_sender
+            .ghost_actor_shutdown_immediate()
+            .await
+            .unwrap();
+
+        ep_evt_send
+            .send(MetaNetEvt::Disconnected {
                 remote_url: "".to_string(),
                 con: mk_test_con(),
             })

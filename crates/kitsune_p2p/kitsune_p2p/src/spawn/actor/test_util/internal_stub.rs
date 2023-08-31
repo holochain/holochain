@@ -87,14 +87,16 @@ impl InternalHandler for InternalStub {
         todo!()
     }
 
-    fn handle_new_con(&mut self, _url: String, _con: MetaNetCon) -> InternalHandlerResult<()> {
-        self.connections.write().insert(_url, _con);
+    fn handle_new_con(&mut self, url: String, con: MetaNetCon) -> InternalHandlerResult<()> {
+        self.connections.write().insert(url, con);
 
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_del_con(&mut self, _url: String) -> InternalHandlerResult<()> {
-        todo!()
+    fn handle_del_con(&mut self, url: String) -> InternalHandlerResult<()> {
+        self.connections.write().remove(&url);
+
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_fetch(
