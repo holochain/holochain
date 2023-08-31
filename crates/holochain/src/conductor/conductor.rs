@@ -2072,7 +2072,6 @@ mod state_impls {
 
     impl Conductor {
         pub(crate) async fn get_state(&self) -> ConductorResult<ConductorState> {
-            dbg!("get_state 0");
             self.spaces.get_state().await
         }
 
@@ -2501,23 +2500,19 @@ impl Conductor {
     /// Remove all Cells which are not referenced by any Enabled app.
     /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
-        dbg!("remove_dangling_cells");
         let state = self.get_state().await?;
 
-        dbg!("remove_dangling_cells: got state");
         let keepers: HashSet<&CellId> = state
             .enabled_apps()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
-        dbg!("remove_dangling_cells: got keepers");
         let all_cells: HashSet<&CellId> = state
             .installed_apps()
             .iter()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
-        dbg!("remove_dangling_cells: got all_cells");
         // Clean up all cells that will be dropped (leave network, etc.)
         let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
             let to_remove: Vec<_> = cells
@@ -2534,14 +2529,11 @@ impl Conductor {
                 .collect()
         });
 
-        dbg!("remove_dangling_cells: got cells_to_cleanup");
-
         // Stop all long-running tasks for cells about to be dropped
         for cell in cells_to_cleanup.iter() {
             cell.cleanup().await?;
         }
 
-        dbg!("remove_dangling_cells: cleaned up cells");
         // Find any DNAs from cleaned up cells which don't have representation in any cells
         // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
         let all_dnas: HashSet<_> = all_cells
@@ -2552,8 +2544,6 @@ impl Conductor {
             .iter()
             .map(|cell| cell.id().dna_hash())
             .filter(|dna| !all_dnas.contains(dna));
-
-        dbg!("remove_dangling_cells: got dnas_to_cleanup");
 
         // For any unrepresented DNAs, clean up those DNA-specific databases
         for dna_hash in dnas_to_cleanup {
@@ -2588,7 +2578,6 @@ impl Conductor {
             .into_iter()
             .collect::<Result<Vec<usize>, _>>()?;
         }
-        dbg!("remove_dangling_cells: done");
 
         Ok(())
     }
