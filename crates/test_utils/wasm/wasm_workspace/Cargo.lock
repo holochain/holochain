@@ -749,7 +749,7 @@ dependencies = [
 name = "fixt"
 version = "0.2.0"
 dependencies = [
- "holochain_serialized_bytes 0.0.53",
+ "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot 0.10.2",
  "paste",
@@ -958,7 +958,7 @@ checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
 
 [[package]]
 name = "hdi"
-version = "0.4.0-beta-dev.8"
+version = "0.4.0-beta-dev.9"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.12"
+version = "0.3.0-beta-dev.13"
 dependencies = [
  "getrandom",
  "hdi",
@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1050,7 +1050,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "holochain_serialized_bytes 0.0.53",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "kitsune_p2p_dht_arc",
  "must_future",
@@ -1064,13 +1064,12 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "arbitrary",
  "derive_builder",
  "holo_hash",
- "holochain_serialized_bytes 0.0.53",
- "kitsune_p2p_dht",
+ "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
  "paste",
  "proptest",
@@ -1092,27 +1091,12 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.51"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9805b3e01e7b5c144782a0823db4dc895fec18a9ccd45a492ce7c7bf157a9e38"
-dependencies = [
- "holochain_serialized_bytes_derive 0.0.51",
- "rmp-serde",
- "serde",
- "serde-transcode",
- "serde_bytes",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "holochain_serialized_bytes"
 version = "0.0.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f7a5fc7c745a107f8ebcb04caab7a6b7a8463e2811f07ced19c281977583de7"
 dependencies = [
  "arbitrary",
- "holochain_serialized_bytes_derive 0.0.53",
+ "holochain_serialized_bytes_derive",
  "proptest",
  "proptest-derive 0.3.0",
  "rmp-serde",
@@ -1121,16 +1105,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "holochain_serialized_bytes_derive"
-version = "0.0.51"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1077232d0c427d64feb9e138fa22800e447eafb1810682d6c13beb95333cb32c"
-dependencies = [
- "quote 1.0.29",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -1145,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.12"
+version = "0.3.0-beta-dev.13"
 dependencies = [
  "hdk",
  "serde",
@@ -1153,11 +1127,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.84"
+version = "0.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "223daec7ca62d4e36841a99d8799b29cc616f5976ad0e2975e6ca6810de8f14f"
+checksum = "f67d666778dfba81be919deead81ca1ee885225089ead921c1d5025697a8b43d"
 dependencies = [
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
  "test-fuzz",
@@ -1168,11 +1142,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.84"
+version = "0.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92b2026e44595cb16108464973622577936605582aa22932933a5130ad32ce42"
+checksum = "9fb560b8d3285061393ffec9cca6c18906eca91558b3cd90522279016f15b5bc"
 dependencies = [
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "parking_lot 0.12.1",
  "paste",
@@ -1182,13 +1156,13 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.9"
+version = "0.3.0-beta-dev.10"
 dependencies = [
  "derive_builder",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
- "holochain_serialized_bytes 0.0.53",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
@@ -1389,11 +1363,14 @@ dependencies = [
 name = "kitsune_p2p_dht_arc"
 version = "0.3.0-beta-dev.3"
 dependencies = [
+ "arbitrary",
  "derive_more",
  "gcollections",
  "intervallum",
  "kitsune_p2p_timestamp",
  "num-traits",
+ "proptest",
+ "proptest-derive 0.3.0",
  "serde",
 ]
 

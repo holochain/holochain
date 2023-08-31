@@ -55,6 +55,7 @@ fuzzing = [
   "arbitrary",
   "proptest",
   "proptest-derive",
+  "kitsune_p2p_dht_arc/fuzzing",
 ]
 sqlite-encrypted = [
   "kitsune_p2p_timestamp/sqlite-encrypted",

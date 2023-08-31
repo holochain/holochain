@@ -2,6 +2,8 @@
 //! represent "properties" of a DNA
 
 use holochain_serialized_bytes::prelude::*;
+
+#[cfg(feature = "fuzzing")]
 use proptest::strategy::{BoxedStrategy, Just, Strategy};
 
 /// A type to allow json values to be used as [`derive@SerializedBytes`]

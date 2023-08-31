@@ -89,7 +89,6 @@ fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
   "contrafact",
   "fuzzing",
-  "holochain_zome_types/fuzzing",
   "holo_hash/fuzzing",
   "isotest",
   "mr_bundle/fuzzing",
@@ -100,6 +99,7 @@ fuzzing = [
   "arbitrary",
   "proptest",
   "proptest-derive",
+  "holochain_zome_types/fuzzing",
 ]
 
 sqlite-encrypted = [

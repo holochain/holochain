@@ -64,6 +64,9 @@ fuzzing = [
   "arbitrary",
   "proptest",
   "proptest-derive",
+  "kitsune_p2p_bin_data/fuzzing",
+  "kitsune_p2p_dht_arc/fuzzing",
+  "kitsune_p2p_dht/fuzzing",
 ]
 
 test_utils = [
