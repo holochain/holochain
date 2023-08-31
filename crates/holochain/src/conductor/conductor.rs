@@ -335,12 +335,8 @@ mod startup_shutdown_impls {
             outcome_rx: OutcomeReceiver,
             admin_configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<CellStartupErrors> {
-            dbg!("Initializing Conductor");
-
-            dbg!("Loading DNAs");
             self.load_dnas().await?;
 
-            dbg!("task manager");
             // Start the task manager
             self.outcomes_task.share_mut(|lock| {
                 if lock.is_some() {
@@ -350,7 +346,6 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
-            dbg!("dpki");
             self.services.share_mut(|services| {
                 let mut dpki = MockDpkiService::new();
                 dpki.expect_is_key_valid()
@@ -366,20 +361,15 @@ mod startup_shutdown_impls {
                 });
             });
 
-            dbg!("admin interfaces");
             self.clone().add_admin_interfaces(admin_configs).await?;
-            dbg!("app interfaces");
             self.clone().startup_app_interfaces().await?;
 
-            dbg!("initializing cells");
             // We don't care what fx are returned here, since all cells need to
             // be spun up
             let _ = self.start_paused_apps().await?;
 
-            dbg!("process_app_status_fx");
             let ret = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
-            dbg!("Conductor initialized");
             ret
         }
     }
