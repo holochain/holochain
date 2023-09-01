@@ -105,6 +105,7 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::{wasm, *};
+use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
@@ -1319,6 +1320,7 @@ mod app_impls {
 
     impl Conductor {
         #[cfg(feature = "test_utils")]
+        // FIXME: can rewrite now in terms of `get_install_app_payload_from_dnas`
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1353,6 +1355,7 @@ mod app_impls {
                 installed_app_id,
                 membrane_proofs,
                 network_seed,
+                ignore_genesis_failure,
             } = payload;
 
             let bundle = {
@@ -1400,15 +1403,30 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
-            crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
+            let cell_ids: Vec<_> = cells_to_create
+                .iter()
+                .map(|(cell_id, _)| cell_id.clone())
+                .collect();
 
-            let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+            let genesis_result =
+                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-            // Update the db
-            let stopped_app = self.add_disabled_app_to_db(app).await?;
+            if genesis_result.is_ok() || ignore_genesis_failure {
+                let roles = ops.role_assignments;
+                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
-            Ok(stopped_app)
+                // Update the db
+                let stopped_app = self.add_disabled_app_to_db(app).await?;
+
+                // Return the result, which be may an error if no_rollback was specified
+                genesis_result.map(|()| stopped_app)
+            } else if let Err(err) = genesis_result {
+                // Rollback created cells on error
+                self.remove_cells(&cell_ids).await;
+                Err(err)
+            } else {
+                unreachable!()
+            }
         }
 
         /// Uninstall an app
@@ -2888,58 +2906,49 @@ pub(crate) async fn genesis_cells(
     cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
 ) -> ConductorResult<()> {
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
-        let space = conductor
-            .get_or_create_space(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()));
-        async {
-            let space = space?;
+        let conductor = conductor.clone();
+        let cell_id_inner = cell_id.clone();
+        tokio::spawn(async move {
+            let space = conductor
+                .get_or_create_space(cell_id_inner.dna_hash())
+                .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
+
             let authored_db = space.authored_db;
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
-            let conductor = conductor.clone();
-            let chc = conductor.chc(conductor.keystore().clone(), &cell_id);
-            let cell_id_inner = cell_id.clone();
+            let chc = conductor.chc(conductor.keystore().clone(), &cell_id_inner);
             let ribosome = conductor
-                .get_ribosome(cell_id.dna_hash())
+                .get_ribosome(cell_id_inner.dna_hash())
                 .map_err(Box::new)?;
-            tokio::spawn(async move {
-                Cell::genesis(
-                    cell_id_inner,
-                    conductor,
-                    authored_db,
-                    dht_db,
-                    dht_db_cache,
-                    ribosome,
-                    proof,
-                    chc,
-                )
-                .await
-            })
-            .map_err(CellError::from)
-            .and_then(|result| async move { result.map(|_| cell_id) })
-            .await
-        }
-    });
-    let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
-        .await
-        .into_iter()
-        .partition(Result::is_ok);
 
-    // unwrap safe because of the partition
-    // TODO: Reference count the databases created here and clean them up on error.
-    let _success = success.into_iter().map(Result::unwrap);
+            Cell::genesis(
+                cell_id_inner.clone(),
+                conductor,
+                authored_db,
+                dht_db,
+                dht_db_cache,
+                ribosome,
+                proof,
+                chc,
+            )
+            .await
+        })
+        .map_err(CellError::from)
+        .map(|genesis_result| (cell_id, genesis_result.and_then(|r| r)))
+    });
+    let (_success, errors): (Vec<CellId>, Vec<(CellId, CellError)>) =
+        futures::future::join_all(cells_tasks)
+            .await
+            .into_iter()
+            .partition_map(|(cell_id, r)| match r {
+                Ok(()) => either::Either::Left(cell_id),
+                Err(err) => either::Either::Right((cell_id, err)),
+            });
+
+    // TODO: Reference count the databases successfully created here and clean them up on error.
 
     // If there were errors, cleanup and return the errors
     if !errors.is_empty() {
-        // match needed to avoid Debug requirement on unwrap_err
-        let errors = errors
-            .into_iter()
-            .map(|e| match e {
-                Err(e) => e,
-                Ok(_) => unreachable!("Safe because of the partition"),
-            })
-            .collect();
-
         Err(ConductorError::GenesisFailed { errors })
     } else {
         Ok(())
