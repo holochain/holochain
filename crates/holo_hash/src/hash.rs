@@ -24,7 +24,9 @@
 //! The complete 39 bytes together are known as the "full" hash
 
 use kitsune_p2p_dht_arc::DhtLocation;
+#[cfg(feature = "fuzzing")]
 use proptest::strategy::BoxedStrategy;
+#[cfg(feature = "fuzzing")]
 use proptest::strategy::Strategy;
 
 use crate::error::HoloHashResult;
