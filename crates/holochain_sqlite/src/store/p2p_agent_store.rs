@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 use crate::sql::*;
-use holochain_zome_types::many_bytes_string;
+use holochain_util::hex::many_bytes_string;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht_arc::DhtArcRange;
 use kitsune_p2p::dht_arc::DhtArcSet;
