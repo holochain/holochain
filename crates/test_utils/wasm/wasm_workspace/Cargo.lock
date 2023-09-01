@@ -657,6 +657,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 
 [[package]]
+name = "dunce"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
+
+[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1051,6 +1057,7 @@ dependencies = [
  "fixt",
  "futures",
  "holochain_serialized_bytes",
+ "holochain_util",
  "holochain_wasmer_common",
  "kitsune_p2p_dht_arc",
  "must_future",
@@ -1070,6 +1077,7 @@ dependencies = [
  "derive_builder",
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_util",
  "kitsune_p2p_timestamp",
  "paste",
  "proptest",
@@ -1123,6 +1131,18 @@ version = "0.3.0-beta-dev.13"
 dependencies = [
  "hdk",
  "serde",
+]
+
+[[package]]
+name = "holochain_util"
+version = "0.2.0"
+dependencies = [
+ "cfg-if 0.1.10",
+ "derive_more",
+ "dunce",
+ "futures",
+ "num_cpus",
+ "once_cell",
 ]
 
 [[package]]
@@ -1318,6 +1338,7 @@ version = "0.3.0-beta-dev.4"
 dependencies = [
  "base64",
  "derive_more",
+ "holochain_util",
  "kitsune_p2p_dht_arc",
  "serde",
  "serde_bytes",

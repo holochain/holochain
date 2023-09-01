@@ -94,7 +94,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl std::fmt::Debug for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.write_fmt(format_args!("{}(0x{})", stringify!($name), &bytes_to_hex(&self.0)))
+                    f.write_fmt(format_args!("{}(0x{})", stringify!($name), &holochain_util::hex::bytes_to_hex(&self.0, false)))
                 }
             }
 
@@ -189,37 +189,11 @@ impl From<Vec<u8>> for KitsuneOpData {
     }
 }
 
-/// Get a hex string representation of two chars per byte
-pub fn bytes_to_hex(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-    let mut s = String::with_capacity(bytes.len());
-    for b in bytes {
-        write!(&mut s, "{:02x}", b).ok();
-    }
-    s
-}
-
-/// Helpful pattern for debug formatting many bytes.
-/// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
-pub fn many_bytes_string(bytes: &[u8]) -> String {
-    if bytes.len() <= 32 {
-        format!("0x{}", bytes_to_hex(bytes))
-    } else {
-        let l = bytes.len();
-        format!(
-            "[0x{}..{}; len={}]",
-            bytes_to_hex(&bytes[0..8]),
-            bytes_to_hex(&bytes[l - 8..l]),
-            l
-        )
-    }
-}
-
 impl std::fmt::Debug for KitsuneOpData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "KitsuneOpData({})",
-            &many_bytes_string(self.0.as_slice())
+            &holochain_util::hex::many_bytes_string(self.0.as_slice())
         ))
     }
 }

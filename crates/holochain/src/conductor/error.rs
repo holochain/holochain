@@ -79,7 +79,7 @@ pub enum ConductorError {
     InterfaceError(#[from] Box<InterfaceError>),
 
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
-    GenesisFailed { errors: Vec<CellError> },
+    GenesisFailed { errors: Vec<(CellId, CellError)> },
 
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
