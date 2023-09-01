@@ -24,8 +24,6 @@
 //! The complete 39 bytes together are known as the "full" hash
 
 use kitsune_p2p_dht_arc::DhtLocation;
-use proptest::strategy::BoxedStrategy;
-use proptest::strategy::Strategy;
 
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
@@ -95,9 +93,11 @@ where
     T::Strategy: 'static,
 {
     type Parameters = ();
-    type Strategy = BoxedStrategy<HoloHash<T>>;
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHash<T>>;
 
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
         let strat = T::arbitrary().prop_flat_map(move |hash_type| {
             let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
             gen_strat.prop_map(move |mut buf| {

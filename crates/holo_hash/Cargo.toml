@@ -44,7 +44,8 @@ full = [
     "fixturators",
     "hashing",
     "encoding",
-    "sqlite"
+    "sqlite",
+    "fuzzing",
 ]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
