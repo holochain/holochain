@@ -67,7 +67,7 @@ codegen-units = 16
 
 [patch.crates-io]
 # proptest = { path = "/home/michael/gitfork/proptest/proptest" }
-proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
+# proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
 
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
