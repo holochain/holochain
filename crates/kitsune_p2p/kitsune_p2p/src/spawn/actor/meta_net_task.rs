@@ -584,20 +584,28 @@ mod tests {
     use crate::spawn::actor::meta_net_task::MetaNetTask;
     use crate::spawn::actor::test_util::InternalStub;
     use crate::spawn::actor::Internal;
-    use crate::spawn::meta_net::{MetaNetCon, MetaNetEvt};
-    use crate::HostStub;
+    use crate::spawn::meta_net::{MetaNetCon, MetaNetConTest, MetaNetEvt};
+    use crate::types::wire;
+    use crate::wire::WireData;
+    use crate::{HostStub, KitsuneAgent, KitsuneHost};
     use futures::channel::mpsc::{channel, Sender};
+    use futures::FutureExt;
     use futures::SinkExt;
     use ghost_actor::actor_builder::GhostActorBuilder;
     use ghost_actor::{GhostControlSender, GhostSender};
+    use kitsune_p2p::KitsuneBinType;
+    use kitsune_p2p_block::BlockTargetId::Node;
+    use kitsune_p2p_block::{Block, BlockTarget, NodeBlockReason, NodeId};
+    use kitsune_p2p_fetch::test_utils::test_space;
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
+    use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect() {
-        let (mut ep_evt_send, internal_stub, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _) = setup().await;
 
         assert_eq!(0, internal_stub.connections.read().len());
 
@@ -622,7 +630,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect_stops_task_if_internal_sender_closes() {
-        let (mut ep_evt_send, internal_stub, internal_sender, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, internal_sender, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -651,7 +659,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_disconnect() {
-        let (mut ep_evt_send, internal_stub, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Connected {
@@ -682,7 +690,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_disconnect_stops_task_if_internal_sender_closes() {
-        let (mut ep_evt_send, internal_stub, internal_sender, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, internal_sender, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -709,10 +717,58 @@ mod tests {
         assert!(meta_net_task_finished.load(Ordering::Acquire));
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn make_request_while_blocked() {
+        let (mut ep_evt_send, internal_stub, internal_sender, host_stub, meta_net_task_finished) =
+            setup().await;
+
+        host_stub
+            .block(Block::new(
+                BlockTarget::Node(test_node_id(1), NodeBlockReason::DOS),
+                InclusiveTimestampInterval::try_new(
+                    Timestamp::now(),
+                    Timestamp::now()
+                        .checked_add(&Duration::from_secs(10))
+                        .unwrap(),
+                )
+                .unwrap(),
+            ))
+            .await
+            .unwrap();
+
+        let con = mk_test_con_with_id(1);
+        let con_state = get_con_state(&con);
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: con,
+                data: wire::Wire::Call(wire::Call {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: WireData(vec![]),
+                }),
+                respond: Box::new(|_| async move { () }.boxed().into()),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while !con_state.read().closed {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for the connection to be closed");
+
+        assert!(con_state.read().closed);
+    }
+
     async fn setup() -> (
         Sender<MetaNetEvt>,
         InternalStub,
         GhostSender<Internal>,
+        Arc<HostStub>,
         Arc<AtomicBool>,
     ) {
         let task = InternalStub::new();
@@ -740,7 +796,7 @@ mod tests {
 
         let meta_net_task = MetaNetTask::new(
             host_sender,
-            host_stub,
+            host_stub.clone(),
             Default::default(),
             fetch_pool,
             fetch_response_queue,
@@ -751,12 +807,39 @@ mod tests {
 
         meta_net_task.spawn();
 
-        (ep_evt_send, task, internal_sender, meta_net_task_finished)
+        (
+            ep_evt_send,
+            task,
+            internal_sender,
+            host_stub,
+            meta_net_task_finished,
+        )
     }
 
     fn mk_test_con() -> MetaNetCon {
         MetaNetCon::Test {
             state: Default::default(),
+        }
+    }
+
+    fn mk_test_con_with_id(id: u8) -> MetaNetCon {
+        MetaNetCon::Test {
+            state: Arc::new(parking_lot::RwLock::new(MetaNetConTest::new_with_id(id))),
+        }
+    }
+
+    fn test_node_id(i: u8) -> NodeId {
+        Arc::new(vec![i; 32].try_into().unwrap())
+    }
+
+    fn test_agent(i: u8) -> Arc<KitsuneAgent> {
+        Arc::new(KitsuneAgent::new(vec![i; 36]))
+    }
+
+    fn get_con_state(con: &MetaNetCon) -> Arc<parking_lot::RwLock<MetaNetConTest>> {
+        match con {
+            MetaNetCon::Test { state } => state.clone(),
+            _ => panic!("Not a test con"),
         }
     }
 }
