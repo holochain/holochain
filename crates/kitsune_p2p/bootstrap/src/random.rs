@@ -91,10 +91,12 @@ mod tests {
             .reply(&filter)
             .await;
         assert_eq!(res.status(), 200);
-        let result: Vec<Vec<u8>> = rmp_decode(&mut res.body().as_ref()).unwrap();
+        #[derive(Debug, serde::Deserialize)]
+        struct Bytes(#[serde(with = "serde_bytes")] Vec<u8>);
+        let result: Vec<Bytes> = rmp_decode(&mut res.body().as_ref()).unwrap();
         let result: Vec<AgentInfoSigned> = result
             .into_iter()
-            .map(|bytes| rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes)).unwrap())
+            .map(|bytes| rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes.0)).unwrap())
             .collect();
         for peer in &result {
             assert!(peers.iter().any(|p| p == peer));
