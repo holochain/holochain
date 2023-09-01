@@ -5,7 +5,6 @@ use futures::FutureExt;
 use kitsune_p2p_block::{Block, BlockTarget, BlockTargetId};
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 
