@@ -9,9 +9,10 @@ use crate::spawn::actor::{
     UNAUTHORIZED_DISCONNECT_REASON,
 };
 use crate::spawn::meta_net::{
-    nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv,
+    nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv, Respond,
 };
-use crate::{wire, HostApi, KitsuneP2pConfig, KitsuneP2pError};
+use crate::wire::WireData;
+use crate::{wire, HostApi, KitsuneAgent, KitsuneP2pConfig, KitsuneP2pError, KitsuneSpace};
 use futures::channel::mpsc::Sender;
 use futures::{SinkExt, StreamExt};
 use ghost_actor::GhostSender;
@@ -145,38 +146,13 @@ impl MetaNetTask {
                                                                      data,
                                                                      ..
                                                                  }) => {
-                                                    let res = match evt_sender
-                                                        .call(space, to_agent, data.into())
-                                                        .await
-                                                    {
-                                                        Err(err) => {
-                                                            let reason = format!("{:?}", err);
-                                                            let fail = wire::Wire::failure(reason);
-                                                            respond(fail).await;
-                                                            return;
-                                                        }
-                                                        Ok(r) => r,
-                                                    };
-                                                    let resp = wire::Wire::call_resp(res.into());
-                                                    respond(resp).await;
+                                                    this.handle_call_request(space, to_agent, data, respond).await;
                                                 }
                                                 wire::Wire::PeerGet(wire::PeerGet {
                                                                         space,
                                                                         agent,
                                                                     }) => {
-                                                    let resp = match host
-                                                        .get_agent_info_signed(
-                                                            GetAgentInfoSignedEvt { space, agent },
-                                                        )
-                                                        .await
-                                                    {
-                                                        Ok(info) => wire::Wire::peer_get_resp(info),
-                                                        Err(err) => wire::Wire::failure(format!(
-                                                            "Error getting agent: {:?}",
-                                                            err,
-                                                        )),
-                                                    };
-                                                    respond(resp).await;
+                                                    this.handle_peer_get_request(space, agent, respond).await;
                                                 }
                                                 wire::Wire::PeerQuery(wire::PeerQuery {
                                                                           space,
@@ -576,6 +552,43 @@ impl MetaNetTask {
             Ok(_) => Ok(()),
         }
     }
+
+    async fn handle_call_request(
+        &self,
+        space: Arc<KitsuneSpace>,
+        to_agent: Arc<KitsuneAgent>,
+        data: WireData,
+        respond: Respond,
+    ) {
+        let res = match self.evt_sender.call(space, to_agent, data.into()).await {
+            Err(err) => {
+                let reason = format!("{:?}", err);
+                let fail = wire::Wire::failure(reason);
+                respond(fail).await;
+                return;
+            }
+            Ok(r) => r,
+        };
+        let resp = wire::Wire::call_resp(res.into());
+        respond(resp).await;
+    }
+
+    async fn handle_peer_get_request(
+        &self,
+        space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+        respond: Respond,
+    ) {
+        let resp = match self
+            .host
+            .get_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+            .await
+        {
+            Ok(info) => wire::Wire::peer_get_resp(info),
+            Err(err) => wire::Wire::failure(format!("Error getting agent: {:?}", err,)),
+        };
+        respond(resp).await;
+    }
 }
 
 #[cfg(test)]
@@ -595,7 +608,6 @@ mod tests {
     use ghost_actor::actor_builder::GhostActorBuilder;
     use ghost_actor::{GhostControlSender, GhostSender};
     use kitsune_p2p::KitsuneBinType;
-    use kitsune_p2p_block::BlockTargetId::Node;
     use kitsune_p2p_block::{Block, BlockTarget, NodeBlockReason, NodeId};
     use kitsune_p2p_fetch::test_utils::test_space;
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
@@ -860,10 +872,104 @@ mod tests {
 
         let reason = match call_response {
             Wire::Failure(f) => f.reason,
-            _ => panic!("Unexpected response"),
+            r => panic!("Unexpected response - {:?}", r),
         };
 
         assert_eq!("GhostError(Disconnected)".to_string(), reason);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn make_peer_get_request() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            _,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::PeerGet(wire::PeerGet {
+                    space: test_space(1),
+                    agent: test_agent(1),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let agent_info_signed = match call_response {
+            Wire::PeerGetResp(res) => res.agent_info_signed,
+            r => panic!("Unexpected response - {:?}", r),
+        };
+
+        assert_eq!(test_agent(1), agent_info_signed.unwrap().agent);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn handle_peer_get_request_error() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            host_stub,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        host_stub.fail_next_request();
+
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::PeerGet(wire::PeerGet {
+                    space: test_space(1),
+                    agent: test_agent(1),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let reason = match call_response {
+            Wire::Failure(f) => f.reason,
+            r => panic!("Unexpected response - {:?}", r),
+        };
+
+        assert_eq!("Error getting agent: \"error for unimplemented KitsuneHost test behavior: method get_agent_info_signed of HostStub\"".to_string(), reason);
     }
 
     async fn setup() -> (
@@ -938,7 +1044,7 @@ mod tests {
     }
 
     fn test_agent(i: u8) -> Arc<KitsuneAgent> {
-        Arc::new(KitsuneAgent::new(vec![i; 36]))
+        Arc::new(KitsuneAgent::new(vec![i; 32]))
     }
 
     fn get_con_state(con: &MetaNetCon) -> Arc<parking_lot::RwLock<MetaNetConTest>> {

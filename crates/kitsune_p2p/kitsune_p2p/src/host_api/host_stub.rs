@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_util::data::mk_agent_info;
 use crate::KitsuneHostDefaultError;
 use futures::FutureExt;
 use kitsune_p2p_block::{Block, BlockTarget, BlockTargetId};
@@ -6,6 +7,7 @@ use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -36,6 +38,7 @@ impl FetchPoolConfig for HostStubErr {
 pub struct HostStub {
     err: HostStubErr,
     check_op_data_impl: Option<CheckOpDataImpl>,
+    fail_next_request: Arc<AtomicBool>,
     blocks: Arc<parking_lot::Mutex<HashSet<Block>>>,
 }
 
@@ -52,6 +55,7 @@ impl HostStub {
         std::sync::Arc::new(Self {
             err: HostStubErr,
             check_op_data_impl: None,
+            fail_next_request: Arc::new(AtomicBool::new(false)),
             blocks: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         })
     }
@@ -61,8 +65,14 @@ impl HostStub {
         std::sync::Arc::new(Self {
             err: HostStubErr,
             check_op_data_impl: Some(check_op_data_impl),
+            fail_next_request: Arc::new(AtomicBool::new(false)),
             blocks: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         })
+    }
+
+    /// Request that the next request will fail and respond with an error
+    pub fn fail_next_request(&self) {
+        self.fail_next_request.store(true, Ordering::SeqCst);
     }
 }
 
@@ -111,7 +121,26 @@ impl KitsuneHost for HostStub {
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        KitsuneHostDefaultError::get_agent_info_signed(&self.err, input)
+        match self.fail_next_request.compare_exchange(
+            true,
+            false,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(true) => {
+                return KitsuneHostDefaultError::get_agent_info_signed(&self.err, input);
+            }
+            _ => {
+                // Ignore
+            }
+        }
+
+        async move {
+            let signed = mk_agent_info(*input.agent.0.to_vec().first().unwrap()).await;
+            Ok(Some(signed))
+        }
+        .boxed()
+        .into()
     }
 
     fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
