@@ -582,11 +582,12 @@ impl MetaNetTask {
 mod tests {
     use crate::spawn::actor::fetch::FetchResponseConfig;
     use crate::spawn::actor::meta_net_task::MetaNetTask;
+    use crate::spawn::actor::test_util::HostStub as HostReceiverStub;
     use crate::spawn::actor::test_util::InternalStub;
     use crate::spawn::actor::Internal;
     use crate::spawn::meta_net::{MetaNetCon, MetaNetConTest, MetaNetEvt};
     use crate::types::wire;
-    use crate::wire::WireData;
+    use crate::wire::{Wire, WireData};
     use crate::{HostStub, KitsuneAgent, KitsuneHost};
     use futures::channel::mpsc::{channel, Sender};
     use futures::FutureExt;
@@ -605,7 +606,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect() {
-        let (mut ep_evt_send, internal_stub, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
 
         assert_eq!(0, internal_stub.connections.read().len());
 
@@ -630,7 +631,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect_stops_task_if_internal_sender_closes() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, internal_sender, _, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -659,7 +660,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_disconnect() {
-        let (mut ep_evt_send, internal_stub, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Connected {
@@ -690,7 +691,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_disconnect_stops_task_if_internal_sender_closes() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, internal_sender, _, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -719,7 +720,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_request_while_blocked() {
-        let (mut ep_evt_send, internal_stub, internal_sender, host_stub, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, internal_sender, _, host_stub, meta_net_task_finished) =
             setup().await;
 
         host_stub
@@ -764,10 +765,60 @@ mod tests {
         assert!(con_state.read().closed);
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn make_call_request() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            _,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        let request_data = vec![2, 7];
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::Call(wire::Call {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: WireData(request_data.clone()),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let response_data = match call_response {
+            Wire::CallResp(res) => res.data.to_vec(),
+            _ => panic!("Unexpected response"),
+        };
+
+        // Because the stub does an echo response
+        assert_eq!(request_data, response_data);
+    }
+
     async fn setup() -> (
         Sender<MetaNetEvt>,
         InternalStub,
         GhostSender<Internal>,
+        HostReceiverStub,
         Arc<HostStub>,
         Arc<AtomicBool>,
     ) {
@@ -782,6 +833,7 @@ mod tests {
             .unwrap();
 
         let (host_sender, host_receiver) = channel(10);
+        let host_receiver_stub = HostReceiverStub::start(host_receiver);
 
         tokio::spawn(builder.spawn(task.clone()));
 
@@ -811,6 +863,7 @@ mod tests {
             ep_evt_send,
             task,
             internal_sender,
+            host_receiver_stub,
             host_stub,
             meta_net_task_finished,
         )

@@ -101,9 +101,7 @@ impl KitsuneHost for HostStub {
                     false
                 }
             }
-            _ => {
-                unimplemented!("Only node blocks are supported for testing with this stub")
-            }
+            _ => false,
         };
 
         async move { Ok(blocked) }.boxed().into()

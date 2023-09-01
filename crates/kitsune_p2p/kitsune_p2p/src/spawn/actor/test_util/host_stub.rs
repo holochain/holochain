@@ -1,4 +1,5 @@
 use crate::event::{KitsuneP2pEvent, PutAgentInfoSignedEvt};
+use crate::types::wire;
 use crate::KitsuneP2pError;
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{FutureExt, SinkExt, StreamExt};
@@ -7,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::AbortHandle;
 use tokio::time::error::Elapsed;
+use tracing_subscriber::filter::FilterExt;
 
 pub struct HostStub {
     pub respond_with_error: Arc<AtomicBool>,
@@ -36,6 +38,12 @@ impl HostStub {
 
                             sender.send(input).await.unwrap();
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                        }
+                        KitsuneP2pEvent::Call {
+                            payload, respond, ..
+                        } => {
+                            // An echo response, no need for anything fancy here
+                            respond.respond(Ok(async move { Ok(payload.to_vec()) }.boxed().into()));
                         }
                         _ => panic!("Unexpected event - {:?}", evt),
                     }
