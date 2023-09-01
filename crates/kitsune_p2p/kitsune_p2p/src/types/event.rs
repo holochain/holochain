@@ -163,11 +163,11 @@ pub fn full_time_window_inclusive() -> TimeWindowInclusive {
     Timestamp::MIN..=Timestamp::MAX
 }
 
-pub(crate) type KSpace = Arc<super::KitsuneSpace>;
-pub(crate) type KAgent = Arc<super::KitsuneAgent>;
-pub(crate) type Payload = Vec<u8>;
-pub(crate) type Ops = Vec<KOp>;
-pub(crate) type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
+type KSpace = Arc<super::KitsuneSpace>;
+type KAgent = Arc<super::KitsuneAgent>;
+type Payload = Vec<u8>;
+type Ops = Vec<KOp>;
+type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
