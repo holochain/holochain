@@ -814,6 +814,58 @@ mod tests {
         assert_eq!(request_data, response_data);
     }
 
+    // TODO This is actually a fatal error so the task should stop and then I need another mechanism to cause an error
+    //      to test the behaviour this test is currently checking.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn make_call_request_after_host_closed() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            _,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        host_receiver_stub.abort();
+
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        let request_data = vec![2, 7];
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::Call(wire::Call {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: WireData(request_data.clone()),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let reason = match call_response {
+            Wire::Failure(f) => f.reason,
+            _ => panic!("Unexpected response"),
+        };
+
+        assert_eq!("GhostError(Disconnected)".to_string(), reason);
+    }
+
     async fn setup() -> (
         Sender<MetaNetEvt>,
         InternalStub,
