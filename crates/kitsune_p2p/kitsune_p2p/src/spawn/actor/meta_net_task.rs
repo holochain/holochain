@@ -593,6 +593,8 @@ impl MetaNetTask {
 
 #[cfg(test)]
 mod tests {
+    use crate::actor::BroadcastData;
+    use crate::dht_arc::DhtLocation;
     use crate::spawn::actor::fetch::FetchResponseConfig;
     use crate::spawn::actor::meta_net_task::MetaNetTask;
     use crate::spawn::actor::test_util::HostStub as HostReceiverStub;
@@ -935,6 +937,7 @@ mod tests {
             meta_net_task_finished,
         ) = setup().await;
 
+        // Set up the error response so that when we make a request we get an error
         host_stub.fail_next_request();
 
         let (send_res, read_res) = futures::channel::oneshot::channel();
@@ -970,6 +973,169 @@ mod tests {
         };
 
         assert_eq!("Error getting agent: \"error for unimplemented KitsuneHost test behavior: method get_agent_info_signed of HostStub\"".to_string(), reason);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn make_peer_query_request() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            host_stub,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::PeerQuery(wire::PeerQuery {
+                    space: test_space(1),
+                    basis_loc: DhtLocation::new(1),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let peer_list = match response {
+            Wire::PeerQueryResp(r) => r.peer_list,
+            r => panic!("Unexpected response - {:?}", r),
+        };
+
+        assert_eq!(8, peer_list.len());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn handle_peer_query_request_error() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            host_stub,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        // Set up the error response so that when we make a request we get an error
+        host_receiver_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::PeerQuery(wire::PeerQuery {
+                    space: test_space(1),
+                    basis_loc: DhtLocation::new(1),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let reason = match response {
+            Wire::Failure(f) => f.reason,
+            r => panic!("Unexpected response - {:?}", r),
+        };
+
+        assert_eq!(
+            "Error querying agents: Other(\"a test error\")".to_string(),
+            reason
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "This crashes the process because it's hitting an `unimplemented` condition"]
+    async fn ignores_unexpected_request_payload() {
+        let (
+            mut ep_evt_send,
+            internal_stub,
+            internal_sender,
+            host_receiver_stub,
+            host_stub,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        // Send a request but don't listen for a response
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(1),
+                    data: BroadcastData::User(test_agent(2).to_vec()),
+                }),
+                respond: Box::new(|r| async move { () }.boxed().into()),
+            })
+            .await
+            .unwrap();
+
+        // Now check that we can still use the task to send/receive messages.
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::PeerQuery(wire::PeerQuery {
+                    space: test_space(1),
+                    basis_loc: DhtLocation::new(1),
+                }),
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        let response = tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap();
+
+        let peer_list = match response {
+            Wire::PeerQueryResp(r) => r.peer_list,
+            r => panic!("Unexpected response - {:?}", r),
+        };
+
+        assert_eq!(8, peer_list.len());
     }
 
     async fn setup() -> (
