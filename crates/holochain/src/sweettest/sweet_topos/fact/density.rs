@@ -1,4 +1,3 @@
-// use super::edge::FullAgentViewFact;
 use crate::sweettest::sweet_topos::network::NetworkTopology;
 use contrafact::Fact;
 use contrafact::Generator;
