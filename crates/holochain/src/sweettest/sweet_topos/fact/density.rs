@@ -9,7 +9,7 @@ use contrafact::Mutation;
 /// This is a number between 0 and 1. 0 means no edges. 1 means every node
 /// is connected to every other node.
 /// This is a directed graph, so the maximum number of edges is n * (n - 1).
-/// This measument only makes sense for simple graphs, so we assume that.
+/// This measurement only makes sense for simple graphs, so we assume that.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DenseNetworkFact {
     /// The density of the network. Number of edges divided by the maximum
