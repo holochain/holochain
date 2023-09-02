@@ -37,7 +37,7 @@ impl NetworkTopologyEdge {
     /// Get the cells in this edge.
     /// MAY disagree with the cells in the conductor.
     /// This is because the conductor may have been mutated since the edge was
-    /// created or vice vesa re: apply.
+    /// created or vice versa re: apply.
     pub fn cells(&self) -> Vec<CellId> {
         self.cells.clone()
     }
