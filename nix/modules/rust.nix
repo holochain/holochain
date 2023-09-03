@@ -77,6 +77,12 @@
         };
 
         customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
+          stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
+
+          # TODO: all of these work as well, figure out if any of them has an advantage
+          # stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.llvmPackages.stdenv;
+          # stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.clang-tools.stdenv;
+
           defaultCrateOverrides = pkgs.lib.attrsets.recursiveUpdate pkgs.defaultCrateOverrides
             ({
               tx5-go-pion-sys = _: { nativeBuildInputs = with pkgs; [ go ]; };
