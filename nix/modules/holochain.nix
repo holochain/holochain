@@ -39,7 +39,7 @@
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
 
-        stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
+        stdenv = config.rustHelper.defaultStdenv pkgs;
       };
 
       # derivation building all dependencies
