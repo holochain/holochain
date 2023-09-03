@@ -36,6 +36,11 @@
           "aarch64-apple-darwin"
         ];
 
+        defaultStdenv = pkgs:
+          if pkgs.stdenv.isLinux
+          then pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv
+          else pkgs.stdenv;
+
         mkRustPkgs =
           { track ? config.rustHelper.defaultTrack
           , version ? config.rustHelper.defaultVersion
@@ -77,7 +82,7 @@
         };
 
         customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
-          stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
+          stdenv = config.rustHelper.defaultStdenv pkgs;
 
           # TODO: all of these work as well, figure out if any of them has an advantage
           # stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.llvmPackages.stdenv;
