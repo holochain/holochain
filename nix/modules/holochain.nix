@@ -38,6 +38,8 @@
         nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
+
+        stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
       };
 
       # derivation building all dependencies
