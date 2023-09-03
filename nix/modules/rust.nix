@@ -37,7 +37,7 @@
         ];
 
         defaultStdenv = pkgs:
-          if pkgs.lib.attrsets.optionalAttrs pkgs.stdenv.isLinux
+          if pkgs.stdenv.isLinux
           then pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv
           else pkgs.stdenv;
 
