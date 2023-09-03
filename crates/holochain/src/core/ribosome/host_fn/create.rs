@@ -249,7 +249,7 @@ pub mod wasm_test {
                 crate::wait_for_10s!(
                     bob_node.conductor().lock().await.write().await.call::<_, Option<Record>, _>(&bob.zome(TestWasm::Create), "get_entry", ()).await,
                     |x: &Option<Record>| x.is_some(),
-                    |x| true
+                    |_| true
                 );
 
                 let record: Option<Record> = bob_node.conductor().lock().await.write().await.call(&bob.zome(TestWasm::Create), "get_entry", ()).await;
