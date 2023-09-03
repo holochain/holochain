@@ -14,6 +14,7 @@
 
 mod sweet_agents;
 mod sweet_app;
+mod sweet_app_installation;
 mod sweet_cell;
 mod sweet_conductor;
 mod sweet_conductor_batch;
@@ -27,6 +28,7 @@ mod sweet_zome;
 
 pub use sweet_agents::*;
 pub use sweet_app::*;
+pub use sweet_app_installation::*;
 pub use sweet_cell::*;
 pub use sweet_conductor::*;
 pub use sweet_conductor_batch::*;

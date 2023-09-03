@@ -18,13 +18,14 @@ pub async fn valid_arbitrary_chain<'a>(
         contrafact::lens1(
             "action is valid",
             |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain_action(author),
+            holochain_zome_types::action::facts::valid_chain_action(author.clone()),
         ),
     ];
 
     let pairs = contrafact::vec_of_length(n, fact).build(g);
     let chain: Vec<Record> = futures::future::join_all(pairs.into_iter().map(|(a, entry)| {
         let keystore = keystore.clone();
+        assert_eq!(a.author(), &author);
         async move {
             Record::new(
                 SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))

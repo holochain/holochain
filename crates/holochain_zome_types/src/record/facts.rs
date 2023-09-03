@@ -29,10 +29,7 @@ pub fn action_and_entry_match<'a>(must_be_public: bool) -> impl Fact<'a, Pair> {
             move |(action, entry): &Pair| {
                 let data = action.entry_data();
                 match (data, entry) {
-                    (
-                        Some((_entry_hash, entry_type)),
-                        RecordEntry::Present(_) | RecordEntry::NotStored,
-                    ) => {
+                    (Some((_entry_hash, entry_type)), RecordEntry::Present(_)) => {
                         // Ensure that entries are public
                         !must_be_public || entry_type.visibility().is_public()
                     }

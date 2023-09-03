@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Change `GenesisFailed` error to include `CellId` so that genesis failures can be correlated with the cells that failed. [2616](https://github.com/holochain/holochain/pull/2616)
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
+
 
 ## 0.3.0-beta-dev.16
 
