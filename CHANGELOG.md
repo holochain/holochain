@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
+
 # 20230830.003423
 
 - Updating the default version of Holochain 0.1 to be 0.1.6 and bumping Lair to 0.3.0. This is a maintenance release that resolves [PR\#2712](https://github.com/holochain/holochain/pull/2712) an issue with serde serialisation that was leading to the error `"invalid type: map, expected variant identifier"`. There were also some updated dependencies of the Lair keystore that weren’t building on Rust 1.66.1 which is the reason for bumping the Lair keystore version. Please run `nix flake update` to take this change and update your HDI/HDK versions.
