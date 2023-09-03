@@ -25,7 +25,7 @@ rec {
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,chc,test_utils,build_wasms,sqlite-encrypted --lib --tests --profile dev ''${1-} -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,chc,test_utils,build_wasms,sqlite-encrypted --lib --tests --profile fast-test ''${1-} -- --nocapture
   '';
 
   hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
