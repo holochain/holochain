@@ -59,11 +59,11 @@
               })
 
               (final: prev: {
-                buildRustCrate = arg: prev.buildRustCrate (arg // {
-                  dontStrip = prev.stdenv.isDarwin;
-                });
+                # TODO: remove or fix this. it's not needed at the moment because we don't use crate2nix on darwin
+                # buildRustCrate = arg: pkgs.buildRustCrate (arg // {
+                #   dontStrip = arg.dontStrip or prev.stdenv.isDarwin;
+                # });
               })
-
             ];
           };
 
@@ -76,7 +76,7 @@
           inherit pkgs;
         };
 
-        customBuildRustCrateForPkgs = _: pkgs.buildRustCrate.override {
+        customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
           defaultCrateOverrides = pkgs.lib.attrsets.recursiveUpdate pkgs.defaultCrateOverrides
             ({
               # this regular module named `build.rs` confuses crate2nix which tries to build and run it as a build script.
