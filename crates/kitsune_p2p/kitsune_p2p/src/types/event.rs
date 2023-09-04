@@ -65,7 +65,7 @@ pub struct SignNetworkDataEvt {
 }
 
 /// Store the AgentInfo as signed by the agent themselves.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
     pub space: KSpace,
