@@ -120,18 +120,11 @@ impl KitsuneHost for HostStub {
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        match self.fail_next_request.compare_exchange(
-            true,
-            false,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            Ok(true) => {
-                return KitsuneHostDefaultError::get_agent_info_signed(&self.err, input);
-            }
-            _ => {
-                // Ignore
-            }
+        if let Ok(true) =
+            self.fail_next_request
+                .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            return KitsuneHostDefaultError::get_agent_info_signed(&self.err, input);
         }
 
         async move {

@@ -13,7 +13,7 @@ use crate::spawn::meta_net::{
 use crate::wire::WireData;
 use crate::{wire, HostApi, KitsuneAgent, KitsuneP2pConfig, KitsuneP2pError, KitsuneSpace};
 use futures::channel::mpsc::Sender;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use ghost_actor::GhostSender;
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
@@ -65,8 +65,8 @@ impl MetaNetTask {
     }
 
     pub fn spawn(mut self) {
-        // Use an mpsc channel rather than a oneshot so no locking is needed in this code to sync the sender.
-        let (shutdown_send, mut shutdown_recv) = futures::channel::mpsc::channel(1);
+        let shutdown_notify = Arc::new(tokio::sync::Notify::new());
+        let shutdown_notify_send = shutdown_notify.clone();
 
         let is_finished = self.is_finished.clone();
 
@@ -86,7 +86,7 @@ impl MetaNetTask {
                         let host = this.host.clone();
                         let i_s = this.i_s.clone();
                         let this = this.clone();
-                        let mut shutdown_send = shutdown_send.clone();
+                        let shutdown_notify = shutdown_notify_send.clone();
 
                         async move {
                             let evt_sender = &evt_sender;
@@ -95,12 +95,12 @@ impl MetaNetTask {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     // TODO can this match be shared once everything is tested?
                                     if let Err(MetaNetTaskError::GhostActorClosed(_)) = this.handle_connect(remote_url, con).await {
-                                        let _ = shutdown_send.send(()).await;
+                                        let _ = shutdown_notify.notify_one();
                                     }
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     if let Err(MetaNetTaskError::GhostActorClosed(_)) = this.handle_disconnect(remote_url).await {
-                                        let _ = shutdown_send.send(()).await;
+                                        let _ = shutdown_notify.notify_one();
                                     }
                                 }
                                 MetaNetEvt::Request {
@@ -503,7 +503,7 @@ impl MetaNetTask {
                     _ = ep_evt_run => {
                         // This will happen if all senders close
                     }
-                    _ = shutdown_recv.next() => {
+                    _ = shutdown_notify.notified() => {
                         // Got a shutdown signal
                     }
                 }
@@ -530,6 +530,7 @@ impl MetaNetTask {
     }
 
     async fn handle_disconnect(&self, remote_url: String) -> MetaNetTaskResult<()> {
+        println!("Handle disconnect");
         match self.i_s.del_con(remote_url).await {
             Err(KitsuneP2pError::GhostError(e)) => match e {
                 ghost_actor::GhostError::Disconnected => Err(e.into()),
@@ -717,6 +718,7 @@ mod tests {
         assert!(meta_net_task_finished.load(Ordering::Acquire));
     }
 
+    // TODO no disconnect event is sent if the connection is force closed by us.
     #[tokio::test(flavor = "multi_thread")]
     async fn make_request_while_blocked() {
         let (mut ep_evt_send, _, _, _, host_stub, _) = setup().await;
