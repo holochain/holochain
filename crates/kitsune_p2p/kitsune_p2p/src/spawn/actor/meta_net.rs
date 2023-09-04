@@ -225,6 +225,14 @@ impl Eq for MetaNetCon {}
 
 impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                state.write().closed = true;
+                return;
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -246,6 +254,13 @@ impl MetaNetCon {
     }
 
     pub fn is_closed(&self) -> bool {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                return state.read().closed;
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -407,6 +422,13 @@ impl MetaNetCon {
     }
 
     pub fn peer_id(&self) -> Arc<[u8; 32]> {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                return state.read().id();
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -429,6 +451,9 @@ impl MetaNetCon {
 #[cfg(test)]
 #[derive(Debug)]
 pub struct MetaNetConTest {
+    pub id: Arc<[u8; 32]>,
+    pub closed: bool,
+
     pub notify_succeed: bool,
     pub notify_call_count: usize,
 }
@@ -437,9 +462,25 @@ pub struct MetaNetConTest {
 impl Default for MetaNetConTest {
     fn default() -> Self {
         Self {
+            id: Arc::new([0; 32]),
+            closed: false,
             notify_succeed: true,
             notify_call_count: 0,
         }
+    }
+}
+
+#[cfg(test)]
+impl MetaNetConTest {
+    pub fn new_with_id(id: u8) -> Self {
+        Self {
+            id: Arc::new(vec![id; 32].try_into().unwrap()),
+            ..Default::default()
+        }
+    }
+
+    pub fn id(&self) -> Arc<[u8; 32]> {
+        self.id.clone()
     }
 }
 

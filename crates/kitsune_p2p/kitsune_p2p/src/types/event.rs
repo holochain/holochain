@@ -6,6 +6,7 @@ use kitsune_p2p_types::{
     bin_types::KOp,
     dht::region::RegionBounds,
     dht_arc::{DhtArcSet, DhtLocation},
+    KOpHash,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -231,7 +232,6 @@ pub struct MetricRecord {
 
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
-type KOpHash = Arc<super::KitsuneOpHash>;
 type Payload = Vec<u8>;
 type Ops = Vec<KOp>;
 type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
