@@ -1,7 +1,7 @@
 /// Wrap a test body in this macro to give it a bigger stack. Expects the body to
 /// be async.
 #[macro_export]
-macro_rules! big_stack_test_async {
+macro_rules! big_stack_test {
     ($what_do:expr, $size:literal) => {
         tokio::runtime::Builder::new_multi_thread()
             // Need a bigger stack for this test for some reason.
@@ -14,7 +14,8 @@ macro_rules! big_stack_test_async {
                 tokio::task::spawn(tokio::time::timeout(
                     std::time::Duration::from_secs(60),
                     $what_do,
-                )).await;
+                ))
+                .await;
             });
     };
 }

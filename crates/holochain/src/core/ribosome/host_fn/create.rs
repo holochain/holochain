@@ -203,7 +203,7 @@ pub mod wasm_test {
 
     #[test]
     fn ribosome_create_entry_network_test() {
-        crate::big_stack_test_async!(async move {
+        crate::big_stack_test!(async move {
                 holochain_trace::test_run().ok();
 
                 let mut network_topology = NetworkTopology::default();
