@@ -109,70 +109,7 @@ impl MetaNetTask {
                                     data,
                                     respond,
                                 } => {
-                                    match nodespace_is_authorized(
-                                        &host,
-                                        con.peer_id(),
-                                        data.maybe_space(),
-                                        Timestamp::now(),
-                                    )
-                                        .await
-                                    {
-                                        MetaNetAuth::UnauthorizedIgnore => {}
-                                        MetaNetAuth::UnauthorizedDisconnect => {
-                                            con.close(
-                                                UNAUTHORIZED_DISCONNECT_CODE,
-                                                UNAUTHORIZED_DISCONNECT_REASON,
-                                            )
-                                                .await;
-                                        }
-                                        MetaNetAuth::Authorized => {
-                                            match data {
-                                                wire::Wire::Call(wire::Call {
-                                                                     space,
-                                                                     to_agent,
-                                                                     data,
-                                                                     ..
-                                                                 }) => {
-                                                    this.handle_call_request(space, to_agent, data, respond).await;
-                                                }
-                                                wire::Wire::PeerGet(wire::PeerGet {
-                                                                        space,
-                                                                        agent,
-                                                                    }) => {
-                                                    this.handle_peer_get_request(space, agent, respond).await;
-                                                }
-                                                wire::Wire::PeerQuery(wire::PeerQuery {
-                                                                          space,
-                                                                          basis_loc,
-                                                                      }) => {
-                                                    // this *does* go over the network...
-                                                    // so we don't want it to be too many
-                                                    const LIMIT: u32 = 8;
-                                                    let query = QueryAgentsEvt::new(space)
-                                                        .near_basis(basis_loc)
-                                                        .limit(LIMIT);
-                                                    let resp = match evt_sender
-                                                        .query_agents(query)
-                                                        .await
-                                                    {
-                                                        Ok(list) => {
-                                                            wire::Wire::peer_query_resp(list)
-                                                        }
-                                                        Err(err) => wire::Wire::failure(format!(
-                                                            "Error querying agents: {:?}",
-                                                            err,
-                                                        )),
-                                                    };
-                                                    respond(resp).await;
-                                                }
-                                                _ => {
-                                                    tracing::warn!(
-                                                        "received non-request data in a request"
-                                                    );
-                                                },
-                                            }
-                                        }
-                                    }
+                                    this.handle_request(con, data, respond).await;
                                 }
                                 MetaNetEvt::Notify {
                                     remote_url: url,
@@ -542,6 +479,59 @@ impl MetaNetTask {
             },
             Err(_) => Err(MetaNetTaskError::Ignored),
             Ok(_) => Ok(()),
+        }
+    }
+
+    async fn handle_request(&self, con: MetaNetCon, data: wire::Wire, respond: Respond) {
+        match nodespace_is_authorized(
+            &self.host,
+            con.peer_id(),
+            data.maybe_space(),
+            Timestamp::now(),
+        )
+        .await
+        {
+            MetaNetAuth::UnauthorizedIgnore => {}
+            MetaNetAuth::UnauthorizedDisconnect => {
+                con.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                    .await;
+            }
+            MetaNetAuth::Authorized => {
+                self.handle_request_authorized(data, respond).await;
+            }
+        }
+    }
+
+    async fn handle_request_authorized(&self, data: wire::Wire, respond: Respond) {
+        match data {
+            wire::Wire::Call(wire::Call {
+                space,
+                to_agent,
+                data,
+                ..
+            }) => {
+                self.handle_call_request(space, to_agent, data, respond)
+                    .await;
+            }
+            wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
+                self.handle_peer_get_request(space, agent, respond).await;
+            }
+            wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
+                // this *does* go over the network...
+                // so we don't want it to be too many
+                const LIMIT: u32 = 8;
+                let query = QueryAgentsEvt::new(space)
+                    .near_basis(basis_loc)
+                    .limit(LIMIT);
+                let resp = match self.evt_sender.query_agents(query).await {
+                    Ok(list) => wire::Wire::peer_query_resp(list),
+                    Err(err) => wire::Wire::failure(format!("Error querying agents: {:?}", err,)),
+                };
+                respond(resp).await;
+            }
+            _ => {
+                tracing::warn!("received non-request data in a request");
+            }
         }
     }
 
@@ -1166,14 +1156,7 @@ mod tests {
             .first()
             .unwrap()
             .clone();
-        assert_eq!(
-            BroadcastData::Publish {
-                source: test_agent(5),
-                op_hash_list: vec![],
-                context: Default::default(),
-            },
-            args.5
-        );
+        assert_eq!(test_space(1), args.0);
     }
 
     #[tokio::test(flavor = "multi_thread")]
