@@ -10,12 +10,15 @@ macro_rules! big_stack_test {
             .build()
             .unwrap()
             .block_on(async move {
-                // This spawns a task with a big stack.
+                // This spawns a task with a big stack. The outer block on does
+                // NOT have the larger stack size.
                 tokio::task::spawn(tokio::time::timeout(
                     std::time::Duration::from_secs(60),
                     $what_do,
                 ))
-                .await;
-            });
+                .await
+                .unwrap()
+            })
+            .unwrap()
     };
 }

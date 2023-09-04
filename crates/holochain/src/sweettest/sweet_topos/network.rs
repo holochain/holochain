@@ -136,6 +136,7 @@ impl NetworkTopology {
     /// - There are no edges that reference conductors that are not equal to
     ///   their origin node.
     pub fn integrity_check(&self) -> Result<(), NetworkTopologyError> {
+        let mut edge_set = HashSet::new();
         for edge in self.edge_references() {
             // Check that there are no self edges.
             if edge.source() == edge.target() {
@@ -143,33 +144,38 @@ impl NetworkTopology {
             }
 
             // Check that there are no duplicate edges.
-            let mut edge_set = HashSet::new();
             if !edge_set.insert(edge.weight()) {
                 return Err(NetworkTopologyError::IntegrityDuplicateEdge);
             }
 
-            // Check that there are no edges that reference nodes that are not in
-            // the graph as a source.
-            if let Some(source) = self.node_weight(edge.source()) {
-                // Check the source conductor is the same as the edge source
-                // conductor.
-                if edge.weight().source_conductor() != source.conductor() {
-                    return Err(NetworkTopologyError::IntegritySourceConductorMismatch);
+            {
+                // Check that there are no edges that reference nodes that are not in
+                // the graph as a source.
+                if let Some(source) = self.node_weight(edge.source()) {
+                    // Check the source conductor is the same as the edge source
+                    // conductor.
+                    if edge.weight().source_conductor() != source.conductor() {
+                        return Err(NetworkTopologyError::IntegritySourceConductorMismatch);
+                    }
                 }
-            } else {
-                return Err(NetworkTopologyError::IntegrityDanglingEdgeSource);
-            }
+                // I think petgraph forbids this, but just in case.
+                else {
+                    return Err(NetworkTopologyError::IntegrityDanglingEdgeSource);
+                }
 
-            // Check that there are no edges that reference nodes that are not in
-            // the graph as a target.
-            if let Some(target) = self.node_weight(edge.target()) {
-                // Check the target conductor is the same as the edge target
-                // conductor.
-                if edge.weight().target_conductor() != target.conductor() {
-                    return Err(NetworkTopologyError::IntegrityTargetConductorMismatch);
+                // Check that there are no edges that reference nodes that are not in
+                // the graph as a target.
+                if let Some(target) = self.node_weight(edge.target()) {
+                    // Check the target conductor is the same as the edge target
+                    // conductor.
+                    if edge.weight().target_conductor() != target.conductor() {
+                        return Err(NetworkTopologyError::IntegrityTargetConductorMismatch);
+                    }
                 }
-            } else {
-                return Err(NetworkTopologyError::IntegrityDanglingEdgeTarget);
+                // I think petgraph forbids this, but just in case.
+                else {
+                    return Err(NetworkTopologyError::IntegrityDanglingEdgeTarget);
+                }
             }
         }
 
@@ -520,25 +526,30 @@ pub mod test {
 
     #[test]
     fn test_network_topology_integrity_check_pass() {
-        let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(
+            async move {
+                let mut topology = NetworkTopology::default();
 
-        assert_eq!(Ok(()), topology.integrity_check());
+                assert_eq!(Ok(()), topology.integrity_check());
 
-        let node_a = NetworkTopologyNode::new();
-        assert!(topology.add_node(node_a.clone()));
+                let node_a = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_a.clone()));
 
-        assert_eq!(Ok(()), topology.integrity_check());
+                assert_eq!(Ok(()), topology.integrity_check());
 
-        let node_b = NetworkTopologyNode::new();
-        assert!(topology.add_node(node_b.clone()));
+                let node_b = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_b.clone()));
 
-        assert_eq!(Ok(()), topology.integrity_check());
+                assert_eq!(Ok(()), topology.integrity_check());
 
-        let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
+                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
 
-        assert!(topology.add_simple_edge(0, 1, edge.clone()));
+                assert!(topology.add_simple_edge(0, 1, edge.clone()));
 
-        assert_eq!(Ok(()), topology.integrity_check());
+                assert_eq!(Ok(()), topology.integrity_check());
+            },
+            3_000_000
+        );
     }
 
     #[test]
@@ -561,6 +572,122 @@ pub mod test {
         assert_eq!(
             Err(NetworkTopologyError::IntegritySelfEdge),
             topology.integrity_check()
+        );
+    }
+
+    #[test]
+    fn test_network_topology_integrity_check_duplicate_edge_fail() {
+        crate::big_stack_test!(
+            async move {
+                let mut topology = NetworkTopology::default();
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_a = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_a.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_b = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_b.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
+
+                assert!(topology.add_simple_edge(0, 1, edge.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                // Adding the same edge again should fail.
+                assert!(!topology.add_simple_edge(0, 1, edge.clone()));
+                // Force add it for the test.
+                topology.graph.add_edge(0.into(), 1.into(), edge);
+
+                assert_eq!(
+                    Err(NetworkTopologyError::IntegrityDuplicateEdge),
+                    topology.integrity_check()
+                );
+            },
+            3_000_000
+        );
+    }
+
+    #[test]
+    fn test_network_topology_integrity_check_source_conductor_mismatch_fail() {
+        crate::big_stack_test!(
+            async move {
+                let mut topology = NetworkTopology::default();
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_a = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_a.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_b = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_b.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_c = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_c.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_c, &node_b);
+
+                // Adding the edge should fail.
+                assert!(!topology.add_simple_edge(0, 1, edge.clone()));
+
+                // Force add it for the test.
+                topology.graph.add_edge(0.into(), 1.into(), edge);
+
+                assert_eq!(
+                    Err(NetworkTopologyError::IntegritySourceConductorMismatch),
+                    topology.integrity_check()
+                );
+            },
+            3_000_000
+        );
+    }
+
+    #[test]
+    fn test_network_topology_integrity_check_target_conductor_mismatch_fail() {
+        crate::big_stack_test!(
+            async move {
+                let mut topology = NetworkTopology::default();
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_a = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_a.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_b = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_b.clone()));
+
+                assert_eq!(Ok(()), topology.integrity_check());
+
+                let node_c = NetworkTopologyNode::new();
+                assert!(topology.add_node(node_c.clone()));
+
+                let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_c);
+
+                // Adding the edge should fail.
+                assert!(!topology.add_simple_edge(0, 1, edge.clone()));
+
+                // Force add it for the test.
+                topology.graph.add_edge(0.into(), 1.into(), edge);
+
+                assert_eq!(
+                    Err(NetworkTopologyError::IntegrityTargetConductorMismatch),
+                    topology.integrity_check()
+                );
+            },
+            3_000_000
         );
     }
 }
