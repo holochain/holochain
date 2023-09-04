@@ -764,34 +764,17 @@ mod tests {
     async fn make_call_request() {
         let (mut ep_evt_send, _, _, _, _, _) = setup().await;
 
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
         let request_data = vec![2, 7];
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::Call(wire::Call {
-                    space: test_space(1),
-                    to_agent: test_agent(2),
-                    data: WireData(request_data.clone()),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
 
-        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let call_response = do_request(
+            ep_evt_send,
+            wire::Wire::Call(wire::Call {
+                space: test_space(1),
+                to_agent: test_agent(2),
+                data: WireData(request_data.clone()),
+            }),
+        )
+        .await;
 
         let response_data = match call_response {
             Wire::CallResp(res) => res.data.to_vec(),
@@ -810,34 +793,16 @@ mod tests {
 
         host_receiver_stub.abort();
 
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
         let request_data = vec![2, 7];
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::Call(wire::Call {
-                    space: test_space(1),
-                    to_agent: test_agent(2),
-                    data: WireData(request_data.clone()),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
-
-        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let call_response = do_request(
+            ep_evt_send,
+            wire::Wire::Call(wire::Call {
+                space: test_space(1),
+                to_agent: test_agent(2),
+                data: WireData(request_data.clone()),
+            }),
+        )
+        .await;
 
         let reason = match call_response {
             Wire::Failure(f) => f.reason,
@@ -851,32 +816,14 @@ mod tests {
     async fn make_peer_get_request() {
         let (mut ep_evt_send, _, _, _, _, _) = setup().await;
 
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::PeerGet(wire::PeerGet {
-                    space: test_space(1),
-                    agent: test_agent(1),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
-
-        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let call_response = do_request(
+            ep_evt_send,
+            wire::Wire::PeerGet(wire::PeerGet {
+                space: test_space(1),
+                agent: test_agent(1),
+            }),
+        )
+        .await;
 
         let agent_info_signed = match call_response {
             Wire::PeerGetResp(res) => res.agent_info_signed,
@@ -893,32 +840,14 @@ mod tests {
         // Set up the error response so that when we make a request we get an error
         host_stub.fail_next_request();
 
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::PeerGet(wire::PeerGet {
-                    space: test_space(1),
-                    agent: test_agent(1),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
-
-        let call_response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let call_response = do_request(
+            ep_evt_send,
+            wire::Wire::PeerGet(wire::PeerGet {
+                space: test_space(1),
+                agent: test_agent(1),
+            }),
+        )
+        .await;
 
         let reason = match call_response {
             Wire::Failure(f) => f.reason,
@@ -932,32 +861,14 @@ mod tests {
     async fn make_peer_query_request() {
         let (mut ep_evt_send, _, _, _, _, _) = setup().await;
 
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::PeerQuery(wire::PeerQuery {
-                    space: test_space(1),
-                    basis_loc: DhtLocation::new(1),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
-
-        let response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let response = do_request(
+            ep_evt_send,
+            wire::Wire::PeerQuery(wire::PeerQuery {
+                space: test_space(1),
+                basis_loc: DhtLocation::new(1),
+            }),
+        )
+        .await;
 
         let peer_list = match response {
             Wire::PeerQueryResp(r) => r.peer_list,
@@ -976,32 +887,14 @@ mod tests {
             .respond_with_error
             .store(true, Ordering::SeqCst);
 
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::PeerQuery(wire::PeerQuery {
-                    space: test_space(1),
-                    basis_loc: DhtLocation::new(1),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
-
-        let response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let response = do_request(
+            ep_evt_send,
+            wire::Wire::PeerQuery(wire::PeerQuery {
+                space: test_space(1),
+                basis_loc: DhtLocation::new(1),
+            }),
+        )
+        .await;
 
         let reason = match response {
             Wire::Failure(f) => f.reason,
@@ -1034,32 +927,14 @@ mod tests {
             .unwrap();
 
         // Now check that we can still use the task to send/receive messages.
-        let (send_res, read_res) = futures::channel::oneshot::channel();
-
-        ep_evt_send
-            .send(MetaNetEvt::Request {
-                remote_url: "".to_string(),
-                con: mk_test_con_with_id(1),
-                data: wire::Wire::PeerQuery(wire::PeerQuery {
-                    space: test_space(1),
-                    basis_loc: DhtLocation::new(1),
-                }),
-                respond: Box::new(|r| {
-                    async move {
-                        send_res.send(r).unwrap();
-                        ()
-                    }
-                    .boxed()
-                    .into()
-                }),
-            })
-            .await
-            .unwrap();
-
-        let response = tokio::time::timeout(Duration::from_secs(1), read_res)
-            .await
-            .expect("Timed out while waiting for a response")
-            .unwrap();
+        let response = do_request(
+            ep_evt_send,
+            wire::Wire::PeerQuery(wire::PeerQuery {
+                space: test_space(1),
+                basis_loc: DhtLocation::new(1),
+            }),
+        )
+        .await;
 
         let peer_list = match response {
             Wire::PeerQueryResp(r) => r.peer_list,
@@ -1442,6 +1317,32 @@ mod tests {
             host_stub,
             meta_net_task_finished,
         )
+    }
+
+    async fn do_request(mut ep_evt_send: Sender<MetaNetEvt>, data: wire::Wire) -> wire::Wire {
+        let (send_res, read_res) = futures::channel::oneshot::channel();
+
+        ep_evt_send
+            .send(MetaNetEvt::Request {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data,
+                respond: Box::new(|r| {
+                    async move {
+                        send_res.send(r).unwrap();
+                        ()
+                    }
+                    .boxed()
+                    .into()
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(1), read_res)
+            .await
+            .expect("Timed out while waiting for a response")
+            .unwrap()
     }
 
     fn mk_test_con() -> MetaNetCon {
