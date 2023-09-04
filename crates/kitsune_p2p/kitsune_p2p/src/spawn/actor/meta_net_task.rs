@@ -1488,6 +1488,10 @@ mod tests {
                 .respond_with_error_count
                 .load(Ordering::Acquire)
         );
+        assert!(host_receiver_stub
+            .put_agent_info_signed_calls
+            .read()
+            .is_empty());
         assert!(!meta_net_task_finished.load(Ordering::Acquire));
     }
 

@@ -15,6 +15,8 @@ use tokio::time::error::Elapsed;
 pub struct HostStub {
     pub respond_with_error: Arc<AtomicBool>,
     pub respond_with_error_count: Arc<AtomicUsize>,
+
+    pub put_agent_info_signed_calls: Arc<parking_lot::RwLock<Vec<PutAgentInfoSignedEvt>>>,
     pub notify_calls: Arc<parking_lot::RwLock<Vec<(KSpace, KAgent, Payload)>>>,
 
     put_events: Receiver<PutAgentInfoSignedEvt>,
@@ -25,14 +27,19 @@ impl HostStub {
     pub fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
         let (mut sender, receiver) = channel(10);
 
+        let put_agent_info_signed_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
         let notify_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
 
         let respond_with_error = Arc::new(AtomicBool::new(false));
         let respond_with_error_count = Arc::new(AtomicUsize::new(0));
+
         let handle = tokio::spawn({
             let task_respond_with_error = respond_with_error.clone();
             let task_respond_with_error_count = respond_with_error_count.clone();
+
+            let task_put_agent_info_signed_calls = put_agent_info_signed_calls.clone();
             let task_notify_calls = notify_calls.clone();
+
             async move {
                 while let Some(evt) = host_receiver.next().await {
                     match evt {
@@ -46,7 +53,9 @@ impl HostStub {
                                 continue;
                             }
 
+                            task_put_agent_info_signed_calls.write().push(input.clone());
                             sender.send(input).await.unwrap();
+
                             respond
                                 .unwrap()
                                 .respond(Ok(async move { Ok(()) }.boxed().into()));
@@ -111,6 +120,7 @@ impl HostStub {
         HostStub {
             respond_with_error,
             respond_with_error_count,
+            put_agent_info_signed_calls,
             notify_calls,
             put_events: receiver,
             abort_handle: handle.abort_handle(),
