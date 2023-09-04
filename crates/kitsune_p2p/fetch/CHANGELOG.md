@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.2.2-beta-rc.1
+
 ## 0.2.2-beta-rc.0
 
 - Fix an issue with merging fetch contexts where merging an item with a context with an item that did not could result in the removal of the context.
