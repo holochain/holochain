@@ -8,6 +8,8 @@ members = [
   "crates/hdi",
   "crates/mock_hdi",
   "crates/mr_bundle",
+  "crates/stef",
+  "crates/stef_derive",
 
   "crates/holochain_integrity_types",
   "crates/holochain_zome_types",
@@ -35,6 +37,8 @@ members = [
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",
   "crates/kitsune_p2p/fetch",
+  # "crates/kitsune_p2p/gossip",
+  # "crates/kitsune_p2p/host_api",
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/mdns",
   "crates/kitsune_p2p/proxy",
@@ -49,7 +53,9 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-exclude = ["crates/release-automation"]
+exclude = [
+  "crates/release-automation",
+]
 
 resolver = "2"
 
