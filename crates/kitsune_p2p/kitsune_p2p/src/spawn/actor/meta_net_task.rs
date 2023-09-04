@@ -194,7 +194,7 @@ impl MetaNetTask {
                                                                       }) => match data {
                                                     BroadcastData::User(data) => {
                                                         // TODO: Should we check if the basis is
-                                                        // held before calling notify?
+                                                        //       held before calling notify?
                                                         if let Err(err) = evt_sender
                                                             .notify(space, to_agent, data)
                                                             .await
@@ -207,7 +207,7 @@ impl MetaNetTask {
                                                     }
                                                     BroadcastData::AgentInfo(agent_info) => {
                                                         // TODO: Should we check if the basis is
-                                                        // held before calling put_agent_info_signed?
+                                                        //       held before calling put_agent_info_signed?
                                                         if let Err(err) = evt_sender
                                                             .put_agent_info_signed(
                                                                 PutAgentInfoSignedEvt {
@@ -1249,7 +1249,7 @@ mod tests {
             }
         })
         .await
-        .expect("Timed out waiting for a publish call");
+        .expect("Timed out waiting for an error");
 
         assert_eq!(
             1,
@@ -1261,6 +1261,233 @@ mod tests {
             .incoming_delegate_broadcast_calls
             .read()
             .is_empty());
+        assert!(!meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_publish() {
+        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::Publish {
+                        source: test_agent(5),
+                        op_hash_list: vec![],
+                        context: Default::default(),
+                    },
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while internal_stub.incoming_publish_calls.read().is_empty() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for a publish broadcast");
+
+        let args = internal_stub
+            .incoming_publish_calls
+            .read()
+            .first()
+            .unwrap()
+            .clone();
+        assert_eq!(test_space(1), args.0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_publish_fails_to_forward() {
+        let (mut ep_evt_send, internal_stub, _, _, _, meta_net_task_finished) = setup().await;
+
+        internal_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::Publish {
+                        source: test_agent(5),
+                        op_hash_list: vec![],
+                        context: Default::default(),
+                    },
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while internal_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+                == 0
+            {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for an error");
+
+        assert_eq!(
+            1,
+            internal_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+        );
+        assert!(internal_stub.incoming_publish_calls.read().is_empty());
+        assert!(!meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_user() {
+        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, _) = setup().await;
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::User(test_agent(5).to_vec()),
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while host_receiver_stub.notify_calls.read().is_empty() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for a notify");
+
+        assert_eq!(1, host_receiver_stub.notify_calls.read().len());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_user_fails_to_forward() {
+        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, meta_net_task_finished) =
+            setup().await;
+
+        host_receiver_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::User(test_agent(5).to_vec()),
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while host_receiver_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+                == 0
+            {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for an error");
+
+        assert_eq!(
+            1,
+            host_receiver_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+        );
+        assert!(host_receiver_stub.notify_calls.read().is_empty());
+        assert!(!meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_agent_info() {
+        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _) = setup().await;
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::AgentInfo(mk_agent_info(6).await),
+                }),
+            })
+            .await
+            .unwrap();
+
+        let agent_info_evt = host_receiver_stub
+            .next_event(Duration::from_millis(1000))
+            .await;
+        assert_eq!(1, agent_info_evt.peer_data.len());
+        assert_eq!(
+            mk_agent_info(6).await,
+            agent_info_evt.peer_data.first().unwrap().clone()
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_agent_info_fails_to_forward() {
+        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, meta_net_task_finished) =
+            setup().await;
+
+        host_receiver_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::AgentInfo(mk_agent_info(6).await),
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while host_receiver_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+                == 0
+            {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for a publish call");
+
+        assert_eq!(
+            1,
+            host_receiver_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+        );
         assert!(!meta_net_task_finished.load(Ordering::Acquire));
     }
 
