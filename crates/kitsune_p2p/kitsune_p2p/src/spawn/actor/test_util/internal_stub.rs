@@ -44,6 +44,17 @@ pub struct InternalStub {
             )>,
         >,
     >,
+    pub incoming_gossip_calls: Arc<
+        parking_lot::RwLock<
+            Vec<(
+                crate::spawn::actor::KSpace,
+                MetaNetCon,
+                String,
+                crate::spawn::actor::Payload,
+                GossipModuleType,
+            )>,
+        >,
+    >,
     pub connections: Arc<parking_lot::RwLock<HashMap<String, MetaNetCon>>>,
     pub respond_with_error_count: Arc<AtomicUsize>,
     pub respond_with_error: Arc<AtomicBool>,
@@ -55,6 +66,7 @@ impl InternalStub {
             fetch_calls: vec![],
             incoming_publish_calls: Arc::new(RwLock::new(vec![])),
             incoming_delegate_broadcast_calls: Arc::new(RwLock::new(vec![])),
+            incoming_gossip_calls: Arc::new(RwLock::new(vec![])),
             connections: Arc::new(parking_lot::RwLock::new(HashMap::new())),
             respond_with_error_count: Arc::new(AtomicUsize::new(0)),
             respond_with_error: Arc::new(AtomicBool::new(false)),
@@ -138,13 +150,21 @@ impl InternalHandler for InternalStub {
 
     fn handle_incoming_gossip(
         &mut self,
-        _space: crate::spawn::actor::KSpace,
-        _con: MetaNetCon,
-        _remote_url: String,
-        _data: crate::spawn::actor::Payload,
-        _module_type: GossipModuleType,
+        space: crate::spawn::actor::KSpace,
+        con: MetaNetCon,
+        remote_url: String,
+        data: crate::spawn::actor::Payload,
+        module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
-        todo!()
+        if let Err(e) = self.maybe_error() {
+            return Ok(async move { Err(e) }.boxed().into());
+        }
+
+        self.incoming_gossip_calls
+            .write()
+            .push((space, con, remote_url, data, module_type));
+
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_incoming_metric_exchange(
