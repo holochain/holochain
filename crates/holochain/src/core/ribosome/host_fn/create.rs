@@ -203,16 +203,7 @@ pub mod wasm_test {
 
     #[test]
     fn ribosome_create_entry_network_test() {
-        tokio::runtime::Builder::new_multi_thread()
-            // Need a bigger stack for this test for some reason.
-            .thread_stack_size(4_000_000)
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async move {
-                // This spawn is required so that the thread size config takes
-                // effect because a block_on doesn't count as a worker.
-                let handle = tokio::spawn(async move {
+        crate::big_stack_test_async!(async move {
                 holochain_trace::test_run().ok();
 
                 let mut network_topology = NetworkTopology::default();
@@ -255,9 +246,7 @@ pub mod wasm_test {
                 let record: Option<Record> = bob_node.conductor().lock().await.write().await.call(&bob.zome(TestWasm::Create), "get_entry", ()).await;
 
                 assert_eq!(record.unwrap().action_address(), &action_hash);
-                });
-                handle.await.unwrap();
-            })
+            }, 4_000_000);
     }
 
     #[tokio::test(flavor = "multi_thread")]

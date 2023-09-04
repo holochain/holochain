@@ -27,14 +27,14 @@ pub struct NetworkTopologyConductor(Arc<OnceCell<RwLock<SweetConductor>>>);
 
 impl PartialEq for NetworkTopologyConductor {
     fn eq(&self, other: &Self) -> bool {
-        match (self.0.get(), other.0.get()) {
-            (Some(self_lock), Some(other_lock)) => tokio_helper::block_forever_on(async {
-                let self_id = self_lock.read().await.id();
-                let other_id = other_lock.read().await.id();
-                self_id == other_id
-            }),
-            _ => false,
-        }
+        tokio_helper::block_forever_on(async {
+            // We're going to ensure the conductors are initialized, then read
+            // their IDs and compare them. Comparing uninitialized once cells
+            // seems pointless so we don't do it.
+            let self_id = self.lock().await.read().await.id();
+            let other_id = other.lock().await.read().await.id();
+            self_id == other_id
+        })
     }
 }
 
@@ -86,7 +86,7 @@ pub struct NetworkTopology {
 }
 
 /// Errors that can occur when manipulating a `NetworkTopology`.
-#[derive(derive_more::Error, derive_more::Display, Debug)]
+#[derive(derive_more::Error, derive_more::Display, Debug, PartialEq)]
 pub enum NetworkTopologyError {
     /// Failed to remove an edge from the graph.
     #[display(fmt = "Failed to remove an edge from the graph.")]
@@ -408,7 +408,8 @@ impl NetworkTopology {
 
     /// Add a simple edge to the graph. A simple edge is an edge that does not
     /// already exist in the graph and does not create a self edge. If the edge
-    /// already exists or would create a self edge, then do nothing.
+    /// already exists or would create a self edge, or the indexes don't match
+    /// the conductors, then do nothing.
     /// Returns true if the edge was added, false if it was not.
     pub fn add_simple_edge(
         &mut self,
@@ -416,6 +417,16 @@ impl NetworkTopology {
         target: usize,
         edge: NetworkTopologyEdge,
     ) -> bool {
+        let origin_weight = self.node_weight(origin.into());
+        if origin_weight.is_none() || origin_weight.unwrap().conductor() != edge.source_conductor()
+        {
+            return false;
+        }
+        let target_weight = self.node_weight(target.into());
+        if target_weight.is_none() || target_weight.unwrap().conductor() != edge.target_conductor()
+        {
+            return false;
+        }
         if !self.contains_edge(origin.into(), target.into()) && origin != target {
             // Directly mutate the inner graph here.
             self.graph.add_edge(origin.into(), target.into(), edge);
@@ -493,7 +504,7 @@ pub mod test {
         let graph = NetworkTopology::arbitrary(&mut u)?;
         // It's arbitrary, so we can't really assert anything about it, but we
         // can print it out to see what it looks like.
-        println!(
+        tracing::info!(
             "{:?}",
             Dot::with_config(
                 graph.as_ref(),
@@ -505,5 +516,51 @@ pub mod test {
             )
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_network_topology_integrity_check_pass() {
+        let mut topology = NetworkTopology::default();
+
+        assert_eq!(Ok(()), topology.integrity_check());
+
+        let node_a = NetworkTopologyNode::new();
+        assert!(topology.add_node(node_a.clone()));
+
+        assert_eq!(Ok(()), topology.integrity_check());
+
+        let node_b = NetworkTopologyNode::new();
+        assert!(topology.add_node(node_b.clone()));
+
+        assert_eq!(Ok(()), topology.integrity_check());
+
+        let edge = NetworkTopologyEdge::new_full_view_on_node(&node_a, &node_b);
+
+        assert!(topology.add_simple_edge(0, 1, edge.clone()));
+
+        assert_eq!(Ok(()), topology.integrity_check());
+    }
+
+    #[test]
+    fn test_network_topology_integrity_check_self_edge_fail() {
+        let mut topology = NetworkTopology::default();
+
+        assert_eq!(Ok(()), topology.integrity_check());
+
+        let node = NetworkTopologyNode::new();
+        assert!(topology.add_node(node.clone()));
+
+        assert_eq!(Ok(()), topology.integrity_check());
+
+        let edge = NetworkTopologyEdge::new_full_view_on_node(&node, &node);
+        // Adding a self node should fail for a simple edge.
+        assert!(!topology.add_simple_edge(0, 0, edge.clone()));
+        // Force add it for the test.
+        topology.graph.add_edge(0.into(), 0.into(), edge);
+
+        assert_eq!(
+            Err(NetworkTopologyError::IntegritySelfEdge),
+            topology.integrity_check()
+        );
     }
 }
