@@ -95,12 +95,12 @@ impl MetaNetTask {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     // TODO can this match be shared once everything is tested?
                                     if let Err(MetaNetTaskError::GhostActorClosed(_)) = this.handle_connect(remote_url, con).await {
-                                        let _ = shutdown_notify.notify_one();
+                                        shutdown_notify.notify_one();
                                     }
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     if let Err(MetaNetTaskError::GhostActorClosed(_)) = this.handle_disconnect(remote_url).await {
-                                        let _ = shutdown_notify.notify_one();
+                                        shutdown_notify.notify_one();
                                     }
                                 }
                                 MetaNetEvt::Request {
