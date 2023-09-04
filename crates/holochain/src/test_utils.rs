@@ -566,17 +566,6 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     num_attempts: usize,
     delay: Duration,
 ) {
-    fn display_op(op: &DhtOp) -> String {
-        format!(
-            "{} {:>3}  {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            // op.to_light().action_hash().clone(),
-            op.get_type(),
-            op.action().action_type(),
-        )
-    }
-
     for i in 0..num_attempts {
         let num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {

@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Change `GenesisFailed` error to include `CellId` so that genesis failures can be correlated with the cells that failed. [2733](https://github.com/holochain/holochain/pull/2733)
+
+
 ## 0.2.2-beta-rc.0
 
 - Improves error messages when validation fails with an InvalidCommit error

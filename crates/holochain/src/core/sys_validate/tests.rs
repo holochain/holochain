@@ -978,9 +978,9 @@ async fn test_dpki_agent_update() {
         .unwrap_err();
 }
 
-#[tokio::test(flavor = "multi_thread")]
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
+#[tokio::test(flavor = "multi_thread")]
 async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();
