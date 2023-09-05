@@ -1580,22 +1580,25 @@ mod tests {
                 remote_url: "".to_string(),
                 con: mk_test_con(),
                 data: wire::Wire::FetchOp(wire::FetchOp {
-                    fetch_list: vec![(test_space(1), vec![test_key_op(1), test_key_op(2)])],
+                    fetch_list: vec![
+                        (test_space(1), vec![test_key_op(1), test_key_op(2)]),
+                        (test_space(2), vec![test_key_op(3), test_key_op(4)]),
+                    ],
                 }),
             })
             .await
             .unwrap();
 
         tokio::time::timeout(Duration::from_millis(1000), async {
-            while fetch_response_queue.bytes_sent.load(Ordering::Acquire) < 3 {
+            while fetch_response_queue.bytes_sent.load(Ordering::Acquire) < 6 {
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         })
         .await
         .expect("Timed out waiting for op fetch");
 
-        // The first does not get sent due to an error fetching the op data but the second does succeed and gets sent
-        assert_eq!(3, fetch_response_queue.bytes_sent.load(Ordering::Acquire));
+        // The list for the first space does not get sent due to an error fetching its op data but the second does succeed and gets sent
+        assert_eq!(6, fetch_response_queue.bytes_sent.load(Ordering::Acquire));
     }
 
     async fn setup() -> (
