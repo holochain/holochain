@@ -178,8 +178,26 @@
                 export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
               '');
             };
+
+        nixDev =
+          pkgs.mkShell
+            {
+              inputsFrom = [
+                self'.devShells.rustDev
+              ];
+
+              shellHook = self'.devShells.rustDev + ''
+                export RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
+              '';
+
+              packages = [
+                (pkgs.callPackage self.inputs.crate2nix.outPath { })
+                pkgs.llvmPackages.bintools
+              ];
+            };
       };
     };
+
 }
 
 

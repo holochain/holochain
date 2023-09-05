@@ -148,6 +148,12 @@ pub struct InstallAppPayload {
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     pub network_seed: Option<NetworkSeed>,
+
+    /// Optional: If app installation fails due to genesis failure, normally the app will be
+    /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
+    /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
+    #[serde(default)]
+    pub ignore_genesis_failure: bool,
 }
 
 /// The possible locations of an AppBundle
