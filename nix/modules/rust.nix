@@ -36,6 +36,11 @@
           "aarch64-apple-darwin"
         ];
 
+        defaultStdenv = pkgs:
+          if pkgs.stdenv.isLinux
+          then pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv
+          else pkgs.stdenv;
+
         mkRustPkgs =
           { track ? config.rustHelper.defaultTrack
           , version ? config.rustHelper.defaultVersion
@@ -59,11 +64,7 @@
               })
 
               (final: prev: {
-                buildRustCrate = arg: prev.buildRustCrate (arg // {
-                  dontStrip = prev.stdenv.isDarwin;
-                });
               })
-
             ];
           };
 
@@ -76,38 +77,13 @@
           inherit pkgs;
         };
 
-        customBuildRustCrateForPkgs = _: pkgs.buildRustCrate.override {
+        customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
+          stdenv = config.rustHelper.defaultStdenv pkgs;
+
           defaultCrateOverrides = pkgs.lib.attrsets.recursiveUpdate pkgs.defaultCrateOverrides
             ({
-              # this regular module named `build.rs` confuses crate2nix which tries to build and run it as a build script.
-              build-fs-tree = _: {
-                prePatch = ''
-                  mv build.rs build/mod.rs
-                '';
-              };
-
-              openssl-sys = _:
-                {
-                  OPENSSL_NO_VENDOR = "1";
-                  OPENSSL_LIB_DIR = "${self'.packages.opensslStatic.out}/lib";
-                  OPENSSL_INCLUDE_DIR = "${self'.packages.opensslStatic.dev}/include";
-
-                  nativeBuildInputs = [
-                    pkgs.pkg-config
-                  ];
-
-                  buildInputs = [
-                    pkgs.openssl
-                    self'.packages.opensslStatic
-                  ];
-                };
               tx5-go-pion-sys = _: { nativeBuildInputs = with pkgs; [ go ]; };
               tx5-go-pion-turn = _: { nativeBuildInputs = with pkgs; [ go ]; };
-              holochain = attrs: {
-                codegenUnits = 8;
-              };
-
-              gobject-sys = _: { buildInputs = with pkgs; [ pkg-config glib ]; };
             });
         };
 
