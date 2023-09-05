@@ -64,10 +64,6 @@
               })
 
               (final: prev: {
-                # TODO: remove or fix this. it's not needed at the moment because we don't use crate2nix on darwin
-                # buildRustCrate = arg: pkgs.buildRustCrate (arg // {
-                #   dontStrip = arg.dontStrip or prev.stdenv.isDarwin;
-                # });
               })
             ];
           };
@@ -83,10 +79,6 @@
 
         customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
           stdenv = config.rustHelper.defaultStdenv pkgs;
-
-          # TODO: all of these work as well, figure out if any of them has an advantage
-          # stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.llvmPackages.stdenv;
-          # stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.clang-tools.stdenv;
 
           defaultCrateOverrides = pkgs.lib.attrsets.recursiveUpdate pkgs.defaultCrateOverrides
             ({
