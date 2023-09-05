@@ -11,15 +11,20 @@ use ghost_actor::{GhostControlHandler, GhostHandler};
 use kitsune_p2p_fetch::{FetchContext, FetchKey, FetchSource};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::KOpHash;
+use std::collections::HashMap;
+use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct InternalStub {
     fetch_calls: Vec<(FetchKey, KSpace, FetchSource)>,
+    pub connections: Arc<parking_lot::RwLock<HashMap<String, MetaNetCon>>>,
 }
 
 impl InternalStub {
     pub fn new() -> Self {
         InternalStub {
             fetch_calls: vec![],
+            connections: Arc::new(parking_lot::RwLock::new(HashMap::new())),
         }
     }
 }
@@ -82,12 +87,16 @@ impl InternalHandler for InternalStub {
         todo!()
     }
 
-    fn handle_new_con(&mut self, _url: String, _con: MetaNetCon) -> InternalHandlerResult<()> {
-        todo!()
+    fn handle_new_con(&mut self, url: String, con: MetaNetCon) -> InternalHandlerResult<()> {
+        self.connections.write().insert(url, con);
+
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_del_con(&mut self, _url: String) -> InternalHandlerResult<()> {
-        todo!()
+    fn handle_del_con(&mut self, url: String) -> InternalHandlerResult<()> {
+        self.connections.write().remove(&url);
+
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_fetch(

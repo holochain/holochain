@@ -1,4 +1,5 @@
 use crate::event::{KitsuneP2pEvent, PutAgentInfoSignedEvt};
+use crate::test_util::data::mk_agent_info;
 use crate::KitsuneP2pError;
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{FutureExt, SinkExt, StreamExt};
@@ -36,6 +37,35 @@ impl HostStub {
 
                             sender.send(input).await.unwrap();
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                        }
+                        KitsuneP2pEvent::Call {
+                            payload, respond, ..
+                        } => {
+                            // An echo response, no need for anything fancy here
+                            respond.respond(Ok(async move { Ok(payload.to_vec()) }.boxed().into()));
+                        }
+                        KitsuneP2pEvent::QueryAgents { input, respond, .. } => {
+                            if task_respond_with_error.load(Ordering::SeqCst) {
+                                respond.respond(Ok(async move {
+                                    Err(KitsuneP2pError::other("a test error"))
+                                }
+                                .boxed()
+                                .into()));
+                                continue;
+                            }
+
+                            let len = input.limit.unwrap();
+
+                            respond.respond(Ok(async move {
+                                let mut agents = vec![];
+                                for i in 0..len {
+                                    agents.push(mk_agent_info(i as u8).await);
+                                }
+
+                                Ok(agents)
+                            }
+                            .boxed()
+                            .into()))
                         }
                         _ => panic!("Unexpected event - {:?}", evt),
                     }
