@@ -1550,6 +1550,48 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_gossip_handles_error() {
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _, _) = setup().await;
+
+        // Set up an error
+        internal_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Gossip(wire::Gossip {
+                    space: test_space(1),
+                    data: wire::WireData(vec![1, 4, 6]),
+                    module: GossipModuleType::ShardedRecent,
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while internal_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+                == 0
+            {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for an error");
+
+        assert_eq!(
+            1,
+            internal_stub
+                .respond_with_error_count
+                .load(Ordering::Acquire)
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_fetch_op() {
         let (mut ep_evt_send, _, _, _, _, fetch_response_queue, _, _) = setup().await;
 
@@ -1646,6 +1688,70 @@ mod tests {
 
         assert!(fetch_pool.is_empty());
         assert_eq!(1, host_receiver_stub.receive_ops_calls.read().len());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_peer_unsolicited() {
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, fetch_pool, _) = setup().await;
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                    peer_list: vec![mk_agent_info(1).await, mk_agent_info(2).await],
+                }),
+            })
+            .await
+            .unwrap();
+
+        // Wait for both agent infos to be received
+        for i in 1..3 {
+            assert_eq!(
+                mk_agent_info(i).await,
+                host_receiver_stub
+                    .next_event(Duration::from_secs(1))
+                    .await
+                    .peer_data
+                    .first()
+                    .unwrap()
+                    .clone()
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_peer_unsolicited_fails_independently() {
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, fetch_pool, _) = setup().await;
+
+        // Set up an error for the first call
+        host_receiver_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                    // Send two agent infos
+                    peer_list: vec![mk_agent_info(1).await, mk_agent_info(2).await],
+                }),
+            })
+            .await
+            .unwrap();
+
+        // Expect only the second agent info
+        assert_eq!(
+            mk_agent_info(2).await,
+            host_receiver_stub
+                .next_event(Duration::from_secs(1))
+                .await
+                .peer_data
+                .first()
+                .unwrap()
+                .clone()
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
