@@ -25,6 +25,12 @@ impl PartialEq for NetworkTopologyNode {
     }
 }
 
+impl Default for NetworkTopologyNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NetworkTopologyNode {
     /// Create a new node with a new conductor, and no cells.
     pub fn new() -> Self {

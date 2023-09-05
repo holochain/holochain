@@ -48,10 +48,8 @@ impl<'a> Fact<'a, NetworkTopology> for SizedNetworkFact {
             node_count = network_topology.node_count();
         }
         while node_count > self.nodes {
-            network_topology.remove_node_index(
-                g.int_in_range(0..=node_count, || "could not remove node")?
-                    .into(),
-            );
+            network_topology
+                .remove_node_index(g.int_in_range(0..=node_count, || "could not remove node")?);
             node_count = network_topology.node_count();
         }
         Ok(network_topology)

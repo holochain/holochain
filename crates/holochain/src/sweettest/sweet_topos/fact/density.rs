@@ -38,7 +38,7 @@ impl DenseNetworkFact {
     /// a truncation of the density times the maximum number of edges, so we're
     /// rounding down.
     pub fn target_edge_count(&self, graph: &NetworkTopology) -> usize {
-        (self.density * Self::max_edge_count(&graph) as f64) as usize
+        (self.density * Self::max_edge_count(graph) as f64) as usize
     }
 }
 

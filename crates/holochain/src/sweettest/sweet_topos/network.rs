@@ -293,8 +293,7 @@ impl NetworkTopology {
         let edge_indices = self.edge_indices().collect::<Vec<_>>();
         let max_edge_index = self.edge_count() - 1;
         let index = edge_indices
-            .iter()
-            .nth(rng.gen_range(0..=max_edge_index).into())
+            .get(rng.gen_range(0..=max_edge_index))
             .ok_or(NetworkTopologyError::EdgeRemove)?
             .index();
         if self.remove_edge_index(index) {
@@ -324,7 +323,7 @@ impl NetworkTopology {
                     self.node_or_err(node_index)?,
                     self.node_or_err(other_node_index)?,
                 );
-                self.add_simple_edge(node_index.into(), other_node_index.into(), edge);
+                self.add_simple_edge(node_index, other_node_index, edge);
                 break;
             }
         }
@@ -363,8 +362,7 @@ impl NetworkTopology {
             nodes_in_smallest_partition.shuffle(rng);
 
             let other_node_index = *nodes_in_smallest_partition
-                .iter()
-                .next()
+                .first()
                 .ok_or(NetworkTopologyError::EmptySmallestPartition)?;
 
             // If the node in the smallest partition is the node we picked,
@@ -381,8 +379,7 @@ impl NetworkTopology {
                     self.node_or_err(other_node_index)?,
                 );
 
-                did_reassign =
-                    self.add_simple_edge(node_index.into(), other_node_index.into(), edge);
+                did_reassign = self.add_simple_edge(node_index, other_node_index, edge);
             }
         }
 
@@ -392,11 +389,11 @@ impl NetworkTopology {
     /// Add a node to the graph. Idempotent. Returns true if the node was added,
     /// false if it was not.
     pub fn add_node(&mut self, node: NetworkTopologyNode) -> bool {
-        if self.node_weights().find(|n| *n == &node).is_none() {
+        if self.node_weights().any(|n| *n == node) {
+            false
+        } else {
             self.graph.add_node(node);
             true
-        } else {
-            false
         }
     }
 

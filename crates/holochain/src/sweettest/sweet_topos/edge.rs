@@ -65,7 +65,6 @@ impl NetworkTopologyEdge {
                 .raw_handle()
                 .spaces
                 .get_from_spaces(|s| s.p2p_agents_db.clone())
-                .clone()
             {
                 envs.push(env.clone());
             }
@@ -92,7 +91,7 @@ impl NetworkTopologyEdge {
             id: rng.gen(),
             source_conductor: source.conductor().clone(),
             target_conductor: target.conductor().clone(),
-            cells: target.cells().clone(),
+            cells: target.cells(),
         }
     }
 }
