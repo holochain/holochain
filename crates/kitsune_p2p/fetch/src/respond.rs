@@ -169,6 +169,7 @@ mod tests {
 
     #[test]
     fn config_provides_defaults() {
+        #[derive(Clone)]
         struct DefaultConf;
         impl FetchResponseConfig for DefaultConf {
             type User = ();
