@@ -128,6 +128,8 @@ impl HostStub {
                                 FetchOpDataEvtQuery::Hashes { op_hash_list, .. } => {
                                     let response = op_hash_list
                                         .into_iter()
+                                        // TODO why are we responding with hashes when they are part of the input? It's an atomic
+                                        //      operation in the sense that you get everything or an error so there is no matching to be done.
                                         .map(|h| (h, KitsuneOpData::new(vec![1, 2, 3])))
                                         .collect();
 
