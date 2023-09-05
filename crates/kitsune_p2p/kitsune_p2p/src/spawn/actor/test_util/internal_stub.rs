@@ -1,5 +1,4 @@
 use crate::actor::BroadcastData;
-use crate::event::KitsuneP2pEvent;
 use crate::spawn::actor::{
     EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
 };

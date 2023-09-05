@@ -608,7 +608,7 @@ mod tests {
     use kitsune_p2p::KitsuneBinType;
     use kitsune_p2p_block::{Block, BlockTarget, NodeBlockReason, NodeId};
     use kitsune_p2p_fetch::test_utils::{test_key_op, test_req_op, test_source, test_space};
-    use kitsune_p2p_fetch::{FetchPool, FetchPoolPush, FetchResponseQueue};
+    use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
     use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
@@ -777,7 +777,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_call_request() {
-        let (mut ep_evt_send, _, _, _, _, _, _, _) = setup().await;
+        let (ep_evt_send, _, _, _, _, _, _, _) = setup().await;
 
         let request_data = vec![2, 7];
 
@@ -804,7 +804,7 @@ mod tests {
     //      to test the behaviour this test is currently checking.
     #[tokio::test(flavor = "multi_thread")]
     async fn make_call_request_after_host_closed() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, _) = setup().await;
+        let (ep_evt_send, _, _, host_receiver_stub, _, _, _, _) = setup().await;
 
         host_receiver_stub.abort();
 
@@ -829,7 +829,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_peer_get_request() {
-        let (mut ep_evt_send, _, _, _, _, _, _, _) = setup().await;
+        let (ep_evt_send, _, _, _, _, _, _, _) = setup().await;
 
         let call_response = do_request(
             ep_evt_send,
@@ -850,7 +850,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_peer_get_request_error() {
-        let (mut ep_evt_send, _, _, _, host_stub, _, _, _) = setup().await;
+        let (ep_evt_send, _, _, _, host_stub, _, _, _) = setup().await;
 
         // Set up the error response so that when we make a request we get an error
         host_stub.fail_next_request();
@@ -874,7 +874,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_peer_query_request() {
-        let (mut ep_evt_send, _, _, _, _, _, _, _) = setup().await;
+        let (ep_evt_send, _, _, _, _, _, _, _) = setup().await;
 
         let response = do_request(
             ep_evt_send,
@@ -895,7 +895,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_peer_query_request_error() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, _) = setup().await;
+        let (ep_evt_send, _, _, host_receiver_stub, _, _, _, _) = setup().await;
 
         // Set up the error response so that when we make a request we get an error
         host_receiver_stub
@@ -1366,7 +1366,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_user() {
-        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1394,16 +1394,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_user_fails_to_forward() {
-        let (
-            mut ep_evt_send,
-            internal_stub,
-            _,
-            host_receiver_stub,
-            _,
-            _,
-            _,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
 
         host_receiver_stub
             .respond_with_error
@@ -1446,7 +1438,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_agent_info() {
-        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1473,16 +1465,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_agent_info_fails_to_forward() {
-        let (
-            mut ep_evt_send,
-            internal_stub,
-            _,
-            host_receiver_stub,
-            _,
-            _,
-            _,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
 
         host_receiver_stub
             .respond_with_error
@@ -1528,7 +1512,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_gossip() {
-        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1567,16 +1551,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_fetch_op() {
-        let (
-            mut ep_evt_send,
-            internal_stub,
-            _,
-            mut host_receiver_stub,
-            _,
-            fetch_response_queue,
-            _,
-            _,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, _, _, fetch_response_queue, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1602,16 +1577,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_fetch_op_fail_independently() {
-        let (
-            mut ep_evt_send,
-            internal_stub,
-            _,
-            mut host_receiver_stub,
-            _,
-            fetch_response_queue,
-            _,
-            _,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, fetch_response_queue, _, _) =
+            setup().await;
 
         // The first call will fail, subsequent calls succeed
         host_receiver_stub
@@ -1646,16 +1613,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data() {
-        let (
-            mut ep_evt_send,
-            internal_stub,
-            _,
-            mut host_receiver_stub,
-            _,
-            fetch_response_queue,
-            fetch_pool,
-            _,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
 

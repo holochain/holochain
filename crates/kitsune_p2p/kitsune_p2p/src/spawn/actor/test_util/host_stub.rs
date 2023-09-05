@@ -14,7 +14,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::AbortHandle;
 use tokio::time::error::Elapsed;
-use tracing_subscriber::filter::FilterExt;
 
 pub struct HostStub {
     pub respond_with_error: Arc<AtomicBool>,
