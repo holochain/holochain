@@ -61,21 +61,27 @@ pub fn state(
 
 struct Options {
     _parameterized: Option<syn::Path>,
+    share_type: Option<syn::Type>,
 }
 
 impl syn::parse::Parse for Options {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut _parameterized = None;
+        let mut share_type = None;
 
         while !input.is_empty() {
             let key: syn::Path = input.parse()?;
-            if key.is_ident("parameterized") {
-                _parameterized = Some(input.parse()?);
+            if key.is_ident("share") {
+                let _: syn::Token![=] = input.parse()?;
+                share_type = Some(input.parse()?);
             }
             let _: syn::Result<syn::Token![,]> = input.parse();
         }
 
-        Ok(Self { _parameterized })
+        Ok(Self {
+            _parameterized,
+            share_type,
+        })
     }
 }
 
@@ -100,7 +106,10 @@ fn state_impl(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let Options { _parameterized: _ } = parse_macro_input!(attr as Options);
+    let Options {
+        _parameterized: _,
+        share_type,
+    } = parse_macro_input!(attr as Options);
 
     let mut action_name = None;
     let mut effect_name = None;
@@ -133,8 +142,8 @@ fn state_impl(
         }
         fn inputs(&self) -> Vec<(Box<Pat>, Box<Type>)> {
             let mut f_inputs = self.f.sig.inputs.iter();
-            match f_inputs.next().expect("problem 1!") {
-                syn::FnArg::Receiver(r) if r.mutability.is_some() => (),
+            match f_inputs.next() {
+                Some(syn::FnArg::Receiver(r)) if r.mutability.is_some() => (),
                 o => {
                     abort!(
                         o.span(),
@@ -200,14 +209,21 @@ fn state_impl(
         effect_name.unwrap_or_else(|| abort!(Span::call_site(), "`type Effect` must be set"));
 
     let define_action_enum_variants = delim::<_, Token!(,)>(fns.iter().map(|f| {
-        let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(_, ty)| ty));
+        let params = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(_, ty)| ty));
         let variant_name = f.variant_name();
-        if args.is_empty() {
+        if params.is_empty() {
             f.variant_name().to_token_stream()
         } else {
-            quote! ( #variant_name(#args) ).to_token_stream()
+            quote! ( #variant_name(#params) ).to_token_stream()
         }
     }));
+
+    // if define_action_enum_variants.is_empty() {
+    //     abort!(
+    //         Span::call_site(),
+    //         "at least one function must be provided to create the Action enum"
+    //     )
+    // }
 
     let mut define_action_enum: syn::ItemEnum = syn::parse(
         quote! {
@@ -222,21 +238,24 @@ fn state_impl(
 
     let define_hidden_fns_inner = ss_flatten(fns.iter().map(|f| {
         let mut original_func = f.f.clone();
-        let (rarr, output_type) = match &mut original_func.sig.output {
-            syn::ReturnType::Default => abort!(f.f.span(), "functions must return a type"),
-            syn::ReturnType::Type(rarr, t) => {
-                let actual = t.clone();
 
-                // *t = Box::new(effect_name.clone());
-
-                (rarr, actual)
-            }
-        };
         original_func.sig.ident = syn::Ident::new(
             &format!("_stef_impl_{}", original_func.sig.ident),
             f.f.span(),
         );
-        original_func.sig.output = syn::ReturnType::Type(*rarr, output_type);
+
+        // let (rarr, output_type) = match &mut original_func.sig.output {
+        //     syn::ReturnType::Default => abort!(f.f.span(), "functions must return a type"),
+        //     syn::ReturnType::Type(rarr, t) => {
+        //         let actual = t.clone();
+
+        //         // *t = Box::new(effect_name.clone());
+
+        //         (rarr, actual)
+        //     }
+        // };
+        // original_func.sig.output = syn::ReturnType::Type(*rarr, output_type);
+
         // let impl_name = f.impl_name();
         // let block = f.f.block;
         // let args = delim::<_, Token!(,)>(f.inputs().iter().map(|(pat, ty)| quote! { #pat: #ty }));
@@ -301,6 +320,106 @@ fn state_impl(
     .expect("problem 5!");
     define_public_fns.generics = item.generics.clone();
 
+    let define_share_type = if let Some(share_type) = share_type {
+        let define_share_fns_inner = ss_flatten(fns.iter().map(|f| {
+            let mut original_func = f.f.clone();
+            let variant_name = f.variant_name();
+            let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
+            let transition = if args.is_empty() {
+                quote! { <Self as stef::State>::Action::#variant_name }
+            } else {
+                quote! { <Self as stef::State>::Action::#variant_name(#args) }
+            };
+            match original_func.sig.inputs.first_mut().expect("problem 9283!") {
+                syn::FnArg::Receiver(ref mut r) => {
+                    r.mutability = None;
+                    match r.ty.as_mut() {
+                        Type::Reference(r) => r.mutability = None,
+                        _ => unreachable!(),
+                    }
+                    // r.ty.as_mut().mutability = None;
+                    // panic!("{:#?}", r.ty);
+                }
+                syn::FnArg::Typed(_) => unreachable!(),
+            }
+            original_func.block = syn::parse(
+                quote! {{
+                    self.0.transition(#transition)
+                }}
+                .into_token_stream()
+                .into(),
+            )
+            .expect("problem 48!");
+            original_func.to_token_stream()
+        }));
+
+        let mut define_share_struct: syn::ItemStruct = syn::parse(
+            quote! {
+                #[derive(Clone, Debug)]
+                pub struct #share_type(stef::Share<#struct_path>);
+            }
+            .into(),
+        )
+        .expect("problem 29!");
+        define_share_struct.generics = item.generics.clone();
+
+        let mut define_share_impl: syn::ItemImpl = syn::parse(
+            quote! {
+                impl #share_type {
+
+                    pub fn new(data: #struct_path) -> Self {
+                        Self(stef::Share::new(data))
+                    }
+
+                    #define_share_fns_inner
+                }
+            }
+            .into(),
+        )
+        .expect("problem 72!");
+        define_share_impl.generics = item.generics.clone();
+
+        let mut define_deref_impl: syn::ItemImpl = syn::parse(
+            quote! {
+                impl std::ops::Deref for #share_type {
+                    type Target = stef::Share<#struct_path>;
+
+                    fn deref(&self) -> &Self::Target {
+                        &self.0
+                    }
+                }
+            }
+            .into(),
+        )
+        .expect("problem 7232!");
+        define_deref_impl.generics = item.generics.clone();
+
+        let mut define_share_state_impl: syn::ItemImpl = syn::parse(
+            quote! {
+                impl stef::State for #share_type {
+                    type Action = #action_name;
+                    type Effect = #effect_name;
+
+                    fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                        self.0.transition(action)
+                    }
+                }
+            }
+            .into(),
+        )
+        .expect("problem 72!");
+        define_share_state_impl.generics = item.generics.clone();
+
+        quote! {
+            #define_share_struct
+            #define_share_impl
+            #define_deref_impl
+            #define_share_state_impl
+        }
+    } else {
+        quote!()
+    };
+
     // let action_name_generic = match action_name.clone() {
     //     Type::Path(mut path) => {
     //         path.path.segments.last_mut().expect("problem 6!").arguments = struct_path
@@ -361,6 +480,7 @@ fn state_impl(
         #define_public_fns
         #define_hidden_fns
         #define_state_impl
+        #define_share_type
     };
 
     proc_macro::TokenStream::from(expanded)

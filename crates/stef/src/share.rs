@@ -1,8 +1,14 @@
 use super::*;
 
-/// Wrap a State in a threadsafe mutex for shared access.
-#[derive(Clone, Default)]
+/// Wrap a State in a mutex for shared access.
+#[derive(Default)]
 pub struct Share<S>(std::sync::Arc<parking_lot::RwLock<S>>);
+
+impl<S> Clone for Share<S> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
 impl<S: State> Share<S> {
     /// Constructor
