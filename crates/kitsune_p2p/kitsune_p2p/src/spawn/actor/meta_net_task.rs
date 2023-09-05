@@ -1648,6 +1648,47 @@ mod tests {
         assert_eq!(1, host_receiver_stub.receive_ops_calls.read().len());
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ignores_unexpected_notify_payload() {
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, _) = setup().await;
+
+        // Send a notification with a payload that is not expected.
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con_with_id(1),
+                data: wire::Wire::PeerQuery(wire::PeerQuery {
+                    space: test_space(1),
+                    basis_loc: DhtLocation::new(1),
+                }),
+            })
+            .await
+            .unwrap();
+
+        // Now check that we can still use the task to send notify messages.
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::AgentInfo(mk_agent_info(6).await),
+                }),
+            })
+            .await
+            .unwrap();
+
+        let agent_info_evt = host_receiver_stub
+            .next_event(Duration::from_millis(1000))
+            .await;
+        assert_eq!(1, agent_info_evt.peer_data.len());
+        assert_eq!(
+            mk_agent_info(6).await,
+            agent_info_evt.peer_data.first().unwrap().clone()
+        );
+    }
+
     async fn setup() -> (
         Sender<MetaNetEvt>,
         InternalStub,
