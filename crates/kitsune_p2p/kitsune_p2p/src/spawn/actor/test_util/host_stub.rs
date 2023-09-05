@@ -1,4 +1,6 @@
-use crate::event::{KitsuneP2pEvent, KitsuneP2pEventHandlerResult, PutAgentInfoSignedEvt};
+use crate::event::{
+    FetchOpDataEvtQuery, KitsuneP2pEvent, KitsuneP2pEventHandlerResult, PutAgentInfoSignedEvt,
+};
 use crate::spawn::actor::{KAgent, KSpace};
 use crate::test_util::data::mk_agent_info;
 use crate::types::event::Payload;
@@ -6,6 +8,7 @@ use crate::KitsuneP2pError;
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{FutureExt, SinkExt, StreamExt};
 use ghost_actor::GhostRespond;
+use kitsune_p2p_types::bin_types::KitsuneOpData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -110,6 +113,36 @@ impl HostStub {
                             respond
                                 .unwrap()
                                 .respond(Ok(async move { Ok(()) }.boxed().into()))
+                        }
+                        KitsuneP2pEvent::FetchOpData { input, respond, .. } => {
+                            let respond = maybe_respond_error(
+                                task_respond_with_error.clone(),
+                                task_respond_with_error_count.clone(),
+                                respond,
+                            );
+                            if respond.is_none() {
+                                continue;
+                            }
+
+                            match input.query {
+                                FetchOpDataEvtQuery::Hashes { op_hash_list, .. } => {
+                                    let response = op_hash_list
+                                        .into_iter()
+                                        .map(|h| (h, KitsuneOpData::new(vec![1, 2, 3])))
+                                        .collect();
+
+                                    respond
+                                        .unwrap()
+                                        .respond(Ok(async move { Ok(response) }.boxed().into()))
+                                }
+                                _ => {
+                                    respond.unwrap().respond(Ok(async move {
+                                        Err(KitsuneP2pError::other("a test error"))
+                                    }
+                                    .boxed()
+                                    .into()));
+                                }
+                            }
                         }
                         _ => panic!("Unexpected event - {:?}", evt),
                     }

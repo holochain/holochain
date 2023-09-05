@@ -274,19 +274,24 @@ impl MetaNetTask {
                                                             .get_topology(space.clone())
                                                             .await
                                                         {
-                                                            Err(_) => continue,
-                                                            Ok(topo) => topo,
+                                                            Err(e) => {
+                                                                tracing::warn!("Could not get topology from the host for space {:?}: {:?}", space, e);
+                                                                None
+                                                            },
+                                                            Ok(topo) => Some(topo),
                                                         };
                                                         let mut regions = Vec::new();
 
                                                         for key in key_list {
                                                             match key {
                                                                 FetchKey::Region(region_coords) => {
-                                                                    regions.push((
-                                                                        region_coords,
-                                                                        region_coords
-                                                                            .to_bounds(&topo),
-                                                                    ));
+                                                                    if let Some(topo) = &topo {
+                                                                        regions.push((
+                                                                            region_coords,
+                                                                            region_coords
+                                                                                .to_bounds(topo),
+                                                                        ));
+                                                                    }
                                                                 }
                                                                 FetchKey::Op(op_hash) => {
                                                                     hashes.push(op_hash);
@@ -585,7 +590,6 @@ mod tests {
     use crate::spawn::meta_net::{MetaNetCon, MetaNetConTest, MetaNetEvt};
     use crate::test_util::data::mk_agent_info;
     use crate::types::wire;
-    use crate::wire::{Wire, WireData};
     use crate::{GossipModuleType, HostStub, KitsuneAgent, KitsuneBasis, KitsuneHost};
     use futures::channel::mpsc::{channel, Sender};
     use futures::FutureExt;
@@ -594,7 +598,7 @@ mod tests {
     use ghost_actor::{GhostControlSender, GhostSender};
     use kitsune_p2p::KitsuneBinType;
     use kitsune_p2p_block::{Block, BlockTarget, NodeBlockReason, NodeId};
-    use kitsune_p2p_fetch::test_utils::test_space;
+    use kitsune_p2p_fetch::test_utils::{test_key_op, test_space};
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
     use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -603,7 +607,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect() {
-        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _) = setup().await;
 
         assert_eq!(0, internal_stub.connections.read().len());
 
@@ -628,7 +632,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect_stops_task_if_internal_sender_closes() {
-        let (mut ep_evt_send, _, internal_sender, _, _, meta_net_task_finished) = setup().await;
+        let (mut ep_evt_send, _, internal_sender, _, _, _, meta_net_task_finished) = setup().await;
 
         internal_sender
             .ghost_actor_shutdown_immediate()
@@ -656,7 +660,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_disconnect() {
-        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Connected {
@@ -687,7 +691,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_disconnect_stops_task_if_internal_sender_closes() {
-        let (mut ep_evt_send, _, internal_sender, _, _, meta_net_task_finished) = setup().await;
+        let (mut ep_evt_send, _, internal_sender, _, _, _, meta_net_task_finished) = setup().await;
 
         internal_sender
             .ghost_actor_shutdown_immediate()
@@ -716,7 +720,7 @@ mod tests {
     // TODO no disconnect event is sent if the connection is force closed by us.
     #[tokio::test(flavor = "multi_thread")]
     async fn make_request_while_blocked() {
-        let (mut ep_evt_send, _, _, _, host_stub, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, host_stub, _, _) = setup().await;
 
         host_stub
             .block(Block::new(
@@ -742,7 +746,7 @@ mod tests {
                 data: wire::Wire::Call(wire::Call {
                     space: test_space(1),
                     to_agent: test_agent(2),
-                    data: WireData(vec![]),
+                    data: wire::WireData(vec![]),
                 }),
                 respond: Box::new(|_| async move { () }.boxed().into()),
             })
@@ -762,7 +766,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_call_request() {
-        let (mut ep_evt_send, _, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, _, _, _) = setup().await;
 
         let request_data = vec![2, 7];
 
@@ -771,13 +775,13 @@ mod tests {
             wire::Wire::Call(wire::Call {
                 space: test_space(1),
                 to_agent: test_agent(2),
-                data: WireData(request_data.clone()),
+                data: wire::WireData(request_data.clone()),
             }),
         )
         .await;
 
         let response_data = match call_response {
-            Wire::CallResp(res) => res.data.to_vec(),
+            wire::Wire::CallResp(res) => res.data.to_vec(),
             _ => panic!("Unexpected response"),
         };
 
@@ -789,7 +793,7 @@ mod tests {
     //      to test the behaviour this test is currently checking.
     #[tokio::test(flavor = "multi_thread")]
     async fn make_call_request_after_host_closed() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _) = setup().await;
 
         host_receiver_stub.abort();
 
@@ -799,13 +803,13 @@ mod tests {
             wire::Wire::Call(wire::Call {
                 space: test_space(1),
                 to_agent: test_agent(2),
-                data: WireData(request_data.clone()),
+                data: wire::WireData(request_data.clone()),
             }),
         )
         .await;
 
         let reason = match call_response {
-            Wire::Failure(f) => f.reason,
+            wire::Wire::Failure(f) => f.reason,
             r => panic!("Unexpected response - {:?}", r),
         };
 
@@ -814,7 +818,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_peer_get_request() {
-        let (mut ep_evt_send, _, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, _, _, _) = setup().await;
 
         let call_response = do_request(
             ep_evt_send,
@@ -826,7 +830,7 @@ mod tests {
         .await;
 
         let agent_info_signed = match call_response {
-            Wire::PeerGetResp(res) => res.agent_info_signed,
+            wire::Wire::PeerGetResp(res) => res.agent_info_signed,
             r => panic!("Unexpected response - {:?}", r),
         };
 
@@ -835,7 +839,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_peer_get_request_error() {
-        let (mut ep_evt_send, _, _, _, host_stub, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, host_stub, _, _) = setup().await;
 
         // Set up the error response so that when we make a request we get an error
         host_stub.fail_next_request();
@@ -850,7 +854,7 @@ mod tests {
         .await;
 
         let reason = match call_response {
-            Wire::Failure(f) => f.reason,
+            wire::Wire::Failure(f) => f.reason,
             r => panic!("Unexpected response - {:?}", r),
         };
 
@@ -859,7 +863,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn make_peer_query_request() {
-        let (mut ep_evt_send, _, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, _, _, _) = setup().await;
 
         let response = do_request(
             ep_evt_send,
@@ -871,7 +875,7 @@ mod tests {
         .await;
 
         let peer_list = match response {
-            Wire::PeerQueryResp(r) => r.peer_list,
+            wire::Wire::PeerQueryResp(r) => r.peer_list,
             r => panic!("Unexpected response - {:?}", r),
         };
 
@@ -880,7 +884,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_peer_query_request_error() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _) = setup().await;
 
         // Set up the error response so that when we make a request we get an error
         host_receiver_stub
@@ -897,7 +901,7 @@ mod tests {
         .await;
 
         let reason = match response {
-            Wire::Failure(f) => f.reason,
+            wire::Wire::Failure(f) => f.reason,
             r => panic!("Unexpected response - {:?}", r),
         };
 
@@ -909,7 +913,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ignores_unexpected_request_payload() {
-        let (mut ep_evt_send, _, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, _, _, _) = setup().await;
 
         // Send a request but don't listen for a response
         ep_evt_send
@@ -937,7 +941,7 @@ mod tests {
         .await;
 
         let peer_list = match response {
-            Wire::PeerQueryResp(r) => r.peer_list,
+            wire::Wire::PeerQueryResp(r) => r.peer_list,
             r => panic!("Unexpected response - {:?}", r),
         };
 
@@ -947,7 +951,7 @@ mod tests {
     // TODO no disconnect event is sent if the connection is force closed by us.
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_while_blocked() {
-        let (mut ep_evt_send, _, _, _, host_stub, _) = setup().await;
+        let (mut ep_evt_send, _, _, _, host_stub, _, _) = setup().await;
 
         host_stub
             .block(Block::new(
@@ -995,7 +999,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_publish() {
-        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1036,7 +1040,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_publish_fails_to_forward() {
-        let (mut ep_evt_send, internal_stub, _, _, _, meta_net_task_finished) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, meta_net_task_finished) = setup().await;
 
         internal_stub
             .respond_with_error
@@ -1086,7 +1090,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_user() {
-        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1127,7 +1131,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_user_fails_to_forward() {
-        let (mut ep_evt_send, internal_stub, _, _, _, meta_net_task_finished) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, meta_net_task_finished) = setup().await;
 
         internal_stub
             .respond_with_error
@@ -1176,7 +1180,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_agent_info() {
-        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1217,7 +1221,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_agent_info_fails_to_forward() {
-        let (mut ep_evt_send, internal_stub, _, _, _, meta_net_task_finished) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, meta_net_task_finished) = setup().await;
 
         internal_stub
             .respond_with_error
@@ -1266,7 +1270,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_publish() {
-        let (mut ep_evt_send, internal_stub, _, _, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1304,7 +1308,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_publish_fails_to_forward() {
-        let (mut ep_evt_send, internal_stub, _, _, _, meta_net_task_finished) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, _, _, _, meta_net_task_finished) = setup().await;
 
         internal_stub
             .respond_with_error
@@ -1351,7 +1355,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_user() {
-        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1379,7 +1383,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_user_fails_to_forward() {
-        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, _, meta_net_task_finished) =
             setup().await;
 
         host_receiver_stub
@@ -1423,7 +1427,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_agent_info() {
-        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1450,7 +1454,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_agent_info_fails_to_forward() {
-        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, meta_net_task_finished) =
+        let (mut ep_evt_send, internal_stub, _, host_receiver_stub, _, _, meta_net_task_finished) =
             setup().await;
 
         host_receiver_stub
@@ -1497,7 +1501,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_gossip() {
-        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _) = setup().await;
+        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1505,7 +1509,7 @@ mod tests {
                 con: mk_test_con(),
                 data: wire::Wire::Gossip(wire::Gossip {
                     space: test_space(1),
-                    data: WireData(vec![1, 4, 6]),
+                    data: wire::WireData(vec![1, 4, 6]),
                     module: GossipModuleType::ShardedRecent,
                 }),
             })
@@ -1534,12 +1538,73 @@ mod tests {
         );
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_fetch_op() {
+        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, fetch_response_queue, _) =
+            setup().await;
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::FetchOp(wire::FetchOp {
+                    fetch_list: vec![(test_space(1), vec![test_key_op(1), test_key_op(2)])],
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while fetch_response_queue.bytes_sent.load(Ordering::Acquire) < 6 {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for op fetch");
+
+        assert_eq!(6, fetch_response_queue.bytes_sent.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_fetch_op_fail_independently() {
+        let (mut ep_evt_send, internal_stub, _, mut host_receiver_stub, _, fetch_response_queue, _) =
+            setup().await;
+
+        // The first call will fail, subsequent calls succeed
+        host_receiver_stub
+            .respond_with_error
+            .store(true, Ordering::SeqCst);
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::FetchOp(wire::FetchOp {
+                    fetch_list: vec![(test_space(1), vec![test_key_op(1), test_key_op(2)])],
+                }),
+            })
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while fetch_response_queue.bytes_sent.load(Ordering::Acquire) < 3 {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for op fetch");
+
+        // The first does not get sent due to an error fetching the op data but the second does succeed and gets sent
+        assert_eq!(3, fetch_response_queue.bytes_sent.load(Ordering::Acquire));
+    }
+
     async fn setup() -> (
         Sender<MetaNetEvt>,
         InternalStub,
         GhostSender<Internal>,
         HostReceiverStub,
         Arc<HostStub>,
+        FetchResponseQueue<FetchResponseConfig>,
         Arc<AtomicBool>,
     ) {
         let task = InternalStub::new();
@@ -1571,7 +1636,7 @@ mod tests {
             host_stub.clone(),
             Default::default(),
             fetch_pool,
-            fetch_response_queue,
+            fetch_response_queue.clone(),
             ep_evt_rcv,
             internal_sender.clone(),
         );
@@ -1585,6 +1650,7 @@ mod tests {
             internal_sender,
             host_receiver_stub,
             host_stub,
+            fetch_response_queue,
             meta_net_task_finished,
         )
     }
