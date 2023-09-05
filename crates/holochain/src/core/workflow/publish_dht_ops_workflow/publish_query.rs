@@ -3,15 +3,17 @@ use std::time::UNIX_EPOCH;
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
+use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
+use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::query::prelude::*;
-use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::prelude::OpBasis;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedAction;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 
@@ -23,10 +25,13 @@ use super::MIN_PUBLISH_INTERVAL;
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
-pub async fn get_ops_to_publish(
+pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
-    db: &DbRead<DbKindAuthored>,
-) -> WorkflowResult<Vec<DhtOpHashed>> {
+    db: &AuthorDb,
+) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>>
+where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+{
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
@@ -35,11 +40,16 @@ pub async fn get_ops_to_publish(
         .unwrap_or(0);
 
     let results = db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let mut stmt = txn.prepare(
                 "
             SELECT
             Action.blob as action_blob,
+            LENGTH(Action.blob) AS action_size,
+            CASE
+              WHEN DhtOp.type IN ('StoreEntry', 'StoreRecord') THEN LENGTH(Entry.blob)
+              ELSE 0
+            END AS entry_size,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
             DhtOp.hash as dht_hash
@@ -67,9 +77,14 @@ pub async fn get_ops_to_publish(
                     ":store_entry": DhtOpType::StoreEntry,
                 },
                 |row| {
+                    let action_size: usize = row.get("action_size")?;
+                    // will be NULL if the op has no associated entry
+                    let entry_size: Option<usize> = row.get("entry_size")?;
+                    let op_size = (action_size + entry_size.unwrap_or(0)).into();
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                     let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
+                    let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
                     let entry = match action.0.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -80,10 +95,9 @@ pub async fn get_ops_to_publish(
                         }
                         _ => None,
                     };
-                    WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                        DhtOp::from_type(op_type, action, entry)?,
-                        hash,
-                    ))
+                    let op = DhtOp::from_type(op_type, action, entry)?;
+                    let basis = op.dht_basis();
+                    WorkflowResult::Ok((basis, op_hash_sized, op))
                 },
             )?;
             WorkflowResult::Ok(r.collect())
@@ -121,7 +135,6 @@ mod tests {
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_sqlite::db::DbWrite;
-    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;
@@ -156,16 +169,25 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let db = test_authored_db();
-        let expected = test_data(&db.to_db().into());
-        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db().into())
+        let expected = test_data(&db.to_db().into()).await;
+        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
-        assert_eq!(r, expected.results);
+        assert_eq!(
+            r.into_iter()
+                .map(|t| t.1.into_inner().0)
+                .collect::<Vec<_>>(),
+            expected
+                .results
+                .into_iter()
+                .map(|op| op.into_inner().1.to_kitsune())
+                .collect::<Vec<_>>(),
+        );
     }
 
-    fn create_and_insert_op(
+    async fn create_and_insert_op(
         db: &DbWrite<DbKindAuthored>,
         facts: Facts,
         consistent_data: &Consistent,
@@ -207,30 +229,33 @@ mod tests {
             DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
                 fixt!(Signature),
                 NewEntryAction::Create(action.clone()),
-                Box::new(entry.clone()),
+                entry.clone(),
             ))
         } else {
             DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
                 fixt!(Signature),
                 Action::Create(action.clone()),
-                Some(Box::new(entry.clone())),
+                entry.clone().into(),
             ))
         };
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                let hash = state.as_hash().clone();
-                insert_op(txn, &state).unwrap();
+        db.write_async({
+            let query_state = state.clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let hash = query_state.as_hash().clone();
+                insert_op(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
-                DatabaseResult::Ok(())
-            })
-            .unwrap();
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
         state
     }
 
-    fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
+    async fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
         let mut results = Vec::new();
         let cd = Consistent {
             this_agent: fixt!(AgentPubKey),
@@ -248,7 +273,7 @@ mod tests {
             is_this_agent: true,
             store_entry: true,
         };
-        let op = create_and_insert_op(db, facts, &cd);
+        let op = create_and_insert_op(db, facts, &cd).await;
         results.push(op);
 
         // All facts are the same unless stated:
@@ -258,29 +283,29 @@ mod tests {
         let mut f = facts;
         f.private = true;
         f.store_entry = false;
-        let op = create_and_insert_op(db, f, &cd);
+        let op = create_and_insert_op(db, f, &cd).await;
         results.push(op);
 
         // We **don't** expect any of these in the results:
         // - Private: true.
         let mut f = facts;
         f.private = true;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         // - WithinMinPeriod: true.
         let mut f = facts;
         f.within_min_period = true;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         // - HasRequireReceipts: true.
         let mut f = facts;
         f.has_required_receipts = true;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(db, f, &cd);
+        create_and_insert_op(db, f, &cd).await;
 
         Expected {
             agent: cd.this_agent.clone(),

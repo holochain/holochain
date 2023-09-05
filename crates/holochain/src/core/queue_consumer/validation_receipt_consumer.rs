@@ -1,52 +1,35 @@
 //! The workflow and queue consumer for validation receipt
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
-#[instrument(skip(env, conductor_handle, stop, network))]
+#[instrument(skip(env, conductor, network))]
 pub fn spawn_validation_receipt_consumer(
     dna_hash: Arc<DnaHash>,
     env: DbWrite<DbKindDht>,
-    conductor_handle: ConductorHandle,
-    mut stop: sync::broadcast::Receiver<()>,
+    conductor: ConductorHandle,
     network: HolochainP2pDna,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let trigger_self = tx.clone();
-    let keystore = conductor_handle.keystore().clone();
-    let handle = tokio::spawn(async move {
-        loop {
-            // Wait for next job
-            if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
-                tracing::warn!(
-                    "Cell is shutting down: stopping validation_receipt_workflow queue consumer."
-                );
-                break;
-            }
+) -> TriggerSender {
+    let (tx, rx) = TriggerSender::new();
+    let keystore = conductor.keystore().clone();
 
-            // Run the workflow
-            match validation_receipt_workflow(
+    super::queue_consumer_dna_bound(
+        "validation_receipt_consumer",
+        dna_hash.clone(),
+        conductor.task_manager(),
+        (tx.clone(), rx),
+        move || {
+            validation_receipt_workflow(
                 dna_hash.clone(),
                 env.clone(),
-                &network,
+                network.clone(),
                 keystore.clone(),
-                conductor_handle.clone(),
+                conductor.clone(),
             )
-            .await
-            {
-                Ok(WorkComplete::Incomplete) => {
-                    tracing::debug!("Work incomplete, retriggering workflow");
-                    trigger_self.trigger(&"retrigger")
-                }
-                Err(err) => handle_workflow_error(err)?,
-                _ => (),
-            };
-        }
-        Ok(())
-    });
-    (tx, handle)
+        },
+    );
+
+    tx
 }

@@ -1,4 +1,6 @@
 //! Common use sandboxes with lots of default choices.
+
+use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -11,17 +13,28 @@ use crate::CmdRunner;
 
 /// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
-/// Then installs the dnas with a new app per dna.
+/// Then installs the specified hApp.
 pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
     directory: Option<PathBuf>,
     happ: PathBuf,
     app_id: InstalledAppId,
+    structured: Output,
 ) -> anyhow::Result<PathBuf> {
-    let Create { network, root, .. } = create;
-    let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
-    let conductor = run_async(holochain_path, path.clone(), None).await?;
+    let Create {
+        network,
+        root,
+        in_process_lair,
+        ..
+    } = create;
+    let path = crate::generate::generate(
+        network.map(|n| n.into_inner().into()),
+        root,
+        directory,
+        in_process_lair,
+    )?;
+    let conductor = run_async(holochain_path, path.clone(), None, structured).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {
         app_id: Some(app_id),
@@ -33,13 +46,14 @@ pub async fn default_with_network(
     Ok(path)
 }
 
-/// Same as [`default_with_network`] but creates n copies
-/// of this sandbox in their own directories.
+/// Same as [`default_with_network`] but creates _n_ copies
+/// of this sandbox in separate directories.
 pub async fn default_n(
     holochain_path: &Path,
     create: Create,
     happ: PathBuf,
     app_id: InstalledAppId,
+    structured: Output,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let num_sandboxes = create.num_sandboxes;
     msg!(
@@ -54,6 +68,7 @@ pub async fn default_n(
             create.directories.get(i).cloned(),
             happ.clone(),
             app_id.clone(),
+            structured.clone(),
         )
         .await?;
         paths.push(p);

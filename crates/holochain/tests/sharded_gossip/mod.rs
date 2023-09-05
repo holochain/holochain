@@ -1,70 +1,87 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{
-    standard_config, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
-};
+use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced, WaitFor};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
 use holochain_p2p::*;
-use holochain_sqlite::db::*;
+use holochain_sqlite::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_agent_bloom};
+use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) -> ConductorConfig {
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+fn make_tuning(
+    publish: bool,
+    recent: bool,
+    historical: bool,
+    recent_threshold: Option<u64>,
+) -> KitsuneP2pTuningParams {
+    let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.disable_publish = true;
+    tuning.disable_publish = !publish;
     tuning.disable_recent_gossip = !recent;
     tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
+
     tuning.gossip_inbound_target_mbps = 10000.0;
     tuning.gossip_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_inbound_target_mbps = 10000.0;
-    // tuning.gossip_max_batch_size = 32_000_000;
 
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let mut config = standard_config();
-    config.network = Some(network);
-    config
+    // This allows attempting to contact an offline node to timeout quickly,
+    // so we can fallback to the next one
+    tuning.default_rpc_single_timeout_ms = 3_000;
+    tuning.gossip_round_timeout_ms = 10_000;
+    tuning.bootstrap_check_delay_backoff_multiplier = 1;
+
+    tuning
+}
+
+fn make_config(
+    publish: bool,
+    recent: bool,
+    historical: bool,
+    recent_threshold: Option<u64>,
+) -> SweetConductorConfig {
+    let tuning = make_tuning(publish, recent, historical, recent_threshold);
+    SweetConductorConfig::rendezvous().set_tuning_params(tuning)
 }
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
-    let _g = observability::test_run().ok();
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
+async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(true, true, None)).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        NUM_CONDUCTORS,
+        make_config(false, true, true, None),
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    conductors
+        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
+        .await;
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
@@ -72,7 +89,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo]).await;
+    consistency_60s([&alice, &bobbo]).await;
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -94,14 +111,18 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    // let _g = observability::test_run().ok();
+    // let _g = holochain_trace::test_run().ok();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
 
-    let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, Some(0))).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        NUM_CONDUCTORS,
+        make_config(false, false, true, Some(0)),
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
@@ -110,9 +131,12 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .setup_app("app", &[dna_file.clone()])
         .await
         .unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    conductors
+        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
+        .await;
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
@@ -164,13 +188,204 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that a gossip payload larger than the max frame size does not
-/// cause problems
+/// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+async fn test_zero_arc_get_links() {
+    holochain_trace::test_run().ok();
+
+    // Standard config with arc clamped to zero
+    let mut tuning = make_tuning(true, true, true, None);
+    tuning.gossip_arc_clamping = "empty".into();
+    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
+
+    let mut conductor0 = SweetConductor::from_config(config).await;
+    let mut conductor1 = SweetConductor::from_standard_config().await;
+
+    let tw = holochain_wasm_test_utils::TestWasm::Link;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;
+    let app0 = conductor0.setup_app("app", [&dna_file]).await.unwrap();
+    let _ = conductor1.setup_app("app", [&dna_file]).await.unwrap();
+    let (cell0,) = app0.into_tuple();
+
+    // conductors.exchange_peer_info().await;
+
+    let zome0 = cell0.zome(tw);
+    let _hash0: ActionHash = conductor0.call(&zome0, "create_link", ()).await;
+
+    let links: Vec<Link> = conductor0.call(&zome0, "get_links", ()).await;
+    assert_eq!(links.len(), 1);
+}
+
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
+async fn test_zero_arc_no_gossip_2way() {
+    holochain_trace::test_run().ok();
+
+    // Standard config
+    let config_0 = make_config(true, true, true, None);
+
+    // Standard config with arc clamped to zero and publishing off
+    // This should result in no publishing or gossip
+    let mut tuning_1 = make_tuning(false, true, true, None);
+    tuning_1.gossip_arc_clamping = "empty".into();
+    let config_1 = SweetConductorConfig::rendezvous().set_tuning_params(tuning_1);
+
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_0,), (cell_1,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
+
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
+    let hash_0: ActionHash = conductors[0]
+        .call(&zome_0, "create_string", "hi".to_string())
+        .await;
+
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+    let hash_1: ActionHash = conductors[1]
+        .call(&zome_1, "create_string", "hi".to_string())
+        .await;
+
+    // can't await consistency because one node is neither publishing nor gossiping, and is relying only on `get`
+
+    let record_01: Option<Record> = conductors[0].call(&zome_0, "read", hash_1.clone()).await;
+    let record_10: Option<Record> = conductors[1].call(&zome_1, "read", hash_0.clone()).await;
+
+    // 1 is not a valid target for the get, and 0 did not publish, so 0 can't get 1's data.
+    assert!(record_01.is_none());
+
+    // 1 can get 0's data, though.
+    assert!(record_10.is_some());
+}
+
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
+async fn test_zero_arc_no_gossip_4way() {
+    use futures::future::join_all;
+
+    holochain_trace::test_run().ok();
+
+    let configs = [
+        // Standard config
+        make_config(true, true, true, None),
+        // Publishing turned off
+        make_config(false, true, true, None),
+        {
+            // Standard config with arc clamped to zero
+            let mut tuning = make_tuning(true, true, true, None);
+            tuning.gossip_arc_clamping = "empty".into();
+            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
+        },
+        {
+            // Publishing turned off, arc clamped to zero
+            let mut tuning = make_tuning(false, true, true, None);
+            tuning.gossip_arc_clamping = "empty".into();
+            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
+        },
+    ];
+
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous(configs).await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let zomes: Vec<_> = cells
+        .iter()
+        .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
+        .collect();
+
+    // Ensure that each node has one agent in its peer store, for the single app installed.
+    for (i, cell) in cells.iter().enumerate() {
+        let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
+            conductors[i]
+                .get_spaces()
+                .p2p_agents_db(&dna_hash)
+                .unwrap()
+                .into(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|i| AgentPubKey::from_kitsune(&i.agent()))
+        .collect::<Vec<_>>();
+        assert_eq!(stored_agents, vec![cell.agent_pubkey().clone()]);
+    }
+
+    conductors.exchange_peer_info().await;
+
+    // Ensure that each node has all agents in their local p2p store.
+    for c in conductors.iter() {
+        let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
+            c.get_spaces().p2p_agents_db(&dna_hash).unwrap().into(),
+        )
+        .await
+        .unwrap()
+        .len();
+        assert_eq!(stored_agents, conductors.len());
+    }
+
+    // Have each conductor create an entry
+    let hashes: Vec<ActionHash> = join_all(
+        conductors
+            .iter()
+            .enumerate()
+            .map(|(i, c)| c.call(&zomes[i], "create_string", format!("{}", i))),
+    )
+    .await;
+
+    // Have each conductor attempt to get every other conductor's entry,
+    // retrying for a certain amount of time until the entry could be successfully retrieved,
+    // then testing for success.
+    //
+    // Nobody should be able to get conductor 3's entry, because it is not publishing
+    // and not gossiping due to zero arc.
+    let _: Vec<()> = join_all(conductors.iter().enumerate().flat_map(|(i, c)| {
+        hashes
+            .iter()
+            .enumerate()
+            .map(|(j, hash)| {
+                let zome = zomes[i].clone();
+                async move {
+                    let assertion = |x: bool| {
+                        if j == 3 && i != j {
+                            assert!(!x, "Node 3's data should not be accessible by anyone but itself. i={}, j={}", i, j);
+                        } else {
+                            assert!(x, "All nodes should be able to get all data except for node 3's. i={}, j={}", i, j);
+                        }
+                    };
+                    holochain::wait_for!(
+                        WaitFor::new(std::time::Duration::from_secs(5), 10),
+                        c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
+                            .await
+                            .is_some(),
+                        |x: &bool| *x,
+                        assertion
+                    );
+                }
+            })
+            .collect::<Vec<_>>()
+    }))
+    .await;
+}
+
+/// Test that when the conductor shuts down, gossip does not continue,
+/// and when it restarts, gossip resumes.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "deal with connections closing and banning for 10s"]
 async fn test_gossip_shutdown() {
-    observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
+    holochain_trace::test_run().ok();
+    let mut conductors =
+        SweetConductorBatch::from_config_rendezvous(2, make_config(false, true, true, None)).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -201,28 +416,76 @@ async fn test_gossip_shutdown() {
     assert_eq!(record.unwrap().action_address(), &hash);
 }
 
+/// Test that when a new conductor joins, gossip picks up existing data without needing a publish.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This test is potentially useful but uses sleeps and has never failed.
+            Run it again in the future to see if it fails, and if so, rewrite it without sleeps."]
+async fn test_gossip_startup() {
+    holochain_trace::test_run().ok();
+    let config = || {
+        SweetConductorConfig::standard().tune(|t| {
+            t.danger_gossip_recent_threshold_secs = 1;
+            t.default_rpc_single_timeout_ms = 3_000;
+        })
+    };
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let mk_conductor = || async {
+        let cfg = config();
+        assert!(cfg.network.as_ref().unwrap().is_tx5());
+        let mut conductor =
+            SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
+        // let mut conductor = SweetConductor::from_config(config()).await;
+        let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
+        let cell = app.into_cells().pop().unwrap();
+        let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+        (conductor, cell, zome)
+    };
+    let (conductor0, cell0, zome0) = mk_conductor().await;
+
+    // Create an entry before the conductors know about each other
+    let hash: ActionHash = conductor0
+        .call(&zome0, "create_string", "hi".to_string())
+        .await;
+
+    // Startup and do peer discovery
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    let (conductor1, cell1, zome1) = mk_conductor().await;
+
+    // Wait a bit so that conductor 0 doesn't publish in the next step.
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    SweetConductor::exchange_peer_info([&conductor0, &conductor1]).await;
+
+    consistency_60s([&cell0, &cell1]).await;
+    let record: Option<Record> = conductor1.call(&zome1, "read", hash.clone()).await;
+    assert_eq!(record.unwrap().action_address(), &hash);
+}
+
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    observability::test_run().ok();
-    let config = make_config(true, false, None);
+    holochain_trace::test_run().ok();
+    let config = make_config(false, true, false, None);
     three_way_gossip(config).await;
 }
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    observability::test_run().ok();
-    let config = make_config(false, true, Some(0));
+    holochain_trace::test_run().ok();
+    let config = make_config(false, false, true, Some(0));
     three_way_gossip(config).await;
 }
 
 /// Test that:
-/// - 30MB of data can pass from node A to B,
+/// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(config: ConductorConfig) {
-    let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
+async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -246,14 +509,12 @@ async fn three_way_gossip(config: ConductorConfig) {
         let bytes = vec![42u8 + i as u8; size];
         let hash: ActionHash = conductors[0].call(&zomes[0], "create_bytes", bytes).await;
         hashes.push(hash);
-        dbg!(start.elapsed());
     }
 
-    conductors.exchange_peer_info().await;
     consistency_60s([&cells[0], &cells[1]]).await;
 
-    tracing::info!(
-        "CONSISTENCY REACHED between first two nodes in {:?}",
+    println!(
+        "Done waiting for consistency between first two nodes. Elapsed: {:?}",
         start.elapsed()
     );
 
@@ -274,27 +535,46 @@ async fn three_way_gossip(config: ConductorConfig) {
             .collect::<Vec<_>>()
     );
     assert_eq!(records_0, records_1);
-    dbg!(start.elapsed());
 
     conductors[0].shutdown().await;
 
     // Bring a third conductor online
-    let mut conductor = SweetConductor::from_config(config).await;
-    let (cell,) = conductor
+    conductors.add_conductor_from_config(config).await;
+
+    let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
         .await
         .unwrap()
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
-    conductors.add_conductor(conductor);
-    conductors.exchange_peer_info().await;
+    conductors[2]
+        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
+        .await;
 
-    consistency_60s_advanced([(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
+    consistency_advanced(
+        [(&cells[0], false), (&cells[1], true), (&cell, true)],
+        30,
+        std::time::Duration::from_secs(1),
+    )
+    .await;
 
-    dbg!(start.elapsed());
+    println!(
+        "Done waiting for consistency between last two nodes. Elapsed: {:?}",
+        start.elapsed()
+    );
 
     let records_2: Vec<Option<Record>> = conductors[2].call(&zome, "read_multi", hashes).await;
+    assert_eq!(
+        records_2.iter().filter(|r| r.is_some()).count(),
+        num,
+        "couldn't get records at positions: {:?}",
+        records_2
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .collect::<Vec<_>>()
+    );
     assert_eq!(records_2, records_1);
 }
 
@@ -303,9 +583,13 @@ async fn three_way_gossip(config: ConductorConfig) {
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config(true, true, None)).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        make_config(false, true, true, None),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -385,7 +669,7 @@ async fn mock_network_sharded_gossip() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;
@@ -427,7 +711,9 @@ async fn mock_network_sharded_gossip() {
     let num_hashes_alice_should_hold = Arc::new(AtomicUsize::new(0));
 
     // Create some oneshot to notify of any publishes to the wrong node.
-    let (bad_publish_tx, mut bad_publish_rx) = tokio::sync::oneshot::channel();
+    // TODO (david.b) - publish has been replaced by a combined receive_ops
+    //let (bad_publish_tx, mut bad_publish_rx) = tokio::sync::oneshot::channel();
+
     // Create some oneshot to notify of any gets to the wrong node.
     let (bad_get_tx, mut bad_get_rx) = tokio::sync::oneshot::channel();
     // Track the agents that have been gossiped with.
@@ -445,7 +731,9 @@ async fn mock_network_sharded_gossip() {
             let mut agents_gossiped_with = HashSet::new();
             let mut num_missed_gossips = 0;
             let mut last_intervals = None;
-            let mut bad_publish = Some(bad_publish_tx);
+            // TODO (david.b) - publish has been replaced by a
+            //                  combined receive_ops
+            //let mut bad_publish = Some(bad_publish_tx);
             let mut bad_get = Some(bad_get_tx);
 
             // Get the next network message.
@@ -464,6 +752,11 @@ async fn mock_network_sharded_gossip() {
                             debug!("CallRemoteMulti")
                         }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
+                        holochain_p2p::WireMessage::PublishCountersign { .. } => {
+                            debug!("PublishCountersign")
+                        }
+                        /* (david.b) TODO - this has been replaced by
+                         *                  combined `receive_ops`
                         holochain_p2p::WireMessage::Publish { ops, .. } => {
                             if bad_publish.is_some() {
                                 let arc = data.agent_to_arc[&agent];
@@ -475,6 +768,7 @@ async fn mock_network_sharded_gossip() {
                                 }
                             }
                         }
+                        */
                         holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
                             debug!("Validation Receipt")
                         }
@@ -501,6 +795,7 @@ async fn mock_network_sharded_gossip() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
@@ -516,6 +811,7 @@ async fn mock_network_sharded_gossip() {
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
                     HolochainP2pMockMsg::PeerQuery(_) => debug!("PeerQuery"),
                     HolochainP2pMockMsg::PeerQueryResp(_) => debug!("PeerQueryResp"),
+                    HolochainP2pMockMsg::PeerUnsolicited(_) => debug!("PeerUnsolicited"),
                     HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::Gossip {
                         dna,
@@ -627,7 +923,8 @@ async fn mock_network_sharded_gossip() {
                                             )
                                         });
 
-                                        let missing_hashes = check_ops_boom(hashes, missing_hashes);
+                                        let missing_hashes =
+                                            check_ops_bloom(hashes, missing_hashes);
                                         let missing_hashes = match &last_intervals {
                                             Some(intervals) => missing_hashes
                                                 .into_iter()
@@ -636,24 +933,12 @@ async fn mock_network_sharded_gossip() {
                                                         data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                     )
                                                 })
+                                                .cloned()
                                                 .collect(),
                                             None => vec![],
                                         };
                                         gossiped_ops.extend(missing_hashes.iter().cloned());
 
-                                        let missing_ops: Vec<_> = missing_hashes
-                                            .into_iter()
-                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
-                                            .map(|op| {
-                                                kitsune_p2p::KitsuneOpData::new(
-                                                    holochain_p2p::WireDhtOpData {
-                                                        op_data: op.into_content(),
-                                                    }
-                                                    .encode()
-                                                    .unwrap(),
-                                                )
-                                            })
-                                            .collect();
                                         let num_gossiped = gossiped_ops.len();
                                         let p_done = num_gossiped as f64
                                             / num_hashes_alice_should_hold as f64
@@ -691,7 +976,7 @@ async fn mock_network_sharded_gossip() {
                                         debug!(
                                             "Gossiped with {}, got {} of {} ops, overlap: {:.2}%, max could get {}, {:.2}% done, avg freq of gossip {:?}, est finish in {:?}",
                                             agent,
-                                            missing_ops.len(),
+                                            missing_hashes.len(),
                                             num_this_agent_hashes,
                                             overlap,
                                             max_could_get,
@@ -703,15 +988,21 @@ async fn mock_network_sharded_gossip() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(
-                                                    missing_ops,
+                                                ShardedGossipWire::missing_op_hashes(
+                                                    missing_hashes
+                                                        .into_iter()
+                                                        .map(|h| kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized::new(h, None))
+                                                        .collect(),
                                                     MissingOpsStatus::AllComplete as u8,
                                                 ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
                                     }
-                                    ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
+                                    ShardedGossipWire::MissingOpHashes(MissingOpHashes {
+                                        ops,
+                                        ..
+                                    }) => {
                                         debug!(
                                             "Gossiped with {} {} out of {}, who sent {} ops and gossiped with {} nodes outside of arc",
                                             agent,
@@ -748,8 +1039,7 @@ async fn mock_network_sharded_gossip() {
     let mock_network: AdapterFactory = Arc::new(mock_network);
 
     // Setup the network.
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
@@ -786,14 +1076,13 @@ async fn mock_network_sharded_gossip() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                {
-                    let mut conn = alice_p2p_agents_db.conn().unwrap();
-                    let txn = conn.transaction().unwrap();
-                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
-                    {
-                        *alice_info.lock() = info;
-                    }
-                }
+                let info = alice_p2p_agents_db.test_read({
+                    let alice_kit = alice_kit.clone();
+                    move |txn| txn.p2p_get_agent(&alice_kit).unwrap()
+                });
+
+                *alice_info.lock() = info;
+
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }
@@ -858,6 +1147,8 @@ async fn mock_network_sharded_gossip() {
         }
     }
 
+    // TODO (david.b) - publish has been replaced by a combined receive_ops
+    /*
     // Check if we got any publishes to the wrong agent.
     match bad_publish_rx.try_recv() {
         Ok(_) | Err(tokio::sync::oneshot::error::TryRecvError::Closed) => {
@@ -865,6 +1156,7 @@ async fn mock_network_sharded_gossip() {
         }
         Err(_) => (),
     }
+    */
 
     // Check if we got any gets to the wrong agent.
     match bad_get_rx.try_recv() {
@@ -919,7 +1211,7 @@ async fn mock_network_sharding() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;
@@ -980,7 +1272,6 @@ async fn mock_network_sharding() {
                             debug!("CallRemoteMulti")
                         }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
-                        holochain_p2p::WireMessage::Publish { .. } => {}
                         holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
                             debug!("Validation Receipt")
                         }
@@ -1020,6 +1311,7 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
@@ -1029,11 +1321,15 @@ async fn mock_network_sharding() {
                         holochain_p2p::WireMessage::CountersigningSessionNegotiation { .. } => {
                             debug!("countersigning_session_negotiation")
                         }
+                        holochain_p2p::WireMessage::PublishCountersign { .. } => {
+                            debug!("publish_countersign")
+                        }
                     },
                     HolochainP2pMockMsg::CallResp(_) => debug!("CallResp"),
                     HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::PeerGet(_) => eprintln!("PeerGet"),
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
+                    HolochainP2pMockMsg::PeerUnsolicited(_) => debug!("PeerUnsolicited"),
                     HolochainP2pMockMsg::PeerQuery(kitsune_p2p::wire::PeerQuery {
                         basis_loc,
                         ..
@@ -1165,7 +1461,8 @@ async fn mock_network_sharding() {
                                             )
                                         });
 
-                                        let missing_hashes = check_ops_boom(hashes, missing_hashes);
+                                        let missing_hashes =
+                                            check_ops_bloom(hashes, missing_hashes);
                                         let missing_hashes = match &last_intervals {
                                             Some(intervals) => missing_hashes
                                                 .into_iter()
@@ -1174,29 +1471,23 @@ async fn mock_network_sharding() {
                                                         data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                     )
                                                 })
+                                                .cloned()
                                                 .collect(),
                                             None => vec![],
                                         };
-
-                                        let missing_ops: Vec<_> = missing_hashes
-                                            .into_iter()
-                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
-                                            .map(|op| {
-                                                kitsune_p2p::KitsuneOpData::new(
-                                                    holochain_p2p::WireDhtOpData {
-                                                        op_data: op.into_content(),
-                                                    }
-                                                    .encode()
-                                                    .unwrap(),
-                                                )
-                                            })
-                                            .collect();
 
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, 2),
+                                                // TODO: get and send sizes for recent gossip ops
+                                                ShardedGossipWire::missing_op_hashes(
+                                                    missing_hashes
+                                                        .into_iter()
+                                                        .map(|h| kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized::new(h, None))
+                                                        .collect(),
+                                                    2,
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -1231,7 +1522,7 @@ async fn mock_network_sharding() {
 
                                     ShardedGossipWire::MissingAgents(_) => {}
                                     ShardedGossipWire::Accept(_) => (),
-                                    ShardedGossipWire::MissingOps(_) => (),
+                                    ShardedGossipWire::MissingOpHashes(_) => (),
                                     ShardedGossipWire::NoAgents(_) => (),
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
@@ -1256,8 +1547,7 @@ async fn mock_network_sharding() {
     // Setup the bootstrap.
     let (bootstrap, _shutdown) = run_bootstrap(data.agent_to_info.values().cloned()).await;
     // Setup the network.
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
@@ -1289,15 +1579,25 @@ async fn mock_network_sharding() {
         let alice_info = alice_info.clone();
         async move {
             loop {
-                fresh_reader_test(alice_p2p_agents_db.clone(), |txn| {
-                    let info = txn.p2p_get_agent(&alice_kit).unwrap();
-                    {
-                        if let Some(info) = &info {
-                            eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                alice_p2p_agents_db
+                    .read_async({
+                        let my_alice_kit = alice_kit.clone();
+                        let my_alice_info = alice_info.clone();
+
+                        move |txn| -> DatabaseResult<()> {
+                            let info = txn.p2p_get_agent(&my_alice_kit).unwrap();
+                            {
+                                if let Some(info) = &info {
+                                    eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                                }
+                                *my_alice_info.lock() = info;
+                            }
+
+                            Ok(())
                         }
-                        *alice_info.lock() = info;
-                    }
-                });
+                    })
+                    .await
+                    .unwrap();
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

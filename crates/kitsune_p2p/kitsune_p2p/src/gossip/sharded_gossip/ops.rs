@@ -1,3 +1,4 @@
+use kitsune_p2p_fetch::{FetchKey, FetchPoolPush, OpHashSized};
 use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;
@@ -26,7 +27,8 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     let mut to_fetch = vec![];
     let mut first = true;
     while let Some(region) = queue.front() {
-        size += region.data.size;
+        // Only op hashes are gossiped now, so we just count the 36 bytes for each hash.
+        size += region.data.count * 36;
         if first || size <= batch_size {
             to_fetch.push(queue.pop_front().unwrap());
             if size > batch_size {
@@ -46,13 +48,13 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     to_fetch
 }
 
-/// Queued MissingOps hashes can either
+/// Queued MissingOpHashes hashes can either
 /// be saved as the remaining hashes or if this
 /// is too large the bloom filter is saved so the
 /// remaining hashes can be generated in the future.
 enum QueuedOps {
     /// Hashes that need to be fetched and returned
-    /// as MissingOps to a remote node.
+    /// as MissingOpHashes to a remote node.
     Hashes(Vec<Arc<KitsuneOpHash>>),
     /// A remote nodes bloom filter that has been adjusted
     /// to the remaining time window to fetch the remaining hashes.
@@ -99,7 +101,7 @@ impl ShardedGossipLocal {
 
     pub(super) async fn queue_incoming_regions(
         &self,
-        peer_cert: &Tx2Cert,
+        peer_cert: &Arc<[u8; 32]>,
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
@@ -114,14 +116,6 @@ impl ShardedGossipLocal {
 
             self.inner.share_mut(|i, _| {
                 if let Some(round) = i.round_map.get_mut(peer_cert) {
-                    round.throughput.expected_op_bytes.outgoing +=
-                        our_region_diff.iter().map(|r| r.data.size).sum::<u32>();
-                    round.throughput.expected_op_count.outgoing +=
-                        our_region_diff.iter().map(|r| r.data.count).sum::<u32>();
-                    round.throughput.expected_op_bytes.incoming +=
-                        their_region_diff.iter().map(|r| r.data.size).sum::<u32>();
-                    round.throughput.expected_op_count.incoming +=
-                        their_region_diff.iter().map(|r| r.data.count).sum::<u32>();
                     round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
                     round.regions_are_queued = true;
                     i.metrics.write().update_current_round(
@@ -142,22 +136,8 @@ impl ShardedGossipLocal {
             // Note, this is a LOT of output!
             // tracing::info!("region diffs ({}): {:?}", diff_regions.len(), diff_regions);
 
-            // subdivide any regions which are too large to fit in a batch.
-            // TODO: PERF: this does a DB query per region, and potentially many more for large
-            // regions which need to be split many times. Check to make sure this
-            // doesn't become a hotspot.
-            let limited_regions = self
-                .host_api
-                .query_size_limited_regions(
-                    self.space.clone(),
-                    self.tuning_params.gossip_max_batch_size,
-                    our_region_diff,
-                )
-                .await
-                .map_err(KitsuneError::other)?;
-
             state.ops_batch_queue.0.share_mut(|queue, _| {
-                for region in limited_regions {
+                for region in our_region_diff {
                     queue.region_queue.push_back(region)
                 }
                 Ok(())
@@ -173,12 +153,6 @@ impl ShardedGossipLocal {
         &self,
         state: RoundState,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
-        let topo = self
-            .host_api
-            .get_topology(self.space.clone())
-            .await
-            .map_err(KitsuneError::other)?;
-
         let (to_fetch, finished) = state.ops_batch_queue.share_mut(|queues, _| {
             let items = get_region_queue_batch(
                 &mut queues.region_queue,
@@ -187,26 +161,27 @@ impl ShardedGossipLocal {
             Ok((items, queues.region_queue.is_empty()))
         })?;
 
-        let bounds: Vec<_> = to_fetch
-            .into_iter()
-            .map(|r| r.coords.to_bounds(&topo))
-            .collect();
-        // TODO: make region set diffing more robust to different times (arc power differences are already handled)
+        let queries = to_fetch.into_iter().map(|region| {
+            self.host_api
+                .query_op_hashes_by_region(self.space.clone(), region.coords)
+        });
 
-        let ops: Vec<KOp> = self
-            .evt_sender
-            .fetch_op_data(FetchOpDataEvt {
-                space: self.space.clone(),
-                query: FetchOpDataEvtQuery::Regions(bounds),
-            })
+        let ops: Vec<OpHashSized> = futures::future::join_all(queries)
             .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(KitsuneError::other)?
             .into_iter()
-            .map(second)
+            .flatten()
             .collect();
 
+        // // TODO: make region set diffing more robust to different times (arc power differences are already handled)
+
         let finished_val = if finished { 2 } else { 1 };
-        Ok(vec![ShardedGossipWire::missing_ops(ops, finished_val)])
+        Ok(vec![ShardedGossipWire::missing_op_hashes(
+            ops,
+            finished_val,
+        )])
     }
 
     /// Generate the next batch of missing ops.
@@ -236,7 +211,7 @@ impl ShardedGossipLocal {
                             .await
                     }
                     // Nothing is queued so this node is done.
-                    None => Ok(vec![ShardedGossipWire::missing_ops(
+                    None => Ok(vec![ShardedGossipWire::missing_op_hashes(
                         Vec::with_capacity(0),
                         MissingOpsStatus::AllComplete as u8,
                     )]),
@@ -257,13 +232,16 @@ impl ShardedGossipLocal {
         let mut gossip = Vec::new();
 
         // Fetch the missing ops if there is any.
-        let missing_ops = if missing_hashes.is_empty() {
+        let missing_op_hashes = if missing_hashes.is_empty() {
             Vec::with_capacity(0)
         } else {
             self.evt_sender
                 .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
-                    query: FetchOpDataEvtQuery::Hashes(missing_hashes.clone()),
+                    query: FetchOpDataEvtQuery::Hashes {
+                        op_hash_list: missing_hashes.clone(),
+                        include_limbo: false,
+                    },
                 })
                 .await
                 .map_err(KitsuneError::other)?
@@ -272,7 +250,7 @@ impl ShardedGossipLocal {
                 .collect()
         };
 
-        let got_len = missing_ops.len();
+        let got_len = missing_op_hashes.len();
 
         // If there is less ops then missing hashes the call was batched.
         let is_batched = got_len < num_missing;
@@ -308,60 +286,70 @@ impl ShardedGossipLocal {
         };
 
         // Chunk the ops into multiple gossip messages if needed.
-        into_chunks(&mut gossip, missing_ops, complete);
+        into_chunks(&mut gossip, missing_hashes, complete);
 
         Ok(gossip)
     }
 
     /// Incoming ops that were missing from this nodes bloom filter.
-    pub(super) async fn incoming_missing_ops(&self, ops: Vec<KOp>) -> KitsuneResult<()> {
-        // Put the ops in the agents that contain the ops within their arcs.
-        store::put_ops(&self.evt_sender, &self.space, ops).await?;
-
+    pub(super) async fn incoming_missing_op_hashes(
+        &self,
+        source: FetchSource,
+        ops: Vec<OpHashSized>,
+    ) -> KitsuneResult<()> {
+        for op_hash in ops {
+            let (hash, size) = op_hash.into_inner();
+            let request = FetchPoolPush {
+                key: FetchKey::Op(hash),
+                author: None,
+                context: None,
+                space: self.space.clone(),
+                source: source.clone(),
+                size,
+            };
+            self.fetch_pool.push(request);
+        }
         Ok(())
     }
 }
 
 /// Separate gossip into chunks to keep messages under the max size.
 // pair(maackle, freesig): can use this for chunking, see above fn for use
-fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, ops: Vec<KOp>, complete: u8) {
-    let mut chunk = Vec::with_capacity(ops.len());
+fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, hashes: Vec<KOpHash>, complete: u8) {
+    let mut chunk = Vec::with_capacity(hashes.len());
     let mut size = 0;
 
     // If there are no ops missing we send back an empty final chunk
     // so the other side knows we're done.
-    if ops.is_empty() {
-        gossip.push(ShardedGossipWire::missing_ops(
-            Vec::with_capacity(0),
-            complete,
-        ));
+    if hashes.is_empty() {
+        gossip.push(ShardedGossipWire::missing_op_hashes(vec![], complete));
     }
 
-    for op in ops {
+    for op in hashes {
         // Bytes for this op.
-        let bytes = op.size();
+        let bytes = op.0.len();
 
         // Check if this op will fit without going over the max.
         if size + bytes <= MAX_SEND_BUF_BYTES {
             // Op will fit so add it to the chunk and update the size.
-            chunk.push(op);
+            chunk.push(OpHashSized::new(op, None));
             size += bytes;
         } else {
             // Op won't fit so flush the chunk.
             // There will be at least one more chunk so this isn't the final.
-            gossip.push(ShardedGossipWire::missing_ops(
+            gossip.push(ShardedGossipWire::missing_op_hashes(
                 std::mem::take(&mut chunk),
                 MissingOpsStatus::ChunkComplete as u8,
             ));
             // Reset the size to this ops size.
             size = bytes;
             // Push this op onto the next chunk.
-            chunk.push(op);
+            chunk.push(OpHashSized::new(op, None));
         }
     }
     // If there is a final chunk to write then add it and set it to final.
     if !chunk.is_empty() {
-        gossip.push(ShardedGossipWire::missing_ops(chunk, complete));
+        gossip.push(ShardedGossipWire::missing_op_hashes(chunk, complete));
     }
 }
 

@@ -119,7 +119,9 @@ impl Offset for TimeOffset {
 /// way of describing intervals uses tree coordinates as well:
 /// The length of an interval is 2^(power), and the position of its left edge
 /// is at (offset * length).
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
+)]
 pub struct Segment<O: Offset> {
     /// The exponent, where length = 2^power
     pub power: u8,

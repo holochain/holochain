@@ -104,6 +104,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
         ZomeDef::Wasm(WasmZome {
             wasm_hash,
             mut dependencies,
+            preserialized_path,
         }) => {
             dependencies.clear();
             dependencies.push("2".into());
@@ -113,6 +114,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash,
                     dependencies,
+                    preserialized_path,
                 })
                 .into(),
             )
@@ -194,6 +196,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
     let new_coordinator: CoordinatorZomeDef = ZomeDef::Wasm(WasmZome {
         wasm_hash,
         dependencies: vec!["2".into()],
+        preserialized_path: None,
     })
     .into();
 
@@ -245,6 +248,7 @@ async fn test_update_admin_interface() {
         zomes: vec![ZomeManifest {
             name: TestCoordinatorWasm::CoordinatorZomeUpdate.into(),
             hash: None,
+            dylib: None,
             location: ZomeLocation::Bundled(TestCoordinatorWasm::CoordinatorZomeUpdate.into()),
             dependencies: Some(vec![ZomeDependency {
                 name: TestIntegrityWasm::IntegrityZome.into(),
@@ -254,7 +258,8 @@ async fn test_update_admin_interface() {
 
     let code = DnaWasm::from(TestCoordinatorWasm::CoordinatorZomeUpdate)
         .code
-        .to_vec();
+        .to_vec()
+        .into();
 
     let source: CoordinatorBundle = Bundle::new(
         manifest,

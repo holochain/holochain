@@ -3,7 +3,7 @@ use num_traits::Zero;
 
 use crate::spacetime::{SpaceOffset, Topology};
 
-use super::{is_full, Arq, ArqStrat};
+use super::{is_full, Arq, ArqClamping, ArqStrat};
 
 /// A "view" of the peers in a neighborhood. The view consists of a few
 /// observations about the distribution of peers within a particular arc, used
@@ -25,7 +25,7 @@ impl PeerView {
         match self {
             Self::Quantized(v) => {
                 let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
-                let updated = v.update_arq(&v.topo, &mut arq);
+                let updated = v.update_arq(&mut arq);
                 *dht_arc = arq.to_dht_arc(&v.topo);
                 updated
             }
@@ -117,8 +117,22 @@ impl PeerViewQ {
     }
 
     /// Mutate the arq to its ideal target
-    pub fn update_arq(&self, topo: &Topology, arq: &mut Arq) -> bool {
-        self.update_arq_with_stats(topo, arq).changed
+    pub fn update_arq(&self, arq: &mut Arq) -> bool {
+        let topo = &self.topo;
+        let strat = &self.strat;
+        match strat.local_storage.arc_clamping {
+            Some(ArqClamping::Empty) => {
+                let changed = arq.is_empty();
+                *arq.count_mut() = 0;
+                changed
+            }
+            Some(ArqClamping::Full) => {
+                let changed = arq.is_full(topo);
+                *arq = Arq::new_full(topo, arq.start, topo.max_space_power(strat));
+                changed
+            }
+            None => self.update_arq_with_stats(arq).changed,
+        }
     }
 
     fn is_slacking(&self, cov: f64, num_peers: usize) -> bool {
@@ -221,7 +235,8 @@ impl PeerViewQ {
     /// More detail on these assumptions here:
     /// <https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g>
     /// TODO: make the above link to something publicly available, preferably in the repo
-    pub fn update_arq_with_stats(&self, topo: &Topology, arq: &mut Arq) -> UpdateArqStats {
+    pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
+        let topo = &self.topo;
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);
 
         let old_count = arq.count();
@@ -359,6 +374,7 @@ impl PeerViewQ {
         PowerStats { median, std_dev }
     }
 
+    /// Filter to return only **non-zero** arcs whose start lies in the filtering arc
     fn filtered_arqs(&self, filter: DhtArc) -> impl Iterator<Item = &Arq> {
         let it = self.peers.iter();
 
@@ -368,7 +384,7 @@ impl PeerViewQ {
             .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
             .map(|(_, arq)| arq);
 
-        it.filter(move |arq| filter.contains(&arq.start_loc()))
+        it.filter(move |arq| !arq.is_empty() && filter.contains(arq.start_loc()))
     }
 }
 
@@ -438,7 +454,7 @@ mod tests {
 
         let arqs = vec![a, b, c];
         print_arqs(&topo, &arqs, 64);
-        let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
+        let view = PeerViewQ::new(topo.clone(), ArqStrat::default(), arqs);
 
         let get = |b: Arq| {
             view.filtered_arqs(b.to_dht_arc(&topo))
@@ -460,7 +476,7 @@ mod tests {
             .map(|x| make_arq(&topo, pow, x, x + 0x20))
             .collect();
         print_arqs(&topo, &arqs, 64);
-        let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
+        let view = PeerViewQ::new(topo.clone(), ArqStrat::default(), arqs);
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(&make_arq(&topo, pow, 0, 0x10)),
             (2.0, 1)

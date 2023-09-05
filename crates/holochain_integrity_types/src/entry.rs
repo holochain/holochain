@@ -9,7 +9,9 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::AppEntryDef;
 use crate::EntryDefIndex;
+use crate::EntryType;
 use crate::ZomeIndex;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
@@ -25,7 +27,7 @@ pub use app_entry_bytes::*;
 pub use error::*;
 
 /// Entries larger than this number of bytes cannot be created
-pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
+pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MB
 
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
@@ -82,7 +84,7 @@ impl From<EntryHashed> for Entry {
 }
 
 /// Structure holding the entry portion of a chain record.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
@@ -133,13 +135,24 @@ impl Entry {
     }
 
     /// Create an Entry::App from SerializedBytes
-    pub fn app_fancy<
-        E: Into<EntryError>,
-        SB: TryInto<SerializedBytes, Error = SerializedBytesError>,
-    >(
+    pub fn app_fancy<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
         sb: SB,
     ) -> Result<Self, EntryError> {
         Ok(Entry::App(AppEntryBytes::try_from(sb.try_into()?)?))
+    }
+
+    /// Get an EntryType based on the type of this Entry.
+    /// If the entry type is Entry, and no entry def is specified, return None
+    pub fn entry_type(&self, entry_def: Option<AppEntryDef>) -> Option<EntryType> {
+        match (self, entry_def) {
+            (Entry::Agent(_), _) => Some(EntryType::AgentPubKey),
+            (Entry::CapClaim(_), _) => Some(EntryType::CapClaim),
+            (Entry::CapGrant(_), _) => Some(EntryType::CapGrant),
+            (Entry::App(_), Some(aed)) | (Entry::CounterSign(_, _), Some(aed)) => {
+                Some(EntryType::App(aed))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -156,10 +169,7 @@ impl HashableContent for Entry {
                 // We must retype this AgentPubKey as an EntryHash so that the
                 // prefix bytes match the Entry prefix
                 HashableContentBytes::Prehashed39(
-                    agent_pubkey
-                        .clone()
-                        .retype(holo_hash::hash_type::Entry)
-                        .into_inner(),
+                    EntryHash::from(agent_pubkey.clone()).into_inner(),
                 )
             }
             entry => HashableContentBytes::Content(
@@ -172,7 +182,7 @@ impl HashableContent for Entry {
 }
 
 /// Zome input for must_get_valid_record.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetValidRecordInput(pub ActionHash);
 
 impl MustGetValidRecordInput {
@@ -188,7 +198,7 @@ impl MustGetValidRecordInput {
 }
 
 /// Zome input for must_get_entry.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetEntryInput(pub EntryHash);
 
 impl MustGetEntryInput {
@@ -204,7 +214,7 @@ impl MustGetEntryInput {
 }
 
 /// Zome input for must_get_action.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetActionInput(pub ActionHash);
 
 impl MustGetActionInput {

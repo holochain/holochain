@@ -12,8 +12,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
@@ -67,7 +65,9 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
             call_context.zome = CoordinatorZome::from(zome).erase_type();
-            ribosome.module(call_context.zome.zome_name()).unwrap();
+            ribosome
+                .runtime_compiled_module(call_context.zome.zome_name())
+                .unwrap();
         }
 
         self.0.index += 1;
@@ -395,7 +395,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster);
 );
 
 fixturator!(
@@ -409,16 +409,6 @@ fixturator!(
 );
 
 fixturator!(
-    ValidationPackageInvocation;
-    constructor fn new(IntegrityZome, AppEntryDef);
-);
-
-fixturator!(
-    ValidationPackageHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
-);
-
-fixturator!(
     HostContext;
     variants [
         ZomeCall(ZomeCallHostAccess)
@@ -426,7 +416,6 @@ fixturator!(
         Init(InitHostAccess)
         EntryDefs(EntryDefsHostAccess)
         MigrateAgent(MigrateAgentHostAccess)
-        ValidationPackage(ValidationPackageHostAccess)
         PostCommit(PostCommitHostAccess)
     ];
 );

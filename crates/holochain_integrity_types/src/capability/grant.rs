@@ -36,7 +36,7 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 /// The entry for the ZomeCall capability grant.
 /// This data is committed to the callee's source chain as a private entry.
@@ -96,7 +96,11 @@ impl CapGrant {
                 access, functions, ..
             }) => {
                 // The checked function needs to be in the grant…
-                functions.contains(check_function)
+                let granted = match functions {
+                    GrantedFunctions::All => true,
+                    GrantedFunctions::Listed(fns) => fns.contains(check_function),
+                };
+                granted
                 // The agent needs to be valid…
                 && match access {
                     // The grant is assigned so the agent needs to match…
@@ -118,7 +122,7 @@ impl CapGrant {
 }
 
 /// Represents access requirements for capability grants.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
@@ -168,7 +172,26 @@ impl From<(CapSecret, AgentPubKey)> for CapAccess {
     }
 }
 
+impl CapAccess {
+    /// Return variant denominator as string slice
+    pub fn as_variant_string(&self) -> &str {
+        match self {
+            CapAccess::Unrestricted => "unrestricted",
+            CapAccess::Transferable { .. } => "transferable",
+            CapAccess::Assigned { .. } => "assigned",
+        }
+    }
+}
+
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
-pub type GrantedFunctions = BTreeSet<GrantedFunction>;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum GrantedFunctions {
+    /// grant all zomes all functions
+    All,
+    /// grant to specified zomes and functions
+    Listed(BTreeSet<GrantedFunction>),
+}

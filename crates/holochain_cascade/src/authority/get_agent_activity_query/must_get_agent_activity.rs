@@ -2,8 +2,7 @@ use std::ops::RangeInclusive;
 
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::DbRead;
+use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
@@ -34,7 +33,7 @@ pub async fn must_get_agent_activity(
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
     let result = env
-        .async_reader(move |mut txn| get_bounded_activity(&mut txn, None, &author, filter))
+        .read_async(move |mut txn| get_bounded_activity(&mut txn, None, &author, filter))
         .await?;
     filter_then_check(result)
 }

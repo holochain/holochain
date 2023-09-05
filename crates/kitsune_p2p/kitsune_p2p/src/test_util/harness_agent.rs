@@ -23,11 +23,18 @@ ghost_actor::ghost_chan! {
     }
 }
 
+#[derive(Debug)]
 pub struct HarnessHost;
 
 impl HarnessHost {
     pub fn new() -> Arc<Self> {
         Arc::new(Self)
+    }
+}
+
+impl FetchPoolConfig for HarnessHost {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
     }
 }
 
@@ -90,12 +97,13 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
 use kitsune_p2p_types::dht::spacetime::Topology;
-use kitsune_p2p_types::dht::PeerStrat;
+use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 
 struct AgentHarness {
@@ -105,6 +113,7 @@ struct AgentHarness {
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
     topology: Topology,
+    strat: ArqStrat,
 }
 
 impl AgentHarness {
@@ -127,6 +136,7 @@ impl AgentHarness {
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
             topology,
+            strat: ArqStrat::default(),
         })
     }
 }
@@ -229,7 +239,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
-        let strat = PeerStrat::default();
+        let strat = PeerStrat::from(self.strat.clone());
         let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
 
         // contains is already checked in the iterator
@@ -270,10 +280,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
         ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for op_data in ops {
             // TODO: check that we're handling string data uniformly in both directions
@@ -309,7 +320,10 @@ impl KitsuneP2pEventHandler for AgentHarness {
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, KOp)>> {
         let mut out = Vec::new();
         match input.query {
-            FetchOpDataEvtQuery::Hashes(hashes) => {
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list: hashes,
+                ..
+            } => {
                 for hash in hashes {
                     if let Some(op) = self.gossip_store.get(&hash) {
                         let data = KitsuneOpData::new(op.clone().into_bytes());

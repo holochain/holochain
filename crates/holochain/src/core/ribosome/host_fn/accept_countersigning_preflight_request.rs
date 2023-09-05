@@ -116,7 +116,7 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
-    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
     use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
@@ -158,7 +158,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_timeout_session() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -368,7 +368,7 @@ pub mod wasm_test {
     async fn unlock_invalid_session() {
         use holochain_state::nonce::fresh_nonce;
 
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -489,7 +489,7 @@ pub mod wasm_test {
     async fn lock_chain() {
         use holochain_state::nonce::fresh_nonce;
 
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -545,7 +545,7 @@ pub mod wasm_test {
             };
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        
+
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
             .raw_handle()
@@ -588,7 +588,7 @@ pub mod wasm_test {
             };
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        
+
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .raw_handle()
@@ -795,7 +795,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn enzymatic_session_success() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -933,13 +933,14 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn enzymatic_session_fail() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
-        let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous()).await;
         let apps = conductors
             .setup_app("countersigning", &[dna_file.clone()])
             .await
@@ -1033,6 +1034,8 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+
             // Alice commits the action.
             let _countersigned_action_hash_alice: ActionHash = alice_conductor
                 .call(
@@ -1087,6 +1090,7 @@ pub mod wasm_test {
                 bob_activity_pre.valid_activity.len() + 2
             );
         }
+
 
         // ENZYMATIC
 

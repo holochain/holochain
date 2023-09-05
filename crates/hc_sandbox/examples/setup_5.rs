@@ -10,11 +10,11 @@ use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
 
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Input {
-    #[structopt(short, long, default_value = "holochain")]
+    #[arg(short = 'H', long, default_value = "holochain")]
     holochain_path: PathBuf,
     happ: Option<PathBuf>,
 }
@@ -22,7 +22,7 @@ struct Input {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Get and parse any input.
-    let input = Input::from_args();
+    let input = Input::parse();
     let happ = hc_sandbox::bundles::parse_happ(input.happ)?;
 
     // Using the default mem network.
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
         let app_id = app_id.clone();
 
         // Create a conductor config with the network.
-        let path = hc_sandbox::generate::generate(Some(network.clone()), None, None)?;
+        let path = hc_sandbox::generate::generate(Some(network.clone()), None, None, false)?;
 
         // Create a command runner to run admin commands.
         // This runs the conductor in the background and cleans
@@ -55,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
             network_seed: None,
+            ignore_genesis_failure: false,
         };
 
         let r = AdminRequest::InstallApp(Box::new(payload));

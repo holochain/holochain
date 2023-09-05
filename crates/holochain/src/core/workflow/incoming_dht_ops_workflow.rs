@@ -119,7 +119,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
 #[instrument(skip(space, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
-    space: &Space,
+    space: Space,
     sys_validation_trigger: TriggerSender,
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     request_validation_receipt: bool,
@@ -152,7 +152,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     if !request_validation_receipt {
-        ops = filter_existing_ops(dht_db, ops).await?;
+        ops = filter_existing_ops(&dht_db, ops).await?;
     }
 
     for (hash, op) in ops {
@@ -171,7 +171,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     let (mut maybe_batch, rcv) =
-        batch_check_insert(incoming_ops_batch, request_validation_receipt, filter_ops);
+        batch_check_insert(&incoming_ops_batch, request_validation_receipt, filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
     if maybe_batch.is_some() {
@@ -183,7 +183,7 @@ pub async fn incoming_dht_ops_workflow(
                     let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let senders2 = senders.clone();
                     if let Err(err) = dht_db
-                        .async_commit(move |txn| {
+                        .write_async(move |txn| {
                             for entry in entries {
                                 let InOpBatchEntry {
                                     snd,
@@ -270,7 +270,7 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
-        .async_reader(move |txn| op_exists_inner(&txn, &hash))
+        .read_async(move |txn| op_exists_inner(&txn, &hash))
         .await
 }
 
@@ -279,7 +279,7 @@ pub async fn filter_existing_ops(
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
 ) -> DatabaseResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
     vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             ops.retain(|(hash, _)| !op_exists_inner(&txn, hash).unwrap_or(true));
             Ok(ops)
         })

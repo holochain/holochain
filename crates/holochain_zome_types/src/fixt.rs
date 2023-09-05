@@ -24,12 +24,18 @@ use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub use holo_hash::fixt::*;
 
 fixturator!(
     ExternIO;
     from Bytes;
+);
+
+fixturator!(
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
 );
 
 // Create random timestamps that are guaranteed to be valid UTC date and time (see datetime
@@ -106,6 +112,7 @@ fixturator!(
 );
 
 pub struct KnownCreateLink {
+    pub author: AgentPubKey,
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
@@ -122,6 +129,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
     type Item = CreateLink;
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(CreateLink);
+        f.author = self.0.curve.author.clone();
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
@@ -305,11 +313,11 @@ fixturator!(
                 let mut rng = rng();
                 let number_of_zomes = rng.gen_range(0..5);
 
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
+                let mut fns = BTreeSet::new();
                 for _ in 0..number_of_zomes {
-                    granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
+                    fns.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
-                granted_functions
+                GrantedFunctions::Listed(fns)
             }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
     };
@@ -321,15 +329,15 @@ fixturator!(
                 let mut rng = rand::thread_rng();
                 let number_of_zomes = rng.gen_range(0..5);
 
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
+                let mut fns = BTreeSet::new();
                 for _ in 0..number_of_zomes {
-                    granted_functions.insert(
-                        GrantedFunctionFixturator::new(Unpredictable)
-                            .next()
-                            .unwrap(),
+                    fns.insert(
+                    GrantedFunctionFixturator::new(Unpredictable)
+                        .next()
+                        .unwrap(),
                     );
                 }
-                granted_functions
+                GrantedFunctions::Listed(fns)
             },
             // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
@@ -343,14 +351,16 @@ fixturator!(
                 .next()
                 .unwrap(),
             {
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
-                for _ in 0..get_fixt_index!() % 3 {
-                    granted_functions
-                        .insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
+                if get_fixt_index!() %2 == 0{
+                    let mut fns = BTreeSet::new();
+                    for _ in 0..get_fixt_index!() % 3 {
+                        fns.insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
+                    }
+                    GrantedFunctions::Listed(fns)
+                } else {
+                    GrantedFunctions::All
                 }
-                granted_functions
-            },
-            // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
+            }
         )
     };
 );
@@ -796,6 +806,95 @@ fixturator!(
 );
 
 fixturator!(
+    Duration;
+    curve Empty std::time::Duration::from_nanos(0);
+    curve Unpredictable std::time::Duration::from_nanos(
+        U64Fixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()
+    );
+    curve Predictable std::time::Duration::from_nanos(
+        U64Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()
+    );
+);
+
+fixturator!(
+    DnaModifiers;
+    curve Empty DnaModifiers {
+        network_seed: StringFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+        .next()
+        .unwrap(),
+        origin_time: TimestampFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+        quantum_time: DurationFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+    };
+
+    curve Unpredictable DnaModifiers {
+        network_seed: StringFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+        .next()
+        .unwrap(),
+        origin_time: TimestampFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
+        quantum_time: DurationFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
+    };
+
+    curve Predictable DnaModifiers {
+        network_seed: StringFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+        .next()
+        .unwrap(),
+        origin_time: TimestampFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        quantum_time: DurationFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+    };
+);
+
+fixturator!(
+    DnaInfoV1;
+    curve Empty DnaInfoV1 {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: DnaModifiersFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap().properties,
+        zome_names: vec![ZomeNameFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Unpredictable DnaInfoV1 {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: DnaModifiersFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap().properties,
+        zome_names: vec![ZomeNameFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Predictable DnaInfoV1 {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: DnaModifiersFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap().properties,
+        zome_names: vec![ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+);
+
+fixturator!(
     DnaInfo;
     curve Empty DnaInfo {
         name: StringFixturator::new_indexed(Empty, get_fixt_index!())
@@ -804,7 +903,7 @@ fixturator!(
         hash: DnaHashFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+        modifiers: DnaModifiersFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
         zome_names: vec![ZomeNameFixturator::new_indexed(Empty, get_fixt_index!())
@@ -819,7 +918,7 @@ fixturator!(
         hash: DnaHashFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+        modifiers: DnaModifiersFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
         zome_names: vec![ZomeNameFixturator::new_indexed(Unpredictable, get_fixt_index!())
@@ -834,7 +933,7 @@ fixturator!(
         hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+        modifiers: DnaModifiersFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         zome_names: vec![ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())

@@ -19,6 +19,28 @@ fn msg() -> Msg {
 }
 
 #[hdk_extern]
+pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
+    HDK.with(|h| {
+        h.borrow().block_agent(holochain_zome_types::block::BlockAgentInput {
+            target,
+            reason: vec![],
+            interval: InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap()
+        })
+    })
+}
+
+#[hdk_extern]
+pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
+    HDK.with(|h| {
+        h.borrow().unblock_agent(holochain_zome_types::block::BlockAgentInput {
+            target,
+            reason: vec![],
+            interval: InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap()
+        })
+    })
+}
+
+#[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<ActionHash> {
     let post = new_post();
     HDK.with(|h| {
@@ -95,8 +117,9 @@ fn get_activity(
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
-    let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.name, "create_entry".into()));
+    let mut fns = BTreeSet::new();
+    fns.insert((zome_info()?.name, "create_entry".into()));
+    let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted

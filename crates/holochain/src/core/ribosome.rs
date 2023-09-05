@@ -9,7 +9,48 @@
 // documentation, and there seems to be no way to add docs to it after the fact
 #[allow(missing_docs)]
 pub mod error;
+
+/// How to version guest callbacks.
+/// See `genesis_self_check` for an example.
+///
+/// - Create unversioned structs in the root of the callback module
+///   - Invocation, result, host access
+///   - The unversioned structs should thinly wrap all their versioned structs
+/// - Create versioned submodules for the callback
+///   - In these, create versioned structs for the unversioned structs
+///   - Write/keep all tests for the versioned copies of the callbacks, test
+///     wasms can expose externs directly without the macros for explicit
+///     legacy identities if needed.
+/// - On the ribosome make sure the trait uses the unversioned struct
+///   - Inside the callback method loop over the versioned callbacks, and
+///     dispatch each that is found in the wasm
+///   - Figure out how to merge/handle results if multiple versions of a callback
+///     are found in the target wasm
+/// - The ribosome method caller will now be forced by types to provide the
+///   unversioned struct, which means they cannot forget to provide and dispatch
+///   everything required for each version
+/// - Update the `map_extern` macro so that the unversioned name of the callback
+///   maps to the latest version of the callback, e.g. `genesis_self_check` is
+///   rewritten to `genesis_self_check_2` at the time of writing
+///   - This has the effect of newly compiled wasms implementing the callback
+///     that is newest when they compile, without polluting the unversioned
+///     callback, which is effectively legacy/deprecated behaviour to call it
+///     directly.
 pub mod guest_callback;
+
+/// How to version host_fns.
+/// See `dna_info_1` and `dna_info_2` for an example.
+///
+/// - Create new versions of the host fn and related IO structs
+///   - Any change to an IO struct implies/necessitates a new host fn version
+///   - Changes to structs MAY also trigger a new callback version if there is
+///     a partially shared data structure in their interfaces
+///   - Update the IO type aliases to point to the newest version of all structs
+/// - Map both the old and new host functions in the ribosome
+/// - Define both of the host functions in the wasm externs in HDI/HDK
+/// - Test all versions of every host fn
+/// - Ensure the convenience wrapper in the HDI/HDK references the latest version
+///   of the host_fn
 pub mod host_fn;
 pub mod real_ribosome;
 
@@ -18,6 +59,8 @@ use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -25,8 +68,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use derive_more::Constructor;
 use error::RibosomeResult;
@@ -35,7 +76,6 @@ use guest_callback::init::InitHostAccess;
 use guest_callback::migrate_agent::MigrateAgentHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
-use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
@@ -45,6 +85,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::nonce::*;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
+use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
@@ -100,12 +141,12 @@ impl CallContext {
 #[derive(Clone, Debug)]
 pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
-    GenesisSelfCheck(GenesisSelfCheckHostAccess),
+    GenesisSelfCheckV1(GenesisSelfCheckHostAccessV1),
+    GenesisSelfCheckV2(GenesisSelfCheckHostAccessV2),
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     Validate(ValidateHostAccess),
-    ValidationPackage(ValidationPackageHostAccess),
     ZomeCall(ZomeCallHostAccess),
 }
 
@@ -113,12 +154,12 @@ impl From<&HostContext> for HostFnAccess {
     fn from(host_access: &HostContext) -> Self {
         match host_access {
             HostContext::ZomeCall(access) => access.into(),
-            HostContext::GenesisSelfCheck(access) => access.into(),
+            HostContext::GenesisSelfCheckV1(access) => access.into(),
+            HostContext::GenesisSelfCheckV2(access) => access.into(),
             HostContext::Validate(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
-            HostContext::ValidationPackage(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
         }
     }
@@ -132,8 +173,7 @@ impl HostContext {
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
-            Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
+            Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
             ),
@@ -171,7 +211,6 @@ impl HostContext {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
-            | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
@@ -184,6 +223,7 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
             | Self::Init(InitHostAccess { signal_tx, .. })
+            | Self::PostCommit(PostCommitHostAccess { signal_tx, .. })
             => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the signal broadcaster without providing one"
@@ -321,7 +361,7 @@ impl ZomeCallInvocation {
                     &self.signature,
                     ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
                 )
-                .await
+                .await?
             {
                 ZomeCallAuthorization::Authorized
             } else {
@@ -376,10 +416,32 @@ impl ZomeCallInvocation {
         )
     }
 
+    pub async fn verify_blocked_provenance(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<ZomeCallAuthorization> {
+        if host_access
+            .call_zome_handle
+            .is_blocked(
+                BlockTargetId::Cell(CellId::new(
+                    (*self.cell_id.dna_hash()).clone(),
+                    self.provenance.clone(),
+                )),
+                Timestamp::now(),
+            )
+            .await?
+        {
+            Ok(ZomeCallAuthorization::BlockedProvenance)
+        } else {
+            Ok(ZomeCallAuthorization::Authorized)
+        }
+    }
+
     /// to verify if the zome call is authorized:
     /// - the signature must be valid
     /// - the nonce must not have already been seen
     /// - the grant must be valid
+    /// - the provenance must not have any active blocks against them right now
     /// the checks MUST be done in this order as witnessing the nonce is a write
     /// and so we MUST NOT write nonces until after we verify the signature.
     #[allow(clippy::extra_unused_lifetimes)]
@@ -389,7 +451,12 @@ impl ZomeCallInvocation {
     ) -> RibosomeResult<ZomeCallAuthorization> {
         Ok(match self.verify_signature().await? {
             ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
-                ZomeCallAuthorization::Authorized => self.verify_grant(host_access).await?,
+                ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
+                    ZomeCallAuthorization::Authorized => {
+                        self.verify_blocked_provenance(host_access).await?
+                    }
+                    unauthorized => unauthorized,
+                },
                 unauthorized => unauthorized,
             },
             unauthorized => unauthorized,
@@ -648,12 +715,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
 
-    fn run_validation_package(
-        &self,
-        access: ValidationPackageHostAccess,
-        invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackageResult>;
-
     fn run_post_commit(
         &self,
         access: PostCommitHostAccess,
@@ -710,7 +771,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn verify_zome_call_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

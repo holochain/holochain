@@ -1,0 +1,92 @@
+name: "holochain build and test"
+
+on:
+  workflow_call:
+    inputs:
+      repo_path:
+        description: "a path to the holochain repository"
+        required: false
+        type: string
+        default: "."
+      fail_fast:
+        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    strategy:
+      fail-fast: ${{ inputs.fail_fast }}
+      matrix:
+        cmd:
+          # ensure functionality on multiple platforms
+          - pkgs:
+              - build-holochain-tests-unit-all
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+
+          # ensures to keep the cache populated for the supported versions on multiple platforms
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_2"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_1"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/weekly"
+        platform:
+          - system: x86_64-darwin
+          - system: aarch64-darwin
+          - system: x86_64-linux
+
+        include:
+          # we only run repo consistency checks on x86_64-linux
+          - cmd:
+              pkgs:
+                - build-holochain-build-crates-standalone
+                - build-holochain-tests-static-all
+                - build-release-automation-tests-unit
+              extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
+            platform:
+              system: x86_64-linux
+
+          # TODO: can this be skipped during a release run because it duplicates the release-prepare job?
+          - cmd:
+              pkgs:
+                - build-release-automation-tests-repo
+              extra_arg: "--override-input repo-git 'path:.git'"
+            platform:
+              system: x86_64-linux
+
+    # runs-on: ${{ matrix.platform.runs-on }}
+    runs-on: [self-hosted, multi-arch]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          lfs: false
+
+      - name: Print matrix
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
+        run: echo ${MATRIX}
+
+      - name: "Test command ${{ matrix.nixCommand }}"
+        env:
+          system: ${{ matrix.platform.system }}
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+        run: |
+          set -xe
+
+          git status
+
+          # if a nix store path was passed, ensure it exists locally
+          if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
+            nix-store --realise ${{inputs.repo_path }}
+          fi
+
+          nix build --no-link -L --show-trace \
+            ${{ matrix.cmd.extra_arg }} \
+            .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}

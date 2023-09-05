@@ -46,7 +46,12 @@ impl<S: ArqStart> Arq<S> {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
-        let empty = || " ".repeat(len);
+        let empty = || {
+            let mut s = " ".repeat(len);
+            let ix = loc_downscale(len, self.start.to_loc(topo, self.power));
+            s.replace_range(ix..=ix, ".");
+            s
+        };
         let full = || "-".repeat(len);
 
         // If lo and hi are less than one bucket's width apart when scaled down,

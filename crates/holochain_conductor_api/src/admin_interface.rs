@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::{FullStateDump, InstalledAppInfo};
+use crate::{AppInfo, FullStateDump, StorageInfo};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -101,7 +101,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentPubKeyGenerated`]
     GenerateAgentPubKey,
 
-    /// List all the cell IDs in the conductor.
+    /// List the IDs of all live cells currently running in the conductor.
     ///
     /// # Returns
     ///
@@ -144,11 +144,6 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppDisabled`]
     DisableApp {
         /// The app ID to disable
-        installed_app_id: InstalledAppId,
-    },
-
-    StartApp {
-        /// The app ID to (re)start
         installed_app_id: InstalledAppId,
     },
 
@@ -227,6 +222,9 @@ pub enum AdminRequest {
         dna_hash: Option<DnaHash>,
     },
 
+    /// Dump raw json network statistics from the backend networking lib.
+    DumpNetworkStats,
+
     /// Add a list of agents to this conductor's peer store.
     ///
     /// This is a way of shortcutting peer discovery and is useful for testing.
@@ -255,8 +253,8 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::AgentInfoRequested`]
-    RequestAgentInfo {
+    /// [`AdminResponse::AgentInfo`]
+    AgentInfo {
         /// Optionally choose the agent info of a specific cell.
         cell_id: Option<CellId>,
     },
@@ -325,6 +323,9 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::CloneCellDeleted`]
     DeleteCloneCell(Box<DeleteCloneCellPayload>),
+
+    /// Info about storage used by apps
+    StorageInfo,
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -354,10 +355,10 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
-    /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`RoleName`]s and, most usefully, the new [`CellId`]s
+    /// The resulting [`AppInfo`] contains the app ID,
+    /// the [`RoleName`]s and, most usefully, [`CellInfo`](crate::CellInfo)s
     /// of the newly installed DNAs.
-    AppInstalled(InstalledAppInfo),
+    AppInstalled(AppInfo),
 
     /// The successful response to an [`AdminRequest::UninstallApp`].
     ///
@@ -387,7 +388,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::ListApps`].
     ///
     /// Contains a list of the `InstalledAppInfo` of the installed apps in the conductor.
-    AppsListed(Vec<InstalledAppInfo>),
+    AppsListed(Vec<AppInfo>),
 
     /// The successful response to an [`AdminRequest::AttachAppInterface`].
     ///
@@ -408,7 +409,7 @@ pub enum AdminResponse {
     /// put the app in a running state, it will be running, otherwise it will
     /// be paused.
     AppEnabled {
-        app: InstalledAppInfo,
+        app: AppInfo,
         errors: Vec<(CellId, String)>,
     },
 
@@ -416,14 +417,6 @@ pub enum AdminResponse {
     ///
     /// It means the app was disabled successfully.
     AppDisabled,
-
-    /// The successful response to an [`AdminRequest::StartApp`].
-    ///
-    /// The boolean determines whether or not the app was actually started.
-    /// If `false`, it was because the app was in a disabled state, or the app
-    /// failed to start.
-    /// TODO: add reason why app couldn't start
-    AppStarted(bool),
 
     /// The successful response to an [`AdminRequest::DumpState`].
     ///
@@ -444,15 +437,21 @@ pub enum AdminResponse {
     /// The string is a JSON blob of the metrics results.
     NetworkMetricsDumped(String),
 
+    /// The successful result of a call to [`AdminRequest::DumpNetworkStats`].
+    ///
+    /// The string is a raw JSON blob returned directly from the backend
+    /// networking library.
+    NetworkStatsDumped(String),
+
     /// The successful response to an [`AdminRequest::AddAgentInfo`].
     ///
     /// This means the agent info was successfully added to the peer store.
     AgentInfoAdded,
 
-    /// The successful response to an [`AdminRequest::RequestAgentInfo`].
+    /// The successful response to an [`AdminRequest::AgentInfo`].
     ///
     /// This is all the agent info that was found for the request.
-    AgentInfoRequested(Vec<AgentInfoSigned>),
+    AgentInfo(Vec<AgentInfoSigned>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
@@ -462,6 +461,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,
+
+    /// The successful response to an [`AdminRequest::StorageInfo`].
+    StorageInfo(StorageInfo),
 }
 
 /// Error type that goes over the websocket wire.

@@ -105,6 +105,10 @@ impl ChainItem for TestChainItem {
     fn prev_hash(&self) -> Option<&Self::Hash> {
         self.prev.as_ref()
     }
+
+    fn to_display(&self) -> String {
+        String::from("test chain item")
+    }
 }
 
 impl AsRef<Self> for TestChainItem {
@@ -175,7 +179,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     let prev = n.checked_sub(1).map(Into::into);
                     TestChainItem {
                         seq: n as u32,
-                        hash: TestChainHash::forked(n as u8, i as u8),
+                        hash: TestChainHash::forked(n, i as u8),
                         prev,
                     }
                 } else {

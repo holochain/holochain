@@ -1,18 +1,120 @@
+---
+default_semver_increment_mode: !pre_minor beta-dev
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+Adds `ignore_genesis_failure` field to InstallApp arguments. The default is `false`, and you should never need to use this unless using the CHC feature. [2612](https://github.com/holochain/holochain/pull/2612)
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+## 0.3.0-beta-dev.14
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+## 0.3.0-beta-dev.10
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
+## 0.3.0-beta-dev.5
+
+## 0.3.0-beta-dev.4
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
+
+- Add links to concepts documentation to the conductor API module.
+
+## 0.2.0
+
+## 0.2.0-beta-rc.7
+
+## 0.2.0-beta-rc.6
+
+## 0.2.0-beta-rc.5
+
+- `StorageBlob` is an enum that serialized to camel case named variants. Renames all variants to snake case now.
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+- Adds new functionality to the conductor admin API which returns disk storage information. The storage used by apps is broken down into blobs which are being used by one or more app.
+
+## 0.2.0-beta-rc.2
+
+- `AppInfo` now includes a copy of the `AppManifest` which was used to install the app. This can be used to reinstall the same app under a different agent in the same conductor without needing to supply the original DNA files. [\#2157](https://github.com/holochain/holochain/pull/2157)
+
+## 0.2.0-beta-rc.1
+
+## 0.2.0-beta-rc.0
+
+- Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
+- Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+- Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that’s just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
+- Enabling a clone cell that’s already enabled or disabling a clone cell that’s already disabled would previously return a `CloneCellNotFound` error. Now, in those cases, nothing happens and a successful result is returned. [\#2093](https://github.com/holochain/holochain/pull/2093)
+- Extend `NetworkInfo` call with several data points related to peer network size and activity. [\#2183](https://github.com/holochain/holochain/pull/2183)
+
+## 0.1.0
+
+## 0.1.0-beta-rc.4
+
+- **BREAKING CHANGE**: `CreateCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: `EnableCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: Remove unused call `AdminRequest::StartApp`.
+- **BREAKING CHANGE**: `Cell` is split up into `ProvisionedCell` and `ClonedCell`.
+- **BREAKING CHANGE**: `CellInfo` variants are renamed to snake case during serde.
+- Return additional field `agent_pub_key` in `AppInfo`.
+
+## 0.1.0-beta-rc.3
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+- Fix error while installing app and return app info of newly installed app. [\#1725](https://github.com/holochain/holochain/pull/1725)
+
+## 0.1.0-beta-rc.0
+
 - **BREAKING CHANGE**: Remove deprecated Admin and App API calls.
+
 - **BREAKING CHANGE**: Remove call `InstallApp`.
+
 - **BREAKING CHANGE**: Rename `InstallAppBundle` to `InstallApp`.
-- **BREAKING CHANGE**: Rename `AppInfo` to `GetAppInfo`.
+
 - **BREAKING CHANGE**: Rename `ZomeCall` to `CallZome`. [\#1707](https://github.com/holochain/holochain/pull/1707)
 
 - **BREAKING CHANGE**: Rename ArchiveCloneCell to DisableCloneCell.
+
 - **BREAKING CHANGE**: Rename RestoreArchivedCloneCell to EnableCloneCell.
+
 - **BREAKING CHANGE**: Move EnableCloneCell to App API.
+
 - **BREAKING CHANGE**: Refactor DeleteCloneCell to delete a single disabled clone cell. [\#1704](https://github.com/holochain/holochain/pull/1704)
+
+- **BREAKING CHANGE**: Refactor `AppInfo` to return all cells and DNA modifiers.
+
+- **BREAKING CHANGE**: Rename `RequestAgentInfo` to `AgentInfo`. [\#1719](https://github.com/holochain/holochain/pull/1719)
 
 ## 0.0.72
 

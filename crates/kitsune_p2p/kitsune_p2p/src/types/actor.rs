@@ -5,7 +5,7 @@ use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
 
-use crate::gossip::sharded_gossip::GossipDiagnostics;
+use crate::gossip::sharded_gossip::KitsuneDiagnostics;
 
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
@@ -62,13 +62,27 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-/// The destination of a broadcast message.
-pub enum BroadcastTo {
-    /// Send to notify.
-    Notify,
-    /// Send to publish agent info.
-    PublishAgentInfo,
+/// Data to broadcast to the remote.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+pub enum BroadcastData {
+    /// User broadcast.
+    User(#[serde(with = "serde_bytes")] Vec<u8>),
+
+    /// Agent info.
+    AgentInfo(kitsune_p2p_types::agent_info::AgentInfoSigned),
+
+    /// Publish broadcast.
+    Publish {
+        /// Source (origin) agent that sent this publish.
+        source: Arc<super::KitsuneAgent>,
+
+        /// List of hashes being published.
+        op_hash_list: Vec<kitsune_p2p_fetch::OpHashSized>,
+
+        /// Context associated with this publish.
+        context: kitsune_p2p_fetch::FetchContext,
+    },
 }
 
 type KSpace = Arc<super::KitsuneSpace>;
@@ -87,7 +101,7 @@ ghost_actor::ghost_chan! {
         fn list_transport_bindings() -> Vec<Url2>;
 
         /// Announce a space/agent pair on this network.
-        fn join(space: KSpace, agent: KAgent, initial_arc: OptArc) -> ();
+        fn join(space: KSpace, agent: KAgent, maybe_agent_info: Option<kitsune_p2p_types::agent_info::AgentInfoSigned>, initial_arc: OptArc) -> ();
 
         /// Withdraw this space/agent pair from this network.
         fn leave(space: KSpace, agent: KAgent) -> ();
@@ -112,8 +126,7 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             basis: KBasis,
             timeout: KitsuneTimeout,
-            destination: BroadcastTo,
-            payload: Payload
+            data: BroadcastData,
         ) -> ();
 
         /// Broadcast data to a specific set of agents without
@@ -147,7 +160,10 @@ ghost_actor::ghost_chan! {
             space: KSpaceOpt,
         ) -> serde_json::Value;
 
+        /// dump network stats
+        fn dump_network_stats() -> serde_json::Value;
+
         /// Get data for diagnostics
-        fn get_diagnostics(space: KSpace) -> GossipDiagnostics;
+        fn get_diagnostics(space: KSpace) -> KitsuneDiagnostics;
     }
 }

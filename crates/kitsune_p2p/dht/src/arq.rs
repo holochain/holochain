@@ -468,7 +468,8 @@ pub fn is_full(topo: &Topology, power: u8, count: u32) -> bool {
 }
 
 /// Calculate the unique pairing of power and count implied by a given length
-/// and max number of chunks
+/// and max number of chunks. Gives the nearest value that satisfies the constraints,
+/// but may not be exact.
 pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -> (u8, u32) {
     assert!(len <= U32_LEN);
     let mut power = 0;
@@ -481,6 +482,31 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
     }
     let count = count.round() as u32;
     (power, count)
+}
+
+/// Calculate the highest power and lowest count such that the given length is
+/// represented exactly. If the length is not representable even at the quantum
+/// level (power==0), return None.
+pub fn power_and_count_from_length_exact(
+    dim: &Dimension,
+    len: u64,
+    min_chunks: u32,
+) -> Option<(u8, u32)> {
+    assert!(len <= U32_LEN);
+
+    let z = len.trailing_zeros();
+
+    if z < dim.quantum_power.into() {
+        return None;
+    }
+    let mut power = z as u8 - dim.quantum_power;
+    let mut count = len >> z;
+
+    while (count as u32) < min_chunks {
+        count *= 2;
+        power -= 1;
+    }
+    Some((power, count as u32))
 }
 
 /// Given a center and a length, give Arq which matches most closely given the provided strategy
@@ -511,7 +537,7 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) 
             "power too large: {}",
             power
         );
-        Arq::new(power as u8, start, count.into())
+        Arq::new(power, start, count.into())
     }
 }
 
@@ -620,6 +646,21 @@ mod tests {
     fn test_power_and_count_from_length(len: u64, expected: (u8, u32)) {
         let topo = Topology::standard_epoch_full();
         let (p, c) = power_and_count_from_length(&topo.space, len, 16);
+        assert_eq!((p, c), expected);
+        assert_eq!(
+            2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,
+            len
+        );
+    }
+
+    #[test_case(2u64.pow(30), (15, 8))]
+    #[test_case(2u64.pow(31), (16, 8))]
+    #[test_case(2u64.pow(32), (17, 8))]
+    #[test_case((128 + 16 + 8) * 2u64.pow(24), (15, 19))]
+    #[test_case((128 + 16 + 8 + 4 + 2) * 2u64.pow(24), (13, 79))]
+    fn test_power_and_count_from_length_exact(len: u64, expected: (u8, u32)) {
+        let topo = Topology::standard_epoch_full();
+        let (p, c) = power_and_count_from_length_exact(&topo.space, len, 8).unwrap();
         assert_eq!((p, c), expected);
         assert_eq!(
             2u64.pow(p as u32 + topo.space.quantum_power as u32) * c as u64,

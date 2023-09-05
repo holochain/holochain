@@ -6,7 +6,7 @@ use warp::Filter;
 
 pub(crate) fn random(
     store: Store,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = impl warp::Reply + Sized, Error = warp::Rejection> + Clone {
     warp::post()
         .and(warp::header::exact("X-Op", "random"))
         .and(warp::body::content_length_limit(SIZE_LIMIT))
@@ -18,7 +18,9 @@ pub(crate) fn random(
 async fn random_info(query: Bytes, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     let query: RandomQuery =
         rmp_decode(&mut AsRef::<[u8]>::as_ref(&query)).map_err(|_| warp::reject())?;
-    let result = store.random(query);
+    #[derive(serde::Serialize)]
+    struct Bin(#[serde(with = "serde_bytes")] Vec<u8>);
+    let result = store.random(query).into_iter().map(Bin).collect::<Vec<_>>();
     let mut buf = Vec::with_capacity(result.len());
     rmp_encode(&mut buf, result).map_err(|_| warp::reject())?;
     RANDOM.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -89,10 +91,12 @@ mod tests {
             .reply(&filter)
             .await;
         assert_eq!(res.status(), 200);
-        let result: Vec<Vec<u8>> = rmp_decode(&mut res.body().as_ref()).unwrap();
+        #[derive(Debug, serde::Deserialize)]
+        struct Bytes(#[serde(with = "serde_bytes")] Vec<u8>);
+        let result: Vec<Bytes> = rmp_decode(&mut res.body().as_ref()).unwrap();
         let result: Vec<AgentInfoSigned> = result
             .into_iter()
-            .map(|bytes| rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes)).unwrap())
+            .map(|bytes| rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes.0)).unwrap())
             .collect();
         for peer in &result {
             assert!(peers.iter().any(|p| p == peer));

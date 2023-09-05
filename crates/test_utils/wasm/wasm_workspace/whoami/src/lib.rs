@@ -14,8 +14,9 @@ impl From<Zomes> for ZomeName {
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.name, "whoami".into()));
+    let mut fns = BTreeSet::new();
+    fns.insert((zome_info()?.name, "whoami".into()));
+    let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted

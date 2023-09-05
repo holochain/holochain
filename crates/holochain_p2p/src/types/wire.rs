@@ -48,14 +48,6 @@ pub enum WireMessage {
         nonce: Box<Nonce256Bits>,
         expires_at: Timestamp,
     },
-    Publish {
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        // For backward compat with holochain < 0.0.164
-        #[serde(alias = "dht_hash")]
-        basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
-    },
     ValidationReceipt {
         #[serde(with = "serde_bytes")]
         receipt: Vec<u8>,
@@ -72,6 +64,9 @@ pub enum WireMessage {
         link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
+    CountLinks {
+        query: WireLinkQuery,
+    },
     GetAgentActivity {
         agent: AgentPubKey,
         query: ChainQueryFilter,
@@ -84,6 +79,10 @@ pub enum WireMessage {
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
     },
+    PublishCountersign {
+        flag: bool,
+        op: DhtOp,
+    },
 }
 
 #[allow(missing_docs)]
@@ -94,6 +93,10 @@ impl WireMessage {
 
     pub fn decode(data: &[u8]) -> Result<Self, SerializedBytesError> {
         holochain_serialized_bytes::decode(&data)
+    }
+
+    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
+        Self::PublishCountersign { flag, op }
     }
 
     /// For an outgoing remote call.
@@ -145,20 +148,6 @@ impl WireMessage {
         }
     }
 
-    pub fn publish(
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
-    ) -> WireMessage {
-        Self::Publish {
-            request_validation_receipt,
-            countersigning_session,
-            basis_hash,
-            ops,
-        }
-    }
-
     pub fn validation_receipt(receipt: SerializedBytes) -> WireMessage {
         Self::ValidationReceipt {
             receipt: UnsafeBytes::from(receipt).into(),
@@ -178,6 +167,10 @@ impl WireMessage {
 
     pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
+    }
+
+    pub fn count_links(query: WireLinkQuery) -> WireMessage {
+        Self::CountLinks { query }
     }
 
     pub fn get_agent_activity(

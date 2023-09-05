@@ -88,7 +88,7 @@ impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for ChainFilters<H> {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 /// Input to the `must_get_agent_activity` call.
 pub struct MustGetAgentActivityInput {
     /// The author of the chain that you are requesting

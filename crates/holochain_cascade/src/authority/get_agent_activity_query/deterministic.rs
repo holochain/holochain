@@ -144,7 +144,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let test_db = test_dht_db();
         let db = test_db.to_db();
         let entry_type_1 = fixt!(EntryType);
@@ -171,7 +171,7 @@ mod tests {
                 chain.push(ActionHash::with_data_sync(&action));
                 let op = DhtOp::RegisterAgentActivity(fixt!(Signature), action.into());
                 let op = DhtOpHashed::from_content_sync(op);
-                fill_db(&db, op);
+                fill_db(&db, op).await;
             }
             chains.push(chain);
         }

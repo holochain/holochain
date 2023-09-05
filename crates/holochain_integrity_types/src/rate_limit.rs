@@ -6,7 +6,7 @@ use crate::{Create, CreateLink, Delete, Entry, Update};
 
 /// Input to the `weigh` callback. Includes an "unweighed" action, and Entry
 /// if applicable.
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Debug)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum WeighInput {
     /// A Link to be weighed

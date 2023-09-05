@@ -6,8 +6,8 @@ use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
+use holochain_trace::Output;
 use holochain_util::tokio_helper;
-use observability::Output;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
@@ -80,12 +80,22 @@ async fn async_main() {
         return;
     }
 
-    observability::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
-    debug!("observability initialized");
+    let config = get_conductor_config(&opt);
+
+    if let Some(t) = &config.tracing_override {
+        std::env::set_var("CUSTOM_FILTER", t);
+    }
+
+    holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
+    debug!("holochain_trace initialized");
+
+    holochain_metrics::HolochainMetricsConfig::new(config.environment_path.as_ref())
+        .init()
+        .await;
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
-    let conductor = conductor_handle_from_config_path(&opt).await;
+    let conductor = conductor_handle_from_config(&opt, config).await;
 
     info!("Conductor successfully initialized.");
 
@@ -100,20 +110,17 @@ async fn async_main() {
     #[cfg(unix)]
     let _ = notify(true, &[NotifyState::Ready]);
 
-    // Await on the main JoinHandle, keeping the process alive until all
-    // Conductor activity has ceased
-    let result = conductor
-        .take_shutdown_handle()
-        .expect("The shutdown handle has already been taken.")
-        .await;
-
-    handle_shutdown(result);
-
-    // TODO: on SIGINT/SIGKILL, kill the conductor:
-    // conductor.kill().await
+    // wait for a unix signal or ctrl-c instruction to
+    // shutdown holochain
+    tokio::signal::ctrl_c()
+        .await
+        .unwrap_or_else(|e| tracing::error!("Could not handle termination signal: {:?}", e));
+    tracing::info!("Gracefully shutting down conductor...");
+    let shutdown_result = conductor.shutdown().await;
+    handle_shutdown(shutdown_result);
 }
 
-async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
+fn get_conductor_config(opt: &Opt) -> ConductorConfig {
     let config_path = opt.config_path.clone();
     let config_path_default = config_path.is_none();
     let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
@@ -131,6 +138,10 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
         load_config(&config_path, config_path_default)
     };
 
+    config
+}
+
+async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> ConductorHandle {
     // read the passphrase to prepare for usage
     let passphrase = match &config.keystore {
         KeystoreConfig::DangerTestKeystore => None,
@@ -162,12 +173,18 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
     }
 
     // Initialize the Conductor
-    Conductor::builder()
+    match Conductor::builder()
         .config(config)
         .passphrase(passphrase)
         .build()
         .await
-        .expect("Could not initialize Conductor from configuration")
+    {
+        Err(err) => panic!(
+            "Could not initialize Conductor from configuration: {:?}",
+            err
+        ),
+        Ok(res) => res,
+    }
 }
 
 /// Load config, throw friendly error on failure

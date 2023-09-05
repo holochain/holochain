@@ -39,7 +39,7 @@ const EXTRAP_COV_CHECK_FREQ: Duration = Duration::from_millis(1000 * 60);
 const METRIC_EXCHANGE_FREQ: Duration = Duration::from_millis(1000 * 60);
 
 struct RemoteRef {
-    con: Tx2ConHnd<wire::Wire>,
+    con: MetaNetCon,
     last_sync: ShouldTrigger,
 }
 
@@ -50,7 +50,7 @@ pub(crate) struct MetricExchange {
     extrap_cov: f32,
     #[allow(dead_code)]
     metrics: MetricsSync,
-    remote_refs: HashMap<TxUrl, RemoteRef>,
+    remote_refs: HashMap<String, RemoteRef>,
     arc_set: DhtArcSet,
 }
 
@@ -99,7 +99,7 @@ impl MetricExchange {
         self.arc_set = arc_set;
     }
 
-    pub fn new_con(&mut self, url: TxUrl, con: Tx2ConHnd<wire::Wire>) {
+    pub fn new_con(&mut self, url: String, con: MetaNetCon) {
         use std::collections::hash_map::Entry::*;
 
         match self.remote_refs.entry(url) {
@@ -118,7 +118,7 @@ impl MetricExchange {
         }
     }
 
-    pub fn del_con(&mut self, url: TxUrl) {
+    pub fn del_con(&mut self, url: String) {
         self.remote_refs.remove(&url);
     }
 

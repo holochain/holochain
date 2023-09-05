@@ -43,8 +43,12 @@ wasm_io_types! {
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
-    // @todo
-    fn dna_info (()) -> zt::info::DnaInfo;
+    // Block some agent on the same DNA.
+    fn block_agent (zt::block::BlockAgentInput) -> ();
+
+    // Info about the current DNA.
+    fn dna_info_1 (()) -> zt::info::DnaInfoV1;
+    fn dna_info_2 (()) -> zt::info::DnaInfoV2;
 
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
@@ -90,6 +94,8 @@ wasm_io_types! {
 
     // Get links by entry hash from the cascade.
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
+
+    fn count_links(zt::query::LinkQuery) -> usize;
 
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
@@ -141,6 +147,9 @@ wasm_io_types! {
     // Same as  but also takes the ActionHash of the updated record.
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
+    // Unblock some previously blocked agent.
+    fn unblock_agent(zt::block::BlockAgentInput) -> ();
+
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 
     fn x_salsa20_poly1305_shared_secret_create_random(
@@ -188,6 +197,7 @@ pub enum ZomeCallAuthorization {
     BadSignature,
     BadCapGrant,
     BadNonce(String),
+    BlockedProvenance,
 }
 
 impl std::fmt::Display for ZomeCallAuthorization {

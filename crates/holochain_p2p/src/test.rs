@@ -17,6 +17,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -67,9 +68,21 @@ impl HolochainP2pHandler for StubNetwork {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        source: AgentPubKey,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
-    ) -> HolochainP2pHandlerResult<usize> {
+        reflect_ops: Option<Vec<DhtOp>>,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+
+    fn handle_publish_countersign(
+        &mut self,
+        dna_hash: DnaHash,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
 
@@ -97,6 +110,14 @@ impl HolochainP2pHandler for StubNetwork {
         link_key: WireLinkKey,
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
+        Err("stub".into())
+    }
+
+    fn handle_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        query: WireLinkQuery,
+    ) -> HolochainP2pHandlerResult<CountLinksResponse> {
         Err("stub".into())
     }
 
@@ -155,10 +176,14 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,
-    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics> {
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics> {
         Err("stub".into())
     }
 }
@@ -214,6 +239,8 @@ mod tests {
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p::*;
+    use std::sync::Mutex;
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -227,7 +254,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
             fixt!(AgentPubKey, Predictable, 0),
@@ -276,8 +303,8 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
@@ -358,8 +385,8 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
             .await
@@ -373,17 +400,33 @@ mod tests {
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-            kitsune_p2p::HostStub::new(),
-        )
-        .await
-        .unwrap();
+        let mut tuning_params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.gossip_strategy = "none".to_string();
+        let tuning_params = Arc::new(tuning_params);
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = tuning_params;
 
-        let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let host_list = Arc::new(Mutex::new(Vec::new()));
+        let test_host = {
+            let host_list = host_list.clone();
+            HostStub::with_check_op_data(Box::new(move |space, list, ctx| {
+                host_list
+                    .lock()
+                    .unwrap()
+                    .push(format!("{:?}:{:?}:{:?}", space, list, ctx,));
+                async move { Ok(list.into_iter().map(|_| false).collect()) }
+                    .boxed()
+                    .into()
+            }))
+        };
+        //let test_host = TestHost::default();
 
-        let recv_count_clone = recv_count.clone();
+        let (p2p, mut evt) =
+            spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap(), test_host)
+                .await
+                .unwrap();
+
         let r_task = tokio::task::spawn(async move {
             use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
@@ -391,7 +434,6 @@ mod tests {
                 match evt {
                     Publish { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
-                        recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     SignNetworkData { respond, .. } => {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
@@ -402,18 +444,23 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
+                    QueryAgentInfoSignedNearBasis { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
-                    _ => {}
+                    oth => {
+                        tracing::warn!(?oth, "@@@");
+                    }
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a3.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a3.clone(), None, None).await.unwrap();
 
         let action_hash = holo_hash::OpBasis::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -423,10 +470,22 @@ mod tests {
         // this will fail because we can't reach any remote nodes
         // but, it still published locally, so our test will work
         let _ = p2p
-            .publish(dna, true, false, action_hash, vec![], Some(200))
+            .publish(
+                dna,
+                true,
+                false,
+                action_hash,
+                a1.clone(),
+                vec![],
+                Some(200),
+                None,
+            )
             .await;
 
-        assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            "KitsuneSpace(0x737373737373737373737373737373737373737373737373737373737373737373737373):[]:Some(FetchContext(1))",
+            host_list.lock().unwrap()[0],
+        );
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
@@ -434,7 +493,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna, a1, a2, _a3) = test_setup();
 
@@ -500,9 +559,9 @@ mod tests {
         });
 
         tracing::info!("test - join1");
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
         tracing::info!("test - join2");
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -511,7 +570,7 @@ mod tests {
 
         tracing::info!("test - get");
         let res = p2p
-            .get(dna, hash, actor::GetOptions::default())
+            .get(dna, hash, crate::actor::GetOptions::default())
             .await
             .unwrap();
 
@@ -586,8 +645,8 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let hash = holo_hash::EntryHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -597,10 +656,13 @@ mod tests {
             base: hash.into(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
 
         let res = p2p
-            .get_links(dna, link_key, actor::GetLinksOptions::default())
+            .get_links(dna, link_key, crate::actor::GetLinksOptions::default())
             .await
             .unwrap();
 

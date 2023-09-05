@@ -147,9 +147,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app_bundle(*payload)
                     .await?
                     .into();
-                Ok(AdminResponse::AppInstalled(
-                    InstalledAppInfo::from_installed_app(&app),
-                ))
+                let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
+                Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
+                    &app,
+                    &dna_definitions,
+                )))
             }
             UninstallApp { installed_app_id } => {
                 self.conductor_handle
@@ -174,7 +176,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle
-                    .list_cell_ids(Some(CellStatus::Joined));
+                    .running_cell_ids(Some(CellStatus::Joined))
+                    .into_iter()
+                    .collect();
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListApps { status_filter } => {
@@ -216,15 +220,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            StartApp { installed_app_id } => {
-                // TODO: check to see if app was actually started
-                let app = self
-                    .conductor_handle
-                    .clone()
-                    .start_app(installed_app_id)
-                    .await?;
-                Ok(AdminResponse::AppStarted(app.status().is_running()))
-            }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
                 let port = self
@@ -256,13 +251,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
                 Ok(AdminResponse::NetworkMetricsDumped(dump))
             }
+            DumpNetworkStats => {
+                let stats = self.conductor_handle.dump_network_stats().await?;
+                Ok(AdminResponse::NetworkStatsDumped(stats))
+            }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
-            RequestAgentInfo { cell_id } => {
+            AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfoRequested(r))
+                Ok(AdminResponse::AgentInfo(r))
             }
             GraftRecords {
                 cell_id,
@@ -285,10 +284,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DeleteCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .delete_clone_cell(&*payload)
+                    .delete_clone_cell(&payload)
                     .await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
+            StorageInfo => Ok(AdminResponse::StorageInfo(
+                self.conductor_handle.storage_info().await?,
+            )),
         }
     }
 }
@@ -322,19 +324,19 @@ mod test {
     use crate::conductor::Conductor;
     use anyhow::Result;
     use holochain_state::prelude::*;
+    use holochain_trace;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::test_utils::write_fake_dna_file;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
-    use observability;
     use uuid::Uuid;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_list_dna_app() -> Result<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let env_dir = test_db_dir();
         let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
-        let shutdown = handle.take_shutdown_handle().unwrap();
+
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
@@ -449,8 +451,7 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        handle.shutdown();
-        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+        tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown())
             .await
             .ok();
         Ok(())
@@ -459,7 +460,7 @@ mod test {
     // @todo fix test by using new InstallApp call
     // #[tokio::test(flavor = "multi_thread")]
     // async fn install_list_dna_app() {
-    // observability::test_run().ok();
+    // holochain_trace::test_run().ok();
     // let db_dir = test_db_dir();
     // let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
     // let shutdown = handle.take_shutdown_handle().unwrap();

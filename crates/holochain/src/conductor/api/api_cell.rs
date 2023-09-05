@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
+use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
@@ -16,10 +17,12 @@ use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
+use holochain_state::prelude::DatabaseResult;
 use holochain_types::prelude::*;
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
-use tracing::*;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
@@ -71,9 +74,10 @@ impl CellConductorApiT for CellConductorApi {
         }
     }
 
-    async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
-        warn!("Using placeholder dpki");
-        Ok("TODO".to_string())
+    fn conductor_services(&self) -> ConductorServices {
+        self.conductor_handle
+            .services
+            .share_ref(|s| s.clone().expect("Conductor services not yet initialized"))
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -136,9 +140,8 @@ pub trait CellConductorApiT: Send + Sync {
         call: ZomeCall,
     ) -> ConductorApiResult<ZomeCallResult>;
 
-    /// Make a request to the DPKI service running for this Conductor.
-    /// TODO: decide on actual signature
-    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
+    /// Access to the conductor services
+    fn conductor_services(&self) -> ConductorServices;
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
@@ -205,6 +208,15 @@ pub trait CellConductorReadHandleT: Send + Sync {
         cell_id: &CellId,
         role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>>;
+
+    /// Expose block functionality to zomes.
+    async fn block(&self, input: Block) -> DatabaseResult<()>;
+
+    /// Expose unblock functionality to zomes.
+    async fn unblock(&self, input: Block) -> DatabaseResult<()>;
+
+    /// Expose is_blocked functionality to zomes.
+    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
 }
 
 #[async_trait]
@@ -255,5 +267,17 @@ impl CellConductorReadHandleT for CellConductorApi {
         self.conductor_handle
             .find_cell_with_role_alongside_cell(cell_id, role_name)
             .await
+    }
+
+    async fn block(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_handle.block(input).await
+    }
+
+    async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_handle.unblock(input).await
+    }
+
+    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
+        self.conductor_handle.is_blocked(input, timestamp).await
     }
 }

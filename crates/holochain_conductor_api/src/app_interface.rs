@@ -1,9 +1,10 @@
-use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
+use crate::ExternalApiWireError;
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
-use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
+use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -23,8 +24,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::AppInfoReturned`]
-    GetAppInfo {
+    /// [`AppResponse::AppInfo`]
+    AppInfo {
         /// The app ID for which to get information
         installed_app_id: InstalledAppId,
     },
@@ -67,31 +68,30 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellEnabled`]
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
-    /// Info about gossip
-    GossipInfo(Box<GossipInfoRequestPayload>),
+    /// Info about networking processes
+    NetworkInfo(Box<NetworkInfoRequestPayload>),
 
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    SignalSubscription(SignalSubscription),
+    /// List all host functions available to wasm on this conductor.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::ListWasmHostFunctions`]
+    ListWasmHostFunctions,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppResponse {
-    /// This request is unimplemented
-    Unimplemented(AppRequest),
-
     /// Can occur in response to any [`AppRequest`].
     ///
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
 
-    /// The succesful response to an [`AppRequest::GetAppInfo`].
+    /// The succesful response to an [`AppRequest::AppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
-    /// Check out [`InstalledApp`] for details on when the option is `Some<InstalledAppInfo>`
-    AppInfoReturned(Option<InstalledAppInfo>),
+    AppInfo(Option<AppInfo>),
 
     /// The successful response to an [`AppRequest::CallZome`].
     ///
@@ -103,9 +103,8 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
-    /// The response contains an [`InstalledCell`] with the created clone
-    /// cell's [`CloneId`] and [`CellId`].
-    CloneCellCreated(InstalledCell),
+    /// The response contains the created clone [`ClonedCell`].
+    CloneCellCreated(ClonedCell),
 
     /// The successful response to an [`AppRequest::DisableCloneCell`].
     ///
@@ -114,11 +113,15 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::EnableCloneCell`].
     ///
-    /// A previously disabled clone cell has been enabled.
-    CloneCellEnabled(InstalledCell),
+    /// A previously disabled clone cell has been enabled. The [`ClonedCell`]
+    /// is returned.
+    CloneCellEnabled(ClonedCell),
 
-    /// GossipInfo is returned
-    GossipInfo(Vec<DnaGossipInfo>),
+    /// NetworkInfo is returned
+    NetworkInfo(Vec<NetworkInfo>),
+
+    /// All the wasm host functions supported by this conductor.
+    ListWasmHostFunctions(Vec<String>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -207,110 +210,247 @@ impl ZomeCall {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// Info about an installed app, returned as part of [`AppResponse::AppInfoReturned`]
-pub struct InstalledAppInfo {
-    /// The unique identifier for an installed app in this conductor
-    pub installed_app_id: InstalledAppId,
-    /// Info about the cells installed in this app
-    pub cell_data: Vec<InstalledCell>,
-    /// The app's current status, in an API-friendly format
-    pub status: InstalledAppInfoStatus,
+///
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CellInfo {
+    /// Cells provisioned at app installation as defined in the bundle.
+    Provisioned(ProvisionedCell),
+
+    // Cells created at runtime by cloning provisioned cells.
+    Cloned(ClonedCell),
+
+    /// Potential cells with deferred installation as defined in the bundle.
+    /// Not yet implemented.
+    Stem(StemCell),
 }
 
-impl InstalledAppInfo {
-    pub fn from_installed_app(app: &InstalledApp) -> Self {
+impl CellInfo {
+    pub fn new_provisioned(cell_id: CellId, dna_modifiers: DnaModifiers, name: String) -> Self {
+        Self::Provisioned(ProvisionedCell {
+            cell_id,
+            dna_modifiers,
+            name,
+        })
+    }
+
+    pub fn new_cloned(
+        cell_id: CellId,
+        clone_id: CloneId,
+        original_dna_hash: DnaHash,
+        dna_modifiers: DnaModifiers,
+        name: String,
+        enabled: bool,
+    ) -> Self {
+        Self::Cloned(ClonedCell {
+            cell_id,
+            clone_id,
+            original_dna_hash,
+            dna_modifiers,
+            name,
+            enabled,
+        })
+    }
+}
+
+/// Cell whose instantiation has been deferred.
+/// Not yet implemented.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct StemCell {
+    /// The hash of the DNA that this cell would be instantiated from
+    pub original_dna_hash: DnaHash,
+    /// The DNA modifiers that will be used when instantiating the cell
+    pub dna_modifiers: DnaModifiers,
+    /// An optional name to override the cell's bundle name when instantiating
+    pub name: Option<String>,
+}
+
+/// Provisioned cell, a cell instantiated from a DNA on app installation.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ProvisionedCell {
+    /// The cell's identifying data
+    pub cell_id: CellId,
+    /// The DNA modifiers that were used to instantiate the cell
+    pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
+    pub name: String,
+}
+
+/// Cloned cell that was created from a provisioned cell at runtime.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ClonedCell {
+    /// The cell's identifying data
+    pub cell_id: CellId,
+    /// A conductor-local clone identifier
+    pub clone_id: CloneId,
+    /// The hash of the DNA that this cell was instantiated from
+    pub original_dna_hash: DnaHash,
+    /// The DNA modifiers that were used to instantiate this clone cell
+    pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
+    pub name: String,
+    /// Whether or not the cell is running
+    pub enabled: bool,
+}
+
+/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AppInfo {
+    /// The unique identifier for an installed app in this conductor
+    pub installed_app_id: InstalledAppId,
+    /// Info about the cells installed in this app. Lists of cells are ordered
+    /// and contain first the provisioned cell, then enabled clone cells and
+    /// finally disabled clone cells.
+    pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
+    /// The app's current status, in an API-friendly format
+    pub status: AppInfoStatus,
+    /// The app's agent pub key.
+    pub agent_pub_key: AgentPubKey,
+    /// The original AppManifest used to install the app, which can also be used to
+    /// install the app again under a new agent.
+    pub manifest: AppManifest,
+}
+
+impl AppInfo {
+    pub fn from_installed_app(
+        app: &InstalledApp,
+        dna_definitions: &HashMap<CellId, DnaDefHashed>,
+    ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
-        let clone_cells = app
-            .clone_cells()
-            .map(|cell| (cell.0.as_app_role_name(), cell.1));
-        let cells = app.provisioned_cells().chain(clone_cells);
-        let cell_data = cells
-            .map(|(role_name, id)| InstalledCell::new(id.clone(), role_name.clone()))
-            .collect();
+        let agent_pub_key = app.agent_key().to_owned();
+        let mut manifest = app.manifest().clone();
+
+        let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
+        app.roles().iter().for_each(|(role_name, role_assignment)| {
+            // create a vector with info of all cells for this role
+            let mut cell_info_for_role: Vec<CellInfo> = Vec::new();
+
+            // push the base cell to the vector of cell infos
+            if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
+                if let Some(dna_def) = dna_definitions.get(provisioned_cell) {
+                    // TODO: populate `enabled` with cell state once it is implemented for a base cell
+                    let cell_info = CellInfo::new_provisioned(
+                        provisioned_cell.clone(),
+                        dna_def.modifiers.to_owned(),
+                        dna_def.name.to_owned(),
+                    );
+                    cell_info_for_role.push(cell_info);
+
+                    // Update the manifest with the installed hash
+                    match &mut manifest {
+                        AppManifest::V1(manifest) => {
+                            if let Some(role) =
+                                manifest.roles.iter_mut().find(|r| r.name == *role_name)
+                            {
+                                role.dna.installed_hash = Some(dna_def.hash.clone().into());
+                            }
+                        }
+                    }
+                } else {
+                    tracing::error!("no DNA definition found for cell id {}", provisioned_cell);
+                }
+            } else {
+                // no provisioned cell, thus there must be a deferred cell
+                // this is not implemented as of now
+                unimplemented!()
+            };
+
+            // push enabled clone cells to the vector of cell infos
+            if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
+                clone_cells.iter().for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                        let cell_info = CellInfo::new_cloned(
+                            cell_id.to_owned(),
+                            clone_id.to_owned(),
+                            dna_def.hash.to_owned(),
+                            dna_def.modifiers.to_owned(),
+                            dna_def.name.to_owned(),
+                            true,
+                        );
+                        cell_info_for_role.push(cell_info);
+                    } else {
+                        tracing::error!("no DNA definition found for cell id {}", cell_id);
+                    }
+                });
+            }
+
+            // push disabled clone cells to the vector of cell infos
+            if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
+                clone_cells.iter().for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                        let cell_info = CellInfo::new_cloned(
+                            cell_id.to_owned(),
+                            clone_id.to_owned(),
+                            dna_def.hash.to_owned(),
+                            dna_def.modifiers.to_owned(),
+                            dna_def.name.to_owned(),
+                            false,
+                        );
+                        cell_info_for_role.push(cell_info);
+                    } else {
+                        tracing::error!("no DNA definition found for cell id {}", cell_id);
+                    }
+                });
+            }
+
+            cell_info.insert(role_name.clone(), cell_info_for_role);
+        });
+
         Self {
             installed_app_id,
-            cell_data,
+            cell_info,
             status,
+            agent_pub_key,
+            manifest,
         }
     }
 }
 
-impl From<&InstalledApp> for InstalledAppInfo {
-    fn from(app: &InstalledApp) -> Self {
-        Self::from_installed_app(app)
-    }
-}
-
-/// A flat, slightly more API-friendly representation of [`InstalledAppInfo`]
+/// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
-pub enum InstalledAppInfoStatus {
+pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
     Running,
 }
 
-impl From<AppStatus> for InstalledAppInfoStatus {
+impl From<AppStatus> for AppInfoStatus {
     fn from(i: AppStatus) -> Self {
         match i {
-            AppStatus::Running => InstalledAppInfoStatus::Running,
-            AppStatus::Disabled(reason) => InstalledAppInfoStatus::Disabled { reason },
-            AppStatus::Paused(reason) => InstalledAppInfoStatus::Paused { reason },
+            AppStatus::Running => AppInfoStatus::Running,
+            AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
+            AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
         }
     }
 }
 
-impl From<InstalledAppInfoStatus> for AppStatus {
-    fn from(i: InstalledAppInfoStatus) -> Self {
+impl From<AppInfoStatus> for AppStatus {
+    fn from(i: AppInfoStatus) -> Self {
         match i {
-            InstalledAppInfoStatus::Running => AppStatus::Running,
-            InstalledAppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
-            InstalledAppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+            AppInfoStatus::Running => AppStatus::Running,
+            AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
+            AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct DnaGossipInfo {
-    pub total_historical_gossip_throughput: HistoricalGossipThroughput,
-}
-
-/// Throughput info specific to historical rounds
-#[derive(
-    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes,
-)]
-pub struct HistoricalGossipThroughput {
-    /// Total number of bytes expected to be sent for region data (historical only)
-    pub expected_op_bytes: InOut,
-
-    /// Total number of ops expected to be sent for region data (historical only)
-    pub expected_op_count: InOut,
-
-    /// Total number of bytes sent for op data
-    pub op_bytes: InOut,
-
-    /// Total number of ops sent
-    pub op_count: InOut,
-}
-
-impl From<RoundThroughput> for HistoricalGossipThroughput {
-    fn from(r: RoundThroughput) -> Self {
-        Self {
-            expected_op_bytes: r.expected_op_bytes,
-            expected_op_count: r.expected_op_count,
-            op_count: r.op_count,
-            op_bytes: r.op_bytes,
-        }
-    }
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct NetworkInfo {
+    pub fetch_pool_info: FetchPoolInfo,
+    pub current_number_of_peers: u32,
+    pub arc_size: f64,
+    pub total_network_peers: u32,
+    pub bytes_since_last_time_queried: u64,
+    pub completed_rounds_since_last_time_queried: u32,
 }
 
 #[test]
 fn status_serialization() {
     use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
 
-    let status: InstalledAppInfoStatus =
+    let status: AppInfoStatus =
         AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
 
     assert_eq!(
@@ -318,15 +458,14 @@ fn status_serialization() {
         "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: InstalledAppInfoStatus =
-        AppStatus::Paused(PausedAppReason::Error("because".into())).into();
+    let status: AppInfoStatus = AppStatus::Paused(PausedAppReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
         "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: InstalledAppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
+    let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),

@@ -1,5 +1,6 @@
 use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
+use crate::link::GetLinksInputBuilder;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
@@ -21,7 +22,7 @@ pub fn root_hash() -> ExternResult<AnyLinkableHash> {
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
-/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
+/// If this is a problem for you simply build the components yourself as a `Vec<Vec<u8>>`.
 ///
 /// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
@@ -81,12 +82,14 @@ impl From<&str> for Component {
         Self::from(bytes)
     }
 }
+
 /// Alias From<&str>
 impl From<&String> for Component {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
+
 /// Alias From<&str>
 impl From<String> for Component {
     fn from(s: String) -> Self {
@@ -214,7 +217,7 @@ impl AsRef<Vec<Component>> for Path {
 /// some disambiguation logic is not included in higher level abstractions.
 ///
 /// This supports sharding strategies from a small inline DSL.
-/// Start each component with <width>:<depth># to get shards out of the string.
+/// Start each component with `<width>:<depth>#` to get shards out of the string.
 ///
 /// e.g.
 /// - foo.barbaz => normal path as above ["foo", "barbaz"]
@@ -245,16 +248,31 @@ impl From<&str> for Path {
         )
     }
 }
+
 /// Alias From<&str>
 impl From<&String> for Path {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
+
 /// Alias From<&str>
 impl From<String> for Path {
     fn from(s: String) -> Self {
         Self::from(s.as_str())
+    }
+}
+
+impl TryInto<String> for Path {
+    type Error = SerializedBytesError;
+    fn try_into(self) -> Result<String, Self::Error> {
+        let s = self
+            .as_ref()
+            .iter()
+            .map(String::try_from)
+            .collect::<Result<Vec<String>, Self::Error>>()?;
+
+        Ok(s.join(DELIMITER))
     }
 }
 
@@ -318,16 +336,22 @@ impl TypedPath {
             path,
         }
     }
-    /// Does an entry exist at the hash we expect?
+    /// Does data exist at the hash we expect?
     pub fn exists(&self) -> ExternResult<bool> {
         if self.0.is_empty() {
             Ok(false)
         } else if self.is_root() {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                root_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-                Some(self.make_tag()?),
+                GetLinksInputBuilder::try_new(
+                    root_hash()?,
+                    LinkTypeFilter::single_type(
+                        self.link_type.zome_index,
+                        self.link_type.zome_type,
+                    ),
+                )?
+                .tag_prefix(self.make_tag()?)
+                .build(),
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
@@ -338,9 +362,15 @@ impl TypedPath {
                 .expect("Must have parent if not empty or root");
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                parent.path_entry_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-                Some(self.make_tag()?),
+                GetLinksInputBuilder::try_new(
+                    parent.path_entry_hash()?,
+                    LinkTypeFilter::single_type(
+                        self.link_type.zome_index,
+                        self.link_type.zome_type,
+                    ),
+                )?
+                .tag_prefix(self.make_tag()?)
+                .build(),
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
@@ -387,9 +417,11 @@ impl TypedPath {
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
-            self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-            None,
+            GetLinksInputBuilder::try_new(
+                self.path_entry_hash()?,
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+            )?
+            .build(),
         )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
@@ -457,6 +489,13 @@ impl From<TypedPath> for Path {
     }
 }
 
+impl TryInto<String> for TypedPath {
+    type Error = SerializedBytesError;
+    fn try_into(self) -> Result<String, Self::Error> {
+        self.path.try_into()
+    }
+}
+
 #[test]
 #[cfg(test)]
 fn hash_path_delimiter() {
@@ -481,7 +520,7 @@ fn hash_path_component() {
 
     assert_eq!(
         String::try_from(&Component::from(vec![
-            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0
+            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0,
         ]))
         .unwrap(),
         String::from("foo"),
@@ -578,4 +617,8 @@ fn hash_path_path() {
     ] {
         assert_eq!(Path::from(input), Path::from(output),);
     }
+
+    let path = "foo.a.b.c.abcdef.bar";
+    let path_to_string: String = Path::from(path).try_into().unwrap();
+    assert_eq!(path.to_string(), path_to_string,);
 }

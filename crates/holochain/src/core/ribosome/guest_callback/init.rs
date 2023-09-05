@@ -83,7 +83,7 @@ pub enum InitResult {
     Fail(ZomeName, String),
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
-    /// Vec<EntryHash> is the list of all missing dependency addresses
+    /// `Vec<EntryHash>` is the list of all missing dependency addresses
     UnresolvedDependencies(ZomeName, UnresolvedDependencies),
 }
 
@@ -226,13 +226,24 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::InitResult;
+    use crate::conductor::api::error::ConductorApiResult;
+    use crate::conductor::conductor::CellStatus;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
+    use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
+    use holo_hash::ActionHash;
+    use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
+    use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::prelude::*;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
@@ -290,6 +301,90 @@ mod slow_tests {
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn conductor_will_not_accept_zome_calls_before_the_network_is_initialised() {
+        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
+            random_network_seed(),
+            vec![TestWasm::Create],
+            SerializedBytes::default(),
+        )
+        .await;
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
+
+        let cloned = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: app.installed_app_id().clone(),
+                role_name: dna_file.dna_hash().to_string().clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
+                membrane_proof: None,
+                name: Some("cloned".to_string()),
+            })
+            .await
+            .unwrap();
+
+        let enable_or_disable_payload = DisableCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
+        };
+        conductor
+            .disable_clone_cell(&enable_or_disable_payload)
+            .await
+            .unwrap();
+
+        let zome: SweetZome = SweetZome::new(
+            cloned.cell_id.clone(),
+            TestWasm::Create.coordinator_zome_name(),
+        );
+
+        // Run the cell enable in parallel. If we wait for it then we shouldn't see the error we're looking for
+        let conductor_handle = conductor.raw_handle().clone();
+        let payload = enable_or_disable_payload.clone();
+        tokio::spawn(async move {
+            conductor_handle.enable_clone_cell(&payload).await.unwrap();
+        });
+
+        let mut had_successful_zome_call = false;
+        for _ in 0..30 {
+            let create_post_result: ConductorApiResult<ActionHash> = conductor
+                .call_fallible(
+                    &zome,
+                    "create_post",
+                    Post(format!("clone message").to_string()),
+                )
+                .await;
+
+            match create_post_result {
+                Err(crate::conductor::api::error::ConductorApiError::ConductorError(
+                    crate::conductor::error::ConductorError::CellNetworkNotReady(
+                        CellStatus::Joining,
+                    )
+                    | crate::conductor::error::ConductorError::CellDisabled(_),
+                )) => {
+                    // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
+                }
+                Ok(_) => {
+                    had_successful_zome_call = true;
+
+                    // Stop trying after the first successful zome call
+                    break;
+                }
+                Err(e) => {
+                    panic!("Other types of error are not expected {:?}", e);
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+
+        assert!(
+            had_successful_zome_call,
+            "Should have seen a clone cell join the network and allow calls"
         );
     }
 }

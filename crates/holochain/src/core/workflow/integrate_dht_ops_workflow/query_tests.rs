@@ -3,7 +3,6 @@ use std::collections::HashSet;
 
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_sqlite::db::WriteManager;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;
@@ -95,25 +94,18 @@ impl Scenario {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
-    let expected = test_data(&db.to_db().into());
+    let expected = test_data(&db.to_db()).await;
     let (qt, _rx) = TriggerSender::new();
     // dump_tmp(&db.db());
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(
-        db.to_db().into(),
-        &db.to_db().into(),
-        qt,
-        holochain_p2p_cell,
-    )
-    .await
-    .unwrap();
+    integrate_dht_ops_workflow(db.to_db().into(), db.to_db().into(), qt, holochain_p2p_cell)
+        .await
+        .unwrap();
     let hashes = db
-        .conn()
-        .unwrap()
-        .with_reader_test(|txn| {
+        .write_async(move |txn| -> DatabaseResult<HashSet<DhtOpHash>> {
             let mut stmt =
                 txn.prepare("SELECT hash FROM DhtOp WHERE when_integrated IS NOT NULL")?;
             let hashes: HashSet<DhtOpHash> = stmt
@@ -124,18 +116,19 @@ async fn integrate_query() {
                 .unwrap()
                 .map(Result::unwrap)
                 .collect();
-            DatabaseResult::Ok(hashes)
+            Ok(hashes)
         })
+        .await
         .unwrap();
     let diff = hashes.symmetric_difference(&expected.hashes);
     for d in diff {
-        tracing::debug!(?d, missing = ?expected.ops.get(d));
+        debug!(?d, missing = ?expected.ops.get(d));
     }
     assert_eq!(hashes, expected.hashes);
 }
 
-fn create_and_insert_op(
-    db: &DbRead<DbKindDht>,
+async fn create_and_insert_op(
+    db: &DbWrite<DbKindDht>,
     scenario: Scenario,
     data: &mut SharedData,
 ) -> DhtOpHashed {
@@ -212,11 +205,13 @@ fn create_and_insert_op(
         DhtOp::from_type(op, SignedAction(action.clone(), fixt!(Signature)), entry).unwrap(),
     );
 
-    db.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = state.as_hash().clone();
-            insert_op(txn, &state).unwrap();
+    // TODO unexpected write in data setup, was a DbRead
+    db.write_async({
+        let query_state = state.clone();
+
+        move |txn| -> DatabaseResult<()> {
+            let hash = query_state.as_hash().clone();
+            insert_op(txn, &query_state).unwrap();
             set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             if facts.integrated {
                 set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
@@ -225,13 +220,16 @@ fn create_and_insert_op(
                 set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
                     .unwrap();
             }
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+            Ok(())
+        }
+    })
+    .await
+    .unwrap();
+
     state
 }
 
-fn test_data(db: &DbRead<DbKindDht>) -> Expected {
+async fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
     let mut hashes = HashSet::new();
     let mut ops = HashMap::new();
 
@@ -253,13 +251,13 @@ fn test_data(db: &DbRead<DbKindDht>) -> Expected {
     ];
     for op_type in ops_with_deps {
         let scenario = Scenario::without_dep(op_type);
-        let op = create_and_insert_op(db, scenario, &mut data);
+        let op = create_and_insert_op(db, scenario, &mut data).await;
         ops.insert(op.as_hash().clone(), op);
         let scenarios = Scenario::with_dep(op_type);
-        let op = create_and_insert_op(db, scenarios[0], &mut data);
+        let op = create_and_insert_op(db, scenarios[0], &mut data).await;
         hashes.insert(op.as_hash().clone());
         ops.insert(op.as_hash().clone(), op);
-        let op = create_and_insert_op(db, scenarios[1], &mut data);
+        let op = create_and_insert_op(db, scenarios[1], &mut data).await;
         hashes.insert(op.as_hash().clone());
         ops.insert(op.as_hash().clone(), op);
     }

@@ -1,4 +1,8 @@
 //! Items related to the DNA initialization callback.
+//!
+//! # Examples
+//! Init pass: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/init_pass/src/lib.rs>
+//! Init fail: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/init_fail/src/lib.rs>
 
 use crate::CallbackResult;
 use holochain_integrity_types::UnresolvedDependencies;

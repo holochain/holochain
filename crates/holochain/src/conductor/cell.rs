@@ -6,7 +6,6 @@
 
 use super::api::CellConductorHandle;
 use super::interface::SignalBroadcaster;
-use super::manager::ManagedTaskAdd;
 use super::space::Space;
 use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
@@ -30,7 +29,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use error::CellError;
 use futures::future::FutureExt;
-use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_conductor_api::ZomeCall;
@@ -50,7 +48,6 @@ use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -97,6 +94,10 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorHandle,
+    // NOTE: this got snuck in here, the original purpose was that the Cell would have limited access to
+    // the full Conductor via `CellConductorHandle`. As it stands, it's redundant to have both, but it
+    // may make it easier to a cleanup of the Conductor monolith later if we don't completely remove
+    // the encapsulation of CellConductorHandle, even though the encapsulation is not complete.
     conductor_handle: ConductorHandle,
     space: Space,
     holochain_p2p_cell: HolochainP2pDna,
@@ -118,8 +119,6 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
-        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
-        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
@@ -137,8 +136,6 @@ impl Cell {
                 holochain_p2p_cell.clone(),
                 &space,
                 conductor_handle.clone(),
-                managed_task_add_sender,
-                managed_task_stop_broadcaster,
             )
             .await;
 
@@ -159,12 +156,12 @@ impl Cell {
         }
     }
 
-    /// Performs the Genesis workflow the Cell, ensuring that its initial
+    /// Performs the Genesis workflow for the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
-        id: CellId,
+        cell_id: CellId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
@@ -178,10 +175,10 @@ impl Cell {
     {
         // get the dna
         let dna_file = conductor_handle
-            .get_dna_file(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+            .get_dna_file(cell_id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
 
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
         let workspace = GenesisWorkspace::new(authored_db, dht_db)
@@ -189,13 +186,16 @@ impl Cell {
             .map_err(Box::new)?;
 
         // exit early if genesis has already run
-        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+        if workspace
+            .has_genesis(cell_id.agent_pubkey().clone())
+            .await?
+        {
             return Ok(());
         }
 
         let args = GenesisWorkflowArgs::new(
             dna_file,
-            id.agent_pubkey().clone(),
+            cell_id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
@@ -209,7 +209,7 @@ impl Cell {
 
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
-            .integration_trigger(Arc::new(id.dna_hash().clone()))
+            .integration_trigger(Arc::new(cell_id.dna_hash().clone()))
         {
             trigger.trigger(&"genesis");
         }
@@ -239,23 +239,12 @@ impl Cell {
         self.conductor_api.signal_broadcaster()
     }
 
-    pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
-        let author = self.id.agent_pubkey().clone();
-        Ok(self
-            .space
-            .authored_db
-            .async_commit(move |txn: &mut Transaction| {
-                delete_all_ephemeral_scheduled_fns(txn, &author)
-            })
-            .await?)
-    }
-
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let author = self.id.agent_pubkey().clone();
         let lives = self
             .space
             .authored_db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -331,7 +320,7 @@ impl Cell {
                 let _ = self
                     .space
                     .authored_db
-                    .async_commit(move |txn: &mut Transaction| {
+                    .write_async(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
@@ -467,6 +456,23 @@ impl Cell {
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get_links"))
+                .await;
+            }
+
+            CountLinks {
+                span_context: _,
+                respond,
+                query,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_count_links(query)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_count_links"))
                 .await;
             }
 
@@ -610,13 +616,13 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or action.
         // In the future we should use GetOptions to choose which get to run.
-        let mut r = match *dht_hash.hash_type() {
-            AnyDht::Entry => self
-                .handle_get_entry(dht_hash.into(), options)
+        let mut r = match dht_hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self
+                .handle_get_entry(hash, options)
                 .await
                 .map(WireOps::Entry),
-            AnyDht::Action => self
-                .handle_get_record(dht_hash.into(), options)
+            AnyDhtHashPrimitive::Action(hash) => self
+                .handle_get_record(hash, options)
                 .await
                 .map(WireOps::Record),
         };
@@ -677,6 +683,19 @@ impl Cell {
             .map_err(Into::into)
     }
 
+    /// a remote node is asking us to count links
+    #[instrument(skip(self))]
+    async fn handle_count_links(&self, query: WireLinkQuery) -> CellResult<CountLinksResponse> {
+        let db = self.space.dht_db.clone();
+        Ok(CountLinksResponse::new(
+            authority::handle_get_links_query(db.into(), query)
+                .await?
+                .into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<_>>(),
+        ))
+    }
+
     #[instrument(skip(self, options))]
     async fn handle_get_agent_activity(
         &self,
@@ -713,7 +732,7 @@ impl Cell {
         let action: Option<SignedAction> = self
             .space
             .authored_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let h: Option<Vec<u8>> = txn
                     .query_row(
                         "SELECT Action.blob as action_blob
@@ -761,7 +780,7 @@ impl Cell {
 
         self.space
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 // Get the current count for this dhtop.
                 let receipt_count: usize = txn.query_row(
                     "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
@@ -947,22 +966,21 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
-    //
-    // FIXME: this should ensure that the long-running managed tasks,
-    //        i.e. the queue consumers, are stopped. Currently, they
-    //        will continue running because we have no way to target a specific
-    //        Cell's tasks for shutdown.
-    //
-    //        Consider using a separate TaskManager for each Cell, so that all
-    //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
-    //        TaskManager can have these Cell TaskManagers as children.
-    //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
-        self.holochain_p2p_dna()
+        let shutdown = self
+            .conductor_handle
+            .task_manager()
+            .stop_cell_tasks(self.id().clone())
+            .map(|r| CellResult::Ok(r?));
+        let leave = self
+            .holochain_p2p_dna()
             .leave(self.id.agent_pubkey().clone())
-            .await?;
-        tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
+            .map(|r| CellResult::Ok(r?));
+        let (shutdown, leave) = futures::future::join(shutdown, leave).await;
+        shutdown?;
+        leave?;
+        tracing::info!("Cell cleaned up and removed: {:?}", self.id());
         Ok(())
     }
 

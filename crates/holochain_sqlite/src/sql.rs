@@ -1,5 +1,4 @@
 pub mod sql_cell {
-    pub(crate) const SCHEMA: &str = include_str!("sql/cell/schema.sql");
     pub const UPDATE_INTEGRATE_DEP_ACTIVITY: &str =
         include_str!("sql/cell/update_dep_activity.sql");
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
@@ -24,8 +23,12 @@ pub mod sql_cell {
 
     pub const FETCH_OP_REGION: &str = include_str!("sql/cell/fetch_op_region.sql");
     pub const FETCH_OPS_BY_REGION: &str = include_str!("sql/cell/fetch_ops_by_region.sql");
+    pub const FETCH_REGION_OP_HASHES: &str = include_str!("sql/cell/fetch_region_op_hashes.sql");
 
     pub const FETCH_PUBLISHABLE_OP: &str = include_str!("sql/cell/fetch_publishable_op.sql");
+
+    pub const SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP: &str =
+        include_str!("sql/cell/sum_of_received_bytes_since_timestamp.sql");
 
     pub mod must_get_agent_activity {
         pub const MUST_GET_AGENT_ACTIVITY: &str =
@@ -55,30 +58,29 @@ pub mod sql_cell {
 }
 
 pub mod sql_conductor {
-    pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
+    pub const FROM_BLOCK_SPAN_WHERE_OVERLAPPING: &str =
+        include_str!("sql/conductor/from_block_span_where_overlapping.sql");
+    pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
+    pub const SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET: &str =
+        include_str!("sql/conductor/select_valid_cap_grant_for_cap_secret.sql");
+    pub const SELECT_VALID_UNRESTRICTED_CAP_GRANT: &str =
+        include_str!("sql/conductor/select_valid_unrestricted_cap_grant.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {
-    pub(crate) const SCHEMA: &str = include_str!("sql/p2p_agent_store/schema.sql");
     pub(crate) const INSERT: &str = include_str!("sql/p2p_agent_store/insert.sql");
     pub(crate) const SELECT_ALL: &str = include_str!("sql/p2p_agent_store/select_all.sql");
-    pub(crate) const SELECT: &str = include_str!("sql/p2p_agent_store/select.sql");
-    pub(crate) const GOSSIP_QUERY: &str = include_str!("sql/p2p_agent_store/gossip_query.sql");
-    pub(crate) const QUERY_NEAR_BASIS: &str =
-        include_str!("sql/p2p_agent_store/query_near_basis.sql");
+    pub(crate) const DELETE: &str = include_str!("sql/p2p_agent_store/delete.sql");
     pub(crate) const EXTRAPOLATED_COVERAGE: &str =
         include_str!("sql/p2p_agent_store/extrapolated_coverage.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_agent_store/prune.sql");
 }
 
 pub(crate) mod sql_p2p_metrics {
-    pub(crate) const SCHEMA: &str = include_str!("sql/p2p_metrics/schema.sql");
     pub(crate) const INSERT: &str = include_str!("sql/p2p_metrics/insert.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_metrics/prune.sql");
 }
 
-pub(crate) mod sql_wasm {
-    pub(crate) const SCHEMA: &str = include_str!("sql/wasm/schema.sql");
-}
+pub(crate) mod sql_wasm {}

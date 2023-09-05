@@ -10,7 +10,7 @@ use crate::test_utils::inline_zomes::simple_create_read_zome;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
@@ -30,8 +30,8 @@ async fn sys_validation_agent_activity_test() {
 
     let changed = cell_1
         .dht_db()
-        .async_commit(|txn| {
-            DatabaseResult::Ok(txn.execute(
+        .write_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.execute(
                 "UPDATE Action SET seq = 4 WHERE hash = ? OR hash = ?",
                 [a, b],
             )?)

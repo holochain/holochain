@@ -1,14 +1,16 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
 use crate::{HostStub, KitsuneHost};
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
-use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
+use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 use num_traits::Zero;
 
 use super::*;
 
+#[derive(Debug)]
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
     topology: Topology,
@@ -16,7 +18,29 @@ pub struct StandardResponsesHostApi {
     with_data: bool,
 }
 
+impl FetchPoolConfig for StandardResponsesHostApi {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
 impl KitsuneHost for StandardResponsesHostApi {
+    fn block(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _: kitsune_p2p_block::BlockTargetId,
+        _: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
@@ -28,6 +52,14 @@ impl KitsuneHost for StandardResponsesHostApi {
             .find(|a| a.agent == input.agent)
             .unwrap();
         box_fut(Ok(Some(agent)))
+    }
+
+    fn remove_agent_info_signed(
+        &self,
+        _input: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        // unimplemented
+        box_fut(Ok(false))
     }
 
     fn peer_extrapolated_coverage(
@@ -55,7 +87,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         dht_arc_set: Arc<DhtArcSet>,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
-            let arqs = ArqBoundsSet::from_dht_arc_set(
+            let arqs = ArqSet::from_dht_arc_set_exact(
                 &self.get_topology(space).await?,
                 &self.strat,
                 &dht_arc_set,
@@ -94,6 +126,18 @@ impl KitsuneHost for StandardResponsesHostApi {
         _space: Arc<KitsuneSpace>,
     ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.topology.clone()))
+    }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: dht::region::RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
+        todo!()
     }
 }
 
@@ -147,8 +191,8 @@ async fn standard_responses(
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
     }
     evt_handler
-        .expect_handle_gossip()
-        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
+        .expect_handle_receive_ops()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
 
     (evt_handler, Arc::new(host_api))
 }

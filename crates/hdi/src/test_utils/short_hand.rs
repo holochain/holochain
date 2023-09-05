@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::prelude::*;
 
 /// Create [`EntryHash`].
@@ -188,6 +190,86 @@ pub fn cl(zome_index: u8, link_type: u8) -> CreateLink {
         base_address: eh(0).into(),
         target_address: eh(1).into(),
         tag: ().into(),
+    }
+}
+
+/// Create [`CreateLink`].
+pub fn dl(link_add_address: ActionHash) -> DeleteLink {
+    DeleteLink {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        action_seq: 1,
+        prev_action: ah(0),
+        base_address: eh(0).into(),
+        link_add_address,
+    }
+}
+/// Create [`Delete`].
+pub fn d(deletes_address: ActionHash) -> Delete {
+    Delete {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        action_seq: 1,
+        prev_action: ah(0),
+        deletes_address,
+        deletes_entry_address: eh(0),
+        weight: Default::default(),
+    }
+}
+
+/// Create [`Dna`].
+pub fn dna(dna_hash: DnaHash) -> Dna {
+    Dna {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        hash: dna_hash,
+    }
+}
+
+/// Create [`OpenChain`].
+pub fn oc(previous_dna_hash: DnaHash) -> OpenChain {
+    OpenChain {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        action_seq: 1,
+        prev_action: ah(0),
+        prev_dna_hash: previous_dna_hash,
+    }
+}
+
+/// Create [`CloseChain`].
+pub fn cc(new_dna_hash: DnaHash) -> CloseChain {
+    CloseChain {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        action_seq: 1,
+        prev_action: ah(0),
+        new_dna_hash,
+    }
+}
+
+pub fn mp() -> MembraneProof {
+    Arc::new(SerializedBytes::default())
+}
+
+/// Create [`AgentValidationPkg`].
+pub fn avp(membrane_proof: Option<MembraneProof>) -> AgentValidationPkg {
+    AgentValidationPkg {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        action_seq: 1,
+        prev_action: ah(0),
+        membrane_proof,
+    }
+}
+
+/// Create [`InitZomesComplete`].
+pub fn izc() -> InitZomesComplete {
+    InitZomesComplete {
+        author: ak(0),
+        timestamp: Timestamp(0),
+        action_seq: 1,
+        prev_action: ah(0),
     }
 }
 

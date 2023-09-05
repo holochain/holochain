@@ -3,48 +3,11 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
-use holochain_keystore::MetaLairClient;
-use holochain_p2p::{
-    dht::{
-        arq::{power_and_count_from_length, ArqBoundsSet},
-        hash::RegionHash,
-        prelude::Topology,
-        region::{RegionBounds, RegionData},
-        region_set::{RegionCoordSetLtcs, RegionSetLtcs},
-        spacetime::TelescopingTimes,
-        ArqBounds, ArqStrat,
-    },
-    dht_arc::{DhtArcRange, DhtArcSet},
-    event::FetchOpDataQuery,
+use super::{
+    conductor::RwShare,
+    error::ConductorResult,
+    p2p_agent_store::{self, P2pBatch},
 };
-use holochain_sqlite::{
-    conn::{DbSyncLevel, DbSyncStrategy},
-    db::{
-        DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
-        DbKindWasm, DbWrite, ReadAccess,
-    },
-    prelude::{DatabaseError, DatabaseResult},
-};
-use holochain_state::{
-    mutations,
-    prelude::{from_blob, StateQueryResult},
-    query::{map_sql_dht_op_common, StateQueryError},
-    source_chain::{SourceChain, SourceChainResult},
-};
-use holochain_types::{
-    db_cache::DhtDbQueryCache,
-    dht_op::{DhtOp, DhtOpType},
-};
-use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
-use kitsune_p2p::{
-    event::{TimeWindow, TimeWindowInclusive},
-    KitsuneP2pConfig,
-};
-use rusqlite::{named_params, OptionalExtension};
-use tracing::instrument;
-
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::{
     queue_consumer::QueueConsumerMap,
@@ -55,13 +18,45 @@ use crate::core::{
         },
     },
 };
-
-use super::{
-    conductor::RwShare,
-    error::ConductorResult,
-    p2p_agent_store::{self, P2pBatch},
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
+use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::AgentPubKeyExt;
+use holochain_p2p::DnaHashExt;
+use holochain_p2p::{
+    dht::region::RegionBounds,
+    dht_arc::{DhtArcRange, DhtArcSet},
+    event::FetchOpDataQuery,
 };
+use holochain_sqlite::prelude::{
+    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
+    ReadAccess,
+};
+use holochain_state::{
+    host_fn_workspace::SourceChainWorkspace,
+    mutations,
+    prelude::{from_blob, StateQueryResult},
+    query::{map_sql_dht_op_common, StateQueryError},
+    source_chain::{SourceChain, SourceChainResult},
+};
+use holochain_types::prelude::CellId;
+use holochain_types::{
+    db_cache::DhtDbQueryCache,
+    dht_op::{DhtOp, DhtOpType},
+};
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
+use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
+use kitsune_p2p::{
+    event::{TimeWindow, TimeWindowInclusive},
+    KitsuneP2pConfig,
+};
+use kitsune_p2p_block::NodeId;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
+use tracing::instrument;
 
 #[cfg(test)]
 mod tests;
@@ -163,11 +158,113 @@ impl Spaces {
         })
     }
 
+    /// Block some target.
+    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        holochain_state::block::block(&self.conductor_db, input).await
+    }
+
+    /// Unblock some target.
+    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+        holochain_state::block::unblock(&self.conductor_db, input).await
+    }
+
+    async fn node_agents_in_spaces(
+        &self,
+        node_id: NodeId,
+        dnas: Vec<DnaHash>,
+    ) -> DatabaseResult<Vec<CellId>> {
+        let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
+        for dna in dnas {
+            // @todo join_all for these awaits
+            agent_lists.push(
+                self.p2p_agents_db(&dna)?
+                    .read_async(|txn| txn.p2p_list_agents())
+                    .await?,
+            );
+        }
+
+        Ok(agent_lists
+            .into_iter()
+            .flatten()
+            .filter(|agent| {
+                agent.url_list.iter().any(|url| {
+                    kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
+                        .digest()
+                        .0
+                        == node_id
+                })
+            })
+            .map(|agent_info| {
+                CellId::new(
+                    DnaHash::from_kitsune(&agent_info.space),
+                    AgentPubKey::from_kitsune(&agent_info.agent),
+                )
+            })
+            .collect())
+    }
+
+    /// Check if some target is blocked.
+    pub async fn is_blocked(
+        &self,
+        target_id: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> DatabaseResult<bool> {
+        let cell_ids = match &target_id {
+            BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
+            BlockTargetId::NodeDna(node_id, dna_hash) => {
+                self.node_agents_in_spaces((*node_id).clone(), vec![dna_hash.clone()])
+                    .await?
+            }
+            BlockTargetId::Node(node_id) => {
+                self.node_agents_in_spaces(
+                    (*node_id).clone(),
+                    self.map
+                        .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
+                )
+                .await?
+            }
+            // @todo
+            BlockTargetId::Ip(_) => {
+                vec![]
+            }
+        };
+
+        // If node_agents_in_spaces is not yet initialized, we can't know anything about
+        // which cells are blocked, so avoid the race condition by returning false
+        // TODO: actually fix the preflight, because this could be a loophole for someone
+        //       to evade a block in some circumstances
+        if cell_ids.is_empty() {
+            return Ok(false);
+        }
+
+        self.conductor_db
+            .read_async(move |txn| {
+                Ok(
+                    // If the target_id is directly blocked then we always return true.
+                    holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
+            // If there are zero unblocked cells then return true.
+            || {
+                let mut all_blocked_cell_ids = true;
+                for cell_id in cell_ids {
+                    if !holochain_state::block::query_is_blocked(
+                        &txn,
+                        BlockTargetId::Cell(cell_id), timestamp)? {
+                            all_blocked_cell_ids = false;
+                            break;
+                        }
+                }
+                all_blocked_cell_ids
+            },
+                )
+            })
+            .await
+    }
+
     /// Get the holochain conductor state
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         let state = self
             .conductor_db
-            .async_reader(|txn| {
+            .read_async(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -208,7 +305,7 @@ impl Spaces {
     {
         let output = self
             .conductor_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -233,11 +330,11 @@ impl Spaces {
     }
 
     /// Get the space if it exists or create it if it doesn't.
-    pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
+    pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
         self.get_or_create_space_ref(dna_hash, Space::clone)
     }
 
-    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> ConductorResult<R>
+    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> DatabaseResult<R>
     where
         F: Fn(&Space) -> R,
     {
@@ -263,27 +360,27 @@ impl Spaces {
     }
 
     /// Get the cache database (this will create the space if it doesn't already exist).
-    pub fn cache(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindCache>> {
+    pub fn cache(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindCache>> {
         self.get_or_create_space_ref(dna_hash, |space| space.cache_db.clone())
     }
 
     /// Get the authored database (this will create the space if it doesn't already exist).
-    pub fn authored_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindAuthored>> {
+    pub fn authored_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindAuthored>> {
         self.get_or_create_space_ref(dna_hash, |space| space.authored_db.clone())
     }
 
     /// Get the dht database (this will create the space if it doesn't already exist).
-    pub fn dht_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindDht>> {
+    pub fn dht_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindDht>> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
     /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindP2pAgents>> {
+    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pAgents>> {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_agents_db.clone())
     }
 
     /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindP2pMetrics>> {
+    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pMetrics>> {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_db.clone())
     }
 
@@ -291,7 +388,7 @@ impl Spaces {
     pub fn p2p_batch_sender(
         &self,
         dna_hash: &DnaHash,
-    ) -> ConductorResult<tokio::sync::mpsc::Sender<P2pBatch>> {
+    ) -> DatabaseResult<tokio::sync::mpsc::Sender<P2pBatch>> {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
     }
 
@@ -312,9 +409,12 @@ impl Spaces {
         let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
 
         let db = self.dht_db(dna_hash)?;
-        let include_limbo = include_limbo
-            .then(|| "\n")
-            .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
+
+        let include_limbo = if include_limbo {
+            "\n"
+        } else {
+            "AND DhtOp.when_integrated IS NOT NULL\n"
+        };
 
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(DhtArcRange::Full) = intervals.first() {
@@ -354,7 +454,7 @@ impl Spaces {
             )
         };
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(&sql)?;
                 let hashes = stmt
                     .query_map(
@@ -389,67 +489,6 @@ impl Spaces {
         Ok(results)
     }
 
-    /// The network module needs info about various groupings ("regions") of ops
-    ///
-    /// Note that this always includes all ops regardless of integration status.
-    /// This is to avoid the degenerate case of freshly joining a network, and
-    /// having several new peers gossiping with you at once about the same regions.
-    /// If we calculate our region hash only by integrated ops, we will experience
-    /// mismatches for a large number of ops repeatedly until we have integrated
-    /// those ops. Note that when *sending* ops we filter out ops in limbo.
-    pub async fn handle_fetch_op_regions(
-        &self,
-        dna_hash: &DnaHash,
-        topology: Topology,
-        dht_arc_set: DhtArcSet,
-    ) -> ConductorResult<RegionSetLtcs> {
-        let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let max_chunks = ArqStrat::default().max_chunks();
-        let arq_set = ArqBoundsSet::new(
-            dht_arc_set
-                .intervals()
-                .into_iter()
-                .map(|i| {
-                    let len = i.length();
-                    let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(&topology, pow, i).0
-                })
-                .collect(),
-        );
-        let times = TelescopingTimes::historical(&topology);
-        let coords = RegionCoordSetLtcs::new(times, arq_set);
-        let coords_clone = coords.clone();
-        let db = self.dht_db(dna_hash)?;
-        db.async_reader(move |txn| {
-            let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-            Ok(coords_clone.into_region_set(|(_, coords)| {
-                let bounds = coords.to_bounds(&topology);
-                let (x0, x1) = bounds.x;
-                let (t0, t1) = bounds.t;
-                stmt.query_row(
-                    named_params! {
-                        ":storage_start_loc": x0,
-                        ":storage_end_loc": x1,
-                        ":timestamp_min": t0,
-                        ":timestamp_max": t1,
-                    },
-                    |row| {
-                        let total_action_size: f64 = row.get("total_action_size")?;
-                        let total_entry_size: f64 = row.get("total_entry_size")?;
-                        let size = total_action_size + total_entry_size;
-                        Ok(RegionData {
-                            hash: RegionHash::from_vec(row.get("xor_hash")?)
-                                .expect("region hash must be 32 bytes"),
-                            size: size.min(u32::MAX as f64) as u32,
-                            count: row.get("count")?,
-                        })
-                    },
-                )
-            })?)
-        })
-        .await
-    }
-
     #[instrument(skip(self, query))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data(
@@ -458,8 +497,11 @@ impl Spaces {
         query: FetchOpDataQuery,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         match query {
-            FetchOpDataQuery::Hashes(op_hashes) => {
-                self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
+            FetchOpDataQuery::Hashes {
+                op_hash_list,
+                include_limbo,
+            } => {
+                self.handle_fetch_op_data_by_hashes(dna_hash, op_hash_list, include_limbo)
                     .await
             }
             FetchOpDataQuery::Regions(regions) => {
@@ -479,7 +521,7 @@ impl Spaces {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
         Ok(self
             .dht_db(dna_hash)?
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
                 let results = regions
                     .into_iter()
@@ -518,68 +560,59 @@ impl Spaces {
         &self,
         dna_hash: &DnaHash,
         op_hashes: Vec<holo_hash::DhtOpHash>,
+        include_limbo: bool,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        const OPS_IN_MEMORY_BOUND_BYTES: usize = 3_000_000; // 3MB
-                                                            // FIXME: Test this query.
+        let mut sql = "
+            SELECT DhtOp.hash, DhtOp.type AS dht_type,
+            Action.blob AS action_blob, Entry.blob AS entry_blob
+            FROM DHtOp
+            JOIN Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+            WHERE
+            DhtOp.hash = ?
+        "
+        .to_string();
+
+        if !include_limbo {
+            sql.push_str(
+                "
+                AND
+                DhtOp.when_integrated IS NOT NULL
+            ",
+            );
+        }
+
         let db = self.dht_db(dna_hash)?;
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
-                let mut total_bytes = 0;
                 for hash in op_hashes {
-                    // FIXME: cache this query (make prepared statement)
-                    let r = txn.query_row_and_then(
-                        "
-                            SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                            Action.blob AS action_blob, Entry.blob AS entry_blob,
-                            LENGTH(Action.blob) as action_size, LENGTH(Entry.blob) as entry_size
-                            FROM DHtOp
-                            JOIN Action ON DhtOp.action_hash = Action.hash
-                            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-                            WHERE
-                            DhtOp.hash = ?
-                            AND
-                            DhtOp.when_integrated IS NOT NULL
-                        ",
-                        [hash],
-                        |row| {
-                            let action_bytes: Option<usize> = row.get("action_size")?;
-                            let entry_bytes: Option<usize> = row.get("entry_size")?;
-                            let bytes = action_bytes.unwrap_or(0) + entry_bytes.unwrap_or(0);
-                            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                            let op_type: DhtOpType = row.get("dht_type")?;
-                            let hash: DhtOpHash = row.get("hash")?;
-                            // Check the entry isn't private before gossiping it.
-                            let mut entry: Option<Entry> = None;
-                            if action
-                                .0
-                                .entry_type()
-                                .filter(|et| *et.visibility() == EntryVisibility::Public)
-                                .is_some()
-                            {
-                                let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                                entry = match e {
-                                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                    None => None,
-                                };
-                            }
-                            let op = DhtOp::from_type(op_type, action, entry)?;
-                            StateQueryResult::Ok(((hash, op), bytes))
-                        },
-                    );
-                    match r {
-                        Ok((r, bytes)) => {
-                            out.push(r);
-                            total_bytes += bytes;
-                            // pair(maackle, freesig): be sure to add this limit in the region fetch case too
-                            if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
-                                break;
-                            }
+                    let mut stmt = txn.prepare_cached(&sql)?;
+                    let mut rows = stmt.query([hash])?;
+                    if let Some(row) = rows.next()? {
+                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let hash: DhtOpHash = row.get("hash")?;
+                        // Check the entry isn't private before gossiping it.
+                        let mut entry: Option<Entry> = None;
+                        if action
+                            .0
+                            .entry_type()
+                            .filter(|et| *et.visibility() == EntryVisibility::Public)
+                            .is_some()
+                        {
+                            let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                            entry = match e {
+                                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                None => None,
+                            };
                         }
-                        Err(holochain_state::query::StateQueryError::Sql(
+                        let op = DhtOp::from_type(op_type, action, entry)?;
+                        out.push((hash, op))
+                    } else {
+                        return Err(holochain_state::query::StateQueryError::Sql(
                             rusqlite::Error::QueryReturnedNoRows,
-                        )) => (),
-                        Err(e) => return Err(e),
+                        ));
                     }
                 }
                 StateQueryResult::Ok(out)
@@ -633,7 +666,7 @@ impl Spaces {
                 // Note this is not an error because only a validation receipt is proof of a publish.
                 None => return Ok(()),
             };
-            incoming_dht_ops_workflow(&space, trigger, ops, request_validation_receipt).await?;
+            incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }
         Ok(())
     }
@@ -651,8 +684,7 @@ impl Space {
         dna_hash: Arc<DnaHash>,
         root_db_dir: &DatabaseRootPath,
         db_sync_strategy: DbSyncStrategy,
-    ) -> ConductorResult<Self> {
-        use holochain_p2p::DnaHashExt;
+    ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
@@ -728,6 +760,25 @@ impl Space {
             author,
         )
         .await
+    }
+
+    /// Create a SourceChainWorkspace from this Space
+    pub async fn source_chain_workspace(
+        &self,
+        keystore: MetaLairClient,
+        agent_pubkey: AgentPubKey,
+        dna_def: Arc<DnaDef>,
+    ) -> ConductorResult<SourceChainWorkspace> {
+        Ok(SourceChainWorkspace::new(
+            self.authored_db.clone(),
+            self.dht_db.clone(),
+            self.dht_query_cache.clone(),
+            self.cache_db.clone(),
+            keystore,
+            agent_pubkey,
+            dna_def,
+        )
+        .await?)
     }
 }
 

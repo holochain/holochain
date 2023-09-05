@@ -7,6 +7,7 @@ use crate::fixt::*;
 use arbitrary::Arbitrary;
 use fixt::prelude::*;
 
+#[cfg(test)]
 mod bloom;
 mod common;
 mod ops;
@@ -23,6 +24,8 @@ impl ShardedGossipLocal {
         let mut u = arbitrary::Unstructured::new(&NOISE);
         let space = KitsuneSpace::arbitrary(&mut u).unwrap();
         let space = Arc::new(space);
+        let fetch_pool = FetchPool::new_bitwise_or();
+
         Self {
             gossip_type,
             tuning_params: Default::default(),
@@ -31,6 +34,7 @@ impl ShardedGossipLocal {
             host_api: host,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
+            fetch_pool,
         }
     }
 }

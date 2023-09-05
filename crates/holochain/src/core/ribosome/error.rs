@@ -56,6 +56,10 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    /// ident
+    #[error(transparent)]
     CascadeError(#[from] CascadeError),
 
     /// ident
@@ -94,6 +98,9 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
+
+    #[error(transparent)]
+    ModuleDeserializeError(#[from] holochain_wasmer_host::prelude::DeserializeError),
 }
 
 /// Type alias

@@ -20,7 +20,7 @@ mod tests;
 #[instrument(skip(vault, trigger_receipt, network, dht_query_cache))]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
-    dht_query_cache: &DhtDbQueryCache,
+    dht_query_cache: DhtDbQueryCache,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
@@ -29,7 +29,7 @@ pub async fn integrate_dht_ops_workflow(
     // Get any activity from the cache that is ready to be integrated.
     let activity_to_integrate = dht_query_cache.get_activity_to_integrate().await?;
     let (changed, activity_integrated) = vault
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             let mut total = 0;
             if !activity_to_integrate.is_empty() {
                 let mut stmt = txn.prepare_cached(

@@ -66,8 +66,8 @@ pub(crate) fn incoming_countersigning(
         // Must be a store entry op.
         if let DhtOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
-            if let Entry::CounterSign(session_data, _) = entry.as_ref() {
-                let entry_hash = EntryHash::with_data_sync(&**entry);
+            if let Entry::CounterSign(session_data, _) = entry {
+                let entry_hash = EntryHash::with_data_sync(entry);
                 // Get the required actions for this session.
                 let weight = weigh_placeholder();
                 let action_set = session_data.build_action_set(entry_hash, weight)?;
@@ -106,9 +106,9 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
-    space: &Space,
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
-    sys_validation_trigger: &TriggerSender,
+    space: Space,
+    network: impl HolochainP2pDnaT + Send + Sync,
+    sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
     let complete_sessions = space.countersigning_workspace.get_complete_sessions();
@@ -122,7 +122,7 @@ pub(crate) async fn countersigning_workflow(
             .collect();
         if !non_enzymatic_ops.is_empty() {
             incoming_dht_ops_workflow(
-                space,
+                space.clone(),
                 sys_validation_trigger.clone(),
                 non_enzymatic_ops,
                 false,
@@ -216,7 +216,7 @@ pub(crate) async fn countersigning_success(
         }
     };
     let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
-        authored_db.async_reader(reader_closure).await?;
+        authored_db.read_async(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
     if this_cell_actions_op_basis_hashes.is_empty() {
@@ -226,7 +226,7 @@ pub(crate) async fn countersigning_success(
     // Verify signatures of actions.
     let mut i_am_an_author = false;
     for SignedAction(action, signature) in &signed_actions {
-        if !action.author().verify_signature(signature, action).await {
+        if !action.author().verify_signature(signature, action).await? {
             return Ok(());
         }
         if action.author() == &author {
@@ -245,7 +245,7 @@ pub(crate) async fn countersigning_success(
         .collect();
 
     let result = authored_db
-        .async_commit({
+        .write_async({
             let author = author.clone();
             let entry_hash = entry_hash.clone();
             move |txn| {
@@ -298,8 +298,7 @@ pub(crate) async fn countersigning_success(
             }
             let op = DhtOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
-            let ops = vec![op];
-            if let Err(e) = network.publish(false, false, basis, ops, None).await {
+            if let Err(e) = network.publish_countersign(false, basis, op).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
@@ -321,6 +320,7 @@ pub(crate) async fn countersigning_success(
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
     op: DhtOp,
+    _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
         if let Err(e) = network
@@ -338,8 +338,7 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        let ops = vec![op];
-        if let Err(e) = network.publish(false, true, basis, ops, None).await {
+        if let Err(e) = network.publish_countersign(true, basis, op).await {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e

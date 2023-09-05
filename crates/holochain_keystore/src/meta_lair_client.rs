@@ -141,6 +141,11 @@ impl MetaLairClient {
         Ok(MetaLairClient(inner, c_check_send))
     }
 
+    /// Get the raw underlying lair client instance.
+    pub fn lair_client(&self) -> LairClient {
+        self.0.lock().clone()
+    }
+
     pub(crate) fn cli(&self) -> (LairClient, Esnd) {
         (self.0.lock().clone(), self.1.clone())
     }

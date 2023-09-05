@@ -2,9 +2,10 @@ use super::*;
 use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
+use holochain_trace;
 use holochain_types::db::DbWrite;
 use holochain_types::record::SignedActionHashedExt;
-use observability;
+use std::vec::IntoIter;
 
 #[derive(Clone)]
 struct TestData {
@@ -24,18 +25,21 @@ struct TestData {
 fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
     let mut data = Vec::new();
+    let mut agent_pub_key_fixt = AgentPubKeyFixturator::new(Predictable);
     let mut base_hash_fixt = EntryHashFixturator::new(Predictable);
     let mut target_hash_fixt = EntryHashFixturator::new(Unpredictable);
     for i in 0..n {
         // Create a known link add
         let base_address = base_hash_fixt.next().unwrap();
         let target_address = target_hash_fixt.next().unwrap();
+        let agent_pub_key = agent_pub_key_fixt.next().unwrap();
 
         let tag = LinkTag::new(tag_fix.next().unwrap());
         let zome_index = ZomeIndex(i as u8);
         let link_type = LinkType(i as u8);
 
         let link_add = KnownCreateLink {
+            author: agent_pub_key.clone(),
             base_address: base_address.clone().into(),
             target_address: target_address.clone().into(),
             zome_index,
@@ -50,7 +54,9 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
             ActionHashed::from_content_sync(Action::CreateLink(link_add.clone())).into();
 
         let expected_link = Link {
+            author: agent_pub_key,
             create_link_hash: link_add_hash.clone(),
+            base: link_add.base_address.clone(),
             target: target_address.clone().into(),
             zome_index,
             link_type,
@@ -67,6 +73,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
             link_add.base_address.clone(),
             LinkTypeFilter::single_dep(zome_index),
             Some(link_add.tag.clone()),
+            GetLinksFilter::default(),
         );
         let query_no_tag = GetLinksQuery::base(link_add.base_address.clone(), vec![zome_index]);
 
@@ -100,32 +107,55 @@ impl TestData {
         td
     }
 
-    fn empty<'a>(&'a self, test: &'static str) {
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            self.query
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-                .is_empty()
-        });
+    async fn empty<'a>(&'a self, test: &'static str) {
+        let val = self
+            .env
+            .read_async({
+                let query = self.query.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> DatabaseResult<bool> {
+                    Ok(query
+                        .run(DbScratch::new(&[&txn], &scratch))
+                        .unwrap()
+                        .is_empty())
+                }
+            })
+            .await
+            .unwrap();
         assert!(val, "{}", test);
     }
 
-    fn only_on_full_key<'a>(&'a self, test: &'static str) {
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            self.query
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-        });
+    async fn only_on_full_key<'a>(&'a self, test: &'static str) {
+        let val = self
+            .env
+            .read_async({
+                let query = self.query_no_tag.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap();
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
-    fn not_on_full_key<'a>(&'a self, test: &'static str) {
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            self.query
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-                .contains(&self.expected_link)
-        });
+    async fn not_on_full_key<'a>(&'a self, test: &'static str) {
+        let val = self
+            .env
+            .read_async({
+                let query = self.query.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap()
+            .contains(&self.expected_link);
         assert!(
             !val,
             "LinkMetaVal: {:?} should not be present {}",
@@ -133,27 +163,42 @@ impl TestData {
         );
     }
 
-    fn only_on_base<'a>(&'a self, test: &'static str) {
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            self.query_no_tag
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-        });
+    async fn only_on_base<'a>(&'a self, test: &'static str) {
+        let val = self
+            .env
+            .read_async({
+                let query_no_tag = self.query_no_tag.clone();
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query_no_tag.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap();
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
-    fn is_on_type<'a>(&'a self, test: &'static str) {
+    async fn is_on_type<'a>(&'a self, test: &'static str) {
         let query = GetLinksQuery::new(
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
             None,
+            GetLinksFilter::default(),
         );
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            query
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-                .contains(&self.expected_link)
-        });
+
+        let val = self
+            .env
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap()
+            .contains(&self.expected_link);
         assert!(
             val,
             "Results should contain link: {:?} in test: {}",
@@ -161,14 +206,26 @@ impl TestData {
         );
     }
 
-    fn is_on_type_query<'a>(&'a self, type_query: LinkTypeFilter, test: &'static str) {
-        let query = GetLinksQuery::new(self.base_hash.clone().into(), type_query, None);
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            query
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-                .contains(&self.expected_link)
-        });
+    async fn is_on_type_query<'a>(&'a self, type_query: LinkTypeFilter, test: &'static str) {
+        let query = GetLinksQuery::new(
+            self.base_hash.clone().into(),
+            type_query,
+            None,
+            GetLinksFilter::default(),
+        );
+
+        let val = self
+            .env
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap()
+            .contains(&self.expected_link);
         assert!(
             val,
             "Results should contain link: {:?} in test: {}",
@@ -176,7 +233,7 @@ impl TestData {
         );
     }
 
-    fn only_on_half_tag<'a>(&'a self, test: &'static str) {
+    async fn only_on_half_tag<'a>(&'a self, test: &'static str) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -185,14 +242,24 @@ impl TestData {
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
             Some(half_tag),
+            GetLinksFilter::default(),
         );
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            query.run(DbScratch::new(&[&txn], &self.scratch)).unwrap()
-        });
+
+        let val = self
+            .env
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap();
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
-    fn is_on_half_tag<'a>(&'a self, test: &'static str) {
+    async fn is_on_half_tag<'a>(&'a self, test: &'static str) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -201,13 +268,21 @@ impl TestData {
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
             Some(half_tag),
+            GetLinksFilter::default(),
         );
-        let val = fresh_reader_test(self.env.clone(), |txn| {
-            query
-                .run(DbScratch::new(&[&txn], &self.scratch))
-                .unwrap()
-                .contains(&self.expected_link)
-        });
+
+        let val = self
+            .env
+            .read_async({
+                let scratch = self.scratch.clone();
+
+                move |txn| -> StateQueryResult<Vec<Link>> {
+                    query.run(DbScratch::new(&[&txn], &scratch))
+                }
+            })
+            .await
+            .unwrap()
+            .contains(&self.expected_link);
         assert!(
             val,
             "Results should contain LinkMetaVal: {:?} in test: {}",
@@ -215,17 +290,19 @@ impl TestData {
         );
     }
 
-    fn add_link(&self) {
+    async fn add_link(&self) {
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAddLink(
             fixt!(Signature),
             self.link_add.clone(),
         ));
         self.env
-            .conn()
-            .unwrap()
-            .with_commit_test(|txn| insert_valid_integrated_op(txn, &op).unwrap())
+            .write_async(move |txn| -> StateMutationResult<()> {
+                insert_valid_integrated_op(txn, &op)
+            })
+            .await
             .unwrap();
     }
+
     fn add_link_scratch(&mut self) {
         let action = SignedActionHashed::from_content_sync(SignedAction(
             Action::CreateLink(self.link_add.clone()),
@@ -233,6 +310,7 @@ impl TestData {
         ));
         self.scratch.add_action(action, ChainTopOrdering::default());
     }
+
     fn add_link_given_scratch(&mut self, scratch: &mut Scratch) {
         let action = SignedActionHashed::from_content_sync(SignedAction(
             Action::CreateLink(self.link_add.clone()),
@@ -240,17 +318,20 @@ impl TestData {
         ));
         scratch.add_action(action, ChainTopOrdering::default());
     }
-    fn delete_link(&self) {
+
+    async fn delete_link(&self) {
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterRemoveLink(
             fixt!(Signature),
             self.link_remove.clone(),
         ));
         self.env
-            .conn()
-            .unwrap()
-            .with_commit_test(|txn| insert_valid_integrated_op(txn, &op).unwrap())
+            .write_async(move |txn| -> StateMutationResult<()> {
+                insert_valid_integrated_op(txn, &op)
+            })
+            .await
             .unwrap();
     }
+
     fn delete_link_scratch(&mut self) {
         let action = SignedActionHashed::from_content_sync(SignedAction(
             Action::DeleteLink(self.link_remove.clone()),
@@ -262,7 +343,7 @@ impl TestData {
         self.scratch.drain_actions().for_each(|_| ());
     }
 
-    fn only_these_on_base<'a>(td: &'a [Self], test: &'static str) {
+    async fn only_these_on_base<'a>(td: &'a [Self], test: &'static str) {
         // Check all base hash are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -278,24 +359,33 @@ impl TestData {
                 base_hash.clone().into(),
                 LinkTypeFilter::single_type(d.zome_index, d.link_type),
                 None,
+                GetLinksFilter::default(),
             );
-            fresh_reader_test(d.env.clone(), |txn| {
-                val.extend(
-                    query
-                        .run(DbScratch::new(&[&txn], &d.scratch))
-                        .unwrap()
-                        .into_iter(),
-                );
-            });
+
+            val.extend(
+                d.env
+                    .read_async({
+                        let scratch = d.scratch.clone();
+
+                        move |txn| -> DatabaseResult<IntoIter<Link>> {
+                            Ok(query
+                                .run(DbScratch::new(&[&txn], &scratch))
+                                .unwrap()
+                                .into_iter())
+                        }
+                    })
+                    .await
+                    .unwrap(),
+            );
         }
         assert_eq!(val, expected, "{}", test);
     }
 
-    fn only_these_on_query<'a>(
+    async fn only_these_on_query<'a>(
         td: &'a [Self],
         scratch: &Scratch,
         query: impl Into<LinkTypeFilter>,
-        test: &'static str,
+        test: &str,
     ) {
         // Check all base hash are the same
         for d in td {
@@ -306,16 +396,34 @@ impl TestData {
             .iter()
             .map(|d| d.expected_link.clone())
             .collect::<HashSet<_>>();
-        let query = GetLinksQuery::new(base_hash.clone().into(), query.into(), None);
-        let val: HashSet<_> = fresh_reader_test(td[0].env.clone(), |txn| {
-            query.run(DbScratch::new(&[&txn], &scratch)).unwrap()
-        })
-        .into_iter()
-        .collect();
+        let query = GetLinksQuery::new(
+            base_hash.clone().into(),
+            query.into(),
+            None,
+            GetLinksFilter::default(),
+        );
+
+        let val: HashSet<_> = td[0]
+            .env
+            .clone()
+            .read_async({
+                let scratch = scratch.clone();
+
+                move |txn| -> DatabaseResult<IntoIter<Link>> {
+                    Ok(query
+                        .run(DbScratch::new(&[&txn], &scratch))
+                        .unwrap()
+                        .into_iter())
+                }
+            })
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
         assert_eq!(val, expected, "{}", test);
     }
 
-    fn only_these_on_full_key<'a>(td: &'a [Self], test: &'static str) {
+    async fn only_these_on_full_key<'a>(td: &'a [Self], test: &'static str) {
         // Check all base hash, link type, tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -333,22 +441,31 @@ impl TestData {
             base_hash.into(),
             LinkTypeFilter::single_dep(zome_index),
             Some(tag),
+            GetLinksFilter::default(),
         );
         let mut val = Vec::new();
         for d in td {
-            fresh_reader_test(d.env.clone(), |txn| {
-                val.extend(
-                    query
-                        .run(DbScratch::new(&[&txn], &d.scratch))
-                        .unwrap()
-                        .into_iter(),
-                );
-            });
+            val.extend(
+                d.env
+                    .read_async({
+                        let my_query = query.clone();
+                        let scratch = d.scratch.clone();
+
+                        move |txn| -> DatabaseResult<IntoIter<Link>> {
+                            Ok(my_query
+                                .run(DbScratch::new(&[&txn], &scratch))
+                                .unwrap()
+                                .into_iter())
+                        }
+                    })
+                    .await
+                    .unwrap(),
+            );
         }
         assert_eq!(val, expected, "{}", test);
     }
 
-    fn only_these_on_half_key<'a>(td: &'a [Self], test: &'static str) {
+    async fn only_these_on_half_key<'a>(td: &'a [Self], test: &'static str) {
         let tag_len = td[0].tag.0.len();
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -369,17 +486,26 @@ impl TestData {
             base_hash.into(),
             LinkTypeFilter::single_dep(zome_index),
             Some(half_tag),
+            GetLinksFilter::default(),
         );
         let mut val = Vec::new();
         for d in td {
-            fresh_reader_test(d.env.clone(), |txn| {
-                val.extend(
-                    query
-                        .run(DbScratch::new(&[&txn], &d.scratch))
-                        .unwrap()
-                        .into_iter(),
-                );
-            });
+            val.extend(
+                d.env
+                    .read_async({
+                        let my_query = query.clone();
+                        let scratch = d.scratch.clone();
+
+                        move |txn| -> DatabaseResult<IntoIter<Link>> {
+                            Ok(my_query
+                                .run(DbScratch::new(&[&txn], &scratch))
+                                .unwrap()
+                                .into_iter())
+                        }
+                    })
+                    .await
+                    .unwrap(),
+            );
         }
         assert_eq!(val, expected, "{}", test);
     }
@@ -393,19 +519,19 @@ async fn can_add_and_delete_link() {
     let mut td = fixtures(arc.clone(), 1).into_iter().next().unwrap();
 
     // Check it's empty
-    td.empty(here!("empty at start"));
+    td.empty(here!("empty at start")).await;
 
     // Add a link
     // Add
     td.add_link_scratch();
     // Is in scratch
-    td.only_on_full_key(here!("add link in scratch"));
+    td.only_on_full_key(here!("add link in scratch")).await;
 
     // Remove from scratch
     td.delete_link_scratch();
 
     // Is empty
-    td.empty(here!("empty after remove"));
+    td.empty(here!("empty after remove")).await;
 
     let new_td = TestData::with_same_keys(td.clone());
     td = new_td;
@@ -414,25 +540,25 @@ async fn can_add_and_delete_link() {
     td.add_link_scratch();
 
     // Is in scratch again
-    td.only_on_full_key(here!("Is still in the scratch"));
+    td.only_on_full_key(here!("Is still in the scratch")).await;
 
     // Remove from scratch
     td.delete_link_scratch();
 
     // Is empty
-    td.empty(here!("empty after remove"));
+    td.empty(here!("empty after remove")).await;
 
     // Check it's in db
     td.clear_scratch();
-    td.add_link();
+    td.add_link().await;
 
-    td.only_on_full_key(here!("It's in the db"));
+    td.only_on_full_key(here!("It's in the db")).await;
 
     // Remove the link
-    td.delete_link();
+    td.delete_link().await;
     // Is empty
 
-    td.empty(here!("empty after remove in db"));
+    td.empty(here!("empty after remove in db")).await;
 
     // Add a link
     let new_td = TestData::with_same_keys(td.clone());
@@ -440,24 +566,24 @@ async fn can_add_and_delete_link() {
     // Add
     td.add_link_scratch();
     // Is in scratch
-    td.only_on_full_key(here!("add link in scratch"));
+    td.only_on_full_key(here!("add link in scratch")).await;
     // No zome, no tag
-    td.only_on_base(here!("scratch"));
+    td.only_on_base(here!("scratch")).await;
     // Half the tag
-    td.only_on_half_tag(here!("scratch"));
+    td.only_on_half_tag(here!("scratch")).await;
 
     td.delete_link_scratch();
-    td.empty(here!("empty after remove in db"));
+    td.empty(here!("empty after remove in db")).await;
 
     // Partial matching
     td.clear_scratch();
-    td.add_link();
+    td.add_link().await;
 
-    td.only_on_full_key(here!("db"));
+    td.only_on_full_key(here!("db")).await;
     // No zome, no tag
-    td.only_on_base(here!("db"));
+    td.only_on_base(here!("db")).await;
     // Half the tag
-    td.only_on_half_tag(here!("db"));
+    td.only_on_half_tag(here!("db")).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -475,16 +601,16 @@ async fn multiple_links() {
         }
         // Is in scratch
         for d in &mut td {
-            d.only_on_full_key(here!("add link in scratch"));
+            d.only_on_full_key(here!("add link in scratch")).await;
         }
 
         // Remove from scratch
         td[5].delete_link_scratch();
 
-        td[5].not_on_full_key(here!("removed in scratch"));
+        td[5].not_on_full_key(here!("removed in scratch")).await;
 
         for d in td[0..5].iter().chain(&td[6..]) {
-            d.only_on_full_key(here!("all except 5 scratch"));
+            d.only_on_full_key(here!("all except 5 scratch")).await;
         }
         // Can't add back the same action because removes are tombstones
         // so add one with the same key
@@ -494,10 +620,12 @@ async fn multiple_links() {
         td[5].add_link_scratch();
 
         // Is in scratch again
-        td[5].only_on_full_key(here!("Is back in the scratch"));
+        td[5]
+            .only_on_full_key(here!("Is back in the scratch"))
+            .await;
 
         for d in &mut td {
-            d.only_on_full_key(here!("add link in scratch"));
+            d.only_on_full_key(here!("add link in scratch")).await;
         }
         for d in &mut td {
             d.clear_scratch();
@@ -506,28 +634,28 @@ async fn multiple_links() {
 
     {
         for d in &mut td {
-            d.add_link();
+            d.add_link().await;
         }
         for d in &mut td {
-            d.only_on_full_key(here!("all in db"));
+            d.only_on_full_key(here!("all in db")).await;
         }
-        td[0].delete_link();
+        td[0].delete_link().await;
 
         for d in &td[1..] {
-            d.only_on_full_key(here!("all except 0 scratch"));
+            d.only_on_full_key(here!("all except 0 scratch")).await;
         }
 
-        td[0].not_on_full_key(here!("removed in scratch"));
+        td[0].not_on_full_key(here!("removed in scratch")).await;
     }
 
     for d in &td[1..] {
-        d.only_on_full_key(here!("all except 0"));
+        d.only_on_full_key(here!("all except 0")).await;
     }
-    td[0].not_on_full_key(here!("removed in db"));
+    td[0].not_on_full_key(here!("removed in db")).await;
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -540,11 +668,11 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in &mut td {
-            d.only_on_full_key(here!("re add"));
+            d.only_on_full_key(here!("re add")).await;
             // No zome, no tag
-            d.only_on_base(here!("re add"));
+            d.only_on_base(here!("re add")).await;
             // Half the tag
-            d.is_on_half_tag(here!("re add"));
+            d.is_on_half_tag(here!("re add")).await;
         }
         // Add Again
         for d in &mut td {
@@ -552,25 +680,25 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in &mut td {
-            d.only_on_full_key(here!("re add"));
+            d.only_on_full_key(here!("re add")).await;
             // No zome, no tag
-            d.only_on_base(here!("re add"));
+            d.only_on_base(here!("re add")).await;
             // Half the tag
-            d.is_on_half_tag(here!("re add"));
+            d.is_on_half_tag(here!("re add")).await;
         }
     }
     {
         // Add
         for d in &mut td {
-            d.add_link();
+            d.add_link().await;
         }
         // Is in scratch
         for d in &mut td {
-            d.only_on_full_key(here!("re add"));
+            d.only_on_full_key(here!("re add")).await;
             // No zome, no tag
-            d.only_on_base(here!("re add"));
+            d.only_on_base(here!("re add")).await;
             // Half the tag
-            d.is_on_half_tag(here!("re add"));
+            d.is_on_half_tag(here!("re add")).await;
         }
     }
 
@@ -579,17 +707,17 @@ async fn duplicate_links() {
     }
     // Is in db
     for d in &mut td {
-        d.only_on_full_key(here!("re add"));
+        d.only_on_full_key(here!("re add")).await;
         // No zome, no tag
-        d.only_on_base(here!("re add"));
+        d.only_on_base(here!("re add")).await;
         // Half the tag
-        d.is_on_half_tag(here!("re add"));
+        d.is_on_half_tag(here!("re add")).await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -609,8 +737,10 @@ async fn links_on_same_base() {
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(d.zome_index),
             Some(d.tag.clone()),
+            GetLinksFilter::default(),
         );
         d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
+        d.expected_link.base = d.link_add.base_address.clone();
     }
     {
         // Add
@@ -619,23 +749,23 @@ async fn links_on_same_base() {
         }
         // Is in scratch
         for d in &mut td {
-            d.only_on_full_key(here!("same base"));
+            d.only_on_full_key(here!("same base")).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"));
+            d.is_on_half_tag(here!("same base")).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"));
+        TestData::only_these_on_base(&td, here!("check all return on same base")).await;
     }
     {
         for d in &mut td {
-            d.add_link();
+            d.add_link().await;
         }
         // In db
         for d in &mut td {
-            d.only_on_full_key(here!("same base"));
+            d.only_on_full_key(here!("same base")).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"));
+            d.is_on_half_tag(here!("same base")).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"));
+        TestData::only_these_on_base(&td, here!("check all return on same base")).await;
     }
     {
         for d in &mut td {
@@ -643,11 +773,11 @@ async fn links_on_same_base() {
         }
         // In db
         for d in &mut td {
-            d.only_on_full_key(here!("same base"));
+            d.only_on_full_key(here!("same base")).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"));
+            d.is_on_half_tag(here!("same base")).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"));
+        TestData::only_these_on_base(&td, here!("check all return on same base")).await;
     }
     // Check removes etc.
     {
@@ -656,30 +786,30 @@ async fn links_on_same_base() {
         }
         td[0].delete_link_scratch();
         for d in &td[1..] {
-            d.only_on_full_key(here!("same base"));
+            d.only_on_full_key(here!("same base")).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"));
+            d.is_on_half_tag(here!("same base")).await;
         }
-        TestData::only_these_on_base(&td[1..], here!("check all return on same base"));
-        td[0].not_on_full_key(here!("removed in scratch"));
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base")).await;
+        td[0].not_on_full_key(here!("removed in scratch")).await;
     }
     {
         for d in &mut td {
             d.clear_scratch();
         }
-        td[0].delete_link();
+        td[0].delete_link().await;
         for d in &td[1..] {
-            d.only_on_full_key(here!("same base"));
-            d.is_on_half_tag(here!("same base"));
+            d.only_on_full_key(here!("same base")).await;
+            d.is_on_half_tag(here!("same base")).await;
         }
-        TestData::only_these_on_base(&td[1..], here!("check all return on same base"));
-        td[0].not_on_full_key(here!("removed in scratch"));
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base")).await;
+        td[0].not_on_full_key(here!("removed in scratch")).await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -704,6 +834,7 @@ async fn links_on_same_tag() {
         let (_, link_add_hash): (_, ActionHash) =
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.base = d.link_add.base_address.clone();
         d.expected_link.tag = tag.clone();
         d.expected_link.zome_index = zome_index;
         d.expected_link.link_type = link_type;
@@ -713,6 +844,7 @@ async fn links_on_same_tag() {
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(d.zome_index),
             Some(tag.clone()),
+            GetLinksFilter::default(),
         );
         d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
     }
@@ -721,36 +853,40 @@ async fn links_on_same_tag() {
         for d in &mut td {
             d.add_link_scratch();
         }
-        TestData::only_these_on_base(&td[..], here!("check all return on same base"));
-        TestData::only_these_on_full_key(&td[..], here!("check all return on same base"));
-        TestData::only_these_on_half_key(&td[..], here!("check all return on same base"));
+        TestData::only_these_on_base(&td[..], here!("check all return on same base")).await;
+        TestData::only_these_on_full_key(&td[..], here!("check all return on same base")).await;
+        TestData::only_these_on_half_key(&td[..], here!("check all return on same base")).await;
     }
     {
         // In db
-        TestData::only_these_on_base(&td[..], here!("check all return on same base"));
-        TestData::only_these_on_full_key(&td[..], here!("check all return on same base"));
-        TestData::only_these_on_half_key(&td[..], here!("check all return on same base"));
+        TestData::only_these_on_base(&td[..], here!("check all return on same base")).await;
+        TestData::only_these_on_full_key(&td[..], here!("check all return on same base")).await;
+        TestData::only_these_on_half_key(&td[..], here!("check all return on same base")).await;
     }
     // Check removes etc.
     {
-        td[5].delete_link();
-        td[6].delete_link();
+        td[5].delete_link().await;
+        td[6].delete_link().await;
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
-        TestData::only_these_on_base(&partial_td[..], here!("check all return on same base"));
-        TestData::only_these_on_full_key(&partial_td[..], here!("check all return on same base"));
-        TestData::only_these_on_half_key(&partial_td[..], here!("check all return on same base"));
+        TestData::only_these_on_base(&partial_td[..], here!("check all return on same base")).await;
+        TestData::only_these_on_full_key(&partial_td[..], here!("check all return on same base"))
+            .await;
+        TestData::only_these_on_half_key(&partial_td[..], here!("check all return on same base"))
+            .await;
     }
     {
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
-        TestData::only_these_on_base(&partial_td[..], here!("check all return on same base"));
-        TestData::only_these_on_full_key(&partial_td[..], here!("check all return on same base"));
-        TestData::only_these_on_half_key(&partial_td[..], here!("check all return on same base"));
+        TestData::only_these_on_base(&partial_td[..], here!("check all return on same base")).await;
+        TestData::only_these_on_full_key(&partial_td[..], here!("check all return on same base"))
+            .await;
+        TestData::only_these_on_half_key(&partial_td[..], here!("check all return on same base"))
+            .await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_type() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -768,6 +904,7 @@ async fn links_on_same_type() {
         let (_, link_add_hash): (_, ActionHash) =
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.base = d.link_add.base_address.clone();
         d.expected_link.link_type = link_type;
     }
 
@@ -775,39 +912,46 @@ async fn links_on_same_type() {
         d.add_link_scratch();
     }
     for d in &td {
-        d.is_on_type(here!("Each link is returned for a type"));
+        d.is_on_type(here!("Each link is returned for a type"))
+            .await;
         d.is_on_type_query(
             LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
             here!("Each link is returned for a type"),
-        );
+        )
+        .await;
         d.is_on_type_query(
             LinkTypeFilter::single_type(d.zome_index, d.link_type),
             here!("Each link is returned for a type"),
-        );
+        )
+        .await;
     }
     for d in &mut td {
-        d.add_link();
+        d.add_link().await;
     }
     for d in &td {
-        d.is_on_type(here!("Each link is returned for a type"));
+        d.is_on_type(here!("Each link is returned for a type"))
+            .await;
         d.is_on_type_query(
             LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
             here!("Each link is returned for a type"),
-        );
+        )
+        .await;
         d.is_on_type_query(
             LinkTypeFilter::single_type(d.zome_index, d.link_type),
             here!("Each link is returned for a type"),
-        );
+        )
+        .await;
         d.is_on_type_query(
             LinkTypeFilter::Types(vec![(d.zome_index, vec![d.link_type])]),
             here!("Each link is returned for a type"),
-        );
+        )
+        .await;
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn link_type_ranges() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -824,6 +968,7 @@ async fn link_type_ranges() {
         // Create the new hash
         let link_add_hash = ActionHash::with_data_sync(&Action::CreateLink(d.link_add.clone()));
         d.expected_link.create_link_hash = link_add_hash.clone();
+        d.expected_link.base = d.link_add.base_address.clone();
     }
 
     // Add
@@ -835,13 +980,15 @@ async fn link_type_ranges() {
         &scratch,
         LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
         here!("all return on full range"),
-    );
+    )
+    .await;
     TestData::only_these_on_query(
         &td[0..=0],
         &scratch,
         LinkTypeFilter::single_type(0.into(), 0.into()),
         here!("only single on single range"),
-    );
+    )
+    .await;
     TestData::only_these_on_query(
         &td[4..=9],
         &scratch,
@@ -854,7 +1001,8 @@ async fn link_type_ranges() {
             (9.into(), vec![9.into()]),
         ]),
         here!("range matches"),
-    );
+    )
+    .await;
     let partial_td = &td[2..5]
         .iter()
         .chain(&td[7..9])
@@ -871,7 +1019,8 @@ async fn link_type_ranges() {
             (4.into(), vec![4.into()]),
         ]),
         here!("individual types"),
-    );
+    )
+    .await;
     let partial_td = &td[2..5]
         .iter()
         .chain(&td[7..9])
@@ -888,22 +1037,25 @@ async fn link_type_ranges() {
             (4.into(), vec![4.into()]),
         ]),
         here!("individual types"),
-    );
+    )
+    .await;
     for d in &mut td {
-        d.add_link();
+        d.add_link().await;
     }
     TestData::only_these_on_query(
         &td,
         &Scratch::new(),
         LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
         here!("all return on full range"),
-    );
+    )
+    .await;
     TestData::only_these_on_query(
         &td[0..=0],
         &Scratch::new(),
         LinkTypeFilter::single_type(0.into(), 0.into()),
         here!("all return on full range"),
-    );
+    )
+    .await;
     let partial_td = &td[2..5]
         .iter()
         .chain(&td[7..9])
@@ -920,5 +1072,6 @@ async fn link_type_ranges() {
             (4.into(), vec![4.into()]),
         ]),
         here!("individual types"),
-    );
+    )
+    .await;
 }

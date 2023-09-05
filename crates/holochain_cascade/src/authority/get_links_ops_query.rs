@@ -35,12 +35,7 @@ impl GetLinksOpsQuery {
         }
     }
     pub fn tag_to_hex(tag: &LinkTag) -> String {
-        use std::fmt::Write;
-        let mut s = String::with_capacity(tag.0.len());
-        for b in &tag.0 {
-            write!(&mut s, "{:02X}", b).ok();
-        }
-        s
+        holochain_util::hex::bytes_to_hex(&tag.0, true)
     }
 }
 

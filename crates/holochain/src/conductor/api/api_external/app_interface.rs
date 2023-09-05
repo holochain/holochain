@@ -58,7 +58,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::GetAppInfo { installed_app_id } => Ok(AppResponse::AppInfoReturned(
+            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
                 self.conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?,
@@ -86,17 +86,17 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 }
             }
             AppRequest::CreateCloneCell(payload) => {
-                let installed_clone_cell = self
+                let clone_cell = self
                     .conductor_handle
                     .clone()
                     .create_clone_cell(*payload)
                     .await?;
-                Ok(AppResponse::CloneCellCreated(installed_clone_cell))
+                Ok(AppResponse::CloneCellCreated(clone_cell))
             }
             AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .disable_clone_cell(&*payload)
+                    .disable_clone_cell(&payload)
                     .await?;
                 Ok(AppResponse::CloneCellDisabled)
             }
@@ -104,15 +104,17 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let enabled_cell = self
                     .conductor_handle
                     .clone()
-                    .enable_clone_cell(&*payload)
+                    .enable_clone_cell(&payload)
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
-            AppRequest::GossipInfo(payload) => {
-                let info = self.conductor_handle.gossip_info(&payload.dnas).await?;
-                Ok(AppResponse::GossipInfo(info))
+            AppRequest::NetworkInfo(payload) => {
+                let info = self.conductor_handle.network_info(&payload).await?;
+                Ok(AppResponse::NetworkInfo(info))
             }
-            AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
+            AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
+                self.conductor_handle.list_wasm_host_functions().await?,
+            )),
         }
     }
 }

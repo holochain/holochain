@@ -36,9 +36,6 @@ impl AgentInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AppInfo;
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct CallInfo {
     pub provenance: AgentPubKey,
     pub function_name: FunctionName,

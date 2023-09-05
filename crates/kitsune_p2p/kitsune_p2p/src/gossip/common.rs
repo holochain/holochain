@@ -1,6 +1,6 @@
 use crate::agent_store::AgentInfoSigned;
+use crate::meta_net::*;
 use crate::types::*;
-use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::sync::Arc;
 
@@ -11,8 +11,8 @@ pub type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 pub(crate) enum HowToConnect {
     /// The connection handle and the url that this handle has been connected to.
     /// If the connection handle closes the url can change so we need to track it.
-    Con(Tx2ConHnd<wire::Wire>, TxUrl),
-    Url(TxUrl),
+    Con(MetaNetCon, String),
+    Url(String),
 }
 
 /// The key to use for referencing items in a bloom filter

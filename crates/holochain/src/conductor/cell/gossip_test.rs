@@ -1,17 +1,16 @@
 use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
+use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
-use holochain_sqlite::prelude::*;
-use holochain_state::prelude::fresh_reader_test;
+use holochain_sqlite::prelude::{AsP2pStateTxExt, DatabaseResult};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -26,7 +25,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_10s([&cell_1, &cell_2]).await;
+    consistency_60s([&cell_1, &cell_2]).await;
 
     let hashes: EntryHashes = conductors[1]
         .call(
@@ -40,21 +39,25 @@ async fn gossip_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+
     let mut network_config = KitsuneP2pConfig::default();
     network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
-    // Hit an actual bootstrap service so it can blow up and return an error if we get our end of
+    // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
-    network_config.bootstrap_service = Some(url2::url2!("{}", kitsune_p2p::BOOTSTRAP_SERVICE_DEV));
+    network_config.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
     let zomes = vec![TestWasm::Anchor];
     let mut conductor_test =
         ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
+    // TODO should check that the app is running otherwise we don't know if bootstrap was called
     conductor_test.shutdown_conductor().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -77,9 +80,10 @@ async fn agent_info_test() {
 
     consistency_10s([&cell_1, &cell_2]).await;
     for p2p_agents_db in p2p_agents_dbs {
-        let len = fresh_reader_test(p2p_agents_db.clone(), |txn| {
-            txn.p2p_list_agents().unwrap().len()
-        });
+        let len = p2p_agents_db
+            .read_async(move |txn| -> DatabaseResult<usize> { Ok(txn.p2p_list_agents()?.len()) })
+            .await
+            .unwrap();
         assert_eq!(len, 2);
     }
 }

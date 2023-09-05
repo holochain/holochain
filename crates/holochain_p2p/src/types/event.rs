@@ -115,7 +115,14 @@ pub enum CountersigningSessionNegotiationMessage {
 #[derive(Debug, derive_more::From)]
 pub enum FetchOpDataQuery {
     /// Fetch all ops with the hashes specified
-    Hashes(Vec<holo_hash::DhtOpHash>),
+    Hashes {
+        /// list of ops to fetch
+        op_hash_list: Vec<holo_hash::DhtOpHash>,
+
+        /// should we include limbo ops
+        include_limbo: bool,
+    },
+
     /// Fetch all ops within the time and space bounds specified
     Regions(Vec<RegionBounds>),
 }
@@ -124,12 +131,16 @@ impl FetchOpDataQuery {
     /// Convert from the kitsune form of this query
     pub fn from_kitsune(kit: FetchOpDataEvtQuery) -> Self {
         match kit {
-            FetchOpDataEvtQuery::Hashes(hashes) => Self::Hashes(
-                hashes
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list,
+                include_limbo,
+            } => Self::Hashes {
+                op_hash_list: op_hash_list
                     .into_iter()
                     .map(|h| DhtOpHash::from_kitsune(&h))
                     .collect::<Vec<_>>(),
-            ),
+                include_limbo,
+            },
             FetchOpDataEvtQuery::Regions(coords) => Self::Regions(coords),
         }
     }
@@ -208,6 +219,13 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> WireLinkOps;
 
+        /// A remote node is requesting a link count from us.
+        fn count_links(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            query: WireLinkQuery,
+        ) -> CountLinksResponse;
+
         /// A remote node is requesting agent activity from us.
         fn get_agent_activity(
             dna_hash: DnaHash,
@@ -277,6 +295,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }

@@ -11,7 +11,7 @@ crate::secure_primitive!(Hash256Bits, 32);
 pub struct Hash512Bits([u8; 64]);
 crate::secure_primitive!(Hash512Bits, 64);
 
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 /// Input to holochain hash function.
 pub enum HashInput {

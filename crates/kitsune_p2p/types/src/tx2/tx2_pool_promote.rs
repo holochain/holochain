@@ -660,7 +660,7 @@ fn close_promote_ep_hnd(
 
         *c = true;
         i.con_limit.close();
-        let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
+        let cons = i.cons.values().cloned().collect::<Vec<_>>();
         let ep_close_fut = i.sub_ep.close(code, reason);
         Ok((cons, ep_close_fut, i.logic_hnd.clone()))
     }) {
@@ -835,7 +835,7 @@ impl AsEpFactory for PromoteFactory {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
         let tuning_params = self.tuning_params.clone();
-        let max_cons = tuning_params.tx2_pool_max_connection_count as usize;
+        let max_cons = tuning_params.tx2_pool_max_connection_count;
         let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.adapter.bind(bind_spec, timeout);
         timeout

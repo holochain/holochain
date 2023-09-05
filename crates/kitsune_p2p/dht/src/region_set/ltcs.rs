@@ -19,7 +19,7 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 #[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
-    pub(super) arq_set: ArqBoundsSet,
+    pub(super) arq_set: ArqSet,
 }
 
 impl RegionCoordSetLtcs {
@@ -87,7 +87,7 @@ impl RegionCoordSetLtcs {
     pub fn empty() -> Self {
         Self {
             times: TelescopingTimes::empty(),
-            arq_set: ArqBoundsSet::empty(),
+            arq_set: ArqSet::empty(),
         }
     }
 
@@ -177,9 +177,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         self.coords
             .region_coords_flat()
-            .map(|((ia, ix, it), coords)| {
-                Region::new(coords, self.data[ia][ix as usize][it as usize].clone())
-            })
+            .map(|((ia, ix, it), coords)| Region::new(coords, self.data[ia][ix][it].clone()))
     }
 
     /// Reshape the two region sets so that both match, omitting or merging
@@ -213,7 +211,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
             .regions()
             .into_iter()
             .zip(other.regions().into_iter())
-            .filter_map(|(a, b)| (a.data != b.data).then(|| a))
+            .filter_map(|(a, b)| (a.data != b.data).then_some(a))
             .collect();
 
         Ok(regions)

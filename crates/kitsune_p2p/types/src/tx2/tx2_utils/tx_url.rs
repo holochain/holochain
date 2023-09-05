@@ -58,7 +58,7 @@ impl From<url2::Url2> for TxUrl {
 
 impl From<String> for TxUrl {
     fn from(r: String) -> Self {
-        Self(Arc::new(url2::Url2::parse(&r)))
+        Self(Arc::new(url2::Url2::parse(r)))
     }
 }
 
