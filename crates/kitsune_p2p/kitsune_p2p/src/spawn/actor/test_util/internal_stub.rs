@@ -145,7 +145,7 @@ impl InternalHandler for InternalStub {
         _space: crate::spawn::actor::KSpace,
         _op_hash: KOpHash,
     ) -> InternalHandlerResult<()> {
-        todo!()
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_incoming_gossip(

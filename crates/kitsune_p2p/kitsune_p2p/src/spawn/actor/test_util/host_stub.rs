@@ -4,7 +4,7 @@ use crate::event::{
 use crate::spawn::actor::{KAgent, KSpace};
 use crate::test_util::data::mk_agent_info;
 use crate::types::event::Payload;
-use crate::KitsuneP2pError;
+use crate::{KOp, KitsuneP2pError};
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{FutureExt, SinkExt, StreamExt};
 use ghost_actor::GhostRespond;
@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::AbortHandle;
 use tokio::time::error::Elapsed;
+use tracing_subscriber::filter::FilterExt;
 
 pub struct HostStub {
     pub respond_with_error: Arc<AtomicBool>,
@@ -21,6 +22,8 @@ pub struct HostStub {
 
     pub put_agent_info_signed_calls: Arc<parking_lot::RwLock<Vec<PutAgentInfoSignedEvt>>>,
     pub notify_calls: Arc<parking_lot::RwLock<Vec<(KSpace, KAgent, Payload)>>>,
+    pub receive_ops_calls:
+        Arc<parking_lot::RwLock<Vec<(KSpace, Vec<KOp>, Option<kitsune_p2p_fetch::FetchContext>)>>>,
 
     put_events: Receiver<PutAgentInfoSignedEvt>,
     abort_handle: AbortHandle,
@@ -32,6 +35,7 @@ impl HostStub {
 
         let put_agent_info_signed_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
         let notify_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
+        let receive_ops_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
 
         let respond_with_error = Arc::new(AtomicBool::new(false));
         let respond_with_error_count = Arc::new(AtomicUsize::new(0));
@@ -42,6 +46,7 @@ impl HostStub {
 
             let task_put_agent_info_signed_calls = put_agent_info_signed_calls.clone();
             let task_notify_calls = notify_calls.clone();
+            let task_receive_ops_calls = receive_ops_calls.clone();
 
             async move {
                 while let Some(evt) = host_receiver.next().await {
@@ -146,6 +151,28 @@ impl HostStub {
                                 }
                             }
                         }
+                        KitsuneP2pEvent::ReceiveOps {
+                            space,
+                            ops,
+                            context,
+                            respond,
+                            ..
+                        } => {
+                            let respond = maybe_respond_error(
+                                task_respond_with_error.clone(),
+                                task_respond_with_error_count.clone(),
+                                respond,
+                            );
+                            if respond.is_none() {
+                                continue;
+                            }
+
+                            task_receive_ops_calls.write().push((space, ops, context));
+
+                            respond
+                                .unwrap()
+                                .respond(Ok(async move { Ok(()) }.boxed().into()))
+                        }
                         _ => panic!("Unexpected event - {:?}", evt),
                     }
                 }
@@ -157,6 +184,7 @@ impl HostStub {
             respond_with_error_count,
             put_agent_info_signed_calls,
             notify_calls,
+            receive_ops_calls,
             put_events: receiver,
             abort_handle: handle.abort_handle(),
         }
