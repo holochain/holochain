@@ -551,24 +551,29 @@ pub mod test {
 
     #[test]
     fn test_network_topology_integrity_check_self_edge_fail() {
-        let mut topology = NetworkTopology::default();
+        crate::big_stack_test!(
+            async move {
+                let mut topology = NetworkTopology::default();
 
-        assert_eq!(Ok(()), topology.integrity_check());
+                assert_eq!(Ok(()), topology.integrity_check());
 
-        let node = NetworkTopologyNode::new();
-        assert!(topology.add_node(node.clone()));
+                let node = NetworkTopologyNode::new();
+                assert!(topology.add_node(node.clone()));
 
-        assert_eq!(Ok(()), topology.integrity_check());
+                assert_eq!(Ok(()), topology.integrity_check());
 
-        let edge = NetworkTopologyEdge::new_full_view_on_node(&node, &node);
-        // Adding a self node should fail for a simple edge.
-        assert!(!topology.add_simple_edge(0, 0, edge.clone()));
-        // Force add it for the test.
-        topology.graph.add_edge(0.into(), 0.into(), edge);
+                let edge = NetworkTopologyEdge::new_full_view_on_node(&node, &node);
+                // Adding a self node should fail for a simple edge.
+                assert!(!topology.add_simple_edge(0, 0, edge.clone()));
+                // Force add it for the test.
+                topology.graph.add_edge(0.into(), 0.into(), edge);
 
-        assert_eq!(
-            Err(NetworkTopologyError::IntegritySelfEdge),
-            topology.integrity_check()
+                assert_eq!(
+                    Err(NetworkTopologyError::IntegritySelfEdge),
+                    topology.integrity_check()
+                );
+            },
+            3_000_000
         );
     }
 

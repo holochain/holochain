@@ -86,15 +86,20 @@ pub mod test {
     /// Test that we can build a network with a single node.
     #[test]
     fn test_sweet_topos_sized_network_single_node() {
-        let mut g = unstructured_noise().into();
-        let fact = SizedNetworkFact {
-            nodes: 1,
-            agents: 1..=1,
-        };
-        let graph = fact.build_fallible(&mut g).unwrap();
-        assert_eq!(graph.node_count(), 1);
-        assert_eq!(graph.edge_count(), 0);
-        assert_eq!(graph.strict_partitions(), 1);
+        crate::big_stack_test!(
+            async move {
+                let mut g = unstructured_noise().into();
+                let fact = SizedNetworkFact {
+                    nodes: 1,
+                    agents: 1..=1,
+                };
+                let graph = fact.build_fallible(&mut g).unwrap();
+                assert_eq!(graph.node_count(), 1);
+                assert_eq!(graph.edge_count(), 0);
+                assert_eq!(graph.strict_partitions(), 1);
+            },
+            3_000_000
+        );
     }
 
     /// Test that we can build a network with a dozen nodes.
