@@ -55,6 +55,55 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_random_returns_offline_nodes() {
+        let store = Store::new(vec![]);
+        let filter = super::random(store.clone());
+        let space: Arc<KitsuneSpace> = Arc::new(fixt!(KitsuneSpace));
+        let offline_peer = AgentInfoSigned::sign(
+            space.clone(),
+            Arc::new(fixt!(KitsuneAgent, Unpredictable)),
+            u32::MAX / 4,
+            vec![], // no url means offline
+            0,
+            std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
+            |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable))) },
+        )
+        .await
+        .unwrap();
+        put(store.clone(), vec![offline_peer.clone()]).await;
+
+        let query = RandomQuery {
+            space,
+            limit: RandomLimit(10),
+        };
+        let mut buf = Vec::new();
+        rmp_encode(&mut buf, query).unwrap();
+
+        let res = warp::test::request()
+            .method("POST")
+            .header("Content-type", "application/octet")
+            .header("X-Op", "random")
+            .body(buf)
+            .reply(&filter)
+            .await;
+
+        assert_eq!(res.status(), 200);
+        #[derive(Debug, serde::Deserialize)]
+        struct Bytes(#[serde(with = "serde_bytes")] Vec<u8>);
+        let result: Vec<Bytes> = rmp_decode(&mut res.body().as_ref()).unwrap();
+
+        let mut result: Vec<AgentInfoSigned> = result
+            .into_iter()
+            .map(|bytes| rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes.0)).unwrap())
+            .collect();
+
+        assert_eq!(result.len(), 1);
+
+        let result = result.remove(0);
+        assert_eq!(result, offline_peer);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_random() {
         let store = Store::new(vec![]);
         let filter = super::random(store.clone());
