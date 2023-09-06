@@ -156,6 +156,33 @@ pub struct InstallAppPayload {
     pub ignore_genesis_failure: bool,
 }
 
+/// Provides default values for [InstallAppPayload] that are not intended to be usable but allow
+/// clients to avoid specifying values for new fields.
+///
+/// ```rust
+/// use std::path::PathBuf;
+/// use holochain_types::app::AppBundleSource;
+/// use holochain_types::prelude::InstallAppPayload;
+/// let payload = InstallAppPayload {
+///     // Provide the fields that are important to your happ install
+///     source: AppBundleSource::Path(PathBuf::from("build/myapp.happ")),
+///     /// Ignore other fields and new fields
+///     ..Default::default()
+/// };
+/// ```
+impl Default for InstallAppPayload {
+    fn default() -> Self {
+        InstallAppPayload {
+            source: AppBundleSource::Path(Default::default()),
+            agent_key: AgentPubKey::from_raw_36(vec![0; 36]),
+            installed_app_id: None,
+            membrane_proofs: Default::default(),
+            network_seed: None,
+            ignore_genesis_failure: false,
+        }
+    }
+}
+
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
