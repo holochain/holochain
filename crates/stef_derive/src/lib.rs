@@ -244,6 +244,9 @@ fn state_impl(
     let mut define_action_enum: syn::ItemEnum = syn::parse(
         quote! {
             #[doc = #doc]
+            #[derive(Debug)]
+            // TODO: don't depend on this feature being available in the consuming crate
+            #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
             pub enum #action_name {
                 #define_action_enum_variants
             }

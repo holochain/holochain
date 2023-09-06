@@ -122,7 +122,9 @@ impl ShardedGossipLocal {
                         m.update_current_round(
                             peer_cert.clone(),
                             GossipModuleType::ShardedHistorical,
-                            round.clone(),
+                            round.id.clone(),
+                            round.remote_agent_list.clone(),
+                            round.region_diffs.clone(),
                         )
                     });
                 } else {

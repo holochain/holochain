@@ -171,7 +171,9 @@ impl ShardedGossipLocal {
                     m.update_current_round(
                         peer_cert.clone(),
                         self.gossip_type.into(),
-                        state.clone(),
+                        state.id.clone(),
+                        state.remote_agent_list.clone(),
+                        state.region_diffs.clone(),
                     );
                     m.record_accept(remote_agent_list.clone(), self.gossip_type.into());
                 });

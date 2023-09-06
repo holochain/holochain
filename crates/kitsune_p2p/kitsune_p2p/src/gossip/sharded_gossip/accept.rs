@@ -74,8 +74,15 @@ impl ShardedGossipLocal {
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
 
+            let s = state.clone();
             inner.metrics.write(|m| {
-                m.update_current_round(peer_cert.clone(), self.gossip_type.into(), state.clone());
+                m.update_current_round(
+                    peer_cert.clone(),
+                    self.gossip_type.into(),
+                    s.id,
+                    s.remote_agent_list,
+                    s.region_diffs,
+                );
                 m.record_initiate(remote_agent_list, self.gossip_type.into());
             });
 

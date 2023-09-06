@@ -11,7 +11,6 @@ use tokio::time::Instant;
 
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
-use crate::gossip::sharded_gossip::RoundState;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
@@ -223,9 +222,9 @@ impl CurrentRound {
     }
 
     /// Update status based on an existing round
-    pub fn update(&mut self, round_state: RoundState) {
+    pub fn update(&mut self, region_diffs: RegionDiffs) {
         self.last_touch = Instant::now();
-        self.region_diffs = round_state.region_diffs;
+        self.region_diffs = region_diffs;
     }
 
     /// Convert to a CompletedRound
@@ -474,19 +473,16 @@ impl stef::State<'static> for Metrics {
         &mut self,
         peer: NodeId,
         gossip_type: GossipModuleType,
-        round_state: RoundState,
+        round_id: String,
+        remote_agents: AgentList,
+        region_diffs: RegionDiffs,
     ) {
-        let remote_agents = round_state.remote_agent_list.clone();
         let history = self.node_history.entry(peer.clone()).or_default();
         history.remote_agents = remote_agents;
         if let Some(r) = &mut history.current_round {
-            r.update(round_state);
+            r.update(region_diffs);
         } else {
-            history.current_round = Some(CurrentRound::new(
-                round_state.id.clone(),
-                gossip_type,
-                Instant::now(),
-            ));
+            history.current_round = Some(CurrentRound::new(round_id, gossip_type, Instant::now()));
         }
     }
 
@@ -769,6 +765,8 @@ impl std::fmt::Display for Metrics {
 
 #[cfg(test)]
 mod tests {
+    use stef::State;
+
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -799,5 +797,14 @@ mod tests {
         a5.push_n(100.0, 255);
         a5.push_n(1.0, 255);
         assert_eq!(1.0, *a5);
+    }
+
+    #[cfg(feature = "fuzzing")]
+    #[test_strategy::proptest]
+    fn fuzz_metrics(actions: Vec<MetricsAction>) {
+        let mut metrics = Metrics::default();
+        for a in actions {
+            metrics.transition(a);
+        }
     }
 }
