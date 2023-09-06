@@ -159,6 +159,7 @@ impl HcSandbox {
             HcSandboxSubcommand::Run(Run { ports, existing }) => {
                 let paths = existing.load()?;
                 if paths.is_empty() {
+                    tracing::warn!("no paths available, exiting.");
                     return Ok(());
                 }
                 let holochain_path = self.holochain_path.clone();
