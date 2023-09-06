@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Added `Default` implementation for `holochain_types::prelude::InstallAppPayload`. You may add `..Default::default` 
-  after other fields if you use this type so that the type can be updated without breaking your code.
+  after other fields if you use this type so that the type can be updated without breaking your code. [#2745](https://github.com/holochain/holochain/pull/2745)
 
 ## 0.3.0-beta-dev.13
 
