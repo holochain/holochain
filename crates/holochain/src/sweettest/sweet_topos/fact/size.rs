@@ -119,13 +119,18 @@ pub mod test {
     /// Test that we can build a network with a number of nodes within a range.
     #[test]
     fn test_sweet_topos_sized_network_range() {
-        let mut g = unstructured_noise().into();
-        let fact = SizedNetworkFact::from_range(&mut g, 1..=10, 3..=5).unwrap();
-        let graph = fact.clone().build_fallible(&mut g).unwrap();
-        assert!(graph.node_count() >= 1);
-        assert!(graph.node_count() <= 10);
-        assert_eq!(graph.node_count(), fact.nodes);
-        assert_eq!(graph.edge_count(), 0);
-        assert_eq!(graph.strict_partitions(), fact.nodes);
+        crate::big_stack_test!(
+            async move {
+                let mut g = unstructured_noise().into();
+                let fact = SizedNetworkFact::from_range(&mut g, 1..=10, 3..=5).unwrap();
+                let graph = fact.clone().build_fallible(&mut g).unwrap();
+                assert!(graph.node_count() >= 1);
+                assert!(graph.node_count() <= 10);
+                assert_eq!(graph.node_count(), fact.nodes);
+                assert_eq!(graph.edge_count(), 0);
+                assert_eq!(graph.strict_partitions(), fact.nodes);
+            }, 3_000_000
+        )
+
     }
 }
