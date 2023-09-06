@@ -37,6 +37,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
+    id: [u8; 32],
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
@@ -46,6 +47,16 @@ pub struct SweetConductor {
     signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
+
+/// ID based equality is good for SweetConductors so we can track them
+/// independently no matter what kind of mutations/state might eventuate.
+impl PartialEq for SweetConductor {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for SweetConductor {}
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> SweetConductorConfig {
@@ -76,6 +87,11 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 }
 
 impl SweetConductor {
+    /// Get the ID of this conductor for manual equality checks.
+    pub fn id(&self) -> [u8; 32] {
+        self.id
+    }
+
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
@@ -109,7 +125,10 @@ impl SweetConductor {
 
         let keystore = handle.keystore().clone();
 
+        let mut rng = rand::thread_rng();
+
         Self {
+            id: rng.gen(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
