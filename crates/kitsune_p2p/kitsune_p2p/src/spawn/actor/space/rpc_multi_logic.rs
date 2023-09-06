@@ -30,22 +30,21 @@ pub(crate) async fn handle_rpc_multi_as_single(
                          agent: Arc<KitsuneAgent>|
           -> BoxFuture<'_, KitsuneP2pResult<Vec<actor::RpcMultiResponse>>> {
         async move {
-            let msg = wire::Wire::call(space.clone(), agent.clone(), payload.clone().into());
-
             let start = tokio::time::Instant::now();
-
+            let msg = wire::Wire::call(space.clone(), agent.clone(), payload.clone().into());
             let res = con_hnd.request(&msg, max_timeout).await;
+            let single_agent: AgentList = [agent.clone()].into_iter().collect();
 
             match res {
                 Ok(wire::Wire::CallResp(c)) => {
                     ro_inner
                         .metrics
                         .write()
-                        .record_reachability_event(true, [&agent]);
-                    ro_inner
-                        .metrics
-                        .write()
-                        .record_latency_micros(start.elapsed().as_micros(), [&agent]);
+                        .record_reachability_event(true, single_agent.clone());
+                    ro_inner.metrics.write().record_latency_micros(
+                        start.elapsed().as_micros() as f32,
+                        single_agent.clone(),
+                    );
                     Ok(vec![RpcMultiResponse {
                         agent: agent.clone(),
                         response: c.data.into(),
@@ -55,11 +54,11 @@ pub(crate) async fn handle_rpc_multi_as_single(
                     ro_inner
                         .metrics
                         .write()
-                        .record_reachability_event(false, [&agent]);
-                    ro_inner
-                        .metrics
-                        .write()
-                        .record_latency_micros(start.elapsed().as_micros(), [&agent]);
+                        .record_reachability_event(false, single_agent.clone());
+                    ro_inner.metrics.write().record_latency_micros(
+                        start.elapsed().as_micros() as f32,
+                        single_agent.clone(),
+                    );
                     tracing::warn!(?oth, "unexpected remote call result");
                     Err(format!("rpc_multi request failed: {:?}", oth).into())
                 }

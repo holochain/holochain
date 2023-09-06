@@ -8,7 +8,7 @@ impl ShardedGossipLocal {
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(
         &self,
-        agent_list: Vec<AgentInfoSigned>,
+        agent_list: AgentList,
         all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
@@ -83,7 +83,7 @@ impl ShardedGossipLocal {
         peer_cert: Arc<[u8; 32]>,
         remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
-        remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: AgentList,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -141,7 +141,10 @@ impl ShardedGossipLocal {
                 QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
             )
             .await
-            .map_err(KitsuneError::other)?;
+            .map_err(KitsuneError::other)?
+            .into_iter()
+            .map(|a| a.agent())
+            .collect();
 
         // Send the intervals back as the accept message.
         let mut gossip = vec![ShardedGossipWire::accept(local_arcs.clone(), agent_list)];
@@ -167,7 +170,7 @@ impl ShardedGossipLocal {
                 let mut metrics = inner.metrics.write();
 
                 metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
-                metrics.record_accept(&remote_agent_list, self.gossip_type.into());
+                metrics.record_accept(remote_agent_list.clone(), self.gossip_type.into());
             }
 
             inner.round_map.insert(peer_cert.clone(), state);
@@ -202,7 +205,7 @@ impl ShardedGossipLocal {
     /// - A new state is created for this round.
     pub(super) async fn generate_blooms_or_regions(
         &self,
-        remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: AgentList,
         local_arcs: Vec<DhtArcRange>,
         remote_arc_set: Vec<DhtArcRange>,
         gossip: &mut Vec<ShardedGossipWire>,

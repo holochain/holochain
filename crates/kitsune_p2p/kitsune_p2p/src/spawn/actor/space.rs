@@ -897,30 +897,36 @@ impl KitsuneP2pHandler for Space {
                 discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
                     let payload = wire::Wire::call(space.clone(), to_agent.clone(), payload.into());
                     let res = con_hnd.request(&payload, timeout).await?;
+                    let agents: AgentList = [to_agent].into_iter().collect();
                     match res {
                         wire::Wire::Failure(wire::Failure { reason }) => {
                             metrics
                                 .write()
-                                .record_reachability_event(false, [&to_agent]);
-                            metrics
-                                .write()
-                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                                .record_reachability_event(false, agents.clone());
+                            metrics.write().record_latency_micros(
+                                start.elapsed().as_micros() as f32,
+                                agents.clone(),
+                            );
                             Err(reason.into())
                         }
                         wire::Wire::CallResp(wire::CallResp { data }) => {
-                            metrics.write().record_reachability_event(true, [&to_agent]);
                             metrics
                                 .write()
-                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                                .record_reachability_event(true, agents.clone());
+                            metrics.write().record_latency_micros(
+                                start.elapsed().as_micros() as f32,
+                                agents.clone(),
+                            );
                             Ok(data.into())
                         }
                         r => {
                             metrics
                                 .write()
-                                .record_reachability_event(false, [&to_agent]);
-                            metrics
-                                .write()
-                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                                .record_reachability_event(false, agents.clone());
+                            metrics.write().record_latency_micros(
+                                start.elapsed().as_micros() as f32,
+                                agents.clone(),
+                            );
                             Err(format!("invalid response: {:?}", r).into())
                         }
                     }

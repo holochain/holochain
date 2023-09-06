@@ -22,6 +22,13 @@ impl<S: State> Share<S> {
         f(&g)
     }
 
+    /// Acquire write access to the shared state.
+    /// This isn't really ideal since it doesn't hide mutability,
+    /// so you have to be careful. Better to use a macro (TODO).
+    pub fn write(&self, f: impl FnOnce(&mut S)) {
+        f(&mut self.0.write())
+    }
+
     /// Acquire write access to the shared state to perform a mutation.
     pub fn transition(&self, t: S::Action) -> S::Effect {
         self.transition_with(t, |_| ()).1

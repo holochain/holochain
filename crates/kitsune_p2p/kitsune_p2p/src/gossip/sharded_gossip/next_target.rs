@@ -3,11 +3,11 @@ use std::cmp::Ordering;
 use super::*;
 use crate::metrics::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// A remote node we can connect to.
 /// Note that a node can contain many agents.
 pub(crate) struct Node {
-    pub(crate) agent_info_list: Vec<AgentInfoSigned>,
+    pub(crate) agent_info_list: AgentList,
     pub(crate) cert: Arc<[u8; 32]>,
     pub(crate) url: TxUrl,
 }
@@ -60,13 +60,15 @@ impl ShardedGossipLocal {
             if let Some((info, cert, url)) = info {
                 match remote_nodes.get_mut::<Arc<[u8; 32]>>(&cert) {
                     // Add the agent to the node.
-                    Some(node) => node.agent_info_list.push(info),
+                    Some(node) => {
+                        node.agent_info_list.insert(info.agent());
+                    }
                     None => {
                         // This is a new node.
                         remote_nodes.insert(
                             cert.clone(),
                             Node {
-                                agent_info_list: vec![info],
+                                agent_info_list: maplit::hashset![info.agent()],
                                 cert,
                                 url: url.into(),
                             },

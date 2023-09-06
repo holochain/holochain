@@ -1,10 +1,12 @@
 //! metrics tracked by kitsune_p2p spaces
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use kitsune_p2p_types::KAgent;
 use tokio::time::Instant;
 
 use crate::gossip::sharded_gossip::NodeId;
@@ -13,8 +15,6 @@ use crate::gossip::sharded_gossip::RoundState;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
-
-use num_traits::*;
 
 use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
 use once_cell::sync::Lazy;
@@ -57,14 +57,14 @@ impl Default for RunAvg {
 
 impl RunAvg {
     /// Push a new data point onto the running average
-    pub fn push<V: AsPrimitive<f32>>(&mut self, v: V) {
+    pub fn push(&mut self, v: f32) {
         self.push_n(v, 1);
     }
 
     /// Push multiple entries (up to 255) of the same value onto the average
-    pub fn push_n<V: AsPrimitive<f32>>(&mut self, v: V, count: u8) {
+    pub fn push_n(&mut self, v: f32, count: u8) {
         self.1 = self.1.saturating_add(count);
-        self.0 = (self.0 * (self.1 - count) as f32 + (v.as_() * count as f32)) / self.1 as f32;
+        self.0 = (self.0 * (self.1 - count) as f32 + (v * count as f32)) / self.1 as f32;
     }
 }
 
@@ -153,7 +153,7 @@ pub struct PeerAgentHistory {
 #[derive(Debug, Clone, Default)]
 pub struct PeerNodeHistory {
     /// The most recent list of remote agents reported by this node
-    pub remote_agents: Vec<Arc<KitsuneAgent>>,
+    pub remote_agents: AgentList,
 
     /// Detailed info about the ongoing round with this node
     pub current_round: Option<CurrentRound>,
@@ -345,6 +345,173 @@ impl<'lt> AgentLike<'lt> {
     }
 }
 
+/// A set of agents
+pub type AgentList = HashSet<KAgent>;
+
+// #[stef::state(share = MetricsSync)]
+// impl stef::State for Metrics {
+
+/// Shared access to metrics
+pub type MetricsSync = Arc<parking_lot::RwLock<Metrics>>;
+
+impl Metrics {
+    // type Action = MetricsAction;
+    // type Effect = ();
+
+    /// Record an individual extrapolated coverage event
+    /// (either from us or a remote)
+    /// and add it to our running aggregate extrapolated coverage metric.
+    pub fn record_extrap_cov_event(&mut self, extrap_cov: f32) {
+        self.agg_extrap_cov.push(extrap_cov);
+    }
+
+    /// Sucessful and unsuccessful messages from the remote
+    /// can be combined to estimate a "reachability quotient"
+    /// between 1 (or 0 if empty) and 100. Errors are weighted
+    /// heavier because we retry less frequently.
+    /// Call this to register a reachability event.
+    /// Note, `record_success` and `record_error` below invoke this
+    /// function internally, you don't need to call it again.
+    pub fn record_reachability_event(&mut self, success: bool, remote_agent_list: AgentList) {
+        for agent in remote_agent_list {
+            let info = self.agent_history.entry(agent).or_default();
+            if success {
+                info.reachability_quotient.push(100.0);
+            } else {
+                info.reachability_quotient.push_n(1.0, 5);
+            }
+        }
+    }
+
+    /// Running average for latency microseconds for any direct
+    /// request/response calls to remote agent.
+    pub fn record_latency_micros(&mut self, micros: f32, remote_agent_list: AgentList) {
+        for agent in remote_agent_list {
+            let history = self.agent_history.entry(agent).or_default();
+            history.latency_micros.push(micros);
+        }
+    }
+
+    /// Record a gossip round has been initiated by us.
+    pub fn record_initiate(&mut self, remote_agent_list: AgentList, gossip_type: GossipModuleType) {
+        for agent in remote_agent_list {
+            let history = self.agent_history.entry(agent).or_default();
+            let round = RoundMetric {
+                instant: Instant::now(),
+                gossip_type,
+            };
+            record_item(&mut history.initiates, round);
+            if history.current_round {
+                tracing::info!("Recorded initiate with current round already set");
+            }
+            history.current_round = true;
+        }
+    }
+
+    /// Record a gossip round has been initiated by a peer.
+    pub fn record_accept(&mut self, remote_agent_list: AgentList, gossip_type: GossipModuleType) {
+        for agent in remote_agent_list {
+            let history = self.agent_history.entry(agent).or_default();
+            let round = RoundMetric {
+                instant: Instant::now(),
+                gossip_type,
+            };
+            record_item(&mut history.accepts, round);
+            if history.current_round {
+                tracing::info!("Recorded accept with current round already set");
+            }
+            history.current_round = true;
+        }
+    }
+
+    /// Record a gossip round has completed successfully.
+    pub fn record_success(&mut self, remote_agent_list: AgentList, gossip_type: GossipModuleType) {
+        let mut should_dec_force_initiates = false;
+
+        for agent in remote_agent_list {
+            let history = self.agent_history.entry(agent).or_default();
+            history.reachability_quotient.push(100.0);
+            let round = RoundMetric {
+                instant: Instant::now(),
+                gossip_type,
+            };
+            record_item(&mut history.successes, round);
+            history.current_round = false;
+            if history.is_initiate_round() {
+                should_dec_force_initiates = true;
+            }
+        }
+
+        if should_dec_force_initiates {
+            self.force_initiates = self.force_initiates.saturating_sub(1);
+        }
+
+        tracing::debug!(
+            "recorded success in metrics. force_initiates={}",
+            self.force_initiates
+        );
+    }
+
+    /// Record a gossip round has finished with an error.
+    pub fn record_error(&mut self, remote_agent_list: AgentList, gossip_type: GossipModuleType) {
+        for agent in remote_agent_list {
+            let history = self.agent_history.entry(agent).or_default();
+            history.reachability_quotient.push_n(1.0, 5);
+            let round = RoundMetric {
+                instant: Instant::now(),
+                gossip_type,
+            };
+            record_item(&mut history.errors, round);
+            history.current_round = false;
+        }
+        tracing::debug!(
+            "recorded error in metrics. force_initiates={}",
+            self.force_initiates
+        );
+    }
+
+    /// Update node-level info about a current round, or create one if it doesn't exist
+    pub fn update_current_round(
+        &mut self,
+        peer: &NodeId,
+        gossip_type: GossipModuleType,
+        round_state: &RoundState,
+    ) {
+        let remote_agents = round_state.remote_agent_list.clone();
+        let history = self.node_history.entry(peer.clone()).or_default();
+        history.remote_agents = remote_agents;
+        if let Some(r) = &mut history.current_round {
+            r.update(round_state);
+        } else {
+            history.current_round = Some(CurrentRound::new(
+                round_state.id.clone(),
+                gossip_type,
+                Instant::now(),
+            ));
+        }
+    }
+
+    /// Remove the current round info once it's complete, and put it into the history list
+    pub fn complete_current_round(&mut self, node: &NodeId, error: bool) {
+        let history = self.node_history.entry(node.clone()).or_default();
+        let r = history.current_round.take();
+        if let Some(r) = r {
+            history.completed_rounds.push_back(r.completed(error))
+        }
+    }
+
+    /// Record that we should force initiate the next few rounds.
+    pub fn record_force_initiate(&mut self) {
+        self.force_initiates = MAX_TRIGGERS;
+    }
+}
+
+// impl Default for MetricsSync {
+//     fn default() -> Self {
+//         Self(Default::default())
+//     }
+// }
+
 impl Metrics {
     /// Dump historical metrics for recording to db.
     pub fn dump_historical(&self) -> Vec<MetricRecord> {
@@ -407,236 +574,29 @@ impl Metrics {
         })
     }
 
-    /// Record an individual extrapolated coverage event
-    /// (either from us or a remote)
-    /// and add it to our running aggregate extrapolated coverage metric.
-    pub fn record_extrap_cov_event(&mut self, extrap_cov: f32) {
-        self.agg_extrap_cov.push(extrap_cov);
-    }
-
-    /// Sucessful and unsuccessful messages from the remote
-    /// can be combined to estimate a "reachability quotient"
-    /// between 1 (or 0 if empty) and 100. Errors are weighted
-    /// heavier because we retry less frequently.
-    /// Call this to register a reachability event.
-    /// Note, `record_success` and `record_error` below invoke this
-    /// function internally, you don't need to call it again.
-    pub fn record_reachability_event<'a, T, I>(&mut self, success: bool, remote_agent_list: I)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        for agent_info in remote_agent_list {
-            let info = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            if success {
-                info.reachability_quotient.push(100);
-            } else {
-                info.reachability_quotient.push_n(1, 5);
-            }
-        }
-    }
-
-    /// Running average for latency microseconds for any direct
-    /// request/response calls to remote agent.
-    pub fn record_latency_micros<'a, T, I, V>(&mut self, micros: V, remote_agent_list: I)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-        V: AsPrimitive<f32>,
-    {
-        for agent_info in remote_agent_list {
-            let history = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            history.latency_micros.push(micros);
-        }
-    }
-
-    /// Record a gossip round has been initiated by us.
-    pub fn record_initiate<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        for agent_info in remote_agent_list {
-            let history = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            let round = RoundMetric {
-                instant: Instant::now(),
-                gossip_type,
-            };
-            record_item(&mut history.initiates, round);
-            if history.current_round {
-                tracing::info!("Recorded initiate with current round already set");
-            }
-            history.current_round = true;
-        }
-    }
-
-    /// Record a gossip round has been initiated by a peer.
-    pub fn record_accept<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        for agent_info in remote_agent_list {
-            let history = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            let round = RoundMetric {
-                instant: Instant::now(),
-                gossip_type,
-            };
-            record_item(&mut history.accepts, round);
-            if history.current_round {
-                tracing::info!("Recorded accept with current round already set");
-            }
-            history.current_round = true;
-        }
-    }
-
-    /// Record a gossip round has completed successfully.
-    pub fn record_success<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        let mut should_dec_force_initiates = false;
-
-        for agent_info in remote_agent_list {
-            let history = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            history.reachability_quotient.push(100);
-            let round = RoundMetric {
-                instant: Instant::now(),
-                gossip_type,
-            };
-            record_item(&mut history.successes, round);
-            history.current_round = false;
-            if history.is_initiate_round() {
-                should_dec_force_initiates = true;
-            }
-        }
-
-        if should_dec_force_initiates {
-            self.force_initiates = self.force_initiates.saturating_sub(1);
-        }
-
-        tracing::debug!(
-            "recorded success in metrics. force_initiates={}",
-            self.force_initiates
-        );
-    }
-
-    /// Record a gossip round has finished with an error.
-    pub fn record_error<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        for agent_info in remote_agent_list {
-            let history = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            history.reachability_quotient.push_n(1, 5);
-            let round = RoundMetric {
-                instant: Instant::now(),
-                gossip_type,
-            };
-            record_item(&mut history.errors, round);
-            history.current_round = false;
-        }
-        tracing::debug!(
-            "recorded error in metrics. force_initiates={}",
-            self.force_initiates
-        );
-    }
-
-    /// Update node-level info about a current round, or create one if it doesn't exist
-    pub fn update_current_round(
-        &mut self,
-        peer: &NodeId,
-        gossip_type: GossipModuleType,
-        round_state: &RoundState,
-    ) {
-        let remote_agents = round_state
-            .remote_agent_list
-            .clone()
-            .into_iter()
-            .map(|a| a.agent())
-            .collect();
-        let history = self.node_history.entry(peer.clone()).or_default();
-        history.remote_agents = remote_agents;
-        if let Some(r) = &mut history.current_round {
-            r.update(round_state);
-        } else {
-            history.current_round = Some(CurrentRound::new(
-                round_state.id.clone(),
-                gossip_type,
-                Instant::now(),
-            ));
-        }
-    }
-
-    /// Remove the current round info once it's complete, and put it into the history list
-    pub fn complete_current_round(&mut self, node: &NodeId, error: bool) {
-        let history = self.node_history.entry(node.clone()).or_default();
-        let r = history.current_round.take();
-        if let Some(r) = r {
-            history.completed_rounds.push_back(r.completed(error))
-        }
-    }
-
-    /// Record that we should force initiate the next few rounds.
-    pub fn record_force_initiate(&mut self) {
-        self.force_initiates = MAX_TRIGGERS;
-    }
-
     /// Get the last successful round time.
-    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&RoundMetric>
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
+    pub fn last_success(&self, remote_agent_list: &AgentList) -> Option<&RoundMetric> {
         remote_agent_list
-            .into_iter()
-            .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
+            .iter()
+            .filter_map(|agent| self.agent_history.get(agent))
             .filter_map(|info| info.successes.back())
             .min_by_key(|r| r.instant)
     }
 
     /// Is this node currently in an active round?
-    pub fn is_current_round<'a, T, I>(&self, remote_agent_list: I) -> bool
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
+    pub fn is_current_round(&self, remote_agent_list: &AgentList) -> bool {
         remote_agent_list
-            .into_iter()
-            .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
+            .iter()
+            .filter_map(|agent| self.agent_history.get(agent))
             .any(|info| info.current_round)
     }
 
     /// What was the last outcome for this node's gossip round?
-    pub fn last_outcome<'a, T, I>(&self, remote_agent_list: I) -> Option<RoundOutcome>
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
+    pub fn last_outcome(&self, remote_agent_list: &AgentList) -> Option<RoundOutcome> {
         #[allow(clippy::map_flatten)]
         remote_agent_list
-            .into_iter()
-            .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
+            .iter()
+            .filter_map(|agent| self.agent_history.get(agent))
             .map(|info| {
                 [
                     info.errors.back().map(|x| RoundOutcome::Error(x.clone())),
@@ -657,14 +617,10 @@ impl Metrics {
 
     /// Return the average (mean) reachability quotient for the
     /// supplied remote agents.
-    pub fn reachability_quotient<'a, T, I>(&self, remote_agent_list: I) -> f32
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
+    pub fn reachability_quotient(&self, remote_agent_list: AgentList) -> f32 {
         let (sum, cnt) = remote_agent_list
-            .into_iter()
-            .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
+            .iter()
+            .filter_map(|agent| self.agent_history.get(agent))
             .map(|info| *info.reachability_quotient)
             .fold((0.0, 0.0), |acc, x| (acc.0 + x, acc.1 + 1.0));
         if cnt <= 0.0 {
@@ -676,14 +632,10 @@ impl Metrics {
 
     /// Return the average (mean) latency microseconds for the
     /// supplied remote agents.
-    pub fn latency_micros<'a, T, I>(&self, remote_agent_list: I) -> f32
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
+    pub fn latency_micros(&self, remote_agent_list: AgentList) -> f32 {
         let (sum, cnt) = remote_agent_list
-            .into_iter()
-            .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
+            .iter()
+            .filter_map(|agent| self.agent_history.get(agent))
             .map(|info| *info.latency_micros)
             .fold((0.0, 0.0), |acc, x| (acc.0 + x, acc.1 + 1.0));
         if cnt <= 0.0 {
@@ -816,54 +768,6 @@ impl std::fmt::Display for Metrics {
     }
 }
 
-/// Synchronization primitive around the Metrics struct.
-#[derive(Clone)]
-pub struct MetricsSync(Arc<parking_lot::RwLock<Metrics>>);
-
-impl Default for MetricsSync {
-    fn default() -> Self {
-        Self(Arc::new(parking_lot::RwLock::new(Metrics::default())))
-    }
-}
-
-impl std::fmt::Debug for MetricsSync {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.read().fmt(f)
-    }
-}
-
-impl std::fmt::Display for MetricsSync {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.read().fmt(f)
-    }
-}
-
-impl MetricsSync {
-    /// Get a read lock for the metrics store.
-    pub fn read(&self) -> parking_lot::RwLockReadGuard<Metrics> {
-        match self.0.try_read_for(std::time::Duration::from_millis(100)) {
-            Some(g) => g,
-            // This won't block if a writer is waiting.
-            // NOTE: This is a bit of a hack to work around a lock somewhere that is errant-ly
-            // held over another call to lock. Really we should fix that error,
-            // potentially by using a closure pattern here to ensure the lock cannot
-            // be held beyond the access logic.
-            None => self.0.read_recursive(),
-        }
-    }
-
-    /// Get a write lock for the metrics store.
-    pub fn write(&self) -> parking_lot::RwLockWriteGuard<Metrics> {
-        match self.0.try_write_for(std::time::Duration::from_secs(100)) {
-            Some(g) => g,
-            None => {
-                eprintln!("Metrics lock likely deadlocked");
-                self.0.write()
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -871,7 +775,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_run_avg() {
         let mut a1 = RunAvg::default();
-        a1.push(100);
+        a1.push(100.0);
         a1.push(1);
         a1.push(1);
         a1.push(1);

@@ -32,7 +32,7 @@ use tokio::time::Instant;
 pub use self::bandwidth::BandwidthThrottle;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
-use crate::metrics::MetricsSync;
+use crate::metrics::{AgentList, MetricsSync};
 
 use super::{HowToConnect, MetaOpKey};
 
@@ -197,7 +197,7 @@ impl ShardedGossip {
             bandwidth,
         });
 
-        let mut agent_list_by_local_agents = vec![];
+        let mut agent_list_by_local_agents = AgentList::new();
         let mut all_agents = vec![];
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
@@ -222,13 +222,13 @@ impl ShardedGossip {
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
                         agent_list_by_local_agents =
                             match this.gossip.query_agents_by_local_agents().await {
-                                Ok(a) => a,
+                                Ok(a) => a.into_iter().map(|a| a.agent()).collect(),
                                 Err(e) => {
                                     tracing::error!(
                                         "Failed to query for agents by local agents - {:?}",
                                         e
                                     );
-                                    vec![]
+                                    AgentList::new()
                                 }
                             };
                         all_agents = match store::all_agent_info(
@@ -387,7 +387,7 @@ impl ShardedGossip {
 
     async fn run_one_iteration(
         &self,
-        agent_list_by_local_agents: Vec<AgentInfoSigned>,
+        agent_list_by_local_agents: AgentList,
         all_agents: &[AgentInfoSigned],
     ) {
         match self
@@ -442,7 +442,7 @@ impl ShardedGossip {
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!(
-                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}",
+                        "{:?}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}",
                         i.metrics,
                         stats.avg_processing_time,
                         stats.count,
@@ -485,7 +485,7 @@ pub type NodeId = StateKey;
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
 pub(crate) struct ShardedGossipTarget {
-    pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
+    pub(crate) remote_agent_list: AgentList,
     pub(crate) cert: StateKey,
     pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
@@ -497,7 +497,7 @@ pub(crate) struct ShardedGossipTarget {
 #[derive(Default)]
 pub struct ShardedGossipLocalState {
     /// The list of agents on this node
-    local_agents: HashSet<Arc<KitsuneAgent>>,
+    local_agents: AgentList,
     /// If Some, we are in the process of trying to initiate gossip with this target.
     initiate_tgt: Option<ShardedGossipTarget>,
     round_map: RoundStateMap,
@@ -530,18 +530,18 @@ impl ShardedGossipLocalState {
             let initiate_tgt = self.initiate_tgt.take().unwrap();
             initiate_tgt.remote_agent_list
         } else {
-            vec![]
+            AgentList::new()
         };
         let r = self.round_map.remove(state_key);
         let mut metrics = self.metrics.write();
         if let Some(r) = &r {
             if error {
-                metrics.record_error(&r.remote_agent_list, gossip_type.into());
+                metrics.record_error(r.remote_agent_list.clone(), gossip_type.into());
             } else {
-                metrics.record_success(&r.remote_agent_list, gossip_type.into());
+                metrics.record_success(r.remote_agent_list.clone(), gossip_type.into());
             }
         } else if init_tgt && error {
-            metrics.record_error(&remote_agent_list, gossip_type.into());
+            metrics.record_error(remote_agent_list.clone(), gossip_type.into());
         }
 
         metrics.complete_current_round(state_key, error);
@@ -564,7 +564,7 @@ impl ShardedGossipLocalState {
                     {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, true);
-                        metrics.record_error(remote_agent_list, gossip_type.into());
+                        metrics.record_error(remote_agent_list.clone(), gossip_type.into());
                     }
                     self.initiate_tgt = None;
                 }
@@ -587,7 +587,7 @@ impl ShardedGossipLocalState {
         Ok(())
     }
 
-    fn show_local_agents(&self) -> &HashSet<Arc<KitsuneAgent>> {
+    fn show_local_agents(&self) -> &AgentList {
         &self.local_agents
     }
 
@@ -661,7 +661,7 @@ impl ShardedGossipState {
 #[derive(Debug, Clone)]
 pub struct RoundState {
     /// The remote agents hosted by the remote node, used for metrics tracking
-    pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
+    pub(crate) remote_agent_list: AgentList,
     /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
     /// We've received the last op bloom filter from our partner
@@ -700,7 +700,7 @@ pub type RegionDiffs = Option<(Vec<Region>, Vec<Region>)>;
 impl RoundState {
     /// Constructor
     pub fn new(
-        remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: AgentList,
         common_arc_set: Arc<DhtArcSet>,
         region_set_sent: Option<Arc<RegionSetLtcs<RegionData>>>,
         round_timeout: Duration,
@@ -767,7 +767,7 @@ impl ShardedGossipLocal {
 
     fn new_state(
         &self,
-        remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: AgentList,
         common_arc_set: Arc<DhtArcSet>,
         region_set_sent: Option<RegionSetLtcs>,
         round_timeout: Duration,
@@ -799,9 +799,10 @@ impl ShardedGossipLocal {
             {
                 let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics
-                        .write()
-                        .record_error(&initiate_tgt.remote_agent_list, self.gossip_type.into());
+                    i.metrics.write().record_error(
+                        initiate_tgt.remote_agent_list.clone(),
+                        self.gossip_type.into(),
+                    );
                 }
             }
             Ok(())
@@ -1005,10 +1006,9 @@ impl ShardedGossipLocal {
                     && !ops.is_empty()
                 {
                     if let Some(state) = state.as_ref() {
-                        if let Some(agent) = state.remote_agent_list.get(0) {
+                        if let Some(agent) = state.remote_agent_list.iter().next() {
                             // there is at least 1 agent
-                            let agent = agent.agent.clone();
-                            let source = FetchSource::Agent(agent);
+                            let source = FetchSource::Agent(agent.clone());
                             self.incoming_missing_op_hashes(source, ops).await?;
                         } else {
                             tracing::warn!(
@@ -1082,7 +1082,7 @@ impl ShardedGossipLocal {
                 for (cert, ref r) in i.round_map.take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
                     let mut metrics = i.metrics.write();
-                    metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
+                    metrics.record_error(r.remote_agent_list.clone(), self.gossip_type.into());
                     metrics.complete_current_round(&cert, true);
                 }
                 Ok(())
@@ -1211,7 +1211,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
-            agent_list.2: Vec<AgentInfoSigned>,
+            agent_list.2: AgentList,
         },
 
         /// Accept an incoming round of gossip from a remote node
@@ -1220,7 +1220,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// for all local agents
             intervals.0: Vec<DhtArcRange>,
             /// List of active local agents represented by this node.
-            agent_list.1: Vec<AgentInfoSigned>,
+            agent_list.1: AgentList,
         },
 
         /// Send Agent Info Bloom
