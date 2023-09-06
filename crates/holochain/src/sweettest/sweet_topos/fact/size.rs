@@ -105,15 +105,20 @@ pub mod test {
     /// Test that we can build a network with a dozen nodes.
     #[test]
     fn test_sweet_topos_sized_network_dozen_nodes() {
-        let mut g = unstructured_noise().into();
-        let fact = SizedNetworkFact {
-            nodes: 12,
-            agents: 1..=2,
-        };
-        let graph = fact.build_fallible(&mut g).unwrap();
-        assert_eq!(graph.node_count(), 12);
-        assert_eq!(graph.edge_count(), 0);
-        assert_eq!(graph.strict_partitions(), 12);
+        crate::big_stack_test!(
+            async move {
+                let mut g = unstructured_noise().into();
+                let fact = SizedNetworkFact {
+                    nodes: 12,
+                    agents: 1..=2,
+                };
+                let graph = fact.build_fallible(&mut g).unwrap();
+                assert_eq!(graph.node_count(), 12);
+                assert_eq!(graph.edge_count(), 0);
+                assert_eq!(graph.strict_partitions(), 12);
+            },
+            3_000_000
+        );
     }
 
     /// Test that we can build a network with a number of nodes within a range.

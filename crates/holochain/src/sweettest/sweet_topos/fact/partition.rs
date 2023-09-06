@@ -81,19 +81,24 @@ pub mod test {
     /// Test that we can build a network with one partition.
     #[test]
     fn test_sweet_topos_strictly_partitioned_network_one_partition() {
-        let mut g = unstructured_noise().into();
-        let size_fact = SizedNetworkFact {
-            nodes: 3,
-            agents: 3..=5,
-        };
-        let partition_fact = StrictlyPartitionedNetworkFact {
-            partitions: 1,
-            efficiency: 1.0,
-        };
-        let mut facts = facts![size_fact, partition_fact];
-        let mut graph = NetworkTopology::default();
-        graph = facts.mutate(&mut g, graph).unwrap();
-        assert_eq!(graph.strict_partitions(), 1);
+        crate::big_stack_test!(
+            async move {
+                let mut g = unstructured_noise().into();
+                let size_fact = SizedNetworkFact {
+                    nodes: 3,
+                    agents: 3..=5,
+                };
+                let partition_fact = StrictlyPartitionedNetworkFact {
+                    partitions: 1,
+                    efficiency: 1.0,
+                };
+                let mut facts = facts![size_fact, partition_fact];
+                let mut graph = NetworkTopology::default();
+                graph = facts.mutate(&mut g, graph).unwrap();
+                assert_eq!(graph.strict_partitions(), 1);
+            },
+            3_000_000
+        );
     }
 
     /// Test that we can build a network with a dozen nodes and three partitions.
