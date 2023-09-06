@@ -7,7 +7,7 @@ pub enum ElevatorEffect {
 }
 
 #[stef::state]
-impl Elevator {
+impl stef::State<'static> for Elevator {
     type Action = ElevatorTransition;
     type Effect = ElevatorEffect;
 
@@ -31,7 +31,7 @@ pub enum BananaEffect {
 struct Banana;
 
 #[stef::state]
-impl stef::State for Banana {
+impl stef::State<'static> for Banana {
     type Action = BananaAction;
     type Effect = Option<BananaEffect>;
 

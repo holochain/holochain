@@ -11,7 +11,7 @@ use proptest::prelude::Arbitrary;
 
 /// A State which is capable of producing a "Monte-Carlo state diagram"
 /// from random walks through the state
-pub trait StateDiagrammable: State + Clone + Into<Self::Node>
+pub trait StateDiagrammable<'a>: State<'a> + Clone + Into<Self::Node>
 where
     Self::Action: Clone + Arbitrary,
 {
@@ -53,9 +53,9 @@ where
     }
 }
 
-fn take_a_walk<S: StateDiagrammable>(mut s: S, len: u32) -> Vec<(S::Action, S)>
+fn take_a_walk<'a, S: StateDiagrammable<'a>>(mut s: S, len: u32) -> Vec<(S::Action, S)>
 where
-    <S as State>::Action: Arbitrary + Clone,
+    <S as State<'a>>::Action: Arbitrary + Clone,
 {
     use proptest::strategy::{Strategy, ValueTree};
     use proptest::test_runner::TestRunner;

@@ -12,7 +12,7 @@ pub enum Fx<'a, T> {
 }
 
 #[stef_derive::state]
-impl<'a, T: Clone + Eq> stef::State for Echo<'a, T>
+impl<'a, T: Clone + Eq> stef::State<'a> for Echo<'a, T>
 where
     Self: 'a,
 {
