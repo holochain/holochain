@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 /// A clonable thread safe read write lock designed to make it hard to create dead locks
 /// or hold long long lived locks.
+#[derive(Debug)]
 pub struct RwShare<T>(Arc<parking_lot::RwLock<T>>);
 
 impl<T> Clone for RwShare<T> {
