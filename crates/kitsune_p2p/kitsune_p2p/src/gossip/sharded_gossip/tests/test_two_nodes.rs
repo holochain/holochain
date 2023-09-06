@@ -36,10 +36,7 @@ async fn sharded_sanity_test() {
 
     // - Bob tries to initiate.
     let (_, _, bob_outgoing) = bob
-        .try_initiate(
-            bob.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(bob.show_local_agents(), &all_agents)
         .await
         .unwrap()
         .unwrap();
@@ -148,7 +145,7 @@ async fn partial_missing_doesnt_finish() {
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
                 cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: AgentList::new(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
@@ -204,7 +201,7 @@ async fn missing_ops_finishes() {
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
                 cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: Default::default(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
@@ -261,7 +258,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
                 cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: Default::default(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: false,
@@ -318,7 +315,7 @@ async fn bloom_response_finishes() {
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
                 cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: Default::default(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 0,
                     received_all_incoming_op_blooms: false,
@@ -375,7 +372,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
                 cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: Default::default(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: false,
@@ -435,7 +432,7 @@ async fn no_data_still_finishes() {
             local_agents: maplit::hashset!(agents[0].0.clone()),
             round_map: maplit::hashmap! {
                 bob_cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: Default::default(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 0,
                     received_all_incoming_op_blooms: false,
@@ -463,7 +460,7 @@ async fn no_data_still_finishes() {
             local_agents: maplit::hashset!(agents[1].0.clone()),
             round_map: maplit::hashmap! {
                 alice_cert.clone().into() => RoundState {
-                    remote_agent_list: vec![],
+                    remote_agent_list: Default::default(),
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
@@ -556,18 +553,12 @@ async fn double_initiate_is_handled() {
 
     // - Both players try to initiate and only have the other as a remote agent.
     let (bob_cert, _, alice_initiate) = alice
-        .try_initiate(
-            alice.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(alice.show_local_agents(), &all_agents)
         .await
         .unwrap()
         .unwrap();
     let (alice_cert, _, bob_initiate) = bob
-        .try_initiate(
-            bob.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(bob.show_local_agents(), &all_agents)
         .await
         .unwrap()
         .unwrap();
@@ -612,10 +603,7 @@ async fn initiate_after_target_is_set() {
 
     // - Alice successfully initiates a round with bob.
     let (cert, _, alice_initiate) = alice
-        .try_initiate(
-            alice.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(alice.show_local_agents(), &all_agents)
         .await
         .unwrap()
         .unwrap();
@@ -637,10 +625,7 @@ async fn initiate_after_target_is_set() {
         .unwrap();
     // - Bob tries to initiate a round with alice.
     let bob_initiate = bob
-        .try_initiate(
-            bob.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(bob.show_local_agents(), &all_agents)
         .await
         .unwrap();
     bob.inner
@@ -680,10 +665,7 @@ async fn initiate_times_out() {
 
     // Trying to initiate a round should succeed.
     let (tgt_cert, _, _) = alice
-        .try_initiate(
-            alice.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(alice.show_local_agents(), &all_agents)
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -695,10 +677,7 @@ async fn initiate_times_out() {
         })
         .unwrap();
     let r = alice
-        .try_initiate(
-            alice.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(alice.show_local_agents(), &all_agents)
         .await
         .unwrap();
 
@@ -719,10 +698,7 @@ async fn initiate_times_out() {
     .await;
 
     let (tgt2_cert, _, alice_initiate) = alice
-        .try_initiate(
-            alice.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(alice.show_local_agents(), &all_agents)
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -781,10 +757,7 @@ async fn initiate_times_out() {
     // Check that initiating again doesn't do anything.
 
     let r = alice
-        .try_initiate(
-            alice.query_agents_by_local_agents().await.unwrap(),
-            &all_agents,
-        )
+        .try_initiate(alice.show_local_agents(), &all_agents)
         .await
         .unwrap();
     // Doesn't re-initiate.

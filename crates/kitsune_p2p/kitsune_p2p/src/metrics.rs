@@ -776,29 +776,29 @@ mod tests {
     async fn test_run_avg() {
         let mut a1 = RunAvg::default();
         a1.push(100.0);
-        a1.push(1);
-        a1.push(1);
-        a1.push(1);
+        a1.push(1.0);
+        a1.push(1.0);
+        a1.push(1.0);
         assert_eq!(25.75, *a1);
 
         let mut a2 = RunAvg::default();
-        a2.push_n(100, 1);
-        a2.push_n(1, 3);
+        a2.push_n(100.0, 1);
+        a2.push_n(1.0, 3);
         assert_eq!(25.75, *a2);
 
         let mut a3 = RunAvg::default();
-        a3.push_n(100, 255);
-        a3.push(1);
+        a3.push_n(100.0, 255);
+        a3.push(1.0);
         assert_eq!(99.61176, *a3);
 
         let mut a4 = RunAvg::default();
-        a4.push_n(100, 255);
-        a4.push_n(1, 128);
+        a4.push_n(100.0, 255);
+        a4.push_n(1.0, 128);
         assert_eq!(50.30588, *a4);
 
         let mut a5 = RunAvg::default();
-        a5.push_n(100, 255);
-        a5.push_n(1, 255);
+        a5.push_n(100.0, 255);
+        a5.push_n(1.0, 255);
         assert_eq!(1.0, *a5);
     }
 }

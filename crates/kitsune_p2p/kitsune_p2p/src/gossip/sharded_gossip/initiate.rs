@@ -47,7 +47,7 @@ impl ShardedGossipLocal {
             .await?;
 
         let maybe_gossip = if let Some(next_target::Node {
-            agent_info_list,
+            agent_list: agent_info_list,
             cert,
             url,
         }) = remote_agent
