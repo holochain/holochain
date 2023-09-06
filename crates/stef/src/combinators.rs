@@ -8,14 +8,14 @@ use super::*;
 /// The stored Effects can be accessed at any time later.
 /// Converts the State's Effect type to `()`
 #[derive(derive_more::Deref, derive_more::DerefMut)]
-pub struct StoreEffects<S: State> {
+pub struct StoreEffects<S: State<'static>> {
     #[deref]
     #[deref_mut]
     state: S,
     effects: VecDeque<S::Effect>,
 }
 
-impl<S: State> State for StoreEffects<S> {
+impl<S: State<'static>> State<'static> for StoreEffects<S> {
     type Action = S::Action;
     type Effect = ();
 
@@ -25,7 +25,7 @@ impl<S: State> State for StoreEffects<S> {
     }
 }
 
-impl<S: State> StoreEffects<S> {
+impl<S: State<'static>> StoreEffects<S> {
     /// Constructor
     pub fn new(state: S, _capacity: usize) -> Self {
         Self {
@@ -50,7 +50,7 @@ impl<S: State> StoreEffects<S> {
 /// The new Effect type for the modified State will be whatever
 /// the return value of the runner function is.
 #[derive(derive_more::Deref, derive_more::DerefMut)]
-pub struct RunEffects<S: State, Ret, Runner> {
+pub struct RunEffects<S: State<'static>, Ret, Runner> {
     #[deref]
     #[deref_mut]
     state: S,
@@ -58,8 +58,11 @@ pub struct RunEffects<S: State, Ret, Runner> {
     _phantom: PhantomData<Ret>,
 }
 
-impl<S: State + Default, Ret: Effect, Runner: Fn(S::Effect) -> Ret> ParamState
-    for RunEffects<S, Ret, Runner>
+impl<
+        S: State<'static> + Default,
+        Ret: Effect + 'static,
+        Runner: 'static + Fn(S::Effect) -> Ret,
+    > ParamState<'static> for RunEffects<S, Ret, Runner>
 {
     type Action = S::Action;
     type Effect = Ret;
@@ -87,7 +90,7 @@ impl<S: State + Default, Ret: Effect, Runner: Fn(S::Effect) -> Ret> ParamState
     }
 }
 
-impl<S: State, Ret, Runner: Fn(S::Effect) -> Ret> RunEffects<S, Ret, Runner> {
+impl<S: State<'static>, Ret, Runner: Fn(S::Effect) -> Ret> RunEffects<S, Ret, Runner> {
     /// Constructor
     pub fn new(state: S, runner: Runner) -> Self {
         Self {

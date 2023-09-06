@@ -1,20 +1,21 @@
 #[allow(dead_code)]
-struct Person<D> {
+#[derive(Debug)]
+struct Person<D: std::fmt::Debug> {
     name: String,
     age: u8,
     data: D,
 }
 
-#[derive(Default)]
-struct People<D>(Vec<Person<D>>);
+#[derive(Default, Debug)]
+pub struct People<D: std::fmt::Debug>(Vec<Person<D>>);
 
 #[derive(PartialEq, Eq, Debug)]
-enum PeopleFx<D> {
+pub enum PeopleFx<D> {
     SayHi(String, D),
 }
 
-#[stef_derive::state]
-impl<D: 'static + Clone + Eq> stef::State for People<D> {
+#[stef_derive::state(share = PeopleShare<D>)]
+impl<D: 'static + Clone + Eq + std::fmt::Debug> stef::State<'static> for People<D> {
     type Action = PeopleAction<D>;
     type Effect = Option<PeopleFx<D>>;
 
@@ -48,4 +49,9 @@ fn test_generics() {
 
     p.transition(PeopleAction::Clear);
     assert_eq!(p.0.len(), 0);
+
+    let shared = PeopleShare::new(p);
+
+    shared.add("Ryan".into(), 25, false);
+    assert_eq!(shared.read(|s| s.0.len()), 1);
 }

@@ -1982,6 +1982,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixedbitset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
 name = "fixt"
 version = "0.2.0"
 dependencies = [
@@ -5394,6 +5400,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "petgraph"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
+dependencies = [
+ "fixedbitset",
+ "indexmap 2.0.0",
+]
+
+[[package]]
 name = "phf"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7151,6 +7167,36 @@ dependencies = [
  "nalgebra",
  "num-traits",
  "rand 0.8.5",
+]
+
+[[package]]
+name = "stef"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "derive_more",
+ "either",
+ "futures",
+ "must_future",
+ "parking_lot 0.12.1",
+ "petgraph",
+ "proptest",
+ "proptest-derive",
+ "serde",
+ "stef_derive",
+ "tokio",
+]
+
+[[package]]
+name = "stef_derive"
+version = "0.1.0"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro-error",
+ "proc-macro2 1.0.66",
+ "quote 1.0.33",
+ "stef",
+ "syn 2.0.29",
 ]
 
 [[package]]

@@ -80,7 +80,7 @@ fn test_buffer() {
     #[derive(Debug, PartialEq, Eq)]
     struct S(i32);
 
-    impl State for S {
+    impl State<'static> for S {
         type Action = i32;
         type Effect = String;
 

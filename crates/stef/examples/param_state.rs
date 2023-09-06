@@ -8,7 +8,7 @@ struct Foo {
 #[derive(Default)]
 struct FooState(u32);
 
-impl ParamState for Foo {
+impl ParamState<'static> for Foo {
     type State = FooState;
     type Params = u32;
     type Action = u32;
