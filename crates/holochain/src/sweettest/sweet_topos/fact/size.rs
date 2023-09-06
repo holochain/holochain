@@ -129,8 +129,8 @@ pub mod test {
                 assert_eq!(graph.node_count(), fact.nodes);
                 assert_eq!(graph.edge_count(), 0);
                 assert_eq!(graph.strict_partitions(), fact.nodes);
-            }, 3_000_000
+            },
+            3_000_000
         )
-
     }
 }
