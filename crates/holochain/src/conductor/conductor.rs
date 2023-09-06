@@ -2687,7 +2687,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to stop app(s)", ?errors);
                     }
-
                     (NoChange, errors)
                 }
                 SpinUp | Both => {
@@ -2704,7 +2703,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to start app(s)", ?errors);
                     }
-
                     (delta, errors)
                 }
             };
