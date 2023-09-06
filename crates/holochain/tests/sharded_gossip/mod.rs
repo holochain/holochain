@@ -857,7 +857,7 @@ async fn mock_network_sharded_gossip() {
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
                                                     vec![interval.into()],
-                                                    vec![agent_info],
+                                                    [agent_info.agent()].into_iter().collect(),
                                                 ),
                                             ),
                                         };
@@ -1391,7 +1391,7 @@ async fn mock_network_sharding() {
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
                                                     vec![interval.into()],
-                                                    vec![agent_info],
+                                                    [agent_info.agent()].into_iter().collect(),
                                                 ),
                                             ),
                                         };

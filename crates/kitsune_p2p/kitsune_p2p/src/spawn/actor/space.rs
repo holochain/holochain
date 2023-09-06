@@ -900,33 +900,33 @@ impl KitsuneP2pHandler for Space {
                     let agents: AgentList = [to_agent].into_iter().collect();
                     match res {
                         wire::Wire::Failure(wire::Failure { reason }) => {
-                            metrics
-                                .write()
-                                .record_reachability_event(false, agents.clone());
-                            metrics.write().record_latency_micros(
-                                start.elapsed().as_micros() as f32,
-                                agents.clone(),
-                            );
+                            metrics.write(|m| {
+                                m.record_reachability_event(false, agents.clone());
+                                m.record_latency_micros(
+                                    start.elapsed().as_micros() as f32,
+                                    agents.clone(),
+                                );
+                            });
                             Err(reason.into())
                         }
                         wire::Wire::CallResp(wire::CallResp { data }) => {
-                            metrics
-                                .write()
-                                .record_reachability_event(true, agents.clone());
-                            metrics.write().record_latency_micros(
-                                start.elapsed().as_micros() as f32,
-                                agents.clone(),
-                            );
+                            metrics.write(|m| {
+                                m.record_reachability_event(true, agents.clone());
+                                m.record_latency_micros(
+                                    start.elapsed().as_micros() as f32,
+                                    agents.clone(),
+                                );
+                            });
                             Ok(data.into())
                         }
                         r => {
-                            metrics
-                                .write()
-                                .record_reachability_event(false, agents.clone());
-                            metrics.write().record_latency_micros(
-                                start.elapsed().as_micros() as f32,
-                                agents.clone(),
-                            );
+                            metrics.write(|m| {
+                                m.record_reachability_event(false, agents.clone());
+                                m.record_latency_micros(
+                                    start.elapsed().as_micros() as f32,
+                                    agents.clone(),
+                                );
+                            });
                             Err(format!("invalid response: {:?}", r).into())
                         }
                     }
@@ -1226,7 +1226,7 @@ impl KitsuneP2pHandler for Space {
         _space: Option<Arc<KitsuneSpace>>,
     ) -> KitsuneP2pHandlerResult<serde_json::Value> {
         let space = self.ro_inner.space.clone();
-        let metrics = self.ro_inner.metrics.read().dump();
+        let metrics = self.ro_inner.metrics.read(|m| m.dump());
         Ok(async move {
             Ok(serde_json::json!({
                 "space": space.to_string(),
@@ -1372,7 +1372,7 @@ impl Space {
                     ))
                     .await;
 
-                    let records = metrics.read().dump_historical();
+                    let records = metrics.read(|m| m.dump_historical());
 
                     let _ = host.record_metrics(space.clone(), records).await;
                 }

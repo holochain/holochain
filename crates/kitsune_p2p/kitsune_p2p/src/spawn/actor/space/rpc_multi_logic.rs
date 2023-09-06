@@ -37,28 +37,26 @@ pub(crate) async fn handle_rpc_multi_as_single(
 
             match res {
                 Ok(wire::Wire::CallResp(c)) => {
-                    ro_inner
-                        .metrics
-                        .write()
-                        .record_reachability_event(true, single_agent.clone());
-                    ro_inner.metrics.write().record_latency_micros(
-                        start.elapsed().as_micros() as f32,
-                        single_agent.clone(),
-                    );
+                    ro_inner.metrics.write(|m| {
+                        m.record_reachability_event(true, single_agent.clone());
+                        m.record_latency_micros(
+                            start.elapsed().as_micros() as f32,
+                            single_agent.clone(),
+                        );
+                    });
                     Ok(vec![RpcMultiResponse {
                         agent: agent.clone(),
                         response: c.data.into(),
                     }])
                 }
                 oth => {
-                    ro_inner
-                        .metrics
-                        .write()
-                        .record_reachability_event(false, single_agent.clone());
-                    ro_inner.metrics.write().record_latency_micros(
-                        start.elapsed().as_micros() as f32,
-                        single_agent.clone(),
-                    );
+                    ro_inner.metrics.write(|m| {
+                        m.record_reachability_event(false, single_agent.clone());
+                        m.record_latency_micros(
+                            start.elapsed().as_micros() as f32,
+                            single_agent.clone(),
+                        );
+                    });
                     tracing::warn!(?oth, "unexpected remote call result");
                     Err(format!("rpc_multi request failed: {:?}", oth).into())
                 }

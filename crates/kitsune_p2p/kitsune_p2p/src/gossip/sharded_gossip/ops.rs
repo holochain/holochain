@@ -118,11 +118,13 @@ impl ShardedGossipLocal {
                 if let Some(round) = i.round_map.get_mut(peer_cert) {
                     round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
                     round.regions_are_queued = true;
-                    i.metrics.write().update_current_round(
-                        peer_cert,
-                        GossipModuleType::ShardedHistorical,
-                        round,
-                    );
+                    i.metrics.write(|m| {
+                        m.update_current_round(
+                            peer_cert.clone(),
+                            GossipModuleType::ShardedHistorical,
+                            round.clone(),
+                        )
+                    });
                 } else {
                     tracing::warn!(
                         "attempting to queue_incoming_regions for round with no cert: {:?}",

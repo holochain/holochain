@@ -132,7 +132,8 @@ impl MetricExchange {
                     let mut tmp = [0; 4];
                     tmp.copy_from_slice(&extrap_cov_f32_le[0..4]);
                     let extrap_cov = f32::from_le_bytes(tmp);
-                    self.metrics.write().record_extrap_cov_event(extrap_cov);
+                    self.metrics
+                        .write(|m| m.record_extrap_cov_event(extrap_cov));
                 }
                 MetricExchangeMsg::UnknownMessage => (),
             }
@@ -182,7 +183,7 @@ impl MetricExchangeSync {
                             let count = res.len() as f64;
                             let res = res.into_iter().fold(0.0, |a, x| a + x) / count;
                             mx.write().extrap_cov = res as f32;
-                            metrics.write().record_extrap_cov_event(res as f32);
+                            metrics.write(|m| m.record_extrap_cov_event(res as f32));
                         }
                     }
 

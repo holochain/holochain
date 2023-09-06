@@ -223,9 +223,9 @@ impl CurrentRound {
     }
 
     /// Update status based on an existing round
-    pub fn update(&mut self, round_state: &RoundState) {
+    pub fn update(&mut self, round_state: RoundState) {
         self.last_touch = Instant::now();
-        self.region_diffs = round_state.region_diffs.clone();
+        self.region_diffs = round_state.region_diffs;
     }
 
     /// Convert to a CompletedRound
@@ -348,15 +348,14 @@ impl<'lt> AgentLike<'lt> {
 /// A set of agents
 pub type AgentList = HashSet<KAgent>;
 
-// #[stef::state(share = MetricsSync)]
-// impl stef::State for Metrics {
+// /// Shared access to metrics
+// pub type MetricsSync = Arc<parking_lot::RwLock<Metrics>>;
+// impl Metrics {
 
-/// Shared access to metrics
-pub type MetricsSync = Arc<parking_lot::RwLock<Metrics>>;
-
-impl Metrics {
-    // type Action = MetricsAction;
-    // type Effect = ();
+#[stef::state(share = MetricsSync)]
+impl stef::State<'static> for Metrics {
+    type Action = MetricsAction;
+    type Effect = ();
 
     /// Record an individual extrapolated coverage event
     /// (either from us or a remote)
@@ -473,9 +472,9 @@ impl Metrics {
     /// Update node-level info about a current round, or create one if it doesn't exist
     pub fn update_current_round(
         &mut self,
-        peer: &NodeId,
+        peer: NodeId,
         gossip_type: GossipModuleType,
-        round_state: &RoundState,
+        round_state: RoundState,
     ) {
         let remote_agents = round_state.remote_agent_list.clone();
         let history = self.node_history.entry(peer.clone()).or_default();
@@ -492,7 +491,7 @@ impl Metrics {
     }
 
     /// Remove the current round info once it's complete, and put it into the history list
-    pub fn complete_current_round(&mut self, node: &NodeId, error: bool) {
+    pub fn complete_current_round(&mut self, node: NodeId, error: bool) {
         let history = self.node_history.entry(node.clone()).or_default();
         let r = history.current_round.take();
         if let Some(r) = r {
@@ -506,11 +505,11 @@ impl Metrics {
     }
 }
 
-// impl Default for MetricsSync {
-//     fn default() -> Self {
-//         Self(Default::default())
-//     }
-// }
+impl Default for MetricsSync {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
 
 impl Metrics {
     /// Dump historical metrics for recording to db.

@@ -51,9 +51,10 @@ impl GossipDashboard {
                             if let Some(round) = s.round_table_state.selected() {
                                 let diffs = state.share_mut(|state| {
                                     let node = &state.nodes()[node];
-                                    let metrics = node.diagnostics.metrics.read();
-                                    let histories = state.node_rounds_sorted(&metrics);
-                                    histories.round_regions(round).clone()
+
+                                    node.diagnostics.metrics.read(|m| {
+                                        state.node_rounds_sorted(m).round_regions(round).clone()
+                                    })
                                 });
                                 if let Some((our_diff, their_diff)) = diffs {
                                     s.focus = Focus::Round {

@@ -955,20 +955,19 @@ mod network_impls {
                 let bytes_since_last_time_queried = dht_bytes_received + cache_bytes_received;
 
                 // calculate open peer connections based on current gossip sessions
-                let completed_rounds_since_last_time_queried = diagnostics
-                    .metrics
-                    .read()
-                    .peer_node_histories()
-                    .iter()
-                    .flat_map(|(_, node_history)| node_history.completed_rounds.clone())
-                    .filter(|completed_round| {
-                        let now = tokio::time::Instant::now();
-                        let round_start_time_diff = now - completed_round.start_time;
-                        let round_start_timestamp =
-                            Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
-                        round_start_timestamp > last_time_queried
-                    })
-                    .count() as u32;
+                let completed_rounds_since_last_time_queried = diagnostics.metrics.read(|m| {
+                    m.peer_node_histories()
+                        .iter()
+                        .flat_map(|(_, node_history)| node_history.completed_rounds.clone())
+                        .filter(|completed_round| {
+                            let now = tokio::time::Instant::now();
+                            let round_start_time_diff = now - completed_round.start_time;
+                            let round_start_timestamp =
+                                Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
+                            round_start_timestamp > last_time_queried
+                        })
+                        .count() as u32
+                });
 
                 ConductorResult::Ok(NetworkInfo {
                     fetch_pool_info,

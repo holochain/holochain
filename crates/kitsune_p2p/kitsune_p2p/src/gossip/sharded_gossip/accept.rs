@@ -27,10 +27,12 @@ impl ShardedGossipLocal {
 
         if let Some(when_initiated) = when_initiated {
             let _ = self.inner.share_ref(|i| {
-                i.metrics.write().record_latency_micros(
-                    when_initiated.elapsed().as_micros() as f32,
-                    local_agents.clone(),
-                );
+                i.metrics.write(|m| {
+                    m.record_latency_micros(
+                        when_initiated.elapsed().as_micros() as f32,
+                        local_agents.clone(),
+                    )
+                });
                 Ok(())
             });
         }
@@ -72,9 +74,10 @@ impl ShardedGossipLocal {
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
 
-            let mut metrics = inner.metrics.write();
-            metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
-            metrics.record_initiate(remote_agent_list, self.gossip_type.into());
+            inner.metrics.write(|m| {
+                m.update_current_round(peer_cert.clone(), self.gossip_type.into(), state.clone());
+                m.record_initiate(remote_agent_list, self.gossip_type.into());
+            });
 
             inner.round_map.insert(peer_cert.clone(), state);
             Ok(())

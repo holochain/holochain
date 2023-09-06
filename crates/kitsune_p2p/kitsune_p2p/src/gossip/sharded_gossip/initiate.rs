@@ -167,10 +167,14 @@ impl ShardedGossipLocal {
                 .as_ref()
                 .map_or(true, |tgt| tgt.cert != peer_cert)
             {
-                let mut metrics = inner.metrics.write();
-
-                metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
-                metrics.record_accept(remote_agent_list.clone(), self.gossip_type.into());
+                inner.metrics.write(|m| {
+                    m.update_current_round(
+                        peer_cert.clone(),
+                        self.gossip_type.into(),
+                        state.clone(),
+                    );
+                    m.record_accept(remote_agent_list.clone(), self.gossip_type.into());
+                });
             }
 
             inner.round_map.insert(peer_cert.clone(), state);
