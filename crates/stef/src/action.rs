@@ -3,8 +3,8 @@ use must_future::MustBoxFuture;
 use crate::util::box_fut;
 
 /// The action consumed by a [`State::transition`]
-pub trait Action: Sized + 'static {}
-impl<T> Action for T where T: Sized + 'static {}
+pub trait Action: Sized {}
+impl<T> Action for T where T: Sized {}
 
 /// A type represention a state transition for some [`State`].
 ///
@@ -44,7 +44,7 @@ pub trait ActionCompact:
 }
 impl<T> ActionReplay for T
 where
-    T: ActionCompact,
+    T: ActionCompact + 'static,
 {
     type Compact = Self;
     type Expander = ();
@@ -72,8 +72,8 @@ impl ActionCompact for i64 {}
 impl ActionCompact for f32 {}
 impl ActionCompact for f64 {}
 impl ActionCompact for String {}
-impl<T> ActionCompact for Box<T> where T: ActionCompact {}
-impl<T> ActionCompact for Option<T> where T: ActionCompact {}
-impl<T> ActionCompact for Vec<T> where T: ActionCompact {}
+impl<T: 'static> ActionCompact for Box<T> where T: ActionCompact {}
+impl<T: 'static> ActionCompact for Option<T> where T: ActionCompact {}
+impl<T: 'static> ActionCompact for Vec<T> where T: ActionCompact {}
 // impl<'a> ActionCompact for &'a str {}
 // impl<'a, T> ActionCompact for &'a [T] {}

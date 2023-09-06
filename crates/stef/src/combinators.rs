@@ -58,7 +58,7 @@ pub struct RunEffects<S: State, Ret, Runner> {
     _phantom: PhantomData<Ret>,
 }
 
-impl<S: State + Default, Ret: Effect, Runner: Fn(S::Effect) -> Ret> ParamState
+impl<S: State + Default, Ret: Effect + 'static, Runner: 'static + Fn(S::Effect) -> Ret> ParamState
     for RunEffects<S, Ret, Runner>
 {
     type Action = S::Action;
