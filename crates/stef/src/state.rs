@@ -8,9 +8,9 @@ use crate::*;
 ///
 /// The Effect returned represents some action to be taken. The action will not be
 /// performed immediately -- it must be interpreted by some outside function.
-pub trait State {
+pub trait State<'a> {
     /// The type which represents a change to the state
-    type Action: Action;
+    type Action: Action + 'a;
 
     /// The type which represents a change to the outside world
     type Effect: Effect;
@@ -19,9 +19,9 @@ pub trait State {
     fn transition(&mut self, action: Self::Action) -> Self::Effect;
 }
 
-impl<S> State for S
+impl<'a, S> State<'a> for S
 where
-    S: ParamState,
+    S: ParamState<'a> + 'a,
 {
     type Action = S::Action;
     type Effect = S::Effect;
@@ -34,7 +34,7 @@ where
 
 /// Parameterized State. An alternate definition for state machines
 /// where each state has some immutable data associated with it.
-pub trait ParamState {
+pub trait ParamState<'a> {
     /// The part which represents the actual state
     type State;
 
@@ -61,28 +61,28 @@ pub trait ParamState {
         -> Self::Effect;
 }
 
-/// Extensions to make it easier to apply the built-in combinators to States
-pub trait StateExt: State + Sized {
-    /// Wrap in [`Share`]
-    fn shared(self) -> Share<Self> {
-        Share::new(self)
-    }
+// /// Extensions to make it easier to apply the built-in combinators to States
+// pub trait StateExt<'a>: State<'a> + Sized {
+//     /// Wrap in [`Share`]
+//     fn shared(self) -> Share<Self> {
+//         Share::new(self)
+//     }
 
-    /// Wrap in [`StoreEffects`]
-    fn store_effects(self, capacity: usize) -> StoreEffects<Self> {
-        StoreEffects::new(self, capacity)
-    }
+//     /// Wrap in [`StoreEffects`]
+//     fn store_effects(self, capacity: usize) -> StoreEffects<Self> {
+//         StoreEffects::new(self, capacity)
+//     }
 
-    /// Wrap in [`RunEffects`]
-    fn run_effects<Ret, Runner>(self, runner: Runner) -> RunEffects<Self, Ret, Runner>
-    where
-        Runner: Fn(Self::Effect) -> Ret,
-    {
-        RunEffects::new(self, runner)
-    }
-}
+//     /// Wrap in [`RunEffects`]
+//     fn run_effects<Ret, Runner>(self, runner: Runner) -> RunEffects<Self, Ret, Runner>
+//     where
+//         Runner: Fn(Self::Effect) -> Ret,
+//     {
+//         RunEffects::new(self, runner)
+//     }
+// }
 
-impl<S> StateExt for S where S: State + Sized {}
+// impl<S> StateExt for S where S: State + Sized {}
 
 /// Convenience for updating state by returning an optional owned value
 pub fn maybe_update<S, E>(s: &mut S, f: impl FnOnce(&S) -> (Option<S>, E)) -> E

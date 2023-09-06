@@ -394,9 +394,14 @@ fn state_impl(
         .expect("problem 7232!");
         define_deref_impl.generics = item.generics.clone();
 
+        let (_, item_trait, item_for_token) = item
+            .trait_
+            .clone()
+            .expect("must use `impl stef::State<_> for ...`");
+
         let mut define_share_state_impl: syn::ItemImpl = syn::parse(
             quote! {
-                impl stef::State for #share_type {
+                impl #item_trait #item_for_token #share_type {
                     type Action = #action_name;
                     type Effect = #effect_name;
 
@@ -456,9 +461,12 @@ fn state_impl(
         }
     }));
 
+    let (_, item_trait, item_for_token) =
+        item.trait_.expect("must use `impl stef::State<_> for ...`");
+
     let mut define_state_impl: syn::ItemImpl = syn::parse(
         quote! {
-            impl stef::State for #struct_path {
+            impl #item_trait #item_for_token #struct_path {
                 type Action = #action_name;
                 type Effect = #effect_name;
 

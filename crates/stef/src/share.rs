@@ -10,7 +10,7 @@ impl<S> Clone for Share<S> {
     }
 }
 
-impl<S: State> Share<S> {
+impl<S: State<'static>> Share<S> {
     /// Constructor
     pub fn new(s: S) -> Self {
         Self(std::sync::Arc::new(parking_lot::RwLock::new(s)))
@@ -36,7 +36,7 @@ impl<S: State> Share<S> {
     }
 }
 
-impl<S: State + Clone> Share<S> {
+impl<S: State<'static> + Clone> Share<S> {
     /// Return a cloned copy of the shared state
     pub fn get(&self) -> S {
         let g = self.0.read();
@@ -44,7 +44,7 @@ impl<S: State + Clone> Share<S> {
     }
 }
 
-impl<S: State> State for Share<S> {
+impl<S: State<'static>> State<'static> for Share<S> {
     type Action = S::Action;
     type Effect = S::Effect;
 
@@ -53,7 +53,7 @@ impl<S: State> State for Share<S> {
     }
 }
 
-impl<T: 'static + State + std::fmt::Debug> std::fmt::Debug for Share<T> {
+impl<T: 'static + State<'static> + std::fmt::Debug> std::fmt::Debug for Share<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read(|s| f.debug_tuple("Share").field(s).finish())
     }

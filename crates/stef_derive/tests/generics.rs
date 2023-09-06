@@ -15,7 +15,7 @@ pub enum PeopleFx<D> {
 }
 
 #[stef_derive::state(share = PeopleShare<D>)]
-impl<D: 'static + Clone + Eq + std::fmt::Debug> stef::State for People<D> {
+impl<D: 'static + Clone + Eq + std::fmt::Debug> stef::State<'static> for People<D> {
     type Action = PeopleAction<D>;
     type Effect = Option<PeopleFx<D>>;
 

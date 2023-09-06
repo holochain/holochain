@@ -90,7 +90,7 @@ mod convo {
         }
     }
 
-    impl State for Convo {
+    impl State<'static> for Convo {
         type Action = Action;
         type Effect = Effect;
 
@@ -170,7 +170,7 @@ mod convo {
         }
     }
 
-    impl StateDiagrammable for Convo {
+    impl StateDiagrammable<'static> for Convo {
         type Node = DiagramNode;
         type Edge = Action<()>;
     }
@@ -313,7 +313,7 @@ mod peerlist {
         peers: HashMap<Id, Peer>,
     }
 
-    impl State for PeerList {
+    impl State<'static> for PeerList {
         type Action = Action;
         type Effect = Result<Effect, Error>;
 

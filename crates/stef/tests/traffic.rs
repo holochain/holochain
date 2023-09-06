@@ -36,7 +36,7 @@ impl TrafficLight {
     }
 }
 
-impl State for TrafficLight {
+impl State<'static> for TrafficLight {
     type Action = ();
     type Effect = Option<TrafficLightEffect>;
 
@@ -90,7 +90,7 @@ impl WalkSign {
     }
 }
 
-impl ParamState for WalkSign {
+impl ParamState<'static> for WalkSign {
     type State = u8;
     type Params = u8;
     type Action = ();
@@ -137,7 +137,7 @@ fn share() {
 
 #[test]
 fn share_accumulated() {
-    let mut light = TrafficLight(0).shared().store_effects(10);
+    let mut light = StoreEffects::new(Share::new(TrafficLight(0)), 10);
 
     assert_eq!(light.read(TrafficLight::color), Green);
 
@@ -166,7 +166,7 @@ fn share_runner() {
     let blinking = Arc::new(AtomicBool::new(false));
     let blinky = blinking.clone();
 
-    let mut share = TrafficLight(0).shared().run_effects(move |eff| match eff {
+    let mut share = RunEffects::new(Share::new(TrafficLight(0)), move |eff| match eff {
         Some(StartThatBlinkyBlueLight) => {
             assert!(!blinking.swap(true, std::sync::atomic::Ordering::Relaxed));
             true
@@ -201,7 +201,7 @@ fn composition() {
         walk: Share<WalkSign>,
     }
 
-    impl State for Intersection {
+    impl State<'static> for Intersection {
         type Action = ();
         type Effect = Vec<Either<TrafficLightEffect, WalkSignEffect>>;
 
