@@ -25,6 +25,7 @@
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
     # filter out all .nix files to not affect the input hash
     # when these are changes
     nix-filter.url = "github:numtide/nix-filter";

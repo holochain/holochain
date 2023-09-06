@@ -1,5 +1,6 @@
 use super::error::DnaError;
 use crate::prelude::*;
+use arbitrary::Arbitrary;
 use holo_hash::*;
 use holochain_zome_types::ZomeName;
 use std::collections::BTreeMap;
@@ -14,11 +15,13 @@ mod test;
     Debug,
     PartialEq,
     Eq,
+    Hash,
     serde::Serialize,
     serde::Deserialize,
     derive_more::AsRef,
     derive_more::From,
     derive_more::IntoIterator,
+    Arbitrary,
 )]
 #[serde(from = "WasmMapSerialized", into = "WasmMapSerialized")]
 pub struct WasmMap(BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>);
@@ -50,7 +53,7 @@ impl From<WasmMapSerialized> for WasmMap {
 ///       we should remove the Serialize impl on this type, and perhaps rename
 ///       to indicate that this is simply a validated, fully-formed DnaBundle
 ///       (i.e. all Wasms are bundled and immediately available, not remote.)
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes, Hash, Arbitrary)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
     pub(super) dna: DnaDefHashed,

@@ -38,6 +38,8 @@
         nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
+
+        stdenv = config.rustHelper.defaultStdenv pkgs;
       };
 
       # derivation building all dependencies
