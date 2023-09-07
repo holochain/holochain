@@ -90,6 +90,8 @@ struct MatchPat {
     pat: Pat,
 }
 
+type MapWith = syn::Path;
+
 impl syn::parse::Parse for MatchPat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let pat = Pat::parse_single(input)?;
@@ -125,6 +127,7 @@ fn state_impl(
     struct F {
         f: syn::ImplItemFn,
         match_pat: Option<MatchPat>,
+        map_with: Option<MapWith>,
     }
 
     impl F {
@@ -176,6 +179,8 @@ fn state_impl(
                 let span = f.span();
 
                 let mut match_pat = None;
+                let mut map_with = None;
+
                 for attr in f.attrs.iter() {
                     if attr.path().segments.last().map(|s| s.ident.to_string())
                         == Some("state".to_string())
@@ -188,6 +193,13 @@ fn state_impl(
                                     content.parse().map_err(|e| syn::Error::new(span, e))?;
                                 match_pat = Some(mp);
                                 return Ok(());
+                            } else if meta.path.is_ident("map_with") {
+                                let content;
+                                syn::parenthesized!(content in meta.input);
+                                let mw: MapWith =
+                                    content.parse().map_err(|e| syn::Error::new(span, e))?;
+                                map_with = Some(mw);
+                                return Ok(());
                             }
                             Ok(())
                         })
@@ -197,7 +209,11 @@ fn state_impl(
                     }
                 }
 
-                fns.push(F { f, match_pat });
+                fns.push(F {
+                    f,
+                    match_pat,
+                    map_with,
+                });
             }
             _ => {}
         }
@@ -240,7 +256,8 @@ fn state_impl(
     //     )
     // }
 
-    let doc = format!("The Action type for the {:?} state", struct_path.path);
+    // TODO: get actual struct name
+    let doc = format!("The Action type for the state");
     let mut define_action_enum: syn::ItemEnum = syn::parse(
         quote! {
             #[doc = #doc]
@@ -297,20 +314,30 @@ fn state_impl(
             false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
         };
 
-        let new_block = if let Some(MatchPat { var, pat }) = f.match_pat.as_ref() {
-            quote! {{
-                use stef::State;
-                let eff = self.transition(#arg);
-                match eff {
-                    #pat => #var,
-                    _ => unreachable!("stef::state has a bug in its effect unwrapping logic")
-                }
-            }}
-        } else {
-            quote! {{
-                use stef::State;
-                self.transition(#arg)
-            }}
+        let new_block = match (f.map_with.as_ref(), f.match_pat.as_ref()) {
+            (Some(mw), _) => {
+                quote! {{
+                    use stef::State;
+                    let eff = self.transition(#arg);
+                    #mw(eff)
+                }}
+            }
+            (None, Some(MatchPat { var, pat })) => {
+                quote! {{
+                    use stef::State;
+                    let eff = self.transition(#arg);
+                    match eff {
+                        #pat => #var,
+                        _ => unreachable!("stef::state has a bug in its effect unwrapping logic")
+                    }
+                }}
+            }
+            (None, None) => {
+                quote! {{
+                    use stef::State;
+                    self.transition(#arg)
+                }}
+            }
         };
 
         let ts = proc_macro::TokenStream::from(new_block.into_token_stream());
