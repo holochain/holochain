@@ -34,7 +34,14 @@
 //!     and private visibility (these should never be leaked or otherwise called directly, it would defeat the entire purpose!)
 //! - Another new `impl` block is created with the original function names, but with bodies that simply call the `transition`
 //!     function with the `Action` corresponding to this function. If a `matches` directive was provided, the pattern is
-//!     applies to the output to map the return type
+//!     applied to the output to map the return type
+//!
+//! TODO: the matches() attr is very magical and needs more explanation. But for now:
+//! Both sides of the `<=>` are intepreted as both a Pattern, and an Expression. A function can return a type other than
+//! the Effect, if a matches() or map_with() attr is provided. The left side of the matches() represents the effect type,
+//! and the right side represents the return type. Through this bidirectional mapping (partial isomorphism), we can freely
+//! convert between effect and function return types, so that the users of the function don't have to match on the effect
+//! (usually an enum) to get the value they want
 
 use heck::ToPascalCase;
 use proc_macro2::{Span, TokenStream};
@@ -334,7 +341,7 @@ fn state_impl(
 
                     match eff {
                         #pats,
-                        _ => unreachable!("stef::state has a bug in its effect unwrapping logic")
+                        _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
                     }
                 }}
             }
@@ -506,16 +513,43 @@ fn state_impl(
         let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
         let variant_name = f.variant_name();
         let impl_name = f.impl_name();
-        if args.is_empty() {
+        let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
+            |MatchPat {
+                 backward_pat,
+                 backward_expr,
+                 ..
+             }| quote!(#backward_pat => #backward_expr),
+        ));
+
+        let (pat, expr) = if args.is_empty() {
+            (quote!(Self::Action::#variant_name), quote!(self.#impl_name()))
+        } else {
+            (quote!(Self::Action::#variant_name(#args)), quote!(self.#impl_name(#args)))
+        };
+
+        if pats.is_empty() {
             quote! {
-                Self::Action::#variant_name => self.#impl_name().into()
+                #pat => #expr.into()
             }
         } else {
             quote! {
-                Self::Action::#variant_name(#args) => self.#impl_name(#args).into()
+                #pat => match #expr {
+                    #pats,
+                    _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+                }
             }
         }
     }));
+
+    let define_match: syn::ExprMatch = syn::parse(
+        quote! {
+            match action {
+                #define_transitions
+            }
+        }
+        .into(),
+    )
+    .expect("problem 8sd");
 
     let (_, item_trait, item_for_token) =
         item.trait_.expect("must use `impl stef::State<_> for ...`");
@@ -527,9 +561,7 @@ fn state_impl(
                 type Effect = #effect_name;
 
                 fn transition(&mut self, action: Self::Action) -> Self::Effect {
-                    match action {
-                        #define_transitions
-                    }
+                    #define_match
                 }
             }
         }
