@@ -45,7 +45,7 @@ jobs:
           # See https://docs.cachix.org/pushing#id1
           nix build --refresh -L \
             ${{ matrix.cmd.extra_arg }} \
-            .#devShells.${system}.build-holonix-tests-integration
+            .#packages.${system}.build-holonix-tests-integration
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
