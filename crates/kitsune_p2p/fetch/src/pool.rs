@@ -953,11 +953,63 @@ mod tests {
 
     #[cfg(feature = "fuzzing")]
     #[test_strategy::proptest]
-    fn fuzz_fetchpool(actions: Vec<FetchPoolAction>) {
+    fn fuzz_fetchpool_drainage(space: KSpace, actions: Vec<FetchPoolAction>) {
         use stef::State;
-        let mut pool = FetchPoolState::default();
-        for a in actions {
+
+        // println!("-------------------------------");
+
+        #[derive(Debug)]
+        struct Config;
+
+        impl FetchPoolConfig for Config {
+            fn item_retry_delay(&self) -> Duration {
+                Duration::from_millis(10)
+            }
+
+            fn source_retry_delay(&self) -> Duration {
+                Duration::from_millis(10)
+            }
+
+            fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+                a | b
+            }
+        }
+
+        let mut pool = FetchPoolState::new(Arc::new(Config));
+
+        // filter out region keys
+        let actions = actions.into_iter().filter(|a| match a {
+            FetchPoolAction::Push(push) => !matches!(push.key, FetchKey::Region(_)),
+            _ => true,
+        });
+
+        // apply the random actions
+        for mut a in actions {
+            match a {
+                FetchPoolAction::Push(ref mut push) => {
+                    // set all actions to the same space
+                    push.space = space.clone();
+                }
+                _ => (),
+            }
             pool.transition(a);
         }
+
+        // println!("{}", pool.summary());
+
+        // drain the pool via next_item
+        while pool.len() > 0 {
+            if let Some((key, _, _, _)) = pool.next_item() {
+                pool.remove(key);
+            } else {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+        let reader = FetchPoolReader::from(FetchPool {
+            state: ShareOpen::new(pool),
+        });
+        let info = reader.info([space].into_iter().collect());
+        assert_eq!(info.num_ops_to_fetch, 0);
+        assert_eq!(info.op_bytes_to_fetch, 0);
     }
 }
