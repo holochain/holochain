@@ -104,10 +104,3 @@ jobs:
           done
           
           rm result*
-
-          # TODO: remove this once we've implemented all tests and know that we don't need it
-          # if there's something to run we generate separate commands
-          # if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
-          #   export basecmd="nix run -L --show-trace .#packages.${system}."
-          #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
-          # fi
