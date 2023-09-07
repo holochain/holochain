@@ -43,7 +43,7 @@ jobs:
           set -xe
 
           # See https://docs.cachix.org/pushing#id1
-          nix build -L \
+          nix build --refresh -L \
             ${{ matrix.cmd.extra_arg }} \
             .#devShells.${system}.build-holonix-tests-integration
 
