@@ -97,6 +97,15 @@ pub struct FetchPoolState {
     queue: LinkedHashMap<FetchKey, FetchPoolItem>,
 }
 
+impl Default for FetchPoolState {
+    fn default() -> Self {
+        Self {
+            config: Arc::new(FetchPoolConfigBitwiseOr),
+            queue: Default::default(),
+        }
+    }
+}
+
 type NextItem = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 
 impl FetchPool {
@@ -163,13 +172,15 @@ impl FetchPool {
     }
 }
 
+/// The effect of actions on the FetchPool
 #[derive(Debug, PartialEq, Eq, derive_more::From)]
 pub enum FetchPoolEffect {
+    /// A new item is ready for processing
     NextItem(NextItem),
+    /// An item was removed from the pool
     RemovedItem(FetchPoolItem),
 }
 
-// TODO: add bidirectional mappings via =>
 #[stef::state]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
@@ -831,7 +842,7 @@ mod tests {
         };
 
         assert_eq!(1, q.len());
-        q.remove(&test_key_op(1));
+        q.remove(test_key_op(1));
 
         // Move time forwards to be able to retry the item
         tokio::time::advance(Duration::from_secs(30)).await;
@@ -939,5 +950,15 @@ mod tests {
         assert_eq!(FLAG_1, merged & FLAG_1);
         assert_eq!(FLAG_2, merged & FLAG_2);
         assert_eq!(0, merged ^ (FLAG_1 | FLAG_2)); // Clear FLAG_1 and FLAG_2 to check no other bits are set
+    }
+
+    #[cfg(feature = "fuzzing")]
+    #[test_strategy::proptest]
+    fn fuzz_fetchpool(actions: Vec<FetchPoolAction>) {
+        use stef::State;
+        let mut pool = FetchPoolState::default();
+        for a in actions {
+            pool.transition(a);
+        }
     }
 }
