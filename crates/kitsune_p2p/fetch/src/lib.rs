@@ -36,6 +36,10 @@ pub enum FetchKey {
 
 /// A fetch "unit" that can be de-duplicated.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct FetchPoolPush {
     /// Description of what to fetch.
     pub key: FetchKey,

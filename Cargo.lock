@@ -4090,6 +4090,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_bytes",
+ "stef",
  "test-case 1.2.3",
  "tokio",
  "tracing",

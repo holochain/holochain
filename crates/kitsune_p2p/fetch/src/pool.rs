@@ -133,7 +133,7 @@ impl FetchPool {
     /// When an item has been successfully fetched, we can remove it from the queue.
     pub fn remove(&self, key: &FetchKey) -> Option<FetchPoolItem> {
         self.state.share_mut(|s| {
-            let removed = s.remove(key);
+            let removed = s.remove(key.clone());
             tracing::debug!(
                 "FetchPool (size = {}) item removed: key={:?} val={:?}",
                 s.queue.len(),
@@ -163,20 +163,22 @@ impl FetchPool {
     }
 }
 
-impl FetchPoolState {
-    /// Constructor
-    pub fn new(config: FetchConfig) -> Self {
-        Self {
-            config,
-            queue: Default::default(),
-        }
-    }
+#[derive(Debug, PartialEq, Eq)]
+pub enum FetchPoolEffect {
+    NextItem(NextItem),
+    RemovedItem(FetchPoolItem),
+}
+
+#[stef::state]
+impl stef::State<'static> for FetchPoolState {
+    type Action = FetchPoolAction;
+    type Effect = Option<FetchPoolEffect>;
 
     /// Add an item to the queue.
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    pub fn push(&mut self, args: FetchPoolPush) {
+    fn push(&mut self, args: FetchPoolPush) -> Option<FetchPoolEffect> {
         let FetchPoolPush {
             key,
             author,
@@ -231,10 +233,12 @@ impl FetchPoolState {
                 }
             }
         }
+
+        None
     }
 
     /// Get the next item to be fetched
-    pub fn next_item(&mut self) -> Option<NextItem> {
+    fn next_item(&mut self) -> Option<FetchPoolEffect> {
         let keys: Vec<_> = self
             .queue
             .keys()
@@ -253,7 +257,12 @@ impl FetchPoolState {
                     // TODO what if we're recently tried to use this source and it's not available? The retry delay does not apply across items
                     let space = item.space.clone();
                     item.last_fetch = Some(Instant::now());
-                    return Some((key, space, source, item.context));
+                    return Some(FetchPoolEffect::NextItem((
+                        key,
+                        space,
+                        source,
+                        item.context,
+                    )));
                 }
             }
         }
@@ -262,8 +271,18 @@ impl FetchPoolState {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&mut self, key: &FetchKey) -> Option<FetchPoolItem> {
-        self.queue.remove(key)
+    fn remove(&mut self, key: FetchKey) -> Option<FetchPoolEffect> {
+        self.queue.remove(&key).map(FetchPoolEffect::RemovedItem)
+    }
+}
+
+impl FetchPoolState {
+    /// Constructor
+    pub fn new(config: FetchConfig) -> Self {
+        Self {
+            config,
+            queue: Default::default(),
+        }
     }
 
     /// Get the current size of the fetch pool. This is the number of outstanding items
@@ -374,6 +393,10 @@ impl Sources {
 
 /// A source to fetch from: either a node, or an agent on a node
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum FetchSource {
     /// An agent on a node
     Agent(KAgent),
