@@ -163,12 +163,13 @@ impl FetchPool {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, derive_more::From)]
 pub enum FetchPoolEffect {
     NextItem(NextItem),
     RemovedItem(FetchPoolItem),
 }
 
+// TODO: add bidirectional mappings via <=>
 #[stef::state]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
@@ -238,7 +239,13 @@ impl stef::State<'static> for FetchPoolState {
     }
 
     /// Get the next item to be fetched
-    fn next_item(&mut self) -> Option<FetchPoolEffect> {
+    #[stef::state(
+        matches(
+            Some(FetchPoolEffect::NextItem(i)) => Some(i),
+            None => None
+        )
+    )]
+    fn next_item(&mut self) -> Option<NextItem> {
         let keys: Vec<_> = self
             .queue
             .keys()
@@ -257,12 +264,7 @@ impl stef::State<'static> for FetchPoolState {
                     // TODO what if we're recently tried to use this source and it's not available? The retry delay does not apply across items
                     let space = item.space.clone();
                     item.last_fetch = Some(Instant::now());
-                    return Some(FetchPoolEffect::NextItem((
-                        key,
-                        space,
-                        source,
-                        item.context,
-                    )));
+                    return Some((key, space, source, item.context));
                 }
             }
         }
@@ -271,8 +273,14 @@ impl stef::State<'static> for FetchPoolState {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    fn remove(&mut self, key: FetchKey) -> Option<FetchPoolEffect> {
-        self.queue.remove(&key).map(FetchPoolEffect::RemovedItem)
+    #[stef::state(
+        matches(
+            Some(FetchPoolEffect::RemovedItem(i)) => Some(i),
+            None => None
+        )
+    )]
+    fn remove(&mut self, key: FetchKey) -> Option<FetchPoolItem> {
+        self.queue.remove(&key)
     }
 }
 
