@@ -43,7 +43,7 @@ use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Ident, Pat, Token, Type};
+use syn::{parse_macro_input, Expr, Ident, Pat, Token, Type};
 
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
@@ -86,21 +86,38 @@ impl syn::parse::Parse for Options {
 }
 
 struct MatchPat {
-    var: syn::Expr,
-    pat: Pat,
+    forward_pat: Pat,
+    forward_expr: Expr,
+    backward_pat: Pat,
+    backward_expr: Expr,
 }
 
 type MapWith = syn::Path;
 
 impl syn::parse::Parse for MatchPat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let pat = Pat::parse_single(input)?;
-        if let (Ok(_), Ok(_)) = (input.parse::<Token!(=)>(), input.parse::<Token!(>)>()) {
+        let forward_pat = Pat::parse_single(input)?;
+        let backward_expr = syn::parse(forward_pat.to_token_stream().into())?;
+
+        if true
+            && input.parse::<Token!(<)>().is_ok()
+            && input.parse::<Token!(=)>().is_ok()
+            && input.parse::<Token!(>)>().is_ok()
+        {
+            let backward_pat = Pat::parse_single(input)?;
+            let forward_expr = syn::parse(backward_pat.to_token_stream().into())?;
+            Ok(Self {
+                forward_pat,
+                forward_expr,
+                backward_pat,
+                backward_expr,
+            })
         } else {
-            return Err(syn::Error::new(pat.span(), "Expected => in `matches()`"));
+            Err(syn::Error::new(
+                forward_pat.span(),
+                "Expected => in `matches()`",
+            ))
         }
-        let var = input.parse()?;
-        Ok(Self { var, pat })
     }
 }
 
@@ -326,11 +343,13 @@ fn state_impl(
                 }}
             }
             (None, false) => {
-                let pats = delim::<_, Token!(,)>(
-                    f.match_pats
-                        .iter()
-                        .map(|MatchPat { var, pat }| quote!(#pat => #var)),
-                );
+                let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
+                    |MatchPat {
+                         forward_pat,
+                         forward_expr,
+                         ..
+                     }| quote!(#forward_pat => #forward_expr),
+                ));
                 quote! {{
                     use stef::State;
                     let eff = self.transition(#arg);

@@ -169,7 +169,7 @@ pub enum FetchPoolEffect {
     RemovedItem(FetchPoolItem),
 }
 
-// TODO: add bidirectional mappings via <=>
+// TODO: add bidirectional mappings via =>
 #[stef::state]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
@@ -241,8 +241,8 @@ impl stef::State<'static> for FetchPoolState {
     /// Get the next item to be fetched
     #[stef::state(
         matches(
-            Some(FetchPoolEffect::NextItem(i)) => Some(i),
-            None => None
+            Some(FetchPoolEffect::NextItem(i)) <=> Some(i),
+            None <=> None
         )
     )]
     fn next_item(&mut self) -> Option<NextItem> {
@@ -275,8 +275,8 @@ impl stef::State<'static> for FetchPoolState {
     /// When an item has been successfully fetched, we can remove it from the queue.
     #[stef::state(
         matches(
-            Some(FetchPoolEffect::RemovedItem(i)) => Some(i),
-            None => None
+            Some(FetchPoolEffect::RemovedItem(i)) <=> Some(i),
+            None <=> None
         )
     )]
     fn remove(&mut self, key: FetchKey) -> Option<FetchPoolItem> {

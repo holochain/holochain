@@ -13,8 +13,7 @@ impl stef::State<'static> for Elevator {
 
     #[stef::state(
         matches(
-            ElevatorEffect::Command(x) => x,
-            ElevatorEffect::Foo(x) => x.to_string()
+            ElevatorEffect::Command(x) <=> x
         )
     )]
     fn go(&mut self, action: String) -> String {
