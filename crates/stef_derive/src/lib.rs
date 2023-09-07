@@ -34,7 +34,14 @@
 //!     and private visibility (these should never be leaked or otherwise called directly, it would defeat the entire purpose!)
 //! - Another new `impl` block is created with the original function names, but with bodies that simply call the `transition`
 //!     function with the `Action` corresponding to this function. If a `matches` directive was provided, the pattern is
-//!     applies to the output to map the return type
+//!     applied to the output to map the return type
+//!
+//! TODO: the matches() attr is very magical and needs more explanation. But for now:
+//! Both sides of the `<=>` are intepreted as both a Pattern, and an Expression. A function can return a type other than
+//! the Effect, if a matches() or map_with() attr is provided. The left side of the matches() represents the effect type,
+//! and the right side represents the return type. Through this bidirectional mapping (partial isomorphism), we can freely
+//! convert between effect and function return types, so that the users of the function don't have to match on the effect
+//! (usually an enum) to get the value they want
 
 use heck::ToPascalCase;
 use proc_macro2::{Span, TokenStream};
@@ -86,9 +93,11 @@ impl syn::parse::Parse for Options {
 }
 
 struct MatchPat {
-    var: Ident,
+    var: syn::Expr,
     pat: Pat,
 }
+
+type MapWith = syn::Path;
 
 impl syn::parse::Parse for MatchPat {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -124,7 +133,8 @@ fn state_impl(
 
     struct F {
         f: syn::ImplItemFn,
-        match_pat: Option<MatchPat>,
+        match_pats: Vec<MatchPat>,
+        map_with: Option<MapWith>,
     }
 
     impl F {
@@ -175,7 +185,9 @@ fn state_impl(
             syn::ImplItem::Fn(f) => {
                 let span = f.span();
 
-                let mut match_pat = None;
+                let mut match_pats = vec![];
+                let mut map_with = None;
+
                 for attr in f.attrs.iter() {
                     if attr.path().segments.last().map(|s| s.ident.to_string())
                         == Some("state".to_string())
@@ -184,9 +196,19 @@ fn state_impl(
                             if meta.path.is_ident("matches") {
                                 let content;
                                 syn::parenthesized!(content in meta.input);
-                                let mp: MatchPat =
+                                while !content.is_empty() {
+                                    let mp: MatchPat =
+                                        content.parse().map_err(|e| syn::Error::new(span, e))?;
+                                    match_pats.push(mp);
+                                    let _: syn::Result<syn::Token![,]> = content.parse();
+                                }
+                                return Ok(());
+                            } else if meta.path.is_ident("map_with") {
+                                let content;
+                                syn::parenthesized!(content in meta.input);
+                                let mw: MapWith =
                                     content.parse().map_err(|e| syn::Error::new(span, e))?;
-                                match_pat = Some(mp);
+                                map_with = Some(mw);
                                 return Ok(());
                             }
                             Ok(())
@@ -197,7 +219,11 @@ fn state_impl(
                     }
                 }
 
-                fns.push(F { f, match_pat });
+                fns.push(F {
+                    f,
+                    match_pats,
+                    map_with,
+                });
             }
             _ => {}
         }
@@ -211,10 +237,25 @@ fn state_impl(
     let define_action_enum_variants = delim::<_, Token!(,)>(fns.iter().map(|f| {
         let params = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(_, ty)| ty));
         let variant_name = f.variant_name();
+        let doc = ss_flatten(
+            f.f.attrs
+                .iter()
+                .filter(|a| a.path().is_ident("doc"))
+                .cloned()
+                .map(|a| a.into_token_stream()),
+        );
         if params.is_empty() {
-            f.variant_name().to_token_stream()
+            quote! {
+                #doc
+                #variant_name
+            }
+            .to_token_stream()
         } else {
-            quote! ( #variant_name(#params) ).to_token_stream()
+            quote! {
+                #doc
+                #variant_name(#params)
+            }
+            .to_token_stream()
         }
     }));
 
@@ -225,8 +266,11 @@ fn state_impl(
     //     )
     // }
 
+    // TODO: get actual struct name
+    let doc = format!("The Action type for the state");
     let mut define_action_enum: syn::ItemEnum = syn::parse(
         quote! {
+            #[doc = #doc]
             pub enum #action_name {
                 #define_action_enum_variants
             }
@@ -277,20 +321,36 @@ fn state_impl(
             false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
         };
 
-        let new_block = if let Some(MatchPat { var, pat }) = f.match_pat.as_ref() {
-            quote! {{
-                use stef::State;
-                let eff = self.transition(#arg);
-                match eff {
-                    #pat => #var,
-                    _ => unreachable!("stef::state has a bug in its effect unwrapping logic")
-                }
-            }}
-        } else {
-            quote! {{
-                use stef::State;
-                self.transition(#arg)
-            }}
+        let new_block = match (f.map_with.as_ref(), f.match_pats.is_empty()) {
+            (Some(mw), _) => {
+                quote! {{
+                    use stef::State;
+                    let eff = self.transition(#arg);
+                    #mw(eff)
+                }}
+            }
+            (None, false) => {
+                let pats = delim::<_, Token!(,)>(
+                    f.match_pats
+                        .iter()
+                        .map(|MatchPat { var, pat }| quote!(#pat => #var)),
+                );
+                quote! {{
+                    use stef::State;
+                    let eff = self.transition(#arg);
+
+                    match eff {
+                        #pats,
+                        _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+                    }
+                }}
+            }
+            (None, true) => {
+                quote! {{
+                    use stef::State;
+                    self.transition(#arg)
+                }}
+            }
         };
 
         let ts = proc_macro::TokenStream::from(new_block.into_token_stream());
@@ -355,6 +415,8 @@ fn state_impl(
 
         let mut define_share_struct: syn::ItemStruct = syn::parse(
             quote! {
+                /// Newtype for shared access to a `stef::State`, autogenerated
+                /// by the `#[stef::state]` attribute macro.
                 #[derive(Clone, Debug)]
                 pub struct #share_type(stef::Share<#struct_path>);
             }
@@ -367,6 +429,7 @@ fn state_impl(
             quote! {
                 impl #share_type {
 
+                    /// Constructor
                     pub fn new(data: #struct_path) -> Self {
                         Self(stef::Share::new(data))
                     }
@@ -450,16 +513,43 @@ fn state_impl(
         let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
         let variant_name = f.variant_name();
         let impl_name = f.impl_name();
-        if args.is_empty() {
+        let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
+            |MatchPat {
+                 backward_pat,
+                 backward_expr,
+                 ..
+             }| quote!(#backward_pat => #backward_expr),
+        ));
+
+        let (pat, expr) = if args.is_empty() {
+            (quote!(Self::Action::#variant_name), quote!(self.#impl_name()))
+        } else {
+            (quote!(Self::Action::#variant_name(#args)), quote!(self.#impl_name(#args)))
+        };
+
+        if pats.is_empty() {
             quote! {
-                Self::Action::#variant_name => self.#impl_name().into()
+                #pat => #expr.into()
             }
         } else {
             quote! {
-                Self::Action::#variant_name(#args) => self.#impl_name(#args).into()
+                #pat => match #expr {
+                    #pats,
+                    _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+                }
             }
         }
     }));
+
+    let define_match: syn::ExprMatch = syn::parse(
+        quote! {
+            match action {
+                #define_transitions
+            }
+        }
+        .into(),
+    )
+    .expect("problem 8sd");
 
     let (_, item_trait, item_for_token) =
         item.trait_.expect("must use `impl stef::State<_> for ...`");
@@ -471,9 +561,7 @@ fn state_impl(
                 type Effect = #effect_name;
 
                 fn transition(&mut self, action: Self::Action) -> Self::Effect {
-                    match action {
-                        #define_transitions
-                    }
+                    #define_match
                 }
             }
         }
