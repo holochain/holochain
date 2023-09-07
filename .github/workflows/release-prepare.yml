@@ -189,7 +189,7 @@ jobs:
           cd ${HOLOCHAIN_REPO}
 
           nix run .#cargo-sweep -- sweep -s
-          nix run .#scripts-release-automation-check-and-bump $PWD
+          nix run .#scripts-release-automation-check-and-bump -- $PWD
           nix run .#scripts-ci-generate-readmes
           nix run .#cargo-sweep -- sweep -f
 
