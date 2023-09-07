@@ -11,7 +11,12 @@ impl stef::State<'static> for Elevator {
     type Action = ElevatorTransition;
     type Effect = ElevatorEffect;
 
-    #[stef::state(matches(ElevatorEffect::Command(x) => x))]
+    #[stef::state(
+        matches(
+            ElevatorEffect::Command(x) => x,
+            ElevatorEffect::Foo(x) => x.to_string()
+        )
+    )]
     fn go(&mut self, action: String) -> String {
         format!("{}!", action)
     }

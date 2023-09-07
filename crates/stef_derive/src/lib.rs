@@ -86,7 +86,7 @@ impl syn::parse::Parse for Options {
 }
 
 struct MatchPat {
-    var: Ident,
+    var: syn::Expr,
     pat: Pat,
 }
 
@@ -126,7 +126,7 @@ fn state_impl(
 
     struct F {
         f: syn::ImplItemFn,
-        match_pat: Option<MatchPat>,
+        match_pats: Vec<MatchPat>,
         map_with: Option<MapWith>,
     }
 
@@ -178,7 +178,7 @@ fn state_impl(
             syn::ImplItem::Fn(f) => {
                 let span = f.span();
 
-                let mut match_pat = None;
+                let mut match_pats = vec![];
                 let mut map_with = None;
 
                 for attr in f.attrs.iter() {
@@ -189,9 +189,12 @@ fn state_impl(
                             if meta.path.is_ident("matches") {
                                 let content;
                                 syn::parenthesized!(content in meta.input);
-                                let mp: MatchPat =
-                                    content.parse().map_err(|e| syn::Error::new(span, e))?;
-                                match_pat = Some(mp);
+                                while !content.is_empty() {
+                                    let mp: MatchPat =
+                                        content.parse().map_err(|e| syn::Error::new(span, e))?;
+                                    match_pats.push(mp);
+                                    let _: syn::Result<syn::Token![,]> = content.parse();
+                                }
                                 return Ok(());
                             } else if meta.path.is_ident("map_with") {
                                 let content;
@@ -211,7 +214,7 @@ fn state_impl(
 
                 fns.push(F {
                     f,
-                    match_pat,
+                    match_pats,
                     map_with,
                 });
             }
@@ -314,7 +317,7 @@ fn state_impl(
             false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
         };
 
-        let new_block = match (f.map_with.as_ref(), f.match_pat.as_ref()) {
+        let new_block = match (f.map_with.as_ref(), f.match_pats.is_empty()) {
             (Some(mw), _) => {
                 quote! {{
                     use stef::State;
@@ -322,17 +325,23 @@ fn state_impl(
                     #mw(eff)
                 }}
             }
-            (None, Some(MatchPat { var, pat })) => {
+            (None, false) => {
+                let pats = delim::<_, Token!(,)>(
+                    f.match_pats
+                        .iter()
+                        .map(|MatchPat { var, pat }| quote!(#pat => #var)),
+                );
                 quote! {{
                     use stef::State;
                     let eff = self.transition(#arg);
+
                     match eff {
-                        #pat => #var,
+                        #pats,
                         _ => unreachable!("stef::state has a bug in its effect unwrapping logic")
                     }
                 }}
             }
-            (None, None) => {
+            (None, true) => {
                 quote! {{
                     use stef::State;
                     self.transition(#arg)
