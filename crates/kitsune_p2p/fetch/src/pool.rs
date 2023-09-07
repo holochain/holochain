@@ -190,7 +190,8 @@ impl stef::State<'static> for FetchPoolState {
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    fn push(&mut self, args: FetchPoolPush) -> Option<FetchPoolEffect> {
+    #[stef::state( matches( None <=> () ) )]
+    fn push(&mut self, args: FetchPoolPush) -> () {
         let FetchPoolPush {
             key,
             author,
@@ -245,8 +246,6 @@ impl stef::State<'static> for FetchPoolState {
                 }
             }
         }
-
-        None
     }
 
     /// Get the next item to be fetched
