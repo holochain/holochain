@@ -169,7 +169,7 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Bump the crate versions for the release
+      - name: Generate READMEs and bump the crate versions
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         env:
