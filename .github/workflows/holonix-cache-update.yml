@@ -3,7 +3,7 @@ name: "Update Holonix cache"
 on:
   push:
     branches:
-      - main
+      - develop
   workflow_dispatch:
     inputs: { }
 
