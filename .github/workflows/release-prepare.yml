@@ -169,14 +169,6 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Generate crate READMEs from doc comments
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          cd "${HOLOCHAIN_REPO}"
-          nix run .#scripts-ci-generate-readmes
-
       - name: Bump the crate versions for the release
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
