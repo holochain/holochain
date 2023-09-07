@@ -6,18 +6,19 @@ use crate::db::pool::{
     initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, DbSyncLevel,
 };
 use crate::error::{DatabaseError, DatabaseResult};
+use crate::sync::atomic::{AtomicUsize, Ordering};
+use crate::sync::Mutex;
 use derive_more::Into;
-use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::PathBuf;
+// Does not use crate::sync::Arc because tokio::sync::Semaphore::acquire_owned requires a std::sync::Arc<Self>
 use std::sync::Arc;
 use std::time::Instant;
 use std::{collections::HashMap, path::Path};
-use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
+static ACQUIRE_TIMEOUT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(10_000);
 
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that

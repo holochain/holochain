@@ -3098,6 +3098,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
+ "lazy_static",
  "loom",
  "nanoid 0.4.0",
  "num_cpus",
@@ -4443,9 +4444,9 @@ dependencies = [
 
 [[package]]
 name = "loom"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce9394216e2be01e607cf9e9e2b64c387506df1e768b14cbd2854a3650c3c03e"
+checksum = "86a17963e5073acf8d3e2637402657c6b467218f36fe10d696b3e1095ae019bf"
 dependencies = [
  "cfg-if 1.0.0",
  "generator",

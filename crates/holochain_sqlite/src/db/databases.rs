@@ -1,7 +1,7 @@
 use crate::db::access::DbWrite;
 use crate::db::kind::DbKindT;
 use crate::prelude::*;
-use once_cell::sync::Lazy;
+use crate::sync::lazy_static;
 use std::{
     any::Any,
     collections::HashMap,
@@ -13,30 +13,36 @@ pub(super) struct Databases {
     dbs: parking_lot::RwLock<HashMap<PathBuf, Box<dyn Any + Send + Sync>>>,
 }
 
-pub(super) static DATABASE_HANDLES: Lazy<Databases> = Lazy::new(|| {
-    // This is just a convenient place that we know gets initialized
-    // both in the final binary holochain && in all relevant tests
-    //
-    // Holochain (and most binaries) are left in invalid states
-    // if a thread panic!s - switch to failing fast in that case.
-    //
-    // We tried putting `panic = "abort"` in the Cargo.toml,
-    // but somehow that breaks the wasmer / test_utils integration.
+lazy_static! {
+    pub(super) static ref DATABASE_HANDLES: Databases = {
+        // This is just a convenient place that we know gets initialized
+        // both in the final binary holochain && in all relevant tests
+        //
+        // Holochain (and most binaries) are left in invalid states
+        // if a thread panic!s - switch to failing fast in that case.
+        //
+        // We tried putting `panic = "abort"` in the Cargo.toml,
+        // but somehow that breaks the wasmer / test_utils integration.
 
-    let orig_handler = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic_info| {
-        // print the panic message
-        eprintln!("FATAL PANIC {:#?}", panic_info);
-        // invoke the original handler
-        orig_handler(panic_info);
-        // // Abort the process
-        // // TODO - we need a better solution than this, but if there is
-        // // no better solution, we can uncomment the following line:
-        // std::process::abort();
-    }));
+        // This causes problems for loom leading to a panic in generator/yield_.rs
+        #[cfg(not(loom))]
+        {
+            let orig_handler = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |panic_info| {
+                // print the panic message
+                eprintln!("FATAL PANIC {:#?}", panic_info);
+                // invoke the original handler
+                orig_handler(panic_info);
+                // // Abort the process
+                // // TODO - we need a better solution than this, but if there is
+                // // no better solution, we can uncomment the following line:
+                // std::process::abort();
+            }));
+        }
 
-    Databases::new()
-});
+        Databases::new()
+    };
+}
 
 impl Databases {
     /// Create a new database map.

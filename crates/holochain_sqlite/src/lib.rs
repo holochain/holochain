@@ -20,6 +20,7 @@ pub mod stats;
 pub mod store;
 pub mod swansong;
 
+mod sync;
 mod table;
 
 // Re-export rusqlite for use with `impl_to_sql_via_as_ref!` macro
