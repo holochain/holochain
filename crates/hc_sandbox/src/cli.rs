@@ -144,16 +144,13 @@ impl HcSandbox {
                     let holochain_path = self.holochain_path.clone();
                     let force_admin_ports = self.force_admin_ports.clone();
                     let structured = self.structured.clone();
-                    tokio::task::spawn(async move {
-                        if let Err(e) =
-                            run_n(&holochain_path, paths, ports, force_admin_ports, structured)
-                                .await
-                        {
-                            tracing::error!(failed_to_run = ?e);
-                        }
-                    });
-                    tokio::signal::ctrl_c().await?;
+
+                    let result = tokio::select! {
+                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                        result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
+                    };
                     crate::save::release_ports(std::env::current_dir()?).await?;
+                    return result;
                 }
             }
             HcSandboxSubcommand::Run(Run { ports, existing }) => {
@@ -165,23 +162,12 @@ impl HcSandbox {
                 let holochain_path = self.holochain_path.clone();
                 let force_admin_ports = self.force_admin_ports.clone();
 
-                tokio::select! {
-                    _ = tokio::signal::ctrl_c() => {},
-                    _ = tokio::task::spawn(async move {
-                        if let Err(e) = run_n(
-                            &holochain_path,
-                            paths,
-                            ports,
-                            force_admin_ports,
-                            self.structured,
-                        )
-                        .await
-                        {
-                            tracing::error!(failed_to_run = ?e);
-                        }
-                    }) => {},
+                let result = tokio::select! {
+                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                    result = run_n(&holochain_path, paths, ports, force_admin_ports, self.structured) => result,
                 };
                 crate::save::release_ports(std::env::current_dir()?).await?;
+                return result;
             }
             HcSandboxSubcommand::Call(call) => {
                 crate::calls::call(&self.holochain_path, call, self.structured).await?
