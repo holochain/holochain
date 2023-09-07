@@ -3,6 +3,7 @@ use crate::wire;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::{dht, KOpData, KSpace};
 
+#[derive(Clone)]
 pub struct FetchResponseConfig(KitsuneP2pTuningParams);
 
 impl FetchResponseConfig {

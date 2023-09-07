@@ -69,9 +69,6 @@ impl Store {
                         if i.expires_at_ms <= now {
                             return None;
                         }
-                        if i.url_list.is_empty() {
-                            return None;
-                        }
                         let mut buf = Vec::new();
                         match rmp_encode(&mut buf, i) {
                             Ok(_) => Some(buf),

@@ -1,10 +1,11 @@
 use super::*;
 use crate::test_util::data::mk_agent_info;
-use crate::KitsuneHostDefaultError;
+use crate::{KitsuneBinType, KitsuneHostDefaultError};
 use futures::FutureExt;
 use kitsune_p2p_block::{Block, BlockTarget, BlockTargetId};
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::bin_types::KitsuneOpHash;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -185,7 +186,19 @@ impl KitsuneHost for HostStub {
     }
 
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
-        KitsuneHostDefaultError::op_hash(&self.err, op_data)
+        if let Ok(true) =
+            self.fail_next_request
+                .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            return KitsuneHostDefaultError::op_hash(&self.err, op_data);
+        }
+
+        async move {
+            // Probably not important but we could compute a real hash here if a test needs it
+            Ok(Arc::new(KitsuneOpHash::new(vec![0; 36])))
+        }
+        .boxed()
+        .into()
     }
 
     fn check_op_data(

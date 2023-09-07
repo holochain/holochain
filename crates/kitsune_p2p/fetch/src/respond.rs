@@ -13,7 +13,7 @@ impl FetchResponseGuard {
 }
 
 /// Customization by code making use of the FetchResponseQueue.
-pub trait FetchResponseConfig: 'static + Send + Sync {
+pub trait FetchResponseConfig: 'static + Clone + Send + Sync {
     /// Data that is forwarded.
     type User: 'static + Send;
 
@@ -40,10 +40,14 @@ pub trait FetchResponseConfig: 'static + Send + Sync {
 }
 
 /// Manage responding to requests for data.
+#[derive(Clone)]
 pub struct FetchResponseQueue<C: FetchResponseConfig> {
     byte_limit: Arc<tokio::sync::Semaphore>,
     concurrent_send_limit: Arc<tokio::sync::Semaphore>,
     config: Arc<C>,
+    /// For testing, track the number of bytes sent.
+    #[cfg(feature = "test_utils")]
+    pub bytes_sent: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl<C: FetchResponseConfig> FetchResponseQueue<C> {
@@ -58,6 +62,8 @@ impl<C: FetchResponseConfig> FetchResponseQueue<C> {
             byte_limit,
             concurrent_send_limit,
             config,
+            #[cfg(feature = "test_utils")]
+            bytes_sent: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
     }
 
@@ -83,6 +89,10 @@ impl<C: FetchResponseConfig> FetchResponseQueue<C> {
             }
             Ok(permit) => permit,
         };
+
+        #[cfg(feature = "test_utils")]
+        self.bytes_sent
+            .fetch_add(len as usize, std::sync::atomic::Ordering::SeqCst);
 
         let c_limit = self.concurrent_send_limit.clone();
         let config = self.config.clone();
@@ -159,6 +169,7 @@ mod tests {
 
     #[test]
     fn config_provides_defaults() {
+        #[derive(Clone)]
         struct DefaultConf;
         impl FetchResponseConfig for DefaultConf {
             type User = ();
