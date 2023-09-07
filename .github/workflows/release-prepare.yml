@@ -188,10 +188,10 @@ jobs:
 
           cd ${HOLOCHAIN_REPO}
 
-          nix run .#cargo-sweep -s
-          nix run .#scripts-release-automation-check-and-bump $PWD
+          nix run .#cargo-sweep -- -s
+          nix run .#scripts-release-automation-check-and-bump -- $PWD
           nix run .#scripts-ci-generate-readmes
-          nix run .#cargo-sweep -f
+          nix run .#cargo-sweep -- -f
 
           if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
             echo "releasable_crates=true" >> $GITHUB_OUTPUT
