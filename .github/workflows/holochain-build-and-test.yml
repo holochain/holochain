@@ -14,9 +14,6 @@ on:
         type: boolean
         default: false
     secrets:
-      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI:
-        description: "The Cachix token for `holochain-ci` to be used for caching Holonix"
-        required: true
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
         description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
         required: true
@@ -114,49 +111,3 @@ jobs:
           #   export basecmd="nix run -L --show-trace .#packages.${system}."
           #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
           # fi
-
-  # ensures the cache is regularly updated for the supported versions on multiple platforms
-  cache-update:
-    strategy:
-      fail-fast: false
-      matrix:
-        cmd:
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
-        platform:
-          - system: x86_64-darwin
-          - system: aarch64-darwin
-          - system: x86_64-linux
-
-    runs-on: [ self-hosted, multi-arch ]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          lfs: false
-
-      - name: Print matrix
-        env:
-          MATRIX: ${{ toJSON(matrix) }}
-        run: echo ${MATRIX}
-
-      - name: "Cache packages ${{ join(matrix.cmd.pkgs, ',') }}"
-        env:
-          system: ${{ matrix.platform.system }}
-          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
-          CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI }}"
-        run: |
-          set -xe
-
-          # See https://docs.cachix.org/pushing#id1
-          nix build -L \
-            ${{ matrix.cmd.extra_arg }} \
-            .#devShells.${system}.build-holonix-tests-integration
-
-          # Don't exit if this fails so we can clean up the profile
-          for i in result*; do
-            cachix push holochain-ci $i || true
-          done
-          
-          rm result*
