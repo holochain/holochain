@@ -102,7 +102,6 @@ jobs:
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
           
           # Don't exit if this fails so we can clean up the profile
-          
           for i in result*; do
             cachix push holochain-ci-internal $i || true
           done
@@ -150,15 +149,10 @@ jobs:
         run: |
           set -xe
 
-          # if a nix store path was passed, ensure it exists locally
-          if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
-            nix-store --realise ${{inputs.repo_path }}
-          fi
-
           # See https://docs.cachix.org/pushing#id1
           nix build -L \
             ${{ matrix.cmd.extra_arg }} \
-            .#devShells.${system}.holonix
+            .#devShells.${system}.build-holonix-tests-integration
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
