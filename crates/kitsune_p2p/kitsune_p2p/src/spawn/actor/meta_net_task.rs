@@ -585,6 +585,9 @@ impl MetaNetTask {
                                     tracing::error!(?err, "Failed to receive op");
                                 }
                             }
+
+                            // In the case of an error we don't want to attempt to `resolve_publish_pending_delegates`
+                            continue;
                         }
 
                         // trigger any delegation that is pending on having this data
