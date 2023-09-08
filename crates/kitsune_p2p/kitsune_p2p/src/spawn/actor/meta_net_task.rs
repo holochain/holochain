@@ -2040,7 +2040,7 @@ mod tests {
 
         // and also a successful op push
         tokio::time::timeout(Duration::from_millis(1000), async {
-            while !fetch_pool.is_empty() {
+            while !fetch_pool.is_empty() || host_receiver_stub.receive_ops_calls.read().is_empty() {
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         })
@@ -2110,7 +2110,7 @@ mod tests {
 
         // and also a successful op push
         tokio::time::timeout(Duration::from_millis(1000), async {
-            while !fetch_pool.is_empty() {
+            while !fetch_pool.is_empty() || host_receiver_stub.receive_ops_calls.read().is_empty() {
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
         })
