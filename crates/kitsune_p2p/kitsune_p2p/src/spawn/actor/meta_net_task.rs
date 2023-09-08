@@ -84,15 +84,10 @@ impl MetaNetTask {
                 let ep_evt_run = ep_evt.for_each_concurrent(
                     tuning_params.concurrent_limit_per_thread,
                     move |event| {
-                        let evt_sender = this.evt_sender.clone();
-                        let host = this.host.clone();
-                        let i_s = this.i_s.clone();
                         let this = this.clone();
                         let shutdown_notify = shutdown_notify_send.clone();
 
                         async move {
-                            let evt_sender = &evt_sender;
-
                             if let Err(MetaNetTaskError::RequiredChannelClosed) = match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     this.handle_connect(remote_url, con).await
@@ -1205,7 +1200,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_publish_handles_shutdown() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, met_net_task_finished) =
+        let (mut ep_evt_send, _, internal_sender, _, _, _, _, met_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -1420,7 +1415,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_user_handles_shutdown() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, meta_net_task_finished) =
+        let (mut ep_evt_send, _, internal_sender, _, _, _, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -1535,7 +1530,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_publish_handles_shutdown() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, meta_net_task_finished) =
+        let (mut ep_evt_send, _, internal_sender, _, _, _, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -1639,16 +1634,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_user_handles_shutdown() {
-        let (
-            mut ep_evt_send,
-            _,
-            internal_sender,
-            host_receiver_stub,
-            _,
-            _,
-            _,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
 
         host_receiver_stub.abort();
 
@@ -1745,7 +1732,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_agent_info_handles_shutdown() {
-        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, meta_net_task_finished) =
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, meta_net_task_finished) =
             setup().await;
 
         host_receiver_stub.abort();
@@ -1851,7 +1838,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_gossip_handles_shutdown() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, meta_net_task_finished) =
+        let (mut ep_evt_send, _, internal_sender, _, _, _, _, meta_net_task_finished) =
             setup().await;
 
         internal_sender
@@ -1949,16 +1936,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_fetch_op_handles_shutdown() {
-        let (
-            mut ep_evt_send,
-            _,
-            _,
-            host_receiver_stub,
-            _,
-            fetch_response_queue,
-            _,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
 
         host_receiver_stub.abort();
 
@@ -2074,8 +2053,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, host_stub, _, fetch_pool, _) =
-            setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
         host_receiver_stub
             .respond_with_error
@@ -2175,16 +2153,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_handles_shutdown_on_resolve() {
-        let (
-            mut ep_evt_send,
-            _,
-            internal_sender,
-            host_receiver_stub,
-            _,
-            _,
-            fetch_pool,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, internal_sender, _, _, _, fetch_pool, meta_net_task_finished) =
+            setup().await;
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
         assert_eq!(1, fetch_pool.len());
@@ -2216,7 +2186,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_peer_unsolicited() {
-        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, fetch_pool, _) = setup().await;
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, _) = setup().await;
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -2246,16 +2216,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_peer_unsolicited_fails_independently() {
-        let (
-            mut ep_evt_send,
-            _,
-            _,
-            mut host_receiver_stub,
-            _,
-            _,
-            fetch_pool,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
 
         // Set up an error for the first call
         host_receiver_stub
@@ -2291,16 +2253,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_peer_unsolicited_handles_shutdown() {
-        let (
-            mut ep_evt_send,
-            _,
-            _,
-            mut host_receiver_stub,
-            _,
-            _,
-            fetch_pool,
-            meta_net_task_finished,
-        ) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
 
         host_receiver_stub.abort();
 
