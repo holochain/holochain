@@ -13,13 +13,8 @@ edition = "2021"
 
 [dependencies]
 derive_more = "0.99"
-futures = "0.3"
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.8", path = "../types" }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.1", path = "../timestamp", features = ["now"]}
-must_future = "0.1"
-num-traits = "0.2.14"
 serde = { version = "1.0", features = [ "derive" ] }
-serde_bytes = "0.11"
 tokio = { version = "1.27", features = [ "full" ] }
 tracing = "0.1.29"
 linked-hash-map = "0.5.6"
@@ -28,9 +23,9 @@ human-repr = { version = "1", optional = true}
 
 [dev-dependencies]
 kitsune_p2p_fetch = { path = ".", features = ["test_utils", "sqlite"]}
-holochain_serialized_bytes = "0.0.51"
+holochain_serialized_bytes = "0.0.52"
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../../holochain_trace" }
-pretty_assertions = "0.7.2"
+pretty_assertions = "1.4.0"
 test-case = "1.2"
 tokio = { version = "1.27", features = [ "full", "test-util" ] }
 arbitrary = "1"
@@ -40,10 +35,8 @@ rand = "0.8.5"
 test_utils = ["human-repr"]
 default = ["test_utils"]
 sqlite-encrypted = [
-    "kitsune_p2p_timestamp/sqlite-encrypted",
     "kitsune_p2p_types/sqlite-encrypted",
 ]
 sqlite = [
-    "kitsune_p2p_timestamp/sqlite",
     "kitsune_p2p_types/sqlite",
 ]
