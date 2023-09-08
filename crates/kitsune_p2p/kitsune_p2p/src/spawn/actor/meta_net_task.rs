@@ -639,14 +639,12 @@ impl MetaNetTask {
                     {
                         tracing::warn!(?err, "error processing incoming agent info unsolicited");
 
-                        match err {
+                        return match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                return Err(MetaNetTaskError::RequiredChannelClosed);
+                                Err(MetaNetTaskError::RequiredChannelClosed)
                             }
-                            _ => {
-                                // Ignore other errors
-                            }
-                        }
+                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
+                        };
                     }
                 }
 
