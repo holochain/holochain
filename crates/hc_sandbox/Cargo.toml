@@ -42,3 +42,10 @@ assert_cmd = "1.0.1"
 matches = "0.1"
 escargot = "0.5.7"
 which = "4.4.0"
+
+[features]
+
+chc = [
+    "holochain_types/chc",
+    "holochain_conductor_api/chc",
+]

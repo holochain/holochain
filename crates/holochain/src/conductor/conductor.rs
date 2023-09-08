@@ -1348,13 +1348,18 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
+            #[cfg(feature = "chc")]
+            let ignore_genesis_failure = payload.ignore_genesis_failure;
+            #[cfg(not(feature = "chc"))]
+            let ignore_genesis_failure = false;
+
             let InstallAppPayload {
                 source,
                 agent_key,
                 installed_app_id,
                 membrane_proofs,
                 network_seed,
-                ignore_genesis_failure,
+                ..
             } = payload;
 
             let bundle = {
