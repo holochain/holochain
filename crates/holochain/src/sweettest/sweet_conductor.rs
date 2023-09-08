@@ -8,8 +8,8 @@ use super::{
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
-    CellError, Conductor, ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
+    Conductor, ConductorBuilder,
 };
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
@@ -41,7 +41,6 @@ pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
-    pub(crate) spaces: Spaces,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -111,18 +110,6 @@ impl SweetConductor {
         // Get a stream of all signals since conductor startup
         let signal_stream = handle.signal_broadcaster().subscribe_merged();
 
-        // XXX: this is a bit wonky.
-        // We create a Spaces instance here purely because it's easier to initialize
-        // the per-space databases this way. However, we actually use the TestEnvs
-        // to actually access those databases.
-        // As a TODO, we can remove the need for TestEnvs in sweettest or have
-        // some other better integration between the two.
-        let spaces = Spaces::new(&ConductorConfig {
-            environment_path: env_dir.to_path_buf().into(),
-            ..Default::default()
-        })
-        .unwrap();
-
         let keystore = handle.keystore().clone();
 
         let mut rng = rand::thread_rng();
@@ -132,7 +119,6 @@ impl SweetConductor {
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
-            spaces,
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
@@ -344,7 +330,9 @@ impl SweetConductor {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
             // Initialize per-space databases
-            let _space = self.spaces.get_or_create_space(&dna_hash)?;
+            if let Some(handle) = self.handle.as_ref() {
+                handle.spaces.get_or_create_space(&dna_hash)?;
+            }
 
             // Create and add the SweetCell
             sweet_cells.push(self.get_sweet_cell(CellId::new(dna_hash, agent.clone()))?);
