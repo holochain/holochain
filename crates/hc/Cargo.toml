@@ -28,3 +28,9 @@ holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.3.0-beta-dev.16"
 holochain_cli_run_local_services = { path = "../hc_run_local_services", version = "^0.3.0-beta-dev.8"}
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
 tokio = { version = "1.27", features = ["full"] }
+
+[features]
+
+chc = [
+    "holochain_cli_sandbox/chc"
+]
