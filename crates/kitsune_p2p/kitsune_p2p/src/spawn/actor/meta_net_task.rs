@@ -34,11 +34,11 @@ pub struct MetaNetTask {
 
 #[derive(thiserror::Error, Debug)]
 enum MetaNetTaskError {
-    #[error("Ghost actor closed")]
-    GhostActorClosed,
+    #[error("A required channel has closed")]
+    RequiredChannelClosed,
 
-    #[error("This error should be ignored")]
-    Ignored,
+    #[error("Ignored error: {0}")]
+    Ignored(Box<dyn Error>),
 }
 
 type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
@@ -96,14 +96,14 @@ impl MetaNetTask {
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     // TODO can this match be shared once everything is tested?
-                                    if let Err(MetaNetTaskError::GhostActorClosed) =
+                                    if let Err(MetaNetTaskError::RequiredChannelClosed) =
                                         this.handle_connect(remote_url, con).await
                                     {
                                         shutdown_notify.notify_one();
                                     }
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
-                                    if let Err(MetaNetTaskError::GhostActorClosed) =
+                                    if let Err(MetaNetTaskError::RequiredChannelClosed) =
                                         this.handle_disconnect(remote_url).await
                                     {
                                         shutdown_notify.notify_one();
@@ -115,7 +115,7 @@ impl MetaNetTask {
                                     data,
                                     respond,
                                 } => {
-                                    if let Err(MetaNetTaskError::GhostActorClosed) =
+                                    if let Err(MetaNetTaskError::RequiredChannelClosed) =
                                         this.handle_request(con, data, respond).await
                                     {
                                         shutdown_notify.notify_one();
@@ -126,7 +126,7 @@ impl MetaNetTask {
                                     con,
                                     data,
                                 } => {
-                                    if let Err(MetaNetTaskError::GhostActorClosed) =
+                                    if let Err(MetaNetTaskError::RequiredChannelClosed) =
                                         this.handle_notify(url, con, data).await
                                     {
                                         shutdown_notify.notify_one();
@@ -159,9 +159,9 @@ impl MetaNetTask {
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {
         match self.i_s.new_con(remote_url, con.clone()).await {
             Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                Err(MetaNetTaskError::GhostActorClosed)
+                Err(MetaNetTaskError::RequiredChannelClosed)
             }
-            Err(_) => Err(MetaNetTaskError::Ignored),
+            Err(e) => Err(MetaNetTaskError::Ignored(Box::new(e))),
             Ok(_) => Ok(()),
         }
     }
@@ -169,9 +169,9 @@ impl MetaNetTask {
     async fn handle_disconnect(&self, remote_url: String) -> MetaNetTaskResult<()> {
         match self.i_s.del_con(remote_url).await {
             Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                Err(MetaNetTaskError::GhostActorClosed)
+                Err(MetaNetTaskError::RequiredChannelClosed)
             }
-            Err(_) => Err(MetaNetTaskError::Ignored),
+            Err(e) => Err(MetaNetTaskError::Ignored(Box::new(e))),
             Ok(_) => Ok(()),
         }
     }
@@ -257,9 +257,9 @@ impl MetaNetTask {
 
                 return Err(match err {
                     KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                        MetaNetTaskError::GhostActorClosed
+                        MetaNetTaskError::RequiredChannelClosed
                     }
-                    _ => MetaNetTaskError::Ignored,
+                    e => MetaNetTaskError::Ignored(Box::new(e)),
                 });
             }
             Ok(r) => r,
@@ -350,9 +350,9 @@ impl MetaNetTask {
 
                         match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::GhostActorClosed)
+                                Err(MetaNetTaskError::RequiredChannelClosed)
                             }
-                            _ => Err(MetaNetTaskError::Ignored),
+                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                         }
                     } else {
                         Ok(())
@@ -373,9 +373,9 @@ impl MetaNetTask {
 
                         match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::GhostActorClosed)
+                                Err(MetaNetTaskError::RequiredChannelClosed)
                             }
-                            _ => Err(MetaNetTaskError::Ignored),
+                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                         }
                     } else {
                         Ok(())
@@ -395,9 +395,9 @@ impl MetaNetTask {
 
                         match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::GhostActorClosed)
+                                Err(MetaNetTaskError::RequiredChannelClosed)
                             }
-                            _ => Err(MetaNetTaskError::Ignored),
+                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                         }
                     } else {
                         Ok(())
@@ -418,9 +418,9 @@ impl MetaNetTask {
 
                         match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::GhostActorClosed)
+                                Err(MetaNetTaskError::RequiredChannelClosed)
                             }
-                            _ => Err(MetaNetTaskError::Ignored),
+                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                         }
                     } else {
                         Ok(())
@@ -440,9 +440,9 @@ impl MetaNetTask {
 
                         match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::GhostActorClosed)
+                                Err(MetaNetTaskError::RequiredChannelClosed)
                             }
-                            _ => Err(MetaNetTaskError::Ignored),
+                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                         }
                     } else {
                         Ok(())
@@ -465,9 +465,9 @@ impl MetaNetTask {
 
                     match err {
                         KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                            Err(MetaNetTaskError::GhostActorClosed)
+                            Err(MetaNetTaskError::RequiredChannelClosed)
                         }
-                        _ => Err(MetaNetTaskError::Ignored),
+                        e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                     }
                 } else {
                     Ok(())
@@ -524,7 +524,7 @@ impl MetaNetTask {
                                 }
                             }
                             Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                                return Err(MetaNetTaskError::GhostActorClosed)
+                                return Err(MetaNetTaskError::RequiredChannelClosed)
                             }
                             _ => {
                                 // Ignore other errors
@@ -552,7 +552,7 @@ impl MetaNetTask {
                                 }
                             }
                             Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                                return Err(MetaNetTaskError::GhostActorClosed)
+                                return Err(MetaNetTaskError::RequiredChannelClosed)
                             }
                             _ => {
                                 // Ignore other errors
@@ -603,7 +603,7 @@ impl MetaNetTask {
                         {
                             match err {
                                 KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                    return Err(MetaNetTaskError::GhostActorClosed)
+                                    return Err(MetaNetTaskError::RequiredChannelClosed)
                                 }
                                 err => {
                                     tracing::error!(?err, "Failed to receive op");
@@ -619,7 +619,7 @@ impl MetaNetTask {
                         {
                             match err {
                                 KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                    return Err(MetaNetTaskError::GhostActorClosed);
+                                    return Err(MetaNetTaskError::RequiredChannelClosed);
                                 }
                                 err => {
                                     tracing::error!(
@@ -640,9 +640,9 @@ impl MetaNetTask {
 
                     match err {
                         KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                            Err(MetaNetTaskError::GhostActorClosed)
+                            Err(MetaNetTaskError::RequiredChannelClosed)
                         }
-                        _ => Err(MetaNetTaskError::Ignored),
+                        e => Err(MetaNetTaskError::Ignored(Box::new(e))),
                     }
                 } else {
                     Ok(())
@@ -662,7 +662,7 @@ impl MetaNetTask {
 
                         match err {
                             KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                return Err(MetaNetTaskError::GhostActorClosed);
+                                return Err(MetaNetTaskError::RequiredChannelClosed);
                             }
                             _ => {
                                 // Ignore other errors
@@ -681,7 +681,7 @@ impl MetaNetTask {
             | wire::Wire::PeerQuery(_)
             | wire::Wire::PeerQueryResp(_) => {
                 tracing::warn!("received non-notify data in a notify");
-                Err(MetaNetTaskError::Ignored)
+                Ok(())
             }
         }
     }
@@ -760,15 +760,7 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !meta_net_task_finished.load(Ordering::Acquire) {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for task to shut down");
-
-        assert!(meta_net_task_finished.load(Ordering::Acquire));
+        wait_and_assert_shutdown(meta_net_task_finished).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -836,15 +828,7 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !meta_net_task_finished.load(Ordering::Acquire) {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for task to shut down");
-
-        assert!(meta_net_task_finished.load(Ordering::Acquire));
+        wait_and_assert_shutdown(meta_net_task_finished).await;
     }
 
     // TODO no disconnect event is sent if the connection is force closed by us.
@@ -1219,6 +1203,39 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_delegate_broadcast_publish_handles_shutdown() {
+        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, met_net_task_finished) =
+            setup().await;
+
+        internal_sender
+            .ghost_actor_shutdown_immediate()
+            .await
+            .unwrap();
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
+                    space: test_space(1),
+                    basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
+                    to_agent: test_agent(2),
+                    mod_idx: 0,
+                    mod_cnt: 0,
+                    data: BroadcastData::Publish {
+                        source: test_agent(5),
+                        op_hash_list: vec![],
+                        context: Default::default(),
+                    },
+                }),
+            })
+            .await
+            .unwrap();
+
+        wait_and_assert_shutdown(met_net_task_finished).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_user() {
         let (mut ep_evt_send, internal_stub, _, _, _, _, _, _) = setup().await;
 
@@ -1399,6 +1416,35 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_delegate_broadcast_user_handles_shutdown() {
+        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, meta_net_task_finished) =
+            setup().await;
+
+        internal_sender
+            .ghost_actor_shutdown_immediate()
+            .await
+            .unwrap();
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
+                    space: test_space(1),
+                    basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
+                    to_agent: test_agent(2),
+                    mod_idx: 0,
+                    mod_cnt: 0,
+                    data: BroadcastData::User(test_agent(5).to_vec()),
+                }),
+            })
+            .await
+            .unwrap();
+
+        wait_and_assert_shutdown(meta_net_task_finished).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_publish() {
         let (mut ep_evt_send, internal_stub, _, _, _, _, _, _) = setup().await;
 
@@ -1484,6 +1530,36 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_publish_handles_shutdown() {
+        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, meta_net_task_finished) =
+            setup().await;
+
+        internal_sender
+            .ghost_actor_shutdown_immediate()
+            .await
+            .unwrap();
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::Publish {
+                        source: test_agent(5),
+                        op_hash_list: vec![],
+                        context: Default::default(),
+                    },
+                }),
+            })
+            .await
+            .unwrap();
+
+        wait_and_assert_shutdown(meta_net_task_finished).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_broadcast_user() {
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, _, _) = setup().await;
 
@@ -1553,6 +1629,37 @@ mod tests {
         );
         assert!(host_receiver_stub.notify_calls.read().is_empty());
         assert!(!meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_user_handles_shutdown() {
+        let (
+            mut ep_evt_send,
+            _,
+            internal_sender,
+            host_receiver_stub,
+            _,
+            _,
+            _,
+            meta_net_task_finished,
+        ) = setup().await;
+
+        host_receiver_stub.abort();
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::User(test_agent(5).to_vec()),
+                }),
+            })
+            .await
+            .unwrap();
+
+        wait_and_assert_shutdown(meta_net_task_finished).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1627,6 +1734,29 @@ mod tests {
             .read()
             .is_empty());
         assert!(!meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_notify_broadcast_agent_info_handles_shutdown() {
+        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, meta_net_task_finished) =
+            setup().await;
+
+        host_receiver_stub.abort();
+
+        ep_evt_send
+            .send(MetaNetEvt::Notify {
+                remote_url: "".to_string(),
+                con: mk_test_con(),
+                data: wire::Wire::Broadcast(wire::Broadcast {
+                    space: test_space(1),
+                    to_agent: test_agent(2),
+                    data: BroadcastData::AgentInfo(mk_agent_info(6).await),
+                }),
+            })
+            .await
+            .unwrap();
+
+        wait_and_assert_shutdown(meta_net_task_finished).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -2034,6 +2164,18 @@ mod tests {
             .await
             .expect("Timed out while waiting for a response")
             .unwrap()
+    }
+
+    async fn wait_and_assert_shutdown(meta_net_task_finished: Arc<AtomicBool>) {
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while !meta_net_task_finished.load(Ordering::Acquire) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("Timed out waiting for shutdown");
+
+        assert!(meta_net_task_finished.load(Ordering::Acquire));
     }
 
     fn mk_test_con() -> MetaNetCon {
