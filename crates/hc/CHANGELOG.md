@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds `chc` feature which is recommended if you want to work with a Holochain instance that is built with its `chc` feature.
+  If you are not using CHC you can safely ignore this feature.
+
+## 0.3.0-beta-dev.16
+
 ## 0.3.0-beta-dev.15
 
 ## 0.3.0-beta-dev.14

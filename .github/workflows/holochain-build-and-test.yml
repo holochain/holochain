@@ -8,11 +8,20 @@ on:
         required: false
         type: string
         default: "."
+      fail_fast:
+        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
+        description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
+        required: true
 
 jobs:
-  "test":
+  test:
     strategy:
-      fail-fast: false
+      fail-fast: ${{ inputs.fail_fast }}
       matrix:
         cmd:
           # ensure functionality on multiple platforms
@@ -21,13 +30,13 @@ jobs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
-          # ensures to keep the cache populated for the supported versions on multiple platforms
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2"
+          # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/0_1"
+          - pkgs:
+              - build-holonix-tests-integration
+            extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly"
@@ -41,10 +50,17 @@ jobs:
           - cmd:
               pkgs:
                 - build-holochain-build-crates-standalone
-                - build-release-automation-tests
-                - build-release-automation-tests-repo
                 - build-holochain-tests-static-all
-              extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
+                - build-release-automation-tests-unit
+              extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
+            platform:
+              system: x86_64-linux
+
+          # TODO: can this be skipped during a release run because it duplicates the release-prepare job?
+          - cmd:
+              pkgs:
+                - build-release-automation-tests-repo
+              extra_arg: "--override-input repo-git 'path:.git'"
             platform:
               system: x86_64-linux
 
@@ -61,12 +77,16 @@ jobs:
           MATRIX: ${{ toJSON(matrix) }}
         run: echo ${MATRIX}
 
-      - name: "Test command ${{ matrix.nixCommand }}"
+      - name: "Test command ${{ join(matrix.cmd.pkgs, ',') }}"
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          # TODO Want to be able to choose between internal/external when building external PRs
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
         run: |
           set -xe
+
+          git status
 
           # if a nix store path was passed, ensure it exists locally
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
@@ -77,10 +97,10 @@ jobs:
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
-
-          # TODO: remove this once we've implemented all tests and know that we don't need it
-          # if there's something to run we generate separate commands
-          # if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
-          #   export basecmd="nix run -L --show-trace .#packages.${system}."
-          #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
-          # fi
+          
+          # Don't exit if this fails so we can clean up the profile
+          for i in result*; do
+            cachix push holochain-ci-internal $i || true
+          done
+          
+          rm result*

@@ -2,11 +2,11 @@
 
 use crate::prelude::*;
 use crate::sql::*;
-use holochain_zome_types::many_bytes_string;
-use kitsune_p2p_bin_data::KitsuneAgent;
-use kitsune_p2p_dht_arc::DhtArcRange;
-use kitsune_p2p_dht_arc::DhtArcSet;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use holochain_util::hex::many_bytes_string;
+use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::dht_arc::DhtArcRange;
+use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::KitsuneAgent;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;
