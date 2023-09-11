@@ -960,6 +960,35 @@ where
         Ok(links.len())
     }
 
+    fn merge_agent_activity_responses(
+        acc: (MustGetAgentActivityResponse, Option<ChainFilterRange>),
+        next: &(MustGetAgentActivityResponse, Option<ChainFilterRange>),
+    ) -> (MustGetAgentActivityResponse, Option<ChainFilterRange>) {
+        match (&acc, next) {
+            ((_, None), (_, Some(_))) => next.clone(),
+            (
+                (MustGetAgentActivityResponse::Activity(responses), chain_filter),
+                (MustGetAgentActivityResponse::Activity(more_responses), other_chain_filter),
+            ) => {
+                if chain_filter == other_chain_filter {
+                    let mut merged_responses = responses.clone();
+                    merged_responses.extend(more_responses.to_owned());
+                    let mut merged_activity =
+                        MustGetAgentActivityResponse::Activity(merged_responses);
+                    merged_activity.normalize();
+                    (merged_activity, chain_filter.clone())
+                }
+                // If the chain filters disagree on what the filter is we
+                // have a problem.
+                else {
+                    (MustGetAgentActivityResponse::IncompleteChain, None)
+                }
+            }
+            ((MustGetAgentActivityResponse::Activity(_), _), _) => acc,
+            _ => next.clone(),
+        }
+    }
+
     /// Request a hash bounded chain query.
     pub async fn must_get_agent_activity(
         &self,
@@ -993,39 +1022,10 @@ where
         })
             .await??;
 
-        let mut merged_results = (MustGetAgentActivityResponse::EmptyRange, None);
-
-        for result in &results {
-            match (&merged_results, result) {
-                ((_, None), (_, Some(_))) => {
-                    merged_results = result.to_owned();
-                }
-                (
-                    (MustGetAgentActivityResponse::Activity(responses), chain_filter),
-                    (MustGetAgentActivityResponse::Activity(more_responses), other_chain_filter),
-                ) => {
-                    if chain_filter == other_chain_filter {
-                        let mut merged_responses = responses.clone();
-                        merged_responses.extend(more_responses.to_owned());
-                        let mut merged_activity =
-                            MustGetAgentActivityResponse::Activity(merged_responses);
-                        merged_activity.normalize();
-                        merged_results = (merged_activity, chain_filter.clone());
-                    }
-                    // If the chain filters disagree on what the filter is we
-                    // have a problem.
-                    else {
-                        merged_results = (MustGetAgentActivityResponse::IncompleteChain, None);
-                    }
-                }
-                ((MustGetAgentActivityResponse::Activity(_), _), _) => {
-                    // Noop.
-                }
-                _ => {
-                    merged_results = result.to_owned();
-                }
-            }
-        }
+        let merged_results = results.iter().fold(
+            (MustGetAgentActivityResponse::EmptyRange, None),
+            Self::merge_agent_activity_responses,
+        );
 
         let result =
             authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
