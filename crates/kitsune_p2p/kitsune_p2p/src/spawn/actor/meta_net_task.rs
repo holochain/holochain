@@ -523,15 +523,10 @@ impl MetaNetTask {
                             }
                         };
 
-                        // MAYBE: do something with the
-                        //        is_last bool?
-                        //        Right now we don't
-                        //        really care, because
-                        //        if it's a region
-                        //        we know it's gossip
-                        //        so it's okay if
-                        //        the context is
-                        //        `None`.
+                        // MAYBE: do something with the is_last bool?
+                        //        Right now we don't really care, because
+                        //        if it's a region we know it's gossip
+                        //        so it's okay if the context is `None`.
                         let key = if let Some((region, _is_last)) = op.region {
                             FetchKey::Region(region)
                         } else {
