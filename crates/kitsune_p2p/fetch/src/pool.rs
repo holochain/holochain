@@ -191,6 +191,7 @@ impl stef::State<'static> for FetchPoolState {
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
     #[stef::state( matches( None <=> () ) )]
+    #[allow(clippy::unused_unit)]
     fn push(&mut self, args: FetchPoolPush) -> () {
         let FetchPoolPush {
             key,
@@ -308,6 +309,11 @@ impl FetchPoolState {
     /// ignores retry delays.
     pub fn len(&self) -> usize {
         self.queue.len()
+    }
+
+    /// Is the queue empty?
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
     }
 
     /// Get a string summary of the queue's contents

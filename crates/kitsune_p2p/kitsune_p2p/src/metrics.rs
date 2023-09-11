@@ -477,7 +477,7 @@ impl stef::State<'static> for Metrics {
         remote_agents: AgentList,
         region_diffs: RegionDiffs,
     ) {
-        let history = self.node_history.entry(peer.clone()).or_default();
+        let history = self.node_history.entry(peer).or_default();
         history.remote_agents = remote_agents;
         if let Some(r) = &mut history.current_round {
             r.update(region_diffs);
@@ -488,7 +488,7 @@ impl stef::State<'static> for Metrics {
 
     /// Remove the current round info once it's complete, and put it into the history list
     pub fn complete_current_round(&mut self, node: NodeId, error: bool) {
-        let history = self.node_history.entry(node.clone()).or_default();
+        let history = self.node_history.entry(node).or_default();
         let r = history.current_round.take();
         if let Some(r) = r {
             history.completed_rounds.push_back(r.completed(error))
@@ -501,6 +501,7 @@ impl stef::State<'static> for Metrics {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for MetricsSync {
     fn default() -> Self {
         Self(Default::default())

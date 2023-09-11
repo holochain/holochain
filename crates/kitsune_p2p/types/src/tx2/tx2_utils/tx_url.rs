@@ -91,7 +91,7 @@ impl proptest::arbitrary::Arbitrary for TxUrl {
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
         proptest::string::string_regex(r"http://\w+")
             .unwrap()
-            .prop_map(|s| TxUrl::from(s))
+            .prop_map(TxUrl::from)
             .boxed()
     }
 }
