@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.2.2-beta-rc.2
+
 - Adds `ignore_genesis_failure` field to InstallApp arguments. The default is `false`, and can only use this with the CHC feature. [2612](https://github.com/holochain/holochain/pull/2612)
 
 ## 0.2.2-beta-rc.1
