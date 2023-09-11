@@ -38,7 +38,7 @@ teardown() {
       fi
     ) && {
       result=0
-      continue
+      break
     } || {
       result=$?
     }
