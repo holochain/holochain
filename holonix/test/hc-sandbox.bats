@@ -30,7 +30,6 @@ teardown() {
   for i in `seq 1 10`; do
     sleep 1
     (
-      set -eE
       if [[ -f .hc_live_0 ]]; then
         hc-sandbox --piped call --running $(cat .hc_live_0) list-apps
       else
