@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use holochain_diagnostics::{
     gossip::sharded_gossip::NodeId,
     holochain::{
