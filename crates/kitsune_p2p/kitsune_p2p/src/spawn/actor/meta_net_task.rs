@@ -41,6 +41,17 @@ enum MetaNetTaskError {
     Ignored(Box<dyn Error>),
 }
 
+impl From<KitsuneP2pError> for MetaNetTaskError {
+    fn from(err: KitsuneP2pError) -> Self {
+        match err {
+            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
+                MetaNetTaskError::RequiredChannelClosed
+            }
+            e => MetaNetTaskError::Ignored(Box::new(e)),
+        }
+    }
+}
+
 type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
 
 impl MetaNetTask {
@@ -134,20 +145,18 @@ impl MetaNetTask {
 
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {
         match self.i_s.new_con(remote_url, con.clone()).await {
-            Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                Err(MetaNetTaskError::RequiredChannelClosed)
+            Err(e) => {
+                Err(e.into())
             }
-            Err(e) => Err(MetaNetTaskError::Ignored(Box::new(e))),
             Ok(_) => Ok(()),
         }
     }
 
     async fn handle_disconnect(&self, remote_url: String) -> MetaNetTaskResult<()> {
         match self.i_s.del_con(remote_url).await {
-            Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                Err(MetaNetTaskError::RequiredChannelClosed)
+            Err(e) => {
+                Err(e.into())
             }
-            Err(e) => Err(MetaNetTaskError::Ignored(Box::new(e))),
             Ok(_) => Ok(()),
         }
     }
@@ -231,12 +240,7 @@ impl MetaNetTask {
                 let fail = wire::Wire::failure(reason);
                 respond(fail).await;
 
-                return Err(match err {
-                    KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                        MetaNetTaskError::RequiredChannelClosed
-                    }
-                    e => MetaNetTaskError::Ignored(Box::new(e)),
-                });
+                return Err(err.into());
             }
             Ok(r) => r,
         };
@@ -323,13 +327,7 @@ impl MetaNetTask {
                         .await
                     {
                         tracing::warn!(?err, "failed to handle incoming delegate broadcast");
-
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                        }
+                        Err(err.into())
                     } else {
                         Ok(())
                     }
@@ -346,13 +344,7 @@ impl MetaNetTask {
                         .await
                     {
                         tracing::warn!(?err, "failed to handle incoming delegate broadcast");
-
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                        }
+                        Err(err.into())
                     } else {
                         Ok(())
                     }
@@ -368,13 +360,7 @@ impl MetaNetTask {
                     // TODO: Should we check if the basis is held before calling notify?
                     if let Err(err) = self.evt_sender.notify(space, to_agent, data).await {
                         tracing::warn!(?err, "error processing incoming broadcast");
-
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                        }
+                        Err(err.into())
                     } else {
                         Ok(())
                     }
@@ -391,13 +377,7 @@ impl MetaNetTask {
                         .await
                     {
                         tracing::warn!(?err, "error processing incoming agent info broadcast");
-
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                        }
+                        Err(err.into())
                     } else {
                         Ok(())
                     }
@@ -413,13 +393,7 @@ impl MetaNetTask {
                         .await
                     {
                         tracing::warn!(?err, "failed to handle incoming broadcast");
-
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                        }
+                        Err(err.into())
                     } else {
                         Ok(())
                     }
@@ -438,13 +412,7 @@ impl MetaNetTask {
                     .await
                 {
                     tracing::warn!(?err, "failed to handle incoming gossip");
-
-                    match err {
-                        KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                            Err(MetaNetTaskError::RequiredChannelClosed)
-                        }
-                        e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                    }
+                    Err(err.into())
                 } else {
                     Ok(())
                 }
@@ -616,13 +584,7 @@ impl MetaNetTask {
             wire::Wire::MetricExchange(wire::MetricExchange { space, msgs }) => {
                 if let Err(err) = self.i_s.incoming_metric_exchange(space, msgs).await {
                     tracing::error!(?err, "Metric exchange failed to send");
-
-                    match err {
-                        KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                            Err(MetaNetTaskError::RequiredChannelClosed)
-                        }
-                        e => Err(MetaNetTaskError::Ignored(Box::new(e))),
-                    }
+                    Err(err.into())
                 } else {
                     Ok(())
                 }
