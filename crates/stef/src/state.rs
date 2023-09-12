@@ -2,7 +2,7 @@ use crate::*;
 
 /// A model of an effectful state machine.
 ///
-/// The state can only be mutated through a Action value, and each Action
+/// The state can only be mutated through an Action value, and each Action
 /// may generate an Effect. The actual mutation of state is specified by implementing
 /// the [`transition`] method of this trait in terms of an incoming Action.
 ///

@@ -42,15 +42,6 @@ mod convo {
         last_important_received: Option<Msg>,
     }
 
-    // impl<S: Debug> Display for Convo<S> {
-    //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    //         f.write_fmt(format_args!(
-    //             "{:?}({:?})",
-    //             self.stage, self.last_important_received
-    //         ))
-    //     }
-    // }
-
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     pub struct DiagramNode(Stage);
 
@@ -523,12 +514,3 @@ mod tests {
         ((ta, task_a), (tb, task_b))
     }
 }
-
-/*
-
-            tokio::runtime::Builder::new_multi_thread().build().unwrap().spawn(async move {
-
-                let ((ta, ja), (_, jb)) = duo();
-                dbg!(&msg);
-            });
-*/
