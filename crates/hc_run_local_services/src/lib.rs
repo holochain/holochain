@@ -76,6 +76,29 @@ impl AOut {
 }
 
 impl HcRunLocalServices {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        bootstrap_address_path: Option<std::path::PathBuf>,
+        bootstrap_interface: String,
+        bootstrap_port: u16,
+        disable_bootstrap: bool,
+        signal_address_path: Option<std::path::PathBuf>,
+        signal_interfaces: String,
+        signal_port: u16,
+        disable_signal: bool,
+    ) -> Self {
+        Self {
+            bootstrap_address_path,
+            bootstrap_interface,
+            bootstrap_port,
+            disable_bootstrap,
+            signal_address_path,
+            signal_interfaces,
+            signal_port,
+            disable_signal,
+        }
+    }
+
     pub async fn run(self) {
         if let Err(err) = self.run_err().await {
             eprintln!("run-local-services error");

@@ -169,28 +169,7 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Detect missing release headings
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          set -exu
-          cd "${HOLOCHAIN_REPO}"
-
-          nix develop .#release --ignore-environment --command release-automation \
-              --workspace-path=$PWD \
-              --log-level=debug \
-              crate detect-missing-releaseheadings
-
-      - name: Generate crate READMEs from doc comments
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          cd "${HOLOCHAIN_REPO}"
-          nix develop .#release --ignore-environment --command bash ./scripts/generate_readmes.sh
-
-      - name: Bump the crate versions for the release
+      - name: Generate READMEs and bump the crate versions
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         env:
@@ -201,32 +180,10 @@ jobs:
 
           cd ${HOLOCHAIN_REPO}
 
-          nix develop .#release --ignore-environment --command bash -c '
-            set -e
-            cargo sweep -s
-
-            release-automation \
-              --workspace-path=$PWD \
-              --log-level=debug \
-              --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-              release \
-                --no-verify \
-                --force-tag-creation \
-                --force-branch-creation \
-                --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-                --allowed-semver-increment-modes="!pre_minor beta-dev" \
-                --steps=CreateReleaseBranch,BumpReleaseVersions
-
-            release-automation \
-                --workspace-path=$PWD \
-                --log-level=debug \
-                release \
-                  --dry-run \
-                  --no-verify \
-                  --steps=PublishToCratesIo
-
-            cargo sweep -f
-            '
+          nix run .#cargo-sweep -- sweep -s
+          nix run .#scripts-release-automation-check-and-bump -- $PWD
+          nix run .#scripts-ci-generate-readmes
+          nix run .#cargo-sweep -- sweep -f
 
           if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
             echo "releasable_crates=true" >> $GITHUB_OUTPUT
