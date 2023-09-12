@@ -416,30 +416,9 @@ impl MetaNetTask {
             wire::Wire::FetchOp(wire::FetchOp { fetch_list }) => {
                 for (space, key_list) in fetch_list {
                     let mut hashes = Vec::new();
-                    let topo = match self.host.get_topology(space.clone()).await {
-                        Err(err) => {
-                            tracing::warn!(
-                                ?err,
-                                "Could not get topology from the host for space {:?}",
-                                space,
-                            );
-                            None
-                        }
-                        Ok(topo) => Some(topo),
-                    };
-                    let mut regions = Vec::new();
-
                     for key in key_list {
-                        match key {
-                            FetchKey::Region(region_coords) => {
-                                if let Some(topo) = &topo {
-                                    regions.push((region_coords, region_coords.to_bounds(topo)));
-                                }
-                            }
-                            FetchKey::Op(op_hash) => {
-                                hashes.push(op_hash);
-                            }
-                        }
+                        let FetchKey::Op(op_hash) = key;
+                        hashes.push(op_hash);
                     }
 
                     if !hashes.is_empty() {
@@ -459,34 +438,6 @@ impl MetaNetTask {
                                     self.fetch_response_queue.enqueue_op(
                                         space.clone(),
                                         (con.clone(), url.clone(), None),
-                                        op,
-                                    );
-                                }
-                            }
-                            Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
-                                return Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            _ => {
-                                // Ignore other errors
-                            }
-                        }
-                    }
-
-                    for (coord, bound) in regions {
-                        match self
-                            .evt_sender
-                            .fetch_op_data(FetchOpDataEvt {
-                                space: space.clone(),
-                                query: FetchOpDataEvtQuery::Regions(vec![bound]),
-                            })
-                            .await
-                        {
-                            Ok(list) => {
-                                let last_idx = list.len() - 1;
-                                for (idx, (_hash, op)) in list.into_iter().enumerate() {
-                                    self.fetch_response_queue.enqueue_op(
-                                        space.clone(),
-                                        (con.clone(), url.clone(), Some((coord, idx == last_idx))),
                                         op,
                                     );
                                 }
@@ -519,15 +470,7 @@ impl MetaNetTask {
                             }
                         };
 
-                        // MAYBE: do something with the is_last bool?
-                        //        Right now we don't really care, because
-                        //        if it's a region we know it's gossip
-                        //        so it's okay if the context is `None`.
-                        let key = if let Some((region, _is_last)) = op.region {
-                            FetchKey::Region(region)
-                        } else {
-                            FetchKey::Op(op_hash.clone())
-                        };
+                        let key = FetchKey::Op(op_hash.clone());
                         let fetch_context = self.fetch_pool.remove(&key).and_then(|i| i.context);
 
                         // forward the received op
@@ -1157,39 +1100,6 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_delegate_broadcast_publish_handles_shutdown() {
         let (mut ep_evt_send, _, internal_sender, _, _, _, _, met_net_task_finished) =
-            setup().await;
-
-        internal_sender
-            .ghost_actor_shutdown_immediate()
-            .await
-            .unwrap();
-
-        ep_evt_send
-            .send(MetaNetEvt::Notify {
-                remote_url: "".to_string(),
-                con: mk_test_con(),
-                data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                    space: test_space(1),
-                    basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
-                    to_agent: test_agent(2),
-                    mod_idx: 0,
-                    mod_cnt: 0,
-                    data: BroadcastData::Publish {
-                        source: test_agent(5),
-                        op_hash_list: vec![],
-                        context: Default::default(),
-                    },
-                }),
-            })
-            .await
-            .unwrap();
-
-        wait_and_assert_shutdown(met_net_task_finished).await;
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn send_notify_delegate_broadcast_publish_handles_shutdown() {
-        let (mut ep_evt_send, internal_stub, internal_sender, _, _, _, _, met_net_task_finished) =
             setup().await;
 
         internal_sender
