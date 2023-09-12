@@ -451,9 +451,7 @@ impl From<TestCoordinatorWasm> for TestIntegrityWasm {
             TestCoordinatorWasm::CoordinatorZome | TestCoordinatorWasm::CoordinatorZomeUpdate => {
                 Self::IntegrityZome
             }
-            TestCoordinatorWasm::HcStressTestCoordinator => {
-                Self::HcStressTestIntegrity
-            }
+            TestCoordinatorWasm::HcStressTestCoordinator => Self::HcStressTestIntegrity,
         }
     }
 }

@@ -2739,6 +2739,7 @@ dependencies = [
  "rusqlite",
  "sd-notify",
  "serde",
+ "serde_bytes",
  "serde_json",
  "serde_yaml",
  "serial_test",
