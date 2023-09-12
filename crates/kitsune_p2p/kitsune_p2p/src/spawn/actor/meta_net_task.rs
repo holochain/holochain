@@ -2236,13 +2236,9 @@ mod tests {
     }
 
     async fn wait_and_assert_shutdown(meta_net_task_finished: Arc<AtomicBool>) {
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !meta_net_task_finished.load(Ordering::Acquire) {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for shutdown");
+        wait_for_condition(|| meta_net_task_finished.load(Ordering::Acquire))
+            .await
+            .expect("Timed out waiting for shutdown");
 
         assert!(meta_net_task_finished.load(Ordering::Acquire));
     }
