@@ -145,18 +145,14 @@ impl MetaNetTask {
 
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {
         match self.i_s.new_con(remote_url, con.clone()).await {
-            Err(e) => {
-                Err(e.into())
-            }
+            Err(e) => Err(e.into()),
             Ok(_) => Ok(()),
         }
     }
 
     async fn handle_disconnect(&self, remote_url: String) -> MetaNetTaskResult<()> {
         match self.i_s.del_con(remote_url).await {
-            Err(e) => {
-                Err(e.into())
-            }
+            Err(e) => Err(e.into()),
             Ok(_) => Ok(()),
         }
     }
