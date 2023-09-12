@@ -351,7 +351,7 @@ pub type AgentList = HashSet<KAgent>;
 // pub type MetricsSync = Arc<parking_lot::RwLock<Metrics>>;
 // impl Metrics {
 
-#[stef::state(share = MetricsSync)]
+#[stef::state(gen(struct MetricsSync = stef::Share))]
 impl stef::State<'static> for Metrics {
     type Action = MetricsAction;
     type Effect = ();
