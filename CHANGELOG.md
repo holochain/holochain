@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230911.135238
+
+## [holochain\_cli-0.2.2-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.2.2-beta-rc.2)
+
+- Adds `chc` feature which is recommended if you want to work with a Holochain instance that is built with its `chc` feature. If you are not using CHC you can safely ignore this feature.
+
+## [holochain\_cli\_sandbox-0.2.2-beta-rc.2](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.2-beta-rc.2)
+
+## [holochain\_cli\_bundle-0.2.2-beta-rc.2](crates/holochain_cli_bundle/CHANGELOG.md#0.2.2-beta-rc.2)
+
+## [holochain-0.2.2-beta-rc.3](crates/holochain/CHANGELOG.md#0.2.2-beta-rc.3)
+
+## [holochain\_conductor\_api-0.2.2-beta-rc.2](crates/holochain_conductor_api/CHANGELOG.md#0.2.2-beta-rc.2)
+
+- Adds `ignore_genesis_failure` field to InstallApp arguments. The default is `false`, and can only use this with the CHC feature. [2612](https://github.com/holochain/holochain/pull/2612)
+
+## [holochain\_wasm\_test\_utils-0.2.2-beta-rc.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.2-beta-rc.2)
+
+## [holochain\_cascade-0.2.2-beta-rc.2](crates/holochain_cascade/CHANGELOG.md#0.2.2-beta-rc.2)
+
+## [holochain\_state-0.2.2-beta-rc.2](crates/holochain_state/CHANGELOG.md#0.2.2-beta-rc.2)
+
+## [holochain\_p2p-0.2.2-beta-rc.2](crates/holochain_p2p/CHANGELOG.md#0.2.2-beta-rc.2)
+
+## [holochain\_types-0.2.2-beta-rc.2](crates/holochain_types/CHANGELOG.md#0.2.2-beta-rc.2)
+
 # 20230907.154450
 
 ## [holochain-0.2.2-beta-rc.2](crates/holochain/CHANGELOG.md#0.2.2-beta-rc.2)
