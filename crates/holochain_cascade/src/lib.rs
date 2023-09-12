@@ -954,6 +954,7 @@ where
         Ok(links.len())
     }
 
+    /// Merges two agent activity responses, along with their chain filters.
     fn merge_agent_activity_responses(
         acc: (MustGetAgentActivityResponse, Option<ChainFilterRange>),
         next: &(MustGetAgentActivityResponse, Option<ChainFilterRange>),
