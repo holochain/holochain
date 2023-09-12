@@ -9,12 +9,14 @@ const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestIntegrityWasm {
     IntegrityZome,
+    HcStressTestIntegrity,
 }
 
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestCoordinatorWasm {
     CoordinatorZome,
     CoordinatorZomeUpdate,
+    HcStressTestCoordinator,
 }
 
 #[derive(EnumIter, Clone, Copy)]
@@ -101,6 +103,7 @@ impl From<TestIntegrityWasm> for ZomeName {
     fn from(test_wasm: TestIntegrityWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
             TestIntegrityWasm::IntegrityZome => "integrity_zome",
+            TestIntegrityWasm::HcStressTestIntegrity => "files_integrity",
         })
     }
 }
@@ -110,6 +113,7 @@ impl From<TestCoordinatorWasm> for ZomeName {
         ZomeName::from(match test_wasm {
             TestCoordinatorWasm::CoordinatorZome => "coordinator_zome",
             TestCoordinatorWasm::CoordinatorZomeUpdate => "coordinator_zome_update",
+            TestCoordinatorWasm::HcStressTestCoordinator => "files",
         })
     }
 }
@@ -333,6 +337,9 @@ impl From<TestIntegrityWasm> for PathBuf {
             TestIntegrityWasm::IntegrityZome => {
                 "wasm32-unknown-unknown/release/test_wasm_integrity_zome.wasm"
             }
+            TestIntegrityWasm::HcStressTestIntegrity => {
+                "wasm32-unknown-unknown/release/files_integrity.wasm"
+            }
         })
     }
 }
@@ -345,6 +352,9 @@ impl From<TestCoordinatorWasm> for PathBuf {
             }
             TestCoordinatorWasm::CoordinatorZomeUpdate => {
                 "wasm32-unknown-unknown/release/test_wasm_coordinator_zome_update.wasm"
+            }
+            TestCoordinatorWasm::HcStressTestCoordinator => {
+                "wasm32-unknown-unknown/release/files.wasm"
             }
         })
     }
@@ -440,6 +450,9 @@ impl From<TestCoordinatorWasm> for TestIntegrityWasm {
         match t {
             TestCoordinatorWasm::CoordinatorZome | TestCoordinatorWasm::CoordinatorZomeUpdate => {
                 Self::IntegrityZome
+            }
+            TestCoordinatorWasm::HcStressTestCoordinator => {
+                Self::HcStressTestIntegrity
             }
         }
     }
