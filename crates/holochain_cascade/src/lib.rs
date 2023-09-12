@@ -954,50 +954,6 @@ where
         Ok(links.len())
     }
 
-    /// Merges two agent activity responses, along with their chain filters if
-    /// present. Chain filter range mismatches are treated as an incomplete
-    /// chain for the purpose of merging. Merging should only be done on
-    /// responses that originate from the same authority, so the chain filters
-    /// should always match, or at least their mismatch is the responsibility of
-    /// a single authority.
-    fn merge_bounded_agent_activity_responses(
-        acc: BoundedMustGetAgentActivityResponse,
-        next: &BoundedMustGetAgentActivityResponse,
-    ) -> BoundedMustGetAgentActivityResponse {
-        match (&acc, next) {
-            // If both sides of the merge have activity then merge them or bail
-            // if the chain filters don't match.
-            (
-                BoundedMustGetAgentActivityResponse::Activity(responses, chain_filter),
-                BoundedMustGetAgentActivityResponse::Activity(more_responses, other_chain_filter),
-            ) => {
-                if chain_filter == other_chain_filter {
-                    let mut merged_responses = responses.clone();
-                    merged_responses.extend(more_responses.to_owned());
-                    let mut merged_activity = BoundedMustGetAgentActivityResponse::Activity(
-                        merged_responses,
-                        chain_filter.clone(),
-                    );
-                    merged_activity.normalize();
-                    merged_activity
-                }
-                // If the chain filters disagree on what the filter is we
-                // have a problem.
-                else {
-                    BoundedMustGetAgentActivityResponse::IncompleteChain
-                }
-            }
-            // The acc has activity but the next doesn't so we can just return
-            // the acc.
-            (BoundedMustGetAgentActivityResponse::Activity(_, _), _) => acc,
-            // The next has activity but the acc doesn't so we can just return
-            // the next.
-            (_, BoundedMustGetAgentActivityResponse::Activity(_, _)) => next.clone(),
-            // Neither have activity so we can just return the acc.
-            _ => acc,
-        }
-    }
-
     /// Request a hash bounded chain query.
     pub async fn must_get_agent_activity(
         &self,
@@ -1035,7 +991,7 @@ where
             // It's sort of arbitrary what the initial value is as long as it's
             // not an activity response.
             BoundedMustGetAgentActivityResponse::EmptyRange,
-            Self::merge_bounded_agent_activity_responses,
+            holochain_types::chain::merge_bounded_agent_activity_responses,
         );
 
         let result =
