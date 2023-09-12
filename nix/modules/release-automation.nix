@@ -134,4 +134,5 @@
             echo use "nix-store --realise $out" to retrieve the result.
           '';
       };
-    }
+    };
+}
