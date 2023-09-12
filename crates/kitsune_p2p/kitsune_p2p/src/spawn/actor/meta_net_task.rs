@@ -606,13 +606,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(100), async {
-            while internal_stub.connections.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for connection to be added");
+        wait_for_condition(|| !internal_stub.connections.read().is_empty())
+            .await
+            .expect("Timed out waiting for connection to be added");
 
         assert_eq!(1, internal_stub.connections.read().len());
     }
@@ -666,13 +662,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(100), async {
-            while !internal_stub.connections.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for connection to be removed");
+        wait_for_condition(|| internal_stub.connections.read().is_empty())
+            .await
+            .expect("Timed out waiting for connection to be removed");
 
         assert_eq!(0, internal_stub.connections.read().len());
     }
@@ -687,13 +679,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while meta_net_task_finished.load(Ordering::Acquire) {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for task to shut down");
+        wait_for_condition(|| !meta_net_task_finished.load(Ordering::Acquire))
+            .await
+            .expect("Timed out waiting for task to shut down");
 
         ep_evt_send
             .send(MetaNetEvt::Disconnected {
@@ -742,13 +730,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !con_state.read().closed {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for the connection to be closed");
+        wait_for_condition(|| con_state.read().closed)
+            .await
+            .expect("Timed out waiting for the connection to be closed");
 
         assert!(con_state.read().closed);
     }
@@ -994,13 +978,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !con_state.read().closed {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for the connection to be closed");
+        wait_for_condition(|| con_state.read().closed)
+            .await
+            .expect("Timed out waiting for the connection to be closed");
 
         assert!(con_state.read().closed);
     }
@@ -1029,13 +1009,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub.incoming_publish_calls.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for a publish call");
+        wait_for_condition(|| !internal_stub.incoming_publish_calls.read().is_empty())
+            .await
+            .expect("Timed out waiting for a publish call");
 
         let args = internal_stub
             .incoming_publish_calls
@@ -1074,14 +1050,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            internal_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for a publish call error");
@@ -1150,14 +1123,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            !internal_stub
                 .incoming_delegate_broadcast_calls
                 .read()
                 .is_empty()
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
         })
         .await
         .expect("Timed out waiting for a publish call");
@@ -1195,14 +1165,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            internal_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for a publish call");
@@ -1241,14 +1208,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            !internal_stub
                 .incoming_delegate_broadcast_calls
                 .read()
                 .is_empty()
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
         })
         .await
         .expect("Timed out waiting for a delegate broadcast");
@@ -1286,14 +1250,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            internal_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for an error");
@@ -1362,13 +1323,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub.incoming_publish_calls.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for a publish broadcast");
+        wait_for_condition(|| !internal_stub.incoming_publish_calls.read().is_empty())
+            .await
+            .expect("Timed out waiting for a publish broadcast");
 
         let args = internal_stub
             .incoming_publish_calls
@@ -1404,14 +1361,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            internal_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for an error");
@@ -1474,13 +1428,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while host_receiver_stub.notify_calls.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for a notify");
+        wait_for_condition(|| !host_receiver_stub.notify_calls.read().is_empty())
+            .await
+            .expect("Timed out waiting for a notify");
 
         assert_eq!(1, host_receiver_stub.notify_calls.read().len());
     }
@@ -1507,14 +1457,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while host_receiver_stub
+        wait_for_condition(|| {
+            host_receiver_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for an error");
@@ -1603,14 +1550,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while host_receiver_stub
+        wait_for_condition(|| {
+            host_receiver_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for a publish call");
@@ -1669,13 +1613,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub.incoming_gossip_calls.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for incoming gossip");
+        wait_for_condition(|| !internal_stub.incoming_gossip_calls.read().is_empty())
+            .await
+            .expect("Timed out waiting for incoming gossip");
 
         assert_eq!(1, internal_stub.incoming_gossip_calls.read().len());
         assert_eq!(
@@ -1713,14 +1653,11 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while internal_stub
+        wait_for_condition(|| {
+            internal_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for an error");
@@ -1776,13 +1713,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while fetch_response_queue.bytes_sent.load(Ordering::Acquire) < 6 {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for op fetch");
+        wait_for_condition(|| fetch_response_queue.bytes_sent.load(Ordering::Acquire) == 6)
+            .await
+            .expect("Timed out waiting for op fetch");
 
         assert_eq!(6, fetch_response_queue.bytes_sent.load(Ordering::Acquire));
     }
@@ -1819,13 +1752,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while fetch_response_queue.bytes_sent.load(Ordering::Acquire) < 6 {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for op fetch");
+        wait_for_condition(|| fetch_response_queue.bytes_sent.load(Ordering::Acquire) == 6)
+            .await
+            .expect("Timed out waiting for op fetch");
 
         // The list for the first space does not get sent due to an error fetching its op data but the second does succeed and gets sent
         assert_eq!(6, fetch_response_queue.bytes_sent.load(Ordering::Acquire));
@@ -1878,13 +1807,9 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !fetch_pool.is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for op push");
+        wait_for_condition(|| fetch_pool.is_empty())
+            .await
+            .expect("Timed out waiting for op push");
 
         assert!(fetch_pool.is_empty());
         assert_eq!(1, host_receiver_stub.receive_ops_calls.read().len());
@@ -1927,21 +1852,15 @@ mod tests {
             .unwrap();
 
         // Check that there was an error
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while host_stub.get_fail_count() == 0 {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("Timed out waiting for an error");
+        wait_for_condition(|| host_stub.get_fail_count() != 0)
+            .await
+            .expect("Timed out waiting for an error");
 
         assert_eq!(1, host_stub.get_fail_count());
 
         // and also a successful op push
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !fetch_pool.is_empty() || host_receiver_stub.receive_ops_calls.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+        wait_for_condition(|| {
+            fetch_pool.is_empty() && !host_receiver_stub.receive_ops_calls.read().is_empty()
         })
         .await
         .expect("Timed out waiting for op push");
@@ -1988,14 +1907,11 @@ mod tests {
             .unwrap();
 
         // Check that there was an error
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while host_receiver_stub
+        wait_for_condition(|| {
+            host_receiver_stub
                 .respond_with_error_count
                 .load(Ordering::Acquire)
-                == 0
-            {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+                != 0
         })
         .await
         .expect("Timed out waiting for an error");
@@ -2008,10 +1924,8 @@ mod tests {
         );
 
         // and also a successful op push
-        tokio::time::timeout(Duration::from_millis(1000), async {
-            while !fetch_pool.is_empty() || host_receiver_stub.receive_ops_calls.read().is_empty() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+        wait_for_condition(|| {
+            fetch_pool.is_empty() && !host_receiver_stub.receive_ops_calls.read().is_empty()
         })
         .await
         .expect("Timed out waiting for op push");
@@ -2331,6 +2245,17 @@ mod tests {
         .expect("Timed out waiting for shutdown");
 
         assert!(meta_net_task_finished.load(Ordering::Acquire));
+    }
+
+    async fn wait_for_condition(
+        cond: impl Fn() -> bool,
+    ) -> Result<(), tokio::time::error::Elapsed> {
+        tokio::time::timeout(Duration::from_millis(1000), async {
+            while !cond() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
     }
 
     fn mk_test_con() -> MetaNetCon {
