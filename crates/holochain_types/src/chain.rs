@@ -175,12 +175,27 @@ pub enum MustGetAgentActivityResponse {
     EmptyRange,
 }
 
-impl MustGetAgentActivityResponse {
+/// Identical structure to [`MustGetAgentActivityResponse`] except it includes
+/// the [`ChainFilterRange`] that was used to produce the response. Doesn't need
+/// to be serialized because it is only used internally.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundedMustGetAgentActivityResponse {
+    /// The activity was found.
+    Activity(Vec<RegisterAgentActivity>, ChainFilterRange),
+    /// The requested chain range was incomplete.
+    IncompleteChain,
+    /// The requested chain top was not found in the chain.
+    ChainTopNotFound(ActionHash),
+    /// The filter produces an empty range.
+    EmptyRange,
+}
+
+impl BoundedMustGetAgentActivityResponse {
     /// Sort by the chain seq.
     /// Dedupe by action hash.
     pub fn normalize(&mut self) {
         match self {
-            Self::Activity(activity) => {
+            Self::Activity(activity, _) => {
                 activity.sort_unstable_by_key(|a| a.action.action().action_seq());
                 activity.dedup_by_key(|a| a.action.as_hash().clone());
             }
