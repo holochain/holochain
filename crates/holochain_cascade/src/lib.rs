@@ -954,33 +954,47 @@ where
         Ok(links.len())
     }
 
-    /// Merges two agent activity responses, along with their chain filters.
-    fn merge_agent_activity_responses(
-        acc: (MustGetAgentActivityResponse, Option<ChainFilterRange>),
-        next: &(MustGetAgentActivityResponse, Option<ChainFilterRange>),
-    ) -> (MustGetAgentActivityResponse, Option<ChainFilterRange>) {
+    /// Merges two agent activity responses, along with their chain filters if
+    /// present. Chain filter range mismatches are treated as an incomplete
+    /// chain for the purpose of merging. Merging should only be done on
+    /// responses that originate from the same authority, so the chain filters
+    /// should always match, or at least their mismatch is the responsibility of
+    /// a single authority.
+    fn merge_bounded_agent_activity_responses(
+        acc: BoundedMustGetAgentActivityResponse,
+        next: &BoundedMustGetAgentActivityResponse,
+    ) -> BoundedMustGetAgentActivityResponse {
         match (&acc, next) {
-            ((_, None), (_, Some(_))) => next.clone(),
+            // If both sides of the merge have activity then merge them or bail
+            // if the chain filters don't match.
             (
-                (MustGetAgentActivityResponse::Activity(responses), chain_filter),
-                (MustGetAgentActivityResponse::Activity(more_responses), other_chain_filter),
+                BoundedMustGetAgentActivityResponse::Activity(responses, chain_filter),
+                BoundedMustGetAgentActivityResponse::Activity(more_responses, other_chain_filter),
             ) => {
                 if chain_filter == other_chain_filter {
                     let mut merged_responses = responses.clone();
                     merged_responses.extend(more_responses.to_owned());
-                    let mut merged_activity =
-                        MustGetAgentActivityResponse::Activity(merged_responses);
+                    let mut merged_activity = BoundedMustGetAgentActivityResponse::Activity(
+                        merged_responses,
+                        chain_filter.clone(),
+                    );
                     merged_activity.normalize();
-                    (merged_activity, chain_filter.clone())
+                    merged_activity
                 }
                 // If the chain filters disagree on what the filter is we
                 // have a problem.
                 else {
-                    (MustGetAgentActivityResponse::IncompleteChain, None)
+                    BoundedMustGetAgentActivityResponse::IncompleteChain
                 }
             }
-            ((MustGetAgentActivityResponse::Activity(_), _), _) => acc,
-            _ => next.clone(),
+            // The acc has activity but the next doesn't so we can just return
+            // the acc.
+            (BoundedMustGetAgentActivityResponse::Activity(_, _), _) => acc,
+            // The next has activity but the acc doesn't so we can just return
+            // the next.
+            (_, BoundedMustGetAgentActivityResponse::Activity(_, _)) => next.clone(),
+            // Neither have activity so we can just return the acc.
+            _ => acc,
         }
     }
 
@@ -1018,14 +1032,16 @@ where
             .await??;
 
         let merged_results = results.iter().fold(
-            (MustGetAgentActivityResponse::EmptyRange, None),
-            Self::merge_agent_activity_responses,
+            // It's sort of arbitrary what the initial value is as long as it's
+            // not an activity response.
+            BoundedMustGetAgentActivityResponse::EmptyRange,
+            Self::merge_bounded_agent_activity_responses,
         );
 
         let result =
             authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
                 merged_results,
-            )?;
+            );
 
         // Short circuit if we have a result.
         if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
