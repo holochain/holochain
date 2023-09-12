@@ -71,7 +71,7 @@ pub fn state(
 #[derive(Default)]
 struct Options {
     _parameterized: Option<syn::Path>,
-    gen_paths: HashMap<syn::Type, Vec<syn::Path>>,
+    gen_paths: Vec<(syn::Type, Vec<syn::Path>)>,
 }
 
 impl syn::parse::Parse for Options {
@@ -95,7 +95,7 @@ impl syn::parse::Parse for Options {
                 while !content.is_empty() {
                     items.push(content.parse()?);
                 }
-                this.gen_paths.insert(struct_name, items);
+                this.gen_paths.push((struct_name, items));
             }
             let _: syn::Result<syn::Token![,]> = input.parse();
         }
@@ -420,16 +420,6 @@ fn state_impl(
         .expect("must use `impl stef::State<_> for ...`");
 
     let define_gen_impls = ss_flatten(gen_paths.into_iter().map(|(name, paths)| {
-        let mut inner = struct_path.to_token_stream();
-        for path in paths.iter() {
-            inner = quote! { #path<#inner>};
-        }
-
-        let mut construction = struct_path.to_token_stream();
-        for path in paths {
-            construction = quote! { #path::new(#construction)};
-        }
-
         let define_gen_fns_inner = ss_flatten(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
             let variant_name = f.variant_name();
@@ -467,6 +457,11 @@ fn state_impl(
             original_func.to_token_stream()
         }));
 
+        let mut inner = struct_path.to_token_stream();
+        for path in paths.iter() {
+            inner = quote! { #path<#inner>};
+        }
+
         let mut define_gen_struct: syn::ItemStruct = {
             syn::parse(
                 quote! {
@@ -481,13 +476,18 @@ fn state_impl(
         };
         define_gen_struct.generics = item.generics.clone();
 
+        let mut construction = quote!(data);
+        for path in paths {
+            construction = quote! { #path::new(#construction)};
+        }
+
         let mut define_gen_impl: syn::ItemImpl = syn::parse(
             quote! {
                 impl #name {
 
                     /// Constructor
                     pub fn new(data: #struct_path) -> Self {
-                        Self(stef::Share::new(data))
+                        Self(#construction)
                     }
 
                     #define_gen_fns_inner
