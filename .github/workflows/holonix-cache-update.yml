@@ -83,6 +83,8 @@ jobs:
           lfs: false
       - uses: cachix/install-nix-action@v22
       - uses: cachix/cachix-action@v12
+        with:
+          name: holochain-ci
       - name: Check Holonix cache
         uses: ThetaSinner/nix-cache-check@v1
         with:
