@@ -32,7 +32,7 @@
 
         doCheck = true;
 
-        checkInputs = [
+        nativeCheckInputs = [
           pkgs.coreutils
           pkgs.procps
         ];
