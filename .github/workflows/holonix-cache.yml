@@ -87,4 +87,4 @@ jobs:
         with:
           derivation: .#devShells.${{ matrix.platform }}.holonix
           extra_build_args: ${{ matrix.extra_args }}
-          permit_build_derivations: rust-default-1.66.1,hn-introspect,nix-shell,inheritCargoArtifactsHook,cargoHelperFunctionsHook
+          permit_build_derivations: rust-default-1.66.1,hn-introspect,nix-shell,inheritCargoArtifactsHook,cargoHelperFunctionsHook,installFromCargoBuildLogHook
