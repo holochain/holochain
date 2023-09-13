@@ -88,6 +88,6 @@ jobs:
       - name: Check Holonix cache
         uses: ThetaSinner/nix-cache-check@v1
         with:
-          derivation: .#packages.${{ matrix.system }}.build-holonix-tests-integration
+          derivation: .#packages.${{ matrix.platform }}.build-holonix-tests-integration
           extra_build_args: ${{ matrix.extra_args }}
           permit_build_derivations: hn-introspect
