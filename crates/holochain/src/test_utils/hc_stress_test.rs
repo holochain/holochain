@@ -192,8 +192,6 @@ impl<R: Report> HcStressTestRunner<R> {
 
             report.lock().unwrap().spawn(node_id);
 
-            let _on_drop = _on_drop;
-
             let mut now = std::time::Instant::now();
 
             let shutdown_at = match lifetime {
