@@ -83,20 +83,21 @@ pub fn state(
 struct Options {
     _parameterized: Option<syn::Path>,
     gen_paths: Vec<(syn::Type, Vec<syn::Path>)>,
+    newtypes: Vec<syn::Type>,
 }
 
 impl syn::parse::Parse for Options {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // let mut this = Self {
-        //     _parameterized: Default::default(),
-        //     share_type: Default::default(),
-        //     gen_paths: Default::default(),
-        // };
         let mut this = Self::default();
 
         while !input.is_empty() {
             let key: syn::Path = input.parse()?;
-            if key.is_ident("gen") {
+            if key.is_ident("newtype") {
+                let content;
+                syn::parenthesized!(content in input);
+                let struct_name: syn::Type = content.parse()?;
+                this.newtypes.push(struct_name);
+            } else if key.is_ident("gen") {
                 let content;
                 syn::parenthesized!(content in input);
                 let _: syn::Token![struct] = content.parse()?;
@@ -159,6 +160,7 @@ fn state_impl(
     let Options {
         _parameterized: _,
         gen_paths,
+        newtypes,
     } = parse_macro_input!(attr as Options);
 
     let mut action_name = None;
@@ -437,6 +439,79 @@ fn state_impl(
         .clone()
         .expect("must use `impl stef::State<_> for ...`");
 
+    // #[stef::share(newtype(Foo))]
+    let define_newtype_impls = ss_flatten(newtypes.into_iter().map(|name| {
+        let define_newtype_fns_inner = ss_flatten(fns.iter().map(|f| {
+            let mut original_func = f.f.clone();
+            let variant_name = f.variant_name();
+            let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
+            let transition = if args.is_empty() {
+                quote! { <Self as stef::State>::Action::#variant_name }
+            } else {
+                quote! { <Self as stef::State>::Action::#variant_name(#args) }
+            };
+            match original_func
+                .sig
+                .inputs
+                .first_mut()
+                .expect("problem xyzzy9283!")
+            {
+                syn::FnArg::Receiver(ref mut r) => {
+                    r.mutability = None;
+                    match r.ty.as_mut() {
+                        Type::Reference(r) => r.mutability = None,
+                        _ => unreachable!(),
+                    }
+                    // r.ty.as_mut().mutability = None;
+                    // panic!("{:#?}", r.ty);
+                }
+                syn::FnArg::Typed(_) => unreachable!(),
+            }
+            original_func.block = syn::parse(
+                f.mapped_block(quote! {
+                    self.0.transition(#transition)
+                })
+                .into_token_stream()
+                .into(),
+            )
+            .expect("problem xy8n88!");
+            original_func.vis = Visibility::Public(Default::default());
+            original_func.to_token_stream()
+        }));
+
+        let mut define_newtype_impl: syn::ItemImpl = syn::parse(
+            quote! {
+                impl #name {
+                    #define_newtype_fns_inner
+                }
+            }
+            .into(),
+        )
+        .expect("problem xyzzy72!");
+        define_newtype_impl.generics = item.generics.clone();
+
+        let mut define_newtype_state_impl: syn::ItemImpl = syn::parse(
+            quote! {
+                impl #item_trait #item_for_token #name {
+                    type Action = #action_name;
+                    type Effect = #effect_name;
+
+                    fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                        self.0.transition(action)
+                    }
+                }
+            }
+            .into(),
+        )
+        .expect("problem 84842n!");
+        define_newtype_state_impl.generics = item.generics.clone();
+
+        quote! {
+            #define_newtype_impl
+            #define_newtype_state_impl
+        }
+    }));
+
     // #[stef::share(gen(struct Foo = Bar))]
     let define_gen_impls = ss_flatten(gen_paths.into_iter().map(|(name, paths)| {
         let define_gen_fns_inner = ss_flatten(fns.iter().map(|f| {
@@ -655,6 +730,7 @@ fn state_impl(
         #define_hidden_fns
         #define_state_impl
         #define_gen_impls
+        #define_newtype_impls
     };
 
     proc_macro::TokenStream::from(expanded)

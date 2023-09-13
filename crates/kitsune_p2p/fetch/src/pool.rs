@@ -134,7 +134,17 @@ pub enum FetchPoolEffect {
     RemovedItem(FetchPoolItem),
 }
 
-#[stef::state(gen(struct FetchPool = stef::Share))]
+/// Shared access to FetchPoolState
+#[derive(Clone, Debug, derive_more::Deref)]
+pub struct FetchPool(stef::Share<FetchPoolState>);
+
+impl From<FetchPoolState> for FetchPool {
+    fn from(pool: FetchPoolState) -> Self {
+        FetchPool(stef::Share::new(pool))
+    }
+}
+
+#[stef::state(newtype(FetchPool))]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
     type Effect = Option<FetchPoolEffect>;
