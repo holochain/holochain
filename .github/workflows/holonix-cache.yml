@@ -1,4 +1,4 @@
-name: "Update Holonix cache"
+name: "Holonix cache"
 
 on:
   # TODO for testing only
@@ -64,9 +64,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - ubuntu-latest
-          - macos-latest
         extra_args:
           - '--override-input versions github:holochain/holochain?dir=versions/0_1'
           - '--override-input versions github:holochain/holochain?dir=versions/0_2'
@@ -75,7 +72,7 @@ jobs:
           - x86_64-darwin
           - aarch64-darwin
           - x86_64-linux
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -88,6 +85,6 @@ jobs:
       - name: Check Holonix cache
         uses: ThetaSinner/nix-cache-check@v1
         with:
-          derivation: .#packages.${{ matrix.platform }}.build-holonix-tests-integration
+          derivation: .#devShells.${{ matrix.platform }}.holonix
           extra_build_args: ${{ matrix.extra_args }}
           permit_build_derivations: hn-introspect
