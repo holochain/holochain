@@ -67,7 +67,7 @@ jobs:
         runner:
           - ubuntu-latest
           - macos-latest
-        cmd:
+        extra_args:
           - '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
           - '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
           - '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
@@ -89,5 +89,5 @@ jobs:
         uses: ThetaSinner/nix-cache-check@v1
         with:
           derivation: .#packages.${{ matrix.system }}.build-holonix-tests-integration
-          extra_build_args: ${{ matrix.extra_arg }}
+          extra_build_args: ${{ matrix.extra_args }}
           permit_build_derivations: hn-introspect
