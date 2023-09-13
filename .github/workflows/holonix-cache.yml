@@ -58,9 +58,8 @@ jobs:
 
           rm result*
   cache-check:
-    # TODO disabled for testing, comment back in
-#    needs:
-#      - cache-update
+    needs:
+      - cache-update
     strategy:
       fail-fast: false
       matrix:
