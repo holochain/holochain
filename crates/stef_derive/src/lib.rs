@@ -36,14 +36,25 @@
 //!     function with the `Action` corresponding to this function. If a `matches` directive was provided, the pattern is
 //!     applied to the output to map the return type
 //!
-//! TODO: the matches() attr is very magical and needs more explanation. But for now:
+//! The matches() attr is very magical and needs more explanation. But for now:
 //! Both sides of the `<=>` are intepreted as both a Pattern, and an Expression. A function can return a type other than
 //! the Effect, if a matches() or map_with() attr is provided. The left side of the matches() represents the effect type,
 //! and the right side represents the return type. Through this bidirectional mapping (partial isomorphism), we can freely
 //! convert between effect and function return types, so that the users of the function don't have to match on the effect
-//! (usually an enum) to get the value they want
-
-use std::collections::HashMap;
+//! (usually an enum) to get the value they want. TODO: write more
+//!
+//! gen() is also pretty magical. It lets you define new structs with the same functions as the State,
+//! but which add extra functionality. For instance:
+//!
+//!     #[stef:state(gen(struct Quux = Bar Baz Bat))]
+//!     impl stef::State<'static> for Foo { ... }
+//!
+//! This will not only create the usual implementation of State for `Foo`, along with all the provided
+//! methods, but will also create a new struct `struct Quux(Bar<Baz<Bat<Foo>>>)`, with a constructor
+//! `Quux::new(foo)`, such that `Quux` is also a `State` with the same action and effect types as `Foo`.
+//! Bar, Baz, and Bat are wrapper structs which provide extra functionality when processing actions and
+//! effects, or granting shared access in a specific way. The `stef::combinators` module contains some
+//! built-in wrappers. TODO: write more
 
 use heck::ToPascalCase;
 use proc_macro2::{Span, TokenStream};
@@ -419,6 +430,7 @@ fn state_impl(
         .clone()
         .expect("must use `impl stef::State<_> for ...`");
 
+    // #[stef::share(gen(struct Foo = Bar))]
     let define_gen_impls = ss_flatten(gen_paths.into_iter().map(|(name, paths)| {
         let define_gen_fns_inner = ss_flatten(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
@@ -458,7 +470,7 @@ fn state_impl(
         }));
 
         let mut inner = struct_path.to_token_stream();
-        for path in paths.iter() {
+        for path in paths.iter().rev() {
             inner = quote! { #path<#inner>};
         }
 
@@ -477,7 +489,7 @@ fn state_impl(
         define_gen_struct.generics = item.generics.clone();
 
         let mut construction = quote!(data);
-        for path in paths {
+        for path in paths.iter().rev() {
             construction = quote! { #path::new(#construction)};
         }
 
