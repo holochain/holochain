@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn convo_happy_path_solo() {
         {
-            let mut convo = StoreEffects::new(Convo::default(), 10);
+            let mut convo = StoreEffects::new(Convo::default());
             convo.transition(Hi.into());
             convo.transition(HowAreYou.into());
             convo.transition(GottaGo.into());
@@ -381,7 +381,7 @@ mod tests {
             )
         }
         {
-            let mut convo = StoreEffects::new(Convo::default(), 10);
+            let mut convo = StoreEffects::new(Convo::default());
             convo.transition(Hi.into());
             convo.transition(HowAreYou.into());
             convo.transition(ImFine.into());
