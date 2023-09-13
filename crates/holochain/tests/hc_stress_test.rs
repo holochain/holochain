@@ -3,7 +3,7 @@ use holochain::test_utils::hc_stress_test::*;
 use holochain_types::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn check_zome_functions() {
+async fn hc_stress_test_check_zome_functions() {
     // this is a sanity check to make sure the zome functions work
     // so that we can make more complex behavioral tests
 
@@ -20,8 +20,20 @@ async fn check_zome_functions() {
     assert_eq!(1, all.len());
 
     for hash in all {
-        let rec = test.get_file(hash.clone()).await;
+        let rec = test.get_file(hash.clone()).await.unwrap();
         println!("get: {hash:?}: {:?}", rec);
         assert_eq!("hello world", HcStressTest::record_to_file_data(&rec),);
+    }
+}
+
+#[cfg(feature = "glacial_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn hc_stress_test_3_min_behavior_1() {
+    let test = LocalBehavior1::new();
+
+    for _ in 0..6 {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+
+        println!("{:#?}", &*test.lock().unwrap());
     }
 }
