@@ -146,7 +146,7 @@ impl HcSandbox {
                     let structured = self.structured.clone();
 
                     let result = tokio::select! {
-                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                        result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
                         result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
                     };
                     crate::save::release_ports(std::env::current_dir()?).await?;

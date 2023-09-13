@@ -1,4 +1,5 @@
 #![cfg(feature = "test_utils")]
+#![cfg(feature = "chc")]
 
 use ::fixt::prelude::*;
 use hdk::prelude::*;
@@ -13,7 +14,6 @@ use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::record::SignedActionHashedExt;
 
 /// Test that records can be manually grafted onto a source chain.
-#[cfg(feature = "chc")]
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
