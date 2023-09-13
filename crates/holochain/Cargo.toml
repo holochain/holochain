@@ -61,6 +61,7 @@ rand-utf8 = "0.0.1"
 rpassword = "5.0.1"
 rusqlite = { version = "0.29" }
 serde = { version = "1.0", features = [ "derive" ] }
+serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
