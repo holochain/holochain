@@ -2,9 +2,6 @@
 
 use crate::{FetchContext, FetchKey, FetchPoolPush, FetchSource};
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
-use kitsune_p2p_types::dht::prelude::{
-    RegionCoords, SpaceOffset, SpaceSegment, TimeOffset, TimeSegment,
-};
 use kitsune_p2p_types::{KOpHash, KSpace};
 use std::sync::Arc;
 
@@ -18,36 +15,10 @@ pub fn test_key_op(n: u8) -> FetchKey {
     FetchKey::Op(test_key_hash(n))
 }
 
-/// Create a sample FetchKey::Region.
-pub fn test_key_region(n: u8) -> FetchKey {
-    FetchKey::Region(RegionCoords {
-        space: SpaceSegment {
-            power: n,
-            offset: SpaceOffset(0),
-        },
-        time: TimeSegment {
-            power: n,
-            offset: TimeOffset(0),
-        },
-    })
-}
-
 /// Create a sample FetchPoolPush keyed with a FetchKey::Op.
 pub fn test_req_op(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchPoolPush {
     FetchPoolPush {
         key: test_key_op(n),
-        author: None,
-        context,
-        space: test_space(0),
-        source,
-        size: None,
-    }
-}
-
-/// Create a sample [FetchPoolPush] keyed with a FetchKey::Region.
-pub fn test_req_region(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchPoolPush {
-    FetchPoolPush {
-        key: test_key_region(n),
         author: None,
         context,
         space: test_space(0),

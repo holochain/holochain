@@ -70,8 +70,19 @@ impl HostStub {
                         KitsuneP2pEvent::Call {
                             payload, respond, ..
                         } => {
+                            let respond = maybe_respond_error(
+                                task_respond_with_error.clone(),
+                                task_respond_with_error_count.clone(),
+                                respond,
+                            );
+                            if respond.is_none() {
+                                continue;
+                            }
+
                             // An echo response, no need for anything fancy here
-                            respond.respond(Ok(async move { Ok(payload.to_vec()) }.boxed().into()));
+                            respond
+                                .unwrap()
+                                .respond(Ok(async move { Ok(payload.to_vec()) }.boxed().into()));
                         }
                         KitsuneP2pEvent::QueryAgents { input, respond, .. } => {
                             let respond = maybe_respond_error(
