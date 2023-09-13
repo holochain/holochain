@@ -46,7 +46,5 @@ teardown() {
   echo rc=$result
 
   # ideally we'd know all children but because of double-forks we don't
-  pkill -9 hc-sandbox
-  pkill -9 holochain
-  pkill -9 lair-keystore
+  killall --verbose --user "$(whoami)" --ignore-case --regex -9 -- '(hc-sandbox|holochain|lair-keystore)'
 }

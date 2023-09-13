@@ -35,6 +35,7 @@
         nativeCheckInputs = [
           pkgs.coreutils
           pkgs.procps
+          pkgs.killall
         ];
 
         checkPhase = ''
