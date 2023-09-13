@@ -957,9 +957,9 @@ mod tests {
         assert_eq!(0, merged ^ (FLAG_1 | FLAG_2)); // Clear FLAG_1 and FLAG_2 to check no other bits are set
     }
 
-    #[cfg(feature = "fuzzing")]
     #[test_strategy::proptest]
-    fn fuzz_fetchpool_drainage(space: KSpace, actions: Vec<FetchPoolAction>) {
+    #[cfg(feature = "fuzzing")]
+    fn fuzz_fetchpool_drainage(spaces: [KSpace; 3], actions: Vec<FetchPoolAction>) {
         use stef::State;
 
         // println!("-------------------------------");
@@ -990,11 +990,11 @@ mod tests {
         });
 
         // apply the random actions
-        for mut a in actions {
+        for (i, mut a) in actions.into_iter().enumerate() {
             match a {
                 FetchPoolAction::Push(ref mut push) => {
-                    // set all actions to the same space
-                    push.space = space.clone();
+                    // set all actions to one of 3 spaces
+                    push.space = spaces[i % 3].clone();
                 }
                 _ => (),
             }
@@ -1014,7 +1014,7 @@ mod tests {
         let reader = FetchPoolReader::from(FetchPool {
             state: ShareOpen::new(pool),
         });
-        let info = reader.info([space].into_iter().collect());
+        let info = reader.info(spaces[0..3].iter().cloned().collect());
         assert_eq!(info.num_ops_to_fetch, 0);
         assert_eq!(info.op_bytes_to_fetch, 0);
     }
