@@ -30,7 +30,7 @@ impl FetchTask {
                                 .await
                             {
                                 if res.len() == 1 && res.remove(0) {
-                                    fetch_pool.remove(&key);
+                                    fetch_pool.remove(key);
                                     continue;
                                 }
                             }

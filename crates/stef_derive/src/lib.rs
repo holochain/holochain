@@ -63,7 +63,7 @@ use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Expr, Ident, Pat, Token, Type};
+use syn::{parse_macro_input, Expr, Ident, Pat, Token, Type, Visibility};
 
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
@@ -209,6 +209,42 @@ fn state_impl(
                     _ => unreachable!(),
                 })
                 .collect()
+        }
+
+        fn mapped_block(&self, val: TokenStream) -> TokenStream {
+            match (self.map_with.as_ref(), self.match_pats.is_empty()) {
+                (Some(mw), _) => {
+                    quote! {{
+                        use stef::State;
+                        let eff = #val;
+                        #mw(eff)
+                    }}
+                }
+                (None, false) => {
+                    let pats = delim::<_, Token!(,)>(self.match_pats.iter().map(
+                        |MatchPat {
+                             forward_pat,
+                             forward_expr,
+                             ..
+                         }| quote!(#forward_pat => #forward_expr),
+                    ));
+                    quote! {{
+                        use stef::State;
+                        let eff = #val;
+
+                        match eff {
+                            #pats,
+                            _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+                        }
+                    }}
+                }
+                (None, true) => {
+                    quote! {{
+                        use stef::State;
+                        #val
+                    }}
+                }
+            }
         }
     }
 
@@ -364,42 +400,13 @@ fn state_impl(
             false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
         };
 
-        let new_block = match (f.map_with.as_ref(), f.match_pats.is_empty()) {
-            (Some(mw), _) => {
-                quote! {{
-                    use stef::State;
-                    let eff = self.transition(#arg);
-                    #mw(eff)
-                }}
-            }
-            (None, false) => {
-                let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
-                    |MatchPat {
-                         forward_pat,
-                         forward_expr,
-                         ..
-                     }| quote!(#forward_pat => #forward_expr),
-                ));
-                quote! {{
-                    use stef::State;
-                    let eff = self.transition(#arg);
-
-                    match eff {
-                        #pats,
-                        _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
-                    }
-                }}
-            }
-            (None, true) => {
-                quote! {{
-                    use stef::State;
-                    self.transition(#arg)
-                }}
-            }
-        };
+        let new_block = f.mapped_block(quote! {
+            self.transition(#arg)
+        });
 
         let ts = proc_macro::TokenStream::from(new_block.into_token_stream());
         original_func.block = syn::parse(ts).expect("problem 3!");
+        original_func.vis = Visibility::Public(Default::default());
         original_func.to_token_stream()
     }));
 
@@ -459,13 +466,14 @@ fn state_impl(
                 syn::FnArg::Typed(_) => unreachable!(),
             }
             original_func.block = syn::parse(
-                quote! {{
+                f.mapped_block(quote! {
                     self.0.transition(#transition)
-                }}
+                })
                 .into_token_stream()
                 .into(),
             )
             .expect("problem xyzzy48!");
+            original_func.vis = Visibility::Public(Default::default());
             original_func.to_token_stream()
         }));
 
@@ -496,12 +504,6 @@ fn state_impl(
         let mut define_gen_impl: syn::ItemImpl = syn::parse(
             quote! {
                 impl #name {
-
-                    /// Constructor
-                    pub fn new(data: #struct_path) -> Self {
-                        Self(#construction)
-                    }
-
                     #define_gen_fns_inner
                 }
             }
@@ -509,6 +511,20 @@ fn state_impl(
         )
         .expect("problem xyzzy72!");
         define_gen_impl.generics = item.generics.clone();
+
+        let mut define_gen_from_impl: syn::ItemImpl = syn::parse(
+            quote! {
+                impl From<#struct_path> for #name {
+                    fn from(data: #struct_path) -> Self {
+                        Self(#construction)
+                    }
+                }
+
+            }
+            .into(),
+        )
+        .expect("problem 89nh72!");
+        define_gen_from_impl.generics = item.generics.clone();
 
         let mut define_deref_impl: syn::ItemImpl = syn::parse(
             quote! {
@@ -544,6 +560,7 @@ fn state_impl(
         quote! {
             #define_gen_struct
             #define_gen_impl
+            #define_gen_from_impl
             #define_gen_state_impl
             #define_deref_impl
         }

@@ -11,7 +11,7 @@ pub struct FetchPoolReader(FetchPool);
 impl FetchPoolReader {
     /// Get info about the queue, filtered by space
     pub fn info(&self, spaces: HashSet<KSpace>) -> FetchPoolInfo {
-        let (count, bytes) = self.0.state.share_ref(|s| {
+        let (count, bytes) = self.0.read(|s| {
             s.queue
                 .values()
                 .filter(|v| spaces.contains(&v.space))
@@ -41,18 +41,15 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use crate::{pool::tests::*, FetchPoolState};
-    use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
     use linked_hash_map::LinkedHashMap;
     use std::sync::Arc;
 
     #[test]
     fn queue_info_empty() {
-        let fetch_pool_reader = FetchPoolReader(FetchPool {
-            state: ShareOpen::new(FetchPoolState {
-                queue: LinkedHashMap::new(),
-                config: Arc::new(Config(1, 1)),
-            }),
-        });
+        let fetch_pool_reader = FetchPoolReader(FetchPool::from(FetchPoolState {
+            queue: LinkedHashMap::new(),
+            config: Arc::new(Config(1, 1)),
+        }));
 
         let info = fetch_pool_reader.info([test_space(0), test_space(1)].into_iter().collect());
         assert_eq!(0, info.op_bytes_to_fetch);
@@ -68,12 +65,10 @@ mod tests {
             queue[0].1.size = Some(100.into());
 
             let queue = queue.into_iter().collect();
-            FetchPoolReader(FetchPool {
-                state: ShareOpen::new(FetchPoolState {
-                    queue,
-                    config: Arc::new(cfg),
-                }),
-            })
+            FetchPoolReader(FetchPool::from(FetchPoolState {
+                queue,
+                config: Arc::new(cfg),
+            }))
         };
 
         let info = q.info([].into_iter().collect());
@@ -96,12 +91,10 @@ mod tests {
             queue[1].1.size = Some(1000.into());
 
             let queue = queue.into_iter().collect();
-            FetchPoolReader(FetchPool {
-                state: ShareOpen::new(FetchPoolState {
-                    queue,
-                    config: Arc::new(cfg),
-                }),
-            })
+            FetchPoolReader(FetchPool::from(FetchPoolState {
+                queue,
+                config: Arc::new(cfg),
+            }))
         };
 
         let info = q.info([test_space(0)].into_iter().collect());
@@ -128,12 +121,10 @@ mod tests {
             ];
 
             let queue = queue.into_iter().collect();
-            FetchPoolReader(FetchPool {
-                state: ShareOpen::new(FetchPoolState {
-                    queue,
-                    config: Arc::new(cfg),
-                }),
-            })
+            FetchPoolReader(FetchPool::from(FetchPoolState {
+                queue,
+                config: Arc::new(cfg),
+            }))
         };
 
         let info_space_1 = q.info([test_space(1)].into_iter().collect());

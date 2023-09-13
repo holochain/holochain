@@ -13,7 +13,7 @@
 use std::sync::Arc;
 use tokio::time::{Duration, Instant};
 
-use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace};
+use kitsune_p2p_types::{KAgent, KSpace};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt};
@@ -23,30 +23,6 @@ pub use pool_reader::*;
 
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
-
-/// A FetchPool tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
-/// each of which can have multiple sources associated with it.
-///
-/// When adding the same key twice, the sources are merged by appending the newest
-/// source to the front of the list of sources, and the contexts are merged by the
-/// method defined in [`FetchPoolConfig`].
-///
-/// The queue items can be accessed only through its Iterator implementation.
-/// Each item contains a FetchKey and one Source agent from which to fetch it.
-/// Each time an item is obtained in this way, it is moved to the end of the list.
-/// It is important to use the iterator lazily, and only take what is needed.
-/// Accessing any item through iteration implies that a fetch was attempted.
-#[derive(Clone)]
-pub struct FetchPool {
-    state: ShareOpen<FetchPoolState>,
-}
-
-impl std::fmt::Debug for FetchPool {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.state
-            .share_ref(|state| f.debug_struct("FetchPool").field("state", state).finish())
-    }
-}
 
 /// Alias
 pub type FetchConfig = Arc<dyn FetchPoolConfig>;
@@ -89,7 +65,18 @@ impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
     }
 }
 
-/// The actual inner state of the FetchPool, from which items can be obtained
+/// A FetchPoolState tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
+/// each of which can have multiple sources associated with it.
+///
+/// When adding the same key twice, the sources are merged by appending the newest
+/// source to the front of the list of sources, and the contexts are merged by the
+/// method defined in [`FetchPoolConfig`].
+///
+/// The queue items can be accessed only through its Iterator implementation.
+/// Each item contains a FetchKey and one Source agent from which to fetch it.
+/// Each time an item is obtained in this way, it is moved to the end of the list.
+/// It is important to use the iterator lazily, and only take what is needed.
+/// Accessing any item through iteration implies that a fetch was attempted.
 #[derive(Debug)]
 pub struct FetchPoolState {
     config: FetchConfig,
@@ -111,64 +98,30 @@ type NextItem = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 impl FetchPool {
     /// Constructor
     pub fn new(config: FetchConfig) -> Self {
-        Self {
-            state: ShareOpen::new(FetchPoolState::new(config)),
-        }
+        Self(stef::Share::new(FetchPoolState::new(config)))
     }
 
     /// Constructor, using only the "hardcoded" config (TODO: remove)
     pub fn new_bitwise_or() -> Self {
         let config = Arc::new(FetchPoolConfigBitwiseOr);
-        Self {
-            state: ShareOpen::new(FetchPoolState::new(config)),
-        }
-    }
-
-    /// Add an item to the queue.
-    /// If the FetchKey does not already exist, add it to the end of the queue.
-    /// If the FetchKey exists, add the new source and merge the context in, without
-    /// changing the position in the queue.
-    pub fn push(&self, args: FetchPoolPush) {
-        self.state.share_mut(|s| {
-            tracing::debug!(
-                "FetchPool (size = {}) item added: {:?}",
-                s.queue.len() + 1,
-                args
-            );
-            s.push(args);
-        });
-    }
-
-    /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&self, key: &FetchKey) -> Option<FetchPoolItem> {
-        self.state.share_mut(|s| {
-            let removed = s.remove(key.clone());
-            tracing::debug!(
-                "FetchPool (size = {}) item removed: key={:?} val={:?}",
-                s.queue.len(),
-                key,
-                removed
-            );
-            removed
-        })
+        Self(stef::Share::new(FetchPoolState::new(config)))
     }
 
     /// Get a list of the next items that should be fetched.
     pub fn get_items_to_fetch(&self) -> Vec<NextItem> {
-        self.state
-            .share_mut(move |s| std::iter::from_fn(|| s.next_item()).collect())
+        self.write(move |s| std::iter::from_fn(|| s.next_item()).collect())
     }
 
     /// Get the current size of the fetch pool. This is the number of outstanding items
     /// and may be different to the size of response from `get_items_to_fetch` because it
     /// ignores retry delays.
     pub fn len(&self) -> usize {
-        self.state.share_ref(|s| s.len())
+        self.read(|s| s.len())
     }
 
     /// Check whether the fetch pool is empty.
     pub fn is_empty(&self) -> bool {
-        self.state.share_ref(|s| s.queue.is_empty())
+        self.read(|s| s.queue.is_empty())
     }
 }
 
@@ -181,7 +134,7 @@ pub enum FetchPoolEffect {
     RemovedItem(FetchPoolItem),
 }
 
-#[stef::state]
+#[stef::state(gen(struct FetchPool = stef::Share))]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
     type Effect = Option<FetchPoolEffect>;
@@ -909,25 +862,21 @@ mod tests {
             for item in items {
                 // If the source is available the fetch succeeds and we remove the item, otherwise leave it in the pool
                 if !unavailable_sources.contains(&item.2) {
-                    fetch_pool.remove(&item.0);
+                    fetch_pool.remove(item.0);
                 } else {
                     failed_count += 1;
                 }
             }
 
             // Advance time to allow items retry with a difference source if necessary
-            tokio::time::advance(fetch_pool.state.share_ref(|s| s.config.item_retry_delay())).await;
+            tokio::time::advance(fetch_pool.read(|s| s.config.item_retry_delay())).await;
         }
 
         // We created an item that will always fail, so should have at least one left
         assert!(
             fetch_pool.get_items_to_fetch().len() >= 1,
             "Pool should have had at least one item but got \n {}",
-            fetch_pool.state.share_ref(|s| format!(
-                "{}\n{}",
-                FetchPoolState::summary_heading(),
-                s.summary()
-            ))
+            fetch_pool.read(|s| format!("{}\n{}", FetchPoolState::summary_heading(), s.summary()))
         );
 
         // 10 accounted for by the item we've set up to never succeed, possible to get more but not guaranteed to not
@@ -948,9 +897,7 @@ mod tests {
         let context_2 = FetchContext(FLAG_2);
 
         let pool = FetchPool::new_bitwise_or();
-        let merged = pool
-            .state
-            .share_ref(|s| s.config.merge_fetch_contexts(*context_1, *context_2));
+        let merged = pool.read(|s| s.config.merge_fetch_contexts(*context_1, *context_2));
 
         assert_eq!(FLAG_1, merged & FLAG_1);
         assert_eq!(FLAG_2, merged & FLAG_2);
@@ -1011,9 +958,7 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(1));
             }
         }
-        let reader = FetchPoolReader::from(FetchPool {
-            state: ShareOpen::new(pool),
-        });
+        let reader = FetchPoolReader::from(FetchPool(stef::Share::new(pool)));
         let info = reader.info(spaces[0..3].iter().cloned().collect());
         assert_eq!(info.num_ops_to_fetch, 0);
         assert_eq!(info.op_bytes_to_fetch, 0);

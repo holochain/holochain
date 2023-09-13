@@ -528,7 +528,7 @@ impl MetaNetTask {
                         } else {
                             FetchKey::Op(op_hash.clone())
                         };
-                        let fetch_context = self.fetch_pool.remove(&key).and_then(|i| i.context);
+                        let fetch_context = self.fetch_pool.remove(key).and_then(|i| i.context);
 
                         // forward the received op
                         if let Err(err) = self
