@@ -500,7 +500,7 @@ impl SpaceInternalHandler for Space {
                     continue;
                 } else {
                     // Add this hash to our fetch queue.
-                    ro_inner.fetch_pool.push(FetchPoolPush {
+                    ro_inner.fetch_pool.clone().push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),

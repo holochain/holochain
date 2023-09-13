@@ -59,7 +59,7 @@ fn test_generics() {
     p.transition(PeopleAction::Clear);
     assert_eq!(p.0.len(), 0);
 
-    let shared = PeopleShare::from(p);
+    let mut shared = PeopleShare::from(p);
 
     shared.add("Ryan".into(), 25, false);
     assert_eq!(shared.read(|s| s.0.len()), 1);

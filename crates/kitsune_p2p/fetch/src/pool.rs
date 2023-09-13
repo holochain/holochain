@@ -837,7 +837,7 @@ mod tests {
         let mut u = Unstructured::new(&noise);
 
         // Create a fetch pool to test
-        let fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}));
+        let mut fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}));
 
         // Some sources will be unavailable for blocks of time
         let unavailable_sources: HashSet<FetchSource> =

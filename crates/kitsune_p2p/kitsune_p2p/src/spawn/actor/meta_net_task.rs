@@ -528,7 +528,8 @@ impl MetaNetTask {
                         } else {
                             FetchKey::Op(op_hash.clone())
                         };
-                        let fetch_context = self.fetch_pool.remove(key).and_then(|i| i.context);
+                        let fetch_context =
+                            self.fetch_pool.clone().remove(key).and_then(|i| i.context);
 
                         // forward the received op
                         if let Err(err) = self
@@ -1913,7 +1914,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, mut fetch_pool, _) = setup().await;
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
         assert_eq!(1, fetch_pool.len());
@@ -1949,7 +1950,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_op_hash_error() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, host_stub, _, fetch_pool, _) =
+        let (mut ep_evt_send, _, _, host_receiver_stub, host_stub, _, mut fetch_pool, _) =
             setup().await;
 
         host_stub.fail_next_request();
@@ -2009,7 +2010,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
+        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, mut fetch_pool, _) = setup().await;
 
         host_receiver_stub
             .respond_with_error
@@ -2079,8 +2080,16 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_handles_shutdown_on_receive_ops() {
-        let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, meta_net_task_finished) =
-            setup().await;
+        let (
+            mut ep_evt_send,
+            _,
+            _,
+            host_receiver_stub,
+            _,
+            _,
+            mut fetch_pool,
+            meta_net_task_finished,
+        ) = setup().await;
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
         assert_eq!(1, fetch_pool.len());
@@ -2109,7 +2118,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_handles_shutdown_on_resolve() {
-        let (mut ep_evt_send, _, internal_sender, _, _, _, fetch_pool, meta_net_task_finished) =
+        let (mut ep_evt_send, _, internal_sender, _, _, _, mut fetch_pool, meta_net_task_finished) =
             setup().await;
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));

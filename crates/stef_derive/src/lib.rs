@@ -498,26 +498,28 @@ fn state_impl(
             } else {
                 quote! { <Self as stef::State>::Action::#variant_name(#args) }
             };
-            match original_func
-                .sig
-                .inputs
-                .first_mut()
-                .expect("problem xyzzy9283!")
-            {
-                syn::FnArg::Receiver(ref mut r) => {
-                    r.mutability = None;
-                    match r.ty.as_mut() {
-                        Type::Reference(r) => r.mutability = None,
-                        _ => unreachable!(),
-                    }
-                    // r.ty.as_mut().mutability = None;
-                    // panic!("{:#?}", r.ty);
-                }
-                syn::FnArg::Typed(_) => unreachable!(),
-            }
+
+            // match original_func
+            //     .sig
+            //     .inputs
+            //     .first_mut()
+            //     .expect("problem xyzzy9283!")
+            // {
+            //     syn::FnArg::Receiver(ref mut r) => {
+            //         r.mutability = None;
+            //         match r.ty.as_mut() {
+            //             Type::Reference(r) => r.mutability = None,
+            //             _ => unreachable!(),
+            //         }
+            //         // r.ty.as_mut().mutability = None;
+            //         // panic!("{:#?}", r.ty);
+            //     }
+            //     syn::FnArg::Typed(_) => unreachable!(),
+            // }
+
             original_func.block = syn::parse(
                 f.mapped_block(quote! {
-                    self.0.transition(#transition)
+                    self.transition(#transition)
                 })
                 .into_token_stream()
                 .into(),
