@@ -46,7 +46,8 @@ teardown() {
   echo rc=$result
 
   # ideally we'd know all children but because of double-forks we don't
-  # killall --verbose --user "$(whoami)" --ignore-case --regex -9 -- '(hc-sandbox|holochain|lair-keystore)'
+  # these might fail and then the test will hang as the nix-daemon waits for all processes to end
+  set +e
   killall -v -u "$(whoami)" -9 hc-sandbox
   killall -v -u "$(whoami)" -9 holochain
   killall -v -u "$(whoami)" -9 lair-keystore
