@@ -347,8 +347,8 @@ impl<'lt> AgentLike<'lt> {
 /// A set of agents
 pub type AgentList = HashSet<KAgent>;
 
-/// Shared access to metrics
-#[derive(Clone, Debug, derive_more::Deref, derive_more::DerefMut)]
+/// Shared access to Metrics
+#[derive(Clone, Debug, derive_more::Deref, derive_more::DerefMut, stef::State)]
 pub struct MetricsSync(stef::Share<Metrics>);
 
 #[stef::state(newtype(MetricsSync))]

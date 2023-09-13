@@ -135,7 +135,7 @@ pub enum FetchPoolEffect {
 }
 
 /// Shared access to FetchPoolState
-#[derive(Clone, Debug, derive_more::Deref)]
+#[derive(Clone, Debug, derive_more::Deref, stef::State)]
 pub struct FetchPool(stef::Share<FetchPoolState>);
 
 impl From<FetchPoolState> for FetchPool {

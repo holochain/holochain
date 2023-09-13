@@ -63,7 +63,68 @@ use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Expr, Ident, Pat, Token, Type, Visibility};
+use syn::{
+    parse_macro_input, Expr, Ident, Pat, Token, TraitBound, Type, TypeParamBound, Visibility,
+};
+
+#[proc_macro_derive(State)]
+pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    // let original: TokenStream = item.clone().into();
+    let mut strukt: syn::ItemStruct =
+        syn::parse(item).expect("State can only be derived for a struct");
+    if strukt.fields.len() != 1 {
+        proc_macro_error::abort_call_site!(
+            "State can only be derived for a struct with a single tuple field"
+        )
+    }
+    let field = strukt.fields.into_iter().next().unwrap();
+    let ty = field.ty;
+    // let ty = match field.ty {
+    //     Type::Path(p) => p,
+    //     _ => proc_macro_error::abort_call_site!("Struct field must have simple type"),
+    // };
+    let name = strukt.ident;
+    // panic!("{:#?}", strukt.generics.split_for_impl());
+
+    let tb: TraitBound = syn::parse(
+        quote! {
+            stef::State<'static>
+        }
+        .into(),
+    )
+    .unwrap();
+    strukt
+        .generics
+        .make_where_clause()
+        .predicates
+        .push(syn::WherePredicate::Type(syn::PredicateType {
+            lifetimes: None,
+            bounded_ty: ty.clone(),
+            colon_token: Default::default(),
+            bounds: Punctuated::from_iter(std::iter::once(TypeParamBound::Trait(tb))),
+        }));
+    let (igen, tgen, where_clause) = strukt.generics.split_for_impl();
+
+    let mut state_impl: syn::ItemImpl = syn::parse(
+        quote! {
+            impl #igen stef::State<'static> for #name #tgen #where_clause {
+                type Action = <#ty as stef::State<'static>>::Action;
+                type Effect = <#ty as stef::State<'static>>::Effect;
+
+                fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                    self.0.transition(action)
+                }
+            }
+        }
+        .into(),
+    )
+    .expect("problem 84842n!");
+    state_impl.generics = strukt.generics.clone();
+
+    proc_macro::TokenStream::from(quote! {
+        #state_impl
+    })
+}
 
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
@@ -421,10 +482,10 @@ fn state_impl(
     .expect("problem 5!");
     define_public_fns.generics = item.generics.clone();
 
-    let (_, item_trait, item_for_token) = item
-        .trait_
-        .clone()
-        .expect("must use `impl stef::State<_> for ...`");
+    // let (_, item_trait, item_for_token) = item
+    //     .trait_
+    //     .clone()
+    //     .expect("must use `impl stef::State<_> for ...`");
 
     // #[stef::share(newtype(Foo))]
     let define_newtype_impls = ss_flatten(newtypes.into_iter().map(|name| {
@@ -477,25 +538,24 @@ fn state_impl(
         .expect("problem xyzzy72!");
         define_newtype_impl.generics = item.generics.clone();
 
-        let mut define_newtype_state_impl: syn::ItemImpl = syn::parse(
-            quote! {
-                impl #item_trait #item_for_token #name {
-                    type Action = #action_name;
-                    type Effect = #effect_name;
+        // let mut define_newtype_state_impl: syn::ItemImpl = syn::parse(
+        //     quote! {
+        //         impl #item_trait #item_for_token #name {
+        //             type Action = #action_name;
+        //             type Effect = #effect_name;
 
-                    fn transition(&mut self, action: Self::Action) -> Self::Effect {
-                        self.0.transition(action)
-                    }
-                }
-            }
-            .into(),
-        )
-        .expect("problem 84842n!");
-        define_newtype_state_impl.generics = item.generics.clone();
+        //             fn transition(&mut self, action: Self::Action) -> Self::Effect {
+        //                 self.0.transition(action)
+        //             }
+        //         }
+        //     }
+        //     .into(),
+        // )
+        // .expect("problem 84842n!");
+        // define_newtype_state_impl.generics = item.generics.clone();
 
         quote! {
             #define_newtype_impl
-            #define_newtype_state_impl
         }
     }));
 

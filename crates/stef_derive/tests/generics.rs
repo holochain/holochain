@@ -14,7 +14,7 @@ pub enum PeopleFx<D> {
     SayHi(String, D),
 }
 
-#[derive(derive_more::Deref)]
+#[derive(derive_more::Deref, stef::State)]
 pub struct PeopleShare<D: std::fmt::Debug>(stef::Share<People<D>>);
 
 impl<D: 'static + Clone + Eq + std::fmt::Debug> From<People<D>> for PeopleShare<D> {
