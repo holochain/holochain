@@ -12,6 +12,7 @@ quote = "1"
 syn = { version = "2", features = ["full"] }
 
 [dev-dependencies]
+derive_more = "*"
 stef = { path = "../stef" }
 
 [lib]
