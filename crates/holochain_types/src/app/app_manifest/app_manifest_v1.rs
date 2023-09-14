@@ -17,7 +17,10 @@ use std::collections::HashMap;
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -34,7 +37,10 @@ pub struct AppManifestV1 {
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
     /// - this role,
@@ -64,7 +70,10 @@ impl AppRoleManifest {
 /// The DNA portion of an app role
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppRoleDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
@@ -115,7 +124,10 @@ pub type DnaLocation = mr_bundle::Location;
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
@@ -248,7 +260,7 @@ pub mod tests {
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 
-    #[cfg(feature = "arbitrary")]
+    #[cfg(feature = "fuzzing")]
     use arbitrary::Arbitrary;
 
     #[derive(serde::Serialize, serde::Deserialize)]

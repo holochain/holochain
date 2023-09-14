@@ -3,6 +3,9 @@
 
 use holochain_serialized_bytes::prelude::*;
 
+#[cfg(feature = "fuzzing")]
+use proptest::strategy::{BoxedStrategy, Just, Strategy};
+
 /// A type to allow json values to be used as [`derive@SerializedBytes`]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct YamlProperties(serde_yaml::Value);
@@ -43,9 +46,19 @@ impl Default for YamlProperties {
 }
 
 /// Not a great implementation: always returns null
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
     fn arbitrary(_: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(serde_yaml::Value::Null.into())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for YamlProperties {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        Just(YamlProperties(serde_yaml::Value::Null)).boxed()
     }
 }

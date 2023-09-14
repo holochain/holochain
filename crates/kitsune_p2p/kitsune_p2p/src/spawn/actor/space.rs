@@ -499,7 +499,7 @@ impl SpaceInternalHandler for Space {
                     continue;
                 } else {
                     // Add this hash to our fetch queue.
-                    ro_inner.fetch_pool.push(FetchPoolPush {
+                    ro_inner.fetch_pool.clone().push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
@@ -896,30 +896,36 @@ impl KitsuneP2pHandler for Space {
                 discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
                     let payload = wire::Wire::call(space.clone(), to_agent.clone(), payload.into());
                     let res = con_hnd.request(&payload, timeout).await?;
+                    let agents: AgentList = [to_agent].into_iter().collect();
                     match res {
                         wire::Wire::Failure(wire::Failure { reason }) => {
-                            metrics
-                                .write()
-                                .record_reachability_event(false, [&to_agent]);
-                            metrics
-                                .write()
-                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            metrics.write(|m| {
+                                m.record_reachability_event(false, agents.clone());
+                                m.record_latency_micros(
+                                    start.elapsed().as_micros() as f32,
+                                    agents.clone(),
+                                );
+                            });
                             Err(reason.into())
                         }
                         wire::Wire::CallResp(wire::CallResp { data }) => {
-                            metrics.write().record_reachability_event(true, [&to_agent]);
-                            metrics
-                                .write()
-                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            metrics.write(|m| {
+                                m.record_reachability_event(true, agents.clone());
+                                m.record_latency_micros(
+                                    start.elapsed().as_micros() as f32,
+                                    agents.clone(),
+                                );
+                            });
                             Ok(data.into())
                         }
                         r => {
-                            metrics
-                                .write()
-                                .record_reachability_event(false, [&to_agent]);
-                            metrics
-                                .write()
-                                .record_latency_micros(start.elapsed().as_micros(), [&to_agent]);
+                            metrics.write(|m| {
+                                m.record_reachability_event(false, agents.clone());
+                                m.record_latency_micros(
+                                    start.elapsed().as_micros() as f32,
+                                    agents.clone(),
+                                );
+                            });
                             Err(format!("invalid response: {:?}", r).into())
                         }
                     }
@@ -1219,7 +1225,7 @@ impl KitsuneP2pHandler for Space {
         _space: Option<Arc<KitsuneSpace>>,
     ) -> KitsuneP2pHandlerResult<serde_json::Value> {
         let space = self.ro_inner.space.clone();
-        let metrics = self.ro_inner.metrics.read().dump();
+        let metrics = self.ro_inner.metrics.read(|m| m.dump());
         Ok(async move {
             Ok(serde_json::json!({
                 "space": space.to_string(),
@@ -1365,7 +1371,7 @@ impl Space {
                     ))
                     .await;
 
-                    let records = metrics.read().dump_historical();
+                    let records = metrics.read(|m| m.dump_historical());
 
                     let _ = host.record_metrics(space.clone(), records).await;
                 }

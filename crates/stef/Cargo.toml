@@ -1,0 +1,53 @@
+[package]
+name = "stef"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+anyhow = { version = "*" }
+derive_more = { version = "*" }
+futures = { version = "*" }
+must_future = { version = "*" }
+parking_lot = { version = "*" }
+
+# derive
+stef_derive = { path = "../stef_derive", optional = true }
+
+# diagramming
+petgraph = { version = "*", optional = true }
+proptest = { version = "*", optional = true }
+
+# recording
+serde = { version = "*", features = ["derive"], optional = true }
+rmp-serde = { version = "*", optional = true }
+
+[dev-dependencies]
+either = { version = "*" }
+proptest = { version = "*" }
+proptest-derive = { version = "*" }
+tempfile = "3"
+tokio = { version = "*", features = ["full"] }
+
+[features]
+default = ["derive", "diagramming", "recording"]
+
+derive = [
+    "stef_derive",
+]
+
+diagramming = [
+    "petgraph",
+    "proptest",
+]
+
+recording = [
+    "rmp-serde",
+    "serde",
+    "stef_derive?/recording",
+]
+
+invariants = [
+    "proptest",
+]
+

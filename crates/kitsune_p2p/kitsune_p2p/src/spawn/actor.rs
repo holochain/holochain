@@ -20,6 +20,7 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
@@ -231,12 +232,13 @@ impl KitsuneP2pActor {
             config.tuning_params.clone(),
         ));
 
-        // TODO - use a real config
-        let fetch_pool = FetchPool::new_bitwise_or();
+        // TODO - use a real config, i.e. use `FetchPool::new`
+        let storage_path = std::option_env!("STEF_RECORD_FETCHPOOL").map(PathBuf::from);
+        let fetch_pool = FetchPool::new_bitwise_or(storage_path);
 
         // Start a loop to handle our fetch queue fetch items.
         {
-            let fetch_pool = fetch_pool.clone();
+            let mut fetch_pool = fetch_pool.clone();
             let i_s = internal_sender.clone();
             let host = host.clone();
             tokio::task::spawn(async move {
@@ -250,7 +252,7 @@ impl KitsuneP2pActor {
                                 .await
                             {
                                 if res.len() == 1 && res.remove(0) {
-                                    fetch_pool.remove(&key);
+                                    fetch_pool.remove(key);
                                     continue;
                                 }
                             }
@@ -657,8 +659,8 @@ impl KitsuneP2pActor {
                                                                 } else {
                                                                     FetchKey::Op(op_hash.clone())
                                                                 };
-                                                            let fetch_context = fetch_pool
-                                                                .remove(&key)
+                                                            let fetch_context = fetch_pool.clone()
+                                                                .remove(key)
                                                                 .and_then(|i| i.context);
 
                                                             // forward the received op

@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use kitsune_p2p_timestamp::ArbitraryFuzzing;
+
 use crate::{loc_downscale, loc_upscale, DhtArcRange, DhtLocation};
 
 /// A representation of DhtLocation in the u8 space. Useful for writing tests
@@ -10,6 +12,10 @@ use crate::{loc_downscale, loc_upscale, DhtArcRange, DhtLocation};
 ///
 /// Loc8 has custom `Eq`, `Ord`, and other impls which disregard the `sign`.
 #[derive(Copy, Clone)]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct Loc8 {
     /// The unsigned value
     val: u8,
@@ -150,7 +156,7 @@ impl DhtArcRange {
     }
 }
 
-impl<L> DhtArcRange<L>
+impl<L: Copy + ArbitraryFuzzing> DhtArcRange<L>
 where
     Loc8: From<L>,
 {

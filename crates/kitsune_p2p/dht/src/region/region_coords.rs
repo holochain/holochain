@@ -19,6 +19,10 @@ use crate::spacetime::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topolo
     serde::Deserialize,
     serde::Serialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct RegionCoords {
     /// The space segment
     pub space: SpaceSegment,

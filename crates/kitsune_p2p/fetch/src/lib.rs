@@ -20,6 +20,10 @@ pub use rough_sized::*;
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(tag = "type", content = "key", rename_all = "camelCase")]
 pub enum FetchKey {
     /// Fetch via region.
@@ -30,7 +34,11 @@ pub enum FetchKey {
 }
 
 /// A fetch "unit" that can be de-duplicated.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct FetchPoolPush {
     /// Description of what to fetch.
     pub key: FetchKey,
@@ -67,5 +75,9 @@ pub struct FetchPoolPush {
     serde::Deserialize,
     derive_more::Deref,
     derive_more::From,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct FetchContext(pub u32);

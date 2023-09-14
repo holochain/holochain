@@ -9,7 +9,7 @@
     derive_more::From,
     derive_more::Deref,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct ResourceBytes(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl ResourceBytes {

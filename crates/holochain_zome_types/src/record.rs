@@ -16,7 +16,7 @@ pub mod facts;
 ///
 /// Has implementations From and Into its tuple form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct SignedAction(pub Action, pub Signature);
 
 impl SignedAction {

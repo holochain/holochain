@@ -39,6 +39,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
+stef = { path = "../../stef" }
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
@@ -47,8 +48,11 @@ tx5 = { version = "=0.0.2-alpha", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.2.2"}
 
-# arbitrary could be made optional
-arbitrary = { version = "1.0", features = ["derive"] }
+# fuzzing
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
+test-strategy = { version = "0", optional = true }
 
 blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
@@ -72,6 +76,15 @@ tracing-subscriber = "0.3.16"
 [features]
 default = [ "tx2", "tx5" ]
 
+fuzzing = [
+  "arbitrary",
+  "proptest",
+  "proptest-derive",
+  "test-strategy",
+  "kitsune_p2p_timestamp/fuzzing",
+  "kitsune_p2p_types/fuzzing",
+]
+
 test_utils = [
   "blake2b_simd",
   "tokio/test-util",
@@ -79,7 +92,7 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "maplit",
   "mockall",
-  "kitsune_p2p_timestamp/arbitrary",
+  "fuzzing",
 ]
 mock_network = [
   "kitsune_p2p_types/test_utils",

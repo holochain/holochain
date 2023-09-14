@@ -8,7 +8,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Arc<[u8; 32]>,
         remote_arc_set: Vec<DhtArcRange>,
-        remote_agent_list: Vec<AgentInfoSigned>,
+        remote_agent_list: AgentList,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
             self.inner.share_mut(|i, _| {
@@ -27,9 +27,12 @@ impl ShardedGossipLocal {
 
         if let Some(when_initiated) = when_initiated {
             let _ = self.inner.share_ref(|i| {
-                i.metrics
-                    .write()
-                    .record_latency_micros(when_initiated.elapsed().as_micros(), &local_agents);
+                i.metrics.write(|m| {
+                    m.record_latency_micros(
+                        when_initiated.elapsed().as_micros() as f32,
+                        local_agents.clone(),
+                    )
+                });
                 Ok(())
             });
         }
@@ -71,9 +74,17 @@ impl ShardedGossipLocal {
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
 
-            let mut metrics = inner.metrics.write();
-            metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
-            metrics.record_initiate(&remote_agent_list, self.gossip_type.into());
+            let s = state.clone();
+            inner.metrics.write(|m| {
+                m.update_current_round(
+                    peer_cert.clone(),
+                    self.gossip_type.into(),
+                    s.id,
+                    s.remote_agent_list,
+                    s.region_diffs,
+                );
+                m.record_initiate(remote_agent_list, self.gossip_type.into());
+            });
 
             inner.round_map.insert(peer_cert.clone(), state);
             Ok(())

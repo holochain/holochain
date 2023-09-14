@@ -1,3 +1,5 @@
+use kitsune_p2p_timestamp::ArbitraryFuzzing;
+
 use super::*;
 
 /// An Offset represents the position of the left edge of some Segment.
@@ -6,7 +8,9 @@ use super::*;
 /// context, and topology of the space, by:
 ///
 ///   dht_location = offset * 2^pow * quantum_size
-pub trait Offset: Sized + Copy + Clone + Deref<Target = u32> + From<u32> {
+pub trait Offset:
+    Sized + Copy + Clone + Deref<Target = u32> + From<u32> + ArbitraryFuzzing
+{
     /// The type of quantum to map to, which also implies the absolute coordinates
     type Quantum: Quantum;
 
@@ -45,6 +49,10 @@ pub trait Offset: Sized + Copy + Clone + Deref<Target = u32> + From<u32> {
     serde::Serialize,
     serde::Deserialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(transparent)]
 pub struct SpaceOffset(pub u32);
 
@@ -68,6 +76,10 @@ pub struct SpaceOffset(pub u32);
     derive_more::Into,
     serde::Serialize,
     serde::Deserialize,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 #[serde(transparent)]
 pub struct TimeOffset(pub u32);
@@ -121,6 +133,10 @@ impl Offset for TimeOffset {
 /// is at (offset * length).
 #[derive(
     Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct Segment<O: Offset> {
     /// The exponent, where length = 2^power

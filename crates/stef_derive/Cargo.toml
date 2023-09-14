@@ -1,0 +1,28 @@
+[package]
+name = "stef_derive"
+version = "0.1.0"
+edition = "2021"
+#[stef_derive::state(wrapper(PeopleShare<D>))]#[stef_derive::state(wrapper(PeopleShare<D>))]
+
+[dependencies]
+heck = "*"
+proc-macro2 = "1"
+proc-macro-error = "*"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+
+[dev-dependencies]
+stef_derive = { path = ".", features = ["recording"]}
+derive_more = "*"
+proptest-derive = "*"
+stef = { path = "../stef", features = ["recording"] }
+
+[lib]
+proc-macro = true
+
+[features]
+recording = [
+    "stef/recording"
+]
+
+# [workspace]

@@ -8,7 +8,7 @@ impl GossipDashboard {
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
-                .map(|n| (n.diagnostics.metrics.read(), n.id.clone()))
+                .map(|n| (n.diagnostics.metrics.clone(), n.id.clone()))
                 .collect();
 
             let queue_info: Vec<_> = state
@@ -31,7 +31,9 @@ impl GossipDashboard {
             {
                 let activity = metrics
                     .iter()
-                    .map(|(metrics, _)| !state.node_rounds_sorted(metrics).currents.is_empty())
+                    .map(|(metrics, _)| {
+                        !metrics.read(|m| state.node_rounds_sorted(m).currents.is_empty())
+                    })
                     .enumerate();
                 f.render_stateful_widget(
                     widgets::ui_node_list(activity),
@@ -71,21 +73,22 @@ impl GossipDashboard {
 
             if let Some(selected) = selected {
                 let node = &state.nodes()[selected];
-                let metrics = &node.diagnostics.metrics.read();
-                let rounds = state.node_rounds_sorted(metrics);
-                for (i, gauge) in gauges.into_iter().enumerate() {
-                    f.render_widget(gauge, layout.gauges[i]);
-                }
-                f.render_widget(
-                    gossip_round_table(&GossipRoundTableState {
-                        rounds: &rounds,
-                        start_time: self.start_time,
-                        current_time: state.time(),
-                        filter_zeroes: local.filter_zeroes,
-                        table_state: &local.round_table_state,
-                    }),
-                    layout.bottom,
-                );
+                node.diagnostics.metrics.read(|metrics| {
+                    let rounds = state.node_rounds_sorted(metrics);
+                    for (i, gauge) in gauges.into_iter().enumerate() {
+                        f.render_widget(gauge, layout.gauges[i]);
+                    }
+                    f.render_widget(
+                        gossip_round_table(&GossipRoundTableState {
+                            rounds: &rounds,
+                            start_time: self.start_time,
+                            current_time: state.time(),
+                            filter_zeroes: local.filter_zeroes,
+                            table_state: &local.round_table_state,
+                        }),
+                        layout.bottom,
+                    );
+                });
 
                 if let Focus::Round { round, ours, .. } = &local.focus {
                     let table = gossip_region_table(&GossipRegionTableState {

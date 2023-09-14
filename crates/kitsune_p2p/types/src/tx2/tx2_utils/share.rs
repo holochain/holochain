@@ -97,6 +97,12 @@ impl<T: 'static + Send> Share<T> {
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct ShareOpen<T: 'static + Send>(Share<T>);
 
+impl<T: 'static + Send + Default> Default for ShareOpen<T> {
+    fn default() -> Self {
+        Self(Share::new(Default::default()))
+    }
+}
+
 impl<T: 'static + Send> Clone for ShareOpen<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
