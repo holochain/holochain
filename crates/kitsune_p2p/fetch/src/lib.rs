@@ -35,7 +35,7 @@ pub enum FetchKey {
 }
 
 /// A fetch "unit" that can be de-duplicated.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)

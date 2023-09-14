@@ -87,7 +87,13 @@ pub use stef_derive::{state, State};
 
 #[cfg(feature = "recording")]
 mod recording;
+#[cfg(feature = "recording")]
 pub use recording::*;
+
+pub mod dependencies {
+    #[cfg(feature = "recording")]
+    pub use ::serde;
+}
 
 #[cfg(feature = "diagramming")]
 pub mod diagram;

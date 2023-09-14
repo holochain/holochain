@@ -42,8 +42,9 @@ diagramming = [
 ]
 
 recording = [
-    "serde",
     "rmp-serde",
+    "serde",
+    "stef_derive?/recording",
 ]
 
 invariants = [

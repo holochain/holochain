@@ -7264,8 +7264,10 @@ dependencies = [
  "heck 0.4.1",
  "proc-macro-error",
  "proc-macro2 1.0.66",
+ "proptest-derive 0.3.0",
  "quote 1.0.33",
  "stef",
+ "stef_derive",
  "syn 2.0.29",
 ]
 

@@ -10,9 +10,10 @@ use serde::Serialize;
 use crate::*;
 
 /// Shared access to FetchPoolState
-#[derive(Clone, Debug, derive_more::Deref)]
+#[derive(Clone, Debug, derive_more::Deref, derive_more::DerefMut)]
 pub struct RecordActions<S> {
     #[deref]
+    #[deref_mut]
     state: S,
     storage: Option<Arc<PathBuf>>,
 }

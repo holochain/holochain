@@ -10,7 +10,7 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::{io::Write, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{KAgent, KSpace};
@@ -136,37 +136,15 @@ pub enum FetchPoolEffect {
 
 /// Shared access to FetchPoolState
 #[derive(Clone, Debug, derive_more::Deref, stef::State)]
-pub struct FetchPool {
-    #[deref]
-    state: stef::Share<FetchPoolState>,
-    storage: Option<Arc<PathBuf>>,
-}
-
-impl stef::State<'static> for FetchPool {
-    type Action = <FetchPoolState as stef::State<'static>>::Action;
-    type Effect = <FetchPoolState as stef::State<'static>>::Effect;
-
-    fn transition(&mut self, action: Self::Action) -> Self::Effect {
-        if let Some(path) = self.storage {
-            let bytes = encode(&action).unwrap();
-            let mut f = std::fs::File::options().append(true).open(&*path).unwrap();
-            f.write(&bytes.len().to_le_bytes()).unwrap();
-            f.write(&bytes).unwrap();
-        }
-        self.state.transition(action)
-    }
-}
+pub struct FetchPool(stef::Share<stef::RecordActions<FetchPoolState>>);
 
 impl From<FetchPoolState> for FetchPool {
     fn from(pool: FetchPoolState) -> Self {
-        FetchPool {
-            state: stef::Share::new(pool),
-            storage: None,
-        }
+        FetchPool(stef::Share::new(stef::RecordActions::new(None, pool)))
     }
 }
 
-#[stef::state(newtype(FetchPool))]
+#[stef::state(recording, fuzzing, newtype(FetchPool))]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
     type Effect = Option<FetchPoolEffect>;
@@ -401,7 +379,7 @@ impl Sources {
 }
 
 /// A source to fetch from: either a node, or an agent on a node
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
@@ -990,7 +968,7 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(1));
             }
         }
-        let reader = FetchPoolReader::from(FetchPool(stef::Share::new(pool)));
+        let reader = FetchPoolReader::from(FetchPool::from(pool));
         let info = reader.info(spaces[0..3].iter().cloned().collect());
         assert_eq!(info.num_ops_to_fetch, 0);
         assert_eq!(info.op_bytes_to_fetch, 0);

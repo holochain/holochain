@@ -2,7 +2,7 @@
 name = "stef_derive"
 version = "0.1.0"
 edition = "2021"
-
+#[stef_derive::state(newtype(PeopleShare<D>))]#[stef_derive::state(newtype(PeopleShare<D>))]
 
 [dependencies]
 heck = "*"
@@ -12,10 +12,17 @@ quote = "1"
 syn = { version = "2", features = ["full"] }
 
 [dev-dependencies]
+stef_derive = { path = ".", features = ["recording"]}
 derive_more = "*"
-stef = { path = "../stef" }
+proptest-derive = "*"
+stef = { path = "../stef", features = ["recording"] }
 
 [lib]
 proc-macro = true
+
+[features]
+recording = [
+    "stef/recording"
+]
 
 # [workspace]
