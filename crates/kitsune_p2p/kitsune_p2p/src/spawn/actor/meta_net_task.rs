@@ -2305,7 +2305,7 @@ mod tests {
 
         let host_stub = HostStub::new();
 
-        let fetch_pool = FetchPool::new_bitwise_or();
+        let fetch_pool = FetchPool::new_bitwise_or(None);
 
         let fetch_response_queue =
             FetchResponseQueue::new(FetchResponseConfig::new(Default::default()));

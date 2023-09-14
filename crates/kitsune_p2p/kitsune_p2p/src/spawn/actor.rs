@@ -19,6 +19,7 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
@@ -168,8 +169,9 @@ impl KitsuneP2pActor {
         let fetch_response_queue =
             FetchResponseQueue::new(FetchResponseConfig::new(config.tuning_params.clone()));
 
-        // TODO - use a real config
-        let fetch_pool = FetchPool::new_bitwise_or();
+        // TODO - use a real config, i.e. use `FetchPool::new`
+        let storage_path = std::option_env!("STEF_RECORD_FETCHPOOL").map(PathBuf::from);
+        let fetch_pool = FetchPool::new_bitwise_or(storage_path);
 
         // Start a loop to handle our fetch queue fetch items.
         FetchTask::spawn(fetch_pool.clone(), host.clone(), internal_sender.clone());

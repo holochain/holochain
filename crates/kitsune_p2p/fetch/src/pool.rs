@@ -10,7 +10,7 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{KAgent, KSpace};
@@ -97,14 +97,17 @@ type NextItem = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 
 impl FetchPool {
     /// Constructor
-    pub fn new(config: FetchConfig) -> Self {
-        FetchPoolState::new(config).into()
+    pub fn new(config: FetchConfig, storage_path: Option<PathBuf>) -> Self {
+        Self(stef::Share::new(stef::RecordActions::new(
+            storage_path,
+            FetchPoolState::new(config),
+        )))
     }
 
     /// Constructor, using only the "hardcoded" config (TODO: remove)
-    pub fn new_bitwise_or() -> Self {
+    pub fn new_bitwise_or(storage_path: Option<PathBuf>) -> Self {
         let config = Arc::new(FetchPoolConfigBitwiseOr);
-        FetchPoolState::new(config).into()
+        Self::new(config, storage_path)
     }
 
     /// Get a list of the next items that should be fetched.
@@ -837,7 +840,7 @@ mod tests {
         let mut u = Unstructured::new(&noise);
 
         // Create a fetch pool to test
-        let mut fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}));
+        let mut fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}), None);
 
         // Some sources will be unavailable for blocks of time
         let unavailable_sources: HashSet<FetchSource> =
@@ -906,7 +909,7 @@ mod tests {
         let context_1 = FetchContext(FLAG_1);
         let context_2 = FetchContext(FLAG_2);
 
-        let pool = FetchPool::new_bitwise_or();
+        let pool = FetchPool::new_bitwise_or(None);
         let merged = pool.read(|s| s.config.merge_fetch_contexts(*context_1, *context_2));
 
         assert_eq!(FLAG_1, merged & FLAG_1);

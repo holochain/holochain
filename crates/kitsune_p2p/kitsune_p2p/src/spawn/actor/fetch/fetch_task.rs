@@ -194,7 +194,7 @@ mod tests {
 
         tokio::spawn(builder.spawn(task));
 
-        let fetch_pool = FetchPool::new_bitwise_or();
+        let fetch_pool = FetchPool::new_bitwise_or(None);
 
         let op_data = Arc::new(Mutex::new(HashSet::<KOpHash>::new()));
         let check_op_data_call_count = Arc::new(AtomicUsize::new(0));

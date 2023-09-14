@@ -24,7 +24,7 @@ impl ShardedGossipLocal {
         let mut u = arbitrary::Unstructured::new(&NOISE);
         let space = KitsuneSpace::arbitrary(&mut u).unwrap();
         let space = Arc::new(space);
-        let fetch_pool = FetchPool::new_bitwise_or();
+        let fetch_pool = FetchPool::new_bitwise_or(None);
 
         Self {
             gossip_type,
