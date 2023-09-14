@@ -143,7 +143,7 @@ pub fn state(
 #[derive(Default)]
 struct Options {
     _parameterized: Option<syn::Path>,
-    newtypes: Vec<syn::Type>,
+    wrappers: Vec<syn::Type>,
     fuzzing: bool,
     recording: bool,
 }
@@ -154,11 +154,11 @@ impl syn::parse::Parse for Options {
 
         while !input.is_empty() {
             let key: syn::Path = input.parse()?;
-            if key.is_ident("newtype") {
+            if key.is_ident("wrapper") {
                 let content;
                 syn::parenthesized!(content in input);
                 let struct_name: syn::Type = content.parse()?;
-                this.newtypes.push(struct_name);
+                this.wrappers.push(struct_name);
             } else if key.is_ident("fuzzing") {
                 this.fuzzing = true;
             } else if key.is_ident("recording") {
@@ -214,7 +214,7 @@ fn state_impl(
 ) -> proc_macro::TokenStream {
     let Options {
         _parameterized: _,
-        newtypes,
+        wrappers,
         fuzzing,
         recording,
     } = parse_macro_input!(attr as Options);
@@ -497,9 +497,9 @@ fn state_impl(
     //     .clone()
     //     .expect("must use `impl stef::State<_> for ...`");
 
-    // #[stef::share(newtype(Foo))]
-    let define_newtype_impls = ss_flatten(newtypes.into_iter().map(|name| {
-        let define_newtype_fns_inner = ss_flatten(fns.iter().map(|f| {
+    // #[stef::share(wrapper(Foo))]
+    let define_wrapper_impls = ss_flatten(wrappers.into_iter().map(|name| {
+        let define_wrapper_fns_inner = ss_flatten(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
             let variant_name = f.variant_name();
             let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
@@ -539,18 +539,18 @@ fn state_impl(
             original_func.to_token_stream()
         }));
 
-        let mut define_newtype_impl: syn::ItemImpl = syn::parse(
+        let mut define_wrapper_impl: syn::ItemImpl = syn::parse(
             quote! {
                 impl #name {
-                    #define_newtype_fns_inner
+                    #define_wrapper_fns_inner
                 }
             }
             .into(),
         )
         .expect("problem xyzzy72!");
-        define_newtype_impl.generics = item.generics.clone();
+        define_wrapper_impl.generics = item.generics.clone();
 
-        // let mut define_newtype_state_impl: syn::ItemImpl = syn::parse(
+        // let mut define_wrapper_state_impl: syn::ItemImpl = syn::parse(
         //     quote! {
         //         impl #item_trait #item_for_token #name {
         //             type Action = #action_name;
@@ -564,10 +564,10 @@ fn state_impl(
         //     .into(),
         // )
         // .expect("problem 84842n!");
-        // define_newtype_state_impl.generics = item.generics.clone();
+        // define_wrapper_state_impl.generics = item.generics.clone();
 
         quote! {
-            #define_newtype_impl
+            #define_wrapper_impl
         }
     }));
 
@@ -659,7 +659,7 @@ fn state_impl(
         #define_public_fns
         #define_hidden_fns
         #define_state_impl
-        #define_newtype_impls
+        #define_wrapper_impls
     };
 
     proc_macro::TokenStream::from(expanded)

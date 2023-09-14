@@ -351,7 +351,7 @@ pub type AgentList = HashSet<KAgent>;
 #[derive(Clone, Debug, derive_more::Deref, derive_more::DerefMut, stef::State)]
 pub struct MetricsSync(stef::Share<Metrics>);
 
-#[stef::state(fuzzing, newtype(MetricsSync))]
+#[stef::state(fuzzing, wrapper(MetricsSync))]
 impl stef::State<'static> for Metrics {
     type Action = MetricsAction;
     type Effect = ();

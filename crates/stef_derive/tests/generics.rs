@@ -23,7 +23,7 @@ impl<D: 'static + Clone + Eq + std::fmt::Debug> From<People<D>> for PeopleShare<
     }
 }
 
-#[stef_derive::state(newtype(PeopleShare<D>))]
+#[stef_derive::state(wrapper(PeopleShare<D>))]
 impl<D: 'static + Clone + Eq + std::fmt::Debug> stef::State<'static> for People<D> {
     type Action = PeopleAction<D>;
     type Effect = Option<PeopleFx<D>>;

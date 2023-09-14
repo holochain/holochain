@@ -144,7 +144,7 @@ impl From<FetchPoolState> for FetchPool {
     }
 }
 
-#[stef::state(recording, fuzzing, newtype(FetchPool))]
+#[stef::state(recording, fuzzing, wrapper(FetchPool))]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
     type Effect = Option<FetchPoolEffect>;
