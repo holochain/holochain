@@ -7249,8 +7249,10 @@ dependencies = [
  "petgraph",
  "proptest",
  "proptest-derive 0.4.0",
+ "rmp-serde 0.15.5",
  "serde",
  "stef_derive",
+ "tempfile",
  "tokio",
 ]
 

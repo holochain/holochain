@@ -85,6 +85,10 @@ pub mod util;
 #[cfg(feature = "derive")]
 pub use stef_derive::{state, State};
 
+#[cfg(feature = "recording")]
+mod recording;
+pub use recording::*;
+
 #[cfg(feature = "diagramming")]
 pub mod diagram;
 

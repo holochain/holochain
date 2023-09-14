@@ -19,3 +19,4 @@ pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
     use futures::FutureExt;
     async move { result }.boxed().into()
 }
+

@@ -10,7 +10,7 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::sync::Arc;
+use std::{io::Write, path::PathBuf, sync::Arc};
 use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{KAgent, KSpace};
@@ -98,13 +98,13 @@ type NextItem = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 impl FetchPool {
     /// Constructor
     pub fn new(config: FetchConfig) -> Self {
-        Self(stef::Share::new(FetchPoolState::new(config)))
+        FetchPoolState::new(config).into()
     }
 
     /// Constructor, using only the "hardcoded" config (TODO: remove)
     pub fn new_bitwise_or() -> Self {
         let config = Arc::new(FetchPoolConfigBitwiseOr);
-        Self(stef::Share::new(FetchPoolState::new(config)))
+        FetchPoolState::new(config).into()
     }
 
     /// Get a list of the next items that should be fetched.
@@ -136,11 +136,33 @@ pub enum FetchPoolEffect {
 
 /// Shared access to FetchPoolState
 #[derive(Clone, Debug, derive_more::Deref, stef::State)]
-pub struct FetchPool(stef::Share<FetchPoolState>);
+pub struct FetchPool {
+    #[deref]
+    state: stef::Share<FetchPoolState>,
+    storage: Option<Arc<PathBuf>>,
+}
+
+impl stef::State<'static> for FetchPool {
+    type Action = <FetchPoolState as stef::State<'static>>::Action;
+    type Effect = <FetchPoolState as stef::State<'static>>::Effect;
+
+    fn transition(&mut self, action: Self::Action) -> Self::Effect {
+        if let Some(path) = self.storage {
+            let bytes = encode(&action).unwrap();
+            let mut f = std::fs::File::options().append(true).open(&*path).unwrap();
+            f.write(&bytes.len().to_le_bytes()).unwrap();
+            f.write(&bytes).unwrap();
+        }
+        self.state.transition(action)
+    }
+}
 
 impl From<FetchPoolState> for FetchPool {
     fn from(pool: FetchPoolState) -> Self {
-        FetchPool(stef::Share::new(pool))
+        FetchPool {
+            state: stef::Share::new(pool),
+            storage: None,
+        }
     }
 }
 

@@ -10,7 +10,6 @@ derive_more = { version = "*" }
 futures = { version = "*" }
 must_future = { version = "*" }
 parking_lot = { version = "*" }
-serde = { version = "*", features = ["derive"] }
 
 # derive
 stef_derive = { path = "../stef_derive", optional = true }
@@ -19,14 +18,19 @@ stef_derive = { path = "../stef_derive", optional = true }
 petgraph = { version = "*", optional = true }
 proptest = { version = "*", optional = true }
 
+# recording
+serde = { version = "*", features = ["derive"], optional = true }
+rmp-serde = { version = "*", optional = true }
+
 [dev-dependencies]
 either = { version = "*" }
 proptest = { version = "*" }
 proptest-derive = { version = "*" }
+tempfile = "3"
 tokio = { version = "*", features = ["full"] }
 
 [features]
-default = ["derive", "diagramming"]
+default = ["derive", "diagramming", "recording"]
 
 derive = [
     "stef_derive",
@@ -35,6 +39,11 @@ derive = [
 diagramming = [
     "petgraph",
     "proptest",
+]
+
+recording = [
+    "serde",
+    "rmp-serde",
 ]
 
 invariants = [
