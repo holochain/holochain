@@ -24,15 +24,15 @@ impl FetchTask {
                     let list = fetch_pool.get_items_to_fetch();
 
                     for (key, space, source, context) in list {
-                        if let FetchKey::Op(op_hash) = &key {
-                            if let Ok(mut res) = host
-                                .check_op_data(space.clone(), vec![op_hash.clone()], context)
-                                .await
-                            {
-                                if res.len() == 1 && res.remove(0) {
-                                    fetch_pool.remove(key);
-                                    continue;
-                                }
+                        let FetchKey::Op(op_hash) = &key;
+
+                        if let Ok(mut res) = host
+                            .check_op_data(space.clone(), vec![op_hash.clone()], context)
+                            .await
+                        {
+                            if res.len() == 1 && res.remove(0) {
+                                fetch_pool.remove(key);
+                                continue;
                             }
                         }
 
@@ -70,7 +70,7 @@ mod tests {
     use futures::FutureExt;
     use ghost_actor::actor_builder::GhostActorBuilder;
     use ghost_actor::{GhostControlSender, GhostSender};
-    use kitsune_p2p_fetch::test_utils::{test_key_hash, test_req_op, test_req_region, test_source};
+    use kitsune_p2p_fetch::test_utils::{test_key_hash, test_req_op, test_source};
     use kitsune_p2p_fetch::FetchSource;
     use kitsune_p2p_fetch::{FetchKey, FetchPool};
     use kitsune_p2p_types::KOpHash;
@@ -114,7 +114,7 @@ mod tests {
             setup(InternalStub::new()).await;
 
         // Do enough testing to prove the loop is up and running
-        fetch_pool.push(test_req_region(1, None, test_source(1)));
+        fetch_pool.push(test_req_op(1, None, test_source(1)));
         wait_for_pool_n(&fetch_pool, 1).await;
         wait_for_fetch_n(internal_sender_test.clone(), 1).await;
 

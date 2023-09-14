@@ -296,7 +296,6 @@ impl FetchPoolState {
                         let h = hash.to_string();
                         format!("{}..{}", &h[0..4], &h[h.len() - 4..])
                     }
-                    FetchKey::Region(_) => "[region]".to_string(),
                 };
 
                 let size = v.size.unwrap_or_default().get();
@@ -942,12 +941,6 @@ mod tests {
         }
 
         let mut pool = FetchPoolState::new(Arc::new(Config));
-
-        // filter out region keys
-        let actions = actions.into_iter().filter(|a| match a {
-            FetchPoolAction::Push(push) => !matches!(push.key, FetchKey::Region(_)),
-            _ => true,
-        });
 
         // apply the random actions
         for (i, mut a) in actions.into_iter().enumerate() {

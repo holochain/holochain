@@ -78,7 +78,7 @@ where
                     let len = u32::from_le_bytes(lbuf);
                     abuf.resize(len as usize, 0);
                     f.read(&mut abuf)?;
-                    actions.push(rmp_serde::from_read_ref(&abuf).unwrap());
+                    actions.push(rmp_serde::from_slice(&abuf).unwrap());
                 }
             }
         }

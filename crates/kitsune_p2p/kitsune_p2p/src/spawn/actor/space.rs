@@ -2,6 +2,7 @@ use super::*;
 use crate::metrics::*;
 use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModule;
+use base64::Engine;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
@@ -723,8 +724,8 @@ async fn update_single_agent_info(
                     mdns_kill_thread(current_handle.to_owned());
                 }
                 // Broadcast by using Space as service type and Agent as service name
-                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
+                let agent_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&agent[..]);
                 //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
                 // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
                 // Broadcast rmp encoded agent_info_signed
@@ -802,7 +803,7 @@ impl KitsuneP2pHandler for Space {
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
-                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
                 if !self.mdns_listened_spaces.contains(&space_b64) {
                     self.mdns_listened_spaces.insert(space_b64.clone());
                     tokio::task::spawn(async move {
