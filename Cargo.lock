@@ -7151,8 +7151,10 @@ dependencies = [
  "petgraph",
  "proptest",
  "proptest-derive",
+ "rmp-serde 0.15.5",
  "serde",
  "stef_derive",
+ "tempfile",
  "tokio",
 ]
 
@@ -7160,11 +7162,14 @@ dependencies = [
 name = "stef_derive"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "heck 0.4.1",
  "proc-macro-error",
  "proc-macro2 1.0.64",
+ "proptest-derive",
  "quote 1.0.29",
  "stef",
+ "stef_derive",
  "syn 2.0.25",
 ]
 
