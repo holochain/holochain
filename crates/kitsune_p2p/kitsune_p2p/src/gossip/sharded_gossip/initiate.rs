@@ -8,7 +8,7 @@ impl ShardedGossipLocal {
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(
         &self,
-        agent_list: AgentList,
+        agent_list: Vec<Arc<AgentInfoSigned>>,
         all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
@@ -47,7 +47,7 @@ impl ShardedGossipLocal {
             .await?;
 
         let maybe_gossip = if let Some(next_target::Node {
-            agent_list: agent_info_list,
+            agent_list: remote_agent_list,
             cert,
             url,
         }) = remote_agent
@@ -57,7 +57,7 @@ impl ShardedGossipLocal {
             let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
 
             let tgt = ShardedGossipTarget {
-                remote_agent_list: agent_info_list,
+                remote_agent_list,
                 cert: cert.clone(),
                 tie_break: id,
                 when_initiated: Some(Instant::now()),
@@ -143,7 +143,7 @@ impl ShardedGossipLocal {
             .await
             .map_err(KitsuneError::other)?
             .into_iter()
-            .map(|a| a.agent())
+            .map(Arc::new)
             .collect();
 
         // Send the intervals back as the accept message.

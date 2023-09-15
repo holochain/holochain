@@ -36,7 +36,7 @@ async fn sharded_sanity_test() {
 
     // - Bob tries to initiate.
     let (_, _, bob_outgoing) = bob
-        .try_initiate(bob.show_local_agents(), &all_agents)
+        .try_initiate(bob.test_agent_info().await, &all_agents)
         .await
         .unwrap()
         .unwrap();
@@ -553,12 +553,12 @@ async fn double_initiate_is_handled() {
 
     // - Both players try to initiate and only have the other as a remote agent.
     let (bob_cert, _, alice_initiate) = alice
-        .try_initiate(alice.show_local_agents(), &all_agents)
+        .try_initiate(alice.test_agent_info().await, &all_agents)
         .await
         .unwrap()
         .unwrap();
     let (alice_cert, _, bob_initiate) = bob
-        .try_initiate(bob.show_local_agents(), &all_agents)
+        .try_initiate(bob.test_agent_info().await, &all_agents)
         .await
         .unwrap()
         .unwrap();
@@ -603,7 +603,7 @@ async fn initiate_after_target_is_set() {
 
     // - Alice successfully initiates a round with bob.
     let (cert, _, alice_initiate) = alice
-        .try_initiate(alice.show_local_agents(), &all_agents)
+        .try_initiate(alice.test_agent_info().await, &all_agents)
         .await
         .unwrap()
         .unwrap();
@@ -625,7 +625,7 @@ async fn initiate_after_target_is_set() {
         .unwrap();
     // - Bob tries to initiate a round with alice.
     let bob_initiate = bob
-        .try_initiate(bob.show_local_agents(), &all_agents)
+        .try_initiate(bob.test_agent_info().await, &all_agents)
         .await
         .unwrap();
     bob.inner
@@ -665,7 +665,7 @@ async fn initiate_times_out() {
 
     // Trying to initiate a round should succeed.
     let (tgt_cert, _, _) = alice
-        .try_initiate(alice.show_local_agents(), &all_agents)
+        .try_initiate(alice.test_agent_info().await, &all_agents)
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -677,7 +677,7 @@ async fn initiate_times_out() {
         })
         .unwrap();
     let r = alice
-        .try_initiate(alice.show_local_agents(), &all_agents)
+        .try_initiate(alice.test_agent_info().await, &all_agents)
         .await
         .unwrap();
 
@@ -698,7 +698,7 @@ async fn initiate_times_out() {
     .await;
 
     let (tgt2_cert, _, alice_initiate) = alice
-        .try_initiate(alice.show_local_agents(), &all_agents)
+        .try_initiate(alice.test_agent_info().await, &all_agents)
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -757,7 +757,7 @@ async fn initiate_times_out() {
     // Check that initiating again doesn't do anything.
 
     let r = alice
-        .try_initiate(alice.show_local_agents(), &all_agents)
+        .try_initiate(alice.test_agent_info().await, &all_agents)
         .await
         .unwrap();
     // Doesn't re-initiate.

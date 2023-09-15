@@ -197,7 +197,7 @@ impl ShardedGossip {
             bandwidth,
         });
 
-        let mut agent_list_by_local_agents = AgentList::new();
+        let mut agent_list_by_local_agents = Vec::new();
         let mut all_agents = vec![];
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
@@ -222,13 +222,13 @@ impl ShardedGossip {
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
                         agent_list_by_local_agents =
                             match this.gossip.query_agents_by_local_agents().await {
-                                Ok(a) => a.into_iter().map(|a| a.agent()).collect(),
+                                Ok(a) => a.into_iter().map(Arc::new).collect(),
                                 Err(e) => {
                                     tracing::error!(
                                         "Failed to query for agents by local agents - {:?}",
                                         e
                                     );
-                                    AgentList::new()
+                                    Vec::new()
                                 }
                             };
                         all_agents = match store::all_agent_info(
@@ -387,7 +387,7 @@ impl ShardedGossip {
 
     async fn run_one_iteration(
         &self,
-        agent_list_by_local_agents: AgentList,
+        agent_list_by_local_agents: Vec<Arc<AgentInfoSigned>>,
         all_agents: &[AgentInfoSigned],
     ) {
         match self
@@ -902,15 +902,24 @@ impl ShardedGossipLocal {
                 id,
                 agent_list,
             }) => {
-                self.incoming_initiate(peer_cert, intervals, id, agent_list)
-                    .await?
+                self.incoming_initiate(
+                    peer_cert,
+                    intervals,
+                    id,
+                    agent_list.into_iter().map(|i| i.agent()).collect(),
+                )
+                .await?
             }
             ShardedGossipWire::Accept(Accept {
                 intervals,
                 agent_list,
             }) => {
-                self.incoming_accept(peer_cert, intervals, agent_list)
-                    .await?
+                self.incoming_accept(
+                    peer_cert,
+                    intervals,
+                    agent_list.into_iter().map(|i| i.agent()).collect(),
+                )
+                .await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&peer_cert)? {
@@ -1102,6 +1111,23 @@ impl ShardedGossipLocal {
             .unwrap_or_default()
     }
 
+    /// Get fake agent info where only the agent is correct.
+    /// This is only relevant for the 0.2 backport, since in 0.3, most places in sharded_gossip
+    /// went from accepting agent into to just agent keys, but to make this a non-breaking change,
+    /// we need to go back to agent info in a few places, even though only the agent key is ever used.
+    #[cfg(test)]
+    async fn test_agent_info(&self) -> Vec<Arc<AgentInfoSigned>> {
+        futures::future::join_all(self.show_local_agents().into_iter().map(|agent| {
+            AgentInfoSigned::sign(self.space.clone(), agent, 0, vec![], 0, 0, |_| async move {
+                Ok(Arc::new(KitsuneSignature::from(vec![])))
+            })
+        }))
+        .await
+        .into_iter()
+        .map(|r| Arc::new(r.unwrap()))
+        .collect()
+    }
+
     fn log_state(&self) {
         self.inner
             .share_mut(|i, _| {
@@ -1217,7 +1243,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
-            agent_list.2: AgentList,
+            agent_list.2: Vec<Arc<AgentInfoSigned>>,
         },
 
         /// Accept an incoming round of gossip from a remote node
@@ -1226,7 +1252,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// for all local agents
             intervals.0: Vec<DhtArcRange>,
             /// List of active local agents represented by this node.
-            agent_list.1: AgentList,
+            agent_list.1: Vec<Arc<AgentInfoSigned>>,
         },
 
         /// Send Agent Info Bloom
