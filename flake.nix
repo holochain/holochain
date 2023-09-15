@@ -48,7 +48,6 @@
 
     versions.url = "github:holochain/holochain?dir=versions/0_1";
 
-    # "empty" repo does not have a flake
     holochain.follows = "empty";
     holochain.flake = false;
     lair.follows = "empty";
