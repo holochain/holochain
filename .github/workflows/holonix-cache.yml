@@ -17,14 +17,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cmd:
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
-          - extra_arg: '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
+        extra_args:
+          - '--override-input versions "./versions/0_1"'
+          - '--override-input versions "./versions/0_2"'
+          - '--override-input versions "./versions/weekly"'
         platform:
-          - system: x86_64-darwin
-          - system: aarch64-darwin
-          - system: x86_64-linux
+          - x86_64-darwin
+          - aarch64-darwin
+          - x86_64-linux
 
     runs-on: [ self-hosted, multi-arch ]
     steps:
@@ -38,18 +38,17 @@ jobs:
           MATRIX: ${{ toJSON(matrix) }}
         run: echo ${MATRIX}
 
-      - name: "Cache packages ${{ join(matrix.cmd.pkgs, ',') }}"
+      - name: "Cache packages ${{ matrix.extra_args }}"
         env:
-          system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
           CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI }}"
         run: |
           set -xe
 
           # See https://docs.cachix.org/pushing#id1
-          nix build --refresh -L \
-            ${{ matrix.cmd.extra_arg }} \
-            .#packages.${system}.build-holonix-tests-integration
+          nix build -L \
+            ${{ matrix.extra_args }} \
+            .#devShells.${{ matrix.platform }}.holonix
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
@@ -64,9 +63,9 @@ jobs:
       fail-fast: false
       matrix:
         extra_args:
-          - '--override-input versions github:holochain/holochain?dir=versions/0_1'
-          - '--override-input versions github:holochain/holochain?dir=versions/0_2'
-          - '--override-input versions github:holochain/holochain?dir=versions/weekly'
+          - '--override-input versions ./versions/0_1'
+          - '--override-input versions ./versions/0_2'
+          - '--override-input versions ./versions/weekly'
         platform:
           - x86_64-darwin
           - aarch64-darwin
