@@ -14,7 +14,16 @@ pub enum PeopleFx<D> {
     SayHi(String, D),
 }
 
-#[stef_derive::state(gen(struct PeopleShare<D> = stef::Share))]
+#[derive(derive_more::Deref, stef::State)]
+pub struct PeopleShare<D: std::fmt::Debug>(stef::Share<People<D>>);
+
+impl<D: 'static + Clone + Eq + std::fmt::Debug> From<People<D>> for PeopleShare<D> {
+    fn from(value: People<D>) -> Self {
+        Self(stef::Share::new(value))
+    }
+}
+
+#[stef_derive::state(wrapper(PeopleShare<D>))]
 impl<D: 'static + Clone + Eq + std::fmt::Debug> stef::State<'static> for People<D> {
     type Action = PeopleAction<D>;
     type Effect = Option<PeopleFx<D>>;
@@ -50,7 +59,7 @@ fn test_generics() {
     p.transition(PeopleAction::Clear);
     assert_eq!(p.0.len(), 0);
 
-    let shared = PeopleShare::new(p);
+    let mut shared = PeopleShare::from(p);
 
     shared.add("Ryan".into(), 25, false);
     assert_eq!(shared.read(|s| s.0.len()), 1);

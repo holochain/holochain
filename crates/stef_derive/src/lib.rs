@@ -63,7 +63,68 @@ use quote::{quote, ToTokens};
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Expr, Ident, Pat, Token, Type};
+use syn::{
+    parse_macro_input, Expr, Ident, Pat, Token, TraitBound, Type, TypeParamBound, Visibility,
+};
+
+#[proc_macro_derive(State)]
+pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    // let original: TokenStream = item.clone().into();
+    let mut strukt: syn::ItemStruct =
+        syn::parse(item).expect("State can only be derived for a struct");
+    if strukt.fields.len() != 1 {
+        proc_macro_error::abort_call_site!(
+            "State can only be derived for a struct with a single tuple field"
+        )
+    }
+    let field = strukt.fields.into_iter().next().unwrap();
+    let ty = field.ty;
+    // let ty = match field.ty {
+    //     Type::Path(p) => p,
+    //     _ => proc_macro_error::abort_call_site!("Struct field must have simple type"),
+    // };
+    let name = strukt.ident;
+    // panic!("{:#?}", strukt.generics.split_for_impl());
+
+    let tb: TraitBound = syn::parse(
+        quote! {
+            stef::State<'static>
+        }
+        .into(),
+    )
+    .unwrap();
+    strukt
+        .generics
+        .make_where_clause()
+        .predicates
+        .push(syn::WherePredicate::Type(syn::PredicateType {
+            lifetimes: None,
+            bounded_ty: ty.clone(),
+            colon_token: Default::default(),
+            bounds: Punctuated::from_iter(std::iter::once(TypeParamBound::Trait(tb))),
+        }));
+    let (igen, tgen, where_clause) = strukt.generics.split_for_impl();
+
+    let mut state_impl: syn::ItemImpl = syn::parse(
+        quote! {
+            impl #igen stef::State<'static> for #name #tgen #where_clause {
+                type Action = <#ty as stef::State<'static>>::Action;
+                type Effect = <#ty as stef::State<'static>>::Effect;
+
+                fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                    self.0.transition(action)
+                }
+            }
+        }
+        .into(),
+    )
+    .expect("problem 84842n!");
+    state_impl.generics = strukt.generics.clone();
+
+    proc_macro::TokenStream::from(quote! {
+        #state_impl
+    })
+}
 
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
@@ -82,31 +143,26 @@ pub fn state(
 #[derive(Default)]
 struct Options {
     _parameterized: Option<syn::Path>,
-    gen_paths: Vec<(syn::Type, Vec<syn::Path>)>,
+    wrappers: Vec<syn::Type>,
+    fuzzing: bool,
+    recording: bool,
 }
 
 impl syn::parse::Parse for Options {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // let mut this = Self {
-        //     _parameterized: Default::default(),
-        //     share_type: Default::default(),
-        //     gen_paths: Default::default(),
-        // };
         let mut this = Self::default();
 
         while !input.is_empty() {
             let key: syn::Path = input.parse()?;
-            if key.is_ident("gen") {
+            if key.is_ident("wrapper") {
                 let content;
                 syn::parenthesized!(content in input);
-                let _: syn::Token![struct] = content.parse()?;
                 let struct_name: syn::Type = content.parse()?;
-                let _: syn::Token![=] = content.parse()?;
-                let mut items: Vec<syn::Path> = vec![];
-                while !content.is_empty() {
-                    items.push(content.parse()?);
-                }
-                this.gen_paths.push((struct_name, items));
+                this.wrappers.push(struct_name);
+            } else if key.is_ident("fuzzing") {
+                this.fuzzing = true;
+            } else if key.is_ident("recording") {
+                this.recording = true;
             }
             let _: syn::Result<syn::Token![,]> = input.parse();
         }
@@ -158,7 +214,9 @@ fn state_impl(
 ) -> proc_macro::TokenStream {
     let Options {
         _parameterized: _,
-        gen_paths,
+        wrappers,
+        fuzzing,
+        recording,
     } = parse_macro_input!(attr as Options);
 
     let mut action_name = None;
@@ -209,6 +267,42 @@ fn state_impl(
                     _ => unreachable!(),
                 })
                 .collect()
+        }
+
+        fn mapped_block(&self, val: TokenStream) -> TokenStream {
+            match (self.map_with.as_ref(), self.match_pats.is_empty()) {
+                (Some(mw), _) => {
+                    quote! {{
+                        use stef::State;
+                        let eff = #val;
+                        #mw(eff)
+                    }}
+                }
+                (None, false) => {
+                    let pats = delim::<_, Token!(,)>(self.match_pats.iter().map(
+                        |MatchPat {
+                             forward_pat,
+                             forward_expr,
+                             ..
+                         }| quote!(#forward_pat => #forward_expr),
+                    ));
+                    quote! {{
+                        use stef::State;
+                        let eff = #val;
+
+                        match eff {
+                            #pats,
+                            _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+                        }
+                    }}
+                }
+                (None, true) => {
+                    quote! {{
+                        use stef::State;
+                        #val
+                    }}
+                }
+            }
         }
     }
 
@@ -308,20 +402,26 @@ fn state_impl(
     // }
 
     let doc = "The Action type for the State (autogenerated by stef::state macro)".to_string();
-    let mut define_action_enum: syn::ItemEnum = syn::parse(
-        quote! {
-            #[doc = #doc]
-            #[derive(Debug)]
-            // TODO: don't depend on this feature being available in the consuming crate
-            #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-            pub enum #action_name {
-                #define_action_enum_variants
-            }
+    let mut define_action_enum: syn::ItemEnum = syn::parse_quote! {
+        #[doc = #doc]
+        #[derive(Debug)]
+        pub enum #action_name {
+            #define_action_enum_variants
         }
-        .into(),
-    )
-    .expect("problem 2!");
+    };
     define_action_enum.generics = item.generics.clone();
+
+    if recording && cfg!(feature = "recording") {
+        define_action_enum.attrs.push(syn::parse_quote!(
+            #[derive(::stef::dependencies::serde::Serialize, ::stef::dependencies::serde::Deserialize)]
+        ));
+    }
+
+    if fuzzing {
+        define_action_enum.attrs.push(syn::parse_quote!(
+            #[derive(::proptest_derive::Arbitrary)]
+        ));
+    }
 
     let define_hidden_fns_inner = ss_flatten(fns.iter().map(|f| {
         let mut original_func = f.f.clone();
@@ -364,42 +464,13 @@ fn state_impl(
             false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
         };
 
-        let new_block = match (f.map_with.as_ref(), f.match_pats.is_empty()) {
-            (Some(mw), _) => {
-                quote! {{
-                    use stef::State;
-                    let eff = self.transition(#arg);
-                    #mw(eff)
-                }}
-            }
-            (None, false) => {
-                let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
-                    |MatchPat {
-                         forward_pat,
-                         forward_expr,
-                         ..
-                     }| quote!(#forward_pat => #forward_expr),
-                ));
-                quote! {{
-                    use stef::State;
-                    let eff = self.transition(#arg);
-
-                    match eff {
-                        #pats,
-                        _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
-                    }
-                }}
-            }
-            (None, true) => {
-                quote! {{
-                    use stef::State;
-                    self.transition(#arg)
-                }}
-            }
-        };
+        let new_block = f.mapped_block(quote! {
+            self.transition(#arg)
+        });
 
         let ts = proc_macro::TokenStream::from(new_block.into_token_stream());
         original_func.block = syn::parse(ts).expect("problem 3!");
+        original_func.vis = Visibility::Public(Default::default());
         original_func.to_token_stream()
     }));
 
@@ -414,25 +485,21 @@ fn state_impl(
     .expect("problem 4!");
     define_hidden_fns.generics = item.generics.clone();
 
-    let mut define_public_fns: syn::ItemImpl = syn::parse(
-        quote! {
-            impl #struct_path {
-                #define_public_fns_inner
-            }
+    let mut define_public_fns: syn::ItemImpl = syn::parse_quote! {
+        impl #struct_path {
+            #define_public_fns_inner
         }
-        .into(),
-    )
-    .expect("problem 5!");
+    };
     define_public_fns.generics = item.generics.clone();
 
-    let (_, item_trait, item_for_token) = item
-        .trait_
-        .clone()
-        .expect("must use `impl stef::State<_> for ...`");
+    // let (_, item_trait, item_for_token) = item
+    //     .trait_
+    //     .clone()
+    //     .expect("must use `impl stef::State<_> for ...`");
 
-    // #[stef::share(gen(struct Foo = Bar))]
-    let define_gen_impls = ss_flatten(gen_paths.into_iter().map(|(name, paths)| {
-        let define_gen_fns_inner = ss_flatten(fns.iter().map(|f| {
+    // #[stef::share(wrapper(Foo))]
+    let define_wrapper_impls = ss_flatten(wrappers.into_iter().map(|name| {
+        let define_wrapper_fns_inner = ss_flatten(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
             let variant_name = f.variant_name();
             let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
@@ -441,111 +508,66 @@ fn state_impl(
             } else {
                 quote! { <Self as stef::State>::Action::#variant_name(#args) }
             };
-            match original_func
-                .sig
-                .inputs
-                .first_mut()
-                .expect("problem xyzzy9283!")
-            {
-                syn::FnArg::Receiver(ref mut r) => {
-                    r.mutability = None;
-                    match r.ty.as_mut() {
-                        Type::Reference(r) => r.mutability = None,
-                        _ => unreachable!(),
-                    }
-                    // r.ty.as_mut().mutability = None;
-                    // panic!("{:#?}", r.ty);
-                }
-                syn::FnArg::Typed(_) => unreachable!(),
-            }
+
+            // match original_func
+            //     .sig
+            //     .inputs
+            //     .first_mut()
+            //     .expect("problem xyzzy9283!")
+            // {
+            //     syn::FnArg::Receiver(ref mut r) => {
+            //         r.mutability = None;
+            //         match r.ty.as_mut() {
+            //             Type::Reference(r) => r.mutability = None,
+            //             _ => unreachable!(),
+            //         }
+            //         // r.ty.as_mut().mutability = None;
+            //         // panic!("{:#?}", r.ty);
+            //     }
+            //     syn::FnArg::Typed(_) => unreachable!(),
+            // }
+
             original_func.block = syn::parse(
-                quote! {{
-                    self.0.transition(#transition)
-                }}
+                f.mapped_block(quote! {
+                    self.transition(#transition)
+                })
                 .into_token_stream()
                 .into(),
             )
-            .expect("problem xyzzy48!");
+            .expect("problem xy8n88!");
+            original_func.vis = Visibility::Public(Default::default());
             original_func.to_token_stream()
         }));
 
-        let mut inner = struct_path.to_token_stream();
-        for path in paths.iter().rev() {
-            inner = quote! { #path<#inner>};
-        }
-
-        let mut define_gen_struct: syn::ItemStruct = {
-            syn::parse(
-                quote! {
-                    /// Newtype for shared access to a `stef::State`, autogenerated
-                    /// by the `#[stef::state]` attribute macro.
-                    #[derive(Clone, Debug)]
-                    pub struct #name(#inner);
-                }
-                .into(),
-            )
-            .expect("problem xyzzy29!")
-        };
-        define_gen_struct.generics = item.generics.clone();
-
-        let mut construction = quote!(data);
-        for path in paths.iter().rev() {
-            construction = quote! { #path::new(#construction)};
-        }
-
-        let mut define_gen_impl: syn::ItemImpl = syn::parse(
+        let mut define_wrapper_impl: syn::ItemImpl = syn::parse(
             quote! {
                 impl #name {
-
-                    /// Constructor
-                    pub fn new(data: #struct_path) -> Self {
-                        Self(#construction)
-                    }
-
-                    #define_gen_fns_inner
+                    #define_wrapper_fns_inner
                 }
             }
             .into(),
         )
         .expect("problem xyzzy72!");
-        define_gen_impl.generics = item.generics.clone();
+        define_wrapper_impl.generics = item.generics.clone();
 
-        let mut define_deref_impl: syn::ItemImpl = syn::parse(
-            quote! {
-                impl std::ops::Deref for #name {
-                    type Target = #inner;
+        // let mut define_wrapper_state_impl: syn::ItemImpl = syn::parse(
+        //     quote! {
+        //         impl #item_trait #item_for_token #name {
+        //             type Action = #action_name;
+        //             type Effect = #effect_name;
 
-                    fn deref(&self) -> &Self::Target {
-                        &self.0
-                    }
-                }
-            }
-            .into(),
-        )
-        .expect("problem 7232!");
-        define_deref_impl.generics = item.generics.clone();
-
-        let mut define_gen_state_impl: syn::ItemImpl = syn::parse(
-            quote! {
-                impl #item_trait #item_for_token #name {
-                    type Action = #action_name;
-                    type Effect = #effect_name;
-
-                    fn transition(&mut self, action: Self::Action) -> Self::Effect {
-                        self.0.transition(action)
-                    }
-                }
-            }
-            .into(),
-        )
-        .expect("problem 84842n!");
-        define_gen_state_impl.generics = item.generics.clone();
+        //             fn transition(&mut self, action: Self::Action) -> Self::Effect {
+        //                 self.0.transition(action)
+        //             }
+        //         }
+        //     }
+        //     .into(),
+        // )
+        // .expect("problem 84842n!");
+        // define_wrapper_state_impl.generics = item.generics.clone();
 
         quote! {
-            #define_gen_struct
-            #define_gen_impl
-            #define_gen_state_impl
-            #define_deref_impl
+            #define_wrapper_impl
         }
     }));
 
@@ -637,7 +659,7 @@ fn state_impl(
         #define_public_fns
         #define_hidden_fns
         #define_state_impl
-        #define_gen_impls
+        #define_wrapper_impls
     };
 
     proc_macro::TokenStream::from(expanded)

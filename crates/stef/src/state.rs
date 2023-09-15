@@ -19,6 +19,13 @@ pub trait State<'a> {
     fn transition(&mut self, action: Self::Action) -> Self::Effect;
 }
 
+impl State<'static> for () {
+    type Action = ();
+    type Effect = ();
+
+    fn transition(&mut self, (): Self::Action) -> Self::Effect {}
+}
+
 // impl<'a, S> State<'a> for Box<S>
 // where
 //     S: State<'a>,
