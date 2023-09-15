@@ -234,11 +234,10 @@ impl LocalBehavior1 {
                 );
 
                 loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    this.lock().unwrap().validate();
-
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    this.lock().unwrap().validate();
+                    for _ in 0..6 {
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                        this.lock().unwrap().validate();
+                    }
 
                     println!("spawn shallow query only node that shuts down after ~3 m, query every ~15 s");
                     let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
