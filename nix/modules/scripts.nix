@@ -54,18 +54,6 @@
           mv flake.lock{.new,}
         )
 
-        if [[ $(${pkgs.git}/bin/git diff -- ''${VERSIONS_DIR}/flake.lock | grep -E '^[+-]\s+"' --count) -eq 0 ]]; then
-          echo got no actual source changes, reverting modifications..;
-          ${pkgs.git}/bin/git checkout ''${VERSIONS_DIR}/flake.lock
-          exit 0
-        else
-          ${pkgs.git}/bin/git commit ''${VERSIONS_DIR}/flake.lock -m "updating ''${VERSIONS_DIR} flake"
-        fi
-
-        nix flake lock --update-input versions --override-input versions "git+file:.?rev=$(git rev-parse HEAD)&dir=versions/0_1"
-        jq . < flake.lock | grep -v revCount | grep -v lastModified > flake.lock.new
-        mv flake.lock{.new,}
-
         # replace the URL of the versions flake with the github URL
         nix eval --impure --json --expr "
           let
