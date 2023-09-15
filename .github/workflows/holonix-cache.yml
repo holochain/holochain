@@ -80,7 +80,7 @@ jobs:
       - uses: cachix/cachix-action@v12
         with:
           name: holochain-ci
-      - name: Check Holonix cache
+      - name: Check the Holonix cache
         uses: ThetaSinner/nix-cache-check@v1
         env:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
