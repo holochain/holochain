@@ -27,7 +27,7 @@
       },
       "original": {
         "owner": "holochain",
-        "ref": "main",
+        "ref": "lair_keystore-v0.2.4",
         "repo": "lair",
         "type": "github"
       }
@@ -59,10 +59,10 @@
     "scaffolding": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-U6V453QPUGI6PhtO7kkQCFxEB9WZPiU6hjwyPUdEHaE=",
+        "narHash": "sha256-ea/JlbLUTJ2yMIY0a+RcDZYh0bPTdEAQyWuLecM2HNw=",
         "owner": "holochain",
         "repo": "scaffolding",
-        "rev": "85997cbc4c92f0fea87447d7c7daed1245b47700",
+        "rev": "4b63dd9cc47d96ea62ed74ed680e398176babddc",
         "type": "github"
       },
       "original": {
