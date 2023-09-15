@@ -48,10 +48,12 @@ jobs:
         run: |
           set -xe
 
+          target=${{ matrix.target }}
+
           # See https://docs.cachix.org/pushing#id1
           nix build -L \
             ${{ matrix.extra_args }} \
-            ${${{ matrix.target }}/PLATFORM/${{ matrix.platform}}}
+            ${target/PLATFORM/${{ matrix.platform}}}
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
