@@ -71,7 +71,7 @@
           let
             lib = (import ${pkgs.path} {}).lib;
             lock = builtins.fromJSON (builtins.readFile ./flake.lock);
-            lock_updated = lib.recursiveUpdate lock { nodes.versions.locked.url = \"github:holochain/holochain?dir=versions/0_1\"; };
+            lock_updated = lib.recursiveUpdate lock { nodes.versions.locked.url = \"github:holochain/holochain?dir=''${VERSIONS_DIR}\"; };
           in lock_updated
         " | ${pkgs.jq}/bin/jq --raw-output . > flake.lock.new
         mv flake.lock{.new,}
