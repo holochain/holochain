@@ -35,54 +35,105 @@
         set -xeuo pipefail
         trap "cd $PWD" EXIT
 
-        export VERSIONS_DIR="./versions/''${1}"
-        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
+        export VERSIONS_DIR="versions/''${1}"
+        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.original.dir')"
 
         (
           cd "''${VERSIONS_DIR}"
           nix flake update
           jq . < flake.lock | grep -v revCount | grep -v lastModified > flake.lock.new
           mv flake.lock{.new,}
+        )
 
+        if [[ $(${pkgs.git}/bin/git diff -- ''${VERSIONS_DIR}/flake.lock | grep -E '^[+-]\s+"' --count) -eq 0 ]]; then
+          echo got no actual source changes, reverting modifications..;
+          ${pkgs.git}/bin/git checkout ''${VERSIONS_DIR}/flake.lock
+          exit 0
+        else
+          git commit -m "chore(flakes) [1/2]: update ''${VERSIONS_DIR}" ''${VERSIONS_DIR}/flake.lock
+        fi
+
+        # "locked": {
+        #   "lastModified": 1694809450,
+        #   "narHash": "sha256-+iMesjheOJaz2cgynF6WBR2rCEX8iSPxPq15+9JVGyo=",
+        #   "path": "versions/0_1",
+        #   "type": "path"
+        # },
+
+        # "locked": {
+        #   "dir": "versions/0_1",
+        #   "lastModified": 1694803748,
+        #   "narHash": "sha256-flpSTyaLCXm0LJenk2pxh8RjAsih0gpWvOK4pSk6nck=",
+        #   "owner": "holochain",
+        #   "repo": "holochain",
+        #   "rev": "35ffa0134a126c7d028e420686aae33d220939a7",
+        #   "type": "github"
+        # },
+
+
+        # "locked": {
+        #   "dir": "versions/0_1",
+        #   "lastModified": 1694807849,
+        #   "narHash": "sha256-s2FzrqaCpuIg8Mw+QcFe8L/QtWAB6p5vywzLpAfFot8=",
+        #   "type": "git",
+        #   "url": "file:///home/steveej/src/holo/holochain?dir=versions%2f0_1"
+        # },
+
+        # "dir": "versions/0_1",
+        # "lastModified": 1694803748,
+        # "narHash": "sha256-flpSTyaLCXm0LJenk2pxh8RjAsih0gpWvOK4pSk6nck=",
+        # "ref": "refs/heads/pr_flake_lock_mangling",
+        # "rev": "35ffa0134a126c7d028e420686aae33d220939a7",
+        # "revCount": 11505,
+        # "type": "git",
+        # "url": "file:///home/steveej/src/holo/holochain?dir=versions%2f0_1"
+
+
+        if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
+          rev=$(git show-ref --hash HEAD)
+
+          nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "./''${VERSIONS_DIR}?rev=$rev"
+          # replace the URL of the versions flake with the github URL
           nix eval --impure --json --expr "
             let
               lib = (import ${pkgs.path} {}).lib;
+              removeByPath = pathList: set:
+                lib.updateManyAttrsByPath [
+                  {
+                    path = lib.init pathList;
+                    update = old:
+                      lib.filterAttrs (n: v: n != (lib.last pathList)) old;
+                  }
+                ] set;
               lock = builtins.fromJSON (builtins.readFile ./flake.lock);
-              lock_updated = lib.recursiveUpdate lock { nodes.lair.original.ref = \"main\"; };
+              lock_updated = removeByPath [ \"nodes\" \"versions\" \"locked\" \"revCount\" ] (lib.recursiveUpdate lock {
+                nodes.versions.locked = {
+                  inherit (lock.nodes.versions.locked)
+                    lastModified
+                    narHash
+                    ;
+
+                  # type = \"github\";
+                  # owner =  \"holochain\";
+                  # repo= \"holochain\";
+                  rev = \"$rev\";
+                  ref = \"develop\";
+                  dir = \"''${VERSIONS_DIR}\";
+                  url = \"github:holochain/holochain?dir=''${VERSIONS_DIR}\";
+                };
+              });
             in lock_updated
           " | ${pkgs.jq}/bin/jq --raw-output . > flake.lock.new
           mv flake.lock{.new,}
-        )
-
-        # replace the URL of the versions flake with the github URL
-        nix eval --impure --json --expr "
-          let
-            lib = (import ${pkgs.path} {}).lib;
-            lock = builtins.fromJSON (builtins.readFile ./flake.lock);
-            lock_updated = lib.recursiveUpdate lock { nodes.versions.locked.url = \"github:holochain/holochain?dir=''${VERSIONS_DIR}\"; };
-          in lock_updated
-        " | ${pkgs.jq}/bin/jq --raw-output . > flake.lock.new
-        mv flake.lock{.new,}
-
-        if [[ $(${pkgs.git}/bin/git diff -- flake.lock | grep -E '^[+-]\s+"' --count) -eq 0 ]]; then
-          echo got no actual source changes, reverting modifications..;
-          ${pkgs.git}/bin/git checkout flake.lock
-        else
-          ${pkgs.git}/bin/git commit flake.lock -m "updating toplevel flake"
-        fi
-
-        if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
-          nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
 
         if [[ $(git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
           echo got no actual source changes in the toplevel flake.lock, reverting modifications..
           git checkout flake.lock
-        else
-          git add flake.lock
+          exit 0
         fi
 
-        git commit -m "chore(flakes): update ''${VERSIONS_DIR}"
+        echo git commit -m "chore(flakes) [2/2]: update ''${VERSIONS_DIR}" flake.lock
       '';
 
       scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''
