@@ -133,7 +133,7 @@
           exit 0
         fi
 
-        echo git commit -m "chore(flakes) [2/2]: update ''${VERSIONS_DIR}" flake.lock
+        git commit -m "chore(flakes) [2/2]: update ''${VERSIONS_DIR}" flake.lock
       '';
 
       scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''
