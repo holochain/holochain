@@ -17,6 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        target:
+          - .#packages.PLATFORM.build-holonix-tests-integration
+          - .#devShells.PLATFORM.holonix
         extra_args:
           - '--override-input versions "./versions/0_1"'
           - '--override-input versions "./versions/0_2"'
@@ -48,7 +51,7 @@ jobs:
           # See https://docs.cachix.org/pushing#id1
           nix build -L \
             ${{ matrix.extra_args }} \
-            .#devShells.${{ matrix.platform }}.holonix
+            ${${{ matrix.target }}/PLATFORM/${{ matrix.platform}}}
 
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
