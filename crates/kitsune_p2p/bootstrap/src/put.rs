@@ -27,6 +27,7 @@ async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::R
         impl warp::reject::Reject for Invalid {}
         return Err(Invalid.into());
     }
+    store.put(peer);
     PUT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let mut buf = Vec::with_capacity(1);
     rmp_encode(&mut buf, ()).map_err(|_| warp::reject())?;
