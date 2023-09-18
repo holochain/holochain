@@ -20,7 +20,6 @@ jobs:
         target:
           - .#packages.PLATFORM.build-holonix-tests-integration
           - .#devShells.PLATFORM.holonix
-          - .#packages.PLATFORM.hc-scaffold
         extra_args:
           - '--override-input versions "./versions/0_1"'
           - '--override-input versions "./versions/0_2"'
@@ -68,6 +67,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        target:
+          - ".#devShells.{0}.holonix"
+          - ".#devShells.{0}.hc-scaffold"
         extra_args:
           - '--override-input versions ./versions/0_1'
           - '--override-input versions ./versions/0_2'
@@ -91,5 +93,5 @@ jobs:
         env:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         with:
-          derivation: .#devShells.${{ matrix.platform }}.holonix
+          derivation: ${{ format(matrix.target, matrix.platform) }}
           extra_build_args: ${{ matrix.extra_args }}
