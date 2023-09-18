@@ -28,6 +28,8 @@ async fn hc_stress_test_check_zome_functions() {
 
 #[cfg(feature = "glacial_tests")]
 #[tokio::test(flavor = "multi_thread")]
+// NOTE: this test doesn't run correctly on one particular mac CI runner
+#[cfg(not(target_os = "macos"))]
 async fn hc_stress_test_3_min_behavior_1() {
     let test = LocalBehavior1::new();
 
