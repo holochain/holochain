@@ -86,7 +86,7 @@ jobs:
         with:
           name: holochain-ci
       - name: Check the Holonix cache
-        uses: ThetaSinner/nix-cache-check@v1
+        uses: holochain/nix-cache-check@v1
         env:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         with:
