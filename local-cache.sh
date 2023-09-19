@@ -43,6 +43,7 @@ function update_config {
       # Otherwise, update the value and show a diff to apply
 
       set +e
+      rm -f "$diff_path"
       # shellcheck disable=SC2094
       < "$config_path" sed -e "s/$key =/$key = ${value_to_add//\//\\/}/" | diff -u "$config_path" - > "$diff_path"
       has_diff=$?
@@ -150,12 +151,13 @@ case $command in
     for config_path in "${cleanup_paths[@]}"; do
       if test -f "$config_path"; then
         set +e
+        rm -f "$diff_path"
         # shellcheck disable=SC2094
         < "$config_path" sed -e 's/http:\/\/[[:alnum:]]*.events.infra.holochain.org *//g' \
           | sed -e 's/[[:alnum:]]*.events.infra.holochain.org:[[:alnum:]/=]* *//g' \
-          | grep -v 'extra-substituters =\s*$' \
-          | grep -v 'extra-trusted-public-keys =\s*$' \
-          | diff -u "$config_path" - > "$diff_path"
+          | sed -e '/extra-substituters =[[:blank:]]*$/d' \
+          | sed -e '/extra-trusted-public-keys =[[:blank:]]*$/d' \
+          | diff -u --ignore-blank-lines "$config_path" - > "$diff_path"
         has_diff=$?
         set -e
 
@@ -164,6 +166,8 @@ case $command in
         else
           echo "Nothing to change in [$config_path]"
         fi
+      else
+        echo "Skipping config file [$config_path] as it does not exist"
       fi
     done
   ;;
