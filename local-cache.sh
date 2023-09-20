@@ -183,7 +183,6 @@ if command -v systemctl &> /dev/null; then
   sudo systemctl restart nix-daemon
 elif command -v launchctl &> /dev/null; then
   echo "Restarting the Nix daemon with launchctl..."
-  sudo launchctl list
   sudo launchctl kickstart -k -p system/org.nixos.nix-daemon
 else
   echo "Unable to restart the Nix daemon, please restart it manually"
