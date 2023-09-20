@@ -178,7 +178,14 @@ case $command in
     print_usage
 esac
 
-echo "Restarting Nix daemon"
-sudo systemctl restart nix-daemon
+if command -v systemctl &> /dev/null; then
+  echo "Restarting the Nix daemon..."
+  sudo systemctl restart nix-daemon
+elif command -v launchctl &> /dev/null; then
+  echo "Restarting the Nix daemon..."
+  sudo launchctl kickstart system/org.nixos.nix-daemon
+else
+  echo "Unable to restart the Nix daemon, please restart it manually"
+fi
 
 echo "All done!"
