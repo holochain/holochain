@@ -71,7 +71,7 @@ jobs:
     runs-on: [self-hosted, multi-arch]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: false
 
