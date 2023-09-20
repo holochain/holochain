@@ -4,7 +4,7 @@ set -e
 
 # bump this to the most recent version when the following bugs have been resolved
 # - https://github.com/NixOS/nix/issues/7984
-export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.13.3/install}
+export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.16.1/install}
 
 run_cmd() {
     echo "$@"
