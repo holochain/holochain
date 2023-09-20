@@ -7,7 +7,7 @@ use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::KitsuneOpHash;
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -39,6 +39,7 @@ pub struct HostStub {
     err: HostStubErr,
     check_op_data_impl: Option<CheckOpDataImpl>,
     fail_next_request: Arc<AtomicBool>,
+    fail_count: Arc<AtomicUsize>,
     blocks: Arc<parking_lot::Mutex<HashSet<Block>>>,
 }
 
@@ -56,6 +57,7 @@ impl HostStub {
             err: HostStubErr,
             check_op_data_impl: None,
             fail_next_request: Arc::new(AtomicBool::new(false)),
+            fail_count: Arc::new(AtomicUsize::new(0)),
             blocks: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         })
     }
@@ -66,6 +68,7 @@ impl HostStub {
             err: HostStubErr,
             check_op_data_impl: Some(check_op_data_impl),
             fail_next_request: Arc::new(AtomicBool::new(false)),
+            fail_count: Arc::new(AtomicUsize::new(0)),
             blocks: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         })
     }
@@ -73,6 +76,11 @@ impl HostStub {
     /// Request that the next request will fail and respond with an error
     pub fn fail_next_request(&self) {
         self.fail_next_request.store(true, Ordering::SeqCst);
+    }
+
+    /// Get the count of requests that have failed due to `fail_next_request`.
+    pub fn get_fail_count(&self) -> usize {
+        self.fail_count.load(Ordering::SeqCst)
     }
 }
 
@@ -125,6 +133,7 @@ impl KitsuneHost for HostStub {
             self.fail_next_request
                 .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
         {
+            self.fail_count.fetch_add(1, Ordering::SeqCst);
             return KitsuneHostDefaultError::get_agent_info_signed(&self.err, input);
         }
 
@@ -190,6 +199,7 @@ impl KitsuneHost for HostStub {
             self.fail_next_request
                 .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
         {
+            self.fail_count.fetch_add(1, Ordering::SeqCst);
             return KitsuneHostDefaultError::op_hash(&self.err, op_data);
         }
 
