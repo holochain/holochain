@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+cache_known_domain_suffix="${DOMAIN_SUFFIX_OVERRIDE:-.events.infra.holochain.org}"
 diff_path=${TMPDIR:-/tmp/}holochain-local-cache.diff
 
 function print_usage {
@@ -70,7 +71,7 @@ function update_config {
 }
 
 if test $# -eq 2; then
-  cache_url="http://$2.events.infra.holochain.org"
+  cache_url="http://$2$cache_known_domain_suffix"
   command=$1
 
   if test "$command" = "use"; then
@@ -79,7 +80,7 @@ if test $# -eq 2; then
     print_usage
   fi
 elif test $# -eq 1; then
-  cache_url=".events.infra.holochain.org"
+  cache_url="$cache_known_domain_suffix"
   command=$1
 
   if test "$command" = "cleanup"; then
@@ -139,7 +140,7 @@ echo "Using $nix_config"
 case $command in
   "use")
     update_config "extra-substituters" "$cache_url" "$nix_config"
-    update_config "extra-trusted-public-keys" "events.infra.holochain.org-1:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=" "$nix_config"
+    update_config "extra-trusted-public-keys" "${PUBLIC_KEY_OVERRIDE:-$2$cache_known_domain_suffix:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=}" "$nix_config"
   ;;
   "cleanup")
     cleanup_paths=(
@@ -153,8 +154,8 @@ case $command in
         set +e
         rm -f "$diff_path"
         # shellcheck disable=SC2094
-        < "$config_path" sed -e 's/http:\/\/[[:alnum:]]*.events.infra.holochain.org *//g' \
-          | sed -e 's/[[:alnum:]]*.events.infra.holochain.org:[[:alnum:]/=]* *//g' \
+        < "$config_path" sed -e "s/http:\/\/[[:alnum:]]*${cache_known_domain_suffix} *//g" \
+          | sed -e "s/[[:alnum:]]*${cache_known_domain_suffix}:[[:alnum:]/=]* *//g" \
           | sed -e '/extra-substituters =[[:blank:]]*$/d' \
           | sed -e '/extra-trusted-public-keys =[[:blank:]]*$/d' \
           | diff -u --ignore-blank-lines "$config_path" - > "$diff_path"
