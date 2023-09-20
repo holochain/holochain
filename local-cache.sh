@@ -179,12 +179,14 @@ case $command in
 esac
 
 if command -v systemctl &> /dev/null; then
-  echo "Restarting the Nix daemon..."
+  echo "Restarting the Nix daemon with systemctl..."
   sudo systemctl restart nix-daemon
 elif command -v launchctl &> /dev/null; then
-  echo "Restarting the Nix daemon..."
+  echo "Restarting the Nix daemon with launchctl..."
   sudo launchctl stop system/org.nixos.nix-daemon
+  echo "Stopped"
   sudo launchctl start system/org.nixos.nix-daemon
+  echo "Started"
 else
   echo "Unable to restart the Nix daemon, please restart it manually"
 fi
