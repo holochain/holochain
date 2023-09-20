@@ -182,6 +182,7 @@ jobs:
     with:
       repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
     secrets:
+      GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
 
   finalize:

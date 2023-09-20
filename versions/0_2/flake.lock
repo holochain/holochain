@@ -3,16 +3,16 @@
     "holochain": {
       "flake": false,
       "locked": {
-        "lastModified": 1690227710,
-        "narHash": "sha256-HRVEz5Ldg2+pqciOpZ9fNdMfU93r/3LmUsbTA9jfDIY=",
+        "lastModified": 1694632043,
+        "narHash": "sha256-5QWUpWnwuzUi3hROrOZyQNla8iGdr+oGCH2nniRePBE=",
         "owner": "holochain",
         "repo": "holochain",
-        "rev": "3f594f1a5cef41e896b99b6b46d336d54da3299d",
+        "rev": "1f59d33623031eefe76b5f3573970c9c33f21877",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "holochain-0.2.1",
+        "ref": "holochain-0.2.2",
         "repo": "holochain",
         "type": "github"
       }
@@ -20,16 +20,16 @@
     "lair": {
       "flake": false,
       "locked": {
-        "lastModified": 1682356264,
-        "narHash": "sha256-5ZYJ1gyyL3hLR8hCjcN5yremg8cSV6w1iKCOrpJvCmc=",
+        "lastModified": 1691746070,
+        "narHash": "sha256-CHsTI4yIlkfnYWx2sNgzAoDBvKTLIChybzyJNbB1sMU=",
         "owner": "holochain",
         "repo": "lair",
-        "rev": "43be404da0fd9d57bf4429c44def405bd6490f61",
+        "rev": "6ab41b60744515f1760669db6fc5272298a5f324",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "lair_keystore-v0.2.4",
+        "ref": "lair_keystore-v0.3.0",
         "repo": "lair",
         "type": "github"
       }
@@ -62,11 +62,11 @@
     "scaffolding": {
       "flake": false,
       "locked": {
-        "lastModified": 1692147670,
-        "narHash": "sha256-jFt4LTUaUZTiOg2DLlbUqyeV2edfUxiJSljRjVJlObE=",
+        "lastModified": 1695069964,
+        "narHash": "sha256-QtX2sZgBZ6pxtPrJp9RslJD0LU1KILp+Y0OVldapImA=",
         "owner": "holochain",
         "repo": "scaffolding",
-        "rev": "8a63d356a0856643769adc567e078796c6509511",
+        "rev": "f0b878cdc75bb7b2748cb5f1564d4a4632504ca8",
         "type": "github"
       },
       "original": {
