@@ -178,4 +178,7 @@ case $command in
     print_usage
 esac
 
+echo "Restarting Nix daemon"
+sudo killall nix-daemon || true
+
 echo "All done!"
