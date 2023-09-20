@@ -11,8 +11,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - .#devShells.PLATFORM.holonix
         extra_args:
           - '--override-input versions "./versions/0_1"'
         platform:
@@ -41,11 +39,8 @@ jobs:
 
           DOMAIN_SUFFIX_OVERRIDE=.cachix.org PUBLIC_KEY_OVERRIDE=holochain-ci.cachix.org-1:5IUSkZc0aoRS53rfkvH9Kid40NpyjwCMCzwRTXy+QN8= ./local-cache.sh use holochain-ci
 
-          target=${{ matrix.target }}
-
-          # See https://docs.cachix.org/pushing#id1
-          nix build -L \
+          nix build -L -j0 \
             ${{ matrix.extra_args }} \
-            ${target/PLATFORM/${{ matrix.platform}}}
+            .#holonix
 
           rm result*
