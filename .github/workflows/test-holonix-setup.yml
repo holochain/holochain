@@ -35,7 +35,7 @@ jobs:
           done
           set -e
           nix run --version
-      - name: "Test configure cache ${{ matrix.extra_args }}"
+      - name: "Test configure cache"
         env:
           CACHE_PROTOCOL_OVERRIDE: https
           CACHE_DOMAIN_SUFFIX_OVERRIDE: .cachix.org
@@ -47,6 +47,6 @@ jobs:
 
           nix_system=$(nix show-config --json | jq -r .system.value)
 
-          nix build -L -j0 \
+          nix build -L --refresh -j0 \
             --override-input versions "github:holochain/holochain?dir=versions/0_1" \
             github:holochain/holochain#devShells.${nix_system}.holonix
