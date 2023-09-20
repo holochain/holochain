@@ -139,7 +139,7 @@ echo "Using $nix_config"
 case $command in
   "use")
     update_config "extra-substituters" "$cache_url" "$nix_config"
-    update_config "extra-trusted-public-keys" "ams2023sep.events.infra.holochain.org:FpRA3FcCUuQo0q9gLNZVNsSDBSxUh6K/KvVl9SwsMEA=" "$nix_config"
+    update_config "extra-trusted-public-keys" "events.infra.holochain.org-1:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=" "$nix_config"
   ;;
   "cleanup")
     cleanup_paths=(
