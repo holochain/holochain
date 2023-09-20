@@ -53,9 +53,13 @@ jobs:
           done
           set -e
 
-          nix build -L --refresh -j0 \
-            --override-input versions "github:holochain/holochain?dir=versions/0_1" \
-            github:holochain/holochain#devShells.${nix_system}.holonix && {
+          function do_nix_build {
+            nix build -L --refresh -j0 \
+              --override-input versions "github:holochain/holochain?dir=versions/0_1" \
+              github:holochain/holochain#devShells.${nix_system}.holonix
+          }
+
+          do_nix_build && {
             echo This should not have succeeded.
             exit 1
           } || {
@@ -66,8 +70,6 @@ jobs:
 
           nix_system=$(nix show-config --json | jq -r .system.value)
 
-          nix build -L --refresh -j0 \
-            --override-input versions "github:holochain/holochain?dir=versions/0_1" \
-            github:holochain/holochain#devShells.${nix_system}.holonix
+          do_nix_build
           
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
