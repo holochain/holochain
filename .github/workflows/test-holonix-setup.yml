@@ -60,3 +60,5 @@ jobs:
           nix build -L --refresh -j0 \
             --override-input versions "github:holochain/holochain?dir=versions/0_1" \
             github:holochain/holochain#devShells.${nix_system}.holonix
+          
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
