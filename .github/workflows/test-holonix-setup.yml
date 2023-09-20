@@ -35,7 +35,7 @@ jobs:
           done
           set -e
           nix run --version
-      - name: "Test configure cache"
+      - name: Test configure cache
         env:
           CACHE_PROTOCOL_OVERRIDE: https
           CACHE_DOMAIN_SUFFIX_OVERRIDE: .cachix.org
