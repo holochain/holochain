@@ -53,6 +53,8 @@ jobs:
           done
           set -e
 
+          nix_system=$(nix show-config --json | jq -r .system.value)
+
           function do_nix_build {
             nix develop --build -L --refresh -j0 \
               --override-input versions "github:holochain/holochain?dir=versions/0_1" \
@@ -67,8 +69,6 @@ jobs:
           }
 
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) use holochain-ci
-
-          nix_system=$(nix show-config --json | jq -r .system.value)
 
           do_nix_build
           
