@@ -6,16 +6,15 @@ on:
       - develop
 
 jobs:
-  # ensures the cache is regularly updated for the supported versions on multiple platforms
   cache-update:
     strategy:
       fail-fast: false
       matrix:
         extra_args:
-          - '--override-input versions "./versions/0_1"'
+          - '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
         platform:
           - ubuntu-latest
-          - macos-latest
+          # - macos-latest
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -41,6 +40,6 @@ jobs:
 
           nix build -L -j0 \
             ${{ matrix.extra_args }} \
-            .#holonix
+            .#devShells.x86_64-linux.holonix
 
           rm result*
