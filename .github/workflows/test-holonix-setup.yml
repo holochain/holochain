@@ -56,7 +56,7 @@ jobs:
           nix_system=$(nix show-config --json | jq -r .system.value)
 
           function do_nix_build {
-            nix develop --build -L --refresh -j0 \
+            nix build -L --refresh -j0 \
               --override-input versions "github:holochain/holochain?dir=versions/0_1" \
               github:holochain/holochain#devShells.${nix_system}.holonix
           }
