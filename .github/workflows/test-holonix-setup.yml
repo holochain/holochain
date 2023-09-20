@@ -53,6 +53,15 @@ jobs:
           done
           set -e
 
+          nix build -L --refresh -j0 \
+            --override-input versions "github:holochain/holochain?dir=versions/0_1" \
+            github:holochain/holochain#devShells.${nix_system}.holonix && {
+            echo This should not have succeeded.
+            exit 1
+          } || {
+            echo Failed as expected.
+          }
+
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) use holochain-ci
 
           nix_system=$(nix show-config --json | jq -r .system.value)
