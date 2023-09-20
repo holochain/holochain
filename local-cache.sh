@@ -179,6 +179,6 @@ case $command in
 esac
 
 echo "Restarting Nix daemon"
-sudo killall nix-daemon || true
+sudo systemctl restart nix-daemon
 
 echo "All done!"
