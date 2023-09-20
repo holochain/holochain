@@ -43,7 +43,14 @@ run_cmd sudo --preserve-env=NIX_CONFIG,PATH $(which nix) run nixpkgs/nixos-22.11
 echo
 
 echo "Restarting Nix daemon"
-run_cmd sudo pkill nix-daemon || :
+if command -v systemctl &> /dev/null; then
+  run_cmd sudo systemctl restart nix-daemon
+elif command -v launchctl &> /dev/null; then
+  run_cmd sudo launchctl kickstart -k system/org.nixos.nix-daemon
+else
+  # Fallback which should work on most systems
+  run_cmd sudo pkill nix-daemon || :
+fi
 echo
 
 echo "Creating Nix user config in ~/.config/nix/nix.conf"
