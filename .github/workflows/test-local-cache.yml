@@ -36,7 +36,7 @@ jobs:
         run: |
           set -xe
 
-          CACHE_PROTOCOL_OVERRIDE=https DOMAIN_SUFFIX_OVERRIDE=.cachix.org PUBLIC_KEY_OVERRIDE=holochain-ci.cachix.org-1:5IUSkZc0aoRS53rfkvH9Kid40NpyjwCMCzwRTXy+QN8= ./local-cache.sh use holochain-ci
+          CACHE_PROTOCOL_OVERRIDE=https CACHE_DOMAIN_SUFFIX_OVERRIDE=.cachix.org CACHE_PUBLIC_KEY_OVERRIDE=holochain-ci.cachix.org-1:5IUSkZc0aoRS53rfkvH9Kid40NpyjwCMCzwRTXy+QN8= ./local-cache.sh use holochain-ci
 
           nix_system=$(nix show-config --json | jq -r .system.value)
 

@@ -2,8 +2,12 @@
 
 set -euo pipefail
 
+# Overridable settings for the script, these all have defaults that can be left alone in most cases
 cache_protocol="${CACHE_PROTOCOL_OVERRIDE:-http}"
-cache_known_domain_suffix="${DOMAIN_SUFFIX_OVERRIDE:-.events.infra.holochain.org}"
+cache_domain_suffix="${CACHE_DOMAIN_SUFFIX_OVERRIDE:-.events.infra.holochain.org}"
+cache_public_key="${CACHE_PUBLIC_KEY_OVERRIDE:-$2$cache_domain_suffix:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=}"
+
+# Common
 diff_path=${TMPDIR:-/tmp/}holochain-local-cache.diff
 
 function print_usage {
@@ -72,7 +76,7 @@ function update_config {
 }
 
 if test $# -eq 2; then
-  cache_url="${cache_protocol}://$2$cache_known_domain_suffix"
+  cache_url="${cache_protocol}://$2$cache_domain_suffix"
   command=$1
 
   if test "$command" = "use"; then
@@ -81,7 +85,7 @@ if test $# -eq 2; then
     print_usage
   fi
 elif test $# -eq 1; then
-  cache_url="$cache_known_domain_suffix"
+  cache_url="$cache_domain_suffix"
   command=$1
 
   if test "$command" = "cleanup"; then
@@ -141,7 +145,7 @@ echo "Using $nix_config"
 case $command in
   "use")
     update_config "extra-substituters" "$cache_url" "$nix_config"
-    update_config "extra-trusted-public-keys" "${PUBLIC_KEY_OVERRIDE:-$2$cache_known_domain_suffix:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=}" "$nix_config"
+    update_config "extra-trusted-public-keys" "$cache_public_key" "$nix_config"
   ;;
   "cleanup")
     cleanup_paths=(
@@ -155,8 +159,8 @@ case $command in
         set +e
         rm -f "$diff_path"
         # shellcheck disable=SC2094
-        < "$config_path" sed -e "s/http:\/\/[[:alnum:]]*${cache_known_domain_suffix} *//g" \
-          | sed -e "s/[[:alnum:]]*${cache_known_domain_suffix}:[[:alnum:]/=]* *//g" \
+        < "$config_path" sed -e "s/http:\/\/[[:alnum:]]*${cache_domain_suffix} *//g" \
+          | sed -e "s/[[:alnum:]]*${cache_domain_suffix}:[[:alnum:]/=]* *//g" \
           | sed -e '/extra-substituters =[[:blank:]]*$/d' \
           | sed -e '/extra-trusted-public-keys =[[:blank:]]*$/d' \
           | diff -u --ignore-blank-lines "$config_path" - > "$diff_path"
@@ -178,14 +182,16 @@ case $command in
     print_usage
 esac
 
-if command -v systemctl &> /dev/null; then
-  echo "Restarting the Nix daemon with systemctl..."
-  sudo systemctl restart nix-daemon
-elif command -v launchctl &> /dev/null; then
-  echo "Restarting the Nix daemon with launchctl..."
-  sudo launchctl kickstart -k -p system/org.nixos.nix-daemon
-else
-  echo "Unable to restart the Nix daemon, please restart it manually"
+if ! test "$nix_profile_path" = "$single_user_profile_path"; then
+  if command -v systemctl &> /dev/null; then
+    echo "Restarting the Nix daemon with systemctl..."
+    sudo systemctl restart nix-daemon
+  elif command -v launchctl &> /dev/null; then
+    echo "Restarting the Nix daemon with launchctl..."
+    sudo launchctl kickstart -k -p system/org.nixos.nix-daemon
+  else
+    echo "Unable to restart the Nix daemon, please restart it manually"
+  fi
 fi
 
 echo "All done!"
