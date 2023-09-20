@@ -19,7 +19,7 @@ jobs:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -xe
-          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.ref_name }}/setup.sh)
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/setup.sh)
       - name: Test nix command
         run: |
           set -x +e
@@ -42,7 +42,7 @@ jobs:
         run: |
           set -xe
 
-          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.ref_name }}/configure-cache.sh) -s use holochain-ci
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) -s use holochain-ci
 
           nix_system=$(nix show-config --json | jq -r .system.value)
 
