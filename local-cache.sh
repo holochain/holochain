@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+cache_protocol="${CACHE_PROTOCOL_OVERRIDE:-http}"
 cache_known_domain_suffix="${DOMAIN_SUFFIX_OVERRIDE:-.events.infra.holochain.org}"
 diff_path=${TMPDIR:-/tmp/}holochain-local-cache.diff
 
@@ -71,7 +72,7 @@ function update_config {
 }
 
 if test $# -eq 2; then
-  cache_url="http://$2$cache_known_domain_suffix"
+  cache_url="${cache_protocol}://$2$cache_known_domain_suffix"
   command=$1
 
   if test "$command" = "use"; then
