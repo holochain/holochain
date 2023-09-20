@@ -190,7 +190,9 @@ if ! test "$nix_profile_path" = "$single_user_profile_path"; then
     echo "Restarting the Nix daemon with launchctl..."
     sudo launchctl kickstart -k -p system/org.nixos.nix-daemon
   else
-    echo "Unable to restart the Nix daemon, please restart it manually"
+    # Fallback which should work on most systems
+    echo "Restarting the Nix daemon with pkill..."
+    run_cmd sudo pkill nix-daemon || :
   fi
 fi
 
