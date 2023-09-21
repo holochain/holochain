@@ -84,5 +84,8 @@ jobs:
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) use holochain-ci
           do_nix_build
           
+          # Give the daemon a chance to restart
+          sleep 1
+          
           # Clean up the cache config to check that the command at least runs
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
