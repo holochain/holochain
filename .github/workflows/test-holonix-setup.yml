@@ -57,6 +57,8 @@ jobs:
           
           # Make sure that the runner is clean if it is being re-used
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
+          
+          cat /etc/nix/nix.conf
 
           function do_nix_build {
             nix build -L --refresh -j0 \
