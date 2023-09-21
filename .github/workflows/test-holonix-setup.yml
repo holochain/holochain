@@ -2,8 +2,7 @@ on:
   push:
     branches:
       - "holochain.github.io"
-  pull_request_target:
-    types: [opened, synchronize, reopened]
+  pull_request:
     branches:
       - "holochain.github.io"
   workflow_dispatch: {}
@@ -20,7 +19,7 @@ jobs:
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -xe
-          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.ref_name }}/setup.sh)
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/setup.sh)
       - name: Test nix command
         run: |
           set -x +e
@@ -35,3 +34,61 @@ jobs:
           done
           set -e
           nix run --version
+      - name: Test configure cache
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          CACHE_PROTOCOL_OVERRIDE: https
+          CACHE_DOMAIN_SUFFIX_OVERRIDE: .cachix.org
+          CACHE_PUBLIC_KEY_OVERRIDE: holochain-ci.cachix.org-1:5IUSkZc0aoRS53rfkvH9Kid40NpyjwCMCzwRTXy+QN8=
+        run: |
+          set -x +e
+          for file in \
+              ~/.profile \
+              /etc/profile \
+              /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+              /nix/var/nix/profiles/default/etc/profile.d/nix.sh
+          do
+              source $file > /dev/null 2>&1
+              if command -v nix; then break; fi
+          done
+          set -e
+
+          nix_system=$(nix show-config --json | jq -r .system.value)
+          
+          # Remove the cache config that `setup.sh` added
+          # NOTE: `remove` command requires Cachix 1.6+ which is currently only available in unstable
+          sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-unstable#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
+          
+          # Restart the Nix daemon to pick up the new config
+          if command -v systemctl &> /dev/null; then
+            sudo systemctl restart nix-daemon
+          elif command -v launchctl &> /dev/null; then
+            sudo launchctl kickstart -k system/org.nixos.nix-daemon
+          fi
+          
+          # TODO replace with nix-cache-check
+          function do_nix_build {
+            nix build -L --refresh -j0 \
+              --override-input versions "github:holochain/holochain?dir=versions/0_1" \
+              github:holochain/holochain#devShells.${nix_system}.holonix
+          }
+
+          # Try a build with no cache configured, which should fail with -j0
+          do_nix_build && {
+            echo This should not have succeeded.
+            exit 1
+          } || {
+            echo Failed as expected.
+          }
+
+          # Now actually configure the cache
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) use holochain-ci
+          
+          # Give the daemon a chance to restart on macos
+          sleep 5
+          
+          # and try a build where everything is expected to be cached
+          do_nix_build
+          
+          # Clean up the cache config to check that the command at least runs
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
