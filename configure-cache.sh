@@ -5,7 +5,7 @@ set -euo pipefail
 # Overridable settings for the script, these all have defaults that can be left alone in most cases
 cache_protocol="${CACHE_PROTOCOL_OVERRIDE:-http}"
 cache_domain_suffix="${CACHE_DOMAIN_SUFFIX_OVERRIDE:-.events.infra.holochain.org}"
-cache_public_key="${CACHE_PUBLIC_KEY_OVERRIDE:-$2$cache_domain_suffix:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=}"
+cache_public_key="${CACHE_PUBLIC_KEY_OVERRIDE:-${2:-}$cache_domain_suffix:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=}"
 
 # Common
 diff_path=${TMPDIR:-/tmp/}holochain-local-cache.diff
