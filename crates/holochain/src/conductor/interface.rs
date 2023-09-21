@@ -53,13 +53,18 @@ pub struct SignalBroadcaster {
 }
 
 impl SignalBroadcaster {
-    /// send the signal to the connected client
+    /// Send the signal to the connected client. Send error is logged but not
+    /// returned to the caller.
     pub(crate) fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.senders
             .iter_mut()
-            .map(|tx| tx.send(sig.clone()))
-            .collect::<Result<Vec<_>, broadcast::error::SendError<Signal>>>()
-            .map_err(InterfaceError::SignalSend)?;
+            .for_each(|tx| match tx.send(sig.clone()) {
+                Err(err) => tracing::error!(
+                    "{:?}: no active receivers connected",
+                    InterfaceError::SignalSend(err)
+                ),
+                _ => (),
+            });
         Ok(())
     }
 
