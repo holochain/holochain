@@ -61,9 +61,9 @@ jobs:
           
           # Restart the Nix daemon to pick up the new config
           if command -v systemctl &> /dev/null; then
-            run_cmd sudo systemctl restart nix-daemon
+            sudo systemctl restart nix-daemon
           elif command -v launchctl &> /dev/null; then
-            run_cmd sudo launchctl kickstart -k system/org.nixos.nix-daemon
+            sudo launchctl kickstart -k system/org.nixos.nix-daemon
           fi
           
           function do_nix_build {
