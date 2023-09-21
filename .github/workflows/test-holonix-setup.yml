@@ -55,11 +55,9 @@ jobs:
 
           nix_system=$(nix show-config --json | jq -r .system.value)
           
-          # Make sure that the runner is clean if it is being re-used
-          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
+          # Remove the cache config that `setup.sh` added
+          nix run nixpkgs/nixos-23.05#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
           
-          cat /etc/nix/nix.conf
-
           function do_nix_build {
             nix build -L --refresh -j0 \
               --override-input versions "github:holochain/holochain?dir=versions/0_1" \
