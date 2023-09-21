@@ -47,8 +47,9 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
         .require_initial_gossip_activity_for_cell(&bob, Duration::from_secs(90))
         .await;
 
-    // Listen for signals on Bon's conductor. These are all the signals on that conductor but Bob has the only app on
-    // that conductor for this test.
+    // Listen for signals on Bob's and Carol's conductors. 
+    // These are all the signals on that conductor but the only app installed
+    // is the one for this test.
     let mut conductor_1_signal_stream = conductors[1].signal_stream().await.map(to_signal_message);
     let mut conductor_2_signal_stream = conductors[2].signal_stream().await.map(to_signal_message);
 
