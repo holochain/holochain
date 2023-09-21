@@ -58,7 +58,7 @@ matches = "0.1"
 proptest = "1"
 
 [features]
-default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
+default = ["full-dna-def", "subtle-encoding"]
 
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain

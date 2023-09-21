@@ -38,7 +38,7 @@ rand = "0.8"
 test-case = "1.2"
 
 [features]
-default = ["test_utils"]
+default = []
 test_utils = [
   "colored"
 ]

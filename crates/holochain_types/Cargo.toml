@@ -81,7 +81,7 @@ test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
 
 [features]
-default = ["fixturators", "test_utils"]
+default = []
 
 fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
