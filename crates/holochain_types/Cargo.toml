@@ -87,6 +87,7 @@ fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
   "arbitrary",
   "contrafact",
+  "fixturators",
   "holochain_zome_types/arbitrary",
   "holo_hash/arbitrary",
   "isotest",
