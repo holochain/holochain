@@ -69,7 +69,7 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
             .await;
     }
 
-    // Check that Bob receives all the signals.
+    // Check that Bob and Carol receive all the signals.
     tokio::time::timeout(Duration::from_secs(60), async move {
         for i in 0..6 {
             let message = conductor_1_signal_stream.next().await.unwrap();
