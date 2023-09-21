@@ -59,6 +59,13 @@ jobs:
           # NOTE: `remove` command requires Cachix 1.6+ which is currently only available in unstable
           sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-unstable#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
           
+          # Restart the Nix daemon to pick up the new config
+          if command -v systemctl &> /dev/null; then
+            run_cmd sudo systemctl restart nix-daemon
+          elif command -v launchctl &> /dev/null; then
+            run_cmd sudo launchctl kickstart -k system/org.nixos.nix-daemon
+          fi
+          
           function do_nix_build {
             nix build -L --refresh -j0 \
               --override-input versions "github:holochain/holochain?dir=versions/0_1" \
