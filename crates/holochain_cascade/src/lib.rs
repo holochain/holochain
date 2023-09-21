@@ -23,7 +23,6 @@
 //!
 #![warn(missing_docs)]
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -52,19 +51,24 @@ use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
-use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 use mutations::insert_action;
 use mutations::insert_entry;
 use mutations::insert_op_lite;
 use tracing::*;
+
+#[cfg(feature = "test_utils")]
+use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
+#[cfg(feature = "test_utils")]
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
+#[cfg(feature = "test_utils")]
+use std::collections::HashMap;
 
 pub mod authority;
 pub mod error;
 
 mod agent_activity;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 /// Get an item from an option
@@ -227,7 +231,7 @@ impl CascadeImpl<HolochainP2pDna> {
 
 /// TODO
 #[async_trait::async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait Cascade {
     /// Retrieve [`Entry`] either locally or from an authority.
     /// Data might not have been validated yet by the authority.
@@ -1165,6 +1169,7 @@ where
     }
 }
 
+#[cfg(feature = "test_utils")]
 impl MockCascade {
     /// Construct a mock which acts as if the given records were part of local storage
     pub fn with_records(records: Vec<Record>) -> Self {

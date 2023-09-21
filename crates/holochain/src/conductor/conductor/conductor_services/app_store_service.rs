@@ -6,7 +6,7 @@ use crate::conductor::ConductorHandle;
 
 /// Interface for the AppStore service
 #[async_trait::async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait AppStoreService: Send + Sync {
     /// Fetch a DNA bundle from the store

@@ -15,7 +15,6 @@ use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
-use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::prelude::{DatabaseResult, DbKindAuthored, DbKindDht, DbKindOp, DbKindT};
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations::insert_op;

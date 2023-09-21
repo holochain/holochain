@@ -50,6 +50,8 @@ nanoid = { version = "0.3", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
+holochain_state = { path = ".", features = ["test_utils"] }
+
 anyhow = "1.0.26"
 arbitrary = "1.0"
 fixt = { path = "../fixt" }
