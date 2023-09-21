@@ -72,6 +72,7 @@ jobs:
               github:holochain/holochain#devShells.${nix_system}.holonix
           }
 
+          # Try a build with no cache configured, which should fail with -j0
           do_nix_build && {
             echo This should not have succeeded.
             exit 1
@@ -79,8 +80,9 @@ jobs:
             echo Failed as expected.
           }
 
+          # Now actually configure the cache and try a build
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) use holochain-ci
-
           do_nix_build
           
+          # Clean up the cache config to check that the command at least runs
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.sha }}/configure-cache.sh) cleanup
