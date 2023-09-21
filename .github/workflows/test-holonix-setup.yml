@@ -56,7 +56,7 @@ jobs:
           nix_system=$(nix show-config --json | jq -r .system.value)
           
           # Remove the cache config that `setup.sh` added
-          nix run nixpkgs/nixos-23.05#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
+          nix run nixpkgs/nixos-22.11#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
           
           function do_nix_build {
             nix build -L --refresh -j0 \
