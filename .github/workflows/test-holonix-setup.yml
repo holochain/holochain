@@ -57,7 +57,7 @@ jobs:
           
           # Remove the cache config that `setup.sh` added
           # NOTE: `remove` command requires Cachix 1.6+ which is currently only available in unstable
-          sudo nix run nixpkgs/nixos-unstable#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
+          sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" nix run nixpkgs/nixos-unstable#cachix --extra-experimental-features "nix-command flakes" -- remove holochain-ci
           
           function do_nix_build {
             nix build -L --refresh -j0 \
