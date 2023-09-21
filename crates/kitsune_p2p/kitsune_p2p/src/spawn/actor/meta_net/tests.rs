@@ -422,10 +422,10 @@ async fn meta_net_sanity() {
         test.recv = Arc::new(move |evt| {
             if let MetaNetEvt::Notify { data, .. } = evt {
                 assert!(matches!(
+                    data,
                     wire::Wire::Failure(wire::Failure {
-                        reason: "HelloWorld".into()
-                    }),
-                    data
+                        reason,
+                    }) if reason == "Hello World!",
                 ));
                 recv_done.notify_waiters();
             }
