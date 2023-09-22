@@ -158,8 +158,12 @@ pub enum AdminRequest {
     /// # Arguments
     ///
     /// Optionally a `port` parameter can be passed to this request. If it is `None`,
-    /// a free port is chosen by the conductor.
-    /// The response will contain the port chosen by the conductor if `None` was passed.
+    /// a free port is chosen by the conductor. The response will contain the port in
+    /// either case.
+    ///
+    /// > Existing app interfaces are restored on conductor restart and can be
+    /// queried with the call [`AdminRequest::ListAppInterfaces`]. It is recommended
+    /// to reuse existing ports, as they are not cleaned up.
     ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
