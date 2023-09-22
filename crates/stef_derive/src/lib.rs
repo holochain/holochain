@@ -419,7 +419,7 @@ fn state_impl(
 
     if fuzzing {
         define_action_enum.attrs.push(syn::parse_quote!(
-            #[derive(::proptest_derive::Arbitrary)]
+            #[cfg_attr(feature = "fuzzing", derive(::proptest_derive::Arbitrary))]
         ));
     }
 

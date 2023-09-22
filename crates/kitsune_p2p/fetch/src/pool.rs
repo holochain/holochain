@@ -757,11 +757,11 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn state_iter_sees_all_items() {
+    async fn state_get_items_to_fetch_sees_all_items() {
         let cfg = Config(1, 10);
         let num_items = 2 * NUM_ITEMS_PER_POLL; // Must be greater than NUM_ITEMS_PER_POLL
 
-        let q = {
+        let q: FetchPool = {
             let mut queue = vec![];
             for i in 0..(num_items) {
                 queue.push((
@@ -774,18 +774,21 @@ mod tests {
                 queue: queue.into_iter().collect(),
                 config: Arc::new(cfg),
             }
+            .into()
         };
 
         // None fetched initially, should see all items
         assert_eq!(num_items, q.len());
 
+        assert_eq!(q.get_items_to_fetch().len(), num_items);
+
         // Everything seen, no time elapsed
-        assert_eq!(0, q.len());
+        assert_eq!(q.get_items_to_fetch().len(), 0);
 
         // Move time forwards so everything will be ready to retry
         tokio::time::advance(Duration::from_secs(30)).await;
 
-        assert_eq!(num_items, q.len());
+        assert_eq!(q.get_items_to_fetch().len(), num_items);
     }
 
     #[tokio::test(start_paused = true)]

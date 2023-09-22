@@ -39,6 +39,7 @@ pub fn fake_hash() -> Hash32 {
 )]
 pub struct OpHash(pub Hash32);
 
+#[cfg(feature = "test_utils")]
 impl OpHash {
     /// Random fake hash for testing
     pub fn fake() -> Self {
@@ -52,6 +53,7 @@ impl OpHash {
 )]
 pub struct AgentKey(pub Hash32);
 
+#[cfg(feature = "test_utils")]
 impl AgentKey {
     /// Random fake hash for testing
     pub fn fake() -> Self {

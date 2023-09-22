@@ -226,6 +226,7 @@ impl LaunchInfo {
     }
 }
 
+/// Direct access to the run command
 pub async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
@@ -272,6 +273,7 @@ pub async fn run_n(
     Ok(())
 }
 
+/// Direct access to the generate command
 pub async fn generate(
     holochain_path: &Path,
     happ: Option<PathBuf>,

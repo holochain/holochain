@@ -36,7 +36,7 @@ test-strategy = { version = "0", optional = true }
 kitsune_p2p_fetch = { path = ".", features = ["test_utils", "sqlite"]}
 holochain_serialized_bytes = "0.0.53"
 holochain_trace = { version = "^0.2.2", path = "../../holochain_trace" }
-pretty_assertions = "0.7.2"
+pretty_assertions = "1.4.0"
 test-case = "1.2"
 tokio = { version = "1.27", features = [ "full", "test-util" ] }
 rand = "0.8.5"
@@ -51,7 +51,9 @@ fuzzing = [
     "test-strategy",
     "kitsune_p2p_types/fuzzing"
 ]
-test_utils = ["human-repr", "fuzzing", "kitsune_p2p_types/test_utils"]
+
+test_utils = ["human-repr", "kitsune_p2p_types/test_utils"]
+
 sqlite-encrypted = [
     "kitsune_p2p_timestamp/sqlite-encrypted",
     "kitsune_p2p_types/sqlite-encrypted",

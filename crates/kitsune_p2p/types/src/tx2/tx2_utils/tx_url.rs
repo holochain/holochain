@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use proptest::strategy::{BoxedStrategy, Strategy};
-
 /// New-type for sync ref-counted Urls
 /// to make passing around tx2 more efficient.
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -86,9 +84,10 @@ impl<'a> arbitrary::Arbitrary<'a> for TxUrl {
 #[cfg(any(test, feature = "fuzzing"))]
 impl proptest::arbitrary::Arbitrary for TxUrl {
     type Parameters = ();
-    type Strategy = BoxedStrategy<TxUrl>;
+    type Strategy = proptest::strategy::BoxedStrategy<TxUrl>;
 
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
         proptest::string::string_regex(r"http://\w+")
             .unwrap()
             .prop_map(TxUrl::from)

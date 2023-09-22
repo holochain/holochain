@@ -5,14 +5,14 @@
 
 /// Add the Arbitrary constraint if feature "fuzzing" is enabled.
 /// Otherwise, no constraint added
-#[cfg(feature = "fuzzing")]
-pub trait ArbitraryFuzzing: proptest::arbitrary::Arbitrary {}
-#[cfg(feature = "fuzzing")]
-impl<T> ArbitraryFuzzing for T where T: proptest::arbitrary::Arbitrary {}
+// #[cfg(feature = "fuzzing")]
+// pub trait ArbitraryFuzzing: proptest::arbitrary::Arbitrary {}
+// #[cfg(feature = "fuzzing")]
+// impl<T> ArbitraryFuzzing for T where T: proptest::arbitrary::Arbitrary {}
 
 /// Add the Arbitrary constraint if feature "fuzzing" is enabled.
 /// Otherwise, no constraint added
-#[cfg(not(feature = "fuzzing"))]
+// #[cfg(not(feature = "fuzzing"))]
 pub trait ArbitraryFuzzing {}
-#[cfg(not(feature = "fuzzing"))]
+// #[cfg(not(feature = "fuzzing"))]
 impl<T> ArbitraryFuzzing for T {}

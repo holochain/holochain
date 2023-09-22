@@ -127,7 +127,7 @@ impl CellConductorApiT for CellConductorApi {
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
@@ -173,7 +173,7 @@ pub trait CellConductorApiT: Send + Sync {
 }
 
 #[async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
 pub trait CellConductorReadHandleT: Send + Sync {

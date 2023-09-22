@@ -49,6 +49,4 @@ fuzzing = [
     "kitsune_p2p_timestamp/fuzzing"
 ]
 
-test_utils = [
-    "fuzzing"
-]
+test_utils = []

@@ -83,23 +83,23 @@ test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
 
 [features]
-default = ["fixturators", "test_utils"]
+default = []
 
 fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
-  "contrafact",
-  "fuzzing",
-  "holo_hash/fuzzing",
+  "fixturators",
   "isotest",
-  "mr_bundle/fuzzing",
   "holochain_zome_types/test_utils",
 ]
 
 fuzzing = [
+  "contrafact",
   "arbitrary",
   "proptest",
   "proptest-derive",
+  "holo_hash/fuzzing",
   "holochain_zome_types/fuzzing",
+  "mr_bundle/fuzzing",
 ]
 
 sqlite-encrypted = [

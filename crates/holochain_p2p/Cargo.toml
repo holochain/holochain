@@ -35,9 +35,16 @@ tokio-stream = "0.1"
 holochain_util = { version = "^0.2.2", path = "../holochain_util" }
 
 [features]
-mock_network = [
-  "kitsune_p2p/mock_network",
+
+test_utils = [
+  "mock_network",
   "kitsune_p2p/test_utils",
+  "ghost_actor/test_utils",
+]
+
+mock_network = [
+  "test_utils",
+  "kitsune_p2p/mock_network",
 ]
 
 sqlite-encrypted = [
