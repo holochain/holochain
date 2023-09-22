@@ -56,17 +56,17 @@ async fn send_signal() {
     let (received_signal_1, _) = app_ws_rx_1.next().await.unwrap();
     let received_signal_1: Signal =
         holochain_serialized_bytes::decode(received_signal_1.bytes()).unwrap();
-    match received_signal_1 {
-        Signal::App {
-            cell_id,
-            zome_name,
-            signal,
-        } => {
-            assert_eq!(cell_id, alice_cell_id);
-            assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
-            assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
-        }
-        _ => panic!("not the expected app signal"),
+    if let Signal::App {
+        cell_id,
+        zome_name,
+        signal,
+    } = received_signal_1
+    {
+        assert_eq!(cell_id, alice_cell_id);
+        assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
+        assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+    } else {
+        panic!("not the expected app signal")
     };
 
     // restart conductor
@@ -121,16 +121,16 @@ async fn send_signal() {
     let (received_signal_2, _) = app_ws_rx_1.next().await.unwrap();
     let received_signal_2: Signal =
         holochain_serialized_bytes::decode(received_signal_2.bytes()).unwrap();
-    match received_signal_2 {
-        Signal::App {
-            cell_id,
-            zome_name,
-            signal,
-        } => {
-            assert_eq!(cell_id, alice_cell_id);
-            assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
-            assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
-        }
-        _ => panic!("not the expected app signal"),
+    if let Signal::App {
+        cell_id,
+        zome_name,
+        signal,
+    } = received_signal_2
+    {
+        assert_eq!(cell_id, alice_cell_id);
+        assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
+        assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+    } else {
+        panic!("not the expected app signal")
     };
 }
