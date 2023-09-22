@@ -56,15 +56,14 @@ impl SignalBroadcaster {
     /// Send the signal to the connected client. Send error is logged but not
     /// returned to the caller.
     pub(crate) fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
-        self.senders
-            .iter_mut()
-            .for_each(|tx| match tx.send(sig.clone()) {
-                Err(err) => tracing::error!(
+        self.senders.iter_mut().for_each(|tx| {
+            if let Err(err) = tx.send(sig.clone()) {
+                tracing::error!(
                     "{:?}: no active receivers connected",
                     InterfaceError::SignalSend(err)
-                ),
-                _ => (),
-            });
+                )
+            }
+        });
         Ok(())
     }
 
