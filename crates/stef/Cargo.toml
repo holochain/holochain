@@ -24,8 +24,8 @@ rmp-serde = { version = "*", optional = true }
 
 [dev-dependencies]
 either = { version = "*" }
-proptest = { version = "*" }
-proptest-derive = { version = "*" }
+proptest = { version = "1" }
+proptest-derive = { version = "0" }
 tempfile = "3"
 tokio = { version = "*", features = ["full"] }
 

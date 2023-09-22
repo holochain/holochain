@@ -433,6 +433,21 @@ impl DhtOp {
             None
         }
     }
+
+    /// Access to the Timestamp
+    pub fn timestamp(&self) -> Timestamp {
+        match self {
+            DhtOp::StoreRecord(_, h, _) => h.timestamp(),
+            DhtOp::StoreEntry(_, h, _) => h.timestamp(),
+            DhtOp::RegisterAgentActivity(_, h) => h.timestamp(),
+            DhtOp::RegisterUpdatedContent(_, h, _) => h.timestamp,
+            DhtOp::RegisterUpdatedRecord(_, h, _) => h.timestamp,
+            DhtOp::RegisterDeletedBy(_, h) => h.timestamp,
+            DhtOp::RegisterDeletedEntryAction(_, h) => h.timestamp,
+            DhtOp::RegisterAddLink(_, h) => h.timestamp,
+            DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
+        }
+    }
 }
 
 impl PartialOrd for DhtOp {

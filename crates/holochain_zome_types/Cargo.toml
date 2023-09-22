@@ -83,7 +83,6 @@ fuzzing = [
 ]
 
 test_utils = [
-  "fuzzing",
   "contrafact",
   "once_cell",
   "kitsune_p2p_timestamp/now",
