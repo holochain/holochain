@@ -9,7 +9,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketConfig;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn send_signal() {
+async fn send_signal_after_conductor_restart() {
     let mut conductor = SweetConductor::from_config_rendezvous(
         SweetConductorConfig::rendezvous(),
         SweetLocalRendezvous::new().await,
