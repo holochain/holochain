@@ -113,7 +113,6 @@ pub enum DhtOp {
     RegisterRemoveLink(Signature, action::DeleteLink),
 }
 
-use kitsune_p2p_dht::prelude::OpRegion;
 impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     fn loc(&self) -> Loc {
         self.dht_basis().get_loc()

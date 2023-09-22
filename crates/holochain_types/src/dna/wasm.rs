@@ -14,7 +14,7 @@ use tracing::*;
 
 /// Represents web assembly code.
 #[derive(Serialize, Deserialize, Clone, Eq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     #[allow(clippy::redundant_allocation)]

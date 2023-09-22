@@ -19,7 +19,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 use tracing::*;
 
-#[cfg(feature = "test_utils")]
+#[cfg(test)]
 mod test;
 
 pub(crate) mod get_agent_activity_query;
