@@ -1,7 +1,6 @@
 use super::network::NetworkTopologyConductor;
 use super::node::NetworkTopologyNode;
 use crate::sweettest::SweetConductor;
-use arbitrary::Arbitrary;
 use holochain_zome_types::prelude::CellId;
 use rand::Rng;
 use std::hash::{Hash, Hasher};
@@ -9,7 +8,8 @@ use std::hash::{Hash, Hasher};
 /// A network edge in a network topology. Represents a network connection.
 /// Edges are directed, so if you want a bidirectional connection you need two
 /// edges.
-#[derive(Arbitrary, Clone, Debug, Default, Eq)]
+#[derive(Clone, Debug, Default, Eq)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct NetworkTopologyEdge {
     id: [u8; 32],
     source_conductor: NetworkTopologyConductor,

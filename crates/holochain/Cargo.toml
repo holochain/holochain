@@ -191,6 +191,7 @@ test_utils = [
 fuzzing = [
   "holochain_types/fuzzing",
   "holochain_zome_types/fuzzing",
+  "arbitrary",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI

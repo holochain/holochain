@@ -9,7 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::record::*;
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 pub mod facts;
 
 /// A combination of an action and its signature.

@@ -87,7 +87,6 @@ default = []
 
 fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
-  "contrafact",
   "fixturators",
   "fuzzing",
   "holochain_zome_types/fuzzing",
@@ -98,6 +97,7 @@ test_utils = [
 ]
 
 fuzzing = [
+  "contrafact",
   "arbitrary",
   "proptest",
   "proptest-derive",
