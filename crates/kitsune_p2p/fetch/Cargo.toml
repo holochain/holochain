@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_fetch"
-version = "0.3.0-beta-dev.10"
+version = "0.3.0-beta-dev.11"
 description = "Kitsune P2p Fetch Queue Logic"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,7 +14,7 @@ edition = "2021"
 [dependencies]
 derive_more = "0.99"
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.1", path = "../timestamp" }
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.8", path = "../types" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../types" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 stef = { path = "../../stef" }
@@ -47,7 +47,9 @@ fuzzing = [
     "test-strategy",
     "kitsune_p2p_types/fuzzing"
 ]
+
 test_utils = ["human-repr", "fuzzing", "kitsune_p2p_types/test_utils"]
+
 sqlite-encrypted = [
     "kitsune_p2p_types/sqlite-encrypted",
 ]
