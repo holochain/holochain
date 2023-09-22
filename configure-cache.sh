@@ -6,6 +6,7 @@ set -euo pipefail
 cache_protocol="${CACHE_PROTOCOL_OVERRIDE:-http}"
 cache_domain_suffix="${CACHE_DOMAIN_SUFFIX_OVERRIDE:-.events.infra.holochain.org}"
 cache_public_key="${CACHE_PUBLIC_KEY_OVERRIDE:-${2:-}$cache_domain_suffix:5UYNvUeMRb15qTR/u5nPBo13xjE0H3HXEtjAFDUrYvI=}"
+cache_port="${CACHE_PORT_OVERRIDE:-"80"}"
 
 # Common
 diff_path=${TMPDIR:-/tmp/}holochain-local-cache.diff
@@ -76,7 +77,7 @@ function update_config {
 }
 
 if test $# -eq 2; then
-  cache_url="${cache_protocol}://$2$cache_domain_suffix"
+  cache_url="${cache_protocol}://$2$cache_domain_suffix:$cache_port"
   command=$1
 
   if test "$command" = "use"; then
@@ -85,7 +86,7 @@ if test $# -eq 2; then
     print_usage
   fi
 elif test $# -eq 1; then
-  cache_url="$cache_domain_suffix"
+  cache_url="$cache_domain_suffix:$cache_port"
   command=$1
 
   if test "$command" = "cleanup"; then
