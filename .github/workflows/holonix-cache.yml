@@ -21,9 +21,9 @@ jobs:
           - .#packages.PLATFORM.build-holonix-tests-integration
           - .#devShells.PLATFORM.holonix
         extra_args:
-          - '--override-input versions "./versions/0_1"'
-          - '--override-input versions "./versions/0_2"'
-          - '--override-input versions "./versions/weekly"'
+          - '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
+          - '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
+          - '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
         platform:
           - x86_64-darwin
           - aarch64-darwin
@@ -68,9 +68,9 @@ jobs:
       fail-fast: false
       matrix:
         extra_args:
-          - '--override-input versions ./versions/0_1'
-          - '--override-input versions ./versions/0_2'
-          - '--override-input versions ./versions/weekly'
+          - '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
+          - '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
+          - '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
         platform:
           - x86_64-darwin
           - aarch64-darwin
