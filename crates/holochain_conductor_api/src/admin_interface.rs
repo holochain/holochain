@@ -147,9 +147,13 @@ pub enum AdminRequest {
         installed_app_id: InstalledAppId,
     },
 
-    /// Open up a new websocket for processing [`AppRequest`]s.
+    /// Open up a new websocket for processing [`AppRequest`]s. Any active app will be
+    /// callable via the attached app interface.
     ///
-    /// Any active app will be callable via the attached app interface.
+    /// **NB:** App interfaces are persisted when shutting down the conductor and are
+    /// restored when restarting the conductor. Unused app interfaces are _not_ cleaned
+    /// up. It is therefore recommended to reuse existing interfaces. They can be queried
+    /// with the call [`AdminRequest::ListAppInterfaces`].
     ///
     /// # Returns
     ///
@@ -158,12 +162,7 @@ pub enum AdminRequest {
     /// # Arguments
     ///
     /// Optionally a `port` parameter can be passed to this request. If it is `None`,
-    /// a free port is chosen by the conductor. The response will contain the port in
-    /// either case.
-    ///
-    /// > Existing app interfaces are restored on conductor restart and can be
-    /// queried with the call [`AdminRequest::ListAppInterfaces`]. It is recommended
-    /// to reuse existing ports, as they are not cleaned up.
+    /// a free port is chosen by the conductor.
     ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
@@ -396,9 +395,7 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::AttachAppInterface`].
     ///
-    /// `AppInterfaceApi` successfully attached.
-    /// If no port was specified in the request, contains the port number that was
-    /// selected by the conductor for running this app interface.
+    /// Contains the port number of the attached app interface.
     AppInterfaceAttached {
         /// Networking port of the new `AppInterfaceApi`
         port: u16,
