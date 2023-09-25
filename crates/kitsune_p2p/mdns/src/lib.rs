@@ -9,6 +9,7 @@ use mdns::RecordKind;
 use std::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
+use base64::Engine;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 const HC_SERVICE_PROTOCOL: &str = "._udp";
@@ -52,7 +53,7 @@ pub fn mdns_create_broadcast_thread(
     // Change buffer to base64 string
     let mut b64 = format!(
         "u{}",
-        base64::encode_config(buffer, base64::URL_SAFE_NO_PAD)
+        base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(buffer)
     );
     //println!(
     //    "Broadcasting service type '{}', named '{}' over mdns ({})",
@@ -142,7 +143,7 @@ pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsRespon
                             //println!("Response TXT = {:?}", txt);
                             b64.push_str(&txt);
                         }
-                        buffer = match base64::decode_config(&b64[1..], base64::URL_SAFE_NO_PAD) {
+                        buffer = match base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(&b64[1..]) {
                             Err(e) => return Err(MdnsError::Base64(e)),
                             Ok(s) => s,
                         };

@@ -226,7 +226,7 @@ pub(crate) async fn countersigning_success(
     // Verify signatures of actions.
     let mut i_am_an_author = false;
     for SignedAction(action, signature) in &signed_actions {
-        if !action.author().verify_signature(signature, action).await {
+        if !action.author().verify_signature(signature, action).await? {
             return Ok(());
         }
         if action.author() == &author {

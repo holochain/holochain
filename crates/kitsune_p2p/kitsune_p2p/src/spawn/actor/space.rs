@@ -2,6 +2,7 @@ use super::*;
 use crate::metrics::*;
 use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModule;
+use base64::Engine;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
@@ -21,13 +22,15 @@ const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
 mod metric_exchange;
 use metric_exchange::*;
 
+mod agent_info_update;
+mod bootstrap_task;
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
-type WireConHnd = MetaNetCon;
+pub(crate) type WireConHnd = MetaNetCon;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
@@ -721,8 +724,8 @@ async fn update_single_agent_info(
                     mdns_kill_thread(current_handle.to_owned());
                 }
                 // Broadcast by using Space as service type and Agent as service name
-                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
+                let agent_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&agent[..]);
                 //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
                 // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
                 // Broadcast rmp encoded agent_info_signed
@@ -746,7 +749,10 @@ async fn update_single_agent_info(
     Ok(agent_info_signed)
 }
 
+use crate::spawn::actor::space::agent_info_update::AgentInfoUpdateTask;
+use crate::spawn::actor::space::bootstrap_task::BootstrapTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
@@ -797,7 +803,7 @@ impl KitsuneP2pHandler for Space {
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
-                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
                 if !self.mdns_listened_spaces.contains(&space_b64) {
                     self.mdns_listened_spaces.insert(space_b64.clone());
                     tokio::task::spawn(async move {
@@ -1428,91 +1434,25 @@ impl Space {
                 .collect()
         };
 
-        let i_s_c = i_s.clone();
-        let agent_info_update_interval_ms =
-            config.tuning_params.gossip_agent_info_update_interval_ms as u64;
-        tokio::task::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    agent_info_update_interval_ms,
-                ))
-                .await;
-                if let Err(e) = i_s_c.update_agent_info().await {
-                    tracing::error!(failed_to_update_agent_info_for_space = ?e);
-                }
-            }
-        });
+        AgentInfoUpdateTask::spawn(
+            i_s.clone(),
+            std::time::Duration::from_millis(
+                config.tuning_params.gossip_agent_info_update_interval_ms as u64,
+            ),
+        );
 
         if let NetworkType::QuicBootstrap = &config.network_type {
             // spawn the periodic bootstrap pull
-            let i_s_c = i_s.clone();
-            let evt_s_c = evt_sender.clone();
-            let bootstrap_service = config.bootstrap_service.clone();
-            let bootstrap_check_delay_backoff_multiplier = config
-                .tuning_params
-                .bootstrap_check_delay_backoff_multiplier;
-            let space_c = space.clone();
-            tokio::task::spawn(async move {
-                const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-                const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-                let mut delay_len = START_DELAY;
-
-                loop {
-                    use ghost_actor::GhostControlSender;
-                    if !i_s_c.ghost_actor_is_active() {
-                        break;
-                    }
-
-                    tokio::time::sleep(delay_len).await;
-                    if delay_len <= MAX_DELAY {
-                        delay_len *= bootstrap_check_delay_backoff_multiplier;
-                    }
-
-                    match super::bootstrap::random(
-                        bootstrap_service.clone(),
-                        kitsune_p2p_types::bootstrap::RandomQuery {
-                            space: space_c.clone(),
-                            limit: 8.into(),
-                        },
-                        bootstrap_net,
-                    )
-                    .await
-                    {
-                        Err(e) => {
-                            tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
-                        }
-                        Ok(list) => {
-                            if !i_s_c.ghost_actor_is_active() {
-                                break;
-                            }
-                            let mut peer_data = Vec::with_capacity(list.len());
-                            for item in list {
-                                // TODO - someday some validation here
-                                match i_s_c.is_agent_local(item.agent.clone()).await {
-                                    Err(err) => tracing::error!(?err),
-                                    Ok(is_local) => {
-                                        if !is_local {
-                                            // we got a result - let's add it to our store for the future
-                                            peer_data.push(item);
-                                        }
-                                    }
-                                }
-                            }
-                            if let Err(err) = evt_s_c
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space_c.clone(),
-                                    peer_data,
-                                })
-                                .await
-                            {
-                                tracing::error!(?err, "error storing bootstrap agent_info");
-                            }
-                        }
-                    }
-                }
-                tracing::warn!("bootstrap fetch loop ending");
-            });
+            BootstrapTask::spawn(
+                i_s.clone(),
+                evt_sender.clone(),
+                space.clone(),
+                config.bootstrap_service.clone(),
+                bootstrap_net,
+                config
+                    .tuning_params
+                    .bootstrap_check_delay_backoff_multiplier,
+            );
         }
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {

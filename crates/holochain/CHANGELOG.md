@@ -7,7 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-Adds experimental Chain Head Coordinator feature, allowing multiple machines to share the same source chain. Holochain must be built with the `chc` feature flag (disabled by default).
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
+- Change `GenesisFailed` error to include `CellId` so that genesis failures can be correlated with the cells that failed. [2616](https://github.com/holochain/holochain/pull/2616)
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+- **BREAKING CHANGE** updating the project lock file to use the latest version of `serde` at `1.0.185` has changed how enums get serialized and as a knock on effect it has changed some hashes. This will make databases from previous versions incompatible with the next version of Holochain.
+
+## 0.3.0-beta-dev.14
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+- Improves error messages when validation fails with an InvalidCommit error
+- Fixed bug where if signature verification fails due to the lair service being unavailable, validation could fail. Now, that failure is treated as a normal error, so validation cannot proceed. [\#2604](https://github.com/holochain/holochain/pull/2604)
+
+## 0.3.0-beta-dev.10
+
+- Adds experimental Chain Head Coordinator feature, allowing multiple machines to share the same source chain. Holochain must be built with the `chc` feature flag (disabled by default).
 
 ## 0.3.0-beta-dev.9
 

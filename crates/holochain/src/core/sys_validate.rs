@@ -39,7 +39,7 @@ pub const MAX_TAG_SIZE: usize = 1000;
 
 /// Verify the signature for this action
 pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysValidationResult<()> {
-    if action.author().verify_signature(sig, action).await {
+    if action.author().verify_signature(sig, action).await? {
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
@@ -117,7 +117,7 @@ pub async fn check_countersigning_preflight_response_signature(
                 })?
                 .into(),
         )
-        .await;
+        .await?;
     if signature_is_valid {
         Ok(())
     } else {
@@ -169,16 +169,16 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
         if is_dna && !has_prev {
             Ok(())
         } else {
-            Err(PrevActionError::InvalidRoot)
+            Err(PrevActionErrorKind::InvalidRoot)
         }
     } else {
         if !is_dna && has_prev {
             Ok(())
         } else {
-            Err(PrevActionError::MissingPrev)
+            Err(PrevActionErrorKind::MissingPrev)
         }
     }
-    .map_err(|e| ValidationOutcome::from(e).into())
+    .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into())
 }
 
 /// Check that Dna actions are only added to empty source chains
@@ -191,8 +191,9 @@ pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidat
             } else if action.timestamp() < dna_def.modifiers.origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other action
                 // will be inductively so also due to the prev_action check
-                Err(PrevActionError::InvalidRootOriginTime)
-                    .map_err(|e| ValidationOutcome::from(e).into())
+                Err(PrevActionErrorKind::InvalidRootOriginTime).map_err(|e| {
+                    ValidationOutcome::PrevActionError((e, action.clone()).into()).into()
+                })
             } else {
                 Ok(())
             }
@@ -260,11 +261,11 @@ pub fn check_agent_validation_pkg_predecessor(
     };
 
     if let Some(error) = maybe_error {
-        Err(PrevActionError::InvalidSuccessor(
+        Err(PrevActionErrorKind::InvalidSuccessor(
             error.to_string(),
             Box::new((prev_action.clone(), action.clone())),
         ))
-        .map_err(|e| ValidationOutcome::from(e).into())
+        .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into())
     } else {
         Ok(())
     }
@@ -297,7 +298,8 @@ pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidation
     if a1 == *a2 {
         Ok(())
     } else {
-        Err(PrevActionError::Author(a1, a2.clone())).map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionErrorKind::Author(a1, a2.clone()))
+            .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into())
     }
 }
 
@@ -308,7 +310,8 @@ pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidat
     if t2 > t1 {
         Ok(())
     } else {
-        Err(PrevActionError::Timestamp(t1, t2)).map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionErrorKind::Timestamp(t1, t2))
+            .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into())
     }
 }
 
@@ -319,8 +322,8 @@ pub fn check_prev_seq(action: &Action, prev_action: &Action) -> SysValidationRes
     if action_seq > 0 && prev_seq == action_seq - 1 {
         Ok(())
     } else {
-        Err(PrevActionError::InvalidSeq(action_seq, prev_seq))
-            .map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionErrorKind::InvalidSeq(action_seq, prev_seq))
+            .map_err(|e| ValidationOutcome::PrevActionError((e, action.clone()).into()).into())
     }
 }
 
@@ -450,7 +453,10 @@ pub fn validate_chain<'iter, A: 'iter + ChainItem>(
                     // If there's no persisted chain head, then the first action
                     // must have no parent.
                     if item.prev_hash().is_some() {
-                        return Err(ValidationOutcome::from(PrevActionError::InvalidRoot).into());
+                        return Err(ValidationOutcome::PrevActionError(
+                            (PrevActionErrorKind::InvalidRoot, item).into(),
+                        )
+                        .into());
                     }
                 }
             }
@@ -475,17 +481,21 @@ fn check_prev_action_chain<A: ChainItem>(
 ) -> Result<(), PrevActionError> {
     // The root cannot appear later in the chain
     if action.prev_hash().is_none() {
-        Err(PrevActionError::MissingPrev)
+        Err((PrevActionErrorKind::MissingPrev, action).into())
     } else if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
         // Check the prev hash matches.
-        Err(PrevActionError::HashMismatch(action.seq()))
+        Err((PrevActionErrorKind::HashMismatch(action.seq()), action).into())
     } else if action
         .seq()
         .checked_sub(1)
         .map_or(true, |s| prev_action_seq != s)
     {
         // Check the prev seq is one less.
-        Err(PrevActionError::InvalidSeq(action.seq(), prev_action_seq))
+        Err((
+            PrevActionErrorKind::InvalidSeq(action.seq(), prev_action_seq),
+            action,
+        )
+            .into())
     } else {
         Ok(())
     }

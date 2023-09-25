@@ -105,6 +105,10 @@ impl ChainItem for TestChainItem {
     fn prev_hash(&self) -> Option<&Self::Hash> {
         self.prev.as_ref()
     }
+
+    fn to_display(&self) -> String {
+        String::from("test chain item")
+    }
 }
 
 impl AsRef<Self> for TestChainItem {

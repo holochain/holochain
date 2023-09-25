@@ -10,12 +10,32 @@ use tokio::time::Instant;
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;
-use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use num_traits::*;
+
+use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
+use once_cell::sync::Lazy;
+
+pub(crate) static METRIC_MSG_OUT_BYTE: Lazy<opentelemetry_api::metrics::Histogram<u64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .u64_histogram("kitsune.peer.send.byte.count")
+            .with_description("Outgoing p2p network messages byte count")
+            .with_unit(opentelemetry_api::metrics::Unit::new("By"))
+            .init()
+    });
+
+pub(crate) static METRIC_MSG_OUT_TIME: Lazy<opentelemetry_api::metrics::Histogram<f64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .f64_histogram("kitsune.peer.send.duration")
+            .with_description("Outgoing p2p network messages seconds")
+            .with_unit(opentelemetry_api::metrics::Unit::new("s"))
+            .init()
+    });
 
 /// how long historical metric records should be kept
 /// (currently set to 1 week)

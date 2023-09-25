@@ -3,12 +3,9 @@ use std::sync::Arc;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::db::DbKindCache;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::ReadAccess;
-use holochain_types::db::DbRead;
-use holochain_types::db::DbWrite;
+use holochain_sqlite::prelude::{
+    DbKindAuthored, DbKindCache, DbKindDht, DbRead, DbWrite, ReadAccess,
+};
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_zome_types::DnaDef;
 use holochain_zome_types::SignedActionHashed;

@@ -37,6 +37,7 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
+use opentelemetry_api::metrics::Histogram;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -189,6 +190,50 @@ pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
 type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;
 
+struct MetricSendGuard {
+    rem_id: tx5::Id,
+    is_error: bool,
+    byte_count: u64,
+    start_time: std::time::Instant,
+}
+
+impl MetricSendGuard {
+    pub fn new(rem_id: tx5::Id, byte_count: u64) -> Self {
+        Self {
+            rem_id,
+            is_error: true,
+            byte_count,
+            start_time: std::time::Instant::now(),
+        }
+    }
+
+    pub fn set_is_error(&mut self, is_error: bool) {
+        self.is_error = is_error;
+    }
+}
+
+impl Drop for MetricSendGuard {
+    fn drop(&mut self) {
+        let cx = opentelemetry_api::Context::new();
+        crate::metrics::METRIC_MSG_OUT_BYTE.record(
+            &cx,
+            self.byte_count,
+            &[
+                opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is_error", self.is_error),
+            ],
+        );
+        crate::metrics::METRIC_MSG_OUT_TIME.record(
+            &cx,
+            self.start_time.elapsed().as_secs_f64(),
+            &[
+                opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is_error", self.is_error),
+            ],
+        );
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
@@ -201,6 +246,11 @@ pub enum MetaNetCon {
         rem_url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
+    },
+
+    #[cfg(test)]
+    Test {
+        state: Arc<parking_lot::RwLock<MetaNetConTest>>,
     },
 }
 
@@ -220,6 +270,14 @@ impl Eq for MetaNetCon {}
 
 impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                state.write().closed = true;
+                return;
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -241,6 +299,13 @@ impl MetaNetCon {
     }
 
     pub fn is_closed(&self) -> bool {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                return state.read().closed;
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -263,6 +328,8 @@ impl MetaNetCon {
             MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
                 nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
             }
+            #[cfg(test)]
+            MetaNetCon::Test { .. } => MetaNetAuth::Authorized,
         }
     }
 
@@ -273,6 +340,20 @@ impl MetaNetCon {
         let result = (move || async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
+                    #[cfg(test)]
+                    {
+                        if let MetaNetCon::Test { state } = self {
+                            let mut state = state.write();
+                            state.notify_call_count += 1;
+
+                            return if state.notify_succeed {
+                                Ok(())
+                            } else {
+                                Err("Test error while notifying".into())
+                            };
+                        }
+                    }
+
                     #[cfg(feature = "tx2")]
                     {
                         if let MetaNetCon::Tx2(con, _) = self {
@@ -287,9 +368,16 @@ impl MetaNetCon {
                             let wrap = WireWrap::notify(msg_id, WireData(wire));
 
                             let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+
+                            let mut metric_guard =
+                                MetricSendGuard::new(rem_url.id().unwrap(), data.len() as u64);
+
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
+
+                            metric_guard.set_is_error(false);
+
                             return Ok(());
                         }
                     }
@@ -357,10 +445,17 @@ impl MetaNetCon {
                             let wrap = WireWrap::request(msg_id, WireData(wire));
                             let data = wrap.encode_vec().map_err(KitsuneError::other)?;
 
+                            let mut metric_guard =
+                                MetricSendGuard::new(rem_url.id().unwrap(), data.len() as u64);
+
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
-                            return r.await.map_err(|_| KitsuneError::other("timeout"));
+
+                            let resp = r.await.map_err(|_| KitsuneError::other("timeout"))?;
+
+                            metric_guard.set_is_error(false);
+                            return Ok(resp);
                         }
                     }
 
@@ -386,6 +481,13 @@ impl MetaNetCon {
     }
 
     pub fn peer_id(&self) -> Arc<[u8; 32]> {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                return state.read().id();
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -402,6 +504,42 @@ impl MetaNetCon {
         }
 
         panic!("invalid features");
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub struct MetaNetConTest {
+    pub id: Arc<[u8; 32]>,
+    pub closed: bool,
+
+    pub notify_succeed: bool,
+    pub notify_call_count: usize,
+}
+
+#[cfg(test)]
+impl Default for MetaNetConTest {
+    fn default() -> Self {
+        Self {
+            id: Arc::new([0; 32]),
+            closed: false,
+            notify_succeed: true,
+            notify_call_count: 0,
+        }
+    }
+}
+
+#[cfg(test)]
+impl MetaNetConTest {
+    pub fn new_with_id(id: u8) -> Self {
+        Self {
+            id: Arc::new(vec![id; 32].try_into().unwrap()),
+            ..Default::default()
+        }
+    }
+
+    pub fn id(&self) -> Arc<[u8; 32]> {
+        self.id.clone()
     }
 }
 

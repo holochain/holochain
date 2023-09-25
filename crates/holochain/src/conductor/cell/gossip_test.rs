@@ -3,9 +3,8 @@ use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
-use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::{AsP2pStateTxExt, DatabaseResult};
 use holochain_test_wasm_common::AnchorInput;
-use holochain_types::db::AsP2pStateTxExt;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 
