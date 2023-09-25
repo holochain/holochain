@@ -10,6 +10,8 @@ use fixt::prelude::*;
 mod bloom;
 mod common;
 mod ops;
+
+#[cfg(test)]
 mod test_two_nodes;
 
 impl ShardedGossipLocal {
