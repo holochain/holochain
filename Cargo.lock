@@ -2695,7 +2695,7 @@ dependencies = [
  "tracing-futures",
  "tracing-subscriber",
  "tx5-go-pion-turn",
- "tx5-signal-srv",
+ "tx5-signal-srv 0.0.2-alpha",
  "unwrap_to",
  "url 2.4.0",
  "url2",
@@ -2794,7 +2794,7 @@ dependencies = [
  "kitsune_p2p_bootstrap",
  "tokio",
  "tracing",
- "tx5-signal-srv",
+ "tx5-signal-srv 0.0.2-alpha",
 ]
 
 [[package]]
@@ -3785,6 +3785,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tx5",
+ "tx5-signal-srv 0.0.1-alpha.9",
  "url2",
 ]
 
@@ -7951,9 +7952,24 @@ dependencies = [
  "tokio",
  "tracing",
  "ts_opentelemetry_api",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "tx5-go-pion",
  "tx5-signal",
+ "url 2.4.0",
+]
+
+[[package]]
+name = "tx5-core"
+version = "0.0.1-alpha.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6de3181cafaf2cd7d1cd60c3367db5daf53a818159afa596f420bc2da1d7243d"
+dependencies = [
+ "base64 0.13.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "tracing",
  "url 2.4.0",
 ]
 
@@ -8003,7 +8019,7 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.7",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "zip",
 ]
 
@@ -8021,7 +8037,7 @@ dependencies = [
  "sha2 0.10.7",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "zip",
 ]
 
@@ -8049,9 +8065,30 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.18.0",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "url 2.4.0",
  "webpki-roots",
+]
+
+[[package]]
+name = "tx5-signal-srv"
+version = "0.0.1-alpha.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8359558d90ae7c4b2ff885619fcd75186cccdb62f575252c95c0c06484ce7de0"
+dependencies = [
+ "clap 4.3.24",
+ "dirs 5.0.1",
+ "futures",
+ "if-addrs 0.10.1",
+ "once_cell",
+ "prometheus",
+ "rand 0.8.5",
+ "sodoken",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tx5-core 0.0.1-alpha.7",
+ "warp",
 ]
 
 [[package]]
@@ -8071,7 +8108,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "tx5-core",
+ "tx5-core 0.0.2-alpha",
  "warp",
 ]
 

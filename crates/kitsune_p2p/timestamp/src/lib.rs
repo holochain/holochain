@@ -202,7 +202,7 @@ impl rusqlite::types::FromSql for Timestamp {
 }
 
 /// It's an interval bounded by timestamps that are not infinite.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
 pub struct InclusiveTimestampInterval {
     start: Timestamp,
     end: Timestamp,

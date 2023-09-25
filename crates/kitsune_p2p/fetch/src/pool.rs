@@ -171,8 +171,8 @@ impl stef::State<'static> for FetchPoolState {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = if let Some(author) = author {
-                    // TODO This is currently dead code, no callers provide the author. Even if they do, that's the only thing that the
-                    //      `source` can contain. The author field could actually be removed from the input type.
+                    // TODO This is currently not used. The idea is that the author will always be a valid alternative to fetch
+                    //      this data from. See one of the call sites for `push` to see where this was intended to be used from.
                     Sources(
                         [
                             (source.clone(), SourceRecord::new(source)),
@@ -296,7 +296,6 @@ impl FetchPoolState {
                         let h = hash.to_string();
                         format!("{}..{}", &h[0..4], &h[h.len() - 4..])
                     }
-                    FetchKey::Region(_) => "[region]".to_string(),
                 };
 
                 let size = v.size.unwrap_or_default().get();
@@ -394,6 +393,7 @@ pub enum FetchSource {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;
@@ -401,7 +401,7 @@ mod tests {
     use std::collections::HashSet;
     use std::{sync::Arc, time::Duration};
 
-    use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
+    use kitsune_p2p_types::bin_types::{KitsuneBinType, KitsuneSpace};
 
     use super::*;
 
@@ -422,21 +422,6 @@ mod tests {
         }
     }
 
-    pub(super) fn test_key_op(n: u8) -> FetchKey {
-        FetchKey::Op(Arc::new(KitsuneOpHash::new(vec![n; 36])))
-    }
-
-    pub(super) fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchPoolPush {
-        FetchPoolPush {
-            key: test_key_op(n),
-            author: None,
-            context,
-            space: test_space(0),
-            source,
-            size: None,
-        }
-    }
-
     pub(super) fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchPoolItem {
         FetchPoolItem {
             sources: Sources(
@@ -452,24 +437,8 @@ mod tests {
         }
     }
 
-    pub(super) fn test_space(i: u8) -> KSpace {
-        Arc::new(KitsuneSpace::new(vec![i; 36]))
-    }
-
-    pub(super) fn test_source(i: u8) -> FetchSource {
-        FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
-    }
-
-    pub(super) fn test_sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
-        ix.into_iter().map(test_source).collect()
-    }
-
-    fn arbitrary_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
+    fn arbitrary_test_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
         test_sources(std::iter::repeat_with(|| u8::arbitrary(u).unwrap()).take(count))
-    }
-
-    pub(super) fn ctx(c: u32) -> Option<FetchContext> {
-        Some(c.into())
     }
 
     #[tokio::test(start_paused = true)]
@@ -630,12 +599,12 @@ mod tests {
     fn state_keeps_context_on_merge_if_new_is_none() {
         let mut q = FetchPoolState::new(Arc::new(Config(1, 1)));
 
-        q.push(req(1, ctx(1), test_source(1)));
-        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+        q.push(test_req_op(1, test_ctx(1), test_source(1)));
+        assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
 
         // Same key but different source so that it will merge and no context set to check how that is merged
-        q.push(req(1, None, test_source(0)));
-        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+        q.push(test_req_op(1, None, test_source(0)));
+        assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
     }
 
     #[test]
@@ -643,12 +612,12 @@ mod tests {
         let mut q = FetchPoolState::new(Arc::new(Config(1, 1)));
 
         // Initially have no context
-        q.push(req(1, None, test_source(1)));
+        q.push(test_req_op(1, None, test_source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
 
         // Now merge with a context
-        q.push(req(1, ctx(1), test_source(0)));
-        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+        q.push(test_req_op(1, test_ctx(1), test_source(0)));
+        assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
     }
 
     #[test]
@@ -656,11 +625,11 @@ mod tests {
         let mut q = FetchPoolState::new(Arc::new(Config(1, 1)));
 
         // Initially have no context
-        q.push(req(1, None, test_source(1)));
+        q.push(test_req_op(1, None, test_source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
 
         // Now merge with no context
-        q.push(req(1, None, test_source(0)));
+        q.push(test_req_op(1, None, test_source(0)));
 
         // Still no context
         assert_eq!(None, q.queue.front().unwrap().1.context);
@@ -672,11 +641,11 @@ mod tests {
     fn state_ignores_duplicate_sources_on_merge() {
         let mut q = FetchPoolState::new(Arc::new(Config(1, 1)));
 
-        q.push(req(1, ctx(1), test_source(1)));
+        q.push(test_req_op(1, test_ctx(1), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
 
         // Set a different context but otherwise the same operation as above
-        q.push(req(1, ctx(2), test_source(1)));
+        q.push(test_req_op(1, test_ctx(2), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
     }
 
@@ -685,14 +654,14 @@ mod tests {
         let mut q = FetchPoolState::new(Arc::new(Config(1, 1)));
 
         // note: new sources get added to the back of the list
-        q.push(req(1, ctx(0), test_source(0)));
-        q.push(req(1, ctx(1), test_source(1)));
+        q.push(test_req_op(1, test_ctx(0), test_source(0)));
+        q.push(test_req_op(1, test_ctx(1), test_source(1)));
 
-        q.push(req(2, ctx(0), test_source(0)));
+        q.push(test_req_op(2, test_ctx(0), test_source(0)));
 
         let expected_ready = [
-            (test_key_op(1), item(test_sources(0..=1), ctx(1))),
-            (test_key_op(2), item(test_sources([0]), ctx(0))),
+            (test_key_op(1), item(test_sources(0..=1), test_ctx(1))),
+            (test_key_op(2), item(test_sources([0]), test_ctx(0))),
         ]
         .into_iter()
         .collect();
@@ -705,9 +674,9 @@ mod tests {
         let cfg = Config(1, 10);
         let mut q = {
             let mut queue = [
-                (test_key_op(1), item(test_sources(0..=2), ctx(1))),
-                (test_key_op(2), item(test_sources(1..=3), ctx(1))),
-                (test_key_op(3), item(test_sources(2..=4), ctx(1))),
+                (test_key_op(1), item(test_sources(0..=2), test_ctx(1))),
+                (test_key_op(2), item(test_sources(1..=3), test_ctx(1))),
+                (test_key_op(3), item(test_sources(2..=4), test_ctx(1))),
             ];
             // Set the last_fetch time of one of the sources to something a bit earlier,
             // so it won't show up in next() right away
@@ -745,7 +714,7 @@ mod tests {
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
             std::iter::from_fn(|| q.next_item()).collect::<Vec<_>>(),
-            vec![(test_key_op(2), test_space(0), test_source(2), ctx(1))]
+            vec![(test_key_op(2), test_space(0), test_source(2), test_ctx(1))]
         );
         assert_eq!(q.len(), 0);
 
@@ -766,7 +735,7 @@ mod tests {
             for i in 0..(num_items) {
                 queue.push((
                     test_key_op(i as u8),
-                    item(test_sources([(i % 100) as u8]), ctx(1)),
+                    item(test_sources([(i % 100) as u8]), test_ctx(1)),
                 ))
             }
 
@@ -804,7 +773,7 @@ mod tests {
                     // Give each item a different set of sources
                     item(
                         test_sources((i * num_items) as u8..(i * num_items + num_items) as u8),
-                        ctx(1),
+                        test_ctx(1),
                     ),
                 ))
             }
@@ -836,7 +805,7 @@ mod tests {
     async fn remove_fetch_item() {
         let cfg = Config(1, 10);
         let mut q = {
-            let queue = [(test_key_op(1), item(test_sources([1]), ctx(1)))];
+            let queue = [(test_key_op(1), item(test_sources([1]), test_ctx(1)))];
 
             let queue = queue.into_iter().collect();
             FetchPoolState {
@@ -877,7 +846,7 @@ mod tests {
 
         // Some sources will be unavailable for blocks of time
         let unavailable_sources: HashSet<FetchSource> =
-            arbitrary_sources(&mut u, 10).into_iter().collect();
+            arbitrary_test_sources(&mut u, 10).into_iter().collect();
 
         // Add one item that will never send
         fetch_pool.push(FetchPoolPush {
@@ -886,7 +855,7 @@ mod tests {
             source: unavailable_sources.iter().last().cloned().unwrap(),
             size: None,   // Not important for this test
             author: None, // Unused field, ignore
-            context: ctx(u32::arbitrary(&mut u).unwrap()),
+            context: test_ctx(u32::arbitrary(&mut u).unwrap()),
         });
 
         let mut failed_count = 0;
@@ -899,7 +868,7 @@ mod tests {
                     source: test_source(u8::arbitrary(&mut u).unwrap()),
                     size: None,   // Not important for this test
                     author: None, // Unused field, ignore
-                    context: ctx(u32::arbitrary(&mut u).unwrap()),
+                    context: test_ctx(u32::arbitrary(&mut u).unwrap()),
                 });
             }
 

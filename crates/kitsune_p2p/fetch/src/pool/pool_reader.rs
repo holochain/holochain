@@ -39,6 +39,7 @@ pub struct FetchPoolInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::*;
     use crate::{pool::tests::*, FetchPoolState};
     use linked_hash_map::LinkedHashMap;
     use std::sync::Arc;
@@ -59,7 +60,7 @@ mod tests {
     fn queue_info_fetch_no_spaces() {
         let cfg = Config(1, 1);
         let q = {
-            let mut queue = [(test_key_op(1), item(test_sources(0..=2), ctx(1)))];
+            let mut queue = [(test_key_op(1), item(test_sources(0..=2), test_ctx(1)))];
 
             queue[0].1.size = Some(100.into());
 
@@ -81,9 +82,9 @@ mod tests {
         let cfg = Config(1, 1);
         let q = {
             let mut queue = [
-                (test_key_op(1), item(test_sources(0..=2), ctx(1))),
-                (test_key_op(2), item(test_sources(1..=3), ctx(1))),
-                (test_key_op(3), item(test_sources(2..=4), ctx(1))),
+                (test_key_op(1), item(test_sources(0..=2), test_ctx(1))),
+                (test_key_op(2), item(test_sources(1..=3), test_ctx(1))),
+                (test_key_op(3), item(test_sources(2..=4), test_ctx(1))),
             ];
 
             queue[0].1.size = Some(100.into());
@@ -106,11 +107,11 @@ mod tests {
     fn queue_info_filter_spaces() {
         let cfg = Config(1, 1);
         let q = {
-            let mut item_for_space_1 = item(test_sources(0..=2), ctx(1));
+            let mut item_for_space_1 = item(test_sources(0..=2), test_ctx(1));
             item_for_space_1.space = test_space(1);
             item_for_space_1.size = Some(100.into());
 
-            let mut item_for_space_2 = item(test_sources(0..=2), ctx(1));
+            let mut item_for_space_2 = item(test_sources(0..=2), test_ctx(1));
             item_for_space_2.space = test_space(2);
             item_for_space_2.size = Some(500.into());
 
