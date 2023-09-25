@@ -59,7 +59,7 @@ impl SignalBroadcaster {
         self.senders.iter_mut().for_each(|tx| {
             if let Err(err) = tx.send(sig.clone()) {
                 tracing::error!(
-                    "{:?}: no active receivers connected",
+                    "{:?}: no app websocket connected",
                     InterfaceError::SignalSend(err)
                 )
             }
