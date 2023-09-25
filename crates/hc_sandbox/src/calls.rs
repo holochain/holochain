@@ -246,6 +246,18 @@ pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyho
                 }
             }
         }
+
+        if cmds.is_empty() {
+            bail!(
+                "No running conductors found by searching the current directory. \
+                You need to do one of \
+                    1. Start a new sandbox conductor from this directory, \
+                    2. Change directory to where your sandbox conductor is running, \
+                    3. Use the --running flag to connect to a running conductor\
+                "
+            );
+        }
+
         cmds
     } else {
         let mut cmds = Vec::with_capacity(running.len());
