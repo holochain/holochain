@@ -23,6 +23,7 @@
 //!
 #![warn(missing_docs)]
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -49,9 +50,10 @@ use holochain_state::query::live_record::GetLiveRecordQuery;
 use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
-use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 use mutations::insert_action;
 use mutations::insert_entry;
 use mutations::insert_op_lite;
@@ -94,7 +96,7 @@ pub enum CascadeSource {
 ///
 /// See the module-level docs for more info.
 #[derive(Clone)]
-pub struct Cascade<Network: Send + Sync = HolochainP2pDna> {
+pub struct CascadeImpl<Network: Send + Sync = HolochainP2pDna> {
     authored: Option<DbRead<DbKindAuthored>>,
     dht: Option<DbRead<DbKindDht>>,
     cache: Option<DbWrite<DbKindCache>>,
@@ -103,7 +105,7 @@ pub struct Cascade<Network: Send + Sync = HolochainP2pDna> {
     private_data: Option<Arc<AgentPubKey>>,
 }
 
-impl<Network> Cascade<Network>
+impl<Network> CascadeImpl<Network>
 where
     Network: HolochainP2pDnaT + Clone + 'static + Send + Sync,
 {
@@ -152,8 +154,8 @@ where
         self,
         network: N,
         cache_db: DbWrite<DbKindCache>,
-    ) -> Cascade<N> {
-        Cascade {
+    ) -> CascadeImpl<N> {
+        CascadeImpl {
             authored: self.authored,
             dht: self.dht,
             scratch: self.scratch,
@@ -164,7 +166,7 @@ where
     }
 }
 
-impl Cascade<HolochainP2pDna> {
+impl CascadeImpl<HolochainP2pDna> {
     /// Constructs an empty [Cascade].
     pub fn empty() -> Self {
         Self {
@@ -181,7 +183,7 @@ impl Cascade<HolochainP2pDna> {
     pub fn from_workspace_and_network<N, AuthorDb, DhtDb>(
         workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
         network: N,
-    ) -> Cascade<N>
+    ) -> CascadeImpl<N>
     where
         N: HolochainP2pDnaT + Clone,
         AuthorDb: ReadAccess<DbKindAuthored>,
@@ -194,7 +196,7 @@ impl Cascade<HolochainP2pDna> {
             scratch,
         } = workspace.stores();
         let private_data = workspace.author();
-        Cascade::<N> {
+        CascadeImpl::<N> {
             authored: Some(authored),
             dht: Some(dht),
             cache: Some(cache),
@@ -223,7 +225,145 @@ impl Cascade<HolochainP2pDna> {
     }
 }
 
-impl<Network> Cascade<Network>
+/// TODO
+#[async_trait::async_trait]
+#[mockall::automock]
+pub trait Cascade {
+    /// Retrieve [`Entry`] either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
+    async fn retrieve_entry(
+        &self,
+        hash: EntryHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>>;
+
+    /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
+    async fn retrieve_action(
+        &self,
+        hash: ActionHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>>;
+
+    /// Retrieve data from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
+    async fn retrieve(
+        &self,
+        hash: AnyDhtHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(Record, CascadeSource)>>;
+}
+
+#[async_trait::async_trait]
+impl<Network> Cascade for CascadeImpl<Network>
+where
+    Network: HolochainP2pDnaT + Clone + 'static + Send,
+{
+    async fn retrieve_entry(
+        &self,
+        hash: EntryHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
+        let private_data = self.private_data.clone();
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_entry(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
+        if result.is_some() {
+            return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Local)));
+        }
+        options.request_type = holochain_p2p::event::GetRequest::Pending;
+        self.fetch_record(hash.clone().into(), options).await?;
+
+        // Check if we have the data now after the network call.
+        let private_data = self.private_data.clone();
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_entry(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
+        Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Network)))
+    }
+
+    async fn retrieve_action(
+        &self,
+        hash: ActionHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| Ok(store.get_action(&hash)?)
+            })
+            .await?;
+        if result.is_some() {
+            return Ok(result.map(|a| (a, CascadeSource::Local)));
+        }
+        options.request_type = holochain_p2p::event::GetRequest::Pending;
+        self.fetch_record(hash.clone().into(), options).await?;
+
+        // Check if we have the data now after the network call.
+        let result = self
+            .find_map(move |store| {
+                Ok(store
+                    .get_action(&hash)?
+                    .map(|a| (a, CascadeSource::Network)))
+            })
+            .await?;
+        Ok(result)
+    }
+
+    async fn retrieve(
+        &self,
+        hash: AnyDhtHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(Record, CascadeSource)>> {
+        let private_data = self.private_data.clone();
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_record(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
+        if result.is_some() {
+            return Ok(result.map(|r| (r, CascadeSource::Local)));
+        }
+        options.request_type = holochain_p2p::event::GetRequest::Pending;
+        self.fetch_record(hash.clone(), options).await?;
+
+        let private_data = self.private_data.clone();
+        // Check if we have the data now after the network call.
+        let result = self
+            .find_map(move |store| {
+                Ok(store.get_public_or_authored_record(
+                    &hash,
+                    private_data.as_ref().map(|a| a.as_ref()),
+                )?)
+            })
+            .await?;
+        Ok(result.map(|r| (r, CascadeSource::Network)))
+    }
+}
+
+impl<Network> CascadeImpl<Network>
 where
     Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
@@ -285,7 +425,7 @@ where
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
-            .async_commit(|txn| {
+            .write_async(|txn| {
                 for response in responses {
                     let ops = response.render()?;
                     Self::insert_rendered_ops(txn, &ops)?;
@@ -303,7 +443,7 @@ where
     ) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 for response in responses {
                     let ops = response.render(&key)?;
                     Self::insert_rendered_ops(txn, &ops)?;
@@ -348,7 +488,7 @@ where
             Some(MustGetAgentActivityResponse::Activity(activity)) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
-                    .async_commit({
+                    .write_async({
                         let activity = activity.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
@@ -422,36 +562,37 @@ where
         self.add_activity_into_cache(results).await
     }
 
-    /// Get all available databases.
-    async fn get_databases(&self) -> Vec<(PConnPermit, Box<dyn PermittedConn + Send>)> {
-        let mut conns: Vec<(_, Box<dyn PermittedConn + Send>)> = Vec::with_capacity(3);
-        if let Some(cache) = self.cache.clone() {
-            conns.push((cache.conn_permit().await, Box::new(cache)));
+    /// Get transactions for available databases.
+    async fn get_txn_guards(&self) -> CascadeResult<Vec<PTxnGuard>> {
+        let mut conns: Vec<_> = Vec::with_capacity(3);
+        if let Some(cache) = &self.cache {
+            conns.push(cache.get_read_txn().await?);
         }
-        if let Some(dht) = self.dht.clone() {
-            conns.push((dht.conn_permit().await, Box::new(dht)));
+        if let Some(dht) = &self.dht {
+            conns.push(dht.get_read_txn().await?);
         }
-        if let Some(authored) = self.authored.clone() {
-            conns.push((authored.conn_permit().await, Box::new(authored)));
+        if let Some(authored) = &self.authored {
+            conns.push(authored.get_read_txn().await?);
         }
-        conns
+        Ok(conns)
     }
 
     async fn cascading<Q>(&self, query: Q) -> CascadeResult<Q::Output>
     where
         Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
-        <Q as holochain_state::prelude::Query>::Output: Send + 'static,
+        <Q as Query>::Output: Send + 'static,
     {
-        let conns = self.get_databases().await;
+        let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
+        // TODO We may already be on a blocking thread here because this is accessible from a zome call. Ideally we'd have
+        //      a way to check this situation and avoid spawning a new thread if we're already on an appropriate thread.
         let results = tokio::task::spawn_blocking(move || {
-            let mut conns = conns
-                .into_iter()
-                .map(|(permit, conn)| conn.with_permit(permit))
-                .collect::<DatabaseResult<Vec<_>>>()?;
-            let mut txns = Vec::with_capacity(conns.len());
-            for conn in &mut conns {
-                let txn = conn.transaction().map_err(StateQueryError::from)?;
+            let mut txns = Vec::with_capacity(txn_guards.len());
+            for conn in &mut txn_guards {
+                // TODO The transaction does not actually start here. We're asking for a deferred transaction which is the
+                //      right thing to do, but SQLite won't launch that until we do a read operation. If we want a stricter
+                //      'point in time' view across databases it might make sense to issue a lightweight read op to each txn here?
+                let txn = conn.transaction()?;
                 txns.push(txn);
             }
             let txns_ref: Vec<_> = txns.iter().collect();
@@ -470,159 +611,56 @@ where
     async fn find_map<F, T>(&self, mut f: F) -> CascadeResult<Option<T>>
     where
         T: Send + 'static,
-        F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + 'static,
+        F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + Clone + 'static,
     {
-        let find = |permit, conn: Box<dyn PermittedConn + Send>, mut f: F| async move {
-            tokio::task::spawn_blocking(move || {
-                let mut conn = conn.with_permit(permit)?;
-                let txn = conn.transaction().map_err(StateQueryError::from)?;
-                let txn = Txn::from(&txn);
-                let r = f(&txn)?;
-                CascadeResult::Ok((r, f))
-            })
-            .await?
-        };
         if let Some(cache) = self.cache.clone() {
-            let permit = cache.conn_permit().await;
-            let (r, f1) = find(permit, Box::new(cache), f).await?;
-            f = f1;
+            let r = cache
+                .read_async({
+                    let mut f = f.clone();
+                    move |raw_txn| f(&Txn::from(&raw_txn))
+                })
+                .await?;
 
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         if let Some(dht) = self.dht.clone() {
-            let permit = dht.conn_permit().await;
-            let (r, f1) = find(permit, Box::new(dht), f).await?;
-            f = f1;
+            let r = dht
+                .read_async({
+                    let mut f = f.clone();
+                    move |raw_txn| f(&Txn::from(&raw_txn))
+                })
+                .await?;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         if let Some(authored) = self.authored.clone() {
-            let permit = authored.conn_permit().await;
-            let (r, f1) = find(permit, Box::new(authored), f).await?;
-            f = f1;
+            let r = authored
+                .read_async({
+                    let mut f = f.clone();
+                    move |raw_txn| f(&Txn::from(&raw_txn))
+                })
+                .await?;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         if let Some(scratch) = &self.scratch {
             let r = scratch.apply_and_then(|scratch| f(scratch))?;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         Ok(None)
-    }
-
-    /// Retrieve [`Entry`] from either locally or from an authority.
-    /// Data might not have been validated yet by the authority.
-    pub async fn retrieve_entry(
-        &self,
-        hash: EntryHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
-        let private_data = self.private_data.clone();
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_entry(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
-            })
-            .await?;
-        if result.is_some() {
-            return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Local)));
-        }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone().into(), options).await?;
-
-        // Check if we have the data now after the network call.
-        let private_data = self.private_data.clone();
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_entry(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
-            })
-            .await?;
-        Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Network)))
-    }
-
-    /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
-    /// Data might not have been validated yet by the authority.
-    pub async fn retrieve_action(
-        &self,
-        hash: ActionHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| Ok(store.get_action(&hash)?)
-            })
-            .await?;
-        if result.is_some() {
-            return Ok(result.map(|a| (a, CascadeSource::Local)));
-        }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone().into(), options).await?;
-
-        // Check if we have the data now after the network call.
-        let result = self
-            .find_map(move |store| {
-                Ok(store
-                    .get_action(&hash)?
-                    .map(|a| (a, CascadeSource::Network)))
-            })
-            .await?;
-        Ok(result)
-    }
-
-    /// Retrieve data from either locally or from an authority.
-    /// Data might not have been validated yet by the authority.
-    pub async fn retrieve(
-        &self,
-        hash: AnyDhtHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(Record, CascadeSource)>> {
-        let private_data = self.private_data.clone();
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_record(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
-            })
-            .await?;
-        if result.is_some() {
-            return Ok(result.map(|r| (r, CascadeSource::Local)));
-        }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone(), options).await?;
-
-        let private_data = self.private_data.clone();
-        // Check if we have the data now after the network call.
-        let result = self
-            .find_map(move |store| {
-                Ok(store.get_public_or_authored_record(
-                    &hash,
-                    private_data.as_ref().map(|a| a.as_ref()),
-                )?)
-            })
-            .await?;
-        Ok(result.map(|r| (r, CascadeSource::Network)))
     }
 
     /// Get Entry data along with all CRUD actions associated with it.
@@ -858,8 +896,17 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query =
-            GetLinksQuery::new(key.base, key.type_query, key.tag, GetLinksFilter::default());
+        let query = GetLinksQuery::new(
+            key.base,
+            key.type_query,
+            key.tag,
+            GetLinksFilter {
+                after: key.after,
+                before: key.before,
+                author: key.author,
+            },
+        );
+
         let results = self.cascading(query).await?;
         Ok(results)
     }
@@ -920,7 +967,7 @@ where
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         // Get the available databases.
-        let conns = self.get_databases().await;
+        let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
 
         // For each store try to get the bounded activity.
@@ -928,10 +975,9 @@ where
             let author = author.clone();
             let filter = filter.clone();
             move || {
-                let mut results = Vec::with_capacity(conns.len() + 1);
-                for (permit, conn) in conns {
-                    let mut conn = conn.with_permit(permit)?;
-                    let mut txn = conn.transaction().map_err(StateQueryError::from)?;
+                let mut results = Vec::with_capacity(txn_guards.len() + 1);
+                for txn_guard in &mut txn_guards {
+                    let mut txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
@@ -1117,4 +1163,77 @@ where
             None => Q::without_private_data_access(hash),
         }
     }
+}
+
+impl MockCascade {
+    /// Construct a mock which acts as if the given records were part of local storage
+    pub fn with_records(records: Vec<Record>) -> Self {
+        let mut cascade = Self::default();
+
+        let map: HashMap<AnyDhtHash, Record> = records
+            .into_iter()
+            .flat_map(|r| {
+                let mut items = vec![(r.action_address().clone().into(), r.clone())];
+                if let Some(eh) = r.action().entry_hash() {
+                    items.push((eh.clone().into(), r))
+                }
+                items
+            })
+            .collect();
+
+        let map0 = ShareOpen::new(map);
+
+        let map = map0.clone();
+        cascade.expect_retrieve().returning(move |hash, _| {
+            box_fut_plain(Ok(map.share_ref(|m| {
+                m.get(&hash).map(|r| (r.clone(), CascadeSource::Local))
+            })))
+        });
+
+        let map = map0.clone();
+        cascade.expect_retrieve_action().returning(move |hash, _| {
+            box_fut_plain(Ok(map.share_ref(|m| {
+                m.get(&hash.into())
+                    .map(|r| (r.signed_action().clone(), CascadeSource::Local))
+            })))
+        });
+
+        let map = map0;
+        cascade.expect_retrieve_entry().returning(move |hash, _| {
+            box_fut_plain(Ok(map.share_ref(|m| {
+                m.get(&hash.into()).map(|r| {
+                    (
+                        EntryHashed::from_content_sync(r.entry().as_option().unwrap().clone()),
+                        CascadeSource::Local,
+                    )
+                })
+            })))
+        });
+
+        cascade
+    }
+}
+
+#[tokio::test]
+async fn test_mock_cascade_with_records() {
+    use ::fixt::fixt;
+    let records = vec![fixt!(Record), fixt!(Record), fixt!(Record)];
+    let cascade = MockCascade::with_records(records.clone());
+    let opts = NetworkGetOptions::default();
+    let (r0, _) = cascade
+        .retrieve(records[0].action_address().clone().into(), opts.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    let (r1, _) = cascade
+        .retrieve(records[1].action_address().clone().into(), opts.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    let (r2, _) = cascade
+        .retrieve(records[2].action_address().clone().into(), opts)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(records, vec![r0, r1, r2]);
 }

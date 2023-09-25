@@ -10,9 +10,30 @@ use super::SysValidationError;
 use super::ValidationOutcome;
 
 /// Exit early with either an outcome or an error
+#[derive(Debug)]
 pub enum OutcomeOrError<T, E> {
     Outcome(T),
     Err(E),
+}
+
+impl<T, E> OutcomeOrError<T, E> {
+    /// Peel off an Outcome if that's what it is
+    pub fn into_outcome(self) -> Option<T> {
+        if let Self::Outcome(t) = self {
+            Some(t)
+        } else {
+            None
+        }
+    }
+
+    /// Peel off an Err if that's what it is
+    pub fn into_err(self) -> Option<E> {
+        if let Self::Err(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
 }
 
 /// Helper macro for implementing from sub error types

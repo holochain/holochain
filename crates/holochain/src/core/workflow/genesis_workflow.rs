@@ -152,7 +152,7 @@ impl GenesisWorkspace {
     pub async fn has_genesis(&self, author: AgentPubKey) -> DatabaseResult<bool> {
         let count = self
             .vault
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let count: u32 = txn.query_row(
                     "
                 SELECT

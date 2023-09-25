@@ -58,6 +58,9 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
 
     /// The hash of the previous item
     fn prev_hash(&self) -> Option<&Self::Hash>;
+
+    /// A display representation of the item
+    fn to_display(&self) -> String;
 }
 
 /// Alias for getting the associated hash type of a ChainItem
@@ -77,6 +80,10 @@ impl ChainItem for ActionHashed {
     fn prev_hash(&self) -> Option<&Self::Hash> {
         self.prev_action()
     }
+
+    fn to_display(&self) -> String {
+        format!("{}", self.content)
+    }
 }
 
 impl ChainItem for SignedActionHashed {
@@ -92,6 +99,10 @@ impl ChainItem for SignedActionHashed {
 
     fn prev_hash(&self) -> Option<&Self::Hash> {
         self.hashed.prev_hash()
+    }
+
+    fn to_display(&self) -> String {
+        format!("{}", self.hashed.content)
     }
 }
 

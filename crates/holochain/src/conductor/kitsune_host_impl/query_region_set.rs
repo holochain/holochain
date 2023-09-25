@@ -67,7 +67,7 @@ pub async fn query_region_set(
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 
     let region_set = db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
             let regions = coords
@@ -115,7 +115,6 @@ mod tests {
 
     use super::*;
     use holochain_serialized_bytes::UnsafeBytes;
-    use holochain_state::prelude::StateMutationResult;
     use holochain_state::{prelude::insert_op, test_utils::test_dht_db};
     use holochain_types::fixt::*;
     use holochain_types::prelude::{DhtOp, DhtOpHashed, NewEntryAction};
@@ -140,11 +139,11 @@ mod tests {
         }
 
         let mk_op = |i: u8| {
-            let entry = Box::new(Entry::App(AppEntryBytes(
+            let entry = Entry::App(AppEntryBytes(
                 UnsafeBytes::from(vec![i % 10; 10_000_000])
                     .try_into()
                     .unwrap(),
-            )));
+            ));
             let sig = fixt::fixt!(Signature);
             let mut create = fixt::fixt!(Create);
             create.timestamp = Timestamp::now();
@@ -167,13 +166,11 @@ mod tests {
             })
             .sum();
 
-        db.test_commit(|txn| {
+        db.test_write(move |txn| {
             for op in ops.iter() {
                 insert_op(txn, op).unwrap()
             }
-            StateMutationResult::Ok(())
-        })
-        .unwrap();
+        });
 
         let regions = query_region_set(db.to_db(), topo, &strat, arcset)
             .await

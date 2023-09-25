@@ -7,6 +7,10 @@
     empty.url = "github:steveej/empty";
     empty.flake = false;
 
+    # workaround to allow the passing in of the `.git` directory into the release-automation tests
+    repo-git.url = "file+file:/dev/null";
+    repo-git.flake = false;
+
     # nix packages pointing to the github repo
     nixpkgs.url = "nixpkgs/nixos-unstable";
 
@@ -21,6 +25,7 @@
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
     # filter out all .nix files to not affect the input hash
     # when these are changes
     nix-filter.url = "github:numtide/nix-filter";
@@ -44,9 +49,13 @@
     versions.url = "github:holochain/holochain?dir=versions/0_1";
 
     holochain.follows = "empty";
+    holochain.flake = false;
     lair.follows = "empty";
+    lair.flake = false;
     launcher.follows = "empty";
+    launcher.flake = false;
     scaffolding.follows = "empty";
+    scaffolding.flake = false;
 
     cargo-chef = {
       url = "github:LukeMathWalker/cargo-chef/main";

@@ -85,7 +85,7 @@ impl DhtDbQueryCache {
                 let db = self.dht_db.clone();
                 async move {
                     let (activity_integrated, mut all_activity) = db
-                        .async_reader(|txn| {
+                        .read_async(|txn| {
                             // Get the highest integrated sequence number for each agent.
                             let activity_integrated: Vec<(AgentPubKey, u32)> = txn
                             .prepare_cached(

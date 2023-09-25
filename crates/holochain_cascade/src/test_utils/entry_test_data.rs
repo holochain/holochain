@@ -113,7 +113,7 @@ impl EntryTestData {
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Create(create.clone()),
-            Box::new(entry.clone()),
+            entry.clone(),
         ));
 
         let wire_create = Judged::valid(SignedAction(create_action, signature).try_into().unwrap());
@@ -129,7 +129,7 @@ impl EntryTestData {
         let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
             signature.clone(),
             update,
-            Some(Box::new(update_entry)),
+            update_entry.into(),
         ));
         let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
 
@@ -173,15 +173,22 @@ impl EntryTestData {
             base: create_link.base_address.clone(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: Some(create_link.tag.clone()),
+            after: None,
+            before: None,
+            author: None,
         };
 
         let link = Link {
             author: create_link.author,
+            base: create_link.base_address.clone(),
             target: create_link.target_address.clone(),
             timestamp: create_link.timestamp,
             zome_index: create_link.zome_index,

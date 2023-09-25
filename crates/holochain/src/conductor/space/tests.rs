@@ -14,7 +14,7 @@ use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_types::dht_op::facts::valid_dht_op;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::*;
-use holochain_zome_types::{DnaDef, DnaDefHashed, NOISE};
+use holochain_zome_types::{DnaDef, DnaDefHashed};
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
 
@@ -36,7 +36,8 @@ async fn test_region_queries() {
 
     // let _g = holochain_trace::test_run().ok();
 
-    let mut u = Unstructured::new(&NOISE);
+    let mut g = random_generator();
+
     let temp_dir = tempfile::TempDir::new().unwrap();
     let path = temp_dir.path().to_path_buf();
 
@@ -48,7 +49,7 @@ async fn test_region_queries() {
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
-    let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
+    let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
     let q_us = Dimension::standard_time().quantum as u64;
     let tq = Duration::from_micros(q_us);
     let tq5 = Duration::from_micros(q_us * 5);
@@ -66,10 +67,10 @@ async fn test_region_queries() {
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
-        let mut op = DhtOp::arbitrary(&mut u).unwrap();
+        let mut op = DhtOp::arbitrary(&mut g).unwrap();
         *op.author_mut() = agent.clone();
         let mut fact = valid_dht_op(keystore.clone(), agent.clone(), true);
-        fact.satisfy(&mut op, &mut u);
+        op = fact.satisfy(&mut g, op).unwrap();
         *op.timestamp_mut() = timestamp;
         op
     };
@@ -93,7 +94,7 @@ async fn test_region_queries() {
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
-        fill_db(&db, op.clone());
+        fill_db(&db, op.clone()).await;
         ops.push(op.clone());
 
         // also construct ops which are in the recent time window,
@@ -104,7 +105,7 @@ async fn test_region_queries() {
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
-        fill_db(&db, op2);
+        fill_db(&db, op2).await;
     }
     let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
         .await
