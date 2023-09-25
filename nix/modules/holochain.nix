@@ -3,14 +3,12 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
         version = "1.66.1";
       };
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
-
-      opensslStatic = pkgs.pkgsStatic.openssl;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -24,10 +22,10 @@
         CARGO_PROFILE = "";
 
         OPENSSL_NO_VENDOR = "1";
-        OPENSSL_LIB_DIR = "${opensslStatic.out}/lib";
-        OPENSSL_INCLUDE_DIR = "${opensslStatic.dev}/include";
+        OPENSSL_LIB_DIR = "${self'.packages.opensslStatic.out}/lib";
+        OPENSSL_INCLUDE_DIR = "${self'.packages.opensslStatic.dev}/include";
 
-        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher ])
+        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
@@ -37,9 +35,11 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go ])
+        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
+
+        stdenv = config.rustHelper.defaultStdenv pkgs;
       };
 
       # derivation building all dependencies
@@ -60,7 +60,7 @@
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-        passthru.src.rev = inputs.holochain.rev;
+        passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
@@ -114,8 +114,12 @@
             ${disabledTestsArg} \
           '';
 
+          cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
+
           dontPatchELF = true;
           dontFixup = true;
+
+          nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ holochain ];
 
           installPhase = ''
             mkdir -p $out
@@ -124,7 +128,7 @@
           '';
         });
 
-      build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
+      build-holochain-tests-unit = lib.makeOverridable craneLib.cargoNextest holochainTestsNextestArgs;
 
       build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;

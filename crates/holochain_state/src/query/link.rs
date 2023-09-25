@@ -12,23 +12,37 @@ pub struct GetLinksQuery {
     query: LinksQuery,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct GetLinksFilter {
+    pub after: Option<Timestamp>,
+    pub before: Option<Timestamp>,
+    pub author: Option<AgentPubKey>,
+}
+
 #[derive(Debug, Clone)]
 pub struct LinksQuery {
     pub base: Arc<AnyLinkableHash>,
     pub type_query: LinkTypeFilter,
     pub tag: Option<String>,
+    filter: GetLinksFilter,
     query: String,
 }
 
 impl LinksQuery {
-    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
+        tag: Option<LinkTag>,
+        filter: GetLinksFilter,
+    ) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
-        let create_string = Self::create_query_string(&type_query, tag.clone());
+        let create_string = Self::create_query_string(&type_query, tag.clone(), &filter);
         let delete_string = Self::delete_query_string(&type_query, tag.clone());
         Self {
             base: Arc::new(base),
             type_query,
             tag,
+            filter,
             query: Self::create_query(create_string, delete_string),
         }
     }
@@ -43,7 +57,12 @@ impl LinksQuery {
     }
 
     pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeIndex>) -> Self {
-        Self::new(base, LinkTypeFilter::Dependencies(dependencies), None)
+        Self::new(
+            base,
+            LinkTypeFilter::Dependencies(dependencies),
+            None,
+            GetLinksFilter::default(),
+        )
     }
 
     fn create_query(create: String, delete: String) -> String {
@@ -65,7 +84,12 @@ impl LinksQuery {
             AND DhtOp.when_integrated IS NOT NULL
         "
     }
-    fn create_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
+
+    fn create_query_string(
+        type_query: &LinkTypeFilter,
+        tag: Option<String>,
+        filter: &GetLinksFilter,
+    ) -> String {
         let mut s = format!(
             "
             SELECT Action.blob AS action_blob FROM DhtOp
@@ -74,8 +98,18 @@ impl LinksQuery {
             Self::common_query_string()
         );
         s = Self::add_type_query(s, type_query);
-        Self::add_tag(s, tag)
+        s = Self::add_tag(s, tag);
+        s = Self::add_after(s, filter.after);
+        s = Self::add_before(s, filter.before);
+        s = Self::add_author(s, filter.author.as_ref());
+
+        s
     }
+
+    fn add_type_query(q: String, type_query: &LinkTypeFilter) -> String {
+        format!("{} {} ", q, type_query.to_sql_statement())
+    }
+
     fn add_tag(q: String, tag: Option<String>) -> String {
         match tag {
             Some(tag) => {
@@ -89,9 +123,28 @@ impl LinksQuery {
             None => q,
         }
     }
-    fn add_type_query(q: String, type_query: &LinkTypeFilter) -> String {
-        format!("{} {} ", q, type_query.to_sql_statement())
+
+    fn add_after(q: String, after: Option<Timestamp>) -> String {
+        match after {
+            Some(_) => format!("{} AND DhtOp.authored_timestamp >= :after", q),
+            None => format!("{} AND :after IS NULL", q),
+        }
     }
+
+    fn add_before(q: String, before: Option<Timestamp>) -> String {
+        match before {
+            Some(_) => format!("{} AND DhtOp.authored_timestamp <= :before", q),
+            None => format!("{} AND :before IS NULL", q),
+        }
+    }
+
+    fn add_author(q: String, author: Option<&AgentPubKey>) -> String {
+        match author {
+            Some(_) => format!("{} AND Action.author = :author", q),
+            None => format!("{} AND :author IS NULL", q),
+        }
+    }
+
     fn delete_query_string(type_query: &LinkTypeFilter, tag: Option<String>) -> String {
         let mut sub_create_query = format!(
             "
@@ -126,6 +179,9 @@ impl LinksQuery {
                 ":delete": DhtOpType::RegisterRemoveLink,
                 ":status": ValidationStatus::Valid,
                 ":base_hash": self.base,
+                ":after": self.filter.after,
+                ":before": self.filter.before,
+                ":author": self.filter.author,
             }
         }
         .to_vec()
@@ -133,9 +189,14 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
+        tag: Option<LinkTag>,
+        filter: GetLinksFilter,
+    ) -> Self {
         Self {
-            query: LinksQuery::new(base, type_query, tag),
+            query: LinksQuery::new(base, type_query, tag, filter),
         }
     }
 
@@ -229,6 +290,7 @@ fn link_from_action(action: Action) -> StateQueryResult<Link> {
     match action {
         Action::CreateLink(action) => Ok(Link {
             author: action.author,
+            base: action.base_address,
             target: action.target_address,
             timestamp: action.timestamp,
             zome_index: action.zome_index,

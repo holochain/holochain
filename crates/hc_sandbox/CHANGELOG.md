@@ -1,11 +1,73 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
+- `hc sandbox generate` and `hc sandbox run` now exit when the conductor(s) failed to spawn. previously it would wait for the user to cancel manually. [\#2747](https://github.com/holochain/holochain/pull/2747)
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+## 0.3.0-beta-dev.14
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+## 0.3.0-beta-dev.10
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
+## 0.3.0-beta-dev.5
+
+## 0.3.0-beta-dev.4
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
+
+- updated comment in src/cli.rs to clarify use of –force-admin-ports
+
+- Improved documentation in README, code comments, help text, and error messages.
+
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
+
+- **BREAKING**: In the course of updates, a bug was discovered which necessitated a breaking change; the short arg for `--holochain-path` used in `hc sandbox` subcommand has changed from `-h` to `-H` to resolve a conflict with the short arg for `--help`. [\#2125](https://github.com/holochain/holochain/pull/2125)
+
+## 0.2.0
+
+## 0.2.0-beta-rc.6
+
+## 0.2.0-beta-rc.5
+
+- Add new option `in-process-lair` to `hc sandbox generate` which causes the generated conductor config to specify an in-process lair. This comes with an associated change to make `hc sandbox run` respect the conductor configuration and only launch a lair instance when required.
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+## 0.2.0-beta-rc.2
 
 ## 0.2.0-beta-rc.1
 

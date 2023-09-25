@@ -2,11 +2,13 @@ use super::*;
 use crate::metrics::*;
 use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModule;
+use base64::Engine;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
@@ -20,13 +22,15 @@ const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
 mod metric_exchange;
 use metric_exchange::*;
 
+mod agent_info_update;
+mod bootstrap_task;
 mod rpc_multi_logic;
 
 type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
-type WireConHnd = MetaNetCon;
+pub(crate) type WireConHnd = MetaNetCon;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
@@ -45,6 +49,8 @@ ghost_actor::ghost_chan! {
 
         /// Update / publish a single agent info
         fn publish_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+
+        fn get_all_local_joined_agent_infos() -> Vec<AgentInfoSigned>;
 
         /// see if an agent is locally joined
         fn is_agent_local(agent: KAgent) -> bool;
@@ -160,7 +166,7 @@ impl SpaceInternalHandler for Space {
         _basis: Arc<KitsuneBasis>,
     ) -> SpaceInternalHandlerResult<HashSet<Arc<KitsuneAgent>>> {
         let mut res: HashSet<Arc<KitsuneAgent>> =
-            self.local_joined_agents.iter().cloned().collect();
+            self.local_joined_agents.keys().cloned().collect();
         let all_peers_fut = self
             .evt_sender
             .query_agents(QueryAgentsEvt::new(self.space.clone()));
@@ -179,7 +185,7 @@ impl SpaceInternalHandler for Space {
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
-        for agent in self.local_joined_agents.iter().cloned() {
+        for agent in self.local_joined_agents.keys().cloned() {
             let arc = self.get_agent_arc(&agent);
             agent_list.push((agent, arc));
         }
@@ -189,10 +195,6 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let single_storage_arc_per_space = self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
@@ -211,7 +213,6 @@ impl SpaceInternalHandler for Space {
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
                     dynamic_arcs,
-                    single_storage_arc_per_space,
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
@@ -241,10 +242,6 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let single_storage_arc_per_space = self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space;
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
@@ -262,7 +259,6 @@ impl SpaceInternalHandler for Space {
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
                 dynamic_arcs,
-                single_storage_arc_per_space,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             internal_sender
@@ -282,33 +278,56 @@ impl SpaceInternalHandler for Space {
         input: PutAgentInfoSignedEvt,
     ) -> SpaceInternalHandlerResult<()> {
         let timeout = self.config.tuning_params.implicit_timeout();
-        let tasks: Vec<_> = input
+        let tasks: Result<Vec<_>, _> = input
             .peer_data
-            .into_iter()
+            .iter()
             .map(|agent_info| {
                 self.handle_broadcast(
                     self.space.clone(),
                     Arc::new(KitsuneBasis::new(agent_info.agent.0.clone())),
                     timeout,
-                    BroadcastData::AgentInfo(agent_info),
+                    BroadcastData::AgentInfo(agent_info.clone()),
                 )
             })
             .collect();
+        let ep_hnd = self.ro_inner.ep_hnd.clone();
         Ok(async move {
-            for f in tasks {
-                f?.await?;
-            }
+            futures::future::join(
+                ep_hnd.broadcast(
+                    &wire::Wire::PeerUnsolicited(crate::wire::PeerUnsolicited {
+                        peer_list: input.peer_data,
+                    }),
+                    timeout,
+                ),
+                futures::future::join_all(tasks?),
+            )
+            .await
+            .0?;
             Ok(())
         }
         .boxed()
         .into())
     }
 
+    fn handle_get_all_local_joined_agent_infos(
+        &mut self,
+    ) -> SpaceInternalHandlerResult<Vec<AgentInfoSigned>> {
+        let agent_infos: Vec<AgentInfoSigned> = self
+            .local_joined_agents
+            .values()
+            .into_iter()
+            .filter_map(|maybe_agent_info| maybe_agent_info.as_ref())
+            .cloned()
+            .collect();
+
+        Ok(async move { Ok(agent_infos) }.boxed().into())
+    }
+
     fn handle_is_agent_local(
         &mut self,
         agent: Arc<KitsuneAgent>,
     ) -> SpaceInternalHandlerResult<bool> {
-        let res = self.local_joined_agents.contains(&agent);
+        let res = self.local_joined_agents.contains_key(&agent);
         Ok(async move { Ok(res) }.boxed().into())
     }
 
@@ -337,7 +356,7 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent in self.local_joined_agents.iter() {
+                for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut =
@@ -612,7 +631,6 @@ struct UpdateAgentInfoInput<'borrow> {
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
     dynamic_arcs: bool,
-    single_storage_arc_per_space: bool,
 }
 
 async fn update_arc_length(
@@ -651,13 +669,9 @@ async fn update_single_agent_info(
         mdns_handles,
         bootstrap_service,
         dynamic_arcs,
-        single_storage_arc_per_space,
     } = input;
 
-    // If there is only a single agent per space don't update the empty arcs.
-    let should_not_update_arc_length = single_storage_arc_per_space && arc.is_empty();
-
-    if dynamic_arcs && !should_not_update_arc_length {
+    if dynamic_arcs {
         update_arc_length(evt_sender, space.clone(), &mut arc).await?;
     }
 
@@ -694,6 +708,11 @@ async fn update_single_agent_info(
 
     tracing::debug!(?agent_info_signed);
 
+    // Write to the local peer store. The agent info will also be stored via a local broadcast,
+    // except in the case of a zero arc where it gets filtered out, so we store it here too
+    // to be sure it makes it into the local store.
+    put_local_agent_info(evt_sender.clone(), space.clone(), agent_info_signed.clone()).await?;
+
     // Push to the network as well
     match network_type {
         NetworkType::QuicMdns => {
@@ -705,8 +724,8 @@ async fn update_single_agent_info(
                     mdns_kill_thread(current_handle.to_owned());
                 }
                 // Broadcast by using Space as service type and Agent as service name
-                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
-                let agent_b64 = base64::encode_config(&agent[..], base64::URL_SAFE_NO_PAD);
+                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
+                let agent_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&agent[..]);
                 //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
                 // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
                 // Broadcast rmp encoded agent_info_signed
@@ -730,7 +749,10 @@ async fn update_single_agent_info(
     Ok(agent_info_signed)
 }
 
+use crate::spawn::actor::space::agent_info_update::AgentInfoUpdateTask;
+use crate::spawn::actor::space::bootstrap_task::BootstrapTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
+
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
@@ -764,13 +786,15 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         tracing::debug!(?space, ?agent, ?initial_arc, "handle_join");
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
-        self.local_joined_agents.insert(agent.clone());
+        self.local_joined_agents
+            .insert(agent.clone(), maybe_agent_info);
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
         }
@@ -779,7 +803,7 @@ impl KitsuneP2pHandler for Space {
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
-                let space_b64 = base64::encode_config(&space[..], base64::URL_SAFE_NO_PAD);
+                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
                 if !self.mdns_listened_spaces.contains(&space_b64) {
                     self.mdns_listened_spaces.insert(space_b64.clone());
                     tokio::task::spawn(async move {
@@ -913,22 +937,9 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
-        let location = input.basis.get_loc();
-        let local_agents_holding_basis = self
-            .local_joined_agents
-            .iter()
-            .filter(|agent| {
-                self.agent_arcs
-                    .get(*agent)
-                    .map_or(false, |arc| arc.contains(location))
-            })
-            .cloned()
-            .collect();
-        let fut = rpc_multi_logic::handle_rpc_multi(
-            input,
-            self.ro_inner.clone(),
-            local_agents_holding_basis,
-        );
+        let local_joined_agents = self.local_joined_agents.keys().cloned().collect();
+        let fut =
+            rpc_multi_logic::handle_rpc_multi(input, self.ro_inner.clone(), local_joined_agents);
         Ok(async move { fut.await }.boxed().into())
     }
 
@@ -944,12 +955,14 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent in self.local_joined_agents.iter() {
-                    if let Some(arc) = self.agent_arcs.get(agent) {
+                for (agent_key, _agent_info) in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent_key) {
                         if arc.contains(basis.get_loc()) {
-                            let fut =
-                                self.evt_sender
-                                    .notify(space.clone(), agent.clone(), data.clone());
+                            let fut = self.evt_sender.notify(
+                                space.clone(),
+                                agent_key.clone(),
+                                data.clone(),
+                            );
                             local_notify_events.push(async move {
                                 if let Err(err) = fut.await {
                                     tracing::warn!(?err, "failed local broadcast");
@@ -965,12 +978,11 @@ impl KitsuneP2pHandler for Space {
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let fut = self
-                        .evt_sender
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: self.space.clone(),
-                            peer_data: vec![agent_info.clone()],
-                        });
+                    let fut = put_local_agent_info(
+                        self.evt_sender.clone(),
+                        self.space.clone(),
+                        agent_info.clone(),
+                    );
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
@@ -995,8 +1007,8 @@ impl KitsuneP2pHandler for Space {
             futures::future::join_all(local_agent_info_events).await;
 
             // NOTE
-            // Holochain currently does all its testing without any remote nodes
-            // if we do this inline, it takes us to the 30 second timeout
+            // Holochain currently does most of its testing without any remote
+            // nodes if we do this inline, it takes us to the 30 second timeout
             // on every one of those... so spawning for now, which means
             // we won't get notified if we are unable to publish to anyone.
             // Also, if conductor spams us with publishes, we could fill
@@ -1220,6 +1232,11 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        // call handled by parent actor and never delegated to spaces
+        unreachable!()
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         _space: KSpace,
@@ -1314,7 +1331,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
+    pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Option<AgentInfoSigned>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -1364,134 +1381,78 @@ impl Space {
             metrics.clone(),
         );
 
-        let gossip_mod = config
-            .tuning_params
-            .gossip_strategy
-            .split(',')
-            .flat_map(|module| match module {
-                "sharded-gossip" => {
-                    let mut gossips = vec![];
-                    if !config.tuning_params.disable_recent_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedRecent,
-                            crate::gossip::sharded_gossip::recent_factory(
-                                bandwidth_throttles.recent(),
-                            ),
-                        ));
+        let gossip_mod = if config.tuning_params.arc_clamping() == Some(ArqClamping::Empty) {
+            // If arcs are clamped to zero, then completely disable gossip for this node.
+            // Gossip will never resume
+            tracing::info!("Gossip is disabled due to arc_clamping setting");
+            HashMap::new()
+        } else {
+            config
+                .tuning_params
+                .gossip_strategy
+                .split(',')
+                .flat_map(|module| match module {
+                    "sharded-gossip" => {
+                        let mut gossips = vec![];
+                        if !config.tuning_params.disable_recent_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedRecent,
+                                crate::gossip::sharded_gossip::recent_factory(
+                                    bandwidth_throttles.recent(),
+                                ),
+                            ));
+                        }
+                        if !config.tuning_params.disable_historical_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedHistorical,
+                                crate::gossip::sharded_gossip::historical_factory(
+                                    bandwidth_throttles.historical(),
+                                ),
+                            ));
+                        }
+                        gossips
                     }
-                    if !config.tuning_params.disable_historical_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedHistorical,
-                            crate::gossip::sharded_gossip::historical_factory(
-                                bandwidth_throttles.historical(),
-                            ),
-                        ));
+                    "none" => vec![],
+                    _ => {
+                        panic!("unknown gossip strategy: {}", module);
                     }
-                    gossips
-                }
-                "none" => vec![],
-                _ => {
-                    panic!("unknown gossip strategy: {}", module);
-                }
-            })
-            .map(|(module, factory)| {
-                (
-                    module,
-                    factory.spawn_gossip_task(
-                        config.tuning_params.clone(),
-                        space.clone(),
-                        ep_hnd.clone(),
-                        evt_sender.clone(),
-                        host_api.clone(),
-                        metrics.clone(),
-                        fetch_pool.clone(),
-                    ),
-                )
-            })
-            .collect();
+                })
+                .map(|(module, factory)| {
+                    (
+                        module,
+                        factory.spawn_gossip_task(
+                            config.tuning_params.clone(),
+                            space.clone(),
+                            ep_hnd.clone(),
+                            evt_sender.clone(),
+                            host_api.clone(),
+                            metrics.clone(),
+                            fetch_pool.clone(),
+                        ),
+                    )
+                })
+                .collect()
+        };
 
-        let i_s_c = i_s.clone();
-        let agent_info_update_interval_ms =
-            config.tuning_params.gossip_agent_info_update_interval_ms as u64;
-        tokio::task::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    agent_info_update_interval_ms,
-                ))
-                .await;
-                if let Err(e) = i_s_c.update_agent_info().await {
-                    tracing::error!(failed_to_update_agent_info_for_space = ?e);
-                }
-            }
-        });
+        AgentInfoUpdateTask::spawn(
+            i_s.clone(),
+            std::time::Duration::from_millis(
+                config.tuning_params.gossip_agent_info_update_interval_ms as u64,
+            ),
+        );
 
         if let NetworkType::QuicBootstrap = &config.network_type {
             // spawn the periodic bootstrap pull
-            let i_s_c = i_s.clone();
-            let evt_s_c = evt_sender.clone();
-            let bootstrap_service = config.bootstrap_service.clone();
-            let space_c = space.clone();
-            tokio::task::spawn(async move {
-                const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
-                const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-                let mut delay_len = START_DELAY;
-
-                loop {
-                    use ghost_actor::GhostControlSender;
-                    if !i_s_c.ghost_actor_is_active() {
-                        break;
-                    }
-
-                    tokio::time::sleep(delay_len).await;
-                    if delay_len <= MAX_DELAY {
-                        delay_len *= 2;
-                    }
-
-                    match super::bootstrap::random(
-                        bootstrap_service.clone(),
-                        kitsune_p2p_types::bootstrap::RandomQuery {
-                            space: space_c.clone(),
-                            limit: 8.into(),
-                        },
-                        bootstrap_net,
-                    )
-                    .await
-                    {
-                        Err(e) => {
-                            tracing::error!(msg = "Failed to get peers from bootstrap", ?e);
-                        }
-                        Ok(list) => {
-                            if !i_s_c.ghost_actor_is_active() {
-                                break;
-                            }
-                            let mut peer_data = Vec::with_capacity(list.len());
-                            for item in list {
-                                // TODO - someday some validation here
-                                match i_s_c.is_agent_local(item.agent.clone()).await {
-                                    Err(err) => tracing::error!(?err),
-                                    Ok(is_local) => {
-                                        if !is_local {
-                                            // we got a result - let's add it to our store for the future
-                                            peer_data.push(item);
-                                        }
-                                    }
-                                }
-                            }
-                            if let Err(err) = evt_s_c
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    space: space_c.clone(),
-                                    peer_data,
-                                })
-                                .await
-                            {
-                                tracing::error!(?err, "error storing bootstrap agent_info");
-                            }
-                        }
-                    }
-                }
-                tracing::warn!("bootstrap fetch loop ending");
-            });
+            BootstrapTask::spawn(
+                i_s.clone(),
+                evt_sender.clone(),
+                space.clone(),
+                config.bootstrap_service.clone(),
+                bootstrap_net,
+                config
+                    .tuning_params
+                    .bootstrap_check_delay_backoff_multiplier,
+            );
         }
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {
@@ -1515,7 +1476,7 @@ impl Space {
             i_s,
             evt_sender,
             host_api,
-            local_joined_agents: HashSet::new(),
+            local_joined_agents: HashMap::new(),
             agent_arcs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),
@@ -1604,32 +1565,33 @@ impl Space {
 
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
-        if self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space
-        {
-            let arc = self.agent_arcs.get(agent).cloned();
-            match arc {
-                Some(arc) => arc,
-                None => {
-                    if self.agent_arcs.is_empty() {
-                        DhtArc::full(agent.get_loc())
-                    } else {
-                        DhtArc::empty(agent.get_loc())
-                    }
-                }
+        // TODO: We are simply setting the initial arc to full.
+        // In the future we may want to do something more intelligent.
+        //
+        // In the case an initial_arc is passend into the join request,
+        // handle_join will initialize this agent_arcs map to that value.
+        self.agent_arcs.get(agent).cloned().unwrap_or_else(|| {
+            match self.config.tuning_params.arc_clamping() {
+                Some(ArqClamping::Empty) => DhtArc::empty(agent.get_loc()),
+                Some(ArqClamping::Full) | None => DhtArc::full(agent.get_loc()),
             }
-        } else {
-            // TODO: We are simply setting the initial arc to full.
-            // In the future we may want to do something more intelligent.
-            //
-            // In the case an initial_arc is passend into the join request,
-            // handle_join will initialize this agent_arcs map to that value.
-            self.agent_arcs
-                .get(agent)
-                .cloned()
-                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
-        }
+        })
     }
+}
+
+/// Function to add local agent info to the store.
+/// There's nothing special about this method, it's just helpful to
+/// semantically see the situations where local info is being added.
+async fn put_local_agent_info(
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: KSpace,
+    agent_info: AgentInfoSigned,
+) -> KitsuneP2pResult<()> {
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space,
+            peer_data: vec![agent_info],
+        })
+        .await?;
+    Ok(())
 }

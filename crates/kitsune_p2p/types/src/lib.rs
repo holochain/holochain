@@ -198,7 +198,7 @@ impl From<Arc<Vec<u8>>> for Tx2Cert {
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(*c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(*c);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -226,6 +226,7 @@ impl From<&Tx2Cert> for CertDigest {
     }
 }
 
+use base64::Engine;
 use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
@@ -244,6 +245,10 @@ pub enum KitsuneErrorKind {
     /// This object is closed, calls on it are invalid.
     #[error("This object is closed, calls on it are invalid.")]
     Closed,
+
+    /// The operation is unauthorized by the host.
+    #[error("Unauthorized")]
+    Unauthorized,
 
     /// Unspecified error.
     #[error(transparent)]
@@ -329,15 +334,12 @@ pub use timeout::*;
 
 pub mod agent_info;
 pub mod async_lazy;
-mod auto_stream_select;
-pub use auto_stream_select::*;
 pub mod bootstrap;
 pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
 pub mod metrics;
-pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
@@ -366,6 +368,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "tx2")]
     async fn test_tx2_digest() {
         let d: Tx2Cert = vec![0xdb; 32].into();
         println!("raw_debug: {:?}", d);

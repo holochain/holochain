@@ -169,7 +169,7 @@ fn gossip_scenario_full_sync() {
 
     let strat = ArqStrat {
         min_coverage: n as f64,
-        ..Default::default()
+        ..ArqStrat::default()
     };
 
     let expected_num_space_chunks: u32 = 8;

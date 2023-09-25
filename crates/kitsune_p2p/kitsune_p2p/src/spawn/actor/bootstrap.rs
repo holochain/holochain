@@ -87,7 +87,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
 
 /// `do_api` wrapper for the `put` op.
 ///
-/// Input must be an AgentInfoSigned with a valid siganture otherwise the remote service will not
+/// Input must be an AgentInfoSigned with a valid signature otherwise the remote service will not
 /// accept the data.
 pub async fn put(
     url: Option<Url2>,
@@ -212,37 +212,21 @@ mod tests {
     use crate::types::KitsuneBinType;
     use crate::types::KitsuneSignature;
     use ::fixt::prelude::*;
-    use kitsune_p2p_types::KitsuneError;
+    use ed25519_dalek::ed25519::signature::Signature;
+    use ed25519_dalek::Keypair;
+    use ed25519_dalek::Signer;
     use std::convert::TryInto;
+    use std::net::SocketAddr;
     use std::sync::Arc;
-
-    // stub struct to make these tests compile (though they won't run).
-    #[derive(Clone)]
-    struct Keypair {
-        pub pub_key: (Arc<Vec<u8>>,),
-    }
-
-    impl Keypair {
-        async fn sign(&self, _: Arc<Vec<u8>>) -> Result<(Arc<Vec<u8>>,), std::io::Error> {
-            todo!()
-        }
-    }
-
-    // stub function to make these tests compile (though they won't run).
-    async fn sign_ed25519_keypair_new_from_entropy() -> Result<Keypair, std::io::Error> {
-        todo!()
-    }
-
-    // TODO - FIXME - davidb
-    // I'm disabling all these tests that depend on outside systems
-    // we need local testing to prove these out in a ci environment.
+    use tokio::task::AbortHandle;
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky"]
     async fn test_bootstrap() {
-        let keypair = sign_ed25519_keypair_new_from_entropy().await.unwrap();
+        let (addr, abort_handle) = start_bootstrap().await;
+
+        let keypair = create_test_keypair();
         let space = fixt!(KitsuneSpace);
-        let agent = KitsuneAgent::new((*keypair.pub_key.0).clone());
+        let agent = KitsuneAgent::new(keypair.public.as_bytes().to_vec());
         let urls = fixt!(UrlList);
         let now = std::time::SystemTime::now();
         let millis = now
@@ -260,12 +244,10 @@ mod tests {
             expires_at_ms,
             |d| {
                 let d = Arc::new(d.to_vec());
-                async {
-                    keypair
-                        .sign(d)
-                        .await
-                        .map(|s| Arc::new(KitsuneSignature(s.0.to_vec())))
-                        .map_err(KitsuneError::other)
+                async move {
+                    Ok(Arc::new(KitsuneSignature(
+                        keypair.sign(d.clone().as_slice()).as_bytes().to_vec(),
+                    )))
                 }
             },
         )
@@ -273,27 +255,34 @@ mod tests {
         .unwrap();
 
         // Simply hitting the endpoint should be OK.
-        super::put(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+        put(
+            Some(url2::url2!("http://{:?}", addr)),
             agent_info_signed,
-            BootstrapNet::Tx2,
+            BootstrapNet::Tx5,
         )
         .await
         .unwrap();
 
         // We should get back an error if we don't have a good signature.
-        assert!(super::put(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            fixt!(AgentInfoSigned),
-            BootstrapNet::Tx2,
+        let bad = fixt!(AgentInfoSigned);
+        let mut bad = Arc::try_unwrap(bad.0).unwrap();
+        bad.signature = Arc::new(vec![].into());
+        let bad = AgentInfoSigned(Arc::new(bad));
+        let res = put(
+            Some(url2::url2!("http://{:?}", addr)),
+            bad,
+            BootstrapNet::Tx5,
         )
-        .await
-        .is_err());
+        .await;
+        assert!(res.is_err());
+
+        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky"]
     async fn test_now() {
+        let (addr, abort_handle) = start_bootstrap().await;
+
         let local_now = std::time::SystemTime::now();
         let local_millis: u64 = local_now
             .duration_since(std::time::UNIX_EPOCH)
@@ -303,46 +292,40 @@ mod tests {
             .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now: u64 = super::now(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            BootstrapNet::Tx2,
-        )
-        .await
-        .unwrap();
+        let remote_now: u64 = now(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
+            .await
+            .unwrap();
         let threshold = 5000;
 
         assert!((remote_now - local_millis) < threshold);
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            BootstrapNet::Tx2,
-        )
-        .await
-        .unwrap();
-        assert!(super::NOW_OFFSET_MILLIS.get().is_some());
+        let _: u64 = now_once(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
+            .await
+            .unwrap();
+        assert!(NOW_OFFSET_MILLIS.get().is_some());
+
+        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky"]
     // Fixturator seed: 17591570467001263546
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
-        let space = fixt!(KitsuneSpace, Unpredictable);
-        let now = super::now(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            BootstrapNet::Tx2,
-        )
-        .await
-        .unwrap();
+        let (addr, abort_handle) = start_bootstrap().await;
 
-        let alice = sign_ed25519_keypair_new_from_entropy().await.unwrap();
-        let bob = sign_ed25519_keypair_new_from_entropy().await.unwrap();
+        let space = fixt!(KitsuneSpace, Unpredictable);
+        let now = now(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
+            .await
+            .unwrap();
+
+        let alice = create_test_keypair();
+        let bob = create_test_keypair();
 
         let mut expected: Vec<AgentInfoSigned> = Vec::new();
-        for agent in vec![alice.clone(), bob.clone()] {
-            let kitsune_agent = KitsuneAgent::new((*agent.pub_key.0).clone());
+        for agent in vec![alice, bob] {
+            let kitsune_agent = KitsuneAgent::new(agent.public.as_bytes().to_vec());
             let signed_at_ms = now;
             let expires_at_ms = now + 1000 * 60 * 20;
             let agent_info_signed = AgentInfoSigned::sign(
@@ -354,22 +337,20 @@ mod tests {
                 expires_at_ms,
                 |d| {
                     let d = Arc::new(d.to_vec());
-                    async {
-                        agent
-                            .sign(d)
-                            .await
-                            .map(|s| Arc::new(KitsuneSignature(s.0.to_vec())))
-                            .map_err(KitsuneError::other)
+                    async move {
+                        Ok(Arc::new(KitsuneSignature(
+                            agent.sign(d.clone().as_slice()).as_bytes().to_vec(),
+                        )))
                     }
                 },
             )
             .await
             .unwrap();
 
-            super::put(
-                Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+            put(
+                Some(url2::url2!("http://{:?}", addr)),
                 agent_info_signed.clone(),
-                BootstrapNet::Tx2,
+                BootstrapNet::Tx5,
             )
             .await
             .unwrap();
@@ -378,8 +359,8 @@ mod tests {
         }
 
         let mut random = super::random(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            super::RandomQuery {
+            Some(url2::url2!("http://{:?}", addr)),
+            RandomQuery {
                 space: Arc::new(space.clone()),
                 ..Default::default()
             },
@@ -395,17 +376,39 @@ mod tests {
         assert!(random == expected);
 
         let random_single = super::random(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            super::RandomQuery {
+            Some(url2::url2!("http://{:?}", addr)),
+            RandomQuery {
                 space: Arc::new(space.clone()),
                 limit: 1.into(),
             },
-            BootstrapNet::Tx2,
+            BootstrapNet::Tx5,
         )
         .await
         .unwrap();
 
         assert!(random_single.len() == 1);
         assert!(expected[0] == random_single[0] || expected[1] == random_single[0]);
+
+        abort_handle.abort();
+    }
+
+    async fn start_bootstrap() -> (SocketAddr, AbortHandle) {
+        let (bs_driver, bs_addr, shutdown) =
+            kitsune_p2p_bootstrap::run("127.0.0.1:0".parse::<SocketAddr>().unwrap(), vec![])
+                .await
+                .expect("Could not start bootstrap server");
+
+        let abort_handle = tokio::spawn(async move {
+            let _shutdown_cb = shutdown;
+            bs_driver.await;
+        })
+        .abort_handle();
+
+        (bs_addr, abort_handle)
+    }
+
+    fn create_test_keypair() -> Keypair {
+        let mut rng = rand_dalek::thread_rng();
+        Keypair::generate(&mut rng)
     }
 }

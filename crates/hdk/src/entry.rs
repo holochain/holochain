@@ -125,7 +125,7 @@ where
 
 /// Update an app entry. Also see [`update`].
 ///
-/// The hash is the [`ActionHash`] of the deleted record, the input is a [`TryInto<CreateInput>`].
+/// The hash is the [`ActionHash`] of the updated record, the input is a [`TryInto<CreateInput>`].
 ///
 /// Updates can reference Records which contain Entry data -- namely, Creates and other Updates -- but
 /// not Deletes or system Records.

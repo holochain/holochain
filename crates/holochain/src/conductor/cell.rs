@@ -29,7 +29,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use error::CellError;
 use futures::future::FutureExt;
-use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_conductor_api::ZomeCall;
@@ -162,7 +161,7 @@ impl Cell {
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
-        id: CellId,
+        cell_id: CellId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
@@ -176,10 +175,10 @@ impl Cell {
     {
         // get the dna
         let dna_file = conductor_handle
-            .get_dna_file(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+            .get_dna_file(cell_id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
 
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
         let workspace = GenesisWorkspace::new(authored_db, dht_db)
@@ -187,13 +186,16 @@ impl Cell {
             .map_err(Box::new)?;
 
         // exit early if genesis has already run
-        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+        if workspace
+            .has_genesis(cell_id.agent_pubkey().clone())
+            .await?
+        {
             return Ok(());
         }
 
         let args = GenesisWorkflowArgs::new(
             dna_file,
-            id.agent_pubkey().clone(),
+            cell_id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
@@ -207,7 +209,7 @@ impl Cell {
 
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
-            .integration_trigger(Arc::new(id.dna_hash().clone()))
+            .integration_trigger(Arc::new(cell_id.dna_hash().clone()))
         {
             trigger.trigger(&"genesis");
         }
@@ -242,7 +244,7 @@ impl Cell {
         let lives = self
             .space
             .authored_db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -318,7 +320,7 @@ impl Cell {
                 let _ = self
                     .space
                     .authored_db
-                    .async_commit(move |txn: &mut Transaction| {
+                    .write_async(move |txn: &mut Transaction| {
                         for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
@@ -454,6 +456,23 @@ impl Cell {
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_get_links"))
+                .await;
+            }
+
+            CountLinks {
+                span_context: _,
+                respond,
+                query,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_count_links(query)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_count_links"))
                 .await;
             }
 
@@ -597,13 +616,13 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or action.
         // In the future we should use GetOptions to choose which get to run.
-        let mut r = match *dht_hash.hash_type() {
-            AnyDht::Entry => self
-                .handle_get_entry(dht_hash.into(), options)
+        let mut r = match dht_hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self
+                .handle_get_entry(hash, options)
                 .await
                 .map(WireOps::Entry),
-            AnyDht::Action => self
-                .handle_get_record(dht_hash.into(), options)
+            AnyDhtHashPrimitive::Action(hash) => self
+                .handle_get_record(hash, options)
                 .await
                 .map(WireOps::Record),
         };
@@ -664,6 +683,19 @@ impl Cell {
             .map_err(Into::into)
     }
 
+    /// a remote node is asking us to count links
+    #[instrument(skip(self))]
+    async fn handle_count_links(&self, query: WireLinkQuery) -> CellResult<CountLinksResponse> {
+        let db = self.space.dht_db.clone();
+        Ok(CountLinksResponse::new(
+            authority::handle_get_links_query(db.into(), query)
+                .await?
+                .into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<_>>(),
+        ))
+    }
+
     #[instrument(skip(self, options))]
     async fn handle_get_agent_activity(
         &self,
@@ -700,7 +732,7 @@ impl Cell {
         let action: Option<SignedAction> = self
             .space
             .authored_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let h: Option<Vec<u8>> = txn
                     .query_row(
                         "SELECT Action.blob as action_blob
@@ -748,7 +780,7 @@ impl Cell {
 
         self.space
             .dht_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 // Get the current count for this dhtop.
                 let receipt_count: usize = txn.query_row(
                     "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",

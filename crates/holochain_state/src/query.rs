@@ -1,10 +1,10 @@
 use crate::scratch::FilteredScratch;
 use crate::scratch::Scratch;
 use fallible_iterator::FallibleIterator;
-use holo_hash::hash_type::AnyDht;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
+use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::DhtOpHash;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
@@ -40,6 +40,7 @@ pub mod chain_head;
 pub mod entry_details;
 pub mod error;
 pub mod link;
+pub mod link_count;
 pub mod link_details;
 pub mod live_entry;
 pub mod live_record;
@@ -182,9 +183,9 @@ pub trait Store {
 
     /// Check if a hash is contained in the store
     fn contains_hash(&self, hash: &AnyDhtHash) -> StateQueryResult<bool> {
-        match *hash.hash_type() {
-            AnyDht::Entry => self.contains_entry(&hash.clone().into()),
-            AnyDht::Action => self.contains_action(&hash.clone().into()),
+        match hash.clone().into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self.contains_entry(&hash),
+            AnyDhtHashPrimitive::Action(hash) => self.contains_action(&hash),
         }
     }
 
@@ -348,9 +349,9 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
-        match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
+        match hash.clone().into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
+            AnyDhtHashPrimitive::Action(hash) => self.get_exact_record(&hash),
         }
     }
 
@@ -359,31 +360,35 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         hash: &AnyDhtHash,
         author: Option<&AgentPubKey>,
     ) -> StateQueryResult<Option<Record>> {
-        match *hash.hash_type() {
+        match hash.clone().into_primitive() {
             // Try to get a public record.
-            AnyDht::Entry => match self.get_any_public_record(&hash.clone().into())? {
-                Some(el) => Ok(Some(el)),
-                None => match author {
-                    // If there are none try to get a private authored record.
-                    Some(author) => self.get_any_authored_record(&hash.clone().into(), author),
-                    // If there are no private authored records then try to get any record and
-                    // remove the entry.
-                    None => Ok(self
-                        .get_any_record(&hash.clone().into())?
-                        .map(|el| Record::new(el.into_inner().0, None))),
-                },
-            },
-            AnyDht::Action => Ok(self.get_exact_record(&hash.clone().into())?.map(|el| {
-                // Filter out the entry if it's private.
-                let is_private_entry = el.action().entry_type().map_or(false, |et| {
-                    matches!(et.visibility(), EntryVisibility::Private)
-                });
-                if is_private_entry {
-                    Record::new(el.into_inner().0, None)
-                } else {
-                    el
+            AnyDhtHashPrimitive::Entry(hash) => {
+                match self.get_any_public_record(&hash)? {
+                    Some(el) => Ok(Some(el)),
+                    None => match author {
+                        // If there are none try to get a private authored record.
+                        Some(author) => self.get_any_authored_record(&hash, author),
+                        // If there are no private authored records then try to get any record and
+                        // remove the entry.
+                        None => Ok(self
+                            .get_any_record(&hash)?
+                            .map(|el| Record::new(el.into_inner().0, None))),
+                    },
                 }
-            })),
+            }
+            AnyDhtHashPrimitive::Action(hash) => {
+                Ok(self.get_exact_record(&hash)?.map(|el| {
+                    // Filter out the entry if it's private.
+                    let is_private_entry = el.action().entry_type().map_or(false, |et| {
+                        matches!(et.visibility(), EntryVisibility::Private)
+                    });
+                    if is_private_entry {
+                        Record::new(el.into_inner().0, None)
+                    } else {
+                        el
+                    }
+                }))
+            }
         }
     }
 }

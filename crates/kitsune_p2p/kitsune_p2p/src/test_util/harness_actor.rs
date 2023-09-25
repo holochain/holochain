@@ -11,6 +11,7 @@ ghost_actor::ghost_chan! {
         /// + all new harness agents will also join it
         fn add_space() -> Arc<KitsuneSpace>;
 
+        /*
         /// Create a new agent configured to proxy for others.
         fn add_proxy_agent(nick: String) -> (
             Arc<KitsuneAgent>,
@@ -36,6 +37,7 @@ ghost_actor::ghost_chan! {
             Arc<KitsuneAgent>,
             ghost_actor::GhostSender<KitsuneP2p>,
         );
+        */
 
         /// Magically exchange peer data between peers in harness
         fn magic_peer_info_exchange() -> ();
@@ -65,6 +67,7 @@ pub async fn spawn_test_harness_mem() -> Result<
     spawn_test_harness(TransportConfig::Mem {}).await
 }
 
+/*
 /// construct a test suite around a quic transport
 pub async fn spawn_test_harness_quic() -> Result<
     (
@@ -80,6 +83,7 @@ pub async fn spawn_test_harness_quic() -> Result<
     })
     .await
 }
+*/
 
 /// construct a test suite around a sub transport config concept
 pub async fn spawn_test_harness(
@@ -189,7 +193,7 @@ impl HarnessInnerHandler for HarnessActor {
         let space_list = self.space_list.clone();
         Ok(async move {
             for space in space_list {
-                p2p.join(space.clone(), agent.clone(), None).await?;
+                p2p.join(space.clone(), agent.clone(), None, None).await?;
 
                 harness_chan.publish(HarnessEventType::Join {
                     agent: (&agent).into(),
@@ -210,8 +214,9 @@ impl HarnessControlApiHandler for HarnessActor {
         let space: Arc<KitsuneSpace> = TestVal::test_val();
         self.space_list.push(space.clone());
         let mut all = Vec::new();
+
         for (agent, (p2p, _)) in self.agents.iter() {
-            all.push(p2p.join(space.clone(), agent.clone(), None));
+            all.push(p2p.join(space.clone(), agent.clone(), None, None));
         }
         Ok(async move {
             futures::future::try_join_all(all).await?;
@@ -221,6 +226,7 @@ impl HarnessControlApiHandler for HarnessActor {
         .into())
     }
 
+    /*
     fn handle_add_proxy_agent(
         &mut self,
         nick: String,
@@ -338,6 +344,7 @@ impl HarnessControlApiHandler for HarnessActor {
         .boxed()
         .into())
     }
+    */
 
     fn handle_magic_peer_info_exchange(&mut self) -> HarnessControlApiHandlerResult<()> {
         let ctrls = self

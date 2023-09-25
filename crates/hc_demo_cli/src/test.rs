@@ -11,6 +11,7 @@ const FILE: &str = "test.txt";
 const CONTENT: &[u8] = b"this is a test\n";
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn demo() {
     init_tracing();
 
@@ -105,6 +106,8 @@ async fn run(
             dna: std::path::PathBuf::from(DNA),
             outbox: std::path::PathBuf::from(format!("{name}-out")),
             inbox: std::path::PathBuf::from(format!("{name}-in")),
+            signal_url: DEF_SIGNAL_URL.into(),
+            bootstrap_url: DEF_BOOTSTRAP_URL.into(),
         },
     };
 

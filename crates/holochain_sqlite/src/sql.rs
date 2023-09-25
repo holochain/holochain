@@ -27,6 +27,9 @@ pub mod sql_cell {
 
     pub const FETCH_PUBLISHABLE_OP: &str = include_str!("sql/cell/fetch_publishable_op.sql");
 
+    pub const SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP: &str =
+        include_str!("sql/cell/sum_of_received_bytes_since_timestamp.sql");
+
     pub mod must_get_agent_activity {
         pub const MUST_GET_AGENT_ACTIVITY: &str =
             include_str!("sql/cell/agent_activity/must_get_agent_activity.sql");
@@ -69,11 +72,7 @@ pub mod sql_conductor {
 pub(crate) mod sql_p2p_agent_store {
     pub(crate) const INSERT: &str = include_str!("sql/p2p_agent_store/insert.sql");
     pub(crate) const SELECT_ALL: &str = include_str!("sql/p2p_agent_store/select_all.sql");
-    pub(crate) const SELECT: &str = include_str!("sql/p2p_agent_store/select.sql");
     pub(crate) const DELETE: &str = include_str!("sql/p2p_agent_store/delete.sql");
-    pub(crate) const GOSSIP_QUERY: &str = include_str!("sql/p2p_agent_store/gossip_query.sql");
-    pub(crate) const QUERY_NEAR_BASIS: &str =
-        include_str!("sql/p2p_agent_store/query_near_basis.sql");
     pub(crate) const EXTRAPOLATED_COVERAGE: &str =
         include_str!("sql/p2p_agent_store/extrapolated_coverage.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_agent_store/prune.sql");

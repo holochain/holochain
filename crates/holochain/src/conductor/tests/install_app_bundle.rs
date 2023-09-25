@@ -2,15 +2,124 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::{conductor::error::ConductorError, sweettest::*};
 use fixt::prelude::strum_macros;
-use holo_hash::DnaHash;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_types::prelude::{
-    mapvec, AppBundle, AppBundleSource, AppManifestCurrentBuilder, AppRoleDnaManifest,
-    AppRoleManifest, CellProvisioning, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
+    mapvec, AppBundle, AppBundleError, AppBundleSource, AppManifestCurrentBuilder,
+    AppManifestError, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
+    CreateCloneCellPayload, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+
+    async fn make_payload(agent_key: AgentPubKey, clone_limit: u32) -> InstallAppPayload {
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        let path = PathBuf::from(format!("{}", dna.dna_hash()));
+        let modifiers = DnaModifiersOpt::none();
+        let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
+
+        let roles = vec![AppRoleManifest {
+            name: "name".into(),
+            dna: AppRoleDnaManifest {
+                location: Some(DnaLocation::Bundled(path.clone())),
+                modifiers: modifiers.clone(),
+                installed_hash: Some(installed_dna_hash.into()),
+                clone_limit,
+            },
+            provisioning: Some(CellProvisioning::CloneOnly),
+        }];
+
+        let manifest = AppManifestCurrentBuilder::default()
+            .name("test_app".into())
+            .description(None)
+            .roles(roles)
+            .build()
+            .unwrap();
+        let dna_bundle = DnaBundle::from_dna_file(dna.clone()).unwrap();
+        let resources = vec![(path.clone(), dna_bundle)];
+        let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
+            .await
+            .unwrap();
+
+        InstallAppPayload {
+            agent_key,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: None,
+            membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
+        }
+    }
+
+    // Fails due to clone limit of 0
+    assert_matches!(
+        conductor
+            .clone()
+            .install_app_bundle(make_payload(agent.clone(), 0).await)
+            .await
+            .unwrap_err(),
+        ConductorError::AppBundleError(AppBundleError::AppManifestError(
+            AppManifestError::InvalidStrategyCloneOnly(_)
+        ))
+    );
+
+    {
+        // Succeeds with clone limit of 1
+        let app = conductor
+            .clone()
+            .install_app_bundle(make_payload(agent.clone(), 1).await)
+            .await
+            .unwrap();
+
+        // No cells in this app due to CloneOnly provisioning strategy
+        assert_eq!(app.all_cells().count(), 0);
+        assert_eq!(app.role_assignments().len(), 1);
+    }
+    {
+        let clone_cell = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: "app_1".into(),
+                role_name: "name".into(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+                membrane_proof: None,
+                name: Some("Johnny".into()),
+            })
+            .await
+            .unwrap();
+
+        let state = conductor.get_state().await.unwrap();
+        let app = state.get_app(&"app_1".to_string()).unwrap();
+
+        assert_eq!(clone_cell.name, "Johnny".to_string());
+        assert_eq!(*clone_cell.cell_id.agent_pubkey(), agent);
+        assert_eq!(app.role_assignments().len(), 1);
+        assert_eq!(app.clone_cells().count(), 1);
+    }
+    {
+        conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: "app_1".into(),
+                role_name: "name".into(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+                membrane_proof: None,
+                name: None,
+            })
+            .await
+            .unwrap_err();
+        let state = conductor.get_state().await.unwrap();
+        let app = state.get_app(&"app_1".to_string()).unwrap();
+
+        assert_eq!(app.all_cells().count(), 1);
+    }
+    // TODO: test that the cell can't be provisioned later
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
@@ -40,10 +149,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .roles(roles)
         .build()
         .unwrap();
-    let resources = vec![(
-        path.clone(),
-        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
-    )];
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
@@ -56,14 +162,13 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
         })
         .await
         .unwrap();
 
-    let resources = vec![(
-        path.clone(),
-        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
-    )];
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
@@ -74,6 +179,8 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: alice.clone(),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
             network_seed: None,
         })
         .await;
@@ -85,10 +192,7 @@ async fn reject_duplicate_app_for_same_agent() {
     // enable app
     conductor.enable_app("app_1".into()).await.unwrap();
 
-    let resources = vec![(
-        path.clone(),
-        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
-    )];
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
@@ -99,6 +203,8 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: alice.clone(),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
             network_seed: None,
         })
         .await;
@@ -107,7 +213,7 @@ async fn reject_duplicate_app_for_same_agent() {
         ConductorError::CellAlreadyExists(id) if id == cell_id
     );
 
-    let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).await.unwrap())];
+    let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).unwrap())];
     let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await
         .unwrap();
@@ -118,6 +224,8 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: alice.clone(),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
             network_seed: Some("network".into()),
         })
         .await;
@@ -154,10 +262,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .build()
         .unwrap();
 
-    let resources = vec![(
-        path.clone(),
-        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
-    )];
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
 
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
@@ -171,6 +276,8 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
         })
         .await
         .unwrap();
@@ -213,6 +320,8 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
         })
         .await
         .unwrap();
@@ -232,7 +341,6 @@ async fn network_seed_regression() {
 
     let dna_path = tmp.as_ref().join(format!("the.dna"));
     DnaBundle::from_dna_file(dna)
-        .await
         .unwrap()
         .write_to_file(&dna_path)
         .await
@@ -277,6 +385,8 @@ async fn network_seed_regression() {
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
         })
         .await
         .unwrap();
@@ -289,6 +399,8 @@ async fn network_seed_regression() {
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
         })
         .await
         .unwrap();
@@ -316,7 +428,6 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
                 dna = dna.with_network_seed(seed.to_string()).await;
             }
             DnaBundle::from_dna_file(dna.clone())
-                .await
                 .unwrap()
                 .write_to_file(&path)
                 .await
@@ -483,10 +594,7 @@ impl TestCase {
                     .roles(roles)
                     .build()
                     .unwrap();
-                let resources = vec![(
-                    hashpath,
-                    DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
-                )];
+                let resources = vec![(hashpath, DnaBundle::from_dna_file(dna.clone()).unwrap())];
 
                 AppBundle::new(manifest.into(), resources, PathBuf::from("."))
                     .await
@@ -542,6 +650,8 @@ impl TestCase {
                 installed_app_id: Some(case_str.clone()),
                 network_seed,
                 membrane_proofs: HashMap::new(),
+                #[cfg(feature = "chc")]
+                ignore_genesis_failure: false,
             })
             .await
             .unwrap();

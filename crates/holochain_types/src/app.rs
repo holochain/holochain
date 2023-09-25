@@ -65,8 +65,13 @@ pub struct RegisterDnaPayload {
 /// The instructions on how to request NetworkInfo
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NetworkInfoRequestPayload {
+    /// The calling agent
+    pub agent_pub_key: AgentPubKey,
     /// Get gossip info for these DNAs
     pub dnas: Vec<DnaHash>,
+    /// Timestamp in ms since which received amount of bytes from peers will
+    /// be returned. Defaults to UNIX_EPOCH.
+    pub last_time_queried: Option<Timestamp>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -143,6 +148,13 @@ pub struct InstallAppPayload {
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     pub network_seed: Option<NetworkSeed>,
+
+    /// Optional: If app installation fails due to genesis failure, normally the app will be
+    /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
+    /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
+    #[cfg(feature = "chc")]
+    #[serde(default)]
+    pub ignore_genesis_failure: bool,
 }
 
 /// The possible locations of an AppBundle
@@ -543,11 +555,13 @@ impl InstalledAppCommon {
     /// Add a clone cell.
     pub fn add_clone(&mut self, role_name: &RoleName, cell_id: &CellId) -> AppResult<CloneId> {
         let app_role_assignment = self.role_mut(role_name)?;
+
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
             "A clone cell must use the same agent key as the role it is added to"
         );
+
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
@@ -779,6 +793,11 @@ impl InstalledAppCommon {
     /// Return the manifest if available
     pub fn manifest(&self) -> &AppManifest {
         &self.manifest
+    }
+
+    /// Return the list of role assignments
+    pub fn role_assignments(&self) -> &HashMap<RoleName, AppRoleAssignment> {
+        &self.role_assignments
     }
 }
 

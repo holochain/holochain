@@ -47,6 +47,12 @@ impl RunOpts {
     }
 }
 
+/// The default configured signal server url.
+pub const DEF_SIGNAL_URL: &str = "wss://signal.holo.host";
+
+/// The default configured bootstrap server url.
+pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
+
 /// hc_demo_cli run command.
 #[derive(Debug, clap::Subcommand, serde::Serialize, serde::Deserialize)]
 pub enum RunCmd {
@@ -63,6 +69,14 @@ pub enum RunCmd {
         /// The inbox path.
         #[arg(long, default_value = "hc-demo-cli-inbox")]
         inbox: std::path::PathBuf,
+
+        /// The signal server URL.
+        #[arg(long, default_value = DEF_SIGNAL_URL)]
+        signal_url: String,
+
+        /// The bootstrap server URL.
+        #[arg(long, default_value = DEF_BOOTSTRAP_URL)]
+        bootstrap_url: String,
     },
 
     /// Generate a dna file that can be used with hc demo-cli.
@@ -77,8 +91,14 @@ pub enum RunCmd {
 pub async fn run_demo(opts: RunOpts) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, outbox, inbox } => {
-            run(dna, outbox, inbox, None, None).await;
+        RunCmd::Run {
+            dna,
+            outbox,
+            inbox,
+            signal_url,
+            bootstrap_url,
+        } => {
+            run(dna, outbox, inbox, signal_url, bootstrap_url, None, None).await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -94,8 +114,23 @@ pub async fn run_test_demo(
 ) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, outbox, inbox } => {
-            run(dna, outbox, inbox, Some(ready), Some(rendezvous)).await;
+        RunCmd::Run {
+            dna,
+            outbox,
+            inbox,
+            signal_url,
+            bootstrap_url,
+        } => {
+            run(
+                dna,
+                outbox,
+                inbox,
+                signal_url,
+                bootstrap_url,
+                Some(ready),
+                Some(rendezvous),
+            )
+            .await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -169,6 +204,8 @@ async fn run(
     dna: std::path::PathBuf,
     outbox: std::path::PathBuf,
     inbox: std::path::PathBuf,
+    signal_url: String,
+    bootstrap_url: String,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
 ) {
@@ -199,29 +236,33 @@ async fn run(
     let rendezvous = match rendezvous {
         Some(rendezvous) => rendezvous,
         None => {
-            struct PubRendezvous;
+            struct PubRendezvous(String, String);
 
             impl holochain::sweettest::SweetRendezvous for PubRendezvous {
                 fn bootstrap_addr(&self) -> &str {
-                    "https://bootstrap.holo.host"
+                    self.1.as_str()
                 }
 
                 fn sig_addr(&self) -> &str {
-                    "wss://holotest.net"
+                    self.0.as_str()
                 }
             }
 
-            let rendezvous: holochain::sweettest::DynSweetRendezvous = Arc::new(PubRendezvous);
+            let rendezvous: holochain::sweettest::DynSweetRendezvous =
+                Arc::new(PubRendezvous(signal_url, bootstrap_url));
             rendezvous
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::standard();
+    let config = holochain::sweettest::SweetConductorConfig::rendezvous();
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
-    let mut conductor = holochain::sweettest::SweetConductor::from_config_rendezvous_keystore(
-        config, rendezvous, keystore,
+    let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults_and_metrics(
+        config,
+        Some(keystore),
+        Some(rendezvous),
+        true,
     )
     .await;
 

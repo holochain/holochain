@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+
 //! P2p / dht communication framework.
 //!
 //! ### TLS session key logging
@@ -62,7 +63,7 @@ pub use host_api::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_util;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(test)]
 mod test;
 
 pub mod fixt;

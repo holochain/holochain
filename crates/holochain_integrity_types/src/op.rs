@@ -318,6 +318,23 @@ impl Op {
             Op::RegisterDeleteLink(RegisterDeleteLink { .. }) => ActionType::DeleteLink,
         }
     }
+
+    /// Get the entry-related data for this op, if applicable
+    pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action().entry_data(),
+            Op::StoreEntry(StoreEntry { action, .. }) => {
+                Some((action.hashed.entry_hash(), action.hashed.entry_type()))
+            }
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => {
+                Some((&update.hashed.entry_hash, &update.hashed.entry_type))
+            }
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+                action.hashed.entry_data()
+            }
+            Op::RegisterDelete(_) | Op::RegisterCreateLink(_) | Op::RegisterDeleteLink(_) => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]

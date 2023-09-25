@@ -1,6 +1,7 @@
 use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
+use crate::conductor::conductor::CellStatus;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
@@ -30,6 +31,9 @@ pub enum ConductorError {
 
     #[error("Cell is not initialized.")]
     CellNotInitialized,
+
+    #[error("Cell network is not ready. Status: {0:?}")]
+    CellNetworkNotReady(CellStatus),
 
     #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
     CellDisabled(CellId),
@@ -75,7 +79,7 @@ pub enum ConductorError {
     InterfaceError(#[from] Box<InterfaceError>),
 
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
-    GenesisFailed { errors: Vec<CellError> },
+    GenesisFailed { errors: Vec<(CellId, CellError)> },
 
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),

@@ -365,10 +365,13 @@ impl SignedActionHashedExt for SignedActionHashed {
         let (action, signature) = signed_action.into();
         Self::with_presigned(action.into_hashed(), signature)
     }
-    /// SignedAction constructor
-    async fn sign(keystore: &MetaLairClient, action: ActionHashed) -> LairResult<Self> {
-        let signature = action.author().sign(keystore, &*action).await?;
-        Ok(Self::with_presigned(action, signature))
+    /// Construct by signing the Action (NOT including the hash)
+    async fn sign(keystore: &MetaLairClient, action_hashed: ActionHashed) -> LairResult<Self> {
+        let signature = action_hashed
+            .author()
+            .sign(keystore, action_hashed.as_content())
+            .await?;
+        Ok(Self::with_presigned(action_hashed, signature))
     }
 
     /// Validates a signed action
@@ -377,7 +380,7 @@ impl SignedActionHashedExt for SignedActionHashed {
             .action()
             .author()
             .verify_signature(self.signature(), self.action())
-            .await
+            .await?
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),

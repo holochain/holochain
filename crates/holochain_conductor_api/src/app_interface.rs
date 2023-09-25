@@ -70,6 +70,13 @@ pub enum AppRequest {
 
     /// Info about networking processes
     NetworkInfo(Box<NetworkInfoRequestPayload>),
+
+    /// List all host functions available to wasm on this conductor.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::ListWasmHostFunctions`]
+    ListWasmHostFunctions,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -112,6 +119,9 @@ pub enum AppResponse {
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
+
+    /// All the wasm host functions supported by this conductor.
+    ListWasmHostFunctions(Vec<String>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -426,9 +436,14 @@ impl From<AppInfoStatus> for AppStatus {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
     pub fetch_pool_info: FetchPoolInfo,
+    pub current_number_of_peers: u32,
+    pub arc_size: f64,
+    pub total_network_peers: u32,
+    pub bytes_since_last_time_queried: u64,
+    pub completed_rounds_since_last_time_queried: u32,
 }
 
 #[test]

@@ -104,7 +104,7 @@ pub fn insert_op_scratch(
     let op_light = op.to_light();
     let action = op.action();
     let signature = op.signature().clone();
-    if let Some(entry) = op.entry() {
+    if let Some(entry) = op.entry().into_option() {
         let entry_hashed = EntryHashed::with_pre_hashed(
             entry.clone(),
             action
@@ -140,7 +140,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let action = op.action();
     let timestamp = action.timestamp();
     let signature = op.signature().clone();
-    if let Some(entry) = op.entry() {
+    if let Some(entry) = op.entry().into_option() {
         let entry_hash = action
             .entry_hash()
             .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;

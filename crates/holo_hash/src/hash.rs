@@ -112,7 +112,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
+    pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
         let prefix = hash_type.get_prefix();
         self.hash[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(&prefix[0..HOLO_HASH_PREFIX_LEN]);
         HoloHash {
@@ -160,12 +160,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Get the hex representation of the hash bytes
     pub fn to_hex(&self) -> String {
-        use std::fmt::Write;
-        let mut s = String::with_capacity(self.hash.len());
-        for b in &self.hash {
-            write!(&mut s, "{:02x}", b).ok();
-        }
-        s
+        holochain_util::hex::bytes_to_hex(&self.hash, false)
     }
 }
 
@@ -259,9 +254,9 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "encoding"))]
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
-        assert_eq!(3_688_618_971, h.get_loc());
+        assert_eq!(3_688_618_971, h.get_loc().as_u32());
+        assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
             format!("{:?}", h.get_raw_32()),
@@ -269,7 +264,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",
@@ -291,7 +285,7 @@ mod tests {
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
-        assert_type!(
+        assert_type(
             "ExternalHash",
             ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );

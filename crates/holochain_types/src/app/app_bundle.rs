@@ -68,7 +68,10 @@ impl AppBundle {
         let bundle = Arc::new(self);
         let tasks = roles.into_iter().map(|(role_name, role)| async {
             let bundle = bundle.clone();
-            Ok((role_name, bundle.resolve_cell(dna_store, role).await?))
+            Ok((
+                role_name.clone(),
+                bundle.resolve_cell(dna_store, role_name, role).await?,
+            ))
         });
         let resolution = futures::future::join_all(tasks)
             .await
@@ -95,14 +98,21 @@ impl AppBundle {
                                 let role = AppRoleAssignment::new(cell_id, true, clone_limit);
                                 resolution.role_assignments.push((role_name, role));
                             }
-                            CellProvisioningOp::Noop(cell_id, clone_limit) => {
+                            CellProvisioningOp::ProvisionOnly(dna, clone_limit) => {
+                                let agent = resolution.agent.clone();
+                                let dna_hash = dna.dna_hash().clone();
+                                let cell_id = CellId::new(dna_hash, agent);
+
+                                // TODO: could sequentialize this to remove the clone
+                                let proof = membrane_proofs.get(&role_name).cloned();
+                                resolution.dnas_to_register.push((dna, proof));
                                 resolution.role_assignments.push((
                                     role_name,
                                     AppRoleAssignment::new(cell_id, false, clone_limit),
                                 ));
                             }
-                            other @ CellProvisioningOp::HashMismatch(_, _)
-                            | other @ CellProvisioningOp::Conflict(_) => {
+                            other @ (CellProvisioningOp::HashMismatch(_, _)
+                            | CellProvisioningOp::Conflict(_)) => {
                                 tracing::error!(
                                     "Encountered unexpected CellProvisioningOp: {:?}",
                                     other
@@ -124,6 +134,7 @@ impl AppBundle {
     async fn resolve_cell(
         &self,
         dna_store: &impl DnaStore,
+        role_name: RoleName,
         role: AppRoleManifestValidated,
     ) -> AppBundleResult<CellProvisioningOp> {
         Ok(match role {
@@ -134,19 +145,18 @@ impl AppBundle {
                 modifiers,
                 deferred: _,
             } => {
-                self.resolve_cell_create(
-                    dna_store,
-                    &location,
-                    installed_hash.as_ref(),
-                    clone_limit,
-                    modifiers,
-                )
-                .await?
+                let dna = self
+                    .resolve_dna(
+                        role_name,
+                        dna_store,
+                        &location,
+                        installed_hash.as_ref(),
+                        modifiers,
+                    )
+                    .await?;
+                CellProvisioningOp::CreateFromDnaFile(dna, clone_limit)
             }
 
-            AppRoleManifestValidated::CreateClone { .. } => {
-                unimplemented!("`create_clone` provisioning strategy is currently unimplemented")
-            }
             AppRoleManifestValidated::UseExisting {
                 installed_hash,
                 clone_limit,
@@ -161,14 +171,16 @@ impl AppBundle {
             } => match self.resolve_cell_existing(&installed_hash, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::HashMismatch(_, _) => {
-                    self.resolve_cell_create(
-                        dna_store,
-                        &location,
-                        Some(&installed_hash),
-                        clone_limit,
-                        modifiers,
-                    )
-                    .await?
+                    let dna = self
+                        .resolve_dna(
+                            role_name,
+                            dna_store,
+                            &location,
+                            Some(&installed_hash),
+                            modifiers,
+                        )
+                        .await?;
+                    CellProvisioningOp::CreateFromDnaFile(dna, clone_limit)
                 }
                 CellProvisioningOp::Conflict(_) => {
                     unimplemented!("conflicts are not handled, or even possible yet")
@@ -176,28 +188,38 @@ impl AppBundle {
                 CellProvisioningOp::CreateFromDnaFile(_, _) => {
                     unreachable!("resolve_cell_existing will never return a Create op")
                 }
-                CellProvisioningOp::Noop(_, _) => {
-                    unreachable!("resolve_cell_existing will never return a Noop")
+                CellProvisioningOp::ProvisionOnly(_, _) => {
+                    unreachable!("resolve_cell_existing will never return a ProvisionOnly")
                 }
             },
-            AppRoleManifestValidated::Disabled {
-                installed_hash: _,
-                clone_limit: _,
+            AppRoleManifestValidated::CloneOnly {
+                clone_limit,
+                location,
+                modifiers,
+                installed_hash,
             } => {
-                unimplemented!("`disabled` provisioning strategy is currently unimplemented")
-                // CellProvisioningOp::Noop(clone_limit)
+                let dna = self
+                    .resolve_dna(
+                        role_name,
+                        dna_store,
+                        &location,
+                        installed_hash.as_ref(),
+                        modifiers,
+                    )
+                    .await?;
+                CellProvisioningOp::ProvisionOnly(dna, clone_limit)
             }
         })
     }
 
-    async fn resolve_cell_create(
+    async fn resolve_dna(
         &self,
+        role_name: RoleName,
         dna_store: &impl DnaStore,
         location: &mr_bundle::Location,
         installed_hash: Option<&DnaHashB64>,
-        clone_limit: u32,
         modifiers: DnaModifiersOpt,
-    ) -> AppBundleResult<CellProvisioningOp> {
+    ) -> AppBundleResult<DnaFile> {
         let dna_file = if let Some(hash) = installed_hash {
             let (dna_file, original_hash) =
                 if let Some(mut dna_file) = dna_store.get_dna(&hash.clone().into()) {
@@ -207,18 +229,18 @@ impl AppBundle {
                 } else {
                     self.resolve_location(location, modifiers).await?
                 };
-            let expected_hash = hash.clone().into();
+            let expected_hash: DnaHash = hash.clone().into();
             if expected_hash != original_hash {
-                return Ok(CellProvisioningOp::HashMismatch(
-                    expected_hash,
-                    original_hash,
+                return Err(AppBundleError::CellResolutionFailure(
+                    role_name,
+                    format!("Hash mismatch: {} {}", expected_hash, original_hash),
                 ));
             }
             dna_file
         } else {
             self.resolve_location(location, modifiers).await?.0
         };
-        Ok(CellProvisioningOp::CreateFromDnaFile(dna_file, clone_limit))
+        Ok(dna_file)
     }
 
     fn resolve_cell_existing(
@@ -292,9 +314,9 @@ pub enum CellProvisioningOp {
     CreateFromDnaFile(DnaFile, u32),
     /// Use an existing Cell
     Existing(CellId, u32),
-    /// No provisioning needed, but there might be a clone_limit, and so we need
-    /// to know which DNA and Agent to use for making clones
-    Noop(CellId, u32),
+    /// No creation needed, but there might be a clone_limit, and so we need
+    /// to know which DNA to use for making clones
+    ProvisionOnly(DnaFile, u32),
     /// The specified installed_hash does not match the actual hash of the DNA selected for provisioning. Expected: {0}, Actual: {1}
     HashMismatch(DnaHash, DnaHash),
     /// Ambiguous result, needs manual resolution; can't provision (should this be an Err?)

@@ -480,6 +480,22 @@ mod tests {
     }
 
     #[test]
+    fn test_action_json_roundtrip() {
+        let orig: Action = Dna::from_builder(
+            fake_dna_hash(1),
+            ActionBuilderCommonFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+        )
+        .into();
+        let orig = ActionHashed::from_content_sync(orig);
+        let json = serde_json::to_string(&orig).unwrap();
+        dbg!(&json);
+        let res: ActionHashed = serde_json::from_str(&json).unwrap();
+        assert_eq!(orig, res);
+    }
+
+    #[test]
     fn test_create_entry_msgpack_roundtrip() {
         let orig: Action = Create::from_builder(
             ActionBuilderCommonFixturator::new(Unpredictable)

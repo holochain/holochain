@@ -53,9 +53,6 @@ impl SweetLocalRendezvous {
         let mut addr = None;
 
         for iface in get_if_addrs::get_if_addrs().expect("failed to get_if_addrs") {
-            if iface.is_loopback() {
-                continue;
-            }
             if iface.ip().is_ipv6() {
                 continue;
             }
@@ -63,7 +60,7 @@ impl SweetLocalRendezvous {
             break;
         }
 
-        let addr = addr.expect("failed to get_if_addrs");
+        let addr = addr.expect("no matching network interfaces found");
 
         let (bs_driver, bs_addr, bs_shutdown) = kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
             .await
@@ -98,8 +95,9 @@ impl SweetLocalRendezvous {
                 serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap()
             );
 
-            let (sig_addr, sig_driver) = tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
-            let sig_port = sig_addr.port();
+            let (sig_driver, sig_addr_list, _sig_err_list) =
+                tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
+            let sig_port = sig_addr_list.get(0).unwrap().port();
             let sig_addr: std::net::SocketAddr = (addr, sig_port).into();
             let sig_shutdown = tokio::task::spawn(sig_driver);
             let sig_addr = format!("ws://{sig_addr}");

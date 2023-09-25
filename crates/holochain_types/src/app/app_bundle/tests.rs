@@ -26,7 +26,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
     )
     .await;
 
-    let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).await.unwrap())];
+    let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).unwrap())];
 
     let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await
@@ -72,7 +72,7 @@ async fn provisioning_1_create() {
     let expected = AppRoleResolution {
         agent,
         dnas_to_register: vec![(dna, None)],
-        role_assignments: vec![("name".into(), role)],
+        role_assignments: vec![("role_name".into(), role)],
     };
     assert_eq!(resolution, expected);
 }
