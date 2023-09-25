@@ -672,7 +672,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn queue_next() {
         let cfg = Config(1, 10);
-        let mut q = {
+        let pool: FetchPool = {
             let mut queue = [
                 (test_key_op(1), item(test_sources(0..=2), test_ctx(1))),
                 (test_key_op(2), item(test_sources(1..=3), test_ctx(1))),
@@ -693,19 +693,20 @@ mod tests {
                 queue,
                 config: Arc::new(cfg),
             }
+            .into()
         };
 
         // We can try fetching items one source at a time by waiting 1 sec in between
 
-        assert_eq!(q.len(), 3);
+        assert_eq!(pool.get_items_to_fetch().len(), 3);
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(q.len(), 3);
+        assert_eq!(pool.get_items_to_fetch().len(), 3);
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(q.len(), 2);
+        assert_eq!(pool.get_items_to_fetch().len(), 2);
 
         // Wait for manually modified source to be ready
         // (5 + 1 + 1 + 3 = 10)
@@ -713,16 +714,16 @@ mod tests {
 
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
-            std::iter::from_fn(|| q.next_item()).collect::<Vec<_>>(),
+            std::iter::from_fn(|| pool.write(|p| p.next_item())).collect::<Vec<_>>(),
             vec![(test_key_op(2), test_space(0), test_source(2), test_ctx(1))]
         );
-        assert_eq!(q.len(), 0);
+        assert_eq!(pool.get_items_to_fetch().len(), 0);
 
         // wait long enough for some items to be retryable
         // (10 - 5 - 1 = 4)
         tokio::time::advance(Duration::from_secs(4)).await;
 
-        assert_eq!(q.len(), 3);
+        assert_eq!(pool.get_items_to_fetch().len(), 3);
     }
 
     #[tokio::test(start_paused = true)]
@@ -804,7 +805,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn remove_fetch_item() {
         let cfg = Config(1, 10);
-        let mut q = {
+        let mut pool: FetchPool = {
             let queue = [(test_key_op(1), item(test_sources([1]), test_ctx(1)))];
 
             let queue = queue.into_iter().collect();
@@ -812,15 +813,16 @@ mod tests {
                 queue,
                 config: Arc::new(cfg),
             }
+            .into()
         };
 
-        assert_eq!(1, q.len());
-        q.remove(test_key_op(1));
+        assert_eq!(1, pool.get_items_to_fetch().len());
+        pool.remove(test_key_op(1));
 
         // Move time forwards to be able to retry the item
         tokio::time::advance(Duration::from_secs(30)).await;
 
-        assert_eq!(0, q.len());
+        assert_eq!(0, pool.get_items_to_fetch().len());
     }
 
     #[tokio::test(start_paused = true)]
