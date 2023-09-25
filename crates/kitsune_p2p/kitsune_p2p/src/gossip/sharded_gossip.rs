@@ -40,12 +40,9 @@ pub use bandwidth::BandwidthThrottles;
 
 /// How quickly to run a gossip iteration which attempts to initiate
 /// with a new target.
-///
-/// TODO: Currently our gossip loop does a database query for remote nodes
-/// on every iteration. We should add a longer interval for refreshing this
-/// list (perhaps once per second), and use a cached value for other iterations,
-/// so as not to do hundreds of DB queries per second.
-const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(10);
+const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(100);
+
+const AGENT_LIST_FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
@@ -196,6 +193,11 @@ impl ShardedGossip {
             },
             bandwidth,
         });
+
+        let mut agent_list_by_local_agents = vec![];
+        let mut all_agents = vec![];
+        let mut refresh_agent_list_timer = std::time::Instant::now();
+
         metric_task({
             let this = this.clone();
 
@@ -207,8 +209,37 @@ impl ShardedGossip {
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
-                    this.run_one_iteration().await;
+                    this.run_one_iteration(
+                        agent_list_by_local_agents.clone(),
+                        all_agents.as_slice(),
+                    )
+                    .await;
                     this.stats(&mut stats);
+
+                    if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
+                        agent_list_by_local_agents =
+                            match this.gossip.query_agents_by_local_agents().await {
+                                Ok(a) => a,
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Failed to query for agents by local agents - {:?}",
+                                        e
+                                    );
+                                    vec![]
+                                }
+                            };
+                        all_agents =
+                            match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
+                                .await
+                            {
+                                Ok(a) => a,
+                                Err(e) => {
+                                    tracing::error!("Failed to query for all agents - {:?}", e);
+                                    vec![]
+                                }
+                            };
+                        refresh_agent_list_timer = std::time::Instant::now();
+                    }
                 }
                 KitsuneResult::Ok(())
             }
@@ -349,8 +380,16 @@ impl ShardedGossip {
         Ok(())
     }
 
-    async fn run_one_iteration(&self) {
-        match self.gossip.try_initiate().await {
+    async fn run_one_iteration(
+        &self,
+        agent_list_by_local_agents: Vec<AgentInfoSigned>,
+        all_agents: &[AgentInfoSigned],
+    ) {
+        match self
+            .gossip
+            .try_initiate(agent_list_by_local_agents, all_agents)
+            .await
+        {
             Ok(Some(outgoing)) => {
                 if let Err(err) = self.state.share_mut(|i, _| {
                     i.push_outgoing([outgoing]);
@@ -398,7 +437,7 @@ impl ShardedGossip {
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!(
-                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", 
+                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}",
                         i.metrics,
                         stats.avg_processing_time,
                         stats.count,

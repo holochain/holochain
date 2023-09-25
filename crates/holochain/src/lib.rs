@@ -2,7 +2,7 @@
 
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
-#![recursion_limit = "128"]
+#![recursion_limit = "256"]
 
 #[cfg(feature = "hdk")]
 pub use hdk::HDI_VERSION;
@@ -37,6 +37,8 @@ pub use tracing;
 mod local_network_tests;
 
 pub mod prelude {
+    #[cfg(feature = "hdk")]
+    pub use hdk::link::GetLinksInputBuilder;
     pub use holo_hash;
     pub use holochain_p2p::AgentPubKeyExt;
     pub use holochain_p2p::*;

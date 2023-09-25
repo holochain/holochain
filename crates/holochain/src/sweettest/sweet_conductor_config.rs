@@ -95,13 +95,30 @@ impl SweetConductorConfig {
     /// Set network tuning params.
     pub fn tune(
         mut self,
-        tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
+        f: impl FnOnce(&mut kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams),
+    ) -> Self {
+        let r = &mut self
+            .0
+            .network
+            .as_mut()
+            .expect("failed to tune network")
+            .tuning_params;
+        let mut tuning = (**r).clone();
+        f(&mut tuning);
+        *r = Arc::new(tuning);
+        self
+    }
+
+    /// Set network tuning params.
+    pub fn set_tuning_params(
+        mut self,
+        tuning_params: kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams,
     ) -> Self {
         self.0
             .network
             .as_mut()
             .expect("failed to tune network")
-            .tuning_params = tuning_params;
+            .tuning_params = Arc::new(tuning_params);
         self
     }
 

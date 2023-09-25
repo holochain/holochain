@@ -135,7 +135,7 @@ impl DnaBundle {
 
     /// Build a bundle from a DnaFile. Useful for tests.
     #[cfg(feature = "test_utils")]
-    pub async fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
+    pub fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
         let DnaFile { dna, code, .. } = dna_file;
         let manifest = Self::manifest_from_dna_def(dna.into_content())?;
         let resources = code

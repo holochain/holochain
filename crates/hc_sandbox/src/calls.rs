@@ -33,6 +33,7 @@ use crate::ports::get_admin_ports;
 use crate::run::run_async;
 use crate::CmdRunner;
 use clap::Parser;
+use holochain_trace::Output;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -210,7 +211,7 @@ pub struct ListApps {
 }
 
 #[doc(hidden)]
-pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
+pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyhow::Result<()> {
     let Call {
         existing,
         running,
@@ -233,7 +234,7 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
                         | std::io::ErrorKind::AddrNotAvailable = e.kind()
                         {
                             let (port, holochain, lair) =
-                                run_async(holochain_path, path, None).await?;
+                                run_async(holochain_path, path, None, structured.clone()).await?;
                             cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                             continue;
                         }
@@ -245,6 +246,18 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
                 }
             }
         }
+
+        if cmds.is_empty() {
+            bail!(
+                "No running conductors found by searching the current directory. \
+                \nYou need to do one of: \
+                    \n\t1. Start a new sandbox conductor from this directory, \
+                    \n\t2. Change directory to where your sandbox conductor is running, \
+                    \n\t3. Use the --running flag to connect to a running conductor\
+                "
+            );
+        }
+
         cmds
     } else {
         let mut cmds = Vec::with_capacity(running.len());
@@ -450,6 +463,8 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
         network_seed,
+        #[cfg(feature = "chc")]
+        ignore_genesis_failure: false,
     };
 
     let r = AdminRequest::InstallApp(Box::new(payload));

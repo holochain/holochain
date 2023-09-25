@@ -4,8 +4,8 @@ use crate::core::workflow::publish_dht_ops_workflow::{
 
 use super::*;
 use arbitrary::Arbitrary;
-use holochain_sqlite::db::WriteManager;
 use holochain_state::mutations;
+use holochain_state::prelude::StateMutationResult;
 
 #[tokio::test]
 async fn test_trigger() {
@@ -228,11 +228,8 @@ async fn publish_loop() {
     let op = DhtOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
-    db.conn()
-        .unwrap()
-        .with_commit_test(|txn| {
-            mutations::insert_op(txn, &op).unwrap();
-        })
+    db.write_async(move |txn| -> StateMutationResult<()> { mutations::insert_op(txn, &op) })
+        .await
         .unwrap();
     let mut dna_network = MockHolochainP2pDnaT::new();
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
@@ -301,12 +298,14 @@ async fn publish_loop() {
         .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
         .unwrap();
 
-    db.conn()
-        .unwrap()
-        .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
-        })
-        .unwrap();
+    db.write_async({
+        let query_op_hash = op_hash.clone();
+        move |txn| -> StateMutationResult<()> {
+            mutations::set_last_publish_time(txn, &query_op_hash, five_mins_ago)
+        }
+    })
+    .await
+    .unwrap();
 
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
@@ -323,12 +322,14 @@ async fn publish_loop() {
     op_published.recv().await.unwrap();
 
     // - Set receipts complete.
-    db.conn()
-        .unwrap()
-        .with_commit_test(|txn| {
-            mutations::set_receipts_complete(txn, &op_hash, true).unwrap();
-        })
-        .unwrap();
+    db.write_async({
+        let query_op_hash = op_hash.clone();
+        move |txn| -> StateMutationResult<()> {
+            mutations::set_receipts_complete(txn, &query_op_hash, true)
+        }
+    })
+    .await
+    .unwrap();
 
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
@@ -357,13 +358,17 @@ async fn publish_loop() {
 
     // - Set the ops last publish time to five mins ago.
     // - Set receipts not complete.
-    db.conn()
-        .unwrap()
-        .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
-            mutations::set_receipts_complete(txn, &op_hash, false).unwrap();
-        })
-        .unwrap();
+    db.write_async({
+        let query_op_hash = op_hash.clone();
+        move |txn| -> StateMutationResult<()> {
+            mutations::set_last_publish_time(txn, &query_op_hash, five_mins_ago)?;
+            mutations::set_receipts_complete(txn, &query_op_hash, false)?;
+
+            Ok(())
+        }
+    })
+    .await
+    .unwrap();
 
     // - Publish runs due to a trigger.
     ts.trigger(&"");

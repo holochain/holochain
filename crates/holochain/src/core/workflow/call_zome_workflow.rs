@@ -234,7 +234,7 @@ where
     Ribosome: RibosomeT + 'static,
 {
     let cascade =
-        holochain_cascade::Cascade::from_workspace_and_network(&workspace, network.clone());
+        holochain_cascade::CascadeImpl::from_workspace_and_network(&workspace, network.clone());
 
     let to_app_validate = {
         // collect all the records we need to validate in wasm
@@ -242,7 +242,7 @@ where
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            sys_validate_record(&record, &cascade, &conductor_handle)
+            sys_validate_record(&record, &cascade)
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
@@ -268,6 +268,7 @@ where
                 workspace.clone().into(),
                 &network,
                 &ribosome,
+                &conductor_handle,
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
@@ -295,7 +296,11 @@ fn map_outcome(
         // from the network where unmet dependencies would need to be
         // rescheduled to attempt later due to partitions etc.
         app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-            return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+            return Err(SourceChainError::InvalidCommit(format!(
+                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
+                hashes
+            ))
+            .into());
         }
     }
     Ok(())

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use holochain_diagnostics::{dht::test_utils::seeded_rng, holochain::prelude::*, random_bytes};
 
 pub fn basic_zome() -> InlineIntegrityZome {
-    InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 1)
+    InlineIntegrityZome::new_unique([EntryDef::default_from_id("a")], 1)
         .function(
             "create",
             |api, (base, bytes): (AnyLinkableHash, Vec<u8>)| {
@@ -55,11 +55,12 @@ pub fn basic_zome() -> InlineIntegrityZome {
             "link_count",
             |api, (base, entries): (AnyLinkableHash, bool)| {
                 let links = api
-                    .get_links(vec![GetLinksInput::new(
+                    .get_links(vec![GetLinksInputBuilder::try_new(
                         base,
                         LinkTypeFilter::single_dep(0.into()),
-                        None,
-                    )])
+                    )
+                    .unwrap()
+                    .build()])
                     .unwrap();
                 let links = links.first().unwrap();
                 if entries {
@@ -92,7 +93,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
 }
 
 pub fn syn_zome() -> InlineIntegrityZome {
-    InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 0)
+    InlineIntegrityZome::new_unique([EntryDef::default_from_id("a")], 0)
         .function("commit", |api, bytes: Vec<u8>| {
             let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
             api.create(CreateInput::new(

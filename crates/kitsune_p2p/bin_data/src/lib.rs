@@ -57,6 +57,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl KitsuneBinType for $name {
 
+                // TODO This actually allows mixups, for example a KitsuneAgent can be constructed with a 36 byte vector
                 fn new(mut bytes: Vec<u8>) -> Self {
                     if bytes.len() != 36 {
                         // If location bytes are not included, append them now.
@@ -83,12 +84,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl std::fmt::Debug for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.write_fmt(format_args!("{}(0x", stringify!($name)))?;
-                    for byte in &self.0 {
-                        f.write_fmt(format_args!("{:02x}", byte))?;
-                    }
-                    f.write_fmt(format_args!(")"))?;
-                    Ok(())
+                    f.write_fmt(format_args!("{}(0x{})", stringify!($name), &holochain_util::hex::bytes_to_hex(&self.0, false)))
                 }
             }
 
@@ -166,49 +162,12 @@ impl From<Vec<u8>> for KitsuneOpData {
     }
 }
 
-/// Helpful pattern for debug formatting many bytes.
-/// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
-pub fn fmt_many_bytes(
-    name: &str,
-    f: &mut std::fmt::Formatter<'_>,
-    bytes: &[u8],
-) -> std::fmt::Result {
-    if bytes.len() <= 32 {
-        let mut t = f.debug_tuple(name);
-        t.field(&bytes).finish()
-    } else {
-        let mut t = f.debug_struct(name);
-        let l = bytes.len();
-        t.field("length", &l);
-        t.field(
-            "bytes",
-            &format!(
-                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
-                bytes[0],
-                bytes[1],
-                bytes[2],
-                bytes[3],
-                bytes[4],
-                bytes[5],
-                bytes[6],
-                bytes[7],
-                bytes[l - 1],
-                bytes[l - 2],
-                bytes[l - 3],
-                bytes[l - 4],
-                bytes[l - 5],
-                bytes[l - 6],
-                bytes[l - 7],
-                bytes[l - 8],
-            ),
-        )
-        .finish()
-    }
-}
-
 impl std::fmt::Debug for KitsuneOpData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_many_bytes("KitsuneOpData", f, self.0.as_slice())
+        f.write_fmt(format_args!(
+            "KitsuneOpData({})",
+            &holochain_util::hex::many_bytes_string(self.0.as_slice())
+        ))
     }
 }
 

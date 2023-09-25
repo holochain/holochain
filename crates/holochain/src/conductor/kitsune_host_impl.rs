@@ -16,9 +16,8 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
-use holochain_sqlite::prelude::AsP2pStateTxExt;
+use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateTxExt};
 use holochain_types::{
-    db::PermittedConn,
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };
@@ -27,6 +26,7 @@ use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
+use kitsune_p2p_types::metrics::MetricRecord;
 use kitsune_p2p_types::{
     config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
 };
@@ -40,6 +40,16 @@ pub struct KitsuneHostImpl {
     strat: ArqStrat,
     lair_tag: Option<Arc<str>>,
     lair_client: Option<lair_keystore_api::LairClient>,
+}
+
+/// Manual Debug implementation to skip non debuggable fields.
+impl std::fmt::Debug for KitsuneHostImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KitsuneHostImpl")
+            .field("tuning_params", &self.tuning_params)
+            .field("strat", &self.strat)
+            .finish()
+    }
 }
 
 impl KitsuneHostImpl {
@@ -102,14 +112,10 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<f64>> {
         async move {
             let db = self.spaces.p2p_agents_db(&DnaHash::from_kitsune(&space))?;
-            use holochain_sqlite::db::AsP2pAgentStoreConExt;
-            let permit = db.conn_permit().await;
-            let task = tokio::task::spawn_blocking(move || {
-                let mut conn = db.with_permit(permit)?;
-                conn.p2p_extrapolated_coverage(dht_arc_set)
-            })
-            .await;
-            Ok(task??)
+            let coverage = db
+                .read_async(move |txn| txn.p2p_extrapolated_coverage(dht_arc_set))
+                .await?;
+            Ok(coverage)
         }
         .boxed()
         .into()
@@ -118,18 +124,13 @@ impl KitsuneHost for KitsuneHostImpl {
     fn record_metrics(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
-        records: Vec<kitsune_p2p::event::MetricRecord>,
+        records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         async move {
             let db = self.spaces.p2p_metrics_db(&DnaHash::from_kitsune(&space))?;
-            use holochain_sqlite::db::AsP2pMetricStoreConExt;
-            let permit = db.conn_permit().await;
-            let task = tokio::task::spawn_blocking(move || {
-                let mut conn = db.with_permit(permit)?;
-                conn.p2p_log_metrics(records)
-            })
-            .await;
-            Ok(task??)
+            Ok(db
+                .write_async(move |txn| txn.p2p_log_metrics(records))
+                .await?)
         }
         .boxed()
         .into()
@@ -156,7 +157,7 @@ impl KitsuneHost for KitsuneHostImpl {
         let db = self.spaces.p2p_agents_db(&dna_hash);
         async move {
             Ok(db?
-                .async_commit(move |txn| txn.p2p_remove_agent(&agent))
+                .write_async(move |txn| txn.p2p_remove_agent(&agent))
                 .await?)
         }
         .boxed()
@@ -251,7 +252,7 @@ impl KitsuneHost for KitsuneHostImpl {
         async move {
             let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
             let results = db
-                .async_commit(move |txn| {
+                .write_async(move |txn| {
                     let mut out = Vec::new();
                     for op_hash in op_hash_list {
                         let op_hash = DhtOpHash::from_kitsune(&op_hash);

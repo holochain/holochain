@@ -5,12 +5,12 @@ use std::time::Duration;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain::test_utils::wait_for_integration;
-use holochain_state::prelude::fresh_reader_test;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Entry;
 
 use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain::test_utils::host_fn_caller::*;
+use holochain_sqlite::error::DatabaseResult;
 use holochain_zome_types::EntryDefLocation;
 use holochain_zome_types::EntryVisibility;
 use rusqlite::named_params;
@@ -54,21 +54,30 @@ async fn authored_test() {
     triggers.publish_dht_ops.trigger(&"");
 
     // Alice commits the entry
-    fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
-        let basis: AnyDhtHash = entry_hash.clone().into();
-        let has_authored_entry: bool = txn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+    alice_call_data
+        .authored_db
+        .read_async({
+            let basis: AnyDhtHash = entry_hash.clone().into();
+            let alice_pk = alice_call_data.cell_id.agent_pubkey().clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let has_authored_entry: bool = txn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
                     WHERE basis_hash = :hash AND Action.author = :author)",
-                named_params! {
+                    named_params! {
                     ":hash": basis,
-                    ":author": alice_call_data.cell_id.agent_pubkey(),
+                    ":author": alice_pk,
                 },
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(has_authored_entry);
-    });
+                    |row| row.get(0),
+                )?;
+
+                assert!(has_authored_entry);
+
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
 
     // Integration should have 3 ops in it.
     // Plus another 14 for genesis.
@@ -83,35 +92,52 @@ async fn authored_test() {
     )
     .await;
 
-    fresh_reader_test(bob_call_data.authored_db.clone(), |txn| {
-        let basis: AnyDhtHash = entry_hash.clone().into();
-        let has_authored_entry: bool = txn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+    bob_call_data
+        .authored_db
+        .read_async({
+            let basis: AnyDhtHash = entry_hash.clone().into();
+            let bob_pk = bob_call_data.cell_id.agent_pubkey().clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let has_authored_entry: bool = txn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
                     WHERE basis_hash = :hash AND Action.author = :author)",
-                named_params! {
+                    named_params! {
                     ":hash": basis,
-                    ":author": bob_call_data.cell_id.agent_pubkey(),
+                    ":author": bob_pk,
                 },
-                |row| row.get(0),
-            )
-            .unwrap();
-        // Bob Should not have the entry in their authored table
-        assert!(!has_authored_entry);
-    });
-    fresh_reader_test(bob_call_data.dht_db.clone(), |txn| {
-        let basis: AnyDhtHash = entry_hash.clone().into();
-        let has_integrated_entry: bool = txn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash)",
-                named_params! {
-                    ":hash": basis,
-                },
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(has_integrated_entry);
-    });
+                    |row| row.get(0),
+                )?;
+                // Bob Should not have the entry in their authored table
+                assert!(!has_authored_entry);
+
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
+
+    bob_call_data
+        .dht_db
+        .read_async({
+            let basis: AnyDhtHash = entry_hash.clone().into();
+
+            move |txn| -> DatabaseResult<()> {
+                let has_integrated_entry: bool = txn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash)",
+                    named_params! {
+                        ":hash": basis,
+                    },
+                    |row| row.get(0),
+                )?;
+
+                assert!(has_integrated_entry);
+
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
 
     // Now bob commits the entry
     let h = bob_call_data.get_api(TestWasm::Create);
@@ -130,22 +156,31 @@ async fn authored_test() {
         .unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
-    fresh_reader_test(bob_call_data.authored_db.clone(), |txn| {
-        let basis: AnyDhtHash = entry_hash.clone().into();
-        let has_authored_entry: bool = txn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
+    bob_call_data
+        .authored_db
+        .read_async({
+            let basis: AnyDhtHash = entry_hash.clone().into();
+            let bob_pk = bob_call_data.cell_id.agent_pubkey().clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let has_authored_entry: bool = txn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
                     WHERE basis_hash = :hash AND Action.author = :author)",
-                named_params! {
+                    named_params! {
                     ":hash": basis,
-                    ":author": bob_call_data.cell_id.agent_pubkey(),
+                    ":author": bob_pk,
                 },
-                |row| row.get(0),
-            )
-            .unwrap();
-        // Bob Should have the entry in their authored table because they committed it.
-        assert!(has_authored_entry);
-    });
+                    |row| row.get(0),
+                )?;
+
+                // Bob Should have the entry in their authored table because they committed it.
+                assert!(has_authored_entry);
+
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
 
     conductor_test.shutdown_conductor().await;
 }

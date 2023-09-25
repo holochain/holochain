@@ -10,6 +10,7 @@ use num_traits::Zero;
 
 use super::*;
 
+#[derive(Debug)]
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
     topology: Topology,

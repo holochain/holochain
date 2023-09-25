@@ -7,6 +7,7 @@ use crate::fixt::*;
 use arbitrary::Arbitrary;
 use fixt::prelude::*;
 
+#[cfg(test)]
 mod bloom;
 mod common;
 mod ops;

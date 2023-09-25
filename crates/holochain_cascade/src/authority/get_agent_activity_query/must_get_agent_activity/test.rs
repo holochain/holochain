@@ -5,7 +5,7 @@ use crate::test_utils::commit_chain;
 use super::*;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_sqlite::db::DbKindDht;
+use holochain_sqlite::prelude::DbKindDht;
 use holochain_types::test_utils::chain::*;
 use holochain_zome_types::ChainFilter;
 use isotest::Iso;

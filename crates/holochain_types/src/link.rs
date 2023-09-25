@@ -31,6 +31,12 @@ pub struct WireLinkKey {
     pub type_query: LinkTypeFilter,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
+    /// Specify a minimum action timestamp to filter results.
+    pub after: Option<Timestamp>,
+    /// Specify a maximum action timestamp to filter results.
+    pub before: Option<Timestamp>,
+    /// Only get links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]

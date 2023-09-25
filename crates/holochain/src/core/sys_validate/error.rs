@@ -1,6 +1,8 @@
+use derive_more::Display;
 use std::convert::TryFrom;
 
 use super::SourceChainError;
+use super::MAX_ENTRY_SIZE;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
@@ -97,7 +99,7 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 /// All the outcomes that can come from validation
 /// This is not an error type it is the outcome of
 /// failed validation.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ValidationOutcome {
     #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
     Counterfeit(Signature, Action),
@@ -111,14 +113,22 @@ pub enum ValidationOutcome {
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
-    #[error("The entry size {0} was larger than the MAX_ENTRY_SIZE {1}")]
-    EntryTooLarge(usize, usize),
+    #[error(
+        "The entry size {0} was larger than the MAX_ENTRY_SIZE {}",
+        MAX_ENTRY_SIZE
+    )]
+    EntryTooLarge(usize),
     #[error("The entry has a different type to the action's entry type")]
-    EntryType,
+    EntryTypeMismatch,
     #[error("The app entry def {0:?} visibility didn't match the zome")]
     EntryVisibility(AppEntryDef),
-    #[error("The link tag size {0} was larger than the MAX_TAG_SIZE {1}")]
-    TagTooLarge(usize, usize),
+    #[error(
+        "The link tag size {0} was larger than the MAX_TAG_SIZE {}",
+        super::MAX_TAG_SIZE
+    )]
+    TagTooLarge(usize),
+    #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]
+    MalformedDhtOp(Box<Action>, DhtOpType, String),
     #[error("The action {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was a {0:?}")]
@@ -129,8 +139,8 @@ pub enum ValidationOutcome {
     PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
     PrevActionError(#[from] PrevActionError),
-    #[error("StoreEntry should not be gossiped for private entries")]
-    PrivateEntry,
+    #[error("Private entry data should never be included in any op other than StoreEntry.")]
+    PrivateEntryLeaked,
     #[error(
         "The DNA does not belong in this space! Action DNA hash: {0:?}, expected DNA hash: {1:?}"
     )]
@@ -158,8 +168,47 @@ impl ValidationOutcome {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum PrevActionError {
+/// Context information for an invalid action to make it easier to trace in errors.
+#[derive(Error, Debug, Display, PartialEq, Eq)]
+#[display(
+    fmt = "{} - with context seq={}, action_hash={:?}, action=[{}]",
+    source,
+    seq,
+    action_hash,
+    action_display
+)]
+pub struct PrevActionError {
+    #[source]
+    pub source: PrevActionErrorKind,
+    pub seq: u32,
+    pub action_hash: ActionHash,
+    pub action_display: String,
+}
+
+impl<A: ChainItem> From<(PrevActionErrorKind, &A)> for PrevActionError {
+    fn from((inner, action): (PrevActionErrorKind, &A)) -> Self {
+        PrevActionError {
+            source: inner,
+            seq: action.seq(),
+            action_hash: action.get_hash().clone().into(),
+            action_display: action.to_display(),
+        }
+    }
+}
+
+impl From<(PrevActionErrorKind, Action)> for PrevActionError {
+    fn from((inner, action): (PrevActionErrorKind, Action)) -> Self {
+        PrevActionError {
+            source: inner,
+            seq: action.action_seq(),
+            action_hash: action.to_hash(),
+            action_display: format!("{}", action),
+        }
+    }
+}
+
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum PrevActionErrorKind {
     #[error("The previous action hash specified in an action doesn't match the actual previous action. Seq: {0}")]
     HashMismatch(u32),
     #[error("Root of source chain must be Dna")]
