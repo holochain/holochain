@@ -1,63 +1,58 @@
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
-#[hdk_entry(
-    id = "post",
-    required_validations = 5,
-    required_validation_type = "full"
-)]
+#[hdk_entry_helper]
 pub struct Post(pub String);
-
-#[hdk_entry(
-    id = "msg",
-    required_validations = 5,
-    required_validation_type = "sub_chain"
-)]
+#[hdk_entry_helper]
 pub struct Msg(pub String);
 
-#[hdk_entry(
-    id = "priv_msg",
-    required_validations = 5,
-    required_validation_type = "full",
-    visibility = "private"
-)]
+#[hdk_entry_helper]
 pub struct PrivMsg(pub String);
 
-entry_defs![Post::entry_def(), Msg::entry_def(), PrivMsg::entry_def()];
+#[hdk_entry_defs]
+#[unit_enum(UnitEntryTypes)]
+pub enum EntryTypes {
+    #[entry_def(required_validations = 5)]
+    Post(Post), // "post"
+    #[entry_def(required_validations = 5)]
+    Msg(Msg),
+    #[entry_def(required_validations = 5, visibility = "private")]
+    PrivMsg(PrivMsg),
+}
 
 #[hdk_extern]
 fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
-    let GenesisSelfCheckData {
-        dna_info: _,
-        membrane_proof: _,
-        agent_key: _,
-    } = data;
+    let GenesisSelfCheckDataV2 {
+        membrane_proof: _maybe_membrane_proof,
+        agent_key: _agent_key,
+     } = data;
     Ok(ValidateCallbackResult::Valid)
 }
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    let this_zome = zome_info()?;
-    if let Op::StoreEntry {
-        header:
+    if let Op::StoreEntry(StoreEntry {
+        action:
             SignedHashed {
                 hashed: HoloHashed {
-                    content: header, ..
+                    content: action, ..
                 },
                 ..
             },
         entry,
-    } = op
+    }) = op
     {
-        if header
-            .app_entry_type()
-            .filter(|app_entry_type| {
-                this_zome.matches_entry_def_id(app_entry_type, Post::entry_def_id())
-            })
-            .map_or(Ok(false), |_| {
-                Post::try_from(entry).map(|post| &post.0 == "Banana")
-            })?
+        if let Some(AppEntryDef {
+            entry_index: entry_def_index,
+            zome_index,
+            ..
+        }) = action.app_entry_def()
         {
-            return Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()));
+            match EntryTypes::deserialize_from_type(*zome_index, *entry_def_index, &entry)? {
+                Some(EntryTypes::Post(_)) => (),
+                Some(EntryTypes::Msg(_)) => (),
+                Some(EntryTypes::PrivMsg(_)) => (),
+                None => (),
+            }
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -76,18 +71,18 @@ fn call_must_get_entry(must_get_entry_input: MustGetEntryInput) -> ExternResult<
     HDI.with(|i| i.borrow().must_get_entry(must_get_entry_input))
 }
 #[hdk_extern]
-fn call_must_get_header(
-    must_get_header_input: MustGetHeaderInput,
-) -> ExternResult<SignedHeaderHashed> {
-    HDI.with(|i| i.borrow().must_get_header(must_get_header_input))
+fn call_must_get_action(
+    must_get_action_input: MustGetActionInput,
+) -> ExternResult<SignedActionHashed> {
+    HDI.with(|i| i.borrow().must_get_action(must_get_action_input))
 }
 #[hdk_extern]
-fn call_must_get_valid_element(
-    must_get_valid_element_input: MustGetValidElementInput,
-) -> ExternResult<Element> {
+fn call_must_get_valid_record(
+    must_get_valid_record_input: MustGetValidRecordInput,
+) -> ExternResult<Record> {
     HDI.with(|i| {
         i.borrow()
-            .must_get_valid_element(must_get_valid_element_input)
+            .must_get_valid_record(must_get_valid_record_input)
     })
 }
 // Info
@@ -100,7 +95,6 @@ fn call_zome_info(zome_info_input: ()) -> ExternResult<ZomeInfo> {
     HDI.with(|i| i.borrow().zome_info(zome_info_input))
 }
 // Trace
-#[cfg(feature = "trace")]
 #[hdk_extern]
 fn call_trace(trace_msg: TraceMsg) -> ExternResult<()> {
     HDI.with(|i| i.borrow().trace(trace_msg))
@@ -127,14 +121,14 @@ fn call_x_25519_x_salsa20_poly1305_decrypt(
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use holochain_deterministic_integrity::prelude::holo_hash::DnaHash;
+    use hdi::prelude::holo_hash::DnaHash;
 
     use super::*;
     #[test]
-    fn test_all_holochain_deterministic_integrity() {
+    fn test_all_hdi() {
         let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();
         let empty_agent_key = AgentPubKey::from_raw_36(vec![0u8; 36]);
-        let empty_header_hash = HeaderHash::from_raw_36(vec![0u8; 36]);
+        let empty_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
         let empty_dna_hash = DnaHash::from_raw_36(vec![0u8; 36]);
 
         mock_hdi
@@ -157,26 +151,26 @@ pub mod test {
             }
         });
 
-        let dna = SignedHeaderHashed::with_presigned(
-            HeaderHashed::with_pre_hashed(
-                Header::Dna(Dna {
+        let dna = SignedActionHashed::with_presigned(
+            ActionHashed::with_pre_hashed(
+                Action::Dna(Dna {
                     author: empty_agent_key.clone(),
                     timestamp: Timestamp::from_micros(0),
                     hash: empty_dna_hash.clone(),
                 }),
-                empty_header_hash.clone(),
+                empty_action_hash.clone(),
             ),
             Signature([0u8; 64]),
         );
 
-        mock_hdi.expect_must_get_header().once().returning({
+        mock_hdi.expect_must_get_action().once().returning({
             let dna = dna.clone();
             move |_| Ok(dna.clone())
         });
 
-        mock_hdi.expect_must_get_valid_element().once().returning({
+        mock_hdi.expect_must_get_valid_record().once().returning({
             let dna = dna.clone();
-            move |_| Ok(Element::new(dna.clone(), None))
+            move |_| Ok(Record::new(dna.clone(), None))
         });
 
         mock_hdi.expect_dna_info().once().returning({
@@ -185,7 +179,12 @@ pub mod test {
                 Ok(DnaInfo {
                     name: "".to_string(),
                     hash: empty_dna_hash.clone(),
-                    properties: UnsafeBytes::from(vec![]).into(),
+                    modifiers: DnaModifiers {
+                        network_seed: String::new(),
+                        properties: UnsafeBytes::from(vec![]).into(),
+                        origin_time: Timestamp(0),
+                        quantum_time: std::time::Duration::new(0, 0),
+                    },
                     zome_names: vec![],
                 })
             }
@@ -199,6 +198,7 @@ pub mod test {
                     id: 0.into(),
                     entry_defs: EntryDefs(vec![]),
                     extern_fns: vec![],
+                    zome_types: Default::default(),
                 })
             }
         });
@@ -216,9 +216,9 @@ pub mod test {
 
         call_must_get_entry(MustGetEntryInput(empty_agent_key.clone().into())).unwrap();
 
-        call_must_get_header(MustGetHeaderInput(empty_header_hash.clone())).unwrap();
+        call_must_get_action(MustGetActionInput(empty_action_hash.clone())).unwrap();
 
-        call_must_get_valid_element(MustGetValidElementInput(empty_header_hash.clone())).unwrap();
+        call_must_get_valid_record(MustGetValidRecordInput(empty_action_hash.clone())).unwrap();
 
         call_dna_info(()).unwrap();
 

@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_util::tokio_helper;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::X25519PubKey;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
@@ -12,7 +12,7 @@ pub fn create_x25519_keypair(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<X25519PubKey, WasmError> {
+) -> Result<X25519PubKey, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess{ keystore: Permission::Allow, .. } => tokio_helper::block_forever_on(async move {
             call_context
@@ -22,12 +22,12 @@ pub fn create_x25519_keypair(
                 .await
                 .map(|k| (*k).into())
         })
-        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
+        .map_err(|keystore_error| wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()),
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
             call_context.zome.zome_name().clone(),
             call_context.function_name().clone(),
             "create_x25519_keypair".into()
-        ).to_string()))
+        ).to_string())).into())
     }
 }
 

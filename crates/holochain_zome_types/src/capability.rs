@@ -28,3 +28,16 @@ mod grant;
 pub use grant::*;
 
 pub use holochain_integrity_types::capability::*;
+use serde::{Deserialize, Serialize};
+
+use crate::CellId;
+
+/// Parameters for granting a zome call capability.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GrantZomeCallCapabilityPayload {
+    /// Cell for which to authorize the capability.
+    pub cell_id: CellId,
+    /// Specifies the capability, consisting of zomes and functions to allow
+    /// signing for as well as access level, secret and assignees.
+    pub cap_grant: ZomeCallCapGrant,
+}

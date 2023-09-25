@@ -4,7 +4,9 @@ use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     bin_types::KOp,
+    dht::region::RegionBounds,
     dht_arc::{DhtArcSet, DhtLocation},
+    KOpHash,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -30,8 +32,24 @@ pub struct QueryOpHashesEvt {
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The op-hashes to fetch
-    pub op_hashes: Vec<KOpHash>,
+    /// The criteria to query by
+    pub query: FetchOpDataEvtQuery,
+}
+
+/// Multiple ways to fetch op data
+#[derive(Debug, derive_more::From)]
+pub enum FetchOpDataEvtQuery {
+    /// Fetch all ops with the hashes specified
+    Hashes {
+        /// list of ops to fetch
+        op_hash_list: Vec<KOpHash>,
+
+        /// should we include limbo ops
+        include_limbo: bool,
+    },
+
+    /// Fetch all ops within the time and space bounds specified
+    Regions(Vec<RegionBounds>),
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
@@ -47,7 +65,7 @@ pub struct SignNetworkDataEvt {
 }
 
 /// Store the AgentInfo as signed by the agent themselves.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -145,76 +163,11 @@ pub fn full_time_window_inclusive() -> TimeWindowInclusive {
     Timestamp::MIN..=Timestamp::MAX
 }
 
-const METRIC_KIND_UNKNOWN: &str = "Unknown";
-const METRIC_KIND_REACHABILITY_QUOTIENT: &str = "ReachabilityQuotient";
-const METRIC_KIND_LATENCY_MICROS: &str = "LatencyMicros";
-const METRIC_KIND_AGG_EXTRAP_COV: &str = "AggExtrapCov";
-
-/// The type of metric recorded
-pub enum MetricRecordKind {
-    /// Failure to parse metric kind
-    Unknown,
-
-    /// ReachabilityQuotient metric kind
-    ReachabilityQuotient,
-
-    /// LatencyMicros metric kind
-    LatencyMicros,
-
-    /// AggExtrapCov metric kind
-    AggExtrapCov,
-}
-
-impl MetricRecordKind {
-    /// database format of this kind variant
-    pub fn to_db(&self) -> &'static str {
-        use MetricRecordKind::*;
-        match self {
-            Unknown => METRIC_KIND_UNKNOWN,
-            ReachabilityQuotient => METRIC_KIND_REACHABILITY_QUOTIENT,
-            LatencyMicros => METRIC_KIND_LATENCY_MICROS,
-            AggExtrapCov => METRIC_KIND_AGG_EXTRAP_COV,
-        }
-    }
-
-    /// parse a database kind into a rust enum variant
-    pub fn from_db(input: &str) -> Self {
-        use MetricRecordKind::*;
-        if input == METRIC_KIND_REACHABILITY_QUOTIENT {
-            ReachabilityQuotient
-        } else if input == METRIC_KIND_LATENCY_MICROS {
-            LatencyMicros
-        } else if input == METRIC_KIND_AGG_EXTRAP_COV {
-            AggExtrapCov
-        } else {
-            Unknown
-        }
-    }
-}
-
-/// An individual metric record
-pub struct MetricRecord {
-    /// kind of this record
-    pub kind: MetricRecordKind,
-
-    /// agent associated with this metric (if applicable)
-    pub agent: Option<Arc<super::KitsuneAgent>>,
-
-    /// timestamp this metric was recorded at
-    pub recorded_at_utc: Timestamp,
-
-    /// timestamp this metric will expire and be available for pruning
-    pub expires_at_utc: Timestamp,
-
-    /// additional data associated with this metric
-    pub data: serde_json::Value,
-}
-
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
-type KOpHash = Arc<super::KitsuneOpHash>;
-type Payload = Vec<u8>;
+pub(crate) type Payload = Vec<u8>;
 type Ops = Vec<KOp>;
+type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -228,7 +181,7 @@ ghost_actor::ghost_chan! {
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;
@@ -236,8 +189,13 @@ ghost_actor::ghost_chan! {
         /// We are receiving a notification from a remote node.
         fn notify(space: KSpace, to_agent: KAgent, payload: Payload) -> ();
 
-        /// We are receiving a dht op we may need to hold distributed via gossip.
-        fn gossip(space: KSpace, ops: Ops) -> ();
+        /// We have received ops to be integrated,
+        /// either through gossip or publish.
+        fn receive_ops(
+            space: KSpace,
+            ops: Ops,
+            context: MaybeContext,
+        ) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.

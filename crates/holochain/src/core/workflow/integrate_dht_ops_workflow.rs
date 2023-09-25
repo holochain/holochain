@@ -20,7 +20,7 @@ mod tests;
 #[instrument(skip(vault, trigger_receipt, network, dht_query_cache))]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
-    dht_query_cache: &DhtDbQueryCache,
+    dht_query_cache: DhtDbQueryCache,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
@@ -29,7 +29,7 @@ pub async fn integrate_dht_ops_workflow(
     // Get any activity from the cache that is ready to be integrated.
     let activity_to_integrate = dht_query_cache.get_activity_to_integrate().await?;
     let (changed, activity_integrated) = vault
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             let mut total = 0;
             if !activity_to_integrate.is_empty() {
                 let mut stmt = txn.prepare_cached(
@@ -38,6 +38,7 @@ pub async fn integrate_dht_ops_workflow(
                 for (author, seq_range) in &activity_to_integrate {
                     let start = seq_range.start();
                     let end = seq_range.end();
+
                     total += stmt.execute(named_params! {
                         ":when_integrated": time,
                         ":register_activity": DhtOpType::RegisterAgentActivity,
@@ -52,7 +53,7 @@ pub async fn integrate_dht_ops_workflow(
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":updated_content": DhtOpType::RegisterUpdatedContent,
-                    ":deleted_entry_header": DhtOpType::RegisterDeletedEntryHeader,
+                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
                     ":store_entry": DhtOpType::StoreEntry,
                 })?;
             total += changed;
@@ -67,13 +68,11 @@ pub async fn integrate_dht_ops_workflow(
                 })?;
             total += changed;
             let changed = txn
-                .prepare_cached(
-                    holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ELEMENT,
-                )?
+                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_RECORD)?
                 .execute(named_params! {
                     ":when_integrated": time,
-                    ":store_element": DhtOpType::StoreElement,
-                    ":updated_element": DhtOpType::RegisterUpdatedElement,
+                    ":store_record": DhtOpType::StoreRecord,
+                    ":updated_record": DhtOpType::RegisterUpdatedRecord,
                     ":deleted_by": DhtOpType::RegisterDeletedBy,
                 })?;
             total += changed;
@@ -97,7 +96,7 @@ pub async fn integrate_dht_ops_workflow(
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps);
     if changed > 0 {
-        trigger_receipt.trigger();
+        trigger_receipt.trigger(&"integrate_dht_ops_workflow");
         network.new_integrated_data().await?;
         Ok(WorkComplete::Incomplete)
     } else {

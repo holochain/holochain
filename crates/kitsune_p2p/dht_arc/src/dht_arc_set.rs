@@ -61,6 +61,8 @@ impl DhtArcSet {
         if is_full(start.into(), end.into()) {
             Self::new_full()
         } else {
+            let start = start.as_u32().min(MAX).into();
+            let end = end.as_u32().min(MAX).into();
             Self::Partial(
                 if start <= end {
                     vec![(start, end)]
@@ -161,6 +163,20 @@ impl DhtArcSet {
         match self {
             Self::Full => u32::MAX,
             Self::Partial(intervals) => intervals.size(),
+        }
+    }
+
+    pub fn print_arcs(&self, len: usize) {
+        let arcs = self.intervals();
+        println!("{} arcs", arcs.len());
+        for (i, arc) in arcs.iter().enumerate() {
+            println!(
+                "{:>3}: |{}| {} {:?}",
+                i,
+                arc.to_ascii(len),
+                arc.length(),
+                arc.to_bounds_grouped(),
+            );
         }
     }
 }

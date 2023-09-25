@@ -1,26 +1,32 @@
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::{tuning_params_struct, KitsuneP2pTuningParams};
 use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use url2::Url2;
 
-/// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
+// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default production bootstrap service url.
 pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap-staging.holo.host";
 
-/// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
+// TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default development bootstrap service url.
 pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 pub(crate) enum KitsuneP2pTx2Backend {
+    #[cfg(feature = "tx2")]
     Mem,
-    Quic { bind_to: TxUrl },
+    //#[cfg(feature = "tx2")]
+    //Quic { bind_to: TxUrl },
+    #[cfg(feature = "tx2")]
     Mock { mock_network: AdapterFactory },
 }
 
+#[cfg(feature = "tx2")]
 pub(crate) enum KitsuneP2pTx2ProxyConfig {
     NoProxy,
+    #[allow(dead_code)]
     Specific(TxUrl),
+    #[allow(dead_code)]
     Bootstrap {
         #[allow(dead_code)]
         bootstrap_url: TxUrl,
@@ -28,25 +34,29 @@ pub(crate) enum KitsuneP2pTx2ProxyConfig {
     },
 }
 
+#[cfg(feature = "tx2")]
 pub(crate) struct KitsuneP2pTx2Config {
     pub backend: KitsuneP2pTx2Backend,
     pub use_proxy: KitsuneP2pTx2ProxyConfig,
 }
 
-/// Configure the kitsune actor
+/// Configure the kitsune actor.
 #[non_exhaustive]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct KitsuneP2pConfig {
-    /// list of sub-transports to be included in this pool
+    /// List of sub-transports to be included in this pool
     pub transport_pool: Vec<TransportConfig>,
+
     /// The service used for peers to discover each before they are peers.
     pub bootstrap_service: Option<Url2>,
+
     /// Network tuning parameters. These are managed loosely,
     /// as they are subject to change. If you specify a tuning parameter
     /// that no longer exists, or a value that does not parse,
     /// a warning will be printed in the tracing log.
     #[serde(default)]
     pub tuning_params: KitsuneP2pTuningParams,
+
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
 }
@@ -62,6 +72,7 @@ impl Default for KitsuneP2pConfig {
     }
 }
 
+#[allow(dead_code)]
 fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
     match bind_to {
         Some(bind_to) => bind_to.clone().into(),
@@ -70,12 +81,49 @@ fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
 }
 
 impl KitsuneP2pConfig {
-    /// tx2 is currently designed to use exactly one proxy wrapped transport
-    /// so, convert a bunch of the options from the previous transport
+    #[allow(dead_code)] // because of feature flipping
+    pub(crate) fn is_tx2(&self) -> bool {
+        #[cfg(feature = "tx2")]
+        {
+            #[cfg(feature = "tx5")]
+            {
+                if let Some(t) = self.transport_pool.get(0) {
+                    !matches!(t, TransportConfig::WebRTC { .. })
+                } else {
+                    true
+                }
+            }
+            #[cfg(not(feature = "tx5"))]
+            {
+                true
+            }
+        }
+        #[cfg(not(feature = "tx2"))]
+        {
+            false
+        }
+    }
+
+    /// This config is making use of tx5 transport
+    #[allow(dead_code)] // because of feature flipping
+    pub fn is_tx5(&self) -> bool {
+        #[cfg(feature = "tx5")]
+        {
+            if let Some(t) = self.transport_pool.get(0) {
+                return matches!(t, TransportConfig::WebRTC { .. });
+            }
+        }
+        false
+    }
+
+    /// `tx2` is currently designed to use exactly one proxy wrapped transport,
+    /// so convert a bunch of the options from the previous transport
     /// paradigm into that pattern.
+    #[cfg(feature = "tx2")]
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         use KitsuneP2pTx2ProxyConfig::*;
         match self.transport_pool.get(0) {
+            /*
             Some(TransportConfig::Proxy {
                 sub_transport,
                 proxy_config,
@@ -110,47 +158,68 @@ impl KitsuneP2pConfig {
                     use_proxy: NoProxy,
                 })
             }
+            */
             Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mock {
                     mock_network: mock_network.0.clone(),
                 },
                 use_proxy: NoProxy,
             }),
+            #[cfg(feature = "tx5")]
+            Some(TransportConfig::WebRTC { .. }) => {
+                Err("Cannot convert tx5 config into tx2".into())
+            }
             None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
                 use_proxy: NoProxy,
             }),
         }
     }
+
+    /// Return a copy with the tuning params altered
+    pub fn tune(
+        mut self,
+        f: impl Fn(
+            tuning_params_struct::KitsuneP2pTuningParams,
+        ) -> tuning_params_struct::KitsuneP2pTuningParams,
+    ) -> Self {
+        let tp = (*self.tuning_params).clone();
+        self.tuning_params = std::sync::Arc::new(f(tp));
+        self
+    }
 }
 
-/// Configure the network bindings for underlying kitsune transports
+/// Configure the network bindings for underlying kitsune transports.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransportConfig {
     /// A transport that uses the local memory transport protocol
-    /// (this is mainly for testing).
+    /// (this is mainly for testing)
+    #[cfg(feature = "tx2")]
     Mem {},
+    /*
     /// A transport that uses the QUIC protocol
+    #[cfg(feature = "tx2")]
     Quic {
-        /// To which network interface / port should we bind?
-        /// Default: "kitsune-quic://0.0.0.0:0".
+        /// Network interface / port to bind to
+        /// Default: "kitsune-quic://0.0.0.0:0"
         bind_to: Option<Url2>,
 
         /// If you have port-forwarding set up,
         /// or wish to apply a vanity domain name,
-        /// you may need to override the local NIC ip.
-        /// Default: None = use NIC ip.
+        /// you may need to override the local NIC IP.
+        /// Default: None = use NIC IP
         override_host: Option<String>,
 
         /// If you have port-forwarding set up,
         /// you may need to override the local NIC port.
-        /// Default: None = use NIC port.
+        /// Default: None = use NIC port
         override_port: Option<u16>,
     },
-    /// A transport that tls tunnels through a sub-transport (ALPN kitsune-proxy/0)
+    /// A transport that TLS tunnels through a sub-transport (ALPN kitsune-proxy/0)
+    #[cfg(feature = "tx2")]
     Proxy {
-        /// The 'Proxy' transport is a wrapper around a sub-transport
+        /// The 'Proxy' transport is a wrapper around a sub-transport.
         /// We also need to define the sub-transport.
         sub_transport: Box<TransportConfig>,
 
@@ -160,31 +229,44 @@ pub enum TransportConfig {
         /// - be directly addressable, but not proxy for others
         proxy_config: ProxyConfig,
     },
+    */
+    /// A mock network for testing
+    #[cfg(feature = "tx2")]
     #[serde(skip)]
-    /// A mock network for testing.
     Mock {
-        /// The adaptor for mocking the network.
+        /// The adaptor for mocking the network
         mock_network: AdapterFactoryMock,
+    },
+    /// Configure to use Tx5 WebRTC for kitsune networking.
+    #[cfg(feature = "tx5")]
+    #[serde(rename = "webrtc", alias = "web_r_t_c", alias = "web_rtc")]
+    WebRTC {
+        /// The url of the signal server to connect to for addressability.
+        signal_url: String,
     },
 }
 
+#[cfg(feature = "tx2")]
 #[derive(Clone)]
 /// A simple wrapper around the [`AdaptorFactory`](tx2::tx2_adapter::AdapterFactory)
 /// to allow implementing Debug and PartialEq.
 pub struct AdapterFactoryMock(pub AdapterFactory);
 
+#[cfg(feature = "tx2")]
 impl std::fmt::Debug for AdapterFactoryMock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("AdapterFactoryMock").finish()
     }
 }
 
+#[cfg(feature = "tx2")]
 impl std::cmp::PartialEq for AdapterFactoryMock {
     fn eq(&self, _: &Self) -> bool {
         unimplemented!()
     }
 }
 
+#[cfg(feature = "tx2")]
 impl From<AdapterFactory> for AdapterFactoryMock {
     fn from(adaptor_factory: AdapterFactory) -> Self {
         Self(adaptor_factory)
@@ -194,6 +276,7 @@ impl From<AdapterFactory> for AdapterFactoryMock {
 /// Proxy configuration options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[cfg(feature = "tx2")]
 pub enum ProxyConfig {
     /// We want to be hosted at a remote proxy location.
     RemoteProxyClient {
@@ -213,7 +296,7 @@ pub enum ProxyConfig {
     },
 
     /// We want to be a proxy server for others.
-    /// (We can also deny all proxy requests for something in-between).
+    /// (We can also deny all proxy requests for something in-between.)
     LocalProxyServer {
         /// Accept proxy request options
         /// Default: None = reject all proxy requests
@@ -224,6 +307,7 @@ pub enum ProxyConfig {
 /// Whether we are willing to proxy on behalf of others
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[cfg(feature = "tx2")]
 pub enum ProxyAcceptConfig {
     /// We will accept all requests to proxy for remotes
     AcceptAll,
@@ -237,7 +321,9 @@ pub enum ProxyAcceptConfig {
 #[serde(rename_all = "snake_case")]
 pub enum NetworkType {
     /// Via bootstrap server to the WAN
+    // MAYBE: Remove the "Quic" from this?
     QuicBootstrap,
     /// Via MDNS to the LAN
+    // MAYBE: Remove the "Quic" from this?
     QuicMdns,
 }

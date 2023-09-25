@@ -22,6 +22,7 @@ mod types {
     }
 }
 
+// NOTE: keep this up to date with `.config/clippy-args.nix`
 fn get_clippy_output() -> Result<String, Error> {
     let mut cmd = std::process::Command::new("cargo");
     cmd.args(&[
@@ -49,6 +50,9 @@ fn get_clippy_output() -> Result<String, Error> {
         "clippy::perf",
         "-D",
         "clippy::correctness",
+        // Cherry-picked lints
+        "-D",
+        "dbg_macro",
     ]);
     log::debug!("running {:#?}", &cmd);
 
@@ -167,8 +171,6 @@ fn main() -> Result<(), Error> {
         suggestions_processed += new_suggestions_processed;
         suggestions_processed_successfully += new_suggestions_processed_successfully;
     }
-
-    std::fs::remove_file("clippy.json")?;
 
     log::info!(
         "{} iterations. suggestions processed {}, of which successful: {}",

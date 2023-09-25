@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.0.4"
+version = "0.3.0-beta-dev.11"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,32 +10,44 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
-holo_hash = { version = "0.0.24", path = "../holo_hash" }
+holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
+holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util", default-features = false }
+paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
-kitsune_p2p_timestamp = { version = "0.0.9", path = "../kitsune_p2p/timestamp", default-features = false }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.2", path = "../kitsune_p2p/timestamp", default-features = false, features = [ "now" ] }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
 
+# full-dna-def dependencies
+derive_builder = { version = "0.9", optional = true }
+
 # Optional
-tracing = { version = "0.1", optional = true }
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
+subtle-encoding = {version = "0.5", optional = true}
+tracing = { version = "0.1", optional = true }
+
+[dev-dependencies]
+holochain_integrity_types = { path = ".", features = ["test_utils"]}
+serde_json = "1"
 
 [features]
 default = []
 
-full = ["default", "kitsune_p2p_timestamp/full"]
+full = ["default", "subtle-encoding", "kitsune_p2p_timestamp/full"]
+
+full-dna-def = ["derive_builder"]
 
 test_utils = [
+  "full",
   "arbitrary",
   "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",
-  "kitsune_p2p_timestamp/rusqlite",
   "holo_hash/arbitrary",
   "holo_hash/hashing",
   "holo_hash/test_utils",

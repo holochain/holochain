@@ -1,12 +1,9 @@
-use crate::element::Element;
 use crate::CallbackResult;
-use holo_hash::AnyDhtHash;
-use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_common::WasmError;
+use holochain_wasmer_common::*;
 
 pub use holochain_integrity_types::validate::*;
 
-/// The validation status for an op or element
+/// The validation status for an op or record
 /// much of this happens in the subconscious
 /// an entry missing validation dependencies may cycle through Pending many times before finally
 /// reaching a final validation state or being abandoned
@@ -17,11 +14,11 @@ pub use holochain_integrity_types::validate::*;
 #[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
 #[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
-    /// all implemented validation callbacks found all dependencies and passed validation
+    /// All dependencies were found and validation passed
     Valid = 0,
-    /// some implemented validation callback definitively failed validation
+    /// Item was rejected by validation
     Rejected = 1,
-    /// the subconscious has decided to never again attempt a conscious validation
+    /// Holochain has decided to never again attempt validation,
     /// commonly due to missing validation dependencies remaining missing for "too long"
     Abandoned = 2,
 }
@@ -31,56 +28,21 @@ impl CallbackResult for ValidateCallbackResult {
         matches!(self, ValidateCallbackResult::Invalid(_))
     }
     fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
-        match wasm_error {
-            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => {
+        match wasm_error.error {
+            WasmErrorInner::Guest(_)
+            | WasmErrorInner::Serialize(_)
+            | WasmErrorInner::Deserialize(_) => {
                 Ok(ValidateCallbackResult::Invalid(wasm_error.to_string()))
             }
-            WasmError::Host(_)
-            | WasmError::HostShortCircuit(_)
-            | WasmError::GuestResultHandling(_)
-            | WasmError::Compile(_)
-            | WasmError::CallError(_)
-            | WasmError::PointerMap
-            | WasmError::ErrorWhileError
-            | WasmError::Memory => Err(wasm_error),
+            WasmErrorInner::Host(_)
+            | WasmErrorInner::HostShortCircuit(_)
+            | WasmErrorInner::Compile(_)
+            | WasmErrorInner::CallError(_)
+            | WasmErrorInner::PointerMap
+            | WasmErrorInner::ErrorWhileError
+            | WasmErrorInner::Memory
+            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ValidationPackage(pub Vec<Element>);
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
-pub enum ValidationPackageCallbackResult {
-    Success(ValidationPackage),
-    Fail(String),
-    UnresolvedDependencies(Vec<AnyDhtHash>),
-}
-
-impl CallbackResult for ValidationPackageCallbackResult {
-    fn is_definitive(&self) -> bool {
-        matches!(self, ValidationPackageCallbackResult::Fail(_))
-    }
-    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
-        match wasm_error {
-            WasmError::Guest(_) | WasmError::Serialize(_) | WasmError::Deserialize(_) => Ok(
-                ValidationPackageCallbackResult::Fail(wasm_error.to_string()),
-            ),
-            WasmError::Host(_)
-            | WasmError::HostShortCircuit(_)
-            | WasmError::GuestResultHandling(_)
-            | WasmError::Compile(_)
-            | WasmError::CallError(_)
-            | WasmError::PointerMap
-            | WasmError::ErrorWhileError
-            | WasmError::Memory => Err(wasm_error),
-        }
-    }
-}
-
-impl ValidationPackage {
-    pub fn new(elements: Vec<Element>) -> Self {
-        Self(elements)
     }
 }
 

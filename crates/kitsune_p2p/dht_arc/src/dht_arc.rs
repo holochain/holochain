@@ -96,15 +96,6 @@ impl DhtArc {
         }
     }
 
-    /// Update the half length based on a PeerView reading.
-    /// This will converge on a new target instead of jumping directly
-    /// to the new target and is designed to be called at a given rate
-    /// with more recent peer views.
-    pub fn update_length<V: Into<PeerView>>(&mut self, view: V) {
-        let new_length = (U32_LEN as f64 * view.into().next_coverage(self.coverage())) as u64;
-        *self = Self::from_start_and_len(self.start_loc(), new_length)
-    }
-
     pub fn inner(self) -> DhtArcRange {
         self.0
     }
@@ -138,6 +129,10 @@ impl DhtArc {
         Self::from_parts(a, start)
     }
 
+    pub fn update_length(&mut self, new_length: u64) {
+        *self = Self::from_start_and_len(self.start_loc(), new_length)
+    }
+
     /// Get the range of the arc
     pub fn range(&self) -> ArcRange {
         match (self.0, self.1) {
@@ -157,7 +152,6 @@ impl DhtArc {
         }
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     pub fn to_ascii(&self, len: usize) -> String {
         let mut s = self.0.to_ascii(len);
         let start = loc_downscale(len, self.start_loc());
@@ -217,11 +211,6 @@ impl<T> DhtArcRange<T> {
             Self::Full => DhtArcRange::Full,
             Self::Bounded(lo, hi) => DhtArcRange::Bounded(f(lo), f(hi)),
         }
-    }
-
-    #[deprecated = "left over from refactor"]
-    pub fn interval(self) -> Self {
-        self
     }
 }
 
@@ -311,6 +300,32 @@ impl DhtArcRange<DhtLocation> {
         matches!(self, Self::Bounded(_, _))
     }
 
+    /// Get the min distance to a location.
+    /// Zero if Full, u32::MAX if Empty.
+    pub fn dist(&self, tgt: u32) -> u32 {
+        match self {
+            DhtArcRange::Empty => u32::MAX,
+            DhtArcRange::Full => 0,
+            DhtArcRange::Bounded(start, end) => {
+                let start = u32::from(*start);
+                let end = u32::from(*end);
+                if start < end {
+                    if tgt >= start && tgt <= end {
+                        0
+                    } else if tgt < start {
+                        std::cmp::min(start - tgt, (u32::MAX - end) + tgt + 1)
+                    } else {
+                        std::cmp::min(tgt - end, (u32::MAX - tgt) + start + 1)
+                    }
+                } else if tgt <= end || tgt >= start {
+                    0
+                } else {
+                    std::cmp::min(tgt - end, start - tgt)
+                }
+            }
+        }
+    }
+
     /// Check if arcs overlap
     pub fn overlaps(&self, other: &Self) -> bool {
         let a = DhtArcSet::from(self);
@@ -347,7 +362,6 @@ impl DhtArcRange<DhtLocation> {
         full_to_half_len(self.length())
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
     pub fn to_ascii(&self, len: usize) -> String {
@@ -431,6 +445,15 @@ impl DhtArcRange<DhtLocation> {
         s
     }
 
+    pub fn print(&self, len: usize) {
+        println!(
+            "     |{}| {} {:?}",
+            self.to_ascii(len),
+            self.length(),
+            self.to_bounds_grouped(),
+        );
+    }
+
     pub fn canonical(self) -> DhtArcRange {
         self
     }
@@ -453,7 +476,7 @@ pub fn full_to_half_len(full_len: u64) -> u32 {
 pub fn half_to_full_len(half_len: u32) -> u64 {
     if half_len == 0 {
         0
-    } else if half_len == MAX_HALF_LENGTH {
+    } else if half_len >= MAX_HALF_LENGTH {
         U32_LEN
     } else {
         (half_len as u64 * 2).wrapping_sub(1)

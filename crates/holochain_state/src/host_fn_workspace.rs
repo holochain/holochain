@@ -3,21 +3,17 @@ use std::sync::Arc;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::db::DbKindCache;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::ReadAccess;
-use holochain_types::db::DbRead;
-use holochain_types::db::DbWrite;
+use holochain_sqlite::prelude::{
+    DbKindAuthored, DbKindCache, DbKindDht, DbRead, DbWrite, ReadAccess,
+};
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_zome_types::DnaDef;
-use holochain_zome_types::SignedHeaderHashed;
+use holochain_zome_types::SignedActionHashed;
 
 use crate::prelude::SourceChain;
 use crate::prelude::SourceChainError;
 use crate::prelude::SourceChainResult;
 use crate::scratch::SyncScratch;
-use holochain_zome_types::Zome;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace<
@@ -56,7 +52,7 @@ impl HostFnWorkspace {
     pub async fn flush(
         self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<(Option<Zome>, SignedHeaderHashed)>> {
+    ) -> SourceChainResult<Vec<SignedActionHashed>> {
         match self.source_chain {
             Some(sc) => sc.flush(network).await,
             None => Ok(Vec::with_capacity(0)),
@@ -199,6 +195,7 @@ where
             init_is_root: false,
         })
     }
+
     pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
         &self.source_chain
     }

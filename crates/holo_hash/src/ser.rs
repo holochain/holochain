@@ -152,16 +152,38 @@ mod tests {
     }
 
     #[test]
+    fn test_json_roundtrip() {
+        let h_orig = AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
+        let json = serde_json::to_string(&h_orig).unwrap();
+        let h: AgentPubKey = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(h_orig, h);
+        assert_eq!(*h.hash_type(), hash_type::Agent::new());
+
+        // Make sure that the representation is a raw 39-byte array
+        let array: TestByteArray = serde_json::from_str(&json).unwrap();
+        assert_eq!(array.0.len(), HOLO_HASH_FULL_LEN);
+        assert_eq!(
+            array.0,
+            vec![
+                132, 32, 36, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219,
+            ]
+        );
+    }
+
+    #[test]
     fn test_composite_hashtype_roundtrips() {
         {
             let h_orig = AnyDhtHash::from_raw_36_and_type(
                 vec![0xdb; HOLO_HASH_UNTYPED_LEN],
-                hash_type::AnyDht::Header,
+                hash_type::AnyDht::Action,
             );
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
-            assert_eq!(*h.hash_type(), hash_type::AnyDht::Header);
+            assert_eq!(*h.hash_type(), hash_type::AnyDht::Action);
         }
         {
             let h_orig = AnyDhtHash::from_raw_36_and_type(
@@ -196,9 +218,9 @@ mod tests {
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
         {
-            let h_orig = HeaderHash::from_raw_36_and_type(
+            let h_orig = ActionHash::from_raw_36_and_type(
                 vec![0xdb; HOLO_HASH_UNTYPED_LEN],
-                hash_type::Header,
+                hash_type::Action,
             );
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
@@ -223,12 +245,12 @@ mod tests {
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct TestData {
             e: EntryHash,
-            h: HeaderHash,
+            h: ActionHash,
         }
 
         let orig = TestData {
             e: EntryHash::from_raw_36_and_type(vec![0xdb; HOLO_HASH_UNTYPED_LEN], hash_type::Entry),
-            h: HeaderHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
+            h: ActionHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         };
 
         let sb: SerializedBytes = (&orig).try_into().unwrap();
@@ -236,7 +258,7 @@ mod tests {
 
         assert_eq!(orig, res);
         assert_eq!(*orig.e.hash_type(), hash_type::Entry);
-        assert_eq!(*orig.h.hash_type(), hash_type::Header);
+        assert_eq!(*orig.h.hash_type(), hash_type::Action);
     }
 
     #[test]
@@ -249,17 +271,17 @@ mod tests {
 
         let any_hash = AnyDhtHash::from_raw_36_and_type(
             b"000000000000000000000000000000000000".to_vec(),
-            hash_type::AnyDht::Header,
+            hash_type::AnyDht::Action,
         );
         let hash_type_sb: SerializedBytes = any_hash.hash_type().try_into().unwrap();
-        let hash_type_json = r#"{"Header":[132,41,36]}"#;
+        let hash_type_json = r#"{"Action":[132,41,36]}"#;
         assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
 
         let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
-        assert_eq!(hash_type_from_sb, hash_type::AnyDht::Header);
+        assert_eq!(hash_type_from_sb, hash_type::AnyDht::Action);
 
         let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(&hash_type_json).unwrap();
-        assert_eq!(hash_type_from_json, hash_type::AnyDht::Header);
+        assert_eq!(hash_type_from_json, hash_type::AnyDht::Action);
     }
 
     #[test]
@@ -291,8 +313,8 @@ mod tests {
             }
         }
 
-        let mut g: Generic<HeaderHash> = Generic::new();
-        let h = HeaderHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
+        let mut g: Generic<ActionHash> = Generic::new();
+        let h = ActionHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
         g.put(&h);
         assert_eq!(h, g.get());
     }

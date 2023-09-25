@@ -1,10 +1,8 @@
 //! Links interrelate entries in a source chain.
 
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::AnyDhtHash;
 use holo_hash::AnyLinkableHash;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use regex::Regex;
@@ -15,29 +13,21 @@ use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
-/// Owned link key for sending across networks
-#[deprecated = "This is being replaced by WireLinkKey"]
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum WireLinkMetaKey {
-    /// Search for all links on a base
-    Base(EntryHash),
-    /// Search for all links on a base, for a zome
-    BaseZome(EntryHash, ZomeId),
-    /// Search for all links on a base, for a zome and with a tag
-    BaseZomeTag(EntryHash, ZomeId, LinkTag),
-    /// This will match only the link created with a certain [CreateLink] hash
-    Full(EntryHash, ZomeId, LinkTag, HeaderHash),
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Link key for sending across the wire for get links requests.
 pub struct WireLinkKey {
     /// Base the links are on.
     pub base: AnyLinkableHash,
     /// The zome the links are in.
-    pub zome_id: ZomeId,
+    pub type_query: LinkTypeFilter,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
+    /// Specify a minimum action timestamp to filter results.
+    pub after: Option<Timestamp>,
+    /// Specify a maximum action timestamp to filter results.
+    pub before: Option<Timestamp>,
+    /// Only get links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]
@@ -74,14 +64,16 @@ impl WireLinkOps {
 pub struct WireCreateLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
 
     pub target_address: AnyLinkableHash,
+    pub zome_index: ZomeIndex,
     pub link_type: LinkType,
     pub tag: Option<LinkTag>,
     pub signature: Signature,
     pub validation_status: ValidationStatus,
+    pub weight: RateWeight,
 }
 
 #[allow(missing_docs)]
@@ -90,10 +82,10 @@ pub struct WireCreateLink {
 pub struct WireDeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
 
-    pub link_add_address: HeaderHash,
+    pub link_add_address: ActionHash,
     pub signature: Signature,
     pub validation_status: ValidationStatus,
 }
@@ -108,13 +100,15 @@ impl WireCreateLink {
         Self {
             author: h.author,
             timestamp: h.timestamp,
-            header_seq: h.header_seq,
-            prev_header: h.prev_header,
+            action_seq: h.action_seq,
+            prev_action: h.prev_action,
             target_address: h.target_address,
+            zome_index: h.zome_index,
             link_type: h.link_type,
             tag: if tag { Some(h.tag) } else { None },
             signature,
             validation_status,
+            weight: h.weight,
         }
     }
     /// Condense down a create link op for the wire without a tag.
@@ -139,21 +133,22 @@ impl WireCreateLink {
             .tag
             .or_else(|| key.tag.clone())
             .ok_or(DhtOpError::LinkKeyTagMissing)?;
-        let header = Header::CreateLink(CreateLink {
+        let action = Action::CreateLink(CreateLink {
             author: self.author,
             timestamp: self.timestamp,
-            header_seq: self.header_seq,
-            prev_header: self.prev_header,
+            action_seq: self.action_seq,
+            prev_action: self.prev_action,
             base_address: key.base.clone(),
             target_address: self.target_address,
-            zome_id: key.zome_id,
+            zome_index: self.zome_index,
             link_type: self.link_type,
+            weight: self.weight,
             tag,
         });
         let signature = self.signature;
         let validation_status = Some(self.validation_status);
         RenderedOp::new(
-            header,
+            action,
             signature,
             validation_status,
             DhtOpType::RegisterAddLink,
@@ -171,8 +166,8 @@ impl WireDeleteLink {
         Self {
             author: h.author,
             timestamp: h.timestamp,
-            header_seq: h.header_seq,
-            prev_header: h.prev_header,
+            action_seq: h.action_seq,
+            prev_action: h.prev_action,
             signature,
             validation_status,
             link_add_address: h.link_add_address,
@@ -180,25 +175,25 @@ impl WireDeleteLink {
     }
     /// Render these ops to their full types.
     pub fn render(self, key: &WireLinkKey) -> DhtOpResult<RenderedOp> {
-        let header = Header::DeleteLink(DeleteLink {
+        let action = Action::DeleteLink(DeleteLink {
             author: self.author,
             timestamp: self.timestamp,
-            header_seq: self.header_seq,
-            prev_header: self.prev_header,
+            action_seq: self.action_seq,
+            prev_action: self.prev_action,
             base_address: key.base.clone(),
             link_add_address: self.link_add_address,
         });
         let signature = self.signature;
         let validation_status = Some(self.validation_status);
         RenderedOp::new(
-            header,
+            action,
             signature,
             validation_status,
             DhtOpType::RegisterRemoveLink,
         )
     }
 }
-// TODO: Probably don't want to send the whole headers.
+// TODO: Probably don't want to send the whole actions.
 // We could probably come up with a more compact
 // network Wire type in the future
 /// Link response to get links
@@ -208,16 +203,6 @@ pub struct GetLinksResponse {
     pub link_adds: Vec<(CreateLink, Signature)>,
     /// All the link removes on the key you searched for
     pub link_removes: Vec<(DeleteLink, Signature)>,
-}
-
-impl WireLinkMetaKey {
-    /// Get the basis of this key
-    pub fn basis(&self) -> AnyDhtHash {
-        use WireLinkMetaKey::*;
-        match self {
-            Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b.clone().into(),
-        }
-    }
 }
 
 /// How do we match this link in queries?
@@ -246,5 +231,43 @@ impl<S: Into<String>> LinkMatch<S> {
             Ok(_) => Ok(re_string),
             Err(_) => Err("Invalid regex passed to get_links".into()),
         }
+    }
+}
+
+/// Query for links to be sent over the network.
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+pub struct WireLinkQuery {
+    /// The base to find links from.
+    pub base: AnyLinkableHash,
+
+    /// Filter by the link type.
+    pub link_type: LinkTypeFilter,
+
+    /// Filter by tag prefix.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
+}
+
+/// Response type for a `WireLinkQuery`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct CountLinksResponse(Vec<ActionHash>);
+
+impl CountLinksResponse {
+    /// Create a new response from the action hashes of the matched links
+    pub fn new(create_link_actions: Vec<ActionHash>) -> Self {
+        CountLinksResponse(create_link_actions)
+    }
+
+    /// Get the action hashes of the matched links
+    pub fn create_link_actions(&self) -> Vec<ActionHash> {
+        self.0.clone()
     }
 }

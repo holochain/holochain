@@ -1,21 +1,7 @@
-use hdk::prelude::*;
+pub mod integrity;
 
-#[hdk_entry(id = "post")]
-struct Post;
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
 
-#[hdk_entry(id = "comment", visibility = "private")]
-struct Comment;
-
-entry_defs![Post::entry_def(), Comment::entry_def()];
-
-#[hdk_extern]
-pub fn assert_indexes(_: ()) -> ExternResult<()> {
-    assert_eq!(EntryDefIndex(0), entry_def_index!(Post)?);
-    assert_eq!(EntryDefIndex(1), entry_def_index!(Comment)?);
-    Ok(())
-}
-
-#[hdk_extern]
-pub fn zome_info(_: ()) -> ExternResult<ZomeInfo> {
-    hdk::prelude::zome_info()
-}
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;

@@ -1,8 +1,7 @@
 pub mod curve;
 
-use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::handle::MockConductorHandleT;
+use crate::conductor::api::MockCellConductorReadHandleT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -13,8 +12,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
@@ -23,6 +20,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
@@ -48,32 +46,28 @@ newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
     RealRibosome;
-    constructor fn new(DnaFile);
+    constructor fn empty(DnaFile);
 );
 
 impl Iterator for RealRibosomeFixturator<curve::Zomes> {
     type Item = RealRibosome;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // @todo fixturate this
-        let dna_file = fake_dna_zomes(
-            &StringFixturator::new(Unpredictable).next().unwrap(),
-            self.0
-                .curve
-                .0
-                .clone()
-                .into_iter()
-                .map(|t| (t.into(), t.into()))
-                .collect(),
-        );
+        let input = self.0.curve.0.clone();
+        let uuid = StringFixturator::new(Unpredictable).next().unwrap();
+        let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
+            SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
+        });
 
-        let ribosome = RealRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome = zome.into();
-            ribosome.module(call_context.zome.zome_name()).unwrap();
+            call_context.zome = CoordinatorZome::from(zome).erase_type();
+            ribosome
+                .runtime_compiled_module(call_context.zome.zome_name())
+                .unwrap();
         }
 
         self.0.index += 1;
@@ -95,7 +89,7 @@ fixturator!(
     curve Empty BTreeMap::new().into();
     curve Unpredictable {
         let mut rng = rand::thread_rng();
-        let number_of_wasms = rng.gen_range(0, 5);
+        let number_of_wasms = rng.gen_range(0..5);
 
         let mut wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);
@@ -138,17 +132,17 @@ fixturator!(
         // align the wasm hashes across the file and def
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmMapFixturator::new(Unpredictable).next().unwrap();
-        let mut zomes: Zomes = Vec::new();
+        let mut zomes: IntegrityZomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                ZomeDef::Wasm(WasmZome {
-                    wasm_hash: hash.to_owned(),
-                }),
+                IntegrityZomeDef::from_hash(
+                    hash.to_owned()
+                ),
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        dna_def.zomes = zomes;
+        dna_def.integrity_zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(dna, WasmMapFixturator::new(Unpredictable).next().unwrap())
     };
@@ -159,19 +153,19 @@ fixturator!(
         let wasms = WasmMapFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
-        let mut zomes: Zomes = Vec::new();
+        let mut zomes: IntegrityZomes = Vec::new();
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                ZomeDef::Wasm(WasmZome {
-                    wasm_hash: hash.to_owned(),
-                }),
+                IntegrityZomeDef::from_hash(
+                    hash.to_owned()
+                ),
             ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
-        dna_def.zomes = zomes;
+        dna_def.integrity_zomes = zomes;
         let dna = dna_def.into_hashed();
         DnaFile::from_parts(
             dna,
@@ -184,7 +178,7 @@ fixturator!(
 
 // fixturator!(
 //     LinkMetaVal;
-//     constructor fn new(HeaderHash, EntryHash, Timestamp, u8, LinkTag);
+//     constructor fn new(ActionHash, EntryHash, Timestamp, u8, LinkTag);
 // );
 
 // impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
@@ -325,7 +319,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(fixt!(DnaDef)),
             ).await.unwrap()
         })
     };
@@ -349,15 +343,14 @@ fixturator!(
         })
     };
 );
-fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
-    let handle = Arc::new(MockConductorHandleT::new());
-    let cell_conductor_api = CellConductorApi::new(handle, cell_id);
-    Arc::new(cell_conductor_api)
+
+fn make_call_zome_handle() -> CellConductorReadHandle {
+    Arc::new(MockCellConductorReadHandleT::new())
 }
 
 fixturator!(
     CellConductorReadHandle;
-    vanilla fn make_call_zome_handle(CellId);
+    vanilla fn make_call_zome_handle();
 );
 
 fixturator!(
@@ -397,12 +390,12 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(Zome, SignedHeaderHashedVec);
+    constructor fn new(CoordinatorZome, SignedActionHashedVec);
 );
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster);
 );
 
 fixturator!(
@@ -416,16 +409,6 @@ fixturator!(
 );
 
 fixturator!(
-    ValidationPackageInvocation;
-    constructor fn new(Zome, AppEntryType);
-);
-
-fixturator!(
-    ValidationPackageHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
-);
-
-fixturator!(
     HostContext;
     variants [
         ZomeCall(ZomeCallHostAccess)
@@ -433,7 +416,6 @@ fixturator!(
         Init(InitHostAccess)
         EntryDefs(EntryDefsHostAccess)
         MigrateAgent(MigrateAgentHostAccess)
-        ValidationPackage(ValidationPackageHostAccess)
         PostCommit(PostCommitHostAccess)
     ];
 );
@@ -457,6 +439,9 @@ fixturator!(
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+        signature: SignatureFixturator::new(Empty).next().unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()).unwrap(),
+        expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
@@ -465,6 +450,10 @@ fixturator!(
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+        signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()).unwrap(),
+        // @todo should this be less predictable?
+        expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
     curve Predictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -485,6 +474,10 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()).unwrap(),
+        // @todo should this be more predictable?
+        expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
 );
 
@@ -499,7 +492,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.into();
+        ret.zome = CoordinatorZome::from(self.0.curve.1).erase_type();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 

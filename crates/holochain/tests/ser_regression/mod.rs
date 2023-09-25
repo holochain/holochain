@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 
@@ -7,9 +5,11 @@ use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
-use holochain::test_utils::setup_app;
+use holochain::test_utils::setup_app_in_new_conductor;
+use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 pub use holochain_zome_types::capability::CapSecret;
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
@@ -23,7 +23,7 @@ pub struct ChannelName(String);
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ser_entry_hash_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let eh = fixt!(EntryHash);
     let extern_io: ExternIO = ExternIO::encode(eh).unwrap();
     tracing::debug!(?extern_io);
@@ -36,7 +36,7 @@ async fn ser_entry_hash_test() {
 #[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
 async fn ser_regression_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // ////////////
     // START DNA
     // ////////////
@@ -44,15 +44,22 @@ async fn ser_regression_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "ser_regression_test".to_string(),
-            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            zomes: vec![TestWasm::SerRegression.into()].into(),
+            modifiers: DnaModifiers {
+                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
+            },
+            integrity_zomes: vec![TestZomes::from(TestWasm::SerRegression)
+                .integrity
+                .into_inner()],
+            coordinator_zomes: vec![TestZomes::from(TestWasm::SerRegression)
+                .coordinator
+                .into_inner()],
         },
-        vec![TestWasm::SerRegression.into()],
+        <Vec<DnaWasm>>::from(TestWasm::SerRegression),
     )
-    .await
-    .unwrap();
+    .await;
 
     // //////////
     // END DNA
@@ -86,7 +93,8 @@ async fn ser_regression_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let (_tmpdir, app_api, handle) = setup_app(
+    let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+        "test app".to_string(),
         vec![dna_file],
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
     )
@@ -100,61 +108,89 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let invocation = ZomeCall {
-        cell_id: alice_cell_id.clone(),
-        zome_name: TestWasm::SerRegression.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: "create_channel".into(),
-        payload: ExternIO::encode(channel).unwrap(),
-        provenance: alice_agent_id.clone(),
-    };
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
+        handle.keystore(),
+        ZomeCallUnsigned {
+            cell_id: alice_cell_id.clone(),
+            zome_name: TestWasm::SerRegression.into(),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            fn_name: "create_channel".into(),
+            payload: ExternIO::encode(channel).unwrap(),
+            provenance: alice_agent_id.clone(),
+            nonce,
+            expires_at,
+        },
+    )
+    .await
+    .unwrap();
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCall(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _channel_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+        AppResponse::ZomeCalled(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    invocation.nonce = nonce;
+    invocation.expires_at = expires_at;
+    let invocation = invocation
+        .resign_zome_call(handle.keystore(), alice_agent_id.clone())
+        .await
+        .unwrap();
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
     let channel_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
-        _ => unreachable!(),
+        _ => panic!("{:?}", output),
     };
 
     let message = CreateMessageInput {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let invocation = ZomeCall {
-        cell_id: alice_cell_id.clone(),
-        zome_name: TestWasm::SerRegression.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: "create_message".into(),
-        payload: ExternIO::encode(message).unwrap(),
-        provenance: alice_agent_id.clone(),
-    };
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
+        handle.keystore(),
+        ZomeCallUnsigned {
+            cell_id: alice_cell_id.clone(),
+            zome_name: TestWasm::SerRegression.into(),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            fn_name: "create_message".into(),
+            payload: ExternIO::encode(message).unwrap(),
+            provenance: alice_agent_id.clone(),
+            nonce,
+            expires_at,
+        },
+    )
+    .await
+    .unwrap();
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCall(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _msg_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+        AppResponse::ZomeCalled(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    invocation.nonce = nonce;
+    invocation.expires_at = expires_at;
+    let invocation = invocation
+        .resign_zome_call(handle.keystore(), alice_agent_id.clone())
+        .await
+        .unwrap();
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
     let _msg_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
-        _ => unreachable!(),
+        _ => panic!("{:?}", output),
     };
 
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+    handle.shutdown().await.unwrap().unwrap();
 }

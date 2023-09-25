@@ -55,7 +55,8 @@ nix-shell --run hc-release-automation-test
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
-mod lib;
+use release_automation as lib;
+
 use lib::*;
 
 use log::debug;

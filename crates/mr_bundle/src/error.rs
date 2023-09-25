@@ -30,6 +30,9 @@ pub enum MrBundleError {
 
     #[error(transparent)]
     MsgpackDecodeError(#[from] rmp_serde::decode::Error),
+
+    #[error("This bundle failed to validate because: {0}")]
+    BundleValidationError(String),
 }
 pub type MrBundleResult<T> = Result<T, MrBundleError>;
 

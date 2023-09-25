@@ -3,9 +3,18 @@ use super::ENTRY_SIZE_LIMIT;
 use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppEntryBytes(SerializedBytes);
+pub struct AppEntryBytes(pub SerializedBytes);
+
+impl std::fmt::Debug for AppEntryBytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "AppEntryBytes({})",
+            holochain_util::hex::many_bytes_string(self.0.bytes())
+        ))
+    }
+}
 
 impl AppEntryBytes {
     /// Get the inner SerializedBytes

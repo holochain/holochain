@@ -1,12 +1,7 @@
-use hdk::prelude::*;
+pub mod integrity;
 
-#[hdk_extern]
-fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    match op {
-        Op::StoreEntry {
-            entry: Entry::Agent(_),
-            ..
-        } => Ok(ValidateCallbackResult::Valid),
-        _ => Ok(ValidateCallbackResult::Invalid("esoteric edge case".into())),
-    }
-}
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
+
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;

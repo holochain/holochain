@@ -1,6 +1,7 @@
 //! crate::dna::wasm is a module for managing webassembly code
 //!  - within the in-memory dna struct
 //!  - and serialized to json
+use arbitrary::Arbitrary;
 use backtrace::Backtrace;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -13,7 +14,7 @@ use std::sync::Arc;
 use tracing::*;
 
 /// Represents web assembly code.
-#[derive(Serialize, Deserialize, Clone, Eq)]
+#[derive(Serialize, Deserialize, Clone, Eq, Arbitrary)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     #[allow(clippy::redundant_allocation)]
@@ -74,7 +75,7 @@ impl DnaWasm {
         }
     }
 
-    /// get a new Arc to the Vec<u8> bytes for the wasm
+    /// get a new Arc to the `Vec<u8>` bytes for the wasm
     #[allow(clippy::redundant_allocation)]
     pub fn code(&self) -> Arc<Box<[u8]>> {
         Arc::clone(&self.code)

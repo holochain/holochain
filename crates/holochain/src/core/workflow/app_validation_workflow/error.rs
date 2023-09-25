@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::validation::OutcomeOrError;
-use crate::core::SourceChainError;
+use crate::core::{SourceChainError, SysValidationError};
 use crate::from_sub_error;
 
 use super::types::Outcome;
@@ -28,8 +28,11 @@ pub enum AppValidationError {
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(ZomeId),
+    // Sys validation that requires calls to zomes happen during app validation
+    #[error(transparent)]
+    SysValidationError(#[from] SysValidationError),
+    #[error("The app entry type {0:?} zome index was out of range")]
+    ZomeIndex(ZomeIndex),
 }
 
 pub type AppValidationResult<T> = Result<T, AppValidationError>;

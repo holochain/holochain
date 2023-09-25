@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+
 //! P2p / dht communication framework.
 //!
 //! ### TLS session key logging
@@ -34,6 +35,7 @@
 
 /// re-exported dependencies
 pub mod dependencies {
+    pub use ::kitsune_p2p_fetch;
     pub use ::kitsune_p2p_proxy;
     pub use ::kitsune_p2p_timestamp;
     pub use ::kitsune_p2p_types;
@@ -46,6 +48,7 @@ mod types;
 pub use types::*;
 
 pub mod gossip;
+pub use gossip::sharded_gossip::KitsuneDiagnostics;
 
 mod config;
 pub use config::*;
@@ -60,7 +63,7 @@ pub use host_api::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_util;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(test)]
 mod test;
 
 pub mod fixt;

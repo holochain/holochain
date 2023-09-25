@@ -8,8 +8,8 @@ use holochain_serialized_bytes::prelude::*;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct XSalsa20Poly1305Decrypt {
-    key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
-    encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    pub key_ref: crate::x_salsa20_poly1305::key_ref::XSalsa20Poly1305KeyRef,
+    pub encrypted_data: crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
 }
 
 impl XSalsa20Poly1305Decrypt {
@@ -36,9 +36,9 @@ impl XSalsa20Poly1305Decrypt {
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct X25519XSalsa20Poly1305Decrypt {
-    recipient: X25519PubKey,
-    sender: X25519PubKey,
-    encrypted_data: XSalsa20Poly1305EncryptedData,
+    pub recipient: X25519PubKey,
+    pub sender: X25519PubKey,
+    pub encrypted_data: XSalsa20Poly1305EncryptedData,
 }
 
 impl X25519XSalsa20Poly1305Decrypt {

@@ -1,22 +1,18 @@
-use crate::prelude::*;
+use std::collections::HashMap;
 
-/// Key for the [EntryDef] buffer
-#[derive(
-    Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, SerializedBytes,
-)]
-pub struct EntryDefBufferKey {
-    /// The zome to which this entry def belongs
-    pub zome: ZomeDef,
-    /// The index, for ordering
-    pub entry_def_position: EntryDefIndex,
+use holo_hash::DnaHash;
+
+use super::DnaFile;
+
+/// A store of DnaFiles which can be accessed by DnaHash.
+pub trait DnaStore {
+    /// Get the DNA for a given hash
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 }
 
-impl EntryDefBufferKey {
-    /// Create a new key
-    pub fn new(zome: ZomeDef, entry_def_position: EntryDefIndex) -> Self {
-        Self {
-            zome,
-            entry_def_position,
-        }
+impl DnaStore for HashMap<DnaHash, DnaFile> {
+    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
+        // TODO: remove clone
+        self.get(dna_hash).cloned()
     }
 }

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 /// Locks the local chain to commence a countersigning session.
+///
 /// The `PreflightRequestAcceptance` MUST be sent back to the session initiator
 /// so that the corresponding entry can be built for everyone to sign.
 /// This function MUST be called by every signer in the signing session.
@@ -31,6 +32,9 @@ pub fn accept_countersigning_preflight_request(
 pub fn session_times_from_millis(ms: u64) -> ExternResult<CounterSigningSessionTimes> {
     let start = sys_time()?;
     let end = start + core::time::Duration::from_millis(ms);
-    CounterSigningSessionTimes::try_new(start, end.map_err(|e| WasmError::Guest(e.to_string()))?)
-        .map_err(|e| WasmError::Guest(e.to_string()))
+    CounterSigningSessionTimes::try_new(
+        start,
+        end.map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    )
+    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
 }

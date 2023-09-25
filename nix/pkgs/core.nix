@@ -2,7 +2,7 @@
 , callPackage
 , lib
 , writeShellScriptBin
-
+, crate2nix
 , holonix
 , holonixPath
 , hcToplevelDir
@@ -23,114 +23,35 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,chc,test_utils,build_wasms,sqlite-encrypted --lib --tests --profile fast-test ''${1-} -- --nocapture
   '';
 
-  hcSlowTests = writeShellScriptBin "hc-test-slow" ''
+  hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    for i in $(((RANDOM % NUM_JOBS) + 1)) $NUM_JOBS 1 ; do
-      if env \
-        RUST_TEST_THREADS=$i \
-        cargo test ''${CARGO_TEST_ARGS:-} -p holochain --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
-      then
-        echo succeeded with RUST_TEST_THREADS=$i
-        exit 0
-      fi
-    done
+    # run all the cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run} ${
+      import ../../.config/nextest-args.nix
+    } ''${1-}
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # run all the wasm tests (within wasm) with the conductor mocked
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcReleaseAutomationTest = writeShellScriptBin "hc-test-release-automation" ''
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-
-    # make sure the binary is built
-    cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
-    # run the release-automation tests
-    cargo test ''${CARGO_TEST_ARGS:-} --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
-  '';
-
-  hcReleaseAutomationTestRepo =
-    let
-      prepareWorkspaceCmd = ''
-        rm -rf ''${TEST_WORKSPACE:?}
-        git clone $PWD ''${TEST_WORKSPACE:?}
-      '';
-
-      crateCmd = logLevel: ''
-        ${releaseAutomation} \
-            --workspace-path=''${TEST_WORKSPACE:?} \
-            --log-level=${logLevel} \
-          crate \
-            apply-dev-versions \
-            --commit \
-            --no-verify
-      '';
-      releaseCmd = logLevel: ''
-        ${releaseAutomation} \
-            --workspace-path=''${TEST_WORKSPACE:?} \
-            --log-level=${logLevel} \
-          release \
-            --no-verify-pre \
-            --force-branch-creation \
-            --disallowed-version-reqs=">=0.1" \
-            --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-            --steps=CreateReleaseBranch,BumpReleaseVersions
-      '';
-    in
-    writeShellScriptBin "hc-test-release-automation-repo" ''
-      set -euxo pipefail
-
-      export TEST_WORKSPACE=$(mktemp -d)
-      if [[ "''${KEEP_TEST_WORKSPACE:-false}" != "true" ]]; then
-        trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
-      fi
-
-      # check the state of the repository
-      (
-        ${prepareWorkspaceCmd}
-        ${crateCmd "debug"}
-        ${releaseCmd "debug"}
-      )
-    '';
-
   hcStaticChecks =
     let
-      pathPrefix = lib.makeBinPath
-        (builtins.attrValues {
-          inherit (holonix.pkgs)
-            hnRustClippy
-            hnRustFmtCheck
-            hnRustFmtFmt
-            ;
-        })
-      ;
+      pathPrefix = lib.makeBinPath (builtins.attrValues {
+        inherit (holonix.pkgs) hnRustClippy hnRustFmtCheck hnRustFmtFmt;
+      });
     in
     writeShellScriptBin "hc-static-checks" ''
       export PATH=${pathPrefix}:$PATH
@@ -152,10 +73,6 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
-
     ${hcReleaseAutomationTest}/bin/hc-test-release-automation
     ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo
   '';
@@ -171,7 +88,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,chc,build_wasms -- --nocapture
     done
     for i in {0..100}
     do
@@ -275,10 +192,6 @@ rec {
     bench $compare
     add_comment_to_commit $compare $commit
   '';
-
-  hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
-    cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
-  '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''
     set -euxo pipefail
@@ -289,7 +202,7 @@ rec {
     # actually kcov does not work with workspace target either
     # we need to use targets in each crate - but that is slow
     # use symlinks so we don't have to recompile deps over and over
-    for i in ''$(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
+    for i in $(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
       # skip some crates that aren't ready yet
       case "$i" in
         "crates/dpki" | "crates/keystore" )
@@ -326,4 +239,5 @@ rec {
     # so we'll just open the coverage report in a browser
     xdg-open target/coverage/index.html
   '';
-} else { })
+} else
+  { })

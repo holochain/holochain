@@ -15,8 +15,12 @@ members = [
     "entry_defs",
     "hash_entry",
     "foo",
+    "genesis_self_check_legacy",
+    "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
+    "hc-stress-test-integrity",
+    "hc-stress-test-coordinator",
     "hash_path",
     "hdk_extern",
     "init_fail",
@@ -36,6 +40,7 @@ members = [
     "ser_regression",
     "sign",
     "sys_time",
+    "the_incredible_halt",
     "update_entry",
     "validate",
     "validate_invalid",
@@ -43,8 +48,6 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
-    "validation_package_fail",
-    "validation_package_success",
     "whoami",
     "zome_info",
 ]
@@ -52,6 +55,13 @@ members = [
 [profile.release]
 opt-level = "z"
 
+[workspace.dependencies]
+serde = "1.0"
+hdi = { path = "../../../hdi" }
+hdk = { path = "../../../hdk" }
+
+# workaround to make it slightly easier to import hc-scress-test zomes
+files_integrity = { path = "hc-stress-test-integrity" }
 
 [patch.crates-io]
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }

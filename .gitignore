@@ -21,3 +21,8 @@ test_cert
 
 .vscode
 .my-shell.nix
+.DS_Store
+.cov
+
+.direnv
+/.pre-commit-config.yaml

@@ -5,27 +5,29 @@
 //! typically included as a dependency in Holochain Zomes, which are
 //! distributed as chunks of Wasm.
 //!
-//! This crate is also designed to be deterministic and more stable then
+//! This crate is also designed to be deterministic and more stable than
 //! the higher level crates.
 
 #![deny(missing_docs)]
 
+#[allow(missing_docs)]
+pub mod action;
 pub mod capability;
+pub mod chain;
 pub mod countersigning;
-pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
 pub mod hash;
-#[allow(missing_docs)]
-pub mod header;
 pub mod info;
 #[allow(missing_docs)]
 pub mod link;
 pub mod op;
 pub mod prelude;
+pub mod rate_limit;
+pub mod record;
 pub mod signature;
 pub use kitsune_p2p_timestamp as timestamp;
 #[allow(missing_docs)]
@@ -38,8 +40,8 @@ pub mod zome_io;
 
 pub mod trace;
 
+pub use action::Action;
 pub use entry::Entry;
-pub use header::Header;
 pub use prelude::*;
 
 /// Re-exported dependencies
@@ -53,32 +55,64 @@ pub mod dependencies {
 /// simple way to implement serialization so that we can send these types between the host/guest.
 macro_rules! fixed_array_serialization {
     ($t:ty, $len:expr) => {
-        impl serde::ser::Serialize for $t {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: serde::ser::Serializer,
-            {
-                serializer.serialize_bytes(&self.0)
-            }
-        }
-
-        impl<'de> serde::de::Deserialize<'de> for $t {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: serde::de::Deserializer<'de>,
-            {
-                use serde::de::Error;
-                let bytes: &[u8] = serde::de::Deserialize::deserialize(deserializer)?;
-                if bytes.len() != $len {
-                    let exp_msg = format!("expected {} bytes got: {} bytes", $len, bytes.len());
-                    return Err(D::Error::invalid_value(
-                        serde::de::Unexpected::Bytes(bytes),
-                        &exp_msg.as_str(),
-                    ));
+        paste::paste! {
+            impl serde::ser::Serialize for $t {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: serde::ser::Serializer,
+                {
+                    serializer.serialize_bytes(&self.0)
                 }
-                let mut inner: [u8; $len] = [0; $len];
-                inner.clone_from_slice(bytes);
-                Ok(Self(inner))
+            }
+
+            struct [<Visitor$t>];
+
+            impl<'de> serde::de::Visitor<'de> for [<Visitor$t>] {
+                type Value = [u8; $len];
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str(format!("a byte array of length {}", $len).as_str())
+                }
+
+                fn visit_bytes<E>(self, value: &[u8]) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    if value.len() == $len {
+                        let mut bytes = [0 as u8; $len];
+                        bytes.clone_from_slice(value);
+                        Ok(bytes)
+                    } else {
+                        let error_message = format!("{} bytes, got {} bytes", $len, value.len());
+                        Err(E::invalid_value(
+                            serde::de::Unexpected::Bytes(value),
+                            &error_message.as_str(),
+                        ))
+                    }
+                }
+
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: serde::de::SeqAccess<'de>,
+                {
+                    let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+
+                    while let Some(b) = seq.next_element()? {
+                        vec.push(b);
+                    }
+
+                    self.visit_bytes(&vec)
+                }
+            }
+
+            impl<'de> serde::de::Deserialize<'de> for $t {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: serde::de::Deserializer<'de>,
+                {
+                    let bytes = deserializer.deserialize_bytes([<Visitor$t>])?;
+                    Ok(Self(bytes))
+                }
             }
         }
     };
@@ -153,11 +187,24 @@ macro_rules! secure_primitive {
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
         ///
-        /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
-        ///       behind a feature flag?
+        /// Note that when using this crate with feature "subtle-encoding", a hex
+        /// representation will be used.
+        //
+        // @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
+        //       behind a feature flag?
+        #[cfg(not(feature = "subtle-encoding"))]
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Debug::fmt(&self.0.to_vec(), f)
+            }
+        }
+
+        #[cfg(feature = "subtle-encoding")]
+        impl std::fmt::Debug for $t {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let str = String::from_utf8(subtle_encoding::hex::encode(self.0.to_vec()))
+                    .unwrap_or_else(|_| "<unparseable signature>".into());
+                f.write_str(&str)
             }
         }
 
@@ -196,4 +243,45 @@ macro_rules! secure_primitive {
             }
         }
     };
+}
+
+/// A utility trait for associating a data enum
+/// with a unit enum that has the same variants.
+pub trait UnitEnum {
+    /// An enum with the same variants as the implementor
+    /// but without any data.
+    type Unit: core::fmt::Debug
+        + Clone
+        + Copy
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + core::hash::Hash;
+
+    /// Turn this type into it's unit enum.
+    fn to_unit(&self) -> Self::Unit;
+
+    /// Iterate over the unit variants.
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>;
+}
+
+/// Needed as a base case for ignoring types.
+impl UnitEnum for () {
+    type Unit = ();
+
+    fn to_unit(&self) -> Self::Unit {}
+
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
+        Box::new([].into_iter())
+    }
+}
+
+/// A full UnitEnum, or just the unit type of that UnitEnum
+#[derive(Clone, Debug)]
+pub enum UnitEnumEither<E: UnitEnum> {
+    /// The full enum
+    Enum(E),
+    /// Just the unit enum
+    Unit(E::Unit),
 }

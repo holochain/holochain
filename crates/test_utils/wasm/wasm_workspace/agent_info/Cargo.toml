@@ -8,14 +8,21 @@ edition = "2021"
 name = "test_wasm_agent_info"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_agent_info"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
-hdk = { path = "../../../../hdk" }
-serde = "1.0"
+hdk = { path = "../../../../hdk", optional = true }
+serde = { workspace = true }
+hdi = { path = "../../../../hdi" }
 
 [dev-dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators"] }
 fixt = { path = "../../../../fixt" }
 
 [features]
-default = []
+default = ["hdk"]
+integrity = []
 mock = ["hdk/mock"]

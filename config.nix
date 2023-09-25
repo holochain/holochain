@@ -10,23 +10,21 @@
     includeHolochainBinaries = false;
     includeScaffolding = false;
     includeTest = false;
+    includeNode = false;
+    includeDocs = false;
+    includeHapps = false;
+    includeRelease = false;
 
-    # configuration for when use-github = false
-    local = {
-      # the path to the local holonix copy
-      path = ../holonix;
-    };
-
-    pathFn = _:
-      if use-github
-      then (import ./nix/sources.nix).holonix
-      else local.path;
-
-    importFn = args: import (pathFn { }) (args // ({
+    importFn = args: import ./holonix (args // ({
       include = (args.include or { }) // {
         scaffolding = args.include.scaffolding or includeScaffolding;
         test = args.include.test or includeTest;
         holochainBinaries = args.include.holochainBinaries or includeHolochainBinaries;
+
+        node = args.include.node or includeScaffolding;
+        docs = args.include.docs or includeDocs;
+        happs = args.include.happs or includeHapps;
+        release = args.include.release or includeRelease;
       };
     }));
   };

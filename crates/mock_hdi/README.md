@@ -6,7 +6,7 @@ This is a simple utility crate that allows mocking the HDI.
 # Examples
 
 ```rust
-use holochain_deterministic_integrity::prelude::*;
+use hdi::prelude::*;
 
 // Create the mock.
 let mut mock_hdi = holochain_mock_hdi::MockHdiT::new();

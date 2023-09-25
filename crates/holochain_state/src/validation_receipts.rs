@@ -177,7 +177,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let test_db = crate::test_utils::test_authored_db();
         let env = test_db.to_db();
@@ -185,31 +185,36 @@ mod tests {
 
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
-            fixt!(Header),
+            fixt!(Action),
         ));
         let test_op_hash = op.as_hash().clone();
-        env.conn()
-            .unwrap()
-            .with_commit_sync(|txn| mutations::insert_op(txn, &op))
+        env.write_async(move |txn| mutations::insert_op(txn, &op))
+            .await
             .unwrap();
 
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
-        {
-            env.conn().unwrap().with_commit_sync(|txn| {
-                add_if_unique(txn, vr1.clone())?;
-                add_if_unique(txn, vr1.clone())?;
-                add_if_unique(txn, vr2.clone())
-            })?;
+        env.write_async({
+            let put_vr1 = vr1.clone();
+            let put_vr2 = vr2.clone();
 
-            env.conn()
-                .unwrap()
-                .with_commit_sync(|txn| add_if_unique(txn, vr1.clone()))?;
-        }
+            move |txn| {
+                add_if_unique(txn, put_vr1.clone())?;
+                add_if_unique(txn, put_vr1.clone())?;
+                add_if_unique(txn, put_vr2.clone())
+            }
+        })
+        .await?;
 
-        let mut g = env.conn().unwrap();
-        g.with_reader_test(|reader| {
+        env.write_async({
+            let put_vr1 = vr1.clone();
+
+            move |txn| add_if_unique(txn, put_vr1)
+        })
+        .await?;
+
+        env.read_async(move |reader| -> DatabaseResult<()> {
             assert_eq!(2, count_valid(&reader, &test_op_hash).unwrap());
 
             let mut list = list_receipts(&reader, &test_op_hash).unwrap();
@@ -227,7 +232,11 @@ mod tests {
             });
 
             assert_eq!(expects, list);
-        });
+
+            Ok(())
+        })
+        .await
+        .unwrap();
         Ok(())
     }
 

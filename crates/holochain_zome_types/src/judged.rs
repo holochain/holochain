@@ -19,7 +19,7 @@ pub struct Judged<T> {
     /// The data that the status applies to.
     pub data: T,
     /// The validation status of the data.
-    status: Option<ValidationStatus>,
+    pub status: Option<ValidationStatus>,
 }
 
 impl<T> Judged<T> {

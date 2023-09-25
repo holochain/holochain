@@ -1,6 +1,5 @@
 //! Helpers for unit tests
 
-use either::Either;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
@@ -15,10 +14,64 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-use crate::prelude::Store;
-use crate::prelude::Txn;
-
 pub mod mutations_helpers;
+
+#[cfg(test)]
+pub mod tests {
+    use holochain_sqlite::error::DatabaseResult;
+    use holochain_sqlite::rusqlite::Transaction;
+
+    fn _dbg_db_schema(db_name: &str, conn: Transaction) {
+        #[derive(Debug)]
+        pub struct Schema {
+            pub ty: String,
+            pub name: String,
+            pub tbl_name: String,
+            pub rootpage: u64,
+            pub sql: Option<String>,
+        }
+
+        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
+        let iter = statement
+            .query_map([], |row| {
+                Ok(Schema {
+                    ty: row.get(0)?,
+                    name: row.get(1)?,
+                    tbl_name: row.get(2)?,
+                    rootpage: row.get(3)?,
+                    sql: row.get(4)?,
+                })
+            })
+            .unwrap();
+
+        println!("~~~ {} START ~~~", &db_name);
+        for i in iter {
+            dbg!(&i);
+        }
+        println!("~~~ {} END ~~~", &db_name);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn dbg_db_schema() {
+        super::test_conductor_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("conductor", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        super::test_p2p_agents_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("p2p_agents", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
+}
 
 /// Create a [`TestDb`] of [`DbKindAuthored`], backed by a temp directory.
 pub fn test_authored_db() -> TestDb<DbKindAuthored> {
@@ -153,7 +206,7 @@ impl<Kind: DbKindT> TestDb<Kind> {
 
     /// Dump db to a location.
     pub fn dump(&self, out: &Path) -> std::io::Result<()> {
-        std::fs::create_dir(&out).ok();
+        std::fs::create_dir(out).ok();
         for entry in std::fs::read_dir(self.tmpdir.path())? {
             let entry = entry?;
             let path = entry.path();
@@ -170,8 +223,8 @@ impl<Kind: DbKindT> TestDb<Kind> {
     }
 
     /// Dump db into `/tmp/test_dbs`.
-    pub fn dump_tmp(&self) {
-        dump_tmp(&self.db);
+    pub async fn dump_tmp(&self) {
+        dump_tmp(&self.db).await;
     }
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
@@ -183,18 +236,18 @@ impl<Kind: DbKindT> TestDb<Kind> {
 }
 
 /// Dump db into `/tmp/test_dbs`.
-pub fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
+pub async fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
     let mut tmp = std::env::temp_dir();
     tmp.push("test_dbs");
     std::fs::create_dir(&tmp).ok();
     tmp.push("backup.sqlite");
     println!("dumping db to {}", tmp.display());
     std::fs::write(&tmp, b"").unwrap();
-    env.conn()
-        .unwrap()
-        .execute("VACUUM main into ?", [tmp.to_string_lossy()])
-        // .backup(DatabaseName::Main, tmp, None)
-        .unwrap();
+    env.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.execute("VACUUM main into ?", [tmp.to_string_lossy()])?)
+    })
+    .await
+    .unwrap();
 }
 
 /// A container for all three non-cell environments
@@ -208,14 +261,66 @@ pub struct TestDbs {
     /// A test p2p environment
     p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
     /// The shared root temp dir for these environments
-    dir: Either<TempDir, PathBuf>,
+    dir: TestDir,
     /// The keystore sender for these environments
     keystore: MetaLairClient,
 }
 
+#[derive(Debug)]
+pub enum TestDir {
+    Temp(TempDir),
+    Perm(PathBuf),
+    Blank,
+}
+
+impl AsRef<Path> for TestDir {
+    fn as_ref(&self) -> &Path {
+        match self {
+            Self::Temp(d) => d.path(),
+            Self::Perm(d) => d.as_path(),
+            Self::Blank => unreachable!(),
+        }
+    }
+}
+
+impl std::ops::Deref for TestDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        match self {
+            Self::Temp(d) => d.path(),
+            Self::Perm(d) => d.as_path(),
+            Self::Blank => unreachable!(),
+        }
+    }
+}
+
+impl From<TempDir> for TestDir {
+    fn from(d: TempDir) -> Self {
+        Self::new(d)
+    }
+}
+
+impl TestDir {
+    pub fn new(d: TempDir) -> Self {
+        Self::Temp(d)
+    }
+
+    pub fn persist(&mut self) {
+        let old = std::mem::replace(self, Self::Blank);
+        match old {
+            Self::Temp(d) => {
+                tracing::info!("Made temp dir permanent at {:?}", d);
+                *self = Self::Perm(d.into_path());
+            }
+            old => *self = old,
+        }
+    }
+}
+
 #[allow(missing_docs)]
 impl TestDbs {
-    /// Create all three non-cell environments at once with a custom keystore
+    /// Create all four non-cell environments at once with a custom keystore
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
         let conductor = DbWrite::test(tempdir.path(), DbKindConductor).unwrap();
         let wasm = DbWrite::test(tempdir.path(), DbKindWasm).unwrap();
@@ -226,7 +331,7 @@ impl TestDbs {
             wasm,
             p2p,
             p2p_metrics,
-            dir: Either::Left(tempdir),
+            dir: TestDir::new(tempdir),
             keystore,
         }
     }
@@ -257,42 +362,14 @@ impl TestDbs {
     }
 
     /// Consume the TempDir so that it will not be cleaned up after the test is over.
-    #[deprecated = "solidified() should only be used during debugging"]
-    pub fn solidified(self) -> Self {
-        let Self {
-            conductor,
-            wasm,
-            p2p,
-            p2p_metrics,
-            dir,
-            keystore,
-        } = self;
-        let dir = dir.left_and_then(|tempdir| {
-            let pathbuf = tempdir.into_path();
-            println!("Solidified TestEnvs at {:?}", pathbuf);
-            Either::Right(pathbuf)
-        });
-        Self {
-            conductor,
-            wasm,
-            p2p,
-            p2p_metrics,
-            dir,
-            keystore,
-        }
-    }
-
-    pub fn into_tempdir(self) -> TempDir {
-        self.dir
-            .expect_left("can only use into_tempdir if not already solidified")
+    #[deprecated = "persist() should only be used during debugging"]
+    pub fn persist(&mut self) {
+        self.dir.persist();
     }
 
     /// Get the root path for these environments
     pub fn path(&self) -> &Path {
-        match &self.dir {
-            Either::Left(tempdir) => tempdir.path(),
-            Either::Right(path) => path,
-        }
+        &self.dir
     }
 
     pub fn keystore(&self) -> &MetaLairClient {
@@ -306,38 +383,6 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
-}
-
-/// Helper to get a [`Store`] from an [`DbRead`].
-pub fn fresh_store_test<F, R, K>(env: &DbRead<K>, f: F) -> R
-where
-    F: FnOnce(&dyn Store) -> R,
-    K: DbKindT,
-{
-    fresh_reader_test!(env, |txn| {
-        let store = Txn::from(&txn);
-        f(&store)
-    })
-}
-
-/// Function to help avoid needing to specify types.
-pub fn fresh_reader_test<E, F, R, K>(env: E, f: F) -> R
-where
-    E: Into<DbRead<K>>,
-    F: FnOnce(Transaction) -> R,
-    K: DbKindT,
-{
-    fresh_reader_test!(&env.into(), f)
-}
-
-/// Function to help avoid needing to specify types.
-pub fn print_stmts_test<E, F, R, K>(env: E, f: F) -> R
-where
-    E: Into<DbRead<K>>,
-    F: FnOnce(Transaction) -> R,
-    K: DbKindT,
-{
-    holochain_sqlite::print_stmts_test!(&env.into(), f)
 }
 
 #[tracing::instrument(skip(txn))]
@@ -364,8 +409,8 @@ pub fn dump_db(txn: &Transaction) {
             }
         }
     };
-    tracing::debug!("Headers:");
-    let stmt = txn.prepare("SELECT * FROM Header").unwrap();
+    tracing::debug!("Actions:");
+    let stmt = txn.prepare("SELECT * FROM Action").unwrap();
     dump(stmt);
 
     tracing::debug!("Entries:");

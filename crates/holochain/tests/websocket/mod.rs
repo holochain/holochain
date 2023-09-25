@@ -2,10 +2,11 @@ use ::fixt::prelude::*;
 use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
-use holochain::sweettest::SweetAgents;
+use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
         api::{AdminRequest, AdminResponse},
@@ -14,14 +15,14 @@ use holochain::{
     },
     fixt::*,
 };
+use holochain_trace;
 use holochain_types::{
     prelude::*,
-    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
+    test_utils::{fake_dna_zomes, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
-use observability;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -29,20 +30,18 @@ use tokio_stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
 
-use test_utils::*;
-
-pub mod test_utils;
+use crate::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
+#[cfg(feature = "glacial_tests")]
 async fn call_admin() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
     let port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(port, environment_path);
@@ -82,22 +81,20 @@ how_many: 42
         fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
-        "role_id".into(),
-        6000,
+        "role_name".into(),
+        10000,
     )
     .await;
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(response, 6000).await;
+    let response = check_timeout(response, 10000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
-    tmp_dna.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
-        .await
-        .unwrap();
+    tmp_dna.modifiers.properties = properties.try_into().unwrap();
+    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
 
     assert_ne!(&original_dna_hash, dna.dna_hash());
 
@@ -106,15 +103,15 @@ how_many: 42
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
+#[cfg(feature = "glacial_tests")]
 async fn call_zome() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
     let admin_port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg_2").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);
@@ -123,7 +120,7 @@ async fn call_zome() {
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
     let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
@@ -133,22 +130,25 @@ async fn call_zome() {
     );
     let original_dna_hash = dna.dna_hash().clone();
 
+    let agent_key = fake_agent_pubkey_1();
+
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let _dna_hash = register_and_install_dna(
-        &mut client,
+    let dna_hash = register_and_install_dna(
+        &mut admin_tx,
         original_dna_hash.clone(),
-        fake_agent_pubkey_1(),
+        agent_key.clone(),
         fake_dna_path,
         None,
         "".into(),
-        6000,
+        10000,
     )
     .await;
+    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // List Dnas
     let request = AdminRequest::ListDnas;
-    let response = client.request(request);
+    let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
     let expects = vec![original_dna_hash.clone()];
@@ -158,16 +158,44 @@ async fn call_zome() {
     let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
-    let response = client.request(request);
+    let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
+    // Generate signing key pair
+    let mut rng = rand_dalek::thread_rng();
+    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+
+    // Grant zome call capability for agent
+    let zome_name = TestWasm::Foo.coordinator_zome_name();
+    let fn_name = FunctionName("foo".into());
+    let cap_secret = grant_zome_call_capability(
+        &mut admin_tx,
+        &cell_id,
+        zome_name.clone(),
+        fn_name.clone(),
+        signing_key,
+    )
+    .await;
+
     // Attach App Interface
-    let app_port = attach_app_interface(&mut client, None).await;
+    let app_port = attach_app_interface(&mut admin_tx, None).await;
+
+    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
 
     // Call Zome
     tracing::info!("Calling zome");
-    call_foo_fn(app_port, original_dna_hash.clone()).await;
+    call_zome_fn(
+        &mut app_tx,
+        cell_id.clone(),
+        &signing_keypair,
+        cap_secret.clone(),
+        zome_name.clone(),
+        fn_name.clone(),
+        &(),
+    )
+    .await;
 
     // Ensure that the other client does not receive any messages, i.e. that
     // responses are not broadcast to all connected clients, only the one
@@ -181,34 +209,46 @@ async fn call_zome() {
 
     // Shutdown holochain
     std::mem::drop(holochain);
-    std::mem::drop(client);
+    std::mem::drop(admin_tx);
 
     // Call zome after restart
     tracing::info!("Restarting conductor");
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     let request = AdminRequest::ListAppInterfaces;
-    let response = client.request(request);
+    let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     let app_port = match response {
         AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
         _ => panic!("Unexpected response"),
     };
 
+    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
-    call_foo_fn(app_port, original_dna_hash).await;
+    call_zome_fn(
+        &mut app_tx,
+        cell_id.clone(),
+        &signing_keypair,
+        cap_secret.clone(),
+        zome_name.clone(),
+        fn_name.clone(),
+        &(),
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -217,9 +257,18 @@ async fn remote_signals() -> anyhow::Result<()> {
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
+    // Check that there are no duplicate agents
+    assert_eq!(
+        all_agents.len(),
+        all_agents
+            .clone()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
+
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
-        .unwrap()
         .0;
 
     let apps = conductors
@@ -233,9 +282,8 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().await.subscribe_separately())
+        rxs.extend(h.signal_broadcaster().subscribe_separately())
     }
-    let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
     let signal = fixt!(ExternIo);
 
@@ -250,14 +298,16 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-
-    let signal = AppSignal::new(signal);
-    for mut rx in rxs {
-        let r = rx.try_recv();
-        // Each handle should recv a signal
-        assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
-    }
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        let signal = AppSignal::new(signal);
+        for mut rx in rxs {
+            let r = rx.recv().await;
+            // Each handle should recv a signal
+            assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
+        }
+    })
+    .await
+    .unwrap();
 
     Ok(())
 }
@@ -265,13 +315,13 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
     let admin_port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg_emit_signals").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);
@@ -289,17 +339,18 @@ async fn emit_signals() {
     );
     let orig_dna_hash = dna.dna_hash().clone();
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
-    // Install Dna
+
     let agent_key = fake_agent_pubkey_1();
 
+    // Install Dna
     let dna_hash = register_and_install_dna(
         &mut admin_tx,
         orig_dna_hash,
-        fake_agent_pubkey_1(),
+        agent_key.clone(),
         fake_dna_path,
         None,
         "".into(),
-        6000,
+        10000,
     )
     .await;
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
@@ -311,6 +362,23 @@ async fn emit_signals() {
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     assert_matches!(response, AdminResponse::AppEnabled { .. });
+
+    // Generate signing key pair
+    let mut rng = rand_dalek::thread_rng();
+    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+
+    // Grant zome call capability for agent
+    let zome_name = TestWasm::EmitSignal.coordinator_zome_name();
+    let fn_name = FunctionName("emit".into());
+    let cap_secret = grant_zome_call_capability(
+        &mut admin_tx,
+        &cell_id,
+        zome_name.clone(),
+        fn_name.clone(),
+        signing_key,
+    )
+    .await;
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -324,9 +392,11 @@ async fn emit_signals() {
     call_zome_fn(
         &mut app_tx_1,
         cell_id.clone(),
-        TestWasm::EmitSignal,
-        "emit".into(),
-        (),
+        &signing_keypair,
+        cap_secret,
+        zome_name.clone(),
+        fn_name,
+        &(),
     )
     .await;
 
@@ -345,7 +415,11 @@ async fn emit_signals() {
     assert!(!msg2.is_request());
 
     assert_eq!(
-        Signal::App(cell_id, AppSignal::new(ExternIO::encode(()).unwrap())),
+        Signal::App {
+            cell_id,
+            zome_name,
+            signal: AppSignal::new(ExternIO::encode(()).unwrap()),
+        },
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);
@@ -355,8 +429,8 @@ async fn emit_signals() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    observability::test_run().ok();
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    holochain_trace::test_run().ok();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
@@ -368,8 +442,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
-        uid: None,
-        properties: None,
+        modifiers: DnaModifiersOpt::none(),
         source: DnaSource::Path(fake_dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
@@ -383,10 +456,10 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces_succeeds() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
@@ -422,10 +495,10 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 }
 
 async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
@@ -461,8 +534,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
-        uid: None,
-        properties: None,
+        modifiers: DnaModifiersOpt::none(),
         source: DnaSource::Path(fake_dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
@@ -481,27 +553,56 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn too_many_open() {
-    observability::test_run().ok();
+#[cfg(feature = "slow_tests")]
+async fn connection_limit_is_respected() {
+    holochain_trace::test_run().ok();
 
-    info!("creating config");
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
-    info!("building conductor");
-    for _i in 0..1000 {
-        holochain_websocket::connect(
-            url2!("ws://127.0.0.1:{}", port),
-            Arc::new(WebsocketConfig {
-                default_request_timeout_s: 1,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+
+    let url = url2!("ws://127.0.0.1:{}", port);
+    let cfg = Arc::new(WebsocketConfig::default());
+
+    // Retain handles so that the test can control when to disconnect clients
+    let mut handles = Vec::new();
+
+    // The first `MAX_CONNECTIONS` connections should succeed
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
     }
+
+    // Try lots of failed connections to make sure the limit is respected
+    for _ in 0..2 * MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+
+        // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
+        sender
+            .request::<AdminRequest, AdminResponse>(AdminRequest::ListDnas)
+            .await
+            .expect_err("Should be no available connection slots");
+    }
+
+    // Disconnect all the clients
+    handles.clear();
+
+    // Should now be possible to connect new clients
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
+    }
+
     conductor_handle.shutdown();
 }
 
@@ -515,13 +616,13 @@ async fn concurrent_install_dna() {
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
     static REQ_TIMEOUT_MS: u64 = 15000;
 
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
     let admin_port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg_concurrent_install_dna").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);
@@ -532,7 +633,7 @@ async fn concurrent_install_dna() {
 
     let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
-    let before = std::time::Instant::now();
+    //let before = std::time::Instant::now();
 
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).into_iter().map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
@@ -545,9 +646,9 @@ async fn concurrent_install_dna() {
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            println!("[{}] Agent pub key generated", i);
+            //println!("[{}] Agent pub key generated", i);
 
-            let dna_hash = register_and_install_dna_named(
+            let _dna_hash = register_and_install_dna_named(
                 &mut client,
                 original_dna_hash.clone(),
                 agent_key,
@@ -559,10 +660,10 @@ async fn concurrent_install_dna() {
             )
             .await;
 
-            println!(
-                "[{}] installed dna with hash {} and name {}",
-                i, dna_hash, name
-            );
+            //println!(
+            //    "[{}] installed dna with hash {} and name {}",
+            //    i, _dna_hash, name
+            //);
         })
     }))
     .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
@@ -573,16 +674,50 @@ async fn concurrent_install_dna() {
         r.unwrap();
     }
 
-    println!(
-        "installed {} dna in {:?}",
-        NUM_CONCURRENT_INSTALLS,
-        before.elapsed()
-    );
+    //println!(
+    //    "installed {} dna in {:?}",
+    //    NUM_CONCURRENT_INSTALLS,
+    //    before.elapsed()
+    //);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore)]
+async fn network_stats() {
+    holochain_trace::test_run().ok();
+
+    let mut batch =
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous()).await;
+
+    let dna_file = SweetDnaFile::unique_empty().await;
+
+    let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
+    batch.exchange_peer_info().await;
+
+    let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
+
+    #[cfg(not(feature = "tx5"))]
+    const EXPECT: &str = "tx2-quic";
+    #[cfg(feature = "tx5")]
+    const EXPECT: &str = "go-pion";
+
+    let req = AdminRequest::DumpNetworkStats;
+    let res: AdminResponse = client.request(req).await.unwrap();
+    match res {
+        AdminResponse::NetworkStatsDumped(json) => {
+            println!("{json}");
+
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            let backend = parsed.as_object().unwrap().get("backend").unwrap();
+            assert_eq!(EXPECT, backend);
+        }
+        _ => panic!("unexpected"),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -590,7 +725,6 @@ async fn full_state_dump_cursor_works() {
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
-        .unwrap()
         .0;
 
     let app = conductor

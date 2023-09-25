@@ -1,10 +1,7 @@
-use hdk::prelude::*;
+pub mod integrity;
 
-#[hdk_extern]
-pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    match op {
-        // This is a pretty pointless example as everything is valid.
-        Op::RegisterCreateLink { .. } => Ok(ValidateCallbackResult::Valid),
-        _ => Ok(ValidateCallbackResult::Valid),
-    }
-}
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
+
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;

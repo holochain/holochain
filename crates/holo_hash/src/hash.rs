@@ -112,7 +112,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
+    pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
         let prefix = hash_type.get_prefix();
         self.hash[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(&prefix[0..HOLO_HASH_PREFIX_LEN]);
         HoloHash {
@@ -157,6 +157,11 @@ impl<T: HashType> HoloHash<T> {
         assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         self.hash
     }
+
+    /// Get the hex representation of the hash bytes
+    pub fn to_hex(&self) -> String {
+        holochain_util::hex::bytes_to_hex(&self.hash, false)
+    }
 }
 
 #[cfg(feature = "hashing")]
@@ -164,14 +169,9 @@ impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
     /// and the 4 location bytes will be computed.
-    ///
-    /// For convenience, 36 bytes can also be passed in, in which case
-    /// the location bytes will used as provided, not computed.
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
-        if hash.len() == HOLO_HASH_CORE_LEN {
-            hash.append(&mut encode::holo_dht_location_bytes(&hash));
-        }
-
+        assert_length!(HOLO_HASH_CORE_LEN, &hash);
+        hash.append(&mut encode::holo_dht_location_bytes(&hash));
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
 
         HoloHash::from_raw_36_and_type(hash, hash_type)
@@ -254,9 +254,9 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "encoding"))]
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
-        assert_eq!(3_688_618_971, h.get_loc());
+        assert_eq!(3_688_618_971, h.get_loc().as_u32());
+        assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
             format!("{:?}", h.get_raw_32()),
@@ -264,7 +264,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",
@@ -286,7 +285,7 @@ mod tests {
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
-        assert_type!(
+        assert_type(
             "ExternalHash",
             ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );

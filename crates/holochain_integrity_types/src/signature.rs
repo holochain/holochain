@@ -7,9 +7,9 @@ pub const SIGNATURE_BYTES: usize = 64;
 
 /// The raw bytes of a signature.
 #[derive(Clone, PartialOrd, Hash, Ord)]
-/// The equality is not different, it's just constant time, so we can derive a hash.
-/// For an actually secure thing we wouldn't want to just assume a safe default hashing
-/// But that is not what clippy is complaining about here.
+// The equality is not different, it's just constant time, so we can derive a hash.
+// For an actually secure thing we wouldn't want to just assume a safe default hashing
+// But that is not what clippy is complaining about here.
 #[allow(clippy::derive_hash_xor_eq)]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
@@ -43,7 +43,7 @@ pub struct EphemeralSignatures {
 }
 
 /// Mirror struct for Sign that includes a signature to verify against a key and data.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct VerifySignature {
     /// The public key associated with the private key that should be used to
     /// verify the signature.
@@ -109,4 +109,11 @@ impl VerifySignature {
             data,
         }
     }
+}
+
+#[test]
+fn signature_roundtrip() {
+    let bytes = Signature::from([1u8; 64]);
+    let json = serde_json::to_string(&bytes).unwrap();
+    let _: Signature = serde_json::from_str(&json).unwrap();
 }

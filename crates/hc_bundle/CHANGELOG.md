@@ -1,8 +1,143 @@
+---
+default_semver_increment_mode: !pre_minor beta-dev
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+## 0.3.0-beta-dev.14
+
+- Export packing, unpacking & utility functions of `mr_bundle` in lib exports [\#2705](https://github.com/holochain/holochain/pull/2705)
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+## 0.3.0-beta-dev.10
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
+## 0.3.0-beta-dev.5
+
+## 0.3.0-beta-dev.4
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
+
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
+
+## 0.2.0
+
+## 0.2.0-beta-rc.6
+
+- **Experimental**: `hc dna pack` command now takes `--dylib-ios` option, which produces iOS optimized Zomes. These can be utilized by passing `dylib`: `PathBuf` for Zome configurations in `dna.yaml` files and other data structures based on ZomeManifest where Zomes are constructed. [\#2218](https://github.com/holochain/holochain/pull/2218)
+
+## 0.2.0-beta-rc.5
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+## 0.2.0-beta-rc.2
+
+## 0.2.0-beta-rc.1
+
+## 0.2.0-beta-rc.0
+
+## 0.1.0
+
+## 0.1.0-beta-rc.0
+
+## 0.0.65
+
+## 0.0.64
+
+## 0.0.63
+
+## 0.0.62
+
+## 0.0.61
+
+## 0.0.60
+
+## 0.0.59
+
+- Adds `--recursive` command to `hc web-app pack` and `hc app pack` which packs all bundled dependencies for the given manifest. So `hc app pack ./workdir --recursive` will first go to each of the DNA manifests which have their location specified as bundled in the app manifest, pack each of them, and finally pack the app itself. `hc web-app pack ./workdir --recursive` will first pack the app recursively first if specified as bundled, and then pack the web-app manifest itself.
+
+## 0.0.58
+
+- Adds experimental `--raw` command to hc unpack commands (e.g. `hc dna unpack`) which allows an invalid manifest to still be unpacked. This can help to “salvage” a bundle which is no longer compatible with the current Holochain version, correcting the manifest so that it can be re-packed into a valid bundle.
+
+## 0.0.57
+
+## 0.0.56
+
+## 0.0.55
+
+## 0.0.54
+
+## 0.0.53
+
+## 0.0.52
+
+## 0.0.51
+
+## 0.0.50
+
+## 0.0.49
+
+## 0.0.48
+
+## 0.0.47
+
+## 0.0.46
+
+## 0.0.45
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## 0.0.44
+
+## 0.0.43
+
+## 0.0.42
+
+## 0.0.41
+
+## 0.0.40
+
+## 0.0.39
+
+## 0.0.38
+
+## 0.0.37
+
+## 0.0.36
+
+## 0.0.35
+
+## 0.0.34
+
+## 0.0.33
 
 ## 0.0.32
 

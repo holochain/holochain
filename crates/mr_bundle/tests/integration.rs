@@ -1,4 +1,4 @@
-use mr_bundle::{Bundle, Location, Manifest};
+use mr_bundle::{Bundle, Location, Manifest, ResourceBytes};
 use std::{collections::HashSet, path::PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -49,13 +49,13 @@ async fn resource_resolution() {
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
-    let local_thing_encoded = mr_bundle::encode(&local_thing).unwrap();
+    let local_thing_encoded = mr_bundle::encode(&local_thing).unwrap().into();
     let local_path = dir.path().join("deeply/nested/local.thing");
     std::fs::create_dir_all(local_path.parent().unwrap()).unwrap();
     std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
 
     let bundled_thing = Thing("bundled".into());
-    let bundled_thing_encoded = mr_bundle::encode(&bundled_thing).unwrap();
+    let bundled_thing_encoded: ResourceBytes = mr_bundle::encode(&bundled_thing).unwrap().into();
     let bundled_path = PathBuf::from("another/nested/bundled.thing");
 
     // Create a Manifest that references these resources
@@ -83,7 +83,7 @@ async fn resource_resolution() {
         bundle
             .bundled_resources()
             .iter()
-            .collect::<HashSet<(&PathBuf, &Vec<u8>)>>(),
+            .collect::<HashSet<(&PathBuf, &ResourceBytes)>>(),
         maplit::hashset![(&bundled_path, &bundled_thing_encoded)]
     );
 
@@ -93,7 +93,7 @@ async fn resource_resolution() {
             .await
             .unwrap()
             .into_iter()
-            .collect::<HashSet<(Location, Vec<u8>)>>(),
+            .collect::<HashSet<(Location, ResourceBytes)>>(),
         maplit::hashset![
             (bundled_location, bundled_thing_encoded),
             (local_location, local_thing_encoded)
@@ -124,15 +124,16 @@ async fn resource_resolution() {
 #[tokio::test]
 async fn unpack_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
+    let dir_path = dir.path().canonicalize().unwrap();
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
-    let local_path = dir.path().join("deeply/nested/local.thing");
+    let local_path = dir_path.join("deeply/nested/local.thing");
     std::fs::create_dir_all(local_path.parent().unwrap()).unwrap();
     std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
 
     let bundled_thing = Thing("bundled".into());
-    let bundled_thing_encoded = mr_bundle::encode(&bundled_thing).unwrap();
+    let bundled_thing_encoded: ResourceBytes = mr_bundle::encode(&bundled_thing).unwrap().into();
     let bundled_path = PathBuf::from("another/nested/bundled.thing");
 
     // Create a Manifest that references these resources
@@ -150,7 +151,7 @@ async fn unpack_roundtrip() {
         ],
     });
 
-    let unpacked_dir = dir.path().join("unpacked");
+    let unpacked_dir = dir_path.join("unpacked");
 
     // Put the bundled resource into a Bundle (excluding the local resource)
     let bundle = Bundle::new(
@@ -163,7 +164,7 @@ async fn unpack_roundtrip() {
         bundle
             .bundled_resources()
             .iter()
-            .collect::<HashSet<(&PathBuf, &Vec<u8>)>>(),
+            .collect::<HashSet<(&PathBuf, &ResourceBytes)>>(),
         maplit::hashset![(&bundled_path, &bundled_thing_encoded)]
     );
 

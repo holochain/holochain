@@ -1,4 +1,4 @@
-use holo_hash::{AnyDhtHash, DhtOpHash, HasHash};
+use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
@@ -6,7 +6,7 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed, DhtOpType},
     prelude::DhtOpResult,
 };
-use holochain_zome_types::{EntryVisibility, SignedHeader};
+use holochain_zome_types::{EntryVisibility, SignedAction};
 
 use crate::{prelude::*, query::get_public_op_from_db};
 
@@ -16,7 +16,7 @@ use crate::{prelude::*, query::get_public_op_from_db};
 /// of any local agents.
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
-    hashes: Vec<(DhtOpHash, AnyDhtHash)>,
+    hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
     authored_db: &DbRead<DbKindAuthored>,
     dht_db: &DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
@@ -36,6 +36,10 @@ pub async fn authored_ops_to_dht_db(
 
 /// Insert any authored ops that have been locally validated
 /// into the dht database awaiting integration.
+/// The "check" that isn't being done is whether the dht db is for an authority
+/// for these ops, which sort of makes sense to skip for the author, even though
+/// the author IS an authority, the network doesn't necessarily think so based
+/// on basis hash alone.
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
     authored_db: &DbRead<DbKindAuthored>,
@@ -45,7 +49,7 @@ pub async fn authored_ops_to_dht_db_without_check(
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
     let ops = authored_db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             for hash in hashes {
                 // This function filters out any private entries from ops
                 // or store entry ops with private entries.
@@ -58,7 +62,7 @@ pub async fn authored_ops_to_dht_db_without_check(
         .await?;
     let mut activity = Vec::new();
     let activity = dht_db
-        .async_commit(|txn| {
+        .write_async(|txn| {
             for op in ops {
                 if let Some(op) = insert_locally_validated_op(txn, op)? {
                     activity.push(op);
@@ -68,15 +72,15 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     for op in activity {
-        let dependency = get_dependency(op.get_type(), &op.header());
+        let dependency = get_dependency(op.get_type(), &op.action());
 
         if matches!(dependency, Dependency::Null) {
             let _ = dht_db_cache
-                .set_activity_to_integrated(op.header().author(), op.header().header_seq())
+                .set_activity_to_integrated(op.action().author(), op.action().action_seq())
                 .await;
         } else {
             dht_db_cache
-                .set_activity_ready_to_integrate(op.header().author(), op.header().header_seq())
+                .set_activity_ready_to_integrate(op.action().author(), op.action().action_seq())
                 .await?;
         }
     }
@@ -95,7 +99,7 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let dependency = get_dependency(op.get_type(), &op.header());
+    let dependency = get_dependency(op.get_type(), &op.action());
     let op_type = op.get_type();
 
     // Insert the op.
@@ -121,16 +125,16 @@ fn insert_locally_validated_op(
 }
 
 fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
-    let is_private_entry = op.header().entry_type().map_or(false, |et| {
+    let is_private_entry = op.action().entry_type().map_or(false, |et| {
         matches!(et.visibility(), EntryVisibility::Private)
     });
 
-    if is_private_entry && op.entry().is_some() {
+    if is_private_entry && op.entry().into_option().is_some() {
         let (op, hash) = op.into_inner();
         let op_type = op.get_type();
-        let (signature, header, _) = op.into_inner();
+        let (signature, action) = (op.signature(), op.action());
         Ok(DhtOpHashed::with_pre_hashed(
-            DhtOp::from_type(op_type, SignedHeader(header, signature), None)?,
+            DhtOp::from_type(op_type, SignedAction(action, signature.clone()), None)?,
             hash,
         ))
     } else {
@@ -139,7 +143,7 @@ fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
 }
 
 fn is_private_store_entry(op: &DhtOp) -> bool {
-    op.header()
+    op.action()
         .entry_type()
         .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
         && op.get_type() == DhtOpType::StoreEntry

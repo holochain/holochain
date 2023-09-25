@@ -1,14 +1,27 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
+use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_conductor_api::{config::InterfaceDriver, InstalledAppInfo};
 use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::error::{ConductorError, ConductorResult};
+
+/// Unique conductor tag / identifier.
+#[derive(Clone, Deserialize, Serialize, Debug, SerializedBytes)]
+#[cfg_attr(test, derive(PartialEq))]
+#[serde(transparent)]
+pub struct ConductorStateTag(pub Arc<str>);
+
+impl Default for ConductorStateTag {
+    fn default() -> Self {
+        Self(nanoid::nanoid!().into())
+    }
+}
 
 /// Mutable conductor state, stored in a DB and writable only via Admin interface.
 ///
@@ -18,7 +31,10 @@ use super::error::{ConductorError, ConductorResult};
 #[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
-    /// Apps that have been installed, regardless of status
+    /// Unique conductor tag / identifier.
+    #[serde(default)]
+    tag: ConductorStateTag,
+    /// Apps that have been installed, regardless of status.
     #[serde(default)]
     installed_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
@@ -59,6 +75,16 @@ impl AppInterfaceId {
 }
 
 impl ConductorState {
+    /// A unique identifier for this conductor
+    pub fn tag(&self) -> &ConductorStateTag {
+        &self.tag
+    }
+
+    #[cfg(test)]
+    pub fn set_tag(&mut self, tag: ConductorStateTag) {
+        self.tag = tag;
+    }
+
     /// Immutable access to the inner collection of all apps
     pub fn installed_apps(&self) -> &InstalledAppMap {
         &self.installed_apps
@@ -122,6 +148,13 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
     }
 
+    /// Getter for a mutable reference to a single app. Returns error if app missing.
+    pub fn get_app_mut(&mut self, id: &InstalledAppId) -> ConductorResult<&mut InstalledApp> {
+        self.installed_apps
+            .get_mut(id)
+            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
+    }
+
     /// Getter for a single app. Returns error if app missing.
     pub fn remove_app(&mut self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         self.installed_apps
@@ -154,14 +187,6 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))?;
         let delta = app.status.transition(transition);
         Ok((app, delta))
-    }
-
-    /// Retrieve info about an installed App by its InstalledAppId
-    #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
-        self.installed_apps
-            .get(installed_app_id)
-            .map(InstalledAppInfo::from_installed_app)
     }
 
     /// Returns the interface configuration with the given ID if present

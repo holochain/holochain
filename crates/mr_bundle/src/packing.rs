@@ -1,8 +1,9 @@
 use super::Bundle;
 use crate::{
+    bundle::ResourceMap,
     error::{MrBundleResult, PackingError, UnpackingError, UnpackingResult},
     util::prune_path,
-    Manifest,
+    Manifest, RawBundle,
 };
 use holochain_util::ffs;
 use std::path::Path;
@@ -14,29 +15,15 @@ impl<M: Manifest> Bundle<M> {
     /// and the path of the manifest file is specified by the `Manifest::path`
     /// trait method implementation of the `M` type.
     pub async fn unpack_yaml(&self, base_path: &Path, force: bool) -> MrBundleResult<()> {
-        self.unpack_yaml_inner(base_path, force)
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn unpack_yaml_inner(&self, base_path: &Path, force: bool) -> UnpackingResult<()> {
-        if !force && base_path.exists() {
-            return Err(UnpackingError::DirectoryExists(base_path.to_owned()));
-        }
-        ffs::create_dir_all(&base_path).await?;
-        for (relative_path, resource) in self.bundled_resources() {
-            let path = base_path.join(&relative_path);
-            let path_clone = path.clone();
-            let parent = path_clone
-                .parent()
-                .ok_or_else(|| UnpackingError::ParentlessPath(path.clone()))?;
-            ffs::create_dir_all(&parent).await?;
-            ffs::write(&path, resource).await?;
-        }
-        let yaml_str = serde_yaml::to_string(self.manifest())?;
-        let manifest_path = base_path.join(M::path());
-        ffs::write(&manifest_path, yaml_str.as_bytes()).await?;
-        Ok(())
+        unpack_yaml(
+            self.manifest(),
+            self.bundled_resources(),
+            base_path,
+            M::path().as_ref(),
+            force,
+        )
+        .await
+        .map_err(Into::into)
     }
 
     /// Reconstruct a `Bundle<M>` from a previously unpacked directory.
@@ -55,14 +42,63 @@ impl<M: Manifest> Bundle<M> {
                 let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
                 ffs::read(&resource_path)
                     .await
-                    .map(|resource| (relative_path, resource))
+                    .map(|resource| (relative_path, resource.into()))
             },
         ))
         .await
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
-        Ok(Bundle::new(manifest, resources, base_path)?)
+        Bundle::new(manifest, resources, base_path)
     }
+}
+
+impl<M: serde::Serialize> RawBundle<M> {
+    /// Create a directory which contains the manifest as a YAML file,
+    /// and each resource written to its own file (as raw bytes)
+    /// The paths of the resources are specified by the paths of the bundle,
+    /// and the path of the manifest file is specified by the manifest_path parameter.
+    pub async fn unpack_yaml(
+        &self,
+        base_path: &Path,
+        manifest_path: &Path,
+        force: bool,
+    ) -> MrBundleResult<()> {
+        unpack_yaml(
+            &self.manifest,
+            &self.resources,
+            base_path,
+            manifest_path,
+            force,
+        )
+        .await
+        .map_err(Into::into)
+    }
+}
+
+async fn unpack_yaml<M: serde::Serialize>(
+    manifest: &M,
+    resources: &ResourceMap,
+    base_path: &Path,
+    manifest_path: &Path,
+    force: bool,
+) -> UnpackingResult<()> {
+    if !force && base_path.exists() {
+        return Err(UnpackingError::DirectoryExists(base_path.to_owned()));
+    }
+    ffs::create_dir_all(&base_path).await?;
+    for (relative_path, resource) in resources {
+        let path = base_path.join(relative_path);
+        let path_clone = path.clone();
+        let parent = path_clone
+            .parent()
+            .ok_or_else(|| UnpackingError::ParentlessPath(path.clone()))?;
+        ffs::create_dir_all(&parent).await?;
+        ffs::write(&path, resource).await?;
+    }
+    let yaml_str = serde_yaml::to_string(manifest)?;
+    let manifest_path = base_path.join(manifest_path);
+    ffs::write(&manifest_path, yaml_str.as_bytes()).await?;
+    Ok(())
 }
 
 #[cfg(test)]

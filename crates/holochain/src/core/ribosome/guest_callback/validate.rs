@@ -4,7 +4,6 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -35,6 +34,12 @@ impl ValidateInvocation {
 pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: HolochainP2pDna,
+}
+
+impl std::fmt::Debug for ValidateHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidateHostAccess").finish()
+    }
 }
 
 impl From<ValidateHostAccess> for HostContext {
@@ -76,7 +81,7 @@ pub enum ValidateResult {
     Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
-    UnresolvedDependencies(Vec<AnyDhtHash>),
+    UnresolvedDependencies(UnresolvedDependencies),
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
@@ -85,7 +90,7 @@ impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
     /// decisive result to the host, even if that "decisive" result
     /// is the UnresolvedDependencies variant.
     /// It drops the irrelevant zome names and falls back to the conversion from
-    /// a Vec<ValidateCallbackResults> -> ValidateResult
+    /// a `Vec<ValidateCallbackResults>` -> ValidateResult
     fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
@@ -137,11 +142,14 @@ mod test {
         let mut rng = ::fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
-        let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
+        let result_ud =
+            || ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(vec![]));
         let result_invalid = || ValidateResult::Invalid("".into());
 
         let cb_valid = || ValidateCallbackResult::Valid;
-        let cb_ud = || ValidateCallbackResult::UnresolvedDependencies(vec![]);
+        let cb_ud = || {
+            ValidateCallbackResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(vec![]))
+        };
         let cb_invalid = || ValidateCallbackResult::Invalid("".into());
 
         for (mut results, expected) in vec![
@@ -158,7 +166,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {
@@ -239,7 +247,8 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -254,7 +263,8 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -272,21 +282,22 @@ mod slow_tests {
 
         let agent = AgentPubKey::arbitrary(&mut u).unwrap();
         let entry = Entry::Agent(agent);
-        let mut header = Create::arbitrary(&mut u).unwrap();
-        header.entry_type = EntryType::AgentPubKey;
-        header.entry_hash = EntryHash::with_data_sync(&entry);
+        let mut action = Create::arbitrary(&mut u).unwrap();
+        action.entry_type = EntryType::AgentPubKey;
+        action.entry_hash = EntryHash::with_data_sync(&entry);
 
-        let op = Op::StoreElement {
-            element: Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(header.into()),
+        let op = Op::StoreRecord(StoreRecord {
+            record: Record::new(
+                SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(action.into()),
                     Signature::arbitrary(&mut u).unwrap(),
                 ),
                 Some(entry),
             ),
-        };
+        });
 
-        let zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
+        let zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalid).erase_type());
         let validate_invocation = ValidateInvocation::new(zomes_to_invoke, &op).unwrap();
 
         let result = ribosome
@@ -297,17 +308,17 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Validate).await;
 
-        let output: HeaderHash = conductor.call(&alice, "always_validates", ()).await;
-        let _output_element: Element = conductor
-            .call(&alice, "must_get_valid_element", output)
+        let output: ActionHash = conductor.call(&alice, "always_validates", ()).await;
+        let _output_record: Record = conductor
+            .call(&alice, "must_get_valid_record", output)
             .await;
 
-        let invalid_output: Result<HeaderHash, _> =
+        let invalid_output: Result<ActionHash, _> =
             conductor.call_fallible(&alice, "never_validates", ()).await;
         assert!(invalid_output.is_err());
     }

@@ -1,8 +1,162 @@
+---
+default_semver_increment_mode: !pre_minor beta-dev
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/holochain/holochain/holochain_zome_types-v0.0.2-alpha.1...HEAD)
+## \[Unreleased\]
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+## 0.3.0-beta-dev.10
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+- Added the `base` field to the `Link` struct for easy access after a `get_links` call.
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
+## 0.3.0-beta-dev.5
+
+## 0.3.0-beta-dev.4
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
+
+- Changes the `ChainQueryFilter` to support filtering on multiple entry types and actions types in the same query. The query builder interface hasn’t changed but if your code was calling `entry_type` or `action_type` more than once it will now create a logical OR rather than replacing the action or entry type to filter on.
+
+## 0.2.0
+
+## 0.2.0-beta-rc.6
+
+## 0.2.0-beta-rc.5
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+## 0.2.0-beta-rc.2
+
+## 0.2.0-beta-rc.1
+
+- `name` in DnaDef no longer has an effect on the DNA hash [\#2099](https://github.com/holochain/holochain/pull/2099)
+
+## 0.2.0-beta-rc.0
+
+## 0.1.0
+
+## 0.1.0-beta-rc.3
+
+- Added the `author` field to the `Link` struct for easy access after a `get_links` call.
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
+
+## 0.0.58
+
+## 0.0.57
+
+## 0.0.56
+
+## 0.0.55
+
+**BREAKING CHANGE**: Rename `AuthorizeZomeCallSigningKey` to `GrantZomeCallCapability` & remove parameter `provenance`. [\#1647](https://github.com/holochain/holochain/pull/1647)
+
+## 0.0.54
+
+## 0.0.53
+
+## 0.0.52
+
+## 0.0.51
+
+## 0.0.50
+
+- Revised the changelog for 0.0.48 to note that changes to `ChainQueryFilter` in that version were breaking changes, please read the log for that version for more detail.
+
+## 0.0.49
+
+## 0.0.48
+
+- Add function to set DNA name. [\#1547](https://github.com/holochain/holochain/pull/1547)
+- **BREAKING CHANGE** - `ChainQueryFilter` gets a new field, which may cause DNAs built with prior versions to break due to a deserialization error. Rebuild your DNA if so.
+- There is now a `ChainQueryFilter::descending()` function which will cause the query results to be returned in descending order. This can be reversed by calling `ChainQueryFilter::ascending()`. The default order is still ascending. [\#1539](https://github.com/holochain/holochain/pull/1539)
+
+## 0.0.47
+
+## 0.0.46
+
+## 0.0.45
+
+## 0.0.44
+
+## 0.0.43
+
+## 0.0.42
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+
+## 0.0.41
+
+## 0.0.40
+
+## 0.0.39
+
+## 0.0.38
+
+## 0.0.37
+
+## 0.0.36
+
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `ZomeDef` now holds dependencies for the zome.
+- `EntryDefLocation` is either an `EntryDefIndex` or a `CapClaim` or a `CapGrant`.
+
+### Changed
+
+- Zomes are now generic over integrity and coordinator.
+
+- `ZomeDef` is now wrapped in either `IntegrityZomeDef` or `CoordinatorZomeDef`.
+
+- `GetLinksInput` takes a `LinkTypeRanges` for filtering on `LinkType`.
+
+- `CreateInput` takes an `EntryDefLocation` for and an `EntryVisibility` for the entry.
+
+- `UpdateInput` doesn’t take a `CreateInput` anymore.
+
+- `UpdateInput` takes an `Entry` and `ChainTopOrdering`.
+
+- `DnaDef` has split zomes into integrity and coordinator.
+
+- `DnaDef` coordinator zomes do not change the `DnaHash`.
+
+- Docs: Describe init callback and link to WASM examples [\#1418](https://github.com/holochain/holochain/pull/1418)
+
+## 0.0.35
+
+## 0.0.34
+
+## 0.0.33
 
 ## 0.0.32
 

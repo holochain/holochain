@@ -1,16 +1,45 @@
+use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
-use crate::HostStub;
-use crate::{test_util::hash_op_data, KitsuneHostDefaultError};
+use crate::{HostStub, KitsuneHost};
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
+use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
+use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
+use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
+use num_traits::Zero;
 
 use super::*;
 
+#[derive(Debug)]
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
+    topology: Topology,
+    strat: ArqStrat,
+    with_data: bool,
 }
 
-impl KitsuneHostDefaultError for StandardResponsesHostApi {
-    const NAME: &'static str = "StandardResponsesHostApi";
+impl FetchPoolConfig for StandardResponsesHostApi {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
+impl KitsuneHost for StandardResponsesHostApi {
+    fn block(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _: kitsune_p2p_block::BlockTargetId,
+        _: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
+    }
 
     fn get_agent_info_signed(
         &self,
@@ -24,6 +53,92 @@ impl KitsuneHostDefaultError for StandardResponsesHostApi {
             .unwrap();
         box_fut(Ok(Some(agent)))
     }
+
+    fn remove_agent_info_signed(
+        &self,
+        _input: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        // unimplemented
+        box_fut(Ok(false))
+    }
+
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
+    ) -> crate::KitsuneHostResult<Vec<f64>> {
+        todo!()
+    }
+
+    fn query_size_limited_regions(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _size_limit: u32,
+        regions: Vec<dht::region::Region>,
+    ) -> crate::KitsuneHostResult<Vec<dht::region::Region>> {
+        // This false implementation will work fine as long as we're not trying
+        // to test situations with regions with a large byte count getting broken up
+        box_fut(Ok(regions))
+    }
+
+    fn query_region_set(
+        &self,
+        space: Arc<KitsuneSpace>,
+        dht_arc_set: Arc<DhtArcSet>,
+    ) -> crate::KitsuneHostResult<RegionSetLtcs> {
+        async move {
+            let arqs = ArqSet::from_dht_arc_set_exact(
+                &self.get_topology(space).await?,
+                &self.strat,
+                &dht_arc_set,
+            )
+            .expect("an arc in the set could not be quantized");
+            let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
+            let region_set = if self.with_data {
+                // XXX: this is very fake, and completely wrong!
+                //      in order to properly match the fake data returned in other methods,
+                //      there should really only be one nonzero region.
+                let data = RegionData {
+                    hash: [1; 32].into(),
+                    size: 1,
+                    count: 1,
+                };
+                coords.into_region_set_infallible(|_| data.clone())
+            } else {
+                coords.into_region_set_infallible(|_| RegionData::zero())
+            };
+            Ok(region_set)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn get_topology(
+        &self,
+        _space: Arc<KitsuneSpace>,
+    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
+        box_fut(Ok(self.topology.clone()))
+    }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: dht::region::RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
+        todo!()
+    }
 }
 
 // TODO: integrate with `HandlerBuilder`
@@ -33,8 +148,11 @@ async fn standard_responses(
 ) -> (MockKitsuneP2pEventHandler, HostApi) {
     let mut evt_handler = MockKitsuneP2pEventHandler::new();
     let infos = agents.iter().map(|(_, i)| i.clone()).collect::<Vec<_>>();
-    let host = StandardResponsesHostApi {
+    let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
+        topology: Topology::standard_epoch_full(),
+        strat: ArqStrat::default(),
+        with_data,
     };
     evt_handler.expect_handle_query_agents().returning({
         move |_| {
@@ -73,10 +191,10 @@ async fn standard_responses(
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
     }
     evt_handler
-        .expect_handle_gossip()
-        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
+        .expect_handle_receive_ops()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
 
-    (evt_handler, Arc::new(host))
+    (evt_handler, Arc::new(host_api))
 }
 
 pub async fn setup_player(

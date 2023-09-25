@@ -54,7 +54,7 @@ pub struct SignalBroadcaster {
 
 impl SignalBroadcaster {
     /// send the signal to the connected client
-    pub fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
+    pub(crate) fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.senders
             .iter_mut()
             .map(|tx| tx.send(sig.clone()))

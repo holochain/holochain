@@ -29,6 +29,10 @@ pub enum HolochainP2pError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    /// Chain Head Coordination error
+    #[error(transparent)]
+    ChcError(#[from] holochain_types::chc::ChcError),
 }
 
 impl HolochainP2pError {
@@ -117,13 +121,13 @@ macro_rules! to_and_from_kitsune {
         $(
             /// Extension trait for holo/kitsune conversion
             pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into Arc<Kitsune> type
+                /// convert into `Arc<Kitsune>` type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
 
                 /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
 
-                /// to Arc<Kitsune> type
+                /// to `Arc<Kitsune>` type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -167,13 +171,13 @@ macro_rules! to_kitsune {
         $(
             /// Extension trait for holo/kitsune conversion
             pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into Arc<Kitsune> type
+                /// convert into `Arc<Kitsune>` type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
 
                 /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
 
-                /// to Arc<Kitsune> type
+                /// to `Arc<Kitsune>` type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -194,4 +198,5 @@ macro_rules! to_kitsune {
 
 to_kitsune! {
     AnyDhtHashExt<holo_hash::AnyDhtHash> -> kitsune_p2p::KitsuneBasis,
+    AnyLinkableHashExt<holo_hash::AnyLinkableHash> -> kitsune_p2p::KitsuneBasis,
 }

@@ -31,7 +31,7 @@ impl Location {
         if let Location::Path(path) = self {
             if path.is_relative() {
                 if let Some(dir) = root_dir {
-                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(&path))?))
+                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(path))?))
                 } else {
                     Err(BundleError::RelativeLocalPath(path.to_owned()).into())
                 }
@@ -45,7 +45,7 @@ impl Location {
 }
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
-    Ok(ffs::read(path).await?)
+    Ok(ffs::read(path).await?.into())
 }
 
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
@@ -54,7 +54,8 @@ pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
         .bytes()
         .await?
         .into_iter()
-        .collect())
+        .collect::<Vec<_>>()
+        .into())
 }
 
 #[cfg(test)]
@@ -62,6 +63,7 @@ mod tests {
 
     use super::*;
     use serde::{Deserialize, Serialize};
+    use serde_yaml::value::{Tag, TaggedValue};
 
     #[derive(Serialize, Deserialize)]
     struct TunaSalad {
@@ -77,8 +79,8 @@ mod tests {
     /// The YAML produced by this test looks like:
     /// ---
     /// celery:
-    ///   - bundled: b
-    ///   - path: p
+    ///   - !bundled: b
+    ///   - !path: p
     /// url: "http://r.co"
     #[test]
     fn location_flattening() {
@@ -91,8 +93,20 @@ mod tests {
         let val = serde_yaml::to_value(&tuna).unwrap();
         println!("yaml produced:\n{}", serde_yaml::to_string(&tuna).unwrap());
 
-        assert_eq!(val["celery"][0]["bundled"], Value::from("b"));
-        assert_eq!(val["celery"][1]["path"], Value::from("p"));
+        assert_eq!(
+            val["celery"][0],
+            Value::Tagged(Box::new(TaggedValue {
+                tag: Tag::new("!bundled"),
+                value: Value::from("b")
+            }))
+        );
+        assert_eq!(
+            val["celery"][1],
+            Value::Tagged(Box::new(TaggedValue {
+                tag: Tag::new("!path"),
+                value: Value::from("p")
+            }))
+        );
         assert_eq!(val["url"], Value::from("http://r.co"));
     }
 }
