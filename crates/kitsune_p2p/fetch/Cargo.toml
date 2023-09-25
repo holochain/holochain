@@ -33,7 +33,7 @@ proptest-derive = { version = "0", optional = true }
 test-strategy = { version = "0", optional = true }
 
 [dev-dependencies]
-kitsune_p2p_fetch = { path = ".", features = ["test_utils", "sqlite"]}
+kitsune_p2p_fetch = { path = ".", features = ["test_utils", "fuzzing", "sqlite"]}
 holochain_serialized_bytes = "0.0.53"
 holochain_trace = { version = "^0.2.2", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
