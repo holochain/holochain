@@ -1,7 +1,7 @@
 use crate::actor::BroadcastData;
 use crate::event::{
-    FetchOpDataEvt, FetchOpDataEvtQuery, GetAgentInfoSignedEvt, KitsuneP2pEvent,
-    KitsuneP2pEventSender, PutAgentInfoSignedEvt, QueryAgentsEvt,
+    FetchOpDataEvt, FetchOpDataEvtQuery, GetAgentInfoSignedEvt, KitsuneP2pEventSender,
+    PutAgentInfoSignedEvt, QueryAgentsEvt,
 };
 use crate::spawn::actor::fetch::FetchResponseConfig;
 use crate::spawn::actor::{
@@ -11,8 +11,7 @@ use crate::spawn::meta_net::{
     nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv, Respond,
 };
 use crate::wire::WireData;
-use crate::{wire, HostApi, KitsuneAgent, KitsuneP2pConfig, KitsuneP2pError, KitsuneSpace};
-use futures::channel::mpsc::Sender;
+use crate::{wire, HostApiLegacy, KitsuneAgent, KitsuneP2pConfig, KitsuneP2pError, KitsuneSpace};
 use futures::StreamExt;
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
@@ -22,8 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub struct MetaNetTask {
-    evt_sender: Sender<KitsuneP2pEvent>,
-    host: HostApi,
+    host: HostApiLegacy,
     config: KitsuneP2pConfig,
     fetch_pool: FetchPool,
     fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
@@ -56,8 +54,7 @@ type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
 
 impl MetaNetTask {
     pub fn new(
-        evt_sender: Sender<KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         fetch_response_queue: FetchResponseQueue<FetchResponseConfig>,
@@ -65,7 +62,6 @@ impl MetaNetTask {
         i_s: GhostSender<Internal>,
     ) -> Self {
         Self {
-            evt_sender,
             host,
             config,
             fetch_pool,
@@ -209,7 +205,7 @@ impl MetaNetTask {
                 let query = QueryAgentsEvt::new(space)
                     .near_basis(basis_loc)
                     .limit(LIMIT);
-                let resp = match self.evt_sender.query_agents(query).await {
+                let resp = match self.host.legacy.query_agents(query).await {
                     Ok(list) => wire::Wire::peer_query_resp(list),
                     Err(err) => wire::Wire::failure(format!("Error querying agents: {:?}", err,)),
                 };
@@ -230,7 +226,7 @@ impl MetaNetTask {
         data: WireData,
         respond: Respond,
     ) -> MetaNetTaskResult<()> {
-        let res = match self.evt_sender.call(space, to_agent, data.into()).await {
+        let res = match self.host.legacy.call(space, to_agent, data.into()).await {
             Err(err) => {
                 let reason = format!("{:?}", err);
                 let fail = wire::Wire::failure(reason);
@@ -354,7 +350,7 @@ impl MetaNetTask {
             }) => match data {
                 BroadcastData::User(data) => {
                     // TODO: Should we check if the basis is held before calling notify?
-                    if let Err(err) = self.evt_sender.notify(space, to_agent, data).await {
+                    if let Err(err) = self.host.legacy.notify(space, to_agent, data).await {
                         tracing::warn!(?err, "error processing incoming broadcast");
                         Err(err.into())
                     } else {
@@ -365,7 +361,8 @@ impl MetaNetTask {
                     // TODO: Should we check if the basis is
                     //       held before calling put_agent_info_signed?
                     if let Err(err) = self
-                        .evt_sender
+                        .host
+                        .legacy
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
                             space,
                             peer_data: vec![agent_info],
@@ -423,7 +420,8 @@ impl MetaNetTask {
 
                     if !hashes.is_empty() {
                         match self
-                            .evt_sender
+                            .host
+                            .legacy
                             .fetch_op_data(FetchOpDataEvt {
                                 space: space.clone(),
                                 query: FetchOpDataEvtQuery::Hashes {
@@ -475,7 +473,8 @@ impl MetaNetTask {
 
                         // forward the received op
                         if let Err(err) = self
-                            .evt_sender
+                            .host
+                            .legacy
                             .receive_ops(space.clone(), vec![op.op_data], fetch_context)
                             .await
                         {
@@ -526,7 +525,8 @@ impl MetaNetTask {
             wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }) => {
                 for peer in peer_list {
                     if let Err(err) = self
-                        .evt_sender
+                        .host
+                        .legacy
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
                             space: peer.space.clone(),
                             peer_data: vec![peer.clone()],
@@ -2161,8 +2161,7 @@ mod tests {
         let (ep_evt_send, ep_evt_rcv) = channel(10);
 
         let meta_net_task = MetaNetTask::new(
-            host_sender,
-            host_stub.clone(),
+            host_stub.clone().legacy(host_sender),
             Default::default(),
             fetch_pool.clone(),
             fetch_response_queue.clone(),
