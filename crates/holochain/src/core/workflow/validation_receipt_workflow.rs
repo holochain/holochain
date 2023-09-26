@@ -16,6 +16,9 @@ use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
 
 #[cfg(test)]
+mod functional_tests;
+
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]
