@@ -10,7 +10,6 @@ use futures::FutureExt;
 use hdk::prelude::Action;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
-use holo_hash::HoloHashOf;
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::error::DatabaseResult;
@@ -25,7 +24,7 @@ use holochain_zome_types::cell::CellId;
 use holochain_zome_types::prelude::ValidationStatus;
 use holochain_zome_types::{Block, BlockTarget, CellBlockReason};
 use parking_lot::RwLock;
-use rusqlite::{named_params, Transaction};
+use rusqlite::named_params;
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -65,22 +64,16 @@ async fn do_not_block_or_send_to_self() {
     let author = fixt!(AgentPubKey);
 
     // Create a valid op that would require a validation receipt except that it's created by us
-    create_modified_op(vault.clone(), Some(author.clone()), |txn, op_hash| {
-        set_require_receipt(txn, &op_hash, true)?;
-        set_when_integrated(txn, &op_hash, Timestamp::now())?;
-        set_validation_status(txn, &op_hash, ValidationStatus::Valid)?;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    create_op_with_status(vault.clone(), Some(author.clone()), ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     // Create a rejected op which would usually cause a block but it's created by us
-    create_modified_op(vault.clone(), Some(author.clone()), |txn, op_hash| {
-        set_require_receipt(txn, &op_hash, true)?;
-        set_when_integrated(txn, &op_hash, Timestamp::now())?;
-        set_validation_status(txn, &op_hash, ValidationStatus::Rejected)?;
-        Ok(())
-    })
+    create_op_with_status(
+        vault.clone(),
+        Some(author.clone()),
+        ValidationStatus::Rejected,
+    )
     .await
     .unwrap();
 
@@ -113,14 +106,9 @@ async fn block_invalid_op_author() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     // Any op created by somebody else, which has been rejected by validation.
-    let (author, op_hash) = create_modified_op(vault.clone(), None, |txn, op_hash| {
-        set_require_receipt(txn, &op_hash, true)?;
-        set_when_integrated(txn, &op_hash, Timestamp::now())?;
-        set_validation_status(txn, &op_hash, ValidationStatus::Rejected)?;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    let (author, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Rejected)
+        .await
+        .unwrap();
 
     // We'll still send a validation receipt, but we should also block them
     let mut dna = MockHolochainP2pDnaT::new();
@@ -178,14 +166,9 @@ async fn stops_if_receipt_cannot_be_signed() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     // Any op created by somebody else, which is valid
-    create_modified_op(vault.clone(), None, |txn, op_hash| {
-        set_require_receipt(txn, &op_hash, true)?;
-        set_when_integrated(txn, &op_hash, Timestamp::now())?;
-        set_validation_status(txn, &op_hash, ValidationStatus::Valid)?;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipt().never();
@@ -220,14 +203,9 @@ async fn send_validation_receipt() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     // Any op created by somebody else, which is valid
-    let (_, op_hash) = create_modified_op(vault.clone(), None, |txn, op_hash| {
-        set_require_receipt(txn, &op_hash, true)?;
-        set_when_integrated(txn, &op_hash, Timestamp::now())?;
-        set_validation_status(txn, &op_hash, ValidationStatus::Valid)?;
-        Ok(())
-    })
-    .await
-    .unwrap();
+    let (_, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipt()
@@ -257,10 +235,10 @@ async fn send_validation_receipt() {
     assert!(!get_requires_receipt(vault.clone(), op_hash).await);
 }
 
-async fn create_modified_op(
+async fn create_op_with_status(
     vault: DbWrite<DbKindDht>,
     author: Option<AgentPubKey>,
-    modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
+    validation_status: ValidationStatus,
 ) -> StateMutationResult<(AgentPubKey, DhtOpHash)> {
     // The actual op does not matter, just some of the status fields
     let mut create_action = fixt!(Create);
@@ -276,7 +254,9 @@ async fn create_modified_op(
             let test_op_hash = test_op_hash.clone();
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op(txn, &op)?;
-                modifier(txn, test_op_hash)?;
+                set_require_receipt(txn, &op_hash, true)?;
+                set_when_integrated(txn, &op_hash, Timestamp::now())?;
+                set_validation_status(txn, &op_hash, validation_status)?;
 
                 Ok(())
             }
