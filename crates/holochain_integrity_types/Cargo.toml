@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 holo_hash = { version = "^0.2.3-beta-rc.0", path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.2.2", path = "../holochain_util", default-features = false }
 paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -52,5 +52,5 @@ test_utils = [
   "holo_hash/arbitrary",
   "holo_hash/hashing",
   "holo_hash/test_utils",
-  "holochain_serialized_bytes/arbitrary",
+  "holochain_serialized_bytes/fuzzing",
 ]
