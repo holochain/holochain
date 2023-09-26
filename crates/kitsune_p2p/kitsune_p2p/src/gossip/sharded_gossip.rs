@@ -4,9 +4,9 @@
 
 use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
-use crate::meta_net::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
+use crate::{meta_net::*, HostApiLegacy};
 use crate::{types::*, HostApi};
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
@@ -77,7 +77,6 @@ pub(crate) mod tests;
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
 type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
-type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug)]
 struct TimedBloomFilter {
@@ -163,8 +162,7 @@ impl ShardedGossip {
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: EventSender,
-        host_api: HostApi,
+        host_api: HostApiLegacy,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
@@ -187,7 +185,6 @@ impl ShardedGossip {
             gossip: ShardedGossipLocal {
                 tuning_params,
                 space,
-                evt_sender,
                 host_api,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
@@ -231,18 +228,16 @@ impl ShardedGossip {
                                     vec![]
                                 }
                             };
-                        all_agents = match store::all_agent_info(
-                            &this.gossip.evt_sender,
-                            &this.gossip.space,
-                        )
-                        .await
-                        {
-                            Ok(a) => a,
-                            Err(e) => {
-                                tracing::error!("Failed to query for all agents - {:?}", e);
-                                vec![]
-                            }
-                        };
+                        all_agents =
+                            match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
+                                .await
+                            {
+                                Ok(a) => a,
+                                Err(e) => {
+                                    tracing::error!("Failed to query for all agents - {:?}", e);
+                                    vec![]
+                                }
+                            };
                         refresh_agent_list_timer = std::time::Instant::now();
                     }
                 }
@@ -465,8 +460,7 @@ pub struct ShardedGossipLocal {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
-    evt_sender: EventSender,
-    host_api: HostApi,
+    host_api: HostApiLegacy,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
     fetch_pool: FetchPool,
@@ -1383,8 +1377,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
     ) -> GossipModule {
@@ -1392,7 +1385,6 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             tuning_params,
             space,
             ep_hnd,
-            evt_sender,
             host,
             GossipType::Recent,
             self.bandwidth.clone(),
@@ -1418,8 +1410,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
     ) -> GossipModule {
@@ -1427,7 +1418,6 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             tuning_params,
             space,
             ep_hnd,
-            evt_sender,
             host,
             GossipType::Historical,
             self.bandwidth.clone(),
