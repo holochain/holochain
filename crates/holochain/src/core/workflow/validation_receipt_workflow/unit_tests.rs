@@ -24,7 +24,7 @@ use holochain_zome_types::cell::CellId;
 use holochain_zome_types::prelude::ValidationStatus;
 use holochain_zome_types::{Block, BlockTarget, CellBlockReason};
 use parking_lot::RwLock;
-use rusqlite::named_params;
+use rusqlite::{named_params, Transaction};
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
