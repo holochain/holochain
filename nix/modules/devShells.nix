@@ -131,15 +131,15 @@
               '')
 
               (pkgs.writeShellScriptBin "scripts-cargo-update" ''
-                 set -xeu -o pipefail
+                set -xeu -o pipefail
 
-                 # Update the Holochain project Cargo.lock
-                 cargo update --manifest-path Cargo.toml
-                 # Update the release-automation crate's Cargo.lock
-                 cargo update --manifest-path crates/release-automation/Cargo.toml
-                 # Update the WASM workspace Cargo.lock
-                 cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
-               '')
+                # Update the Holochain project Cargo.lock
+                cargo update --manifest-path Cargo.toml
+                # Update the release-automation crate's Cargo.lock
+                cargo update --manifest-path crates/release-automation/Cargo.toml
+                # Update the WASM workspace Cargo.lock
+                cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
+              '')
             ]
 
             # generate one script for each of the "holochain-tests-" prefixed derivations by reusing their checkPhase
@@ -174,12 +174,32 @@
                 export CARGO_CACHE_RUSTC_INFO=1
                 export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
                 export NIX_PATH="nixpkgs=${pkgs.path}"
+                export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+                echo Rust development shell spawned. Type 'exit' to leave.
               '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
                 export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
               '');
             };
+
+        nixDev =
+          pkgs.mkShell
+            {
+              inputsFrom = [
+                self'.devShells.rustDev
+              ];
+
+              shellHook = self'.devShells.rustDev + ''
+                export RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
+              '';
+
+              packages = [
+                (pkgs.callPackage self.inputs.crate2nix.outPath { })
+                pkgs.llvmPackages.bintools
+              ];
+            };
       };
     };
+
 }
 
 

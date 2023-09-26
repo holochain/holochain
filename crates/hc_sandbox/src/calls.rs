@@ -246,6 +246,18 @@ pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyho
                 }
             }
         }
+
+        if cmds.is_empty() {
+            bail!(
+                "No running conductors found by searching the current directory. \
+                \nYou need to do one of: \
+                    \n\t1. Start a new sandbox conductor from this directory, \
+                    \n\t2. Change directory to where your sandbox conductor is running, \
+                    \n\t3. Use the --running flag to connect to a running conductor\
+                "
+            );
+        }
+
         cmds
     } else {
         let mut cmds = Vec::with_capacity(running.len());
@@ -451,6 +463,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         source: AppBundleSource::Path(path),
         membrane_proofs: Default::default(),
         network_seed,
+        #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     };
 

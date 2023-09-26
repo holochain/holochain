@@ -13,6 +13,9 @@ concurrency:
 jobs:
   test:
     uses: ./.github/workflows/holochain-build-and-test.yml
+    secrets:
+      GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
 
   github-actions-ci-jobs-succeed:
     if: ${{ always() }}

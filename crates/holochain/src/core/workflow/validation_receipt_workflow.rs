@@ -24,45 +24,7 @@ pub async fn pending_receipts(
     validators: Vec<AgentPubKey>,
 ) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
     vault
-        .read_async({
-            let validators = validators.clone();
-            move |txn| {
-                let mut stmt = txn.prepare(
-                    "
-            SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
-            DhtOp.when_integrated
-            From DhtOp
-            JOIN Action ON DhtOp.action_hash = Action.hash
-            WHERE
-            DhtOp.require_receipt = 1
-            AND
-            DhtOp.when_integrated IS NOT NULL
-            AND
-            DhtOp.validation_status IS NOT NULL
-            ",
-                )?;
-                let ops = stmt
-                    .query_and_then([], |r| {
-                        let author: AgentPubKey = r.get("author")?;
-                        let dht_op_hash: DhtOpHash = r.get("hash")?;
-                        let validation_status = r.get("validation_status")?;
-                        // NB: timestamp will never be null, so this is OK
-                        let when_integrated = r.get("when_integrated")?;
-                        StateQueryResult::Ok((
-                            ValidationReceipt {
-                                dht_op_hash: dht_op_hash.clone(),
-                                validation_status,
-                                validators: validators.clone(),
-                                when_integrated,
-                            },
-                            author,
-                            dht_op_hash,
-                        ))
-                    })?
-                    .collect::<StateQueryResult<Vec<_>>>()?;
-                StateQueryResult::Ok(ops)
-            }
-        })
+        .read_async({ move |txn| get_pending_validation_receipts(&txn, validators) })
         .await
 }
 
@@ -100,7 +62,6 @@ pub async fn validation_receipt_workflow(
         .collect::<Vec<_>>();
 
     // Get out all ops that are marked for sending receipt.
-    // FIXME: Test this query.
     let receipts = pending_receipts(&vault, validators.clone()).await?;
 
     let validators: HashSet<_> = validators.into_iter().collect();

@@ -87,7 +87,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install nix
         uses: cachix/install-nix-action@v20
       - name: Setup cachix
@@ -169,15 +169,7 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Generate crate READMEs from doc comments
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          cd "${HOLOCHAIN_REPO}"
-          nix run .#scripts-ci-generate-readmes
-
-      - name: Bump the crate versions for the release
+      - name: Generate READMEs and bump the crate versions
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         env:
@@ -188,10 +180,10 @@ jobs:
 
           cd ${HOLOCHAIN_REPO}
 
-          nix run .#cargo-sweep -s
-          nix run .#scripts-release-automation-check-and-bump $PWD
+          nix run .#cargo-sweep -- sweep -s
+          nix run .#scripts-release-automation-check-and-bump -- $PWD
           nix run .#scripts-ci-generate-readmes
-          nix run .#cargo-sweep -f
+          nix run .#cargo-sweep -- sweep -f
 
           if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
             echo "releasable_crates=true" >> $GITHUB_OUTPUT

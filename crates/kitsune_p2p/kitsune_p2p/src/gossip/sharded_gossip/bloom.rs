@@ -19,7 +19,7 @@ impl ShardedGossipLocal {
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
         let agents_within_arc: Vec<_> =
-            get_agent_info(&self.evt_sender, &self.space, common_arc_set).await?;
+            get_agent_info(&self.host_api, &self.space, common_arc_set).await?;
 
         // There was no agents so we don't create a bloom.
         if agents_within_arc.is_empty() {
@@ -63,7 +63,7 @@ impl ShardedGossipLocal {
         let search_end = search_time_window.end;
 
         let stream = store::hash_chunks_query(
-            self.evt_sender.clone(),
+            self.host_api.clone(),
             self.space.clone(),
             (**common_arc_set).clone(),
             search_time_window.clone(),
@@ -176,7 +176,7 @@ impl ShardedGossipLocal {
         } = remote_bloom;
         let end = time.end;
         let mut stream = store::hash_chunks_query(
-            self.evt_sender.clone(),
+            self.host_api.clone(),
             self.space.clone(),
             common_arc_set,
             time.clone(),
@@ -231,11 +231,11 @@ impl ShardedGossipLocal {
 }
 
 async fn get_agent_info(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    Ok(store::agent_info_within_arc_set(evt_sender, space, arc_set)
+    Ok(store::agent_info_within_arc_set(host_api, space, arc_set)
         .await?
         // Need to collect to know the length for the bloom filter.
         .collect())

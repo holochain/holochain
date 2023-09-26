@@ -1349,13 +1349,18 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
+            #[cfg(feature = "chc")]
+            let ignore_genesis_failure = payload.ignore_genesis_failure;
+            #[cfg(not(feature = "chc"))]
+            let ignore_genesis_failure = false;
+
             let InstallAppPayload {
                 source,
                 agent_key,
                 installed_app_id,
                 membrane_proofs,
                 network_seed,
-                ignore_genesis_failure,
+                ..
             } = payload;
 
             let bundle = {
@@ -2065,7 +2070,7 @@ mod app_status_impls {
         {
             for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                    if let Some(cell) = cells.get_mut(cell_id.borrow()) {
                         cell.status = status;
                     }
                 });
@@ -2687,7 +2692,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to stop app(s)", ?errors);
                     }
-
                     (NoChange, errors)
                 }
                 SpinUp | Both => {
@@ -2704,7 +2708,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to start app(s)", ?errors);
                     }
-
                     (delta, errors)
                 }
             };
