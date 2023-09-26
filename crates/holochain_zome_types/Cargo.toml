@@ -18,7 +18,7 @@ kitsune_p2p_block = { version = "^0.3.0-beta-dev.7", path = "../kitsune_p2p/bloc
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.6", path = "../kitsune_p2p/bin_data" }
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["encoding"] }
 holochain_integrity_types = { version = "^0.3.0-beta-dev.11", path = "../holochain_integrity_types", features = ["tracing"] }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 paste = "1.0.12"
 serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
@@ -26,7 +26,7 @@ serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.84"
+holochain_wasmer_common = "=0.0.85"
 
 # fixturator dependencies
 fixt = { version = "^0.2.0", path = "../fixt", optional = true }
@@ -80,7 +80,7 @@ test_utils = [
   "holo_hash/arbitrary",
   "holo_hash/hashing",
   "holo_hash/test_utils",
-  "holochain_serialized_bytes/arbitrary",
+  "holochain_serialized_bytes/fuzzing",
   "full-dna-def",
   "holochain_integrity_types/test_utils",
 ]
