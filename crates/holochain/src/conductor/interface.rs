@@ -58,7 +58,7 @@ impl SignalBroadcaster {
     pub(crate) fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.senders.iter_mut().for_each(|tx| {
             if let Err(err) = tx.send(sig.clone()) {
-                tracing::error!(
+                tracing::info!(
                     "{:?}: no app websocket connected",
                     InterfaceError::SignalSend(err)
                 )
