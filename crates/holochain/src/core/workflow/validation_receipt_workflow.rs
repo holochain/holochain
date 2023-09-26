@@ -16,10 +16,10 @@ use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
 
 #[cfg(test)]
-mod functional_tests;
+mod tests;
 
 #[cfg(test)]
-mod tests;
+mod unit_tests;
 
 pub async fn pending_receipts(
     vault: &DbRead<DbKindDht>,
@@ -41,10 +41,10 @@ pub async fn validation_receipt_workflow<B>(
     network: impl HolochainP2pDnaT,
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
-    mut apply_block: B,
+    apply_block: B,
 ) -> WorkflowResult<WorkComplete>
 where
-    B: FnMut(Block) -> BoxFuture<'static, DatabaseResult<()>>,
+    B: Fn(Block) -> BoxFuture<'static, DatabaseResult<()>>,
 {
     if running_cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);
