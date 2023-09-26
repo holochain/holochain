@@ -1,6 +1,7 @@
 use crate::actor::*;
 use crate::event::*;
 use crate::HostApi;
+use crate::HostApiLegacy;
 
 mod actor;
 pub(crate) use actor::meta_net;
@@ -28,20 +29,11 @@ pub async fn spawn_kitsune_p2p(
     let internal_sender = channel_factory.create_channel::<Internal>().await?;
 
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
+    let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(
-        builder.spawn(
-            KitsuneP2pActor::new(
-                config,
-                tls_config,
-                channel_factory,
-                internal_sender,
-                evt_send,
-                host,
-            )
-            .await?,
-        ),
-    );
+    tokio::task::spawn(builder.spawn(
+        KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host).await?,
+    ));
 
     Ok((sender, evt_recv))
 }
@@ -71,20 +63,11 @@ where
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
 
     let (t, host) = build_host(sender.clone()).await;
+    let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(
-        builder.spawn(
-            KitsuneP2pActor::new(
-                config,
-                tls_config,
-                channel_factory,
-                internal_sender,
-                evt_send,
-                host,
-            )
-            .await?,
-        ),
-    );
+    tokio::task::spawn(builder.spawn(
+        KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host).await?,
+    ));
 
     Ok((sender, evt_recv, t))
 }
