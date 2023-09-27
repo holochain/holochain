@@ -64,12 +64,13 @@ async fn do_not_block_or_send_to_self() {
     let author = fixt!(AgentPubKey);
 
     // Create a valid op that would require a validation receipt except that it's created by us
-    create_op_with_status(vault.clone(), Some(author.clone()), ValidationStatus::Valid)
-        .await
-        .unwrap();
+    let (_, valid_op_hash) =
+        create_op_with_status(vault.clone(), Some(author.clone()), ValidationStatus::Valid)
+            .await
+            .unwrap();
 
     // Create a rejected op which would usually cause a block but it's created by us
-    create_op_with_status(
+    let (_, rejected_op_hash) = create_op_with_status(
         vault.clone(),
         Some(author.clone()),
         ValidationStatus::Rejected,
@@ -85,7 +86,7 @@ async fn do_not_block_or_send_to_self() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault,
+        vault.clone(),
         dna,
         keystore,
         vec![validator].into_iter().collect(), // No running cells
@@ -95,6 +96,9 @@ async fn do_not_block_or_send_to_self() {
     .unwrap();
 
     assert_eq!(WorkComplete::Complete, work_complete);
+
+    assert!(!get_requires_receipt(vault.clone(), valid_op_hash).await);
+    assert!(!get_requires_receipt(vault.clone(), rejected_op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
