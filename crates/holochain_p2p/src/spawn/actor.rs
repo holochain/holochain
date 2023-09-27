@@ -17,6 +17,7 @@ use crate::types::AgentPubKeyExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 
+use holochain_trace::tracing::{info, warn};
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -561,7 +562,7 @@ impl HolochainP2pActor {
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         receipt: Vec<u8>,
-    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let receipt: SerializedBytes = UnsafeBytes::from(receipt).into();
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
@@ -570,8 +571,7 @@ impl HolochainP2pActor {
                 .await?;
 
             // validation receipts don't need a response
-            // send back an empty vec for now
-            Ok(Vec::with_capacity(0))
+            Ok(())
         }
         .boxed()
         .into())
@@ -765,7 +765,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 self.handle_incoming_must_get_agent_activity(space, to_agent, agent, filter)
             }
             crate::wire::WireMessage::ValidationReceipt { receipt } => {
-                self.handle_incoming_validation_receipt(space, to_agent, receipt)
+                // TODO This shouldn't be removed immediately because existing conductors will will be sending these messages.
+                //      Once this change has been back-ported, it can be removed on develop.
+                warn!("Got a validation receipt in a call, this is deprecated and will be removed in a future release.");
+                Ok(self
+                    .handle_incoming_validation_receipt(space, to_agent, receipt)?
+                    .map(|_| Ok(vec![]))
+                    .boxed()
+                    .into())
             }
             // holochain_p2p only broadcasts this message.
             crate::wire::WireMessage::CountersigningSessionNegotiation { .. }
@@ -799,8 +806,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             | crate::wire::WireMessage::GetLinks { .. }
             | crate::wire::WireMessage::CountLinks { .. }
             | crate::wire::WireMessage::GetAgentActivity { .. }
-            | crate::wire::WireMessage::MustGetAgentActivity { .. }
-            | crate::wire::WireMessage::ValidationReceipt { .. } => {
+            | crate::wire::WireMessage::MustGetAgentActivity { .. } => {
                 Err(HolochainP2pError::invalid_p2p_message(
                     "invalid call type message in a notify".to_string(),
                 )
@@ -856,6 +862,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     }
                     None => Err(HolochainP2pError::RoutingAgentError(to_agent).into()),
                 }
+            }
+            WireMessage::ValidationReceipt { receipt } => {
+                info!("Got validation receipt as a notify");
+                self.handle_incoming_validation_receipt(space, to_agent, receipt)
             }
             crate::wire::WireMessage::CountersigningSessionNegotiation { message } => {
                 self.handle_incoming_countersigning_session_negotiation(space, to_agent, message)
@@ -1410,9 +1420,14 @@ impl HolochainP2pHandler for HolochainP2pActor {
 
         let req = crate::wire::WireMessage::validation_receipt(receipt).encode()?;
 
+        let timeout = self.tuning_params.implicit_timeout();
+
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            kitsune_p2p.rpc_single(space, to_agent, req, None).await?;
+            info!("Sending validation receipt as notify");
+            kitsune_p2p
+                .targeted_broadcast(space, vec![to_agent], timeout, req, false)
+                .await?;
             Ok(())
         }
         .boxed()
