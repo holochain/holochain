@@ -1,10 +1,6 @@
 name: "Holonix cache"
 
 on:
-  # TODO for testing only
-  pull_request:
-    branches:
-      - develop
   push:
     branches:
       - develop
