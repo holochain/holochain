@@ -1,6 +1,6 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
-use crate::{HostStub, KitsuneHost};
+use crate::{HostApi, HostStub, KitsuneHost};
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};

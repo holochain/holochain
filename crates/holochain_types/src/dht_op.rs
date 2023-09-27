@@ -27,7 +27,7 @@ pub mod error;
 #[cfg(test)]
 pub mod tests;
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 pub mod facts;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
@@ -35,7 +35,7 @@ pub mod facts;
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum DhtOp {
     #[display(fmt = "StoreRecord")]
     /// Used to notify the authority for an action that it has been created.

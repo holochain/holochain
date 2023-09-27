@@ -4,10 +4,8 @@ use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
 
 use super::*;
 use crate::fixt::*;
-use arbitrary::Arbitrary;
 use fixt::prelude::*;
 
-#[cfg(test)]
 mod bloom;
 mod common;
 mod ops;
@@ -20,6 +18,7 @@ impl ShardedGossipLocal {
         host: HostApiLegacy,
         inner: ShardedGossipLocalState,
     ) -> Self {
+        use arbitrary::Arbitrary;
         let mut u = arbitrary::Unstructured::new(&NOISE);
         let space = KitsuneSpace::arbitrary(&mut u).unwrap();
         let space = Arc::new(space);

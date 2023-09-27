@@ -34,7 +34,7 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 /// functions.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[serde(tag = "type")]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
@@ -116,7 +116,7 @@ macro_rules! write_into_action {
         /// A unit enum which just maps onto the different Action variants,
         /// without containing any extra data
         #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Eq, Clone, Debug)]
-        #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+        #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
         pub enum ActionType {
             $($n,)*
         }
@@ -420,7 +420,7 @@ impl_hashable_content_for_ref!(Delete);
     Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct ZomeIndex(pub u8);
 
 impl ZomeIndex {
@@ -442,12 +442,12 @@ impl ZomeIndex {
     Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct EntryDefIndex(pub u8);
 
 /// The Dna Action is always the first action in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -458,7 +458,7 @@ pub struct Dna {
 /// Action for an agent validation package, used to determine whether an agent
 /// is allowed to participate in this DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -471,7 +471,7 @@ pub struct AgentValidationPkg {
 /// A action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -481,7 +481,7 @@ pub struct InitZomesComplete {
 
 /// Declares that a metadata Link should be made between two EntryHashes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct CreateLink<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -499,7 +499,7 @@ pub struct CreateLink<W = RateWeight> {
 
 /// Declares that a previously made Link should be nullified and considered removed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct DeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -517,7 +517,7 @@ pub struct DeleteLink {
 /// When migrating to a new version of a DNA, this action is committed to the
 /// new chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct OpenChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -530,7 +530,7 @@ pub struct OpenChain {
 /// When migrating to a new version of a DNA, this action is committed to the
 /// old chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct CloseChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -543,7 +543,7 @@ pub struct CloseChain {
 /// A action which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such actions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Create<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -571,7 +571,7 @@ pub struct Create<W = EntryRateWeight> {
 /// so there can only be a linear history of action updates, even if the entry history
 /// experiences repeats.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Update<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -594,7 +594,7 @@ pub struct Update<W = EntryRateWeight> {
 /// that a previously published Entry will become inaccessible if all of its
 /// Actions are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Delete<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -611,7 +611,7 @@ pub struct Delete<W = RateWeight> {
 /// Placeholder for future when we want to have updates on actions
 /// Not currently in use.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct UpdateAction {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -624,7 +624,7 @@ pub struct UpdateAction {
 /// Placeholder for future when we want to have deletes on actions
 /// Not currently in use.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct DeleteAction {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -639,7 +639,7 @@ pub struct DeleteAction {
 /// referencing. Useful for examining Actions without needing to fetch the
 /// corresponding Entries.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -680,7 +680,7 @@ impl std::fmt::Display for EntryType {
 
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AppEntryDef {
     /// A unique u8 identifier within a zome for this
     /// entry type.
