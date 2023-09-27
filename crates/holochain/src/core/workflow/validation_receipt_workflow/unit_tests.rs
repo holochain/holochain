@@ -254,9 +254,9 @@ async fn create_op_with_status(
             let test_op_hash = test_op_hash.clone();
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op(txn, &op)?;
-                set_require_receipt(txn, &op_hash, true)?;
-                set_when_integrated(txn, &op_hash, Timestamp::now())?;
-                set_validation_status(txn, &op_hash, validation_status)?;
+                set_require_receipt(txn, &test_op_hash, true)?;
+                set_when_integrated(txn, &test_op_hash, Timestamp::now())?;
+                set_validation_status(txn, &test_op_hash, validation_status)?;
 
                 Ok(())
             }
