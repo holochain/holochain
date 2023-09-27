@@ -24,7 +24,7 @@ pub async fn pending_receipts(
     validators: Vec<AgentPubKey>,
 ) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
     vault
-        .read_async({ move |txn| get_pending_validation_receipts(&txn, validators) })
+        .read_async(move |txn| get_pending_validation_receipts(&txn, validators))
         .await
 }
 
