@@ -1,4 +1,5 @@
 use super::*;
+use crate::event::KitsuneP2pEvent;
 use crate::test_util::data::mk_agent_info;
 use crate::{KitsuneBinType, KitsuneHostDefaultError};
 use futures::FutureExt;
@@ -81,6 +82,14 @@ impl HostStub {
     /// Get the count of requests that have failed due to `fail_next_request`.
     pub fn get_fail_count(&self) -> usize {
         self.fail_count.load(Ordering::SeqCst)
+    }
+
+    /// Wrap it up with a legacy sender
+    pub fn legacy(
+        self: Arc<Self>,
+        sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    ) -> HostApiLegacy {
+        HostApiLegacy::new(self, sender)
     }
 }
 

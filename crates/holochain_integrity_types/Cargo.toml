@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util", default-features = false }
 paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -33,7 +33,7 @@ subtle-encoding = {version = "0.5", optional = true}
 tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
-holochain_integrity_types = { path = ".", features = ["test_utils"]}
+holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"]}
 serde_json = "1"
 
 [features]
@@ -47,12 +47,16 @@ full = ["default", "hashing", "subtle-encoding", "kitsune_p2p_timestamp/full"]
 
 full-dna-def = ["derive_builder"]
 
+fuzzing = [
+  "arbitrary",
+  "kitsune_p2p_timestamp/fuzzing",
+  "holochain_serialized_bytes/fuzzing",
+  "holo_hash/fuzzing",
+]
+
 test_utils = [
   "full",
-  "arbitrary",
-  "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",
-  "holo_hash/arbitrary",
+  "holo_hash/hashing",
   "holo_hash/test_utils",
-  "holochain_serialized_bytes/arbitrary",
 ]

@@ -8,7 +8,7 @@ const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EntryDefId {
     App(AppEntryName),
     CapClaim,
@@ -22,7 +22,7 @@ pub enum EntryDefId {
 /// This may be removed.
 pub struct AppEntryName(pub Cow<'static, str>);
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for AppEntryName {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self(Cow::Owned(String::arbitrary(u)?)))
@@ -46,13 +46,13 @@ pub trait EntryDefRegistration {
 )]
 /// The number of validations required for an entry to
 /// be considered published.
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct RequiredValidations(pub u8);
 
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
     pub id: EntryDefId,
@@ -84,7 +84,7 @@ pub struct EntryDefs(pub Vec<EntryDef>);
     Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub enum EntryVisibility {
     Public,
     Private,
