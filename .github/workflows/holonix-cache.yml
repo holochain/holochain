@@ -67,6 +67,7 @@ jobs:
           - ".#devShells.{0}.holonix"
           - ".#packages.{0}.hc-scaffold"
         extra_args:
+          - ''
           - '--override-input versions ./versions/0_1'
           - '--override-input versions ./versions/0_2'
           - '--override-input versions ./versions/weekly'
