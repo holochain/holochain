@@ -14,8 +14,9 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 /// [`SpaceSegment`]s are implied by the [`ArqBoundsSet`].
 ///
 /// LTCS stands for Logarithmic Time, Constant Space.
-#[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "test_utils", derive(Clone))]
+#[derive(
+    Debug, Clone, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize,
+)]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
     pub(super) arq_set: ArqSet,
@@ -108,8 +109,7 @@ impl RegionCoordSetLtcs {
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
-#[derive(serde::Serialize, serde::Deserialize, Derivative)]
-#[cfg_attr(feature = "test_utils", derive(Clone))]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
 pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The generator for the coordinates
