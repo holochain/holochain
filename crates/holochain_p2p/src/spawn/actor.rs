@@ -17,7 +17,7 @@ use crate::types::AgentPubKeyExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 
-use holochain_trace::tracing::{info, warn};
+use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -864,7 +864,6 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 }
             }
             WireMessage::ValidationReceipt { receipt } => {
-                info!("Got validation receipt as a notify");
                 self.handle_incoming_validation_receipt(space, to_agent, receipt)
             }
             crate::wire::WireMessage::CountersigningSessionNegotiation { message } => {
@@ -1424,7 +1423,6 @@ impl HolochainP2pHandler for HolochainP2pActor {
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            info!("Sending validation receipt as notify");
             kitsune_p2p
                 .targeted_broadcast(space, vec![to_agent], timeout, req, false)
                 .await?;
