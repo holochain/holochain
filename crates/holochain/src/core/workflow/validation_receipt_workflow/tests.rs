@@ -13,7 +13,6 @@ use holochain_types::prelude::*;
 use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "flaky"]
 async fn test_validation_receipt() {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;

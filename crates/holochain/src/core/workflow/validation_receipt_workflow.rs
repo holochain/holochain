@@ -36,8 +36,6 @@ pub async fn pending_receipts(
 #[instrument(skip(vault, network, keystore, apply_block))]
 /// Send validation receipts to their authors in serial and without waiting for
 /// responses.
-/// TODO: Currently still waiting for responses because we don't have a network call
-/// that doesn't.
 pub async fn validation_receipt_workflow<B>(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
@@ -106,8 +104,6 @@ where
         };
 
         // Send it and don't wait for response.
-        // TODO: When networking has a send without response we can use that
-        // instead of waiting for response.
         if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
             &network,
             author.clone(),
