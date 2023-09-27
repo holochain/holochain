@@ -63,9 +63,7 @@ mod next_target;
 // code path due to test_utils, the helper functions defined in this module
 // are not used due to the tests themselves not being compiled, so it's easier
 // to do this than to annotate each function as `#[cfg(test)]`
-#[cfg(any(test, feature = "test_utils"))]
-#[allow(dead_code)]
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)

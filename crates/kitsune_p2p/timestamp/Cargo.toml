@@ -35,5 +35,7 @@ now = ["chrono"]
 
 full = ["now"]
 
+fuzzing = ["arbitrary"]
+
 sqlite-encrypted = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
 sqlite = [ "rusqlite", "rusqlite/bundled" ]

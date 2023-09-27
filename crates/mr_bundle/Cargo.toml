@@ -35,4 +35,5 @@ tempfile = "3"
 
 [features]
 
+fuzzing = ["arbitrary"]
 packing = ["serde_yaml", "holochain_util/tokio"]

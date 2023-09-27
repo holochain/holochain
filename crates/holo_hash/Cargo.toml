@@ -45,6 +45,11 @@ full = [
     "sqlite"
 ]
 
+fuzzing = [
+    "arbitrary",
+    "holochain_serialized_bytes?/fuzzing",
+]
+
 fixturators = ["fixt", "rand", "hashing", "encoding"]
 hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]

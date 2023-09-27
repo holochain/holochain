@@ -70,17 +70,21 @@ fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_inte
 
 properties = ["serde_yaml"]
 
-test_utils = [
+fuzzing = [
   "arbitrary",
   "contrafact",
+  "kitsune_p2p_timestamp/fuzzing",
+  "holochain_integrity_types/fuzzing",
+  "holochain_serialized_bytes/fuzzing",
+]
+
+test_utils = [
   "once_cell",
-  "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",
   "kitsune_p2p_block/sqlite",
-  "holo_hash/arbitrary",
+  "holo_hash/fuzzing",
   "holo_hash/hashing",
   "holo_hash/test_utils",
-  "holochain_serialized_bytes/fuzzing",
   "full-dna-def",
   "holochain_integrity_types/test_utils",
 ]
