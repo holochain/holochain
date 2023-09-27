@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 /// The various types of database, used to specify the list of databases to initialize
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DbKind {
     /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
     Authored(Arc<DnaHash>),

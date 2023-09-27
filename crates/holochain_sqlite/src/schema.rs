@@ -64,14 +64,36 @@ impl Schema {
         conn: &mut Connection,
         db_kind: Option<DbKind>,
     ) -> rusqlite::Result<()> {
-        let user_version: u16 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        self.initialize_nonstandard(conn, db_kind, true)
+    }
+
+    pub fn initialize_nonstandard(
+        &self,
+        conn: &mut Connection,
+        db_kind: Option<DbKind>,
+        track_migrations: bool,
+    ) -> rusqlite::Result<()> {
         let db_kind = db_kind
             .as_ref()
-            .map(ToString::to_string)
+            .map(|k| format!("{:?}", k))
             .unwrap_or_else(|| "<no name>".to_string());
 
-        let migrations_applied = user_version as usize;
+        let migrations_applied = {
+            if track_migrations {
+                let user_version: u16 =
+                    conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+                user_version as usize
+            } else {
+                0
+            }
+        };
         let num_migrations = self.migrations.len();
+        dbg!(
+            &db_kind,
+            track_migrations,
+            &migrations_applied,
+            &num_migrations
+        );
         match migrations_applied.cmp(&(num_migrations)) {
             std::cmp::Ordering::Less => {
                 let mut txn = conn.transaction()?;
@@ -90,14 +112,18 @@ impl Schema {
                     num_migrations - 1,
                 );
             }
-            std::cmp::Ordering::Equal => {
+            std::cmp::Ordering::Greater if track_migrations => {
+                unimplemented!(
+                    "backward migrations unimplemented. current: {}, target: {}",
+                    migrations_applied,
+                    num_migrations
+                );
+            }
+            _ => {
                 tracing::debug!(
                     "database needed no migration or initialization, good to go: {}",
                     db_kind
                 );
-            }
-            std::cmp::Ordering::Greater => {
-                unimplemented!("backward migrations unimplemented");
             }
         }
 

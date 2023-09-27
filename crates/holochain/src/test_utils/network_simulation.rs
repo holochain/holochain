@@ -12,6 +12,7 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::DbKind;
 use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
@@ -219,11 +220,16 @@ pub async fn generate_test_data(
         authored: data.authored,
     };
     let data = MockNetworkData::new(generated_data);
-    let conn = cache_data(in_memory, &data, is_cached);
+    let conn = cache_data(in_memory, &data, is_cached, &dna_hash);
     (data, conn)
 }
 
-fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Connection {
+fn cache_data(
+    in_memory: bool,
+    data: &MockNetworkData,
+    is_cached: bool,
+    dna_hash: &DnaHash,
+) -> Connection {
     let mut conn = if in_memory {
         Connection::open_in_memory().unwrap()
     } else {
@@ -235,12 +241,17 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     if is_cached && !in_memory {
         return conn;
     }
+    dbg!();
+
+    // Note: applying two different schemas to the same database breaks the migration
+    //       system, hence why we need "nonstandard" initialization
     holochain_sqlite::schema::SCHEMA_CELL
-        .initialize(&mut conn, None)
+        .initialize_nonstandard(&mut conn, None, false)
         .unwrap();
     holochain_sqlite::schema::SCHEMA_P2P_STATE
-        .initialize(&mut conn, None)
+        .initialize_nonstandard(&mut conn, None, false)
         .unwrap();
+
     let mut txn = conn
         .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
         .unwrap();
@@ -266,7 +277,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     .unwrap();
     txn.execute(
         "
-        INSERT INTO Uuid (integrity_uuid, coordinator_uuid) VALUES(?)
+        INSERT INTO Uuid (integrity_uuid, coordinator_uuid) VALUES(?, ?)
         ",
         [&data.integrity_uuid, &data.coordinator_uuid],
     )
@@ -295,6 +306,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
 }
 
 fn get_cached() -> Option<GeneratedData> {
+    dbg!();
     let p = std::env::temp_dir()
         .join("mock_test_data")
         .join("mock_test_data.sqlite3");
