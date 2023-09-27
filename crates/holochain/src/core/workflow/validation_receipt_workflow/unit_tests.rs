@@ -162,7 +162,7 @@ async fn block_invalid_op_author() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stops_if_receipt_cannot_be_signed() {
+async fn continues_if_receipt_cannot_be_signed() {
     holochain_trace::test_run().ok();
 
     let test_db = holochain_state::test_utils::test_dht_db();
@@ -170,7 +170,7 @@ async fn stops_if_receipt_cannot_be_signed() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     // Any op created by somebody else, which is valid
-    create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+    let (_, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
         .await
         .unwrap();
 
@@ -186,7 +186,7 @@ async fn stops_if_receipt_cannot_be_signed() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault,
+        vault.clone(),
         dna,
         keystore,
         vec![invalid_validator].into_iter().collect(), // No running cells
@@ -195,7 +195,8 @@ async fn stops_if_receipt_cannot_be_signed() {
     .await
     .unwrap();
 
-    assert_eq!(WorkComplete::Incomplete, work_complete);
+    assert_eq!(WorkComplete::Complete, work_complete);
+    assert!(!get_requires_receipt(vault, op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
