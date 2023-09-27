@@ -843,7 +843,7 @@ impl MetaNet {
         }
 
         let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
-        tx5::Tx5InitConfig { 
+        tx5::deps::tx5_core::Tx5InitConfig { 
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
             ephemeral_udp_port_max: tuning_params.tx5_max_ephemeral_udp_port,
         }.set_as_global_default()?;
