@@ -1,0 +1,18 @@
+[package]
+name = "holochain_nonce"
+version = "0.3.0-beta-dev.18"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2021"
+description = "This crate is for generating nonces."
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_nonces"
+
+[dependencies]
+getrandom = "0.2.7"
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.2", path = "../kitsune_p2p/timestamp" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.18", path = "../holochain_secure_primitive", default-features = false }
+
+[dev-dependencies]
+holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zome_types", features = ["full"] }
+hdk = { path = "../hdk", version = "^0.3.0-beta-dev.15" }

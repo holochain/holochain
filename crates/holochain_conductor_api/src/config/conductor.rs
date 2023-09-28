@@ -2,7 +2,7 @@
 //! This module is used to configure the conductor
 
 use holochain_types::db::DbSyncStrategy;
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::{KitsuneP2pTuningParams, KitsuneP2pConfig};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -49,7 +49,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+    pub network: Option<KitsuneP2pConfig>,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.

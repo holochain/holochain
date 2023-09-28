@@ -82,7 +82,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
-use holochain_state::nonce::*;
+use holochain_nonce::*;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_zome_types::block::BlockTargetId;
@@ -759,7 +759,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holo_hash::AgentPubKey;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_state::nonce::fresh_nonce;
+    use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
 

@@ -2702,6 +2702,7 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_metrics",
+ "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
@@ -2909,6 +2910,7 @@ dependencies = [
  "directories",
  "holo_hash",
  "holochain_keystore",
+ "holochain_serialized_bytes 0.0.51",
  "holochain_state_types",
  "holochain_trace",
  "holochain_types",
@@ -3004,6 +3006,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_nonce"
+version = "0.3.0-beta-dev.18"
+dependencies = [
+ "getrandom 0.2.10",
+ "hdk",
+ "holochain_secure_primitive",
+ "holochain_zome_types",
+ "kitsune_p2p_timestamp",
+]
+
+[[package]]
 name = "holochain_p2p"
 version = "0.3.0-beta-dev.18"
 dependencies = [
@@ -3029,6 +3042,15 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+]
+
+[[package]]
+name = "holochain_secure_primitive"
+version = "0.3.0-beta-dev.18"
+dependencies = [
+ "paste",
+ "serde",
+ "subtle",
 ]
 
 [[package]]
@@ -3149,6 +3171,7 @@ dependencies = [
  "hdk",
  "holo_hash",
  "holochain_keystore",
+ "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
@@ -3179,6 +3202,11 @@ dependencies = [
 [[package]]
 name = "holochain_state_types"
 version = "0.3.0-beta-dev.18"
+dependencies = [
+ "holo_hash",
+ "holochain_integrity_types",
+ "serde",
+]
 
 [[package]]
 name = "holochain_test_wasm_common"

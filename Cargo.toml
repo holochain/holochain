@@ -25,6 +25,8 @@ members = [
   "crates/holochain_websocket",
   "crates/holochain_util",
   "crates/holochain_metrics",
+  "crates/holochain_secure_primitive",
+  "crates/holochain_nonce",
 
   "crates/hc",
   "crates/hc_bundle",

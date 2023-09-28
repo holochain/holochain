@@ -15,7 +15,7 @@ use arbitrary::Arbitrary;
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call() {
     use holochain_conductor_api::ZomeCall;
-    use holochain_state::nonce::fresh_nonce;
+    use holochain_nonce::fresh_nonce;
     use holochain_zome_types::{
         CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
     };
@@ -158,7 +158,7 @@ async fn signed_zome_call() {
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call_wildcard() {
     use holochain_conductor_api::ZomeCall;
-    use holochain_state::nonce::fresh_nonce;
+    use holochain_nonce::fresh_nonce;
     use holochain_zome_types::{
         CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
     };

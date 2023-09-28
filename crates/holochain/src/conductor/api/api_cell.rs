@@ -16,7 +16,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::WitnessNonceResult;
+use holochain_nonce::WitnessNonceResult;
 use holochain_state::prelude::DatabaseResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::block::Block;

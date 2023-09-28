@@ -37,6 +37,7 @@ holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util", fe
 holochain_wasmer_host = "=0.0.84"
 holochain_websocket = { version = "^0.3.0-beta-dev.3", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zome_types", features = ["full"] }
+holochain_nonce = {version = "0.3.0-beta-dev.18", path = "../holochain_nonce"}
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p", default-features = false }

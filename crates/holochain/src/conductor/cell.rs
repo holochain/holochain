@@ -38,7 +38,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::fresh_nonce;
+use holochain_nonce::fresh_nonce;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
