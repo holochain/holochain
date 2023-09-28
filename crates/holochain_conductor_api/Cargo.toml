@@ -11,7 +11,7 @@ edition = "2021"
 [dependencies]
 directories = "2.0.2"
 derive_more = "0.99.3"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/kitsune_p2p_types" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/types" }
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.3.0-beta-dev.18", path = "../holochain_state_types" }
 holochain_types = { version = "^0.3.0-beta-dev.16", path = "../holochain_types" }
@@ -33,18 +33,12 @@ holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
 chc = []
 sqlite-encrypted = [
     "holo_hash/sqlite-encrypted",
-    "kitsune_p2p/sqlite-encrypted",
-    "holochain_p2p/sqlite-encrypted",
-    "holochain_state/sqlite-encrypted",
     "holochain_types/sqlite-encrypted",
     "holochain_zome_types/sqlite-encrypted",
     "holochain_keystore/sqlite-encrypted",
 ]
 sqlite = [
     "holo_hash/sqlite",
-    "kitsune_p2p/sqlite",
-    "holochain_p2p/sqlite",
-    "holochain_state/sqlite",
     "holochain_types/sqlite",
     "holochain_zome_types/sqlite",
     "holochain_keystore/sqlite",
