@@ -9,6 +9,7 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
 use holochain_types::prelude::block::BlockTargetId;
 use holochain_types::prelude::*;
+use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_validation_receipt() {
