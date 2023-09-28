@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+## Holonix
+
+- Slim down the Rust toolchain [#2854](https://github.com/holochain/holochain/pull/2854)
+    - choose a manual set of toolchain components and effectively exclude _rust-docs_.
+    - only keep `wasm32-unknown-unknown` as a cross-compilation target.
+
 # 20230927.003337
 
 ## [holochain\_cli-0.3.0-beta-dev.19](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.19)
