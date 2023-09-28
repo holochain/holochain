@@ -298,6 +298,54 @@ async fn skips_sending_to_same_unavailable_author() {
     // first time but panic if it is called more than once.
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
+    holochain_trace::test_run().ok();
+
+    let test_db = holochain_state::test_utils::test_dht_db();
+    let vault = test_db.to_db();
+    let keystore = holochain_state::test_utils::test_keystore();
+
+    let (_, op_hash1) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
+
+    let (_, op_hash2) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
+
+    let mut dna = MockHolochainP2pDnaT::new();
+    dna.expect_send_validation_receipt()
+        .return_once(|_, _| Err("I'm a test error".into()));
+
+    dna.expect_send_validation_receipt()
+        .return_once(|_, _| Ok(()));
+
+    let dna_hash = fixt!(DnaHash);
+
+    let validator = CellId::new(
+        dna_hash.clone(),
+        keystore.new_sign_keypair_random().await.unwrap(),
+    );
+
+    let work_complete = validation_receipt_workflow(
+        Arc::new(dna_hash),
+        vault.clone(),
+        dna,
+        keystore,
+        vec![validator].into_iter().collect(), // No running cells
+        |_block| unreachable!("Should not try to block"),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(WorkComplete::Complete, work_complete);
+
+    // Should no longer require a receipt for either
+    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+    assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
+}
+
 async fn create_op_with_status(
     vault: DbWrite<DbKindDht>,
     author: Option<AgentPubKey>,

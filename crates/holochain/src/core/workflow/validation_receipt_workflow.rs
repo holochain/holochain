@@ -158,7 +158,7 @@ where
             return Ok(SendOutcome::Attempted);
         }
         Err(e) => {
-            // TODO Which errors are retryable here? A fatal error would keep being retried and we don't want that so
+            // TODO Which errors are retryable here? A fatal error would keep being retried and we don't want that;
             //      aggressively give up for now.
             info!(failed_to_sign_receipt = ?e);
             return Ok(SendOutcome::Attempted);
