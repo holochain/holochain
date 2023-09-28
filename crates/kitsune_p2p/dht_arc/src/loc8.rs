@@ -1,7 +1,5 @@
 use std::collections::BTreeSet;
 
-use kitsune_p2p_timestamp::ArbitraryFuzzing;
-
 use crate::{loc_downscale, loc_upscale, DhtArcRange, DhtLocation};
 
 /// A representation of DhtLocation in the u8 space. Useful for writing tests
@@ -156,7 +154,7 @@ impl DhtArcRange {
     }
 }
 
-impl<L: Copy + ArbitraryFuzzing> DhtArcRange<L>
+impl<L: Copy> DhtArcRange<L>
 where
     Loc8: From<L>,
 {

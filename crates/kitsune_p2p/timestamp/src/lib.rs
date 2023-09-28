@@ -9,9 +9,6 @@ mod human;
 #[cfg(feature = "chrono")]
 pub use human::*;
 
-mod util;
-pub use util::*;
-
 use core::ops::{Add, Sub};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};

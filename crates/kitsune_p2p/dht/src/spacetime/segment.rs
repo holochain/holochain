@@ -1,5 +1,3 @@
-use kitsune_p2p_timestamp::ArbitraryFuzzing;
-
 use super::*;
 
 /// An Offset represents the position of the left edge of some Segment.
@@ -8,9 +6,7 @@ use super::*;
 /// context, and topology of the space, by:
 ///
 ///   dht_location = offset * 2^pow * quantum_size
-pub trait Offset:
-    Sized + Copy + Clone + Deref<Target = u32> + From<u32> + ArbitraryFuzzing
-{
+pub trait Offset: Sized + Copy + Clone + Deref<Target = u32> + From<u32> {
     /// The type of quantum to map to, which also implies the absolute coordinates
     type Quantum: Quantum;
 

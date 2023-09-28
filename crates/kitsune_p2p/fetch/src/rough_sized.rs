@@ -1,7 +1,5 @@
-use std::hash::Hash;
-
-use kitsune_p2p_timestamp::ArbitraryFuzzing;
 use kitsune_p2p_types::KOpHash;
+use std::hash::Hash;
 
 /// The granularity once we're > i16::MAX
 const GRAN: usize = 4096;
@@ -72,7 +70,7 @@ pub type OpHashSized = RoughSized<KOpHash>;
     derive_more::Deref,
 )]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
-pub struct RoughSized<T: ArbitraryFuzzing> {
+pub struct RoughSized<T> {
     /// The data to be sized
     #[deref]
     data: T,
@@ -81,7 +79,7 @@ pub struct RoughSized<T: ArbitraryFuzzing> {
     size: Option<RoughInt>,
 }
 
-impl<T: ArbitraryFuzzing> RoughSized<T> {
+impl<T> RoughSized<T> {
     /// Break into constituent parts
     pub fn into_inner(self) -> (T, Option<RoughInt>) {
         (self.data, self.size)
@@ -103,33 +101,31 @@ impl<T: ArbitraryFuzzing> RoughSized<T> {
     }
 }
 
-impl<T: Clone + ArbitraryFuzzing> RoughSized<T> {
+impl<T: Clone> RoughSized<T> {
     /// Accessor
     pub fn data(&self) -> T {
         self.data.clone()
     }
 }
 
-impl<T: Hash + ArbitraryFuzzing> Hash for RoughSized<T> {
+impl<T: Hash> Hash for RoughSized<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // size is omitted from the hash
         self.data.hash(state);
     }
 }
 
-impl<T: PartialEq + ArbitraryFuzzing> PartialEq for RoughSized<T> {
+impl<T: PartialEq> PartialEq for RoughSized<T> {
     fn eq(&self, other: &Self) -> bool {
         // size is omitted from the equality
         self.data == other.data
     }
 }
 
-impl<T: Eq + ArbitraryFuzzing> Eq for RoughSized<T> {}
+impl<T: Eq> Eq for RoughSized<T> {}
 
 #[cfg(feature = "fuzzing")]
-impl<'a, T: ArbitraryFuzzing + arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a>
-    for RoughSized<T>
-{
+impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for RoughSized<T> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
             data: arbitrary::Arbitrary::arbitrary(u)?,
