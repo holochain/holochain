@@ -1,3 +1,5 @@
+use heck::CamelCase;
+
 use super::*;
 
 pub type MapWith = syn::Path;
@@ -20,10 +22,7 @@ impl F {
         syn::Ident::new(&format!("_stef_impl_{}", self.f.sig.ident), self.f.span())
     }
     pub fn variant_name(&self) -> Ident {
-        syn::Ident::new(
-            &self.f.sig.ident.to_string().to_pascal_case(),
-            self.f.span(),
-        )
+        syn::Ident::new(&self.f.sig.ident.to_string().to_camel_case(), self.f.span())
     }
     pub fn inputs(&self) -> Vec<(Box<Pat>, Box<Type>)> {
         let mut f_inputs = self.f.sig.inputs.iter();

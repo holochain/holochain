@@ -56,7 +56,6 @@
 //! effects, or granting shared access in a specific way. The `stef::combinators` module contains some
 //! built-in wrappers. TODO: write more
 
-use heck::ToPascalCase;
 use proc_macro2::TokenStream;
 use proc_macro_error::{abort, abort_call_site};
 use quote::{quote, ToTokens};
