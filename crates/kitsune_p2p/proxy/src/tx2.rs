@@ -228,10 +228,10 @@ impl AsConHnd for ProxyConHnd {
 }
 
 fn promote_addr(base_addr: &TxUrl, cert: &Tx2Cert) -> KitsuneResult<TxUrl> {
-    Ok(ProxyUrl::new(base_addr.as_str(), cert.as_digest().clone())
+    ProxyUrl::new(base_addr.as_str(), cert.as_digest().clone())
         .map_err(KitsuneError::other)?
         .as_str()
-        .try_into()?)
+        .try_into()
 }
 
 #[derive(Clone)]
