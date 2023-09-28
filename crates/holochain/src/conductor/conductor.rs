@@ -2069,7 +2069,7 @@ mod app_status_impls {
         {
             for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                    if let Some(cell) = cells.get_mut(cell_id.borrow()) {
                         cell.status = status;
                     }
                 });

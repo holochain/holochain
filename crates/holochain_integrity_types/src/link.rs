@@ -14,7 +14,7 @@ use holochain_serialized_bytes::prelude::*;
     serde::Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct LinkType(pub u8);
 
 impl LinkType {
@@ -41,7 +41,7 @@ impl LinkType {
     Eq,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl LinkTag {
