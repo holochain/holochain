@@ -3,7 +3,6 @@ use once_cell::sync::OnceCell;
 use crate::{
     arq::*,
     error::{GossipError, GossipResult},
-    op::OpRegion,
     spacetime::*,
 };
 use derivative::Derivative;
@@ -15,8 +14,9 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 /// [`SpaceSegment`]s are implied by the [`ArqBoundsSet`].
 ///
 /// LTCS stands for Logarithmic Time, Constant Space.
-#[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "test_utils", derive(Clone))]
+#[derive(
+    Debug, Clone, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize,
+)]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
     pub(super) arq_set: ArqSet,
@@ -30,6 +30,7 @@ impl RegionCoordSetLtcs {
     pub(crate) fn region_coords_flat(
         &self,
     ) -> impl Iterator<Item = ((usize, usize, usize), RegionCoords)> + '_ {
+        #[allow(deprecated)]
         self.region_coords_nested().flatten().flatten()
     }
 
@@ -61,6 +62,7 @@ impl RegionCoordSetLtcs {
         D: RegionDataConstraints,
         F: FnMut(((usize, usize, usize), RegionCoords)) -> Result<D, E>,
     {
+        #[allow(deprecated)]
         let data = self
             .region_coords_nested()
             .map(|arqdata| {
@@ -107,9 +109,8 @@ impl RegionCoordSetLtcs {
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
-#[derive(serde::Serialize, serde::Deserialize, Derivative)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
-#[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub coords: RegionCoordSetLtcs,
@@ -175,6 +176,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 
     /// Iterate over each region in the set
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
+        #[allow(deprecated)]
         self.coords
             .region_coords_flat()
             .map(|((ia, ix, it), coords)| Region::new(coords, self.data[ia][ix][it].clone()))
@@ -222,6 +224,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     pub fn nonzero_regions(
         &self,
     ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, D)> {
+        #[allow(deprecated)]
         self.coords
             .region_coords_flat()
             .filter_map(|((a, x, y), c)| {
@@ -245,7 +248,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     /// Query the specified OpStore for each coord in the set, constructing
     /// the full RegionSet. Purely for convenience.
-    pub fn from_store<O: OpRegion<D>, S: crate::persistence::AccessOpStore<O, D>>(
+    pub fn from_store<O: crate::op::OpRegion<D>, S: crate::persistence::AccessOpStore<O, D>>(
         store: &S,
         coords: RegionCoordSetLtcs,
     ) -> Self {

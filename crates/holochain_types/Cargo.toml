@@ -29,9 +29,9 @@ getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["encoding"] }
 holochain_keystore = { version = "^0.3.0-beta-dev.13", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.16"}
-holochain_wasmer_host = { version = "0.0.84", features = ["dylib"] }
+holochain_wasmer_host = { version = "0.0.85", features = ["dylib"] }
 holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.12", features = ["full"] }
 itertools = { version = "0.10" }
@@ -69,7 +69,7 @@ isotest = { version = "0", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
-holochain_types = { path = ".", features = ["test_utils"]}
+holochain_types = { path = ".", features = ["test_utils", "fuzzing"]}
 
 arbitrary = "1.0"
 isotest = { version = "0" }
@@ -81,16 +81,22 @@ test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
 
 [features]
-default = ["fixturators", "test_utils"]
+default = []
 
 fixturators = ["holochain_zome_types/fixturators"]
-test_utils = [
+
+fuzzing = [
   "arbitrary",
   "contrafact",
-  "holochain_zome_types/arbitrary",
-  "holo_hash/arbitrary",
+  "holo_hash/fuzzing",
+  "holochain_zome_types/fuzzing",
+  "mr_bundle/fuzzing",
+]
+
+test_utils = [
+  "fixturators",
+  "fuzzing",
   "isotest",
-  "mr_bundle/arbitrary",
   "holochain_zome_types/test_utils",
 ]
 
