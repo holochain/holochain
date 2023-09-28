@@ -150,7 +150,7 @@ where
     }
 
     // Sign on the dotted line.
-    let receipt = match ValidationReceipt::sign(receipt.clone(), &keystore).await {
+    let receipt = match ValidationReceipt::sign(receipt.clone(), keystore).await {
         Ok(Some(r)) => r,
         Ok(None) => {
             // This branch should not be reachable, log an error if we somehow hit it to help diagnose the problem.
