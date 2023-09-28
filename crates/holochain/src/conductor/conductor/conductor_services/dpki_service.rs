@@ -7,6 +7,7 @@ use crate::conductor::ConductorHandle;
 
 /// Interface for the DPKI service
 #[async_trait::async_trait]
+// #[cfg_attr(feature = "test_utils", mockall::automock)]
 #[mockall::automock]
 #[allow(clippy::needless_lifetimes)]
 pub trait DpkiService: Send + Sync {

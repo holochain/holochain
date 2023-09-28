@@ -261,7 +261,8 @@ async fn verify_action_signature_test() {
     let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
     let wrong_signature = Signature([1_u8; 64]);
-    let action_invalid = SignedActionHashed::new(record_valid.action().clone(), wrong_signature);
+    let action_invalid =
+        SignedActionHashed::new_unchecked(record_valid.action().clone(), wrong_signature);
     let record_invalid = Record::new(action_invalid, None);
 
     sys_validate_record(&record_valid, &cascade).await.unwrap();
@@ -978,9 +979,9 @@ async fn test_dpki_agent_update() {
         .unwrap_err();
 }
 
-#[tokio::test(flavor = "multi_thread")]
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
+#[tokio::test(flavor = "multi_thread")]
 async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();

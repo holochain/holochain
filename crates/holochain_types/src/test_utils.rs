@@ -1,7 +1,6 @@
 //! Some common testing helpers.
 
 use crate::dna::wasm::DnaWasm;
-use crate::fixt::*;
 use crate::prelude::*;
 use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
@@ -73,7 +72,7 @@ pub fn fake_dna_zomes_named(
 
 /// Save a Dna to a file and return the path and tempdir that contains it
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempfile::TempDir)> {
-    let bundle = DnaBundle::from_dna_file(dna).await?;
+    let bundle = DnaBundle::from_dna_file(dna)?;
     let tmp_dir = tempfile::Builder::new()
         .prefix("fake_dna")
         .tempdir()
