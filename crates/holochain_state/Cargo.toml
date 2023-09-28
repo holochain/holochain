@@ -27,6 +27,7 @@ holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zo
     "full",
 ] }
 kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_state_types = { version = "^0.3.0-beta-dev.18", path = "../holochain_state_types" }
 mockall = "0.11.3"
 one_err = "0.0.8"
 parking_lot = "0.10"

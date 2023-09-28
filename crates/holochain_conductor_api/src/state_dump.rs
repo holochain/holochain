@@ -1,6 +1,6 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_state::source_chain::SourceChainJsonDump;
+use holochain_state_types::SourceChainJsonDump;
 use holochain_types::dht_op::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;

@@ -1,0 +1,11 @@
+[package]
+name = "holochain_state_types"
+version = "0.3.0-beta-dev.18"
+description = "Type for the holochain_state crate"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_state_types"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2021"
+
+[dependencies]
