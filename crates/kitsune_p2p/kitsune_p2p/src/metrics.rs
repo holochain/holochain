@@ -347,11 +347,11 @@ impl<'lt> AgentLike<'lt> {
 /// A set of agents
 pub type AgentList = HashSet<KAgent>;
 
-// /// Shared access to metrics
-// pub type MetricsSync = Arc<parking_lot::RwLock<Metrics>>;
-// impl Metrics {
+/// Shared access to metrics
+#[derive(Clone, Debug, derive_more::From, derive_more::Deref, stef::State)]
+pub struct MetricsSync(stef::Share<Metrics>);
 
-#[stef::state(share = MetricsSync)]
+#[stef::state(fuzzing, wrapper(MetricsSync))]
 impl stef::State<'static> for Metrics {
     type Action = MetricsAction;
     type Effect = ();

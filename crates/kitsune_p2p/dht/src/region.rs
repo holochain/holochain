@@ -30,10 +30,7 @@ pub const REGION_MASS: u32 = std::mem::size_of::<Region<RegionData>>() as u32;
 
 /// The coordinates defining the Region, along with the calculated [`RegionData`]
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::Constructor)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct Region<D: RegionDataConstraints = RegionData> {
     /// The coords
     pub coords: RegionCoords,

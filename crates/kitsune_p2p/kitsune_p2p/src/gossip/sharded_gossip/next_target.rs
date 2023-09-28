@@ -248,7 +248,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
@@ -282,7 +282,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
@@ -309,7 +309,7 @@ mod tests {
         // - Create 100 remote nodes.
         let mut remote_nodes = create_remote_nodes(100);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last two nodes off the list.
         let last = remote_nodes.pop().unwrap();
@@ -349,7 +349,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
@@ -383,7 +383,7 @@ mod tests {
         // - Create 100 remote nodes.
         let remote_nodes = create_remote_nodes(100);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Record successful initiate rounds for the all of the nodes.
         for node in remote_nodes.iter() {
@@ -474,7 +474,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
