@@ -1,3 +1,5 @@
+//! Fetch queue types
+
 /// Info about the fetch queue
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FetchPoolInfo {
