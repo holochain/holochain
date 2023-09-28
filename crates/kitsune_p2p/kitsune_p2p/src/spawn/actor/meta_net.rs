@@ -26,6 +26,10 @@ use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::*;
+#[cfg(feature = "tx2")]
+use kitsune_p2p_types::config::KitsuneP2pTx2Backend;
+#[cfg(feature = "tx2")]
+use kitsune_p2p_types::config::KitsuneP2pTx2ProxyConfig;
 
 use crate::spawn::actor::InternalSender;
 use crate::spawn::KitsuneP2pEvent;
@@ -36,6 +40,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::*;
 use opentelemetry_api::metrics::Histogram;
 use parking_lot::Mutex;

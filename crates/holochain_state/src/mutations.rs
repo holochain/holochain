@@ -23,7 +23,7 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::zome_io::Nonce256Bits;
+use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::*;
 use std::str::FromStr;
 

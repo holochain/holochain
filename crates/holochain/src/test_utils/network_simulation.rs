@@ -18,7 +18,7 @@ use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;

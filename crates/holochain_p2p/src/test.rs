@@ -5,7 +5,7 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-
+use holochain_nonce::Nonce256Bits;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -237,8 +237,8 @@ mod tests {
     use holochain_types::prelude::AgentPubKeyExt;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p_types::tls::TlsConfig;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p::*;
     use std::sync::Mutex;
 

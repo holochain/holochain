@@ -16,7 +16,7 @@ impl Nonce256Bits {
 /// Rather arbitrary but we expire nonces after 5 mins.
 pub const FRESH_NONCE_EXPIRES_AFTER: Duration = Duration::from_secs(60 * 5);
 
-pub fn fresh_nonce(now: Timestamp) -> Result<(Nonce256Bits, Timestamp), Box<dyn Error>> {
+pub fn fresh_nonce(now: Timestamp) -> Result<(Nonce256Bits, Timestamp), Box<dyn Error + std::marker::Send + Sync>> {
     let mut bytes = [0; 32];
     getrandom::getrandom(&mut bytes)?;
     let nonce = Nonce256Bits::from(bytes);

@@ -110,6 +110,7 @@ pub mod tests {
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
+    use kitsune_p2p_types::config::TransportConfig;
 
     #[test]
     fn test_config_load_yaml() {
@@ -195,7 +196,7 @@ pub mod tests {
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = kitsune_p2p::KitsuneP2pConfig::default();
+        let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://signal.holotest.net".into(),

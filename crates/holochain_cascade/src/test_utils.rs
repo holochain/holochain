@@ -42,7 +42,7 @@ use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::{CountLinksResponse, WireEntryOps};
 use holochain_types::record::WireRecordOps;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::zome_io::Nonce256Bits;
+use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;

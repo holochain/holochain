@@ -11,7 +11,8 @@ use crate::spawn::meta_net::{
     nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv, Respond,
 };
 use crate::wire::WireData;
-use crate::{wire, HostApiLegacy, KitsuneAgent, KitsuneP2pConfig, KitsuneP2pError, KitsuneSpace};
+use crate::{wire, HostApiLegacy, KitsuneAgent, KitsuneP2pError, KitsuneSpace};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use futures::StreamExt;
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};

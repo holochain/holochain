@@ -97,8 +97,8 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_nonce::witness_nonce;
-use holochain_nonce::WitnessNonceResult;
+use holochain_state::nonce::witness_nonce;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -1291,7 +1291,8 @@ mod network_impls {
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
-            let (nonce, expires_at) = holochain_nonce::fresh_nonce(now)?;
+            let (nonce, expires_at) = holochain_nonce::fresh_nonce(now)
+                .map_err(|e| ConductorApiError::Other(e))?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),

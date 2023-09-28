@@ -59,7 +59,6 @@ use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Record;
-use holochain_zome_types::Signature;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;

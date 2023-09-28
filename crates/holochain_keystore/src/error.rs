@@ -1,5 +1,6 @@
 use crate::*;
 use holochain_zome_types::signature::Signature;
+use holochain_secure_primitive::SecurePrimitiveError;
 
 /// Keystore Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -19,7 +20,7 @@ pub enum KeystoreError {
     /// Used in TryFrom implementations for some zome types.
     #[error("Secure primitive error: {0}")]
     SecurePrimitiveError(
-        #[from] holochain_zome_types::dependencies::holochain_integrity_types::SecurePrimitiveError,
+        #[from] SecurePrimitiveError,
     ),
 
     /// Unexpected Internal Error.

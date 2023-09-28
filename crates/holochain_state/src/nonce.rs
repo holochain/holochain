@@ -6,8 +6,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DbKindConductor;
-use holochain_nonce::fresh_nonce;
-use holochain_zome_types::zome_io::Nonce256Bits;
+use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::Timestamp;
 use std::time::Duration;
 
@@ -55,10 +54,10 @@ pub mod test {
     use fixt::prelude::*;
     use hdk::prelude::AgentPubKeyFixturator;
     use holochain_zome_types::Timestamp;
-    use holochain_nonce::{fresh_nonce, FRESH_NONCE_EXPIRES_AFTER};
+    use holochain_nonce::fresh_nonce;
     
     use crate::{
-        nonce::{WitnessNonceResult},
+        nonce::WitnessNonceResult,
         prelude::test_conductor_db,
     };
 

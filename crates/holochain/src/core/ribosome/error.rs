@@ -9,6 +9,7 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::inline_zome::error::InlineZomeError;
+use holochain_secure_primitive::SecurePrimitiveError;
 use thiserror::Error;
 use tokio::task::JoinError;
 
@@ -89,7 +90,7 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     SecurePrimitive(
-        #[from] holochain_zome_types::dependencies::holochain_integrity_types::SecurePrimitiveError,
+        #[from] SecurePrimitiveError,
     ),
 
     /// Zome function doesn't have permissions to call a Host function.

@@ -17,6 +17,7 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -892,7 +893,7 @@ impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
 mod tests {
-    use crate::config::KitsuneP2pConfig;
+    use kitsune_p2p_types::config::{NetworkType, KitsuneP2pConfig, TransportConfig};
     use crate::spawn::actor::bootstrap::BootstrapNet;
     use crate::spawn::actor::create_meta_net;
     use crate::spawn::actor::MetaNet;
@@ -900,7 +901,7 @@ mod tests {
     use crate::spawn::test_util::InternalStub;
     use crate::spawn::Internal;
     use crate::KitsuneP2pResult;
-    use crate::{HostStub, NetworkType, TransportConfig};
+    use crate::HostStub;
     use ghost_actor::actor_builder::GhostActorBuilder;
     use kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
@@ -908,36 +909,38 @@ mod tests {
     use tokio::task::AbortHandle;
     use url2::url2;
 
+    #[cfg(feature="tx2")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx2_with_mdns_meta_net() {
-        let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
-            // Anything other than WebRTC will do here but the tx2 transport isn't available any more
-            transport_pool: vec![TransportConfig::Mem {}],
-            bootstrap_service: None,
-            tuning_params: Default::default(),
-            network_type: NetworkType::QuicMdns,
-        })
-        .await
-        .unwrap();
+        // Anything other than WebRTC will do here but the tx2 transport isn't available any more
+        let mut config = KitsuneP2pConfig::default();
+        config.transport_pool = vec![TransportConfig::Mem {}];
+        config.bootstrap_service = None;
+        config.network_type = NetworkType::QuicMdns;
+        
+        let (_, _, bootstrap_net) = test_create_meta_net(config)
+            .await
+            .unwrap();
 
         // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
         assert_eq!(BootstrapNet::Tx2, bootstrap_net);
     }
 
+    #[cfg(feature="tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
         let (signal_addr, abort_handle) = start_signal_srv();
 
-        let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
-            transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: format!("ws://{:?}", signal_addr),
-            }],
-            bootstrap_service: None,
-            tuning_params: Default::default(),
-            network_type: NetworkType::QuicMdns,
-        })
-        .await
-        .unwrap();
+        let mut config = KitsuneP2pConfig::default();
+        config.transport_pool = vec![TransportConfig::WebRTC {
+            signal_url: format!("ws://{:?}", signal_addr),
+        }];
+        config.bootstrap_service = None;
+        config.network_type = NetworkType::QuicMdns;
+
+        let (meta_net, _, bootstrap_net) = test_create_meta_net(config)
+            .await
+            .unwrap();
 
         // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
@@ -950,14 +953,14 @@ mod tests {
     async fn create_tx5_with_bootstrap_meta_net() {
         let (signal_addr, abort_handle) = start_signal_srv();
 
-        let (meta_net, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
-            transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: format!("ws://{:?}", signal_addr),
-            }],
-            bootstrap_service: Some(url2!("ws://not-a-bootstrap.test")),
-            tuning_params: Default::default(),
-            network_type: NetworkType::QuicBootstrap,
-        })
+        let mut config = KitsuneP2pConfig::default();
+        config.transport_pool = vec![TransportConfig::WebRTC {
+            signal_url: format!("ws://{:?}", signal_addr),
+        }];
+        config.bootstrap_service =  Some(url2!("ws://not-a-bootstrap.test"));
+        config.network_type = NetworkType::QuicBootstrap;
+
+        let (meta_net, _, bootstrap_net) = test_create_meta_net(config)
         .await
         .unwrap();
 

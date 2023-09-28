@@ -1,4 +1,4 @@
-//use kitsune_p2p::KitsuneP2pConfig;
+//use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 /// Helper for constructing common kitsune networks
 pub struct SweetNetwork;
@@ -10,7 +10,7 @@ impl SweetNetwork {
     pub fn env_var_proxy() -> Option<KitsuneP2pConfig> {
         std::env::var_os("KIT_PROXY").map(|proxy_addr| {
             let mut network = KitsuneP2pConfig::default();
-            let transport = kitsune_p2p::TransportConfig::Quic {
+            let transport = TransportConfig::Quic {
                 bind_to: None,
                 override_port: None,
                 override_host: None,
@@ -18,7 +18,7 @@ impl SweetNetwork {
             let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient {
                 proxy_url: url2::url2!("{}", proxy_addr.into_string().unwrap()),
             };
-            network.transport_pool = vec![kitsune_p2p::TransportConfig::Proxy {
+            network.transport_pool = vec![TransportConfig::Proxy {
                 sub_transport: transport.into(),
                 proxy_config,
             }];
@@ -29,7 +29,7 @@ impl SweetNetwork {
     /// Local quic proxy network
     pub fn local_quic() -> KitsuneP2pConfig {
         let mut network = KitsuneP2pConfig::default();
-        network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        network.transport_pool = vec![TransportConfig::Quic {
             bind_to: None,
             override_host: None,
             override_port: None,

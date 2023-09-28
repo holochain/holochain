@@ -350,8 +350,8 @@ impl ghost_actor::GhostControlHandler for HolochainP2pActor {
 impl HolochainP2pActor {
     /// constructor
     pub async fn new(
-        config: kitsune_p2p::KitsuneP2pConfig,
-        tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
+        config: kitsune_p2p_types::config::KitsuneP2pConfig,
+        tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
         host: kitsune_p2p::HostApi,

@@ -37,7 +37,7 @@ use holochain_state::source_chain;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashSet;
@@ -231,7 +231,7 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let mut config = holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default();
+    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::default();
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;

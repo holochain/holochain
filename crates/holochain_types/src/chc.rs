@@ -8,6 +8,7 @@ use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::prelude::*;
 use must_future::MustBoxFuture;
+use holochain_nonce::Nonce256Bits;
 
 use crate::chain::ChainItem;
 

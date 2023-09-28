@@ -82,6 +82,7 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_nonce::*;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;

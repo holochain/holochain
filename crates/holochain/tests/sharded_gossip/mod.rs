@@ -17,7 +17,7 @@ use holochain_p2p::*;
 use holochain_sqlite::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
@@ -650,7 +650,7 @@ async fn mock_network_sharded_gossip() {
         },
     };
     use kitsune_p2p::gossip::sharded_gossip::test_utils::*;
-    use kitsune_p2p::TransportConfig;
+    use kitsune_p2p_types::config::TransportConfig;
     use kitsune_p2p::*;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
@@ -1193,7 +1193,7 @@ async fn mock_network_sharding() {
     use holochain_types::dht_op::WireOps;
     use holochain_types::record::WireRecordOps;
     use kitsune_p2p::gossip::sharded_gossip::test_utils::check_agent_boom;
-    use kitsune_p2p::TransportConfig;
+    use kitsune_p2p_types::config::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     // Get the env var settings for number of simulated agents and
