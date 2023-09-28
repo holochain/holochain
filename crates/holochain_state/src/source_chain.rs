@@ -258,7 +258,8 @@ impl SourceChain {
         .await
     }
 
-    #[cfg(feature = "test_utils")]
+    // TODO: when we fully hook up rate limiting, make this test-only
+    // #[cfg(feature = "test_utils")]
     pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,

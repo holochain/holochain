@@ -14,7 +14,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
-use std::collections::HashSet;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -122,6 +121,7 @@ pub async fn get_single_agent_info(
 /// Share all current agent infos known to all provided peer dbs with each other.
 #[cfg(any(test, feature = "test_utils"))]
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
+    use std::collections::HashSet;
     let mut all_infos: HashSet<AgentInfoSigned> = HashSet::new();
 
     for env in envs.iter() {

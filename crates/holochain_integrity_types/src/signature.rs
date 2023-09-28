@@ -14,7 +14,7 @@ pub const SIGNATURE_BYTES: usize = 64;
 #[allow(clippy::derive_hash_xor_eq)]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Signature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; SIGNATURE_BYTES];

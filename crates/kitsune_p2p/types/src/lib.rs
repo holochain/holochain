@@ -94,7 +94,7 @@ impl From<Tx2Cert> for Arc<[u8; 32]> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::from(u.bytes(32)?.to_vec()))

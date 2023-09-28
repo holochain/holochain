@@ -78,7 +78,7 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-#[cfg(all(any(test, feature = "test_utils"), feature = "arbitrary"))]
+#[cfg(all(any(test, feature = "test_utils"), feature = "fuzzing"))]
 pub mod entropy;
 
 pub use action::Action;

@@ -316,7 +316,6 @@ mod tests {
         holochain_trace::test_run().ok();
 
         let env = crate::test_utils::test_dht_db().to_db();
-        let keystore = crate::test_utils::test_keystore();
 
         // With no validators
         let pending = env
@@ -337,7 +336,6 @@ mod tests {
 
     async fn create_modified_op(
         vault: DbWrite<DbKindDht>,
-        keystore: &MetaLairClient,
         modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {
         // The actual op does not matter, just some of the status fields
@@ -369,10 +367,9 @@ mod tests {
 
         let test_db = crate::test_utils::test_dht_db();
         let env = test_db.to_db();
-        let keystore = crate::test_utils::test_keystore();
 
         // Has not been integrated yet
-        create_modified_op(env.clone(), &keystore, |_txn, _hash| {
+        create_modified_op(env.clone(), |_txn, _hash| {
             // Do nothing
             Ok(())
         })
@@ -380,7 +377,7 @@ mod tests {
         .unwrap();
 
         // Is ready to have a receipt sent
-        let valid_op_hash = create_modified_op(env.clone(), &keystore, |txn, op_hash| {
+        let valid_op_hash = create_modified_op(env.clone(), |txn, op_hash| {
             set_require_receipt(txn, &op_hash, true)?;
             set_when_integrated(txn, &op_hash, Timestamp::now())?;
             set_validation_status(txn, &op_hash, ValidationStatus::Valid)?;
@@ -390,7 +387,7 @@ mod tests {
         .unwrap();
 
         // Is ready to have a receipt sent, with rejected status
-        let rejected_op_hash = create_modified_op(env.clone(), &keystore, |txn, op_hash| {
+        let rejected_op_hash = create_modified_op(env.clone(), |txn, op_hash| {
             set_require_receipt(txn, &op_hash, true)?;
             set_when_integrated(txn, &op_hash, Timestamp::now())?;
             set_validation_status(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -400,7 +397,7 @@ mod tests {
         .unwrap();
 
         // Is ready to have a receipt sent, with abandoned status
-        let abandoned_op_hash = create_modified_op(env.clone(), &keystore, |txn, op_hash| {
+        let abandoned_op_hash = create_modified_op(env.clone(), |txn, op_hash| {
             set_require_receipt(txn, &op_hash, true)?;
             set_when_integrated(txn, &op_hash, Timestamp::now())?;
             set_validation_status(txn, &op_hash, ValidationStatus::Abandoned)?;
@@ -410,7 +407,7 @@ mod tests {
         .unwrap();
 
         // Is ready to have a receipt sent, but does not require one
-        create_modified_op(env.clone(), &keystore, |txn, op_hash| {
+        create_modified_op(env.clone(), |txn, op_hash| {
             set_require_receipt(txn, &op_hash, false)?;
             set_when_integrated(txn, &op_hash, Timestamp::now())?;
             set_validation_status(txn, &op_hash, ValidationStatus::Valid)?;
@@ -420,7 +417,7 @@ mod tests {
         .unwrap();
 
         // Is ready to have a receipt sent, but when_integrated was not set
-        create_modified_op(env.clone(), &keystore, |txn, op_hash| {
+        create_modified_op(env.clone(), |txn, op_hash| {
             set_require_receipt(txn, &op_hash, true)?;
             set_validation_status(txn, &op_hash, ValidationStatus::Valid)?;
             Ok(())
@@ -429,7 +426,7 @@ mod tests {
         .unwrap();
 
         // Is ready to have a receipt sent, but validation_status was not set
-        create_modified_op(env.clone(), &keystore, |txn, op_hash| {
+        create_modified_op(env.clone(), |txn, op_hash| {
             set_require_receipt(txn, &op_hash, true)?;
             set_when_integrated(txn, &op_hash, Timestamp::now())?;
             Ok(())

@@ -40,7 +40,10 @@ impl DnaBundle {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
 
-        Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
+        Ok((
+            DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
+            original_hash,
+        ))
     }
 
     /// Construct from raw bytes
