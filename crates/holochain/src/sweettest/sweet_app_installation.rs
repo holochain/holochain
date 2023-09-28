@@ -51,6 +51,7 @@ pub async fn get_install_app_payload_from_dnas(
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,
         membrane_proofs: Default::default(),
+        #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bin_data"
-version = "0.3.0-beta-dev.4"
+version = "0.3.0-beta-dev.6"
 description = "Binary data types for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,8 +11,8 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-holochain_util = { version = "^0.2.0", path = "../../holochain_util", default-features = false }
-kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.3", path = "../dht_arc" }
+holochain_util = { version = "^0.3.0-beta-dev.0", path = "../../holochain_util", default-features = false }
+kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.5", path = "../dht_arc" }
 shrinkwraprs = "0.3.0"
 derive_more = "0.99.7"
 serde = { version = "1", features = [ "derive", "rc" ] }
@@ -21,9 +21,11 @@ serde_bytes = "0.11"
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 
 [features]
-test_utils = [
+fuzzing = [
   "arbitrary"
 ]
+test_utils = [ ]
+
 sqlite-encrypted = [
   "kitsune_p2p_dht_arc/sqlite-encrypted"
 ]

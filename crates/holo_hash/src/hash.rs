@@ -73,7 +73,7 @@ pub struct HoloHash<T: HashType> {
     hash_type: T,
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; HOLO_HASH_FULL_LEN];

@@ -1,9 +1,9 @@
 #![cfg(feature = "test_utils")]
+#![cfg(feature = "chc")]
 
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::conductor::chc::CHC_LOCAL_MAGIC_URL;
 use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_conductor_api::conductor::ConductorConfig;
@@ -13,12 +13,14 @@ use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::record::SignedActionHashedExt;
 
-#[tokio::test(flavor = "multi_thread")]
 /// Test that records can be manually grafted onto a source chain.
+#[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mut config = ConductorConfig::default();
-    config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
+    config.chc_url = Some(url2::Url2::parse(
+        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
+    ));
     let mut conductor = SweetConductor::from_config(config.clone()).await;
     let keystore = conductor.keystore();
 

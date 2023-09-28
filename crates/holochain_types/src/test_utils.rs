@@ -1,7 +1,6 @@
 //! Some common testing helpers.
 
 use crate::dna::wasm::DnaWasm;
-use crate::fixt::*;
 use crate::prelude::*;
 use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;

@@ -5,7 +5,7 @@ use crate::HoloHashOf;
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 use crate::PrimitiveHashType;
 
 /// Represents some piece of content along with its hash representation, so that
@@ -30,7 +30,7 @@ impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, C> arbitrary::Arbitrary<'a> for HoloHashed<C>
 where
     C: HashableContent + arbitrary::Arbitrary<'a>,

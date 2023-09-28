@@ -166,7 +166,8 @@ impl<Kind: DbKindT> DbRead<Kind> {
         let r = Ok(PConn::new(self.connection_pool.get()?));
         let el = now.elapsed();
         if el.as_millis() > 20 {
-            tracing::error!("Connection pool took {:?} to be free'd", el);
+            // TODO Convert to a metric
+            tracing::info!("Connection pool took {:?} to be freed", el);
         }
         r
     }
