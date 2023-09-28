@@ -312,7 +312,10 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     match op {
         Op::StoreRecord(StoreRecord { mut record }) => {
             if let Some(e) = omitted_entry {
-                *record.as_entry_mut() = RecordEntry::Present(e);
+                // NOTE: this is only possible in this situation because we already removed
+                // this exact entry from this Record earlier. DON'T set entries on records
+                // anywhere else without recomputing hashes and signatures!
+                record.entry = RecordEntry::Present(e);
             }
             record
         }
@@ -353,7 +356,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
             ),
         }),
         DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
-            action: SignedHashed::new(action.into(), signature),
+            action: SignedHashed::new_unchecked(action.into(), signature),
             entry,
         }),
         DhtOp::RegisterAgentActivity(signature, action) => {
@@ -402,7 +405,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                 })
                 .ok_or_else(|| Outcome::awaiting(&update.original_action_address))?;
             Op::RegisterUpdate(RegisterUpdate {
-                update: SignedHashed::new(update, signature),
+                update: SignedHashed::new_unchecked(update, signature),
                 new_entry,
                 original_action,
                 original_entry,
@@ -434,14 +437,14 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                 None
             };
             Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed::new(delete, signature),
+                delete: SignedHashed::new_unchecked(delete, signature),
                 original_action,
                 original_entry,
             })
         }
         DhtOp::RegisterAddLink(signature, create_link) => {
             Op::RegisterCreateLink(RegisterCreateLink {
-                create_link: SignedHashed::new(create_link, signature),
+                create_link: SignedHashed::new_unchecked(create_link, signature),
             })
         }
         DhtOp::RegisterRemoveLink(signature, delete_link) => {
@@ -451,7 +454,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                 .and_then(|(sh, _)| CreateLink::try_from(sh.hashed.content).ok())
                 .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
             Op::RegisterDeleteLink(RegisterDeleteLink {
-                delete_link: SignedHashed::new(delete_link, signature),
+                delete_link: SignedHashed::new_unchecked(delete_link, signature),
                 create_link,
             })
         }

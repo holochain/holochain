@@ -39,7 +39,11 @@ serde_json = "1"
 [features]
 default = []
 
-full = ["default", "subtle-encoding", "kitsune_p2p_timestamp/full"]
+hashing = [
+    "holo_hash/hashing",
+]
+
+full = ["default", "hashing", "subtle-encoding", "kitsune_p2p_timestamp/full"]
 
 full-dna-def = ["derive_builder"]
 

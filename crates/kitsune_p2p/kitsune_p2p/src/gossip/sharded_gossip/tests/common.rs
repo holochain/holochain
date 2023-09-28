@@ -1,11 +1,11 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
-use crate::{HostApi, HostStub, KitsuneHost};
+use crate::{HostApi, KitsuneHost};
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
-use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
+use kitsune_p2p_types::dht::ArqStrat;
 use num_traits::Zero;
 
 use super::*;

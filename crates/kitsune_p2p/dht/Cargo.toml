@@ -28,6 +28,7 @@ tracing = "0.1.29"
 
 [dev-dependencies]
 kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"]}
+
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
 holochain_serialized_bytes = "0.0.53"
 maplit = "1"
@@ -38,7 +39,7 @@ rand = "0.8"
 test-case = "1.2"
 
 [features]
-default = ["test_utils"]
+default = []
 test_utils = [
   "colored"
 ]

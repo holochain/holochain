@@ -271,14 +271,15 @@ impl<A> Record<A> {
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "hashing")]
 impl<T> SignedHashed<T>
 where
     T: HashableContent,
     <T as holo_hash::HashableContent>::HashType: holo_hash::hash_type::HashTypeSync,
 {
-    /// Create a new signed and hashed content by hashing the content.
-    pub fn new(content: T, signature: Signature) -> Self {
+    /// Create a new signed and hashed content by hashing the content, but without checking
+    /// the signature.
+    pub fn new_unchecked(content: T, signature: Signature) -> Self {
         let hashed = HoloHashed::from_content_sync(content);
         Self { hashed, signature }
     }
