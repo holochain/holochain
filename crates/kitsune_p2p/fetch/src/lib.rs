@@ -21,6 +21,10 @@ pub use rough_sized::*;
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(tag = "type", content = "key", rename_all = "camelCase")]
 pub enum FetchKey {
     /// Fetch via op hash.
@@ -65,5 +69,9 @@ pub struct FetchPoolPush {
     serde::Deserialize,
     derive_more::Deref,
     derive_more::From,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct FetchContext(pub u32);

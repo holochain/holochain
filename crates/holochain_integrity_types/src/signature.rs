@@ -7,6 +7,7 @@ pub const SIGNATURE_BYTES: usize = 64;
 
 /// The raw bytes of a signature.
 #[derive(Clone, PartialOrd, Hash, Ord)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 // The equality is not different, it's just constant time, so we can derive a hash.
 // For an actually secure thing we wouldn't want to just assume a safe default hashing
 // But that is not what clippy is complaining about here.

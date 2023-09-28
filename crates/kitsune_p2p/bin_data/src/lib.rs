@@ -2,6 +2,13 @@
 
 use kitsune_p2p_dht_arc::DhtLocation;
 
+pub mod dependencies {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub use proptest;
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub use proptest_derive;
+}
+
 /// Kitsune hashes are expected to be 36 bytes.
 /// The first 32 bytes are the proper hash.
 /// The final 4 bytes are a hash-of-the-hash that can be treated like a u32 "location".
@@ -52,8 +59,12 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
+            #[cfg_attr(any(test, feature = "fuzzing"), derive($crate::dependencies::proptest_derive::Arbitrary))]
             #[shrinkwrap(mutable)]
-            pub struct $name(#[serde(with = "serde_bytes")] pub Vec<u8>);
+            pub struct $name(
+                #[serde(with = "serde_bytes")]
+                #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "proptest::collection::vec(0u8..128, 36)"))]
+                pub Vec<u8>);
 
             impl KitsuneBinType for $name {
 
@@ -119,6 +130,19 @@ macro_rules! make_kitsune_bin_type {
     };
 }
 
+// #[derive(Debug)]
+// pub struct BT(Vec<u8>);
+
+// #[cfg(feature = "fuzzing")]
+// impl proptest::arbitrary::Arbitrary for BT {
+//     type Parameters = ();
+//     type Strategy = proptest::collection::VecStrategy<proptest::num::u8::Any>;
+
+//     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+//         todo!()
+//     }
+// }
+
 make_kitsune_bin_type! {
     "Distinguish multiple categories of communication within the same network module.",
     KitsuneSpace,
@@ -136,6 +160,10 @@ These metadata "Operations" each also have unique OpHashes."#,
 
 /// The op data with its location
 #[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct KitsuneOpData(
@@ -188,7 +216,10 @@ pub type KOp = std::sync::Arc<KitsuneOpData>;
     serde::Deserialize,
     serde::Serialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
