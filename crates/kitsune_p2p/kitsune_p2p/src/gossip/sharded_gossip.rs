@@ -6,8 +6,8 @@ use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
 use crate::types::event::*;
 use crate::types::gossip::*;
+use crate::types::*;
 use crate::{meta_net::*, HostApiLegacy};
-use crate::{types::*, HostApi};
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
@@ -63,9 +63,7 @@ mod next_target;
 // code path due to test_utils, the helper functions defined in this module
 // are not used due to the tests themselves not being compiled, so it's easier
 // to do this than to annotate each function as `#[cfg(test)]`
-#[cfg(any(test, feature = "test_utils"))]
-#[allow(dead_code)]
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)

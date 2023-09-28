@@ -21,9 +21,11 @@ serde_bytes = "0.11"
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 
 [features]
-test_utils = [
+fuzzing = [
   "arbitrary"
 ]
+test_utils = [ ]
+
 sqlite-encrypted = [
   "kitsune_p2p_dht_arc/sqlite-encrypted"
 ]
