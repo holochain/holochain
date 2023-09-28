@@ -39,6 +39,7 @@ pub fn fake_hash() -> Hash32 {
 )]
 pub struct OpHash(pub Hash32);
 
+#[cfg(feature = "test_utils")]
 impl OpHash {
     /// Random fake hash for testing
     pub fn fake() -> Self {
@@ -52,6 +53,7 @@ impl OpHash {
 )]
 pub struct AgentKey(pub Hash32);
 
+#[cfg(feature = "test_utils")]
 impl AgentKey {
     /// Random fake hash for testing
     pub fn fake() -> Self {
@@ -71,7 +73,10 @@ impl AgentKey {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct RegionHash(pub Hash32);
 
 impl RegionHash {

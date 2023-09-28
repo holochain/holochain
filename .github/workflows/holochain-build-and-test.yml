@@ -14,6 +14,9 @@ on:
         type: boolean
         default: false
     secrets:
+      GITHUB_ACCESS_TOKEN:
+        description: "A GitHub access toekn which can be used for cloning the project"
+        required: true
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
         description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
         required: true
@@ -68,7 +71,7 @@ jobs:
     runs-on: [self-hosted, multi-arch]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: false
 

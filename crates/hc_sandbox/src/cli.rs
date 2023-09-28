@@ -30,7 +30,9 @@ pub struct HcSandbox {
     #[arg(long, default_value_t = Output::Log)]
     structured: Output,
 
-    /// Force the admin port(s) that hc uses to talk to Holochain to a specific value.
+    /// Force the admin port(s) that Holochain will use to a specific value.
+    /// This option updates the conductor config file before starting Holochain
+    /// and is only available with the `generate` and `run` commands.
     /// For example `hc sandbox -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
     #[arg(short, long, value_delimiter = ',')]
@@ -146,7 +148,7 @@ impl HcSandbox {
                     let structured = self.structured.clone();
 
                     let result = tokio::select! {
-                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                        result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
                         result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
                     };
                     crate::save::release_ports(std::env::current_dir()?).await?;
@@ -226,7 +228,7 @@ impl LaunchInfo {
     }
 }
 
-/// Run a conductor for each path
+/// Direct access to run command
 pub async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
@@ -273,7 +275,7 @@ pub async fn run_n(
     Ok(())
 }
 
-/// Perform the `generate` subcommand
+/// Direct access to generate command
 pub async fn generate(
     holochain_path: &Path,
     happ: Option<PathBuf>,

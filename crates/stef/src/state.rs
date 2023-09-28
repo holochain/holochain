@@ -2,7 +2,7 @@ use crate::*;
 
 /// A model of an effectful state machine.
 ///
-/// The state can only be mutated through a Action value, and each Action
+/// The state can only be mutated through an Action value, and each Action
 /// may generate an Effect. The actual mutation of state is specified by implementing
 /// the [`transition`] method of this trait in terms of an incoming Action.
 ///
@@ -19,47 +19,24 @@ pub trait State<'a> {
     fn transition(&mut self, action: Self::Action) -> Self::Effect;
 }
 
-impl<'a, S> State<'a> for S
-where
-    S: ParamState<'a> + 'a,
-{
-    type Action = S::Action;
-    type Effect = S::Effect;
+impl State<'static> for () {
+    type Action = ();
+    type Effect = ();
 
-    fn transition(&mut self, action: Self::Action) -> Self::Effect {
-        let (state, data) = self.partition();
-        Self::update(state, data, action)
-    }
+    fn transition(&mut self, (): Self::Action) -> Self::Effect {}
 }
 
-/// Parameterized State. An alternate definition for state machines
-/// where each state has some immutable data associated with it.
-pub trait ParamState<'a> {
-    /// The part which represents the actual state
-    type State;
+// impl<'a, S> State<'a> for Box<S>
+// where
+//     S: State<'a>,
+// {
+//     type Action = S::Action;
+//     type Effect = S::Effect;
 
-    /// The immutable data
-    type Params;
-
-    /// The type which represents a change to the state
-    type Action: Action;
-
-    /// The type which represents a change to the outside world
-    type Effect: Effect;
-
-    /// Constructor to provide the initial state
-    fn initial(params: Self::Params) -> Self;
-
-    /// Distinguish the state from the non-state
-    fn partition(&mut self) -> (&mut Self::State, &Self::Params);
-
-    /// Perform the state transition using mutable state and immutable params.
-    /// This is the whole reason for this trait existing, to be able to define
-    /// the state transition in terms of the partitioned data, rather than giving
-    /// mutable access to the entire datastructure
-    fn update(state: &mut Self::State, params: &Self::Params, action: Self::Action)
-        -> Self::Effect;
-}
+//     fn transition(&mut self, action: Self::Action) -> Self::Effect {
+//         (&mut *self).transition(action)
+//     }
+// }
 
 // /// Extensions to make it easier to apply the built-in combinators to States
 // pub trait StateExt<'a>: State<'a> + Sized {

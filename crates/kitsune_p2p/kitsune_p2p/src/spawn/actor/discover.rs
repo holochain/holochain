@@ -155,7 +155,8 @@ pub(crate) fn search_and_discover_peer_connect(
                                 agent_info_signed: Some(agent_info_signed),
                             })) => {
                                 if let Err(err) = inner
-                                    .evt_sender
+                                    .host_api
+                                    .legacy
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                                         space: inner.space.clone(),
                                         peer_data: vec![agent_info_signed.clone()],
@@ -382,7 +383,8 @@ pub(crate) fn search_remotes_covering_basis(
                             }
                             // if we got results, add them to our peer store
                             if let Err(err) = inner
-                                .evt_sender
+                                .host_api
+                                .legacy
                                 .put_agent_info_signed(PutAgentInfoSignedEvt {
                                     space: inner.space.clone(),
                                     peer_data: peer_list,
@@ -436,7 +438,7 @@ impl GetCachedRemotesNearBasisSpace for Arc<SpaceReadOnlyInner> {
         &self,
         query: QueryAgentsEvt,
     ) -> MustBoxFuture<'static, KitsuneP2pResult<Vec<AgentInfoSigned>>> {
-        self.evt_sender.query_agents(query)
+        self.host_api.legacy.query_agents(query)
     }
 
     fn is_agent_local(

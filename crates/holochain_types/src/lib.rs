@@ -25,8 +25,6 @@ pub mod db_cache;
 pub mod dht_op;
 pub mod dna;
 pub mod entry;
-pub mod fixt;
-pub mod inline_zome;
 pub mod link;
 mod macros;
 pub mod metadata;
@@ -41,6 +39,11 @@ pub mod wasmer_types;
 pub mod web_app;
 pub mod zome_types;
 
+#[cfg(feature = "fixturators")]
+pub mod fixt;
+
+#[cfg(feature = "test_utils")]
+pub mod inline_zome;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 

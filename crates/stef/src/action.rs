@@ -6,7 +6,7 @@ use crate::util::box_fut;
 pub trait Action: Sized {}
 impl<T> Action for T where T: Sized {}
 
-/// A type represention a state transition for some [`State`].
+/// A type representing a state transition for some [`State`].
 ///
 /// Every [`Transition`] specifies a "compact" representation with a smaller size,
 /// which is useful when collecting a list of transitions for analysis or playback,
@@ -14,7 +14,7 @@ impl<T> Action for T where T: Sized {}
 /// If a Transition is already as compact as it can be, you can use [`TransitionCompact`]
 /// to use Self as the [`Compact`] type.
 ///
-/// The [`Expander`] is the source of the extra information needed rebuild the full
+/// The [`Expander`] is the source of the extra information needed to rebuild the full
 /// Transition from the Compact type.
 ///
 /// For instance, if a transition involves adding a large chunk of data to a State,
@@ -75,5 +75,3 @@ impl ActionCompact for String {}
 impl<T: 'static> ActionCompact for Box<T> where T: ActionCompact {}
 impl<T: 'static> ActionCompact for Option<T> where T: ActionCompact {}
 impl<T: 'static> ActionCompact for Vec<T> where T: ActionCompact {}
-// impl<'a> ActionCompact for &'a str {}
-// impl<'a, T> ActionCompact for &'a [T] {}

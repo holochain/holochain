@@ -8,12 +8,12 @@
 //! Actions are declarative so that they may be recorded and played back. By wrapping
 //! up all mutable state in a system into these State modules, the entire system can
 //! be treated as a state machine. Actions are often enums with the various types of
-//! mutation as variants of the enum.
+//! mutation as variants.
 //!
 //! Effects are declarative so that transition logic can be tested in isolation. Effects
 //! are often enums as well, with variants for each different type of effect which can be
 //! produced. Effects should be pure, in that they don't actually "do" anything.
-//! In a real-world environment, Effects should usually be immediately "executed" via a
+//! In a real-world environment, effects should usually be immediately "executed" via a
 //! function which performs some useful operation based on the effect -- however in a test
 //! environment, it can be useful to not execute the effects and instead write assertions
 //! against them, to see what *would* have happened, without allowing anything to actually
@@ -58,13 +58,9 @@
 //!
 //! - Sometimes it can be helpful to think about constructing your Actions in two steps. If you have
 //! an input from some other part of the system (perhaps some other Effect), and your state machine
-//! requires some data from some other part of the system state, the read the data outside the
+//! requires some data from some other part of the system state, then read the data outside the
 //! transition function and pass it in as part of your Action. The Action then becomes the combination
 //! of the original input plus the data needed to make the transition.
-//!
-//!
-
-#![warn(missing_docs)]
 
 mod combinators;
 pub use combinators::*;
@@ -75,6 +71,9 @@ pub use share::Share;
 mod state;
 pub use state::*;
 
+mod param_state;
+pub use param_state::*;
+
 mod action;
 pub use action::*;
 
@@ -84,7 +83,17 @@ pub use effect::*;
 pub mod util;
 
 #[cfg(feature = "derive")]
-pub use stef_derive::state;
+pub use stef_derive::{state, State};
+
+#[cfg(feature = "recording")]
+mod recording;
+#[cfg(feature = "recording")]
+pub use recording::*;
+
+pub mod dependencies {
+    #[cfg(feature = "recording")]
+    pub use ::serde;
+}
 
 #[cfg(feature = "diagramming")]
 pub mod diagram;

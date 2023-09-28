@@ -4,8 +4,6 @@
 //! array or a base-64 string. This type just specifies how serialization should
 //! be done.
 
-use proptest::strategy::{BoxedStrategy, Strategy};
-
 use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
@@ -61,9 +59,10 @@ where
     T::Strategy: 'static,
 {
     type Parameters = ();
-    type Strategy = BoxedStrategy<HoloHashB64<T>>;
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHashB64<T>>;
 
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
         HoloHash::arbitrary().prop_map(Into::into).boxed()
     }
 }

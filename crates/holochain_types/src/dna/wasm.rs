@@ -1,7 +1,6 @@
 //! crate::dna::wasm is a module for managing webassembly code
 //!  - within the in-memory dna struct
 //!  - and serialized to json
-use arbitrary::Arbitrary;
 use backtrace::Backtrace;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -14,7 +13,8 @@ use std::sync::Arc;
 use tracing::*;
 
 /// Represents web assembly code.
-#[derive(Serialize, Deserialize, Clone, Eq, Arbitrary)]
+#[derive(Serialize, Deserialize, Clone, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     #[allow(clippy::redundant_allocation)]

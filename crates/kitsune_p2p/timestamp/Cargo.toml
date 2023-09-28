@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.3.0-beta-dev.0"
+version = "0.3.0-beta-dev.2"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,7 +11,6 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-derive_more = "0.99"
 serde = { version = "1.0", features = ["derive"] }
 
 # Dependencies not needed for integrity.
@@ -35,11 +34,11 @@ now = ["chrono"]
 
 full = ["now"]
 
-sqlite-encrypted = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
-sqlite = [ "rusqlite", "rusqlite/bundled" ]
-
 fuzzing = [
     "arbitrary",
     "proptest",
     "proptest-derive",
 ]
+
+sqlite-encrypted = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
+sqlite = [ "rusqlite", "rusqlite/bundled" ]

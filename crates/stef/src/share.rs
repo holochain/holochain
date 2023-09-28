@@ -25,7 +25,11 @@ impl<S: State<'static>> Share<S> {
     /// Acquire write access to the shared state.
     /// This isn't really ideal since it doesn't hide mutability,
     /// so you have to be careful. Better to use a macro (TODO).
-    pub fn write(&self, f: impl FnOnce(&mut S)) {
+    /// TODO: also is it OK to return values from this? or should it
+    /// be mandated that effects have to be handled internally, so that
+    /// there is less chance that someone will use this for direct
+    /// mutable access?
+    pub fn write<R>(&self, f: impl FnOnce(&mut S) -> R) -> R {
         f(&mut self.0.write())
     }
 

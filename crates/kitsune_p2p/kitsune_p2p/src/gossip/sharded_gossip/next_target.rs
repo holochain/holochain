@@ -24,7 +24,7 @@ impl ShardedGossipLocal {
 
         // Get all the remote nodes in this arc set.
         let remote_agents_within_arc_set: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
+            store::agents_within_arcset(&self.host_api, &self.space, arc_set.clone())
                 .await?
                 .into_iter()
                 .filter(|(a, _)| !local_agents.contains(a))
@@ -248,7 +248,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
@@ -282,7 +282,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
@@ -309,7 +309,7 @@ mod tests {
         // - Create 100 remote nodes.
         let mut remote_nodes = create_remote_nodes(100);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last two nodes off the list.
         let last = remote_nodes.pop().unwrap();
@@ -349,7 +349,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
@@ -383,7 +383,7 @@ mod tests {
         // - Create 100 remote nodes.
         let remote_nodes = create_remote_nodes(100);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Record successful initiate rounds for the all of the nodes.
         for node in remote_nodes.iter() {
@@ -474,7 +474,7 @@ mod tests {
         // - Create N remote nodes.
         let mut remote_nodes = create_remote_nodes(n);
 
-        let metrics = MetricsSync::default();
+        let mut metrics = MetricsSync::default();
 
         // - Pop the last node off the list.
         let last = remote_nodes.pop().unwrap();
