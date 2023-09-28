@@ -1,11 +1,12 @@
 use super::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use SearchRemotesCoveringBasisLogicResult::*;
 
 async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
     let url_list = if offline {
         vec![]
     } else {
-        vec!["wss://test".into()]
+        vec![TxUrl::from_str_panicking("wss://test")]
     };
 
     AgentInfoSigned::sign(

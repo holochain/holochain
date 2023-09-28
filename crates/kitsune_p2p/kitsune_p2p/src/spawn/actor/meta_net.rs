@@ -591,7 +591,7 @@ impl MetaNet {
                     tx2_mem_adapter(conf)
                         .await
                         .map_err(KitsuneP2pError::other)?,
-                    TxUrl::from_str_unsafe("none:"),
+                    TxUrl::from_str_panicking("none:"),
                 )
             }
             /*
@@ -609,7 +609,7 @@ impl MetaNet {
             */
             KitsuneP2pTx2Backend::Mock { mock_network } => {
                 is_mock = true;
-                (mock_network, TxUrl::from_str_unsafe("none:"))
+                (mock_network, TxUrl::from_str_panicking("none:"))
             }
         };
 

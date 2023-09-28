@@ -15,7 +15,7 @@ impl TxUrl {
 
     /// Construct from a string which is known to be a valid URL.
     /// Panics if the URL is not parseable.
-    pub fn from_str_unsafe(s: &str) -> Self {
+    pub fn from_str_panicking(s: &str) -> Self {
         url2::Url2::parse(s).into()
     }
 }

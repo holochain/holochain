@@ -114,7 +114,7 @@ mod tests {
                 space.clone(),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
                 u32::MAX / 4,
-                vec![TxUrl::from_str_unsafe("fake:")],
+                vec![TxUrl::from_str_panicking("fake:")],
                 0,
                 std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,
                 |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable))) },

@@ -105,7 +105,7 @@ async fn main() {
 
     let ep = f
         .bind(
-            TxUrl::from_str_unsafe("kitsune-quic://0.0.0.0:0"),
+            TxUrl::from_str_panicking("kitsune-quic://0.0.0.0:0"),
             KitsuneTimeout::from_millis(5000),
         )
         .await

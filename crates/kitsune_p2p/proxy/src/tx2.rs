@@ -1072,7 +1072,7 @@ mod tests {
         let digest = ProxyUrl::from(nurl.as_str());
         let digest = digest.digest();
         let purl = ProxyUrl::from(purl.as_str());
-        TxUrl::from_str_unsafe(
+        TxUrl::from_str_panicking(
             ProxyUrl::new(purl.as_base().as_str(), digest)
                 .unwrap()
                 .as_str(),
@@ -1094,7 +1094,7 @@ mod tests {
             fake_tgt.into(),
         )
         .unwrap();
-        let fake_tgt = TxUrl::from_str_unsafe(fake_tgt.as_str());
+        let fake_tgt = TxUrl::from_str_panicking(fake_tgt.as_str());
         println!("Fake Tgt: {:?}", fake_tgt);
 
         let (s_done, r_done) = tokio::sync::oneshot::channel();

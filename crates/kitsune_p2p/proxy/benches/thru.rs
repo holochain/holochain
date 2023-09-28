@@ -35,7 +35,7 @@ fn proxify_addr(purl: &TxUrl, nurl: &TxUrl) -> TxUrl {
     let digest = ProxyUrl::from(nurl.as_str());
     let digest = digest.digest();
     let purl = ProxyUrl::from(purl.as_str());
-    TxUrl::from_str_unsafe(
+    TxUrl::from_str_panicking(
         ProxyUrl::new(purl.as_base().as_str(), digest)
             .unwrap()
             .as_str(),
@@ -139,7 +139,7 @@ async fn mk_core(tt: TT) -> (TxUrl, Ep, EpHnd) {
     let f = tx2_proxy(f, conf).unwrap();
 
     let ep = f
-        .bind(TxUrl::from_str_unsafe("kitsune-quic://0.0.0.0:0"), t)
+        .bind(TxUrl::from_str_panicking("kitsune-quic://0.0.0.0:0"), t)
         .await
         .unwrap();
     let ep_hnd = ep.handle().clone();

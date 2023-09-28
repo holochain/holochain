@@ -483,11 +483,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
                 Ok(Tx2ConHnd::new(local_cert, con, remote, rmap, metrics))
             }
             .boxed(),
-            err => async move {
-                #[allow(unreachable_code)]
-                err.map(|_| unreachable!() as Tx2ConHnd<C>)
-            }
-            .boxed(),
+            Err(err) => async move { Err(err) }.boxed(),
         }
     }
 
@@ -951,7 +947,7 @@ mod tests {
             let f = tx2_pool_promote(f, Default::default());
             let f = tx2_api(f, Default::default());
 
-            f.bind(TxUrl::from_str_unsafe("none:"), t).await.unwrap()
+            f.bind(TxUrl::from_str_panicking("none:"), t).await.unwrap()
         };
 
         let ep1 = mk_ep().await;
