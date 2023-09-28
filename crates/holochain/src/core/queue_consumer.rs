@@ -38,6 +38,7 @@ use futures::{Future, Stream, StreamExt};
 use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use tokio::sync::broadcast;
+use tracing::warn;
 
 // MAYBE: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -353,6 +354,7 @@ impl InitialQueueTriggers {
         self.validation_receipt.trigger(&"init");
     }
 }
+
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct TriggerSender {
@@ -653,8 +655,22 @@ async fn queue_consumer_main_task_impl<
     mut fut: impl 'static + Send + FnMut() -> Fut,
 ) -> ManagedTaskResult {
     let mut triggers = trigger_stream(rx, stop);
+    let mut skip_num = 0;
     loop {
         if let Some(()) = triggers.next().await {
+            if skip_num > 0 {
+                skip_num -= 1;
+                continue;
+            }
+
+            skip_num = triggers.size_hint().0;
+            if skip_num > 0 {
+                warn!(
+                    "Skipping {} duplicate triggers for queue {}",
+                    skip_num, name
+                );
+            }
+
             match fut().await {
                 Ok(WorkComplete::Incomplete) => {
                     tracing::debug!("Work incomplete, retriggering workflow");
