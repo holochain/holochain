@@ -5,7 +5,7 @@ use holochain_types::dht_op::DhtOp;
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
-use kitsune_p2p_types::{KitsuneSpace, KitsuneAgent};
+use kitsune_p2p_bin_data::{KitsuneSpace, KitsuneAgent};
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonDump {

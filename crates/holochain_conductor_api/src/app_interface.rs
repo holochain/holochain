@@ -452,7 +452,7 @@ pub struct NetworkInfo {
 
 #[test]
 fn status_serialization() {
-    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
+    use serde_json;
 
     let status: AppInfoStatus =
         AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
