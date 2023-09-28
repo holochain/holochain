@@ -143,23 +143,9 @@ dependencies = [
  "anstyle",
  "anstyle-parse",
  "anstyle-query",
- "anstyle-wincon 1.0.1",
+ "anstyle-wincon",
  "colorchoice",
  "is-terminal",
- "utf8parse",
-]
-
-[[package]]
-name = "anstream"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f58811cfac344940f1a400b6e6231ce35171f614f26439e80f8c1465c5cc0c"
-dependencies = [
- "anstyle",
- "anstyle-parse",
- "anstyle-query",
- "anstyle-wincon 2.1.0",
- "colorchoice",
  "utf8parse",
 ]
 
@@ -192,16 +178,6 @@ name = "anstyle-wincon"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "180abfa45703aebe0093f79badacc01b8fd4ea2e35118747e5811127f926e188"
-dependencies = [
- "anstyle",
- "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "anstyle-wincon"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58f54d10c6dfa51283a066ceab3ec1ab78d13fae00aa49243a45e4571fb79dfd"
 dependencies = [
  "anstyle",
  "windows-sys 0.48.0",
@@ -913,32 +889,34 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.4.5"
+version = "4.3.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "824956d0dca8334758a5b7f7e50518d66ea319330cbceedcf76905c2f6ab30e3"
+checksum = "fb690e81c7840c0d7aade59f242ea3b41b9bc27bcd5997890e7702ae4b32e487"
 dependencies = [
  "clap_builder",
  "clap_derive",
+ "once_cell",
 ]
 
 [[package]]
 name = "clap_builder"
-version = "4.4.5"
+version = "4.3.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122ec64120a49b4563ccaedcbea7818d069ed8e9aa6d829b82d8a4128936b2ab"
+checksum = "5ed2e96bc16d8d740f6f48d663eddf4b8a0983e79210fd55479b7bcd0a69860e"
 dependencies = [
- "anstream 0.5.0",
+ "anstream",
  "anstyle",
  "clap_lex",
+ "once_cell",
  "strsim 0.10.0",
  "terminal_size",
 ]
 
 [[package]]
 name = "clap_derive"
-version = "4.4.2"
+version = "4.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0862016ff20d69b84ef8247369fabf5c008a7417002411897d40ee1f4532b873"
+checksum = "54a9bb5758fc5dfe728d1019941681eccaf0cf8a4189b692a0ee2f2ecf90a050"
 dependencies = [
  "heck 0.4.1",
  "proc-macro2 1.0.64",
@@ -1183,7 +1161,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.4.5",
+ "clap 4.3.24",
  "criterion-plot 0.5.0",
  "is-terminal",
  "itertools 0.10.5",
@@ -2494,7 +2472,7 @@ dependencies = [
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
- "clap 4.4.5",
+ "clap 4.3.24",
  "flate2",
  "hdi",
  "hdk",
@@ -2837,7 +2815,7 @@ name = "holochain_cli"
 version = "0.3.0-beta-dev.19"
 dependencies = [
  "anyhow",
- "clap 4.4.5",
+ "clap 4.3.24",
  "futures",
  "holochain_cli_bundle",
  "holochain_cli_run_local_services",
@@ -2853,7 +2831,7 @@ version = "0.3.0-beta-dev.17"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
- "clap 4.4.5",
+ "clap 4.3.24",
  "futures",
  "holochain_serialized_bytes",
  "holochain_types",
@@ -2878,7 +2856,7 @@ dependencies = [
 name = "holochain_cli_run_local_services"
 version = "0.3.0-beta-dev.10"
 dependencies = [
- "clap 4.4.5",
+ "clap 4.3.24",
  "futures",
  "holochain_trace",
  "if-addrs 0.10.1",
@@ -2896,7 +2874,7 @@ dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
  "chrono",
- "clap 4.4.5",
+ "clap 4.3.24",
  "escargot",
  "futures",
  "holochain_conductor_api",
@@ -3469,7 +3447,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38a841f87949b0dd751864e769a870be79dc34abcee1cf31d737a61d498b22b6"
 dependencies = [
- "anstream 0.3.2",
+ "anstream",
  "anstyle",
  "backtrace",
  "os_info",
@@ -3656,7 +3634,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fb7c1b80a1dfa604bb4a649a5c5aeef3d913f7c520cb42b40e534e8a61bcdfc"
 dependencies = [
  "ahash 0.8.3",
- "clap 4.4.5",
+ "clap 4.3.24",
  "crossbeam-channel",
  "crossbeam-utils",
  "dashmap 5.5.0",
@@ -3923,7 +3901,7 @@ dependencies = [
  "anyhow",
  "base64 0.21.2",
  "bytecount",
- "clap 4.4.5",
+ "clap 4.3.24",
  "fancy-regex",
  "fraction",
  "getrandom 0.2.10",
@@ -4028,7 +4006,7 @@ dependencies = [
 name = "kitsune_p2p_bootstrap"
 version = "0.2.0-beta-dev.9"
 dependencies = [
- "clap 4.4.5",
+ "clap 4.3.24",
  "criterion 0.5.1",
  "fixt",
  "futures",
@@ -7160,7 +7138,7 @@ name = "stef_derive"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "heck 0.4.1",
+ "heck 0.3.3",
  "proc-macro-error",
  "proc-macro2 1.0.64",
  "proptest-derive",
@@ -7459,11 +7437,11 @@ dependencies = [
 
 [[package]]
 name = "terminal_size"
-version = "0.3.0"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+checksum = "8e6bf6f19e9f8ed8d4048dc22981458ebcf406d67e94cd422e5ecd73d63b3237"
 dependencies = [
- "rustix 0.38.4",
+ "rustix 0.37.23",
  "windows-sys 0.48.0",
 ]
 
@@ -8230,7 +8208,7 @@ version = "0.0.1-alpha.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8359558d90ae7c4b2ff885619fcd75186cccdb62f575252c95c0c06484ce7de0"
 dependencies = [
- "clap 4.4.5",
+ "clap 4.3.24",
  "dirs 5.0.1",
  "futures",
  "if-addrs 0.10.1",
@@ -8251,7 +8229,7 @@ version = "0.0.2-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4dd44a26819757459b14994e728adeeb05931ca95605e54eb7733d01f3f130f8"
 dependencies = [
- "clap 4.4.5",
+ "clap 4.3.24",
  "dirs 5.0.1",
  "futures",
  "if-addrs 0.10.1",
