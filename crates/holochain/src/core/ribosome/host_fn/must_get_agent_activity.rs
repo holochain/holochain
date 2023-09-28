@@ -112,6 +112,52 @@ pub mod test {
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
 
+    /// Test that validation can get the currently-being-validated agent's
+    /// activity.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_must_get_agent_activity_self() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
+
+        // This test is a repro of some issue where the init being inline with
+        // the commit being validated may or may not be important. For that
+        // reason this test should not be merged with other tests/assertions.
+        let _: () = conductor
+            .call(
+                &alice,
+                "commit_require_self_agents_chain",
+                (),
+            )
+            .await;
+    }
+
+    /// Test that validation can get the currently-being-validated agent's
+    /// previous action bounded activity.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_must_get_agent_activity_self_prev() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
+
+        // This test is a repro of some issue where the init being inline with
+        // the commit being validated may or may not be important. For that
+        // reason this test should not be merged with other tests/assertions.
+        let _: () = conductor
+            .call(
+                &alice,
+                "commit_require_self_prev_agents_chain",
+                (),
+            )
+            .await;
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity() {
         holochain_trace::test_run().ok();

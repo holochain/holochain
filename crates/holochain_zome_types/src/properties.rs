@@ -43,7 +43,7 @@ impl Default for YamlProperties {
 }
 
 /// Not a great implementation: always returns null
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
     fn arbitrary(_: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(serde_yaml::Value::Null.into())
