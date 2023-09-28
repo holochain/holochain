@@ -20,6 +20,7 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
+use holochain_state_types::{SourceChainJsonDump, SourceChainJsonRecord};
 use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
@@ -62,7 +63,6 @@ use holochain_zome_types::Signature;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
-use holochain_state_types::{SourceChainJsonDump, SourceChainJsonRecord};
 
 use crate::chain_lock::is_chain_locked;
 use crate::chain_lock::is_lock_expired;

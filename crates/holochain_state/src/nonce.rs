@@ -6,9 +6,9 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DbKindConductor;
+use holochain_util::nonce::fresh_nonce;
 use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::Timestamp;
-use holochain_util::nonce::fresh_nonce;
 use std::time::Duration;
 
 /// Rather arbitrary but we expire nonces after 5 mins.

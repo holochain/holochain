@@ -2909,13 +2909,11 @@ dependencies = [
  "directories",
  "holo_hash",
  "holochain_keystore",
- "holochain_p2p",
- "holochain_serialized_bytes 0.0.51",
- "holochain_state",
+ "holochain_state_types",
  "holochain_trace",
  "holochain_types",
  "holochain_zome_types",
- "kitsune_p2p",
+ "kitsune_p2p_types",
  "matches",
  "serde",
  "serde_derive",
@@ -3154,6 +3152,7 @@ dependencies = [
  "holochain_p2p",
  "holochain_serialized_bytes 0.0.51",
  "holochain_sqlite",
+ "holochain_state_types",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -3176,6 +3175,10 @@ dependencies = [
  "tracing",
  "tracing-futures",
 ]
+
+[[package]]
+name = "holochain_state_types"
+version = "0.3.0-beta-dev.18"
 
 [[package]]
 name = "holochain_test_wasm_common"

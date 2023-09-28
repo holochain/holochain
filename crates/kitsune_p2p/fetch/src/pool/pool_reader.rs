@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use kitsune_p2p_types::{KSpace, fetch_pool::FetchPoolInfo};
+use kitsune_p2p_types::{fetch_pool::FetchPoolInfo, KSpace};
 
 use crate::FetchPool;
 
