@@ -45,7 +45,7 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(HoloHash::arbitrary(u)?.into())
