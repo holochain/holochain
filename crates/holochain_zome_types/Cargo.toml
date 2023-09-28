@@ -19,6 +19,7 @@ kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.6", path = "../kitsune_p2p/b
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["encoding"] }
 holochain_integrity_types = { version = "^0.3.0-beta-dev.11", path = "../holochain_integrity_types", features = ["tracing"] }
 holochain_serialized_bytes = "=0.0.51"
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.18", path = "../holochain_secure_primitive"}
 paste = "1.0.12"
 serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"

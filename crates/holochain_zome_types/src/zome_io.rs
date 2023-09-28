@@ -5,6 +5,7 @@ use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
 pub use holochain_integrity_types::zome_io::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_secure_primitive::secure_primitive;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
@@ -237,7 +238,7 @@ pub enum ZomeCallResponse {
 /// 256 Bit generic nonce.
 #[derive(Clone, Copy)]
 pub struct Nonce256Bits([u8; 32]);
-holochain_integrity_types::secure_primitive!(Nonce256Bits, 32);
+secure_primitive!(Nonce256Bits, 32);
 
 impl Nonce256Bits {
     pub fn into_inner(self) -> [u8; 32] {

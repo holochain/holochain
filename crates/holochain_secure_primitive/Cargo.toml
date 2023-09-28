@@ -1,0 +1,15 @@
+[package]
+name = "holochain_secure_primitive"
+version = "0.3.0-beta-dev.18"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_secure_primitive"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = [ "derive" ] }
+paste = "1.0"
+
+# TODO: Figure out how to remove these dependencies.
+subtle = "2"

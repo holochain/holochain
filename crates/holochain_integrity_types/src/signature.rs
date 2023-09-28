@@ -1,6 +1,7 @@
 //! Signature for authenticity of data
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
+use holochain_secure_primitive::secure_primitive;
 
 /// Ed25519 signatures are always the same length, 64 bytes.
 pub const SIGNATURE_BYTES: usize = 64;
@@ -26,7 +27,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Signature {
 // about things like constant time equality.
 // Signature verification should always defer to the host.
 // What's nice about this is that we can easily handle fixed size signatures.
-crate::secure_primitive!(Signature, SIGNATURE_BYTES);
+secure_primitive!(Signature, SIGNATURE_BYTES);
 
 /// The output of ephemeral signing.
 /// The private key for this public key has been discarded by this point.
