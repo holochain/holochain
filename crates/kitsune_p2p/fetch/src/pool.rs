@@ -181,7 +181,7 @@ pub enum FetchPoolEffect {
     RemovedItem(FetchPoolItem),
 }
 
-#[stef::state]
+#[stef::state(fuzzing)]
 impl stef::State<'static> for FetchPoolState {
     type Action = FetchPoolAction;
     type Effect = Option<FetchPoolEffect>;
@@ -981,12 +981,6 @@ mod tests {
         }
 
         let mut pool = FetchPoolState::new(Arc::new(Config));
-
-        // filter out region keys
-        let actions = actions.into_iter().filter(|a| match a {
-            FetchPoolAction::Push(push) => !matches!(push.key, FetchKey::Region(_)),
-            _ => true,
-        });
 
         // apply the random actions
         for mut a in actions {
