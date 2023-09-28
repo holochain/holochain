@@ -113,6 +113,7 @@ impl<S: ArqStart> ArqSet<S> {
     }
 
     /// View ascii for all arq bounds
+    #[cfg(feature = "test_utils")]
     pub fn print_arqs(&self, topo: &Topology, len: usize) {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().iter().enumerate() {
@@ -190,6 +191,7 @@ impl ArqSet {
 }
 
 /// Print ascii for arq bounds
+#[cfg(feature = "test_utils")]
 pub fn print_arq<S: ArqStart>(topo: &Topology, arq: &Arq<S>, len: usize) {
     println!(
         "|{}| {} *2^{}",
@@ -200,6 +202,7 @@ pub fn print_arq<S: ArqStart>(topo: &Topology, arq: &Arq<S>, len: usize) {
 }
 
 /// Print a collection of arqs
+#[cfg(feature = "test_utils")]
 pub fn print_arqs<S: ArqStart>(topo: &Topology, arqs: &[Arq<S>], len: usize) {
     for (i, arq) in arqs.iter().enumerate() {
         println!(

@@ -100,7 +100,7 @@ macro_rules! make_kitsune_bin_type {
                 }
             }
 
-            #[cfg(feature = "arbitrary")]
+            #[cfg(feature = "fuzzing")]
             impl<'a> arbitrary::Arbitrary<'a> for $name {
                 fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
                     // FIXME: there is no way to calculate location bytes right now,
@@ -188,7 +188,7 @@ pub type KOp = std::sync::Arc<KitsuneOpData>;
     serde::Deserialize,
     serde::Serialize,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 

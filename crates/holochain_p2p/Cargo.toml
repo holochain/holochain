@@ -18,7 +18,7 @@ futures = "0.3"
 ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash" }
 holochain_keystore = { version = "^0.3.0-beta-dev.13", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_types = { version = "^0.3.0-beta-dev.16", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p" }
@@ -35,9 +35,15 @@ tokio-stream = "0.1"
 holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util" }
 
 [features]
-mock_network = [
-  "kitsune_p2p/mock_network",
+
+test_utils = [
   "kitsune_p2p/test_utils",
+  "ghost_actor/test_utils",
+]
+
+mock_network = [
+  "test_utils",
+  "kitsune_p2p/mock_network",
 ]
 
 sqlite-encrypted = [
