@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Performance improvement when sending validation receipts. When a batch of DHT ops is being processed and an author is unreachable while attempting to send a validation receipt, all the other receipts for that
+  author will be skipped. The network send already has a retry built in so when an author was offline and a batch of `N` receipts were ready to be sent it would take `N` minutes for the workflow to work through
+  them. This was unfair to other nodes that are still online because they would have to wait unreasonably long to get their validation receipts.
+- Resilience improvement with handling keystore errors in the validation receipt workflow. Previously, all errors caused the workflow to restart from the beginning. This was good for transient errors such as the
+  keystore being unavailable but it also meant that a single validation receipt failing to be signed (e.g. due to a local agent key being removed from the keystore) would prevent any more validation receipts being
+  sent by that conductor.
+- **BREAKING CHANGE** Addressed an outstanding technical debt item to make the validation receipt workflow send a network notification (fire and forget) rather than waiting for a response. When the validation receipt
+  workflow was written this functionality wasn't available but now that it is, sending validation receipts can be sped up by not waiting for a peer to respond. Note that the conductor will still accept and respond
+  to validation receipt requests so that older conductors can send validation receipts to newer ones. However, older conductors will reject validation receipt notifications from newer conductors. This is labelled as
+  a breaking change but really the break will be for older conductors, and newer conductors should work as expected when talking to a mixed network.
+
 ## 0.3.0-beta-dev.20
 
 ## 0.3.0-beta-dev.19
