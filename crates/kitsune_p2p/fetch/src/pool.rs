@@ -24,7 +24,7 @@ pub use pool_reader::*;
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
 
-/// A FetchPool tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
+/// A FetchPool tracks a set of [`FetchKey`]s (op hashes) to be fetched,
 /// each of which can have multiple sources associated with it.
 ///
 /// When adding the same key twice, the sources are merged by appending the newest
@@ -147,6 +147,18 @@ impl FetchPool {
         self.state
             .share_mut(|s| s.iter_mut(&*self.config).collect())
     }
+
+    /// Get the current size of the fetch pool. This is the number of outstanding items
+    /// and may be different to the size of response from `get_items_to_fetch` because it
+    /// ignores retry delays.
+    pub fn len(&self) -> usize {
+        self.state.share_ref(|s| s.queue.len())
+    }
+
+    /// Check whether the fetch pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.state.share_ref(|s| s.queue.is_empty())
+    }
 }
 
 impl State {
@@ -241,7 +253,6 @@ impl State {
                         let h = hash.to_string();
                         format!("{}..{}", &h[0..4], &h[h.len() - 4..])
                     }
-                    FetchKey::Region(_) => "[region]".to_string(),
                 };
 
                 let size = v.size.unwrap_or_default().get();
@@ -373,6 +384,7 @@ pub enum FetchSource {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_utils::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;
@@ -380,7 +392,7 @@ mod tests {
     use std::collections::HashSet;
     use std::{sync::Arc, time::Duration};
 
-    use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
+    use kitsune_p2p_types::bin_types::{KitsuneBinType, KitsuneSpace};
 
     use super::*;
 
@@ -397,21 +409,6 @@ mod tests {
 
         fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
             (a + b).min(1)
-        }
-    }
-
-    pub(super) fn key_op(n: u8) -> FetchKey {
-        FetchKey::Op(Arc::new(KitsuneOpHash::new(vec![n; 36])))
-    }
-
-    pub(super) fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchPoolPush {
-        FetchPoolPush {
-            key: key_op(n),
-            author: None,
-            context,
-            space: space(0),
-            source,
-            size: None,
         }
     }
 
@@ -434,24 +431,8 @@ mod tests {
         }
     }
 
-    pub(super) fn space(i: u8) -> KSpace {
-        Arc::new(KitsuneSpace::new(vec![i; 36]))
-    }
-
-    pub(super) fn source(i: u8) -> FetchSource {
-        FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
-    }
-
-    pub(super) fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
-        ix.into_iter().map(source).collect()
-    }
-
-    fn arbitrary_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
-        sources(std::iter::repeat_with(|| u8::arbitrary(u).unwrap()).take(count))
-    }
-
-    pub(super) fn ctx(c: u32) -> Option<FetchContext> {
-        Some(c.into())
+    fn arbitrary_test_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
+        test_sources(std::iter::repeat_with(|| u8::arbitrary(u).unwrap()).take(count))
     }
 
     #[tokio::test(start_paused = true)]
@@ -459,9 +440,9 @@ mod tests {
         let source_delay = Duration::from_secs(10);
         let mut sources = Sources(
             [(
-                source(1),
+                test_source(1),
                 SourceRecord {
-                    source: source(1),
+                    source: test_source(1),
                     last_request: None,
                 },
             )]
@@ -469,11 +450,11 @@ mod tests {
             .collect(),
         );
 
-        assert_eq!(sources.next(source_delay), Some(source(1)));
+        assert_eq!(sources.next(source_delay), Some(test_source(1)));
 
         tokio::time::advance(source_delay).await;
 
-        assert_eq!(sources.next(source_delay), Some(source(1)));
+        assert_eq!(sources.next(source_delay), Some(test_source(1)));
         assert_eq!(sources.next(source_delay), None);
     }
 
@@ -483,16 +464,16 @@ mod tests {
         let mut sources = Sources(
             [
                 (
-                    source(1),
+                    test_source(1),
                     SourceRecord {
-                        source: source(1),
+                        source: test_source(1),
                         last_request: Some(Instant::now()),
                     },
                 ),
                 (
-                    source(2),
+                    test_source(2),
                     SourceRecord {
-                        source: source(2),
+                        source: test_source(2),
                         last_request: None,
                     },
                 ),
@@ -503,24 +484,24 @@ mod tests {
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), Some(test_source(2)));
         assert_eq!(sources.next(source_delay), None);
 
         tokio::time::advance(Duration::from_secs(9)).await;
 
-        assert_eq!(sources.next(source_delay), Some(source(1)));
+        assert_eq!(sources.next(source_delay), Some(test_source(1)));
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), Some(test_source(2)));
         // source 1 has already had its delay backed off another 10s
         // due to a retry, so it returns None
         assert_eq!(sources.next(source_delay), None);
 
         tokio::time::advance(Duration::from_secs(10)).await;
 
-        assert_eq!(sources.next(source_delay), Some(source(1)));
-        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), Some(test_source(1)));
+        assert_eq!(sources.next(source_delay), Some(test_source(2)));
         assert_eq!(sources.next(source_delay), None);
     }
 
@@ -530,23 +511,23 @@ mod tests {
         let mut sources = Sources(
             [
                 (
-                    source(1),
+                    test_source(1),
                     SourceRecord {
-                        source: source(1),
+                        source: test_source(1),
                         last_request: Some(Instant::now()), // recently tried
                     },
                 ),
                 (
-                    source(2),
+                    test_source(2),
                     SourceRecord {
-                        source: source(2),
+                        source: test_source(2),
                         last_request: None, // never checked
                     },
                 ),
                 (
-                    source(3),
+                    test_source(3),
                     SourceRecord {
-                        source: source(3),
+                        source: test_source(3),
                         last_request: None, // never checked
                     },
                 ),
@@ -555,15 +536,15 @@ mod tests {
             .collect(),
         );
 
-        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), Some(test_source(2)));
 
         // All sources now past their retry delay
         tokio::time::advance(source_delay).await;
 
         // Would expect source 1 to be tried next but trying 2 first rotated 1 and 2 to the end of the list
-        assert_eq!(sources.next(source_delay), Some(source(3)));
-        assert_eq!(sources.next(source_delay), Some(source(1)));
-        assert_eq!(sources.next(source_delay), Some(source(2)));
+        assert_eq!(sources.next(source_delay), Some(test_source(3)));
+        assert_eq!(sources.next(source_delay), Some(test_source(1)));
+        assert_eq!(sources.next(source_delay), Some(test_source(2)));
         assert_eq!(sources.next(source_delay), None);
     }
 
@@ -580,9 +561,9 @@ mod tests {
             .enumerate()
             .map(|(i, duration)| {
                 (
-                    source(i as u8),
+                    test_source(i as u8),
                     SourceRecord {
-                        source: source(i as u8),
+                        source: test_source(i as u8),
                         last_request: Instant::now().checked_sub(duration),
                     },
                 )
@@ -613,12 +594,12 @@ mod tests {
         let mut q = State::default();
         let cfg = Config(1, 1);
 
-        q.push(&cfg, req(1, ctx(1), source(1)));
-        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+        q.push(&cfg, test_req_op(1, test_ctx(1), test_source(1)));
+        assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
 
         // Same key but different source so that it will merge and no context set to check how that is merged
-        q.push(&cfg, req(1, None, source(0)));
-        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+        q.push(&cfg, test_req_op(1, None, test_source(0)));
+        assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
     }
 
     #[test]
@@ -627,12 +608,12 @@ mod tests {
         let cfg = Config(1, 1);
 
         // Initially have no context
-        q.push(&cfg, req(1, None, source(1)));
+        q.push(&cfg, test_req_op(1, None, test_source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
 
         // Now merge with a context
-        q.push(&cfg, req(1, ctx(1), source(0)));
-        assert_eq!(ctx(1), q.queue.front().unwrap().1.context);
+        q.push(&cfg, test_req_op(1, test_ctx(1), test_source(0)));
+        assert_eq!(test_ctx(1), q.queue.front().unwrap().1.context);
     }
 
     #[test]
@@ -641,11 +622,11 @@ mod tests {
         let cfg = Config(1, 1);
 
         // Initially have no context
-        q.push(&cfg, req(1, None, source(1)));
+        q.push(&cfg, test_req_op(1, None, test_source(1)));
         assert_eq!(None, q.queue.front().unwrap().1.context);
 
         // Now merge with no context
-        q.push(&cfg, req(1, None, source(0)));
+        q.push(&cfg, test_req_op(1, None, test_source(0)));
 
         // Still no context
         assert_eq!(None, q.queue.front().unwrap().1.context);
@@ -658,11 +639,11 @@ mod tests {
         let mut q = State::default();
         let cfg = Config(1, 1);
 
-        q.push(&cfg, req(1, ctx(1), source(1)));
+        q.push(&cfg, test_req_op(1, test_ctx(1), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
 
         // Set a different context but otherwise the same operation as above
-        q.push(&cfg, req(1, ctx(2), source(1)));
+        q.push(&cfg, test_req_op(1, test_ctx(2), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.0.len());
     }
 
@@ -672,14 +653,14 @@ mod tests {
         let c = Config(1, 1);
 
         // note: new sources get added to the back of the list
-        q.push(&c, req(1, ctx(0), source(0)));
-        q.push(&c, req(1, ctx(1), source(1)));
+        q.push(&c, test_req_op(1, test_ctx(0), test_source(0)));
+        q.push(&c, test_req_op(1, test_ctx(1), test_source(1)));
 
-        q.push(&c, req(2, ctx(0), source(0)));
+        q.push(&c, test_req_op(2, test_ctx(0), test_source(0)));
 
         let expected_ready = [
-            (key_op(1), item(&c, sources(0..=1), ctx(1))),
-            (key_op(2), item(&c, sources([0]), ctx(0))),
+            (test_key_op(1), item(&c, test_sources(0..=1), test_ctx(1))),
+            (test_key_op(2), item(&c, test_sources([0]), test_ctx(0))),
         ]
         .into_iter()
         .collect();
@@ -692,9 +673,9 @@ mod tests {
         let cfg = Config(1, 10);
         let mut q = {
             let mut queue = [
-                (key_op(1), item(&cfg, sources(0..=2), ctx(1))),
-                (key_op(2), item(&cfg, sources(1..=3), ctx(1))),
-                (key_op(3), item(&cfg, sources(2..=4), ctx(1))),
+                (test_key_op(1), item(&cfg, test_sources(0..=2), test_ctx(1))),
+                (test_key_op(2), item(&cfg, test_sources(1..=3), test_ctx(1))),
+                (test_key_op(3), item(&cfg, test_sources(2..=4), test_ctx(1))),
             ];
             // Set the last_fetch time of one of the sources to something a bit earlier,
             // so it won't show up in next() right away
@@ -702,7 +683,7 @@ mod tests {
                 .1
                 .sources
                 .0
-                .get_mut(&source(2))
+                .get_mut(&test_source(2))
                 .unwrap()
                 .last_request = Some(Instant::now() - Duration::from_secs(3));
 
@@ -729,7 +710,7 @@ mod tests {
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
             q.iter_mut(&cfg).collect::<Vec<_>>(),
-            vec![(key_op(2), space(0), source(2), ctx(1))]
+            vec![(test_key_op(2), test_space(0), test_source(2), test_ctx(1))]
         );
         assert_eq!(q.iter_mut(&cfg).count(), 0);
 
@@ -749,8 +730,8 @@ mod tests {
             let mut queue = vec![];
             for i in 0..(num_items) {
                 queue.push((
-                    key_op(i as u8),
-                    item(&cfg, sources([(i % 100) as u8]), ctx(1)),
+                    test_key_op(i as u8),
+                    item(&cfg, test_sources([(i % 100) as u8]), test_ctx(1)),
                 ))
             }
 
@@ -780,12 +761,12 @@ mod tests {
             let mut queue = vec![];
             for i in 0..num_items {
                 queue.push((
-                    key_op(i as u8),
+                    test_key_op(i as u8),
                     // Give each item a different set of sources
                     item(
                         &cfg,
-                        sources((i * num_items) as u8..(i * num_items + num_items) as u8),
-                        ctx(1),
+                        test_sources((i * num_items) as u8..(i * num_items + num_items) as u8),
+                        test_ctx(1),
                     ),
                 ))
             }
@@ -816,14 +797,14 @@ mod tests {
     async fn remove_fetch_item() {
         let cfg = Config(1, 10);
         let mut q = {
-            let queue = [(key_op(1), item(&cfg, sources([1]), ctx(1)))];
+            let queue = [(test_key_op(1), item(&cfg, test_sources([1]), test_ctx(1)))];
 
             let queue = queue.into_iter().collect();
             State { queue }
         };
 
         assert_eq!(1, q.iter_mut(&cfg).count());
-        q.remove(&key_op(1));
+        q.remove(&test_key_op(1));
 
         // Move time forwards to be able to retry the item
         tokio::time::advance(Duration::from_secs(30)).await;
@@ -852,16 +833,16 @@ mod tests {
 
         // Some sources will be unavailable for blocks of time
         let unavailable_sources: HashSet<FetchSource> =
-            arbitrary_sources(&mut u, 10).into_iter().collect();
+            arbitrary_test_sources(&mut u, 10).into_iter().collect();
 
         // Add one item that will never send
         fetch_pool.push(FetchPoolPush {
-            key: key_op(220),
-            space: space(u8::arbitrary(&mut u).unwrap()),
+            key: test_key_op(220),
+            space: test_space(u8::arbitrary(&mut u).unwrap()),
             source: unavailable_sources.iter().last().cloned().unwrap(),
             size: None,   // Not important for this test
             author: None, // Unused field, ignore
-            context: ctx(u32::arbitrary(&mut u).unwrap()),
+            context: test_ctx(u32::arbitrary(&mut u).unwrap()),
         });
 
         let mut failed_count = 0;
@@ -869,12 +850,12 @@ mod tests {
             // Add five items to fetch
             for _ in 0..5 {
                 fetch_pool.push(FetchPoolPush {
-                    key: key_op(i),
-                    space: space(u8::arbitrary(&mut u).unwrap()),
-                    source: source(u8::arbitrary(&mut u).unwrap()),
+                    key: test_key_op(i),
+                    space: test_space(u8::arbitrary(&mut u).unwrap()),
+                    source: test_source(u8::arbitrary(&mut u).unwrap()),
                     size: None,   // Not important for this test
                     author: None, // Unused field, ignore
-                    context: ctx(u32::arbitrary(&mut u).unwrap()),
+                    context: test_ctx(u32::arbitrary(&mut u).unwrap()),
                 });
             }
 

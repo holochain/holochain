@@ -1,7 +1,7 @@
 # Contained Jobs
 # - vars: processes the input
 # - prepare: imported from ./release-prepare.yml
-# - test: currently unimplemented
+# - test: calls ./holochain-build-and-test.yml
 # - finalize:
 #   - restore repo from cache
 #   - push to the target branch
@@ -60,8 +60,6 @@ on:
         required: false
         default: "false"
         type: string
-
-  pull_request: {}
 
 concurrency:
   group: release-${{ github.ref_name }}-${{ github.event_name }}
@@ -183,6 +181,9 @@ jobs:
     uses: ./.github/workflows/holochain-build-and-test.yml
     with:
       repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
+    secrets:
+      GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
 
   finalize:
     if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && (needs.prepare.outputs.releasable_crates == 'true' || needs.vars.outputs.skip_prepare_logic == 'true') }}
@@ -190,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install nix
         uses: cachix/install-nix-action@v20
       - name: Setup cachix
@@ -245,10 +246,7 @@ jobs:
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
-          # regenerate the nix sources
-          git config --global user.email "devcore@holochain.org"
-          git config --global user.name "Holochain Core Dev Team"
-
+          ./scripts/ci-git-config.sh
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 

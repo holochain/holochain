@@ -42,8 +42,8 @@ pub const MM: i64 = 1_000_000;
 ///
 /// Supports +/- `chrono::Duration` directly.  There is no `Timestamp::now()` method, since this is not
 /// supported by WASM; however, `holochain_types` provides a `Timestamp::now()` method.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(not(feature = "chrono"), derive(Debug))]
 pub struct Timestamp(
     /// Microseconds from UNIX Epoch, positive or negative
@@ -196,7 +196,7 @@ impl rusqlite::types::FromSql for Timestamp {
 }
 
 /// It's an interval bounded by timestamps that are not infinite.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
 pub struct InclusiveTimestampInterval {
     start: Timestamp,
     end: Timestamp,
@@ -271,6 +271,15 @@ mod tests {
         let s: S = sb.try_into().unwrap();
         let t = s.0;
         assert_eq!(TEST_TS, &t.to_string());
+    }
+
+    #[test]
+    fn test_timestamp_alternate_forms() {
+        use holochain_serialized_bytes::prelude::*;
+
+        decode::<_, Timestamp>(&encode(&(0u64)).unwrap()).unwrap();
+        decode::<_, Timestamp>(&encode(&(i64::MAX as u64)).unwrap()).unwrap();
+        assert!(decode::<_, Timestamp>(&encode(&(i64::MAX as u64 + 1)).unwrap()).is_err());
     }
 
     #[test]

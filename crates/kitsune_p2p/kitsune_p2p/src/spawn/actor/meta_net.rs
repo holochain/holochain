@@ -238,15 +238,20 @@ impl Drop for MetricSendGuard {
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
-    Tx2(Tx2ConHnd<wire::Wire>, HostApi),
+    Tx2(Tx2ConHnd<wire::Wire>, HostApiLegacy),
 
     #[cfg(feature = "tx5")]
     Tx5 {
-        host: HostApi,
+        host: HostApiLegacy,
         ep: tx5::Ep,
         rem_url: tx5::Tx5Url,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
+    },
+
+    #[cfg(test)]
+    Test {
+        state: Arc<parking_lot::RwLock<MetaNetConTest>>,
     },
 }
 
@@ -266,6 +271,14 @@ impl Eq for MetaNetCon {}
 
 impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                state.write().closed = true;
+                return;
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -287,6 +300,13 @@ impl MetaNetCon {
     }
 
     pub fn is_closed(&self) -> bool {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                return state.read().closed;
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -309,6 +329,8 @@ impl MetaNetCon {
             MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
                 nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
             }
+            #[cfg(test)]
+            MetaNetCon::Test { .. } => MetaNetAuth::Authorized,
         }
     }
 
@@ -319,6 +341,20 @@ impl MetaNetCon {
         let result = (move || async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
+                    #[cfg(test)]
+                    {
+                        if let MetaNetCon::Test { state } = self {
+                            let mut state = state.write();
+                            state.notify_call_count += 1;
+
+                            return if state.notify_succeed {
+                                Ok(())
+                            } else {
+                                Err("Test error while notifying".into())
+                            };
+                        }
+                    }
+
                     #[cfg(feature = "tx2")]
                     {
                         if let MetaNetCon::Tx2(con, _) = self {
@@ -446,6 +482,13 @@ impl MetaNetCon {
     }
 
     pub fn peer_id(&self) -> Arc<[u8; 32]> {
+        #[cfg(test)]
+        {
+            if let MetaNetCon::Test { state } = self {
+                return state.read().id();
+            }
+        }
+
         #[cfg(feature = "tx2")]
         {
             if let MetaNetCon::Tx2(con, _) = self {
@@ -465,17 +508,53 @@ impl MetaNetCon {
     }
 }
 
+#[cfg(test)]
+#[derive(Debug)]
+pub struct MetaNetConTest {
+    pub id: Arc<[u8; 32]>,
+    pub closed: bool,
+
+    pub notify_succeed: bool,
+    pub notify_call_count: usize,
+}
+
+#[cfg(test)]
+impl Default for MetaNetConTest {
+    fn default() -> Self {
+        Self {
+            id: Arc::new([0; 32]),
+            closed: false,
+            notify_succeed: true,
+            notify_call_count: 0,
+        }
+    }
+}
+
+#[cfg(test)]
+impl MetaNetConTest {
+    pub fn new_with_id(id: u8) -> Self {
+        Self {
+            id: Arc::new(vec![id; 32].try_into().unwrap()),
+            ..Default::default()
+        }
+    }
+
+    pub fn id(&self) -> Arc<[u8; 32]> {
+        self.id.clone()
+    }
+}
+
 /// Networking abstraction to handle feature flipping.
 #[derive(Clone)]
 pub enum MetaNet {
     /// Tx2 Abstraction
     #[cfg(feature = "tx2")]
-    Tx2(Tx2EpHnd<wire::Wire>, HostApi),
+    Tx2(Tx2EpHnd<wire::Wire>, HostApiLegacy),
 
     /// Tx5 Abstraction
     #[cfg(feature = "tx5")]
     Tx5 {
-        host: HostApi,
+        host: HostApiLegacy,
         ep: tx5::Ep,
         url: tx5::Tx5Url,
         res: ResStore,
@@ -487,7 +566,7 @@ impl MetaNet {
     /// Construct abstraction with tx2 backend.
     #[cfg(feature = "tx2")]
     pub async fn new_tx2(
-        host: HostApi,
+        host: HostApiLegacy,
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         metrics: Tx2ApiMetrics,
@@ -693,14 +772,14 @@ impl MetaNet {
     #[cfg(feature = "tx5")]
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
-        host: HostApi,
+        host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
-        evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         signal_url: String,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
+        let evt_sender = host.legacy.clone();
         let mut tx5_config = tx5::DefConfig::default()
             .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
             .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.9"
+version = "0.3.0-beta-dev.12"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,13 +12,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.4", path = "../kitsune_p2p/dht" }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.0", path = "../kitsune_p2p/timestamp" }
-kitsune_p2p_block = { version = "^0.3.0-beta-dev.5", path = "../kitsune_p2p/block" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.4", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.3.0-beta-dev.6", path = "../holo_hash", features = ["encoding"] }
-holochain_integrity_types = { version = "^0.3.0-beta-dev.8", path = "../holochain_integrity_types", features = ["tracing"] }
-holochain_serialized_bytes = "=0.0.51"
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.6", path = "../kitsune_p2p/dht" }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.2", path = "../kitsune_p2p/timestamp" }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.7", path = "../kitsune_p2p/block" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.6", path = "../kitsune_p2p/bin_data" }
+holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["encoding"] }
+holochain_integrity_types = { version = "^0.3.0-beta-dev.11", path = "../holochain_integrity_types", features = ["tracing"] }
+holochain_serialized_bytes = "=0.0.53"
 paste = "1.0.12"
 serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
@@ -26,7 +26,7 @@ serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.84"
+holochain_wasmer_common = "=0.0.85"
 
 # fixturator dependencies
 fixt = { version = "^0.2.0", path = "../fixt", optional = true }
@@ -58,7 +58,7 @@ matches = "0.1"
 proptest = "1"
 
 [features]
-default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
+default = ["full-dna-def", "subtle-encoding"]
 
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
@@ -70,17 +70,21 @@ fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_inte
 
 properties = ["serde_yaml"]
 
-test_utils = [
+fuzzing = [
   "arbitrary",
   "contrafact",
+  "kitsune_p2p_timestamp/fuzzing",
+  "holochain_integrity_types/fuzzing",
+  "holochain_serialized_bytes/fuzzing",
+]
+
+test_utils = [
   "once_cell",
-  "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",
   "kitsune_p2p_block/sqlite",
-  "holo_hash/arbitrary",
+  "holo_hash/fuzzing",
   "holo_hash/hashing",
   "holo_hash/test_utils",
-  "holochain_serialized_bytes/arbitrary",
   "full-dna-def",
   "holochain_integrity_types/test_utils",
 ]

@@ -73,7 +73,7 @@ pub struct HoloHash<T: HashType> {
     hash_type: T,
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; HOLO_HASH_FULL_LEN];
@@ -160,7 +160,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Get the hex representation of the hash bytes
     pub fn to_hex(&self) -> String {
-        bytes_to_hex(&self.hash, false)
+        holochain_util::hex::bytes_to_hex(&self.hash, false)
     }
 }
 
@@ -250,28 +250,13 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[3] as u32) << 24)
 }
 
-/// Get a hex string representation of two chars per byte
-pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
-    use std::fmt::Write;
-    let mut s = String::with_capacity(bytes.len() + 2);
-    if caps {
-        for b in bytes {
-            write!(&mut s, "{:02X}", b).ok();
-        }
-    } else {
-        for b in bytes {
-            write!(&mut s, "{:02x}", b).ok();
-        }
-    }
-    s
-}
-
 #[cfg(test)]
 mod tests {
     use crate::*;
 
-    fn assert_type<T: HashType>(_: &str, h: HoloHash<T>) {
+    fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc().as_u32());
+        assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
             format!("{:?}", h.get_raw_32()),
