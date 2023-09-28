@@ -2,6 +2,8 @@ use hdk::prelude::*;
 
 use crate::integrity::AgentsChain;
 use crate::integrity::AgentsChainRec;
+use crate::integrity::SelfAgentsChain;
+use crate::integrity::SelfPrevAgentsChain;
 use crate::integrity::EntryTypes;
 use crate::integrity::Something;
 
@@ -47,4 +49,21 @@ fn commit_require_agents_chain_recursive(
     create_entry(EntryTypes::AgentsChainRec(AgentsChainRec(
         author, chain_top,
     )))
+}
+
+#[hdk_extern]
+fn commit_require_self_agents_chain(_: ()) -> ExternResult<()> {
+    create_entry(EntryTypes::SelfAgentsChain(SelfAgentsChain))?;
+    Ok(())
+}
+
+#[hdk_extern]
+fn commit_require_self_prev_agents_chain(_: ()) -> ExternResult<()> {
+    create_entry(EntryTypes::SelfPrevAgentsChain(SelfPrevAgentsChain))?;
+    Ok(())
+}
+
+#[hdk_extern]
+fn noop(_: ()) -> ExternResult<()> {
+    Ok(())
 }
