@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use kitsune_p2p_types::KSpace;
+use kitsune_p2p_types::{KSpace, fetch_pool::FetchPoolInfo};
 
 use crate::FetchPool;
 
@@ -24,16 +24,6 @@ impl FetchPoolReader {
             num_ops_to_fetch: count,
         }
     }
-}
-
-/// Info about the fetch queue
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FetchPoolInfo {
-    /// Total number of bytes expected to be received through fetches
-    pub op_bytes_to_fetch: usize,
-
-    /// Total number of ops expected to be received through fetches
-    pub num_ops_to_fetch: usize,
 }
 
 #[cfg(test)]

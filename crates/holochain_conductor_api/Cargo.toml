@@ -11,7 +11,7 @@ edition = "2021"
 [dependencies]
 directories = "2.0.2"
 derive_more = "0.99.3"
-kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/kitsune_p2p_types" }
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["full"] }
 holochain_p2p = { version = "^0.3.0-beta-dev.18", path = "../holochain_p2p" }
 holochain_state = { version = "^0.3.0-beta-dev.18", path = "../holochain_state" }
