@@ -2670,7 +2670,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2782,7 +2782,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2794,6 +2794,7 @@ dependencies = [
  "hdk",
  "hdk_derive",
  "holo_hash",
+ "holochain_cascade",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
@@ -2818,7 +2819,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "anyhow",
  "clap 4.3.24",
@@ -2833,7 +2834,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.3.0-beta-dev.16"
+version = "0.3.0-beta-dev.17"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -2874,7 +2875,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2905,7 +2906,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "derive_more",
  "directories",
@@ -3011,7 +3012,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.18"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3067,7 +3068,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.3.0-beta-dev.15"
+version = "0.3.0-beta-dev.16"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3113,7 +3114,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.18"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3136,6 +3137,7 @@ dependencies = [
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_state",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -3191,7 +3193,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.3.0-beta-dev.15"
+version = "0.3.0-beta-dev.16"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3271,7 +3273,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.3.0-beta-dev.16"
+version = "0.3.0-beta-dev.17"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3928,7 +3930,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.15"
+version = "0.3.0-beta-dev.16"
 dependencies = [
  "arbitrary",
  "arrayref",

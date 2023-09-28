@@ -54,10 +54,7 @@ pub enum MetricExchangeMsg {
 /// An individual op item within a "PushOpData" wire message.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct PushOpItem {
     /// The payload of this op.
     pub op_data: Arc<KitsuneOpData>,

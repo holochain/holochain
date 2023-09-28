@@ -463,7 +463,6 @@ impl<'a> From<&'a NewEntryAction> for NewEntryActionRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fixt::ActionBuilderCommonFixturator;
     use crate::test_utils::fake_dna_hash;
     use crate::test_utils::fake_entry_hash;
     use ::fixt::prelude::Unpredictable;
