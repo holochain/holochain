@@ -8,6 +8,7 @@ use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DbKindConductor;
 use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::Timestamp;
+use holochain_util::nonce::fresh_nonce;
 use std::time::Duration;
 
 /// Rather arbitrary but we expire nonces after 5 mins.
@@ -49,14 +50,6 @@ pub async fn witness_nonce(
         })
         .await
     }
-}
-
-pub fn fresh_nonce(now: Timestamp) -> DatabaseResult<(Nonce256Bits, Timestamp)> {
-    let mut bytes = [0; 32];
-    getrandom::getrandom(&mut bytes)?;
-    let nonce = Nonce256Bits::from(bytes);
-    let expires: Timestamp = (now + FRESH_NONCE_EXPIRES_AFTER)?;
-    Ok((nonce, expires))
 }
 
 #[cfg(test)]
