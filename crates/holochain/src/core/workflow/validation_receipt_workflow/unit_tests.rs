@@ -306,20 +306,27 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
     let vault = test_db.to_db();
     let keystore = holochain_state::test_utils::test_keystore();
 
-    let (_, op_hash1) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+    let (author1, op_hash1) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
         .await
         .unwrap();
 
-    let (_, op_hash2) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+    let (author2, op_hash2) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
         .await
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
+    let mut seq = mockall::Sequence::new();
     dna.expect_send_validation_receipt()
-        .return_once(|_, _| Err("I'm a test error".into()));
+        .times(1)
+        .withf(move |author: &AgentPubKey, _| *author == author1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| Err("I'm a test error".into()));
 
     dna.expect_send_validation_receipt()
-        .return_once(|_, _| Ok(()));
+        .times(1)
+        .withf(move |author: &AgentPubKey, _| *author == author2)
+        .in_sequence(&mut seq)
+        .returning(|_, _| Ok(()));
 
     let dna_hash = fixt!(DnaHash);
 
