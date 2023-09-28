@@ -156,7 +156,7 @@ impl MetricExchangeSync {
     pub fn spawn(
         space: Arc<KitsuneSpace>,
         tuning_params: KitsuneP2pTuningParams,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
     ) -> Self {
         let out = Self(Arc::new(parking_lot::RwLock::new(MetricExchange::spawn(
@@ -176,6 +176,7 @@ impl MetricExchangeSync {
                     if last_extrap_cov.should_trigger() {
                         let arc_set = mx.read().arc_set.clone();
                         if let Ok(res) = host
+                            .api
                             .peer_extrapolated_coverage(space.clone(), arc_set)
                             .await
                         {

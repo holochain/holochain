@@ -137,7 +137,7 @@ fn share() {
 
 #[test]
 fn share_accumulated() {
-    let mut light = StoreEffects::new(Share::new(TrafficLight(0)), 10);
+    let mut light = StoreEffects::new(Share::new(TrafficLight(0)));
 
     assert_eq!(light.read(TrafficLight::color), Green);
 
@@ -166,7 +166,7 @@ fn share_runner() {
     let blinking = Arc::new(AtomicBool::new(false));
     let blinky = blinking.clone();
 
-    let mut share = RunEffects::new(Share::new(TrafficLight(0)), move |eff| match eff {
+    let run = move |eff| match eff {
         Some(StartThatBlinkyBlueLight) => {
             assert!(!blinking.swap(true, std::sync::atomic::Ordering::Relaxed));
             true
@@ -176,19 +176,21 @@ fn share_runner() {
             true
         }
         None => false,
-    });
+    };
+
+    let share = Share::new(TrafficLight(0));
 
     assert_eq!(share.read(TrafficLight::color), Green);
 
-    assert!(!share.transition(()));
+    assert!(!run(share.transition(())));
     assert!(!blinky.load(std::sync::atomic::Ordering::Relaxed));
     assert_eq!(share.read(TrafficLight::color), Amber);
 
-    assert!(share.transition(()));
+    assert!(run(share.transition(())));
     assert!(blinky.load(std::sync::atomic::Ordering::Relaxed));
     assert_eq!(share.read(TrafficLight::color), Red);
 
-    assert!(share.transition(()));
+    assert!(run(share.transition(())));
     assert!(!blinky.load(std::sync::atomic::Ordering::Relaxed));
     assert_eq!(share.read(TrafficLight::color), Green);
 }
@@ -222,7 +224,7 @@ fn composition() {
 
     let light = Share::new(TrafficLight(0));
     let walk = Share::new(WalkSign::new(10));
-    let mut s = StoreEffects::new(Intersection { light, walk }, 10);
+    let mut s = StoreEffects::new(Intersection { light, walk });
 
     for _ in 0..6 {
         s.transition(());

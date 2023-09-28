@@ -163,6 +163,9 @@ where
 
     let validation_result =
         inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
+
+    // If the validation failed remove any active chain lock that matches the
+    // entry that failed validation.
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(

@@ -4,9 +4,9 @@ use kitsune_p2p_dht_arc::DhtLocation;
 
 pub mod dependencies {
     #[cfg(any(test, feature = "fuzzing"))]
-    pub use ::proptest;
+    pub use proptest;
     #[cfg(any(test, feature = "fuzzing"))]
-    pub use ::proptest_derive;
+    pub use proptest_derive;
 }
 
 /// Kitsune hashes are expected to be 36 bytes.

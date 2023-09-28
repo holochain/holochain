@@ -19,6 +19,8 @@ members = [
     "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
+    "hc-stress-test-integrity",
+    "hc-stress-test-coordinator",
     "hash_path",
     "hdk_extern",
     "init_fail",
@@ -55,6 +57,11 @@ opt-level = "z"
 
 [workspace.dependencies]
 serde = "1.0"
+hdi = { path = "../../../hdi" }
+hdk = { path = "../../../hdk" }
+
+# workaround to make it slightly easier to import hc-scress-test zomes
+files_integrity = { path = "hc-stress-test-integrity" }
 
 [patch.crates-io]
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }
