@@ -70,8 +70,8 @@ where
         let bytes = rmp_serde::to_vec(action)?;
         let mut f = File::options().append(true).open(&self.path)?;
         let len = bytes.len() as u32;
-        f.write(&len.to_le_bytes())?;
-        f.write(&bytes)?;
+        f.write_all(&len.to_le_bytes())?;
+        f.write_all(&bytes)?;
         Ok(())
     }
 
@@ -95,7 +95,7 @@ where
                 Ok(_) => {
                     let len = u32::from_le_bytes(lbuf);
                     abuf.resize(len as usize, 0);
-                    f.read(&mut abuf)?;
+                    f.read_exact(&mut abuf)?;
                     actions.push(rmp_serde::from_slice(&abuf).unwrap());
                 }
             }
