@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "*" }
+derivative = "2.2.0"
 derive_more = { version = "*" }
 futures = { version = "*" }
 must_future = { version = "*" }

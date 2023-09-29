@@ -7118,6 +7118,7 @@ name = "stef"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "derivative",
  "derive_more",
  "either",
  "futures",
