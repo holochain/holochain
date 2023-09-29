@@ -73,7 +73,7 @@ impl RangeBounds<u32> for ArcRange {
 /// associated with any particular Agent, and so the agent's Location cannot be known.
 #[derive(Copy, Clone, Debug, derive_more::Deref, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(
-    any(test, feature = "fuzzing"),
+    feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct DhtArc(#[deref] DhtArcRange, Option<DhtLocation>);

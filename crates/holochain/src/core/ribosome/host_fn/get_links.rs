@@ -203,6 +203,7 @@ pub mod slow_tests {
             .call(&alice, "list_anchor_addresses", "foo".to_string())
             .await;
 
+        // should be 2 anchors under "foo" sorted by hash
         assert_eq!(list_anchor_addresses_output.0.len(), 2);
         assert_eq!(
             (list_anchor_addresses_output.0)[0].get_raw_32().to_vec(),
