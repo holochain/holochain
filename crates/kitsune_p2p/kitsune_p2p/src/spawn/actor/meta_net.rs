@@ -842,11 +842,12 @@ impl MetaNet {
             tx5_config.set_lair_tag(lair_tag);
         }
 
-        let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
-        tx5::deps::tx5_core::Tx5InitConfig { 
+        tx5::deps::tx5_core::Tx5InitConfig {
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
             ephemeral_udp_port_max: tuning_params.tx5_max_ephemeral_udp_port,
-        }.set_as_global_default()?;
+        }
+        .set_as_global_default()?;
+        let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
 
         let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
         tracing::info!(%cli_url, "tx5 listening at url");
