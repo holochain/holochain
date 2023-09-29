@@ -10,7 +10,7 @@ impl<S> Clone for Share<S> {
     }
 }
 
-impl<S: State<'static>> Share<S> {
+impl<S> Share<S> {
     /// Constructor
     pub fn new(s: S) -> Self {
         Self(std::sync::Arc::new(parking_lot::RwLock::new(s)))
@@ -32,7 +32,9 @@ impl<S: State<'static>> Share<S> {
     pub fn write<R>(&self, f: impl FnOnce(&mut S) -> R) -> R {
         f(&mut self.0.write())
     }
+}
 
+impl<S: State<'static>> Share<S> {
     /// Acquire write access to the shared state to perform a mutation.
     pub fn transition(&self, t: S::Action) -> S::Effect {
         self.transition_with(t, |_| ()).1
@@ -64,7 +66,7 @@ impl<S: State<'static>> State<'static> for Share<S> {
     }
 }
 
-impl<T: 'static + State<'static> + std::fmt::Debug> std::fmt::Debug for Share<T> {
+impl<T: State<'static> + std::fmt::Debug> std::fmt::Debug for Share<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.read(|s| f.debug_tuple("Share").field(s).finish())
     }
