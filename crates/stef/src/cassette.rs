@@ -40,23 +40,37 @@ impl<S: State<'static>> Cassette<S> for () {
     }
 }
 
-pub struct FileCassette<S> {
+pub struct FileCassette<S, E = RmpEncoder>
+where
+    S: State<'static>,
+    S::Action: Serialize + DeserializeOwned,
+    E: Encoder<S::Action>,
+{
     path: PathBuf,
-    state: PhantomData<S>,
+    encoder: E,
+    state: PhantomData<(S, E)>,
 }
 
-impl<S> From<PathBuf> for FileCassette<S> {
+impl<S, E> From<PathBuf> for FileCassette<S, E>
+where
+    S: State<'static>,
+    S::Action: Serialize + DeserializeOwned,
+    E: Encoder<S::Action>,
+{
     fn from(path: PathBuf) -> Self {
         Self {
             path,
+            encoder: E::default(),
             state: PhantomData,
         }
     }
 }
 
-impl<S: State<'static>> Cassette<S> for FileCassette<S>
+impl<S, E> Cassette<S> for FileCassette<S, E>
 where
+    S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
+    E: Encoder<S::Action>,
 {
     fn initialize(&self) -> anyhow::Result<()> {
         File::options()
@@ -67,7 +81,7 @@ where
     }
 
     fn record_action(&self, action: &S::Action) -> anyhow::Result<()> {
-        let bytes = rmp_serde::to_vec(action)?;
+        let bytes = self.encoder.encode(action)?;
         let mut f = File::options().append(true).open(&self.path)?;
         let len = bytes.len() as u32;
         f.write_all(&len.to_le_bytes())?;
@@ -96,7 +110,7 @@ where
                     let len = u32::from_le_bytes(lbuf);
                     abuf.resize(len as usize, 0);
                     f.read_exact(&mut abuf)?;
-                    actions.push(rmp_serde::from_slice(&abuf).unwrap());
+                    actions.push(self.encoder.decode(&abuf).unwrap());
                 }
             }
         }

@@ -7129,6 +7129,7 @@ dependencies = [
  "proptest-derive",
  "rmp-serde 1.1.1",
  "serde",
+ "serde_json",
  "stef_derive",
  "tempfile",
  "tokio",

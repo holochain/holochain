@@ -21,6 +21,7 @@ proptest = { version = "*", optional = true }
 
 # recording
 serde = { version = "*", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 rmp-serde = { version = "*", optional = true }
 
 [dev-dependencies]
@@ -44,6 +45,7 @@ diagramming = [
 
 recording = [
     "rmp-serde",
+    "serde_json",
     "serde",
     "stef_derive?/recording",
 ]
