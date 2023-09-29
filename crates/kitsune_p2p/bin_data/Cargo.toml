@@ -24,15 +24,16 @@ proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
 [features]
-test_utils = [
-  "fuzzing",
-]
+
 fuzzing = [
   "arbitrary",
   "proptest",
   "proptest-derive",
   "kitsune_p2p_dht_arc/fuzzing",
 ]
+
+test_utils = [ ]
+
 sqlite-encrypted = [
   "kitsune_p2p_dht_arc/sqlite-encrypted"
 ]

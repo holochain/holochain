@@ -17,7 +17,6 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
-use kitsune_p2p_timestamp::ArbitraryFuzzing;
 
 pub mod builder;
 pub mod conversions;
@@ -578,7 +577,7 @@ pub struct CloseChain {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct Create<W: ArbitraryFuzzing = EntryRateWeight> {
+pub struct Create<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,
@@ -609,7 +608,7 @@ pub struct Create<W: ArbitraryFuzzing = EntryRateWeight> {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct Update<W: ArbitraryFuzzing = EntryRateWeight> {
+pub struct Update<W = EntryRateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,
@@ -635,7 +634,7 @@ pub struct Update<W: ArbitraryFuzzing = EntryRateWeight> {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct Delete<W: ArbitraryFuzzing = RateWeight> {
+pub struct Delete<W = RateWeight> {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub action_seq: u32,

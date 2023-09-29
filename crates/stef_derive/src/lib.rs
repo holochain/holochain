@@ -56,69 +56,55 @@
 //! effects, or granting shared access in a specific way. The `stef::combinators` module contains some
 //! built-in wrappers. TODO: write more
 
-use heck::ToPascalCase;
-use proc_macro2::{Span, TokenStream};
-use proc_macro_error::abort;
+use proc_macro2::TokenStream;
+use proc_macro_error::{abort, abort_call_site};
 use quote::{quote, ToTokens};
-use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{
-    parse_macro_input, Expr, Ident, Pat, Token, TraitBound, Type, TypeParamBound, Visibility,
-};
+use syn::{parse_macro_input, Ident, Pat, Token, Type, Visibility};
+
+mod attr_parsers;
+use attr_parsers::*;
+
+mod func;
+use func::*;
 
 #[proc_macro_derive(State)]
 pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    // let original: TokenStream = item.clone().into();
     let mut strukt: syn::ItemStruct =
         syn::parse(item).expect("State can only be derived for a struct");
+
     if strukt.fields.len() != 1 {
         proc_macro_error::abort_call_site!(
             "State can only be derived for a struct with a single tuple field"
         )
     }
+
     let field = strukt.fields.into_iter().next().unwrap();
     let ty = field.ty;
-    // let ty = match field.ty {
-    //     Type::Path(p) => p,
-    //     _ => proc_macro_error::abort_call_site!("Struct field must have simple type"),
-    // };
     let name = strukt.ident;
-    // panic!("{:#?}", strukt.generics.split_for_impl());
 
-    let tb: TraitBound = syn::parse(
-        quote! {
-            stef::State<'static>
-        }
-        .into(),
-    )
-    .unwrap();
+    let predicate: syn::WherePredicate = syn::parse_quote! {
+        #ty: stef::State<'static>
+    };
     strukt
         .generics
         .make_where_clause()
         .predicates
-        .push(syn::WherePredicate::Type(syn::PredicateType {
-            lifetimes: None,
-            bounded_ty: ty.clone(),
-            colon_token: Default::default(),
-            bounds: Punctuated::from_iter(std::iter::once(TypeParamBound::Trait(tb))),
-        }));
+        .push(predicate);
+
     let (igen, tgen, where_clause) = strukt.generics.split_for_impl();
 
-    let mut state_impl: syn::ItemImpl = syn::parse(
-        quote! {
-            impl #igen stef::State<'static> for #name #tgen #where_clause {
-                type Action = <#ty as stef::State<'static>>::Action;
-                type Effect = <#ty as stef::State<'static>>::Effect;
+    let mut state_impl: syn::ItemImpl = syn::parse_quote! {
+        impl #igen stef::State<'static> for #name #tgen #where_clause {
+            type Action = <#ty as stef::State<'static>>::Action;
+            type Effect = <#ty as stef::State<'static>>::Effect;
 
-                fn transition(&mut self, action: Self::Action) -> Self::Effect {
-                    self.0.transition(action)
-                }
+            fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                self.0.transition(action)
             }
         }
-        .into(),
-    )
-    .expect("problem 84842n!");
+    };
     state_impl.generics = strukt.generics.clone();
 
     proc_macro::TokenStream::from(quote! {
@@ -140,78 +126,11 @@ pub fn state(
     item
 }
 
-#[derive(Default)]
-struct Options {
-    _parameterized: Option<syn::Path>,
-    wrappers: Vec<syn::Type>,
-    fuzzing: bool,
-    recording: bool,
-}
-
-impl syn::parse::Parse for Options {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut this = Self::default();
-
-        while !input.is_empty() {
-            let key: syn::Path = input.parse()?;
-            if key.is_ident("wrapper") {
-                let content;
-                syn::parenthesized!(content in input);
-                let struct_name: syn::Type = content.parse()?;
-                this.wrappers.push(struct_name);
-            } else if key.is_ident("fuzzing") {
-                this.fuzzing = true;
-            } else if key.is_ident("recording") {
-                this.recording = true;
-            }
-            let _: syn::Result<syn::Token![,]> = input.parse();
-        }
-
-        Ok(this)
-    }
-}
-
-struct MatchPat {
-    forward_pat: Pat,
-    forward_expr: Expr,
-    backward_pat: Pat,
-    backward_expr: Expr,
-}
-
-type MapWith = syn::Path;
-
-impl syn::parse::Parse for MatchPat {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let forward_pat = Pat::parse_single(input)?;
-        let backward_expr = syn::parse(forward_pat.to_token_stream().into())?;
-
-        #[allow(clippy::nonminimal_bool)]
-        if true
-            && input.parse::<Token!(<)>().is_ok()
-            && input.parse::<Token!(=)>().is_ok()
-            && input.parse::<Token!(>)>().is_ok()
-        {
-            let backward_pat = Pat::parse_single(input)?;
-            let forward_expr = syn::parse(backward_pat.to_token_stream().into())?;
-            Ok(Self {
-                forward_pat,
-                forward_expr,
-                backward_pat,
-                backward_expr,
-            })
-        } else {
-            Err(syn::Error::new(
-                forward_pat.span(),
-                "Expected <=> in `matches()`",
-            ))
-        }
-    }
-}
-
 fn state_impl(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    // Parse top-level attrs
     let Options {
         _parameterized: _,
         wrappers,
@@ -224,96 +143,23 @@ fn state_impl(
 
     let item = parse_macro_input!(input as syn::ItemImpl);
 
-    // let struct_ty = item.self_ty.clone();
+    // The path of the type for which State is being impl'd
     let struct_path = match &*item.self_ty {
         Type::Path(path) => path,
         _ => abort!(item.self_ty.span(), "This impl is too fancy"),
     };
 
-    struct F {
-        f: syn::ImplItemFn,
-        match_pats: Vec<MatchPat>,
-        map_with: Option<MapWith>,
-    }
-
-    impl F {
-        fn _name(&self) -> Ident {
-            syn::Ident::new(&self.f.sig.ident.to_string(), self.f.span())
-        }
-        fn impl_name(&self) -> Ident {
-            syn::Ident::new(&format!("_stef_impl_{}", self.f.sig.ident), self.f.span())
-        }
-        fn variant_name(&self) -> Ident {
-            syn::Ident::new(
-                &self.f.sig.ident.to_string().to_pascal_case(),
-                self.f.span(),
-            )
-        }
-        fn inputs(&self) -> Vec<(Box<Pat>, Box<Type>)> {
-            let mut f_inputs = self.f.sig.inputs.iter();
-            match f_inputs.next() {
-                Some(syn::FnArg::Receiver(r)) if r.mutability.is_some() => (),
-                o => {
-                    abort!(
-                        o.span(),
-                        "#[stef::state] must take &mut self as first argument",
-                    )
-                }
-            }
-
-            f_inputs
-                .map(|i| match i {
-                    syn::FnArg::Typed(arg) => (arg.pat.clone(), arg.ty.clone()),
-                    _ => unreachable!(),
-                })
-                .collect()
-        }
-
-        fn mapped_block(&self, val: TokenStream) -> TokenStream {
-            match (self.map_with.as_ref(), self.match_pats.is_empty()) {
-                (Some(mw), _) => {
-                    quote! {{
-                        use stef::State;
-                        let eff = #val;
-                        #mw(eff)
-                    }}
-                }
-                (None, false) => {
-                    let pats = delim::<_, Token!(,)>(self.match_pats.iter().map(
-                        |MatchPat {
-                             forward_pat,
-                             forward_expr,
-                             ..
-                         }| quote!(#forward_pat => #forward_expr),
-                    ));
-                    quote! {{
-                        use stef::State;
-                        let eff = #val;
-
-                        match eff {
-                            #pats,
-                            _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
-                        }
-                    }}
-                }
-                (None, true) => {
-                    quote! {{
-                        use stef::State;
-                        #val
-                    }}
-                }
-            }
-        }
-    }
-
     let mut fns = vec![];
 
+    // Pick apart the impl
     for item in item.items {
         match item {
             syn::ImplItem::Type(ty) => {
                 if ty.ident == "Action" {
+                    // - type Action = Foo
                     action_name = Some(ty.ty.clone());
                 } else if ty.ident == "Effect" {
+                    // - type Effect = Foo
                     effect_name = Some(ty.ty.clone());
                 }
             }
@@ -327,8 +173,10 @@ fn state_impl(
                     if attr.path().segments.last().map(|s| s.ident.to_string())
                         == Some("state".to_string())
                     {
+                        // #[stef::state]
                         attr.parse_nested_meta(|meta| {
                             if meta.path.is_ident("matches") {
+                                // #[stef::state(matches(_ <=> _))]
                                 let content;
                                 syn::parenthesized!(content in meta.input);
                                 while !content.is_empty() {
@@ -339,6 +187,7 @@ fn state_impl(
                                 }
                                 return Ok(());
                             } else if meta.path.is_ident("map_with") {
+                                // #[stef::state(map_with(foo))]
                                 let content;
                                 syn::parenthesized!(content in meta.input);
                                 let mw: MapWith =
@@ -349,7 +198,7 @@ fn state_impl(
                             Ok(())
                         })
                         .unwrap_or_else(|err| {
-                            abort!("blah {}", err);
+                            abort_call_site!("couldn't parse function attrs {}", err);
                         })
                     }
                 }
@@ -364,49 +213,43 @@ fn state_impl(
         }
     }
 
-    let action_name =
-        action_name.unwrap_or_else(|| abort!(Span::call_site(), "`type Action` must be set"));
-    let effect_name =
-        effect_name.unwrap_or_else(|| abort!(Span::call_site(), "`type Effect` must be set"));
+    let action_name = action_name.unwrap_or_else(|| abort_call_site!("`type Action` must be set"));
+    let effect_name = effect_name.unwrap_or_else(|| abort_call_site!("`type Effect` must be set"));
 
-    let define_action_enum_variants = delim::<_, Token!(,)>(fns.iter().map(|f| {
-        let params = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(_, ty)| ty));
-        let variant_name = f.variant_name();
-        let doc = ss_flatten(
-            f.f.attrs
-                .iter()
-                .filter(|a| a.path().is_ident("doc"))
-                .cloned()
-                .map(|a| a.into_token_stream()),
-        );
-        if params.is_empty() {
-            quote! {
-                #doc
-                #variant_name
+    // - define `pub enum FooAction`
+    let mut define_action_enum: syn::ItemEnum = {
+        let variants = delim::<_, Token!(,)>(fns.iter().map(|f| {
+            let params = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(_, ty)| ty));
+            let variant_name = f.variant_name();
+            let doc = ss_flatten(
+                f.f.attrs
+                    .iter()
+                    .filter(|a| a.path().is_ident("doc"))
+                    .cloned()
+                    .map(|a| a.into_token_stream()),
+            );
+            if params.is_empty() {
+                quote! {
+                    #doc
+                    #variant_name
+                }
+                .to_token_stream()
+            } else {
+                quote! {
+                    #doc
+                    #variant_name(#params)
+                }
+                .to_token_stream()
             }
-            .to_token_stream()
-        } else {
-            quote! {
-                #doc
-                #variant_name(#params)
+        }));
+
+        let doc = "The Action type for the State (autogenerated by stef::state macro)".to_string();
+        syn::parse_quote! {
+            #[doc = #doc]
+            #[derive(Debug)]
+            pub enum #action_name {
+                #variants
             }
-            .to_token_stream()
-        }
-    }));
-
-    // if define_action_enum_variants.is_empty() {
-    //     abort!(
-    //         Span::call_site(),
-    //         "at least one function must be provided to create the Action enum"
-    //     )
-    // }
-
-    let doc = "The Action type for the State (autogenerated by stef::state macro)".to_string();
-    let mut define_action_enum: syn::ItemEnum = syn::parse_quote! {
-        #[doc = #doc]
-        #[derive(Debug)]
-        pub enum #action_name {
-            #define_action_enum_variants
         }
     };
     define_action_enum.generics = item.generics.clone();
@@ -419,226 +262,169 @@ fn state_impl(
 
     if fuzzing {
         define_action_enum.attrs.push(syn::parse_quote!(
-            #[cfg_attr(feature = "fuzzing", derive(::proptest_derive::Arbitrary))]
+            #[derive(::proptest_derive::Arbitrary)]
         ));
     }
 
-    let define_hidden_fns_inner = ss_flatten(fns.iter().map(|f| {
-        let mut original_func = f.f.clone();
-
-        original_func.sig.ident = syn::Ident::new(
-            &format!("_stef_impl_{}", original_func.sig.ident),
-            f.f.span(),
-        );
-
-        // let (rarr, output_type) = match &mut original_func.sig.output {
-        //     syn::ReturnType::Default => abort!(f.f.span(), "functions must return a type"),
-        //     syn::ReturnType::Type(rarr, t) => {
-        //         let actual = t.clone();
-
-        //         // *t = Box::new(effect_name.clone());
-
-        //         (rarr, actual)
-        //     }
-        // };
-        // original_func.sig.output = syn::ReturnType::Type(*rarr, output_type);
-
-        // let impl_name = f.impl_name();
-        // let block = f.f.block;
-        // let args = delim::<_, Token!(,)>(f.inputs().iter().map(|(pat, ty)| quote! { #pat: #ty }));
-        original_func.to_token_stream()
-        // quote! {
-        //    fn #impl_name(&mut self, #args) -> #output_type {
-        //        #block
-        //    }
-        // }
-    }));
-
-    let define_public_fns_inner = ss_flatten(fns.iter().map(|f| {
-        let mut original_func = f.f.clone();
-        let variant_name = f.variant_name();
-
-        let pats = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
-        let arg = match pats.is_empty() {
-            true => quote! { <Self as stef::State>::Action::#variant_name },
-            false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
-        };
-
-        let new_block = f.mapped_block(quote! {
-            self.transition(#arg)
-        });
-
-        let ts = proc_macro::TokenStream::from(new_block.into_token_stream());
-        original_func.block = syn::parse(ts).expect("problem 3!");
-        original_func.vis = Visibility::Public(Default::default());
-        original_func.to_token_stream()
-    }));
-
-    let mut define_hidden_fns: syn::ItemImpl = syn::parse(
-        quote! {
-            impl #struct_path {
-                #define_hidden_fns_inner
-            }
-        }
-        .into(),
-    )
-    .expect("problem 4!");
-    define_hidden_fns.generics = item.generics.clone();
-
-    let mut define_public_fns: syn::ItemImpl = syn::parse_quote! {
-        impl #struct_path {
-            #define_public_fns_inner
-        }
-    };
-    define_public_fns.generics = item.generics.clone();
-
-    // let (_, item_trait, item_for_token) = item
-    //     .trait_
-    //     .clone()
-    //     .expect("must use `impl stef::State<_> for ...`");
-
-    // #[stef::share(wrapper(Foo))]
-    let define_wrapper_impls = ss_flatten(wrappers.into_iter().map(|name| {
-        let define_wrapper_fns_inner = ss_flatten(fns.iter().map(|f| {
+    // - define impl with `_stef_impl_*` functions containing the real logic used to
+    //   implement `State::transition`
+    let mut define_hidden_fns: syn::ItemImpl = {
+        let inner = ss_flatten(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
-            let variant_name = f.variant_name();
-            let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
-            let transition = if args.is_empty() {
-                quote! { <Self as stef::State>::Action::#variant_name }
-            } else {
-                quote! { <Self as stef::State>::Action::#variant_name(#args) }
-            };
 
-            // match original_func
-            //     .sig
-            //     .inputs
-            //     .first_mut()
-            //     .expect("problem xyzzy9283!")
-            // {
-            //     syn::FnArg::Receiver(ref mut r) => {
-            //         r.mutability = None;
-            //         match r.ty.as_mut() {
-            //             Type::Reference(r) => r.mutability = None,
-            //             _ => unreachable!(),
-            //         }
-            //         // r.ty.as_mut().mutability = None;
-            //         // panic!("{:#?}", r.ty);
+            original_func.sig.ident = syn::Ident::new(
+                &format!("_stef_impl_{}", original_func.sig.ident),
+                f.f.span(),
+            );
+
+            // let (rarr, output_type) = match &mut original_func.sig.output {
+            //     syn::ReturnType::Default => abort!(f.f.span(), "functions must return a type"),
+            //     syn::ReturnType::Type(rarr, t) => {
+            //         let actual = t.clone();
+
+            //         // *t = Box::new(effect_name.clone());
+
+            //         (rarr, actual)
             //     }
-            //     syn::FnArg::Typed(_) => unreachable!(),
-            // }
+            // };
+            // original_func.sig.output = syn::ReturnType::Type(*rarr, output_type);
 
-            original_func.block = syn::parse(
-                f.mapped_block(quote! {
-                    self.transition(#transition)
-                })
-                .into_token_stream()
-                .into(),
-            )
-            .expect("problem xy8n88!");
-            original_func.vis = Visibility::Public(Default::default());
+            // let impl_name = f.impl_name();
+            // let block = f.f.block;
+            // let args = delim::<_, Token!(,)>(f.inputs().iter().map(|(pat, ty)| quote! { #pat: #ty }));
             original_func.to_token_stream()
+            // quote! {
+            //    fn #impl_name(&mut self, #args) -> #output_type {
+            //        #block
+            //    }
+            // }
         }));
-
-        let mut define_wrapper_impl: syn::ItemImpl = syn::parse(
+        syn::parse(
             quote! {
-                impl #name {
-                    #define_wrapper_fns_inner
+                impl #struct_path {
+                    #inner
                 }
             }
             .into(),
         )
-        .expect("problem xyzzy72!");
-        define_wrapper_impl.generics = item.generics.clone();
-
-        // let mut define_wrapper_state_impl: syn::ItemImpl = syn::parse(
-        //     quote! {
-        //         impl #item_trait #item_for_token #name {
-        //             type Action = #action_name;
-        //             type Effect = #effect_name;
-
-        //             fn transition(&mut self, action: Self::Action) -> Self::Effect {
-        //                 self.0.transition(action)
-        //             }
-        //         }
-        //     }
-        //     .into(),
-        // )
-        // .expect("problem 84842n!");
-        // define_wrapper_state_impl.generics = item.generics.clone();
-
-        quote! {
-            #define_wrapper_impl
-        }
-    }));
-
-    // let action_name_generic = match action_name.clone() {
-    //     Type::Path(mut path) => {
-    //         path.path.segments.last_mut().expect("problem 6!").arguments = struct_path
-    //             .path
-    //             .segments
-    //             .last()
-    //             .expect("problem 7!")
-    //             .arguments
-    //             .clone();
-    //         path
-    //     }
-    //     _ => todo!(),
-    // };
-    let _action_name_nogeneric = match action_name.clone() {
-        Type::Path(mut path) => {
-            path.path.segments.last_mut().expect("problem 6!").arguments = Default::default();
-            path
-        }
-        _ => todo!(),
+        .expect("problem 4!")
     };
+    define_hidden_fns.generics = item.generics.clone();
 
-    let define_transitions = delim::<_, Token!(,)>(fns.iter().map(|f| {
-        let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
-        let variant_name = f.variant_name();
-        let impl_name = f.impl_name();
-        let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
-            |MatchPat {
-                 backward_pat,
-                 backward_expr,
-                 ..
-             }| quote!(#backward_pat => #backward_expr),
-        ));
+    // - define impl with public functions which perform state transitions, which in turn call the
+    //   corresponding hidden functions
+    let mut define_public_fns: syn::ItemImpl = {
+        let inner = ss_flatten(fns.iter().map(|f| {
+            let mut original_func = f.f.clone();
+            let variant_name = f.variant_name();
 
-        let (pat, expr) = if args.is_empty() {
-            (quote!(Self::Action::#variant_name), quote!(self.#impl_name()))
-        } else {
-            (quote!(Self::Action::#variant_name(#args)), quote!(self.#impl_name(#args)))
-        };
+            let pats = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
+            let arg = match pats.is_empty() {
+                true => quote! { <Self as stef::State>::Action::#variant_name },
+                false => quote! { <Self as stef::State>::Action::#variant_name(#pats) },
+            };
 
-        if pats.is_empty() {
-            quote! {
-                #pat => #expr.into()
+            let new_block = f.mapped_block(quote! {
+                self.transition(#arg)
+            });
+
+            let ts = proc_macro::TokenStream::from(new_block.into_token_stream());
+            original_func.block = syn::parse(ts).expect("problem 3!");
+            original_func.vis = Visibility::Public(Default::default());
+            original_func.to_token_stream()
+        }));
+
+        syn::parse_quote! {
+            impl #struct_path {
+                #inner
             }
-        } else {
-            quote! {
-                #pat => match #expr {
-                    #pats,
-                    _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+        }
+    };
+    define_public_fns.generics = item.generics.clone();
+
+    // - generated by #[stef::share(wrapper(Foo))]
+    let define_wrapper_impls = ss_flatten(wrappers.into_iter().map(|name| {
+        let mut define_wrapper_impl: syn::ItemImpl = {
+            let inner = ss_flatten(fns.iter().map(|f| {
+                let mut original_func = f.f.clone();
+                let variant_name = f.variant_name();
+                let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
+                let transition = if args.is_empty() {
+                    quote! { <Self as stef::State>::Action::#variant_name }
+                } else {
+                    quote! { <Self as stef::State>::Action::#variant_name(#args) }
+                };
+
+                original_func.block = syn::parse(
+                    f.mapped_block(quote! {
+                        self.transition(#transition)
+                    })
+                    .into_token_stream()
+                    .into(),
+                )
+                .expect("problem xy8n88!");
+                original_func.vis = Visibility::Public(Default::default());
+                original_func.to_token_stream()
+            }));
+
+            syn::parse(
+                quote! {
+                    impl #name {
+                        #inner
+                    }
                 }
-            }
-        }
+                .into(),
+            )
+            .expect("problem xyzzy72!")
+        };
+        define_wrapper_impl.generics = item.generics.clone();
+        define_wrapper_impl.into_token_stream()
     }));
-
-    let define_match: syn::ExprMatch = syn::parse(
-        quote! {
-            match action {
-                #define_transitions
-            }
-        }
-        .into(),
-    )
-    .expect("problem 8sd");
 
     let (_, item_trait, item_for_token) =
         item.trait_.expect("must use `impl stef::State<_> for ...`");
 
-    let mut define_state_impl: syn::ItemImpl = syn::parse(
-        quote! {
+    // - impl State for StructName
+    let mut define_state_impl: syn::ItemImpl = {
+        let define_transitions = delim::<_, Token!(,)>(fns.iter().map(|f| {
+            let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(pat, _)| pat));
+            let variant_name = f.variant_name();
+            let impl_name = f.impl_name();
+            let pats = delim::<_, Token!(,)>(f.match_pats.iter().map(
+                |MatchPat {
+                    backward_pat,
+                    backward_expr,
+                    ..
+                }| quote!(#backward_pat => #backward_expr),
+            ));
+
+            let (pat, expr) = if args.is_empty() {
+                (quote!(Self::Action::#variant_name), quote!(self.#impl_name()))
+            } else {
+                (quote!(Self::Action::#variant_name(#args)), quote!(self.#impl_name(#args)))
+            };
+
+            if pats.is_empty() {
+                quote! {
+                    #pat => #expr.into()
+                }
+            } else {
+                quote! {
+                    #pat => match #expr {
+                        #pats,
+                        _ => unreachable!("stef::state is using some invalid logic in its matches() attr")
+                    }
+                }
+            }
+        }));
+
+        let define_match: syn::ExprMatch = syn::parse_quote! {
+            match action {
+                #define_transitions
+            }
+        };
+
+        syn::parse_quote! {
             impl #item_trait #item_for_token #struct_path {
                 type Action = #action_name;
                 type Effect = #effect_name;
@@ -648,10 +434,7 @@ fn state_impl(
                 }
             }
         }
-        .into(),
-    )
-    .expect("problem 8!");
-
+    };
     define_state_impl.generics = item.generics;
 
     let expanded = quote! {

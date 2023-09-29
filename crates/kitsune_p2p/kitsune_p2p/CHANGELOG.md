@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING**: gossip protocol has breaking changes:
   - Initiate and Accept messages send a list of agent hashes rather than full agent info
   
+
+## 0.3.0-beta-dev.16
+
 ## 0.3.0-beta-dev.15
 
 ## 0.3.0-beta-dev.14

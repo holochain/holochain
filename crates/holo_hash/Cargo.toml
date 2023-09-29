@@ -47,8 +47,14 @@ full = [
     "sqlite",
 ]
 
+fuzzing = [
+    "arbitrary",
+    "proptest", 
+    "proptest-derive",
+    "holochain_serialized_bytes?/fuzzing",
+]
+
 fixturators = ["fixt", "rand", "hashing", "encoding"]
-fuzzing = ["arbitrary", "proptest", "proptest-derive"]
 hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
 encoding = ["base64", "blake2b_simd", "derive_more"]

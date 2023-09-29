@@ -138,10 +138,11 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
+    let host = HostApiLegacy::new(host, evt_send);
+
     tokio::task::spawn(builder.spawn(Space::new(
         space,
         i_s.clone(),
-        evt_send,
         host,
         ep_hnd,
         config,
@@ -168,7 +169,8 @@ impl SpaceInternalHandler for Space {
         let mut res: HashSet<Arc<KitsuneAgent>> =
             self.local_joined_agents.keys().cloned().collect();
         let all_peers_fut = self
-            .evt_sender
+            .host_api
+            .legacy
             .query_agents(QueryAgentsEvt::new(self.space.clone()));
         Ok(async move {
             for peer in all_peers_fut.await? {
@@ -191,7 +193,7 @@ impl SpaceInternalHandler for Space {
         }
         let bootstrap_net = self.ro_inner.bootstrap_net;
         let ep_hnd = self.ro_inner.ep_hnd.clone();
-        let evt_sender = self.evt_sender.clone();
+        let evt_sender = self.host_api.legacy.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
@@ -237,7 +239,7 @@ impl SpaceInternalHandler for Space {
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let ep_hnd = self.ro_inner.ep_hnd.clone();
-        let evt_sender = self.evt_sender.clone();
+        let evt_sender = self.host_api.legacy.clone();
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
@@ -359,9 +361,11 @@ impl SpaceInternalHandler for Space {
                 for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
-                            let fut =
-                                self.evt_sender
-                                    .notify(space.clone(), agent.clone(), data.clone());
+                            let fut = self.host_api.legacy.notify(
+                                space.clone(),
+                                agent.clone(),
+                                data.clone(),
+                            );
                             local_notify_events.push(async move {
                                 if let Err(err) = fut.await {
                                     tracing::warn!(?err, "failed local broadcast");
@@ -378,7 +382,8 @@ impl SpaceInternalHandler for Space {
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
                     let fut = self
-                        .evt_sender
+                        .host_api
+                        .legacy
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
                             space: self.space.clone(),
                             peer_data: vec![agent_info.clone()],
@@ -763,7 +768,7 @@ impl ghost_actor::GhostControlHandler for Space {
 
             use futures::sink::SinkExt;
             // this is a curtesy, ok if fails
-            let _ = self.evt_sender.close().await;
+            let _ = self.host_api.legacy.close().await;
             for module in self.gossip_mod.values_mut() {
                 module.close();
             }
@@ -799,7 +804,7 @@ impl KitsuneP2pHandler for Space {
             module.local_agent_join(agent.clone());
         }
         let fut = self.i_s.update_single_agent_info(agent);
-        let evt_sender = self.evt_sender.clone();
+        let evt_sender = self.host_api.legacy.clone();
         match self.config.network_type {
             NetworkType::QuicMdns => {
                 // Listen to MDNS service that has that space as service type
@@ -871,7 +876,7 @@ impl KitsuneP2pHandler for Space {
         payload: Vec<u8>,
         timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
-        let evt_sender = self.evt_sender.clone();
+        let evt_sender = self.host_api.legacy.clone();
 
         let timeout_ms = match timeout_ms {
             None | Some(0) => self.config.tuning_params.default_rpc_single_timeout_ms as u64,
@@ -964,7 +969,7 @@ impl KitsuneP2pHandler for Space {
                 for (agent_key, _agent_info) in self.local_joined_agents.iter() {
                     if let Some(arc) = self.agent_arcs.get(agent_key) {
                         if arc.contains(basis.get_loc()) {
-                            let fut = self.evt_sender.notify(
+                            let fut = self.host_api.legacy.notify(
                                 space.clone(),
                                 agent_key.clone(),
                                 data.clone(),
@@ -985,7 +990,7 @@ impl KitsuneP2pHandler for Space {
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
                     let fut = put_local_agent_info(
-                        self.evt_sender.clone(),
+                        self.host_api.legacy.clone(),
                         self.space.clone(),
                         agent_info.clone(),
                     );
@@ -1116,7 +1121,7 @@ impl KitsuneP2pHandler for Space {
         payload: Vec<u8>,
         drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
-        let evt_sender = self.evt_sender.clone();
+        let evt_sender = self.host_api.legacy.clone();
         let ro_inner = self.ro_inner.clone();
         Ok(async move {
             for agent in agents {
@@ -1268,8 +1273,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) space: Arc<KitsuneSpace>,
     #[allow(dead_code)]
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
-    pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) host_api: HostApi,
+    pub(crate) host_api: HostApiLegacy,
     pub(crate) ep_hnd: MetaNet,
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1335,8 +1339,7 @@ pub(crate) struct Space {
     pub(crate) ro_inner: Arc<SpaceReadOnlyInner>,
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
-    pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) host_api: HostApi,
+    pub(crate) host_api: HostApiLegacy,
     pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Option<AgentInfoSigned>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1351,8 +1354,7 @@ impl Space {
     pub fn new(
         space: Arc<KitsuneSpace>,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
-        evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-        host_api: HostApi,
+        host_api: HostApiLegacy,
         ep_hnd: MetaNet,
         config: Arc<KitsuneP2pConfig>,
         bootstrap_net: BootstrapNet,
@@ -1430,7 +1432,6 @@ impl Space {
                             config.tuning_params.clone(),
                             space.clone(),
                             ep_hnd.clone(),
-                            evt_sender.clone(),
                             host_api.clone(),
                             metrics.clone(),
                             fetch_pool.clone(),
@@ -1451,7 +1452,7 @@ impl Space {
             // spawn the periodic bootstrap pull
             BootstrapTask::spawn(
                 i_s.clone(),
-                evt_sender.clone(),
+                host_api.legacy.clone(),
                 space.clone(),
                 config.bootstrap_service.clone(),
                 bootstrap_net,
@@ -1464,7 +1465,6 @@ impl Space {
         let ro_inner = Arc::new(SpaceReadOnlyInner {
             space: space.clone(),
             i_s: i_s.clone(),
-            evt_sender: evt_sender.clone(),
             host_api: host_api.clone(),
             ep_hnd,
             config: config.clone(),
@@ -1480,7 +1480,6 @@ impl Space {
             ro_inner,
             space,
             i_s,
-            evt_sender,
             host_api,
             local_joined_agents: HashMap::new(),
             agent_arcs: HashMap::new(),
@@ -1507,7 +1506,7 @@ impl Space {
         let space = self.space.clone();
         let network_type = self.config.network_type.clone();
         let bootstrap_net = self.ro_inner.bootstrap_net;
-        let evt_sender = self.evt_sender.clone();
+        let evt_sender = self.host_api.legacy.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let host = self.host_api.clone();

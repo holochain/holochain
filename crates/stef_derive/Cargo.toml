@@ -2,7 +2,6 @@
 name = "stef_derive"
 version = "0.1.0"
 edition = "2021"
-#[stef_derive::state(wrapper(PeopleShare<D>))]#[stef_derive::state(wrapper(PeopleShare<D>))]
 
 [dependencies]
 heck = "*"

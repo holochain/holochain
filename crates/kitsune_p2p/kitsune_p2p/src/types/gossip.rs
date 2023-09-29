@@ -1,7 +1,7 @@
 use crate::meta_net::*;
 use crate::metrics::*;
 use crate::types::*;
-use crate::HostApi;
+use crate::HostApiLegacy;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::*;
@@ -80,8 +80,7 @@ pub trait AsGossipModuleFactory: 'static + Send + Sync {
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
     ) -> GossipModule;
@@ -96,19 +95,11 @@ impl GossipModuleFactory {
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
     ) -> GossipModule {
-        self.0.spawn_gossip_task(
-            tuning_params,
-            space,
-            ep_hnd,
-            evt_sender,
-            host,
-            metrics,
-            fetch_pool,
-        )
+        self.0
+            .spawn_gossip_task(tuning_params, space, ep_hnd, host, metrics, fetch_pool)
     }
 }

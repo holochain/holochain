@@ -27,7 +27,7 @@ pub mod error;
 #[cfg(test)]
 pub mod tests;
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 pub mod facts;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold

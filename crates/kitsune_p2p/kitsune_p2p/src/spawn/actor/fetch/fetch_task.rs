@@ -1,5 +1,5 @@
 use crate::spawn::actor::{Internal, InternalSender};
-use crate::{HostApi, KitsuneP2pError};
+use crate::{HostApiLegacy, KitsuneP2pError};
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool};
 use parking_lot::RwLock;
@@ -12,7 +12,7 @@ pub struct FetchTask {
 impl FetchTask {
     pub fn spawn(
         mut fetch_pool: FetchPool,
-        host: HostApi,
+        host: HostApiLegacy,
         internal_sender: GhostSender<Internal>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
@@ -199,6 +199,11 @@ mod tests {
         let op_data = Arc::new(Mutex::new(HashSet::<KOpHash>::new()));
         let check_op_data_call_count = Arc::new(AtomicUsize::new(0));
 
+        let (dummy_sender, _) = futures::channel::mpsc::channel(10);
+        // if needed, use a real stub:
+        // let (host_sender, host_receiver) = channel(10);
+        // let host_receiver_stub = HostReceiverStub::start(host_receiver);
+
         // TODO this logic should just be common, and the HostStub can expose a hashset instead that
         //      tests can add to as required.
         let host_stub = HostStub::with_check_op_data({
@@ -215,7 +220,9 @@ mod tests {
 
                 async move { Ok(held_hashes) }.boxed().into()
             })
-        });
+        })
+        .legacy(dummy_sender);
+
         let task = FetchTask::spawn(fetch_pool.clone(), host_stub, internal_sender);
 
         (
