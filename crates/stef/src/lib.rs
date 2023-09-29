@@ -90,6 +90,11 @@ mod recording;
 #[cfg(feature = "recording")]
 pub use recording::*;
 
+#[cfg(feature = "recording")]
+mod cassette;
+#[cfg(feature = "recording")]
+pub use cassette::*;
+
 pub mod dependencies {
     #[cfg(feature = "recording")]
     pub use ::serde;
