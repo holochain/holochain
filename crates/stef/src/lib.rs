@@ -65,6 +65,9 @@
 mod combinators;
 pub use combinators::*;
 
+mod nested;
+pub use nested::*;
+
 mod share;
 pub use share::Share;
 
@@ -89,6 +92,11 @@ pub use stef_derive::{state, State};
 mod recording;
 #[cfg(feature = "recording")]
 pub use recording::*;
+
+#[cfg(feature = "recording")]
+mod cassette;
+#[cfg(feature = "recording")]
+pub use cassette::*;
 
 pub mod dependencies {
     #[cfg(feature = "recording")]
