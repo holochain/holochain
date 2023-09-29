@@ -56,12 +56,13 @@
 //! effects, or granting shared access in a specific way. The `stef::combinators` module contains some
 //! built-in wrappers. TODO: write more
 
+use heck::CamelCase;
 use proc_macro2::TokenStream;
 use proc_macro_error::{abort, abort_call_site};
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Ident, Pat, Token, Type, Visibility};
+use syn::*;
 
 mod attr_parsers;
 use attr_parsers::*;
@@ -70,45 +71,112 @@ mod func;
 use func::*;
 
 #[proc_macro_derive(State)]
+#[proc_macro_error::proc_macro_error]
 pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let mut strukt: syn::ItemStruct =
-        syn::parse(item).expect("State can only be derived for a struct");
+    let strukt: syn::ItemStruct = syn::parse(item).expect("State can only be derived for a struct");
 
-    if strukt.fields.len() != 1 {
+    if strukt.fields.len() == 0 {
         proc_macro_error::abort_call_site!(
-            "State can only be derived for a struct with a single tuple field"
+            "State can only be derived for structs with at least one field"
         )
     }
 
-    let field = strukt.fields.into_iter().next().unwrap();
-    let ty = field.ty;
-    let name = strukt.ident;
+    let mut generics = strukt.generics.clone();
+    let name = &strukt.ident;
+    
+    proc_macro::TokenStream::from(if strukt.fields.len() == 1 {
+        let field = strukt.fields.into_iter().next().unwrap();
+        let ty = field.ty;
 
-    let predicate: syn::WherePredicate = syn::parse_quote! {
-        #ty: stef::State<'static>
-    };
-    strukt
-        .generics
-        .make_where_clause()
-        .predicates
-        .push(predicate);
+        let predicate: syn::WherePredicate = syn::parse_quote! {
+            #ty: stef::State<'static>
+        };
+        generics.make_where_clause().predicates.push(predicate);
+        let (igen, tgen, where_clause) = generics.split_for_impl();
 
-    let (igen, tgen, where_clause) = strukt.generics.split_for_impl();
+        let mut impl_state: syn::ItemImpl = syn::parse_quote! {
+            impl #igen stef::State<'static> for #name #tgen #where_clause {
+                type Action = <#ty as stef::State<'static>>::Action;
+                type Effect = <#ty as stef::State<'static>>::Effect;
 
-    let mut state_impl: syn::ItemImpl = syn::parse_quote! {
-        impl #igen stef::State<'static> for #name #tgen #where_clause {
-            type Action = <#ty as stef::State<'static>>::Action;
-            type Effect = <#ty as stef::State<'static>>::Effect;
-
-            fn transition(&mut self, action: Self::Action) -> Self::Effect {
-                self.0.transition(action)
+                fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                    self.0.transition(action)
+                }
             }
-        }
-    };
-    state_impl.generics = strukt.generics.clone();
+        };
 
-    proc_macro::TokenStream::from(quote! {
-        #state_impl
+        impl_state.generics = generics.clone();
+        impl_state.into_token_stream()
+    } else {
+        let action_enum_name = syn::Ident::new(
+            &format!("{}Action", strukt.ident.to_string()).to_camel_case(),
+            strukt.span(),
+        );
+        let effect_enum_name = syn::Ident::new(
+            &format!("{}Effect", strukt.ident.to_string()).to_camel_case(),
+            strukt.span(),
+        );
+
+        let rows: Vec<_> = strukt.fields.iter().map(|field| {
+            let Field { ty, ident, .. } = field;
+            let ident = ident.clone().unwrap();
+            let variant_name = syn::Ident::new(&ident.to_string().to_camel_case(), ident.span());
+            let action_variant = quote!(#variant_name(<#ty as stef::State<'static>>::Action) ,);
+            let effect_variant = quote!(#variant_name(<#ty as stef::State<'static>>::Effect) ,);
+
+            let case = quote!(#action_enum_name::#variant_name(s) => #effect_enum_name::#variant_name(self.#ident.transition(s)), );
+            
+            let predicate: syn::WherePredicate = syn::parse_quote! {
+                #ty: stef::State<'static>
+            };
+
+            (action_variant, effect_variant, predicate, case)
+        }).collect();
+
+        let action_variants = TokenStream::from_iter(rows.iter().map(|(a, _, _, _)| a.clone()));
+        let effect_variants = TokenStream::from_iter(rows.iter().map(|(_, e, _, _)| e.clone()));
+        let predicates = rows.iter().map(|(_, _, p, _)| p.clone());
+        let transition_cases = TokenStream::from_iter(rows.iter().map(|(_, _, _, c)| c.clone()));
+
+        let mut action_enum: ItemEnum = parse_quote! {
+            #[derive(Debug)]
+            pub enum #action_enum_name {
+                #action_variants
+            }
+        };
+        let mut effect_enum: ItemEnum = parse_quote! {
+            #[derive(Debug, PartialEq, Eq)]
+            pub enum #effect_enum_name {
+                #effect_variants
+            }
+        };
+        action_enum.generics = generics.clone();
+        effect_enum.generics = generics.clone();
+
+        for p in predicates {
+            generics.make_where_clause().predicates.push(p);
+        }
+        let (igen, tgen, where_clause) = generics.split_for_impl();
+
+        let mut impl_state: syn::ItemImpl = syn::parse_quote! {
+            impl #igen stef::State<'static> for #name #tgen #where_clause {
+                type Action = #action_enum_name;
+                type Effect = #effect_enum_name;
+
+                fn transition(&mut self, action: Self::Action) -> Self::Effect {
+                    match action {
+                        #transition_cases
+                    }
+                }
+            }
+        };
+        impl_state.generics = generics.clone();
+
+        quote! {
+            #action_enum
+            #effect_enum
+            #impl_state
+        }
     })
 }
 
@@ -221,7 +289,7 @@ fn state_impl(
         let variants = delim::<_, Token!(,)>(fns.iter().map(|f| {
             let params = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(_, ty)| ty));
             let variant_name = f.variant_name();
-            let doc = ss_flatten(
+            let doc = TokenStream::from_iter(
                 f.f.attrs
                     .iter()
                     .filter(|a| a.path().is_ident("doc"))
@@ -269,7 +337,7 @@ fn state_impl(
     // - define impl with `_stef_impl_*` functions containing the real logic used to
     //   implement `State::transition`
     let mut define_hidden_fns: syn::ItemImpl = {
-        let inner = ss_flatten(fns.iter().map(|f| {
+        let inner = TokenStream::from_iter(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
 
             original_func.sig.ident = syn::Ident::new(
@@ -314,7 +382,7 @@ fn state_impl(
     // - define impl with public functions which perform state transitions, which in turn call the
     //   corresponding hidden functions
     let mut define_public_fns: syn::ItemImpl = {
-        let inner = ss_flatten(fns.iter().map(|f| {
+        let inner = TokenStream::from_iter(fns.iter().map(|f| {
             let mut original_func = f.f.clone();
             let variant_name = f.variant_name();
 
@@ -343,9 +411,9 @@ fn state_impl(
     define_public_fns.generics = item.generics.clone();
 
     // - generated by #[stef::share(wrapper(Foo))]
-    let define_wrapper_impls = ss_flatten(wrappers.into_iter().map(|name| {
+    let define_wrapper_impls = TokenStream::from_iter(wrappers.into_iter().map(|name| {
         let mut define_wrapper_impl: syn::ItemImpl = {
-            let inner = ss_flatten(fns.iter().map(|f| {
+            let inner = TokenStream::from_iter(fns.iter().map(|f| {
                 let mut original_func = f.f.clone();
                 let variant_name = f.variant_name();
                 let args = delim::<_, Token!(,)>(f.inputs().into_iter().map(|(id, _)| id));
@@ -452,11 +520,4 @@ fn delim<T: ToTokens, P: ToTokens + Default>(ss: impl Iterator<Item = T>) -> Pun
     let mut items = Punctuated::<T, P>::new();
     items.extend(ss);
     items
-}
-
-fn ss_flatten(ss: impl Iterator<Item = TokenStream>) -> TokenStream {
-    ss.fold(TokenStream::new(), |mut ss, s| {
-        ss.extend(s);
-        ss
-    })
 }
