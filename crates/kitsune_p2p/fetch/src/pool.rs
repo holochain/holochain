@@ -11,6 +11,7 @@
 //! interval.
 
 use std::{path::PathBuf, sync::Arc};
+use stef::FileCassette;
 use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{KAgent, KSpace};
@@ -99,7 +100,7 @@ impl FetchPool {
     /// Constructor
     pub fn new(config: FetchConfig, storage_path: Option<PathBuf>) -> Self {
         Self(stef::Share::new(stef::RecordActions::new(
-            storage_path,
+            storage_path.map(FileCassette::from),
             FetchPoolState::new(config),
         )))
     }
@@ -143,7 +144,7 @@ pub struct FetchPool(stef::Share<stef::RecordActions<FetchPoolState>>);
 
 impl From<FetchPoolState> for FetchPool {
     fn from(pool: FetchPoolState) -> Self {
-        FetchPool(stef::Share::new(stef::RecordActions::new(None, pool)))
+        FetchPool(stef::Share::new(stef::RecordActions::new(Some(()), pool)))
     }
 }
 
