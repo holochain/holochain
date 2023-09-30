@@ -1,6 +1,6 @@
 use serde::{de::DeserializeOwned, Serialize};
 
-pub trait Encoder<T: Serialize + DeserializeOwned>: Default {
+pub trait Encoder<T: Serialize + DeserializeOwned>: Default + Send + Sync + 'static {
     fn encode(&self, action: &T) -> anyhow::Result<Vec<u8>>;
     fn decode(&self, encoded: &[u8]) -> anyhow::Result<T>;
 }
@@ -20,7 +20,7 @@ impl<T: Serialize + DeserializeOwned> Encoder<T> for RmpEncoder {
 
 #[derive(Default, Clone)]
 pub struct JsonEncoder {
-    pretty: bool,
+    pub pretty: bool,
 }
 
 impl<T: Serialize + DeserializeOwned> Encoder<T> for JsonEncoder {

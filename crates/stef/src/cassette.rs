@@ -58,9 +58,20 @@ where
     E: Encoder<S::Action>,
 {
     fn from(path: PathBuf) -> Self {
+        Self::new(path, Default::default())
+    }
+}
+
+impl<S, E> FileCassette<S, E>
+where
+    S: State<'static>,
+    S::Action: Serialize + DeserializeOwned,
+    E: Encoder<S::Action>,
+{
+    pub fn new(path: PathBuf, encoder: E) -> Self {
         Self {
             path,
-            encoder: E::default(),
+            encoder,
             state: PhantomData,
         }
     }
