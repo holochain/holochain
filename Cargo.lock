@@ -2593,7 +2593,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.2.3-beta-rc.0"
+version = "0.2.3-beta-rc.1"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2734,7 +2734,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.2.3-beta-rc.0"
+version = "0.2.3-beta-rc.1"
 dependencies = [
  "anyhow",
  "clap 4.3.24",
@@ -2790,7 +2790,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.2.3-beta-rc.0"
+version = "0.2.3-beta-rc.1"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2821,7 +2821,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.2.3-beta-rc.0"
+version = "0.2.3-beta-rc.1"
 dependencies = [
  "derive_more",
  "directories",
