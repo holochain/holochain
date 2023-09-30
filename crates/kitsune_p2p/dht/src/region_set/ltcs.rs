@@ -211,8 +211,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 
         let regions = self
             .regions()
-            .into_iter()
-            .zip(other.regions().into_iter())
+            .zip(other.regions())
             .filter_map(|(a, b)| (a.data != b.data).then_some(a))
             .collect();
 
