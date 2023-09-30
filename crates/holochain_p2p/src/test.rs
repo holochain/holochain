@@ -321,10 +321,10 @@ mod tests {
                     cell_id: CellId::new(dna.clone(), a2.clone()),
                     zome_name: zome_name.clone(),
                     fn_name: fn_name.clone(),
-                    cap_secret: cap_secret.clone(),
+                    cap_secret: cap_secret,
                     payload: payload.clone(),
-                    nonce: nonce.clone(),
-                    expires_at: expires_at.clone(),
+                    nonce: nonce,
+                    expires_at: expires_at,
                 }
                 .data_to_sign()
                 .unwrap(),
