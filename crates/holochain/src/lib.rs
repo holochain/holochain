@@ -1,9 +1,19 @@
 //! All the components you need to build a Holochain Conductor
 
-// Toggle this to see what needs to be eventually refactored (as warnings).
-#![allow(deprecated)]
+// TODO investigate this lint
+#![allow(clippy::result_large_err)]
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
+#![recursion_limit = "256"]
+
+#[cfg(feature = "hdk")]
+pub use hdk::HDI_VERSION;
+
+#[cfg(feature = "hdk")]
+pub use hdk::HDK_VERSION;
+
+/// Current Holochain Conductor rust crate version.
+pub const HOLOCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod conductor;
 #[allow(missing_docs)]
@@ -27,3 +37,16 @@ pub use tracing;
 // we work out the test utils stuff
 #[cfg(test)]
 mod local_network_tests;
+
+pub mod prelude {
+    #[cfg(feature = "hdk")]
+    pub use hdk::link::GetLinksInputBuilder;
+    pub use holo_hash;
+    pub use holochain_p2p::AgentPubKeyExt;
+    pub use holochain_p2p::*;
+    pub use holochain_types::prelude::*;
+    pub use kitsune_p2p::*;
+
+    #[cfg(feature = "test_utils")]
+    pub use holochain_types::inline_zome::*;
+}

@@ -18,34 +18,34 @@ impl GetEntryDetailsQuery {
 }
 
 pub struct State {
-    headers: HashSet<SignedHeaderHashed>,
-    rejected_headers: HashSet<SignedHeaderHashed>,
-    deletes: HashMap<HeaderHash, SignedHeaderHashed>,
-    updates: HashSet<SignedHeaderHashed>,
+    actions: HashSet<SignedActionHashed>,
+    rejected_actions: HashSet<SignedActionHashed>,
+    deletes: HashMap<ActionHash, SignedActionHashed>,
+    updates: HashSet<SignedActionHashed>,
 }
 
 impl Query for GetEntryDetailsQuery {
-    type Item = Judged<SignedHeaderHashed>;
+    type Item = Judged<SignedActionHashed>;
     type State = State;
     type Output = Option<EntryDetails>;
 
     fn query(&self) -> String {
         "
-        SELECT Header.blob AS header_blob, DhtOp.validation_status AS status
+        SELECT Action.blob AS action_blob, DhtOp.validation_status AS status
         FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
+        JOIN Action On DhtOp.action_hash = Action.hash
         WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
         AND DhtOp.basis_hash = :entry_hash
         AND DhtOp.when_integrated IS NOT NULL
         AND DhtOp.validation_status IS NOT NULL
-        AND (Header.private_entry = 0 OR Header.private_entry IS NULL OR Header.author = :author)
+        AND (Action.private_entry = 0 OR Action.private_entry IS NULL OR Action.author = :author)
         "
         .into()
     }
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
             ":create_type": DhtOpType::StoreEntry,
-            ":delete_type": DhtOpType::RegisterDeletedEntryHeader,
+            ":delete_type": DhtOpType::RegisterDeletedEntryAction,
             ":update_type": DhtOpType::RegisterUpdatedContent,
             ":entry_hash": self.0,
             ":author": self.1,
@@ -55,11 +55,11 @@ impl Query for GetEntryDetailsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header =
-                from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?)?;
-            let SignedHeader(header, signature) = header;
-            let header = HeaderHashed::from_content_sync(header);
-            let shh = SignedHeaderHashed::with_presigned(header, signature);
+            let action =
+                from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
+            let SignedAction(action, signature) = action;
+            let action = ActionHashed::from_content_sync(action);
+            let shh = SignedActionHashed::with_presigned(action, signature);
             let status = row.get(row.as_ref().column_index("status")?)?;
             let r = Judged::new(shh, status);
             Ok(r)
@@ -69,20 +69,20 @@ impl Query for GetEntryDetailsQuery {
 
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let entry_filter = self.0.clone();
-        let f = move |header: &QueryData<Self>| {
-            let header = &header;
-            match header.header() {
-                Header::Create(Create { entry_hash, .. })
-                | Header::Update(Update { entry_hash, .. })
+        let f = move |action: &QueryData<Self>| {
+            let action = &action;
+            match action.action() {
+                Action::Create(Create { entry_hash, .. })
+                | Action::Update(Update { entry_hash, .. })
                     if *entry_hash == entry_filter =>
                 {
                     true
                 }
-                Header::Update(Update {
+                Action::Update(Update {
                     original_entry_address,
                     ..
                 }) => *original_entry_address == entry_filter,
-                Header::Delete(Delete {
+                Action::Delete(Delete {
                     deletes_entry_address,
                     ..
                 }) => *deletes_entry_address == entry_filter,
@@ -94,8 +94,8 @@ impl Query for GetEntryDetailsQuery {
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(State {
-            headers: Default::default(),
-            rejected_headers: Default::default(),
+            actions: Default::default(),
+            rejected_actions: Default::default(),
             deletes: Default::default(),
             updates: Default::default(),
         })
@@ -103,34 +103,34 @@ impl Query for GetEntryDetailsQuery {
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let (shh, validation_status) = item.into();
-        let add_header = |state: &mut State, shh| match validation_status {
+        let add_action = |state: &mut State, shh| match validation_status {
             Some(ValidationStatus::Valid) => {
-                state.headers.insert(shh);
+                state.actions.insert(shh);
             }
             Some(ValidationStatus::Rejected) => {
-                state.rejected_headers.insert(shh);
+                state.rejected_actions.insert(shh);
             }
             _ => (),
         };
-        match shh.header() {
-            Header::Create(_) => add_header(&mut state, shh),
-            Header::Update(update) => {
+        match shh.action() {
+            Action::Create(_) => add_action(&mut state, shh),
+            Action::Update(update) => {
                 if update.original_entry_address == self.0 && update.entry_hash == self.0 {
                     state.updates.insert(shh.clone());
-                    add_header(&mut state, shh);
+                    add_action(&mut state, shh);
                 } else if update.entry_hash == self.0 {
-                    add_header(&mut state, shh);
+                    add_action(&mut state, shh);
                 } else if update.original_entry_address == self.0 {
                     state.updates.insert(shh.clone());
                 }
             }
-            Header::Delete(delete) => {
+            Action::Delete(delete) => {
                 let hash = delete.deletes_address.clone();
                 state.deletes.insert(hash, shh.clone());
             }
             _ => {
-                return Err(StateQueryError::UnexpectedHeader(
-                    shh.header().header_type(),
+                return Err(StateQueryError::UnexpectedAction(
+                    shh.action().action_type(),
                 ))
             }
         }
@@ -141,19 +141,19 @@ impl Query for GetEntryDetailsQuery {
     where
         S: Store,
     {
-        // Choose an arbitrary header.
-        // TODO: Is it sound to us a rejected header here?
-        let header = state
-            .headers
+        // Choose an arbitrary action.
+        // TODO: Is it sound to us a rejected action here?
+        let action = state
+            .actions
             .iter()
-            .chain(state.rejected_headers.iter())
+            .chain(state.rejected_actions.iter())
             .next();
-        match header {
-            Some(header) => {
-                let entry_hash = header
-                    .header()
+        match action {
+            Some(action) => {
+                let entry_hash = action
+                    .action()
                     .entry_hash()
-                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.header().clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?;
                 let author = self.1.as_ref().map(|a| a.as_ref());
                 let details = stores
                     .get_public_or_authored_entry(entry_hash, author)?
@@ -161,9 +161,9 @@ impl Query for GetEntryDetailsQuery {
                         let entry_dht_status = compute_entry_status(&state);
                         EntryDetails {
                             entry,
-                            headers: state.headers.into_iter().collect(),
-                            rejected_headers: state.rejected_headers.into_iter().collect(),
-                            deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
+                            actions: state.actions.into_iter().collect(),
+                            rejected_actions: state.rejected_actions.into_iter().collect(),
+                            deletes: state.deletes.into_values().collect(),
                             updates: state.updates.into_iter().collect(),
                             entry_dht_status,
                         }
@@ -176,12 +176,12 @@ impl Query for GetEntryDetailsQuery {
 }
 
 fn compute_entry_status(state: &State) -> EntryDhtStatus {
-    let live_headers = state
-        .headers
+    let live_actions = state
+        .actions
         .iter()
-        .filter(|h| !state.deletes.contains_key(h.header_address()))
+        .filter(|h| !state.deletes.contains_key(h.action_address()))
         .count();
-    if live_headers > 0 {
+    if live_actions > 0 {
         EntryDhtStatus::Live
     } else {
         EntryDhtStatus::Dead

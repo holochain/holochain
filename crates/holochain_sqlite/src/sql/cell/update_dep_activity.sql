@@ -7,13 +7,13 @@ WHERE
   validation_stage = 3
   AND validation_status IS NOT NULL
   AND DhtOp.type = :register_activity
-  AND DhtOp.header_hash IN (
+  AND DhtOp.action_hash IN (
     SELECT
       hash
     FROM
-      Header
+      'Action'
     WHERE
-      seq > :activity_integrated
-      AND seq < :activity_missing
+      seq >= :seq_start
+      AND seq <= :seq_end
       AND author = :author
   )

@@ -210,7 +210,7 @@ async fn in_chan_recv_logic(
         }
     }
 
-    tracing::warn!(?local_cert, ?peer_cert, "channel logic end");
+    tracing::info!(?local_cert, ?peer_cert, "channel logic end");
 
     Ok(())
 }
@@ -318,6 +318,7 @@ impl AsConHnd for ConItem {
 
             if let Err(e) = logic().await {
                 let reason = format!("{:?}", e);
+                tracing::warn!(?e, "Closing writer");
                 this.close(INTERNAL_ERR, &reason).await;
                 return Err(e);
             }
@@ -445,7 +446,7 @@ impl ConItem {
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Self>> {
-        timeout.mix(async move {
+        timeout.mix("ConItem::inner_con_inner", async move {
             let permit = con_limit
                 .acquire_owned()
                 .await
@@ -659,7 +660,7 @@ fn close_promote_ep_hnd(
 
         *c = true;
         i.con_limit.close();
-        let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
+        let cons = i.cons.values().cloned().collect::<Vec<_>>();
         let ep_close_fut = i.sub_ep.close(code, reason);
         Ok((cons, ep_close_fut, i.logic_hnd.clone()))
     }) {
@@ -834,11 +835,11 @@ impl AsEpFactory for PromoteFactory {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
         let tuning_params = self.tuning_params.clone();
-        let max_cons = tuning_params.tx2_pool_max_connection_count as usize;
+        let max_cons = tuning_params.tx2_pool_max_connection_count;
         let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.adapter.bind(bind_spec, timeout);
         timeout
-            .mix(async move {
+            .mix("PromoteFactory::bind", async move {
                 let pair = pair_fut.await?;
                 let ep = PromoteEp::new(tuning_params, max_cons, con_limit, pair).await?;
                 let ep: Ep = Box::new(ep);

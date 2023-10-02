@@ -1,6 +1,7 @@
 //! Utilities for dealing with proxy urls.
 
 use crate::*;
+use base64::Engine;
 
 /// Utility for dealing with proxy urls.
 /// Proxy URLs are like super-urls... they need to be able to
@@ -30,10 +31,10 @@ pub struct ProxyUrl {
 
 impl ProxyUrl {
     /// Create a new proxy url from a full url str.
-    pub fn from_full(full: &str) -> TransportResult<Self> {
+    pub fn from_full(full: &str) -> KitsuneResult<Self> {
         macro_rules! err {
             ($h:literal) => {
-                TransportError::from(format!(
+                KitsuneError::from(format!(
                     "Invalid Proxy Url({}): {}: at: {}:{}",
                     $h,
                     full,
@@ -93,14 +94,14 @@ impl ProxyUrl {
     }
 
     /// Create a new proxy url from a base + tls cert digest.
-    pub fn new(base: &str, cert_digest: CertDigest) -> TransportResult<Self> {
-        let base = url2::try_url2!("{}", base).map_err(TransportError::other)?;
-        let tls = base64::encode_config(&cert_digest[..], base64::URL_SAFE_NO_PAD);
+    pub fn new(base: &str, cert_digest: CertDigest) -> KitsuneResult<Self> {
+        let base = url2::try_url2!("{}", base).map_err(KitsuneError::other)?;
+        let tls = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&cert_digest[..]);
         let mut full = url2::url2!("kitsune-proxy://{}", tls);
         {
             let mut path = full
                 .path_segments_mut()
-                .map_err(|_| TransportError::from(""))?;
+                .map_err(|_| KitsuneError::from(""))?;
             path.push(base.scheme());
             if let Some(h) = base.host_str() {
                 path.push("h");
@@ -132,9 +133,22 @@ impl ProxyUrl {
 
     /// Extract the cert digest from the url
     pub fn digest(&self) -> CertDigest {
-        let digest =
-            base64::decode_config(self.full.host_str().unwrap(), base64::URL_SAFE_NO_PAD).unwrap();
-        digest.into()
+        let scheme = self.full.scheme();
+        if scheme == "wss" || scheme == "ws" {
+            // override for tx5
+            if let Some(mut i) = self.full.path_segments() {
+                if let Some(_u) = i.next() {
+                    if let Some(u) = i.next() {
+                        let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(u).unwrap();
+                        return CertDigest::from_slice(&digest);
+                    }
+                }
+            }
+        }
+        let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD
+            .decode(self.full.host_str().unwrap())
+            .unwrap();
+        CertDigest::from_slice(&digest)
     }
 
     /// Get a short-hash / first six characters of tls digest for logging
@@ -224,8 +238,11 @@ mod tests {
 
     #[test]
     fn proxy_url_from_base() {
-        let cert_digest = base64::decode_config(TEST_CERT, base64::URL_SAFE_NO_PAD).unwrap();
-        let u = ProxyUrl::new(TEST_BASE, cert_digest.into()).unwrap();
+        let cert_digest = base64::prelude::BASE64_URL_SAFE_NO_PAD
+            .decode(TEST_CERT)
+            .unwrap();
+        let digest = CertDigest::from_slice(&cert_digest);
+        let u = ProxyUrl::new(TEST_BASE, digest).unwrap();
         assert_eq!(TEST_FULL, u.as_full_str());
         assert_eq!(TEST_BASE, u.as_base_str());
     }

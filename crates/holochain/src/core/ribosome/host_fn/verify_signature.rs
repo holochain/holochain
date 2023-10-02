@@ -4,34 +4,37 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: VerifySignature,
-) -> Result<bool, WasmError> {
+) -> Result<bool, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore_deterministic: Permission::Allow,
             ..
-        } => Ok(tokio_helper::block_forever_on(async move {
+        } => tokio_helper::block_forever_on(async move {
             let VerifySignature {
                 key,
                 signature,
                 data,
             } = input;
-            key.verify_signature_raw(&signature, data.into()).await
-        })),
-        _ => Err(WasmError::Host(
+            key.verify_signature_raw(&signature, data.into())
+                .await
+                .map_err(|e| RuntimeError::user(Box::new(e)))
+        }),
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "verify_signature".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -44,7 +47,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_raw_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -168,7 +171,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

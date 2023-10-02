@@ -11,6 +11,7 @@ async fn sharded_sanity_test() {
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let mut iter = agents.clone().into_iter();
     let alice_agent = iter.next().unwrap().0;
     let bob_agent = iter.next().unwrap().0;
@@ -33,8 +34,15 @@ async fn sharded_sanity_test() {
     )
     .await;
 
-    // - Bob try's to initiate.
-    let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
+    // - Bob tries to initiate.
+    let (_, _, bob_outgoing) = bob
+        .try_initiate(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let alices_cert = bob
         .inner
         .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().cert.clone()))
@@ -42,7 +50,7 @@ async fn sharded_sanity_test() {
 
     // - Send initiate to alice.
     let alice_outgoing = alice
-        .process_incoming(bob_cert.clone(), bob_outgoing)
+        .process_incoming(bob_cert.clone().into(), bob_outgoing)
         .await
         .unwrap();
 
@@ -83,7 +91,7 @@ async fn sharded_sanity_test() {
     // - Send the above to alice.
     for incoming in bob_outgoing {
         let outgoing = alice
-            .process_incoming(bob_cert.clone(), incoming)
+            .process_incoming(bob_cert.clone().into(), incoming)
             .await
             .unwrap();
         alice_outgoing.extend(outgoing);
@@ -139,15 +147,20 @@ async fn partial_missing_doesnt_finish() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -158,12 +171,15 @@ async fn partial_missing_doesnt_finish() {
     .await;
 
     // - Send a missing ops message that isn't marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::ChunkComplete as u8,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 0);
 
     bob.inner
@@ -187,15 +203,20 @@ async fn missing_ops_finishes() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -206,12 +227,15 @@ async fn missing_ops_finishes() {
     .await;
 
     // Send a message marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::AllComplete as u8,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 0);
 
     bob.inner
@@ -236,15 +260,20 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -255,12 +284,15 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     .await;
 
     // - Send a message marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::AllComplete as u8,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 0);
 
     bob.inner
@@ -285,15 +317,20 @@ async fn bloom_response_finishes() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 0,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -304,12 +341,15 @@ async fn bloom_response_finishes() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 1);
 
     bob.inner
@@ -334,15 +374,20 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -353,12 +398,15 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 1);
 
     bob.inner
@@ -386,15 +434,20 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
             round_map: maplit::hashmap! {
-                bob_cert.clone() => RoundState {
+                bob_cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 0,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -409,15 +462,20 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[1].0.clone()),
             round_map: maplit::hashmap! {
-                alice_cert.clone() => RoundState {
+                alice_cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -428,13 +486,13 @@ async fn no_data_still_finishes() {
     .await;
 
     // - Send the final ops bloom message to alice.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
 
     let outgoing = alice
-        .process_incoming(bob_cert.clone(), incoming)
+        .process_incoming(bob_cert.clone().into(), incoming)
         .await
         .unwrap();
 
@@ -443,7 +501,10 @@ async fn no_data_still_finishes() {
 
     // - Send this to bob.
     let outgoing = bob
-        .process_incoming(alice_cert.clone(), outgoing.into_iter().next().unwrap())
+        .process_incoming(
+            alice_cert.clone().into(),
+            outgoing.into_iter().next().unwrap(),
+        )
         .await
         .unwrap();
 
@@ -469,10 +530,11 @@ async fn no_data_still_finishes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-/// This test checks that when two players concurrently
-/// initiate a round it is handle correctly.
+/// This test checks that when two players simultaneously
+/// initiate a round it is handled correctly.
 async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     // - Set up two players with themselves as local agents.
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -493,8 +555,22 @@ async fn double_initiate_is_handled() {
     .await;
 
     // - Both players try to initiate and only have the other as a remote agent.
-    let (alice_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
-    let (bob_cert, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
+    let (bob_cert, _, alice_initiate) = alice
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    let (alice_cert, _, bob_initiate) = bob
+        .try_initiate(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
     // - Both players process the initiate.
     let alice_outgoing = alice
@@ -507,7 +583,7 @@ async fn double_initiate_is_handled() {
         .unwrap();
 
     // - Check we always have at least one node not proceeding with initiate.
-    assert!((bob_outgoing.len() == 0 || alice_outgoing.len() == 0));
+    assert!((bob_outgoing.is_empty() || alice_outgoing.is_empty()));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -515,6 +591,7 @@ async fn double_initiate_is_handled() {
 /// a node is already in progress does not initiate a new round.
 async fn initiate_after_target_is_set() {
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let alice = setup_empty_player(
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
@@ -534,7 +611,14 @@ async fn initiate_after_target_is_set() {
     .await;
 
     // - Alice successfully initiates a round with bob.
-    let (cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    let (cert, _, alice_initiate) = alice
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     dbg!(&cert);
     dbg!(&agents);
     // - Bob accepts the round.
@@ -552,7 +636,13 @@ async fn initiate_after_target_is_set() {
         })
         .unwrap();
     // - Bob tries to initiate a round with alice.
-    let bob_initiate = bob.try_initiate().await.unwrap();
+    let bob_initiate = bob
+        .try_initiate(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap();
     bob.inner
         .share_mut(|i, _| {
             dbg!(&i.initiate_tgt);
@@ -569,6 +659,7 @@ async fn initiate_after_target_is_set() {
 /// Test the initiates timeout after the round timeout has elapsed.
 async fn initiate_times_out() {
     let agents = agents_with_infos(3).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let alice_cert = cert_from_info(agents[0].1.clone());
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -589,7 +680,10 @@ async fn initiate_times_out() {
 
     // Trying to initiate a round should succeed.
     let (tgt_cert, _, _) = alice
-        .try_initiate()
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -600,7 +694,13 @@ async fn initiate_times_out() {
             Ok(())
         })
         .unwrap();
-    let r = alice.try_initiate().await.unwrap();
+    let r = alice
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap();
 
     // Doesn't re-initiate.
     assert!(r.is_none());
@@ -612,11 +712,17 @@ async fn initiate_times_out() {
         })
         .unwrap();
 
-    // Wait slightly longer then the timeout.
-    tokio::time::sleep(ROUND_TIMEOUT + std::time::Duration::from_millis(1)).await;
+    // Wait slightly longer than the timeout.
+    tokio::time::sleep(
+        alice.tuning_params.gossip_round_timeout() + std::time::Duration::from_millis(1),
+    )
+    .await;
 
     let (tgt2_cert, _, alice_initiate) = alice
-        .try_initiate()
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -633,7 +739,7 @@ async fn initiate_times_out() {
 
     // Process the initiate with Bob.
     let bob_outgoing = bob
-        .process_incoming(alice_cert.clone(), alice_initiate)
+        .process_incoming(alice_cert.clone().into(), alice_initiate)
         .await
         .unwrap();
 
@@ -653,7 +759,7 @@ async fn initiate_times_out() {
         .unwrap();
 
     // Wait slightly longer then the timeout but touch the round in between.
-    tokio::time::sleep(ROUND_TIMEOUT / 2).await;
+    tokio::time::sleep(alice.tuning_params.gossip_round_timeout() / 2).await;
 
     // Get the map so the round doesn't timeout
     alice
@@ -664,11 +770,20 @@ async fn initiate_times_out() {
         })
         .unwrap();
 
-    tokio::time::sleep(ROUND_TIMEOUT / 2 + std::time::Duration::from_millis(1)).await;
+    tokio::time::sleep(
+        alice.tuning_params.gossip_round_timeout() / 2 + std::time::Duration::from_millis(1),
+    )
+    .await;
 
     // Check that initiating again doesn't do anything.
 
-    let r = alice.try_initiate().await.unwrap();
+    let r = alice
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
+        .await
+        .unwrap();
     // Doesn't re-initiate.
     assert!(r.is_none());
     alice

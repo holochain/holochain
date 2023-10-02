@@ -13,14 +13,11 @@ impl ShardedGossipLocal {
 
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
-        let missing: Vec<_> = get_agent_info(&self.evt_sender, &self.space, common_arc_set)
+        let missing: Vec<_> = get_agent_info(&self.host_api, &self.space, common_arc_set)
             .await?
             .filter(|info| {
                 // Check them against the bloom
-                !remote_bloom.check(&Arc::new(MetaOpKey::Agent(
-                    info.agent.clone(),
-                    info.signed_at_ms,
-                )))
+                !remote_bloom.check(&MetaOpKey::Agent(info.agent.clone(), info.signed_at_ms))
             })
             .map(Arc::new)
             .collect();
@@ -44,15 +41,15 @@ impl ShardedGossipLocal {
         agents: &[Arc<AgentInfoSigned>],
     ) -> KitsuneResult<()> {
         // Add the agents to the stores.
-        store::put_agent_info(&self.evt_sender, &self.space, agents).await?;
+        store::put_agent_info(&self.host_api, &self.space, agents).await?;
         Ok(())
     }
 }
 
 async fn get_agent_info(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    store::agent_info_within_arc_set(evt_sender, space, arc_set).await
+    store::agent_info_within_arc_set(host_api, space, arc_set).await
 }

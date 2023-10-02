@@ -1,7 +1,8 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::env::DbSyncStrategy;
+use holochain_types::db::DbSyncStrategy;
+use kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -14,7 +15,7 @@ mod keystore_config;
 pub mod paths;
 //mod logger_config;
 //mod signal_config;
-pub use paths::EnvironmentRootPath;
+pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -28,40 +29,53 @@ use std::path::Path;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the database for this conductor.
-    /// If omitted, chooses a default path.
-    pub environment_path: EnvironmentRootPath,
+    /// Override the environment specified tracing config.
+    #[serde(default)]
+    pub tracing_override: Option<String>,
+
+    /// The path to the database for this conductor;
+    /// if omitted, chooses a default path.
+    pub environment_path: DatabaseRootPath,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
     pub keystore: KeystoreConfig,
 
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances
+    /// keys for new instances.
     pub dpki: Option<DpkiConfig>,
 
-    /// Setup admin interfaces to control this conductor through a websocket connection
+    /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
-    /// Config options for the network module. Optional.
+    /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
+    /// Optional specification of Chain Head Coordination service URL.
+    /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
+    /// If you don't know what this means, leave this setting alone (as `None`)
     #[serde(default)]
+    #[cfg(feature = "chc")]
+    pub chc_url: Option<url2::Url2>,
+
     /// Override the default database synchronous strategy.
-    /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous)
-    /// for information about database sync levels.
+    ///
+    /// See [sqlite documentation] for information about database sync levels.
     /// See [`DbSyncStrategy`] for details.
-    /// This is best left at it's default value unless you know what you
+    /// This is best left at its default value unless you know what you
     /// are doing.
+    ///
+    /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
+    #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
     //
     //
-    // /// Which signals to emit
+    // Which signals to emit
     // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
     // pub signals: SignalConfig,
 }
 
-/// helper fnction function to load a `Config` from a yaml string.
+/// Helper function to load a config from a YAML string.
 fn config_from_yaml<T>(yaml: &str) -> ConductorConfigResult<T>
 where
     T: DeserializeOwned,
@@ -70,7 +84,7 @@ where
 }
 
 impl ConductorConfig {
-    /// create a ConductorConfig struct from a yaml file path
+    /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
             e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {
@@ -79,6 +93,14 @@ impl ConductorConfig {
             _ => err.into(),
         })?;
         config_from_yaml(&config_yaml)
+    }
+
+    /// Get tuning params for this config (default if not set)
+    pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
+        self.network
+            .as_ref()
+            .map(|c| c.tuning_params.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -113,25 +135,28 @@ pub mod tests {
     environment_path: /path/to/env
 
     keystore:
-      type: danger_test_keystore_legacy_deprecated
+      type: danger_test_keystore
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
             result,
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
+                keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
 
     #[test]
     fn test_config_complete_config() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let yaml = r#"---
     environment_path: /path/to/env
@@ -140,8 +165,7 @@ pub mod tests {
     decryption_service_uri: ws://localhost:9003
 
     keystore:
-      type: lair_server_legacy_deprecated
-      danger_passphrase_insecure_from_config: "test-passphrase"
+      type: lair_server_in_proc
 
     dpki:
       instance_id: some_id
@@ -155,13 +179,8 @@ pub mod tests {
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
-        - type: proxy
-          sub_transport:
-            type: quic
-            bind_to: kitsune-quic://0.0.0.0:0
-          proxy_config:
-            type: local_proxy_server
-            proxy_accept_config: reject_all
+        - type: webrtc
+          signal_url: wss://signal.holotest.net
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -179,15 +198,8 @@ pub mod tests {
         use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.push(TransportConfig::Proxy {
-            sub_transport: Box::new(TransportConfig::Quic {
-                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-                override_host: None,
-                override_port: None,
-            }),
-            proxy_config: ProxyConfig::LocalProxyServer {
-                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
-            },
+        network_config.transport_pool.push(TransportConfig::WebRTC {
+            signal_url: "wss://signal.holotest.net".into(),
         });
         let mut tuning_params =
             kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -203,25 +215,24 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                keystore: KeystoreConfig::LairServerLegacyDeprecated {
-                    keystore_path: None,
-                    danger_passphrase_insecure_from_config: "test-passphrase".to_string(),
-                },
+                keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
 
-    /* TODO uncomment when lair_keystore_api initialization is implemented
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
@@ -236,16 +247,18 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
-                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
+                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
-                db_sync_level: DbSyncLevel::default(),
+                db_sync_strategy: DbSyncStrategy::Fast,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
-    */
 }

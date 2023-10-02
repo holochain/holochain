@@ -1,4 +1,5 @@
 use crate::prelude::*;
+pub use hdi::info::*;
 
 /// Trivial wrapper for `__agent_info` host function.
 /// Agent info input struct is `()` so the function call simply looks like this:
@@ -13,26 +14,19 @@ pub fn agent_info() -> ExternResult<AgentInfo> {
     HDK.with(|h| h.borrow().agent_info(()))
 }
 
-/// Get the DNA information.
-/// There are no inputs to [ `dna_info` ].
+/// Trivial wrapper for `__agent_info` host function.
+/// Call info input struct is `()` so the function call simply looks like this:
 ///
-/// DNA information includes dna name, hash, properties, and zome names.
-pub fn dna_info() -> ExternResult<DnaInfo> {
-    HDK.with(|h| h.borrow().dna_info(()))
-}
-
-/// Get the zome information.
-/// There are no inputs to [ `zome_info` ].
+/// ```ignore
+/// let call_info = call_info()?;
+/// ```
 ///
-/// Zome information includes zome name, id and properties.
-///
-/// In general any holochain compatible wasm can be compiled and run in any zome so the zome info
-/// needs to be looked up at runtime to e.g. know where to send/receive `call_remote` rpc calls to.
-pub fn zome_info() -> ExternResult<ZomeInfo> {
-    HDK.with(|h| h.borrow().zome_info(()))
-}
-
-/// @todo Not implemented
+/// the [ `CallInfo` ] is
+/// - the provenance of the call
+/// - function name that was the extern/entrypoint into the wasm
+/// - the chain head as at the start of the call, won't change even if the chain
+///   is written to during the call
+/// - the [ `CapGrant` ] used to authorize the call
 pub fn call_info() -> ExternResult<CallInfo> {
     HDK.with(|h| h.borrow().call_info(()))
 }

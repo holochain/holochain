@@ -11,7 +11,7 @@ pub enum ZomeError {
     #[error("Accessed a zome expecting to find a WasmZome, but found other type. Zome name: {0}")]
     NonWasmZome(ZomeName),
 
-    /// SerializedBytesError (can occur during DnaDef::modify_phenotype)
+    /// SerializedBytesError (can occur during DnaDef::update_modifiers)
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 }

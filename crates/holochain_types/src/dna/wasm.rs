@@ -14,6 +14,7 @@ use tracing::*;
 
 /// Represents web assembly code.
 #[derive(Serialize, Deserialize, Clone, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
     #[allow(clippy::redundant_allocation)]
@@ -74,7 +75,7 @@ impl DnaWasm {
         }
     }
 
-    /// get a new Arc to the Vec<u8> bytes for the wasm
+    /// get a new Arc to the `Vec<u8>` bytes for the wasm
     #[allow(clippy::redundant_allocation)]
     pub fn code(&self) -> Arc<Box<[u8]>> {
         Arc::clone(&self.code)

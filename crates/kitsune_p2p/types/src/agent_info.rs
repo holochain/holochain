@@ -5,13 +5,12 @@ use crate::dht_arc::DhtArc;
 use crate::tx2::tx2_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
-use dht_arc::ArcInterval;
 
 /// A list of Urls.
 pub type UrlList = Vec<TxUrl>;
 
 /// An agent paired with its storage arc in interval form
-pub type AgentArc = (Arc<KitsuneAgent>, ArcInterval);
+pub type AgentArc = (Arc<KitsuneAgent>, DhtArc);
 
 /// agent_info helper types
 pub mod agent_info_helper {
@@ -89,6 +88,13 @@ pub struct AgentInfoInner {
     pub encoded_bytes: Box<[u8]>,
 }
 
+impl AgentInfoInner {
+    /// If this agent is considered active.
+    pub fn is_active(&self) -> bool {
+        !self.url_list.is_empty()
+    }
+}
+
 impl std::fmt::Debug for AgentInfoInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AgentInfoSigned")
@@ -164,8 +170,9 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             return Err(serde::de::Error::custom("agent mismatch"));
         }
 
-        let center_loc = agent.get_loc();
-        let storage_arc = DhtArc::new(center_loc, meta.dht_storage_arc_half_length);
+        let start_loc = agent.get_loc();
+        let storage_arc =
+            DhtArc::from_start_and_half_len(start_loc, meta.dht_storage_arc_half_length);
 
         let AgentInfoEncode {
             space,
@@ -227,11 +234,11 @@ impl AgentInfoSigned {
 
         let signature = f(&encoded_bytes).await?;
 
-        let center_loc = agent.get_loc();
+        let start_loc = agent.get_loc();
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc: DhtArc::new(center_loc, dht_storage_arc_half_length),
+            storage_arc: DhtArc::from_start_and_half_len(start_loc, dht_storage_arc_half_length),
             url_list,
             signed_at_ms,
             expires_at_ms,
@@ -257,7 +264,12 @@ impl AgentInfoSigned {
 
     /// get just the agent and its storage arc
     pub fn to_agent_arc(&self) -> AgentArc {
-        (self.agent.clone(), self.storage_arc.interval())
+        (self.agent.clone(), self.storage_arc)
+    }
+
+    /// Accessor
+    pub fn agent(&self) -> Arc<KitsuneAgent> {
+        self.agent.clone()
     }
 }
 

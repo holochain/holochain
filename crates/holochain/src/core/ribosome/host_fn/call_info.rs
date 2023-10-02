@@ -1,17 +1,18 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::InvocationAuth;
-use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
-use holochain_zome_types::info::CallInfo;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::RibosomeT;
+use holochain_state::source_chain::SourceChainError;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::info::CallInfo;
 use std::sync::Arc;
 
 pub fn call_info(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<CallInfo, WasmError> {
+) -> Result<CallInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings: Permission::Allow,
@@ -37,7 +38,7 @@ pub fn call_info(
                                 check_function,
                                 check_agent,
                                 cap_secret,
-                            ).await.map_err(|e| WasmError::Host(e.to_string()))?
+                            ).await.map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?
                             // This is really a problem.
                             // It means that the host function calling into `call_info`
                             // is using a cap secret that never had authorization to call in the first place.
@@ -67,33 +68,39 @@ pub fn call_info(
                     .source_chain()
                     .as_ref()
                     .expect("Must have source chain if bindings access is given")
-                    .persisted_chain_head(),
+                    .persisted_head_info()
+                    .ok_or(wasm_error!(WasmErrorInner::Host(
+                        SourceChainError::ChainEmpty.to_string()
+                    )))?
+                    .into_tuple(),
                 provenance,
                 cap_grant,
             })
         }
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "call_info".into()
-        ).to_string()))
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "call_info".into()
+            )
+            .to_string()
+        ))
+        .into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_info_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
 
         let call_info: CallInfo = conductor.call(&alice, "call_info", ()).await;
@@ -102,7 +109,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_info_provenance_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

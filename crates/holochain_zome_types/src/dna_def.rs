@@ -4,15 +4,21 @@ use super::zome;
 use crate::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
+use holochain_integrity_types::info::DnaModifiersBuilder;
+
+#[cfg(feature = "full-dna-def")]
 use crate::zome::error::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
-/// Zomes need to be an ordered map from ZomeName to a Zome
-pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
+#[cfg(feature = "full-dna-def")]
+use kitsune_p2p_dht::spacetime::Dimension;
 
-/// Placeholder for a real UID type
-pub type Uid = String;
+/// Ordered list of integrity zomes in this DNA.
+pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
+
+/// Ordered list of coordinator zomes in this DNA.
+pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
@@ -22,6 +28,7 @@ pub type Uid = String;
 /// Hence, this type can basically be thought of as a fully validated, normalized
 /// `DnaManifest`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
 pub struct DnaDef {
@@ -32,54 +39,123 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// A UID for uniquifying this Dna.
-    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
-    pub uid: String,
-
-    /// Any arbitrary application properties can be included in this object.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
-    pub properties: SerializedBytes,
-
-    /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Header timestamps must come after this time.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
-    pub origin_time: Timestamp,
+    /// Modifiers of this DNA - the network seed, properties and origin time - as
+    /// opposed to the actual DNA code. The modifiers are included in the DNA hash
+    /// computation.
+    pub modifiers: DnaModifiers,
 
     /// A vector of zomes associated with your DNA.
-    pub zomes: Zomes,
+    pub integrity_zomes: IntegrityZomes,
+
+    /// A vector of zomes that do not affect
+    /// the [`DnaHash`].
+    pub coordinator_zomes: CoordinatorZomes,
+}
+
+#[derive(Serialize, Debug, PartialEq, Eq)]
+/// A reference to for creating the hash for [`DnaDef`].
+struct DnaDefHash<'a> {
+    modifiers: &'a DnaModifiers,
+    integrity_zomes: &'a IntegrityZomes,
 }
 
 #[cfg(feature = "test_utils")]
 impl DnaDef {
-    /// Create a DnaDef with a random UID, useful for testing
-    pub fn unique_from_zomes(zomes: Vec<Zome>) -> DnaDef {
-        let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
+    /// Create a DnaDef with a random network seed, useful for testing
+    pub fn unique_from_zomes(
+        integrity: Vec<IntegrityZome>,
+        coordinator: Vec<CoordinatorZome>,
+    ) -> DnaDef {
+        let integrity = integrity.into_iter().map(|z| z.into_inner()).collect();
+        let coordinator = coordinator.into_iter().map(|z| z.into_inner()).collect();
         DnaDefBuilder::default()
-            .zomes(zomes)
-            .random_uid()
+            .integrity_zomes(integrity)
+            .coordinator_zomes(coordinator)
+            .random_network_seed()
             .build()
             .unwrap()
     }
 }
 
+impl DnaDef {
+    /// Get all zomes including the integrity and coordinator zomes.
+    pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &zome::ZomeDef)> {
+        self.integrity_zomes
+            .iter()
+            .map(|(n, def)| (n, def.as_any_zome_def()))
+            .chain(
+                self.coordinator_zomes
+                    .iter()
+                    .map(|(n, def)| (n, def.as_any_zome_def())),
+            )
+    }
+}
+
 #[cfg(feature = "full-dna-def")]
 impl DnaDef {
-    /// Return a Zome
-    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
-        self.zomes
+    /// Find an integrity zome from a [`ZomeName`].
+    pub fn get_integrity_zome(
+        &self,
+        zome_name: &ZomeName,
+    ) -> Result<zome::IntegrityZome, ZomeError> {
+        self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
             .cloned()
-            .map(|(name, def)| Zome::new(name, def))
+            .map(|(name, def)| IntegrityZome::new(name, def))
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Check if a zome is an integrity zome.
+    pub fn is_integrity_zome(&self, zome_name: &ZomeName) -> bool {
+        self.integrity_zomes
+            .iter()
+            .any(|(name, _)| name == zome_name)
+    }
+
+    /// Find a coordinator zome from a [`ZomeName`].
+    pub fn get_coordinator_zome(
+        &self,
+        zome_name: &ZomeName,
+    ) -> Result<zome::CoordinatorZome, ZomeError> {
+        self.coordinator_zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| CoordinatorZome::new(name, def))
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Find a any zome from a [`ZomeName`].
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
+        self.integrity_zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| Zome::new(name, def.erase_type()))
+            .or_else(|| {
+                self.coordinator_zomes
+                    .iter()
+                    .find(|(name, _)| name == zome_name)
+                    .cloned()
+                    .map(|(name, def)| Zome::new(name, def.erase_type()))
+            })
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Get all the [`CoordinatorZome`]s for this dna
+    pub fn get_all_coordinators(&self) -> Vec<zome::CoordinatorZome> {
+        self.coordinator_zomes
+            .iter()
+            .cloned()
+            .map(|(name, def)| CoordinatorZome::new(name, def))
+            .collect()
     }
 
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
-        self.zomes
-            .iter()
-            .find(|(name, _)| name == zome_name)
+        self.all_zomes()
+            .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
             .and_then(|def| {
@@ -91,27 +167,60 @@ impl DnaDef {
             })
     }
 
-    /// Change the "phenotype" of this DNA -- the UID and properties -- while
-    /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uid: Uid, properties: SerializedBytes) -> Self {
+    /// Return the Wasm Hash for Zome, error if not a Wasm type Zome
+    pub fn get_wasm_zome_hash(&self, zome_name: &ZomeName) -> Result<WasmHash, ZomeError> {
+        self.all_zomes()
+            .find(|(name, _)| *name == zome_name)
+            .map(|(_, def)| def)
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .and_then(|def| match def {
+                ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),
+                _ => Err(ZomeError::NonWasmZome(zome_name.clone())),
+            })
+    }
+
+    /// Set the DNA's name.
+    pub fn set_name(&self, name: String) -> Self {
         let mut clone = self.clone();
-        clone.properties = properties;
-        clone.uid = uid;
+        clone.name = name;
         clone
+    }
+
+    /// Change the DNA modifiers -- the network seed, properties and origin time -- while
+    /// leaving the actual DNA code intact.
+    pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
+        let mut clone = self.clone();
+        clone.modifiers = clone.modifiers.update(dna_modifiers);
+        clone
+    }
+
+    /// Get the topology to use for kitsune gossip
+    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
+        kitsune_p2p_dht::spacetime::Topology {
+            space: Dimension::standard_space(),
+            time: Dimension::time(self.modifiers.quantum_time),
+            time_origin: self.modifiers.origin_time,
+            time_cutoff: cutoff,
+        }
     }
 }
 
-/// Get a random UID
+/// Get a random network seed
 #[cfg(feature = "full-dna-def")]
-pub fn random_uid() -> String {
+pub fn random_network_seed() -> String {
     nanoid::nanoid!()
 }
 
 #[cfg(feature = "full-dna-def")]
 impl DnaDefBuilder {
-    /// Provide a random UID
-    pub fn random_uid(&mut self) -> &mut Self {
-        self.uid = Some(random_uid());
+    /// Provide a random network seed
+    pub fn random_network_seed(&mut self) -> &mut Self {
+        self.modifiers = Some(
+            DnaModifiersBuilder::default()
+                .network_seed(random_network_seed())
+                .build()
+                .unwrap(),
+        );
         self
     }
 }
@@ -121,4 +230,64 @@ impl DnaDefBuilder {
 pub type DnaDefHashed = HoloHashed<DnaDef>;
 
 #[cfg(feature = "full-dna-def")]
-impl_hashable_content!(DnaDef, Dna);
+impl HashableContent for DnaDef {
+    type HashType = holo_hash::hash_type::Dna;
+
+    fn hash_type(&self) -> Self::HashType {
+        holo_hash::hash_type::Dna::new()
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        let hash = DnaDefHash {
+            modifiers: &self.modifiers,
+            integrity_zomes: &self.integrity_zomes,
+        };
+        HashableContentBytes::Content(
+            holochain_serialized_bytes::UnsafeBytes::from(
+                holochain_serialized_bytes::encode(&hash)
+                    .expect("Could not serialize HashableContent"),
+            )
+            .into(),
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use holochain_serialized_bytes::prelude::*;
+    use kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME;
+
+    #[test]
+    fn test_update_modifiers() {
+        #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+        struct Props(u32);
+
+        let props = SerializedBytes::try_from(Props(42)).unwrap();
+
+        let now = Timestamp::now();
+        let mods = DnaModifiers {
+            network_seed: "seed".into(),
+            properties: ().try_into().unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: STANDARD_QUANTUM_TIME,
+        };
+
+        let opt = DnaModifiersOpt {
+            network_seed: None,
+            properties: Some(props.clone()),
+            origin_time: Some(now),
+            quantum_time: Some(core::time::Duration::from_secs(60)),
+        };
+
+        let expected = DnaModifiers {
+            network_seed: "seed".into(),
+            properties: props.clone(),
+            origin_time: now,
+            quantum_time: core::time::Duration::from_secs(60),
+        };
+
+        assert_eq!(mods.update(opt), expected);
+    }
+}

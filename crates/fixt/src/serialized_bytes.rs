@@ -69,8 +69,8 @@ fixturator!(
         let mut index = get_fixt_index!();
         // iteratively select a thing to serialize
         let thing_to_serialize = THINGS_TO_SERIALIZE
-            .to_vec()
-            .into_iter()
+            .iter()
+            .copied()
             .cycle()
             .nth(index)
             .unwrap();

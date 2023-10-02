@@ -5,15 +5,15 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::query::prelude::*;
 use holochain_state::query::StateQueryError;
+use holochain_types::action::WireUpdateRelationship;
 use holochain_types::dht_op::DhtOpType;
-use holochain_types::header::WireUpdateRelationship;
 use holochain_types::prelude::EntryData;
 use holochain_types::prelude::HasValidationStatus;
 use holochain_types::prelude::WireEntryOps;
 use holochain_zome_types::EntryType;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::Judged;
-use holochain_zome_types::SignedHeader;
+use holochain_zome_types::SignedAction;
 use holochain_zome_types::TryFrom;
 use holochain_zome_types::TryInto;
 
@@ -28,7 +28,7 @@ impl GetEntryOpsQuery {
 
 pub struct Item {
     op_type: DhtOpType,
-    header: SignedHeader,
+    action: SignedAction,
 }
 
 #[derive(Debug, Default)]
@@ -44,10 +44,10 @@ impl Query for GetEntryOpsQuery {
 
     fn query(&self) -> String {
         "
-        SELECT Header.blob AS header_blob, DhtOp.type AS dht_type,
+        SELECT Action.blob AS action_blob, DhtOp.type AS dht_type,
         DhtOp.validation_status AS status
         FROM DhtOp
-        JOIN Header On DhtOp.header_hash = Header.hash
+        JOIN Action On DhtOp.action_hash = Action.hash
         WHERE DhtOp.type IN (:store_entry, :delete, :update)
         AND
         DhtOp.basis_hash = :entry_hash
@@ -60,7 +60,7 @@ impl Query for GetEntryOpsQuery {
     fn params(&self) -> Vec<Params> {
         let params = named_params! {
             ":store_entry": DhtOpType::StoreEntry,
-            ":delete": DhtOpType::RegisterDeletedEntryHeader,
+            ":delete": DhtOpType::RegisterDeletedEntryAction,
             ":update": DhtOpType::RegisterUpdatedContent,
             ":entry_hash": self.0,
         };
@@ -69,11 +69,11 @@ impl Query for GetEntryOpsQuery {
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         let f = |row: &Row| {
-            let header =
-                from_blob::<SignedHeader>(row.get(row.as_ref().column_index("header_blob")?)?)?;
+            let action =
+                from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
             let op_type = row.get(row.as_ref().column_index("dht_type")?)?;
             let validation_status = row.get(row.as_ref().column_index("status")?)?;
-            Ok(Judged::raw(Item { op_type, header }, validation_status))
+            Ok(Judged::raw(Item { op_type, action }, validation_status))
         };
         Arc::new(f)
     }
@@ -87,7 +87,7 @@ impl Query for GetEntryOpsQuery {
             DhtOpType::StoreEntry => {
                 if dht_op
                     .data
-                    .header
+                    .action
                     .0
                     .entry_type()
                     .filter(|et| *et.visibility() == EntryVisibility::Public)
@@ -97,7 +97,7 @@ impl Query for GetEntryOpsQuery {
                     if state.entry_data.is_none() {
                         state.entry_data = dht_op
                             .data
-                            .header
+                            .action
                             .0
                             .entry_data()
                             .map(|(h, t)| (h.clone(), t.clone()));
@@ -105,21 +105,21 @@ impl Query for GetEntryOpsQuery {
                     state
                         .ops
                         .creates
-                        .push(Judged::raw(dht_op.data.header.try_into()?, status));
+                        .push(Judged::raw(dht_op.data.action.try_into()?, status));
                 }
             }
-            DhtOpType::RegisterDeletedEntryHeader => {
+            DhtOpType::RegisterDeletedEntryAction => {
                 let status = dht_op.validation_status();
                 state
                     .ops
                     .deletes
-                    .push(Judged::raw(dht_op.data.header.try_into()?, status));
+                    .push(Judged::raw(dht_op.data.action.try_into()?, status));
             }
             DhtOpType::RegisterUpdatedContent => {
                 let status = dht_op.validation_status();
-                let header = dht_op.data.header;
+                let action = dht_op.data.action;
                 state.ops.updates.push(Judged::raw(
-                    WireUpdateRelationship::try_from(header)?,
+                    WireUpdateRelationship::try_from(action)?,
                     status,
                 ));
             }

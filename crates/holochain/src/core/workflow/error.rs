@@ -3,6 +3,7 @@
 
 use super::app_validation_workflow::AppValidationError;
 use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::conductor::DpkiServiceError;
 use crate::conductor::CellError;
 use crate::core::queue_consumer::QueueTriggerClosedError;
 use crate::core::ribosome::error::RibosomeError;
@@ -35,6 +36,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
+
+    #[error(transparent)]
+    DpkiServiceError(#[from] DpkiServiceError),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
@@ -76,6 +80,9 @@ pub enum WorkflowError {
     DhtOpError(#[from] DhtOpError),
 
     #[error(transparent)]
+    DbCacheError(#[from] holochain_types::db_cache::error::DbCacheError),
+
+    #[error(transparent)]
     SysValidationError(#[from] SysValidationError),
 
     #[error(transparent)]
@@ -93,6 +100,9 @@ pub enum WorkflowError {
     #[error(transparent)]
     SystemTimeError(#[from] std::time::SystemTimeError),
 
+    #[error(transparent)]
+    TimestampError(#[from] holochain_zome_types::TimestampError),
+
     #[error("RecvError")]
     RecvError,
 
@@ -108,6 +118,15 @@ impl WorkflowError {
     /// promote a custom error type to a WorkflowError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
+    }
+
+    /// True if a workflow encountering this error should bail, else it should
+    /// continue executing/looping.
+    pub fn workflow_should_bail(&self) -> bool {
+        // Currently GenesisFailure is the only thing we abort the app for but
+        // in the future this could be expanded to a more sophisticated match
+        // statement covering more fatal issues.
+        matches!(self, Self::GenesisFailure(_))
     }
 }
 

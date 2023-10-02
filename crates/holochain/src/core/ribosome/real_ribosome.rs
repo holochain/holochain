@@ -3,7 +3,6 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
-use super::guest_callback::validation_package::ValidationPackageHostAccess;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -12,6 +11,9 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckResultV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckHostAccess;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckInvocation;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
@@ -22,14 +24,10 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
+use crate::core::ribosome::host_fn::block_agent::block_agent;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
@@ -40,16 +38,18 @@ use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
-use crate::core::ribosome::host_fn::dna_info::dna_info;
+use crate::core::ribosome::host_fn::dna_info_1::dna_info_1;
+use crate::core::ribosome::host_fn::dna_info_2::dna_info_2;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
+use crate::core::ribosome::host_fn::must_get_action::must_get_action;
+use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
-use crate::core::ribosome::host_fn::must_get_header::must_get_header;
-use crate::core::ribosome::host_fn::must_get_valid_element::must_get_valid_element;
+use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 use crate::core::ribosome::host_fn::remote_signal::remote_signal;
@@ -59,6 +59,7 @@ use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
+use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -66,47 +67,68 @@ use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_decrypt::x_25519_
 use crate::core::ribosome::host_fn::x_25519_x_salsa20_poly1305_encrypt::x_25519_x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_random::x_salsa20_poly1305_shared_secret_create_random;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::module::SerializedModuleCache;
+// This is here because there were errors about different crate versions
+// without it.
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
+use crate::core::ribosome::host_fn::count_links::count_links;
+use holochain_types::wasmer_types::WASM_METERING_LIMIT;
+use holochain_types::zome_types::GlobalZomeTypes;
+use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
+
 pub struct RealRibosome {
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
     //      - is already in the wasm cache, and only include the DnaDef portion
     //      - here in the ribosome.
     pub dna_file: DnaFile,
+
+    /// Entry and link types for each integrity zome.
+    pub zome_types: Arc<GlobalZomeTypes>,
+
+    /// Dependencies for every zome.
+    pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 }
 
 struct HostFnBuilder {
     store: Store,
-    env: Env,
+    db: Env,
     ribosome_arc: Arc<RealRibosome>,
     // context_arc: Arc<CallContext>,
     context_key: u64,
 }
 
 impl HostFnBuilder {
-    const SIGNATURE: ([Type; 2], [Type; 0]) = ([Type::I32, Type::I32], []);
+    const SIGNATURE: ([Type; 2], [Type; 1]) = ([Type::I32, Type::I32], [Type::I64]);
 
     fn with_host_function<I: 'static, O: 'static>(
         &self,
         ns: &mut Exports,
         host_function_name: &str,
-        host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, WasmError>,
+        host_function: fn(Arc<RealRibosome>, Arc<CallContext>, I) -> Result<O, RuntimeError>,
     ) -> &Self
     where
         I: serde::de::DeserializeOwned + std::fmt::Debug,
@@ -119,22 +141,26 @@ impl HostFnBuilder {
             Function::new_with_env(
                 &self.store,
                 Self::SIGNATURE,
-                self.env.clone(),
-                move |env: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
+                self.db.clone(),
+                move |db: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
                     let guest_ptr: GuestPtr = match args[0] {
-                        Value::I32(i) => i
-                            .try_into()
-                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        Value::I32(i) => i.try_into().map_err(|_| {
+                            RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
+                        })?,
                         _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                            return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
+                                WasmErrorInner::PointerMap
+                            )))
                         }
                     };
                     let len: Len = match args[1] {
-                        Value::I32(i) => i
-                            .try_into()
-                            .map_err(|_| RuntimeError::new(WasmError::PointerMap))?,
+                        Value::I32(i) => i.try_into().map_err(|_| {
+                            RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
+                        })?,
                         _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(WasmError::PointerMap))
+                            return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
+                                WasmErrorInner::PointerMap
+                            )))
                         }
                     };
                     let context_arc = {
@@ -149,23 +175,26 @@ impl HostFnBuilder {
                             })
                             .clone()
                     };
-                    let result = match env.consume_bytes_from_guest(guest_ptr, len) {
-                        Ok(input) => {
-                            match host_function(
-                                Arc::clone(&ribosome_arc),
-                                // Arc::clone(&context_arc),
-                                context_arc,
-                                input,
-                            ) {
-                                Ok(output) => Ok::<_, WasmError>(output),
-                                Err(wasm_error) => Err::<_, WasmError>(wasm_error),
-                            }
-                        }
-                        Err(wasm_error) => Err::<_, WasmError>(wasm_error),
+                    let result = match db.consume_bytes_from_guest(guest_ptr, len) {
+                        Ok(input) => host_function(Arc::clone(&ribosome_arc), context_arc, input),
+                        Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
                     };
-                    env.set_data(result)
-                        .map_err(|e| RuntimeError::new(e.to_string()))?;
-                    Ok(vec![])
+                    Ok(vec![Value::I64(i64::from_le_bytes(
+                        db.move_data_to_guest(match result {
+                            Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
+                                Ok(wasm_error) => match wasm_error {
+                                    WasmError {
+                                        error: WasmErrorInner::HostShortCircuit(_),
+                                        ..
+                                    } => return Err(wasm_error.into()),
+                                    _ => Err(wasm_error),
+                                },
+                                Err(runtime_error) => return Err(runtime_error),
+                            },
+                            Ok(o) => Result::<_, WasmError>::Ok(o),
+                        })?
+                        .to_le_bytes(),
+                    ))])
                 },
             ),
         );
@@ -211,18 +240,137 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile) -> Self {
-        Self { dna_file }
+    pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
+        // Create an empty ribosome.
+        let ribosome = Self {
+            dna_file,
+            zome_types: Default::default(),
+            zome_dependencies: Default::default(),
+        };
+
+        // Collect the number of entry and link types
+        // for each integrity zome.
+        let iter = ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .map(|(name, zome)| {
+                let zome = Zome::new(name.clone(), zome.clone().erase_type());
+
+                // Call the const functions that return the number of types.
+                let num_entry_types = match ribosome.get_const_fn(&zome, "__num_entry_types")? {
+                    Some(i) => {
+                        let i: u8 = i
+                            .try_into()
+                            .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
+                        EntryDefIndex(i)
+                    }
+                    None => EntryDefIndex(0),
+                };
+                let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types")? {
+                    Some(i) => {
+                        let i: u8 = i
+                            .try_into()
+                            .map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?;
+                        LinkType(i)
+                    }
+                    None => LinkType(0),
+                };
+                RibosomeResult::Ok((num_entry_types, num_link_types))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Create the global zome types from the totals.
+        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
+
+        let zome_types = Arc::new(map?);
+
+        // Create a map of integrity zome names to ZomeIndexes.
+        let integrity_zomes: HashMap<_, _> = ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .enumerate()
+            .map(|(i, (n, _))| Some((n.clone(), ZomeIndex(i.try_into().ok()?))))
+            .collect::<Option<_>>()
+            .ok_or(ZomeTypesError::ZomeIndexOverflow)?;
+
+        // Collect the dependencies for each zome.
+        let zome_dependencies = ribosome
+            .dna_def()
+            .all_zomes()
+            .map(|(zome_name, def)| {
+                let mut dependencies = Vec::new();
+
+                if integrity_zomes.len() == 1 {
+                    // If there's only one integrity zome we add it to this zome and are done.
+                    dependencies.push(ZomeIndex(0));
+                } else {
+                    // Integrity zomes need to have themselves as a dependency.
+                    if ribosome.dna_def().is_integrity_zome(zome_name) {
+                        // Get the ZomeIndex for this zome.
+                        let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
+                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                        })?;
+                        dependencies.push(id);
+                    }
+                    for name in def.dependencies() {
+                        // Get the ZomeIndex for this dependency.
+                        let id = integrity_zomes.get(name).copied().ok_or_else(|| {
+                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                        })?;
+                        dependencies.push(id);
+                    }
+                }
+
+                Ok((zome_name.clone(), dependencies))
+            })
+            .collect::<RibosomeResult<HashMap<_, _>>>()?;
+
+        Ok(Self {
+            dna_file: ribosome.dna_file,
+            zome_types,
+            zome_dependencies: Arc::new(zome_dependencies),
+        })
     }
 
-    pub fn dna_file(&self) -> &DnaFile {
-        &self.dna_file
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn empty(dna_file: DnaFile) -> Self {
+        Self {
+            dna_file,
+            zome_types: Default::default(),
+            zome_dependencies: Default::default(),
+        }
     }
 
-    pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+    pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
+        let store = ios_dylib_headless_store();
+        match unsafe { Module::deserialize_from_file(&store, dylib_path) } {
+            Ok(module) => Ok(Arc::new(module)),
+            Err(e) => Err(RibosomeError::ModuleDeserializeError(e)),
+        }
+    }
+
+    pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+        if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+            .get()
+            .is_none()
+        {
+            holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+                .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
+                    cranelift,
+                )))
+                // An error here means the cell is full when we tried to set it, so
+                // some other thread must have done something in between the get
+                // above and the set here. In this case we don't care as we don't
+                // have any competing code paths that could set it to something
+                // unexpected.
+                .ok();
+        }
+
         Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
             self.wasm_cache_key(zome_name)?,
-            &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+            &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
         )?)
     }
 
@@ -231,12 +379,8 @@ impl RealRibosome {
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
         let mut key = [0; 32];
-        let bytes = self
-            .dna_file
-            .dna()
-            .get_wasm_zome(zome_name)?
-            .wasm_hash
-            .get_raw_32();
+        let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
+        let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
         Ok(key)
     }
@@ -248,6 +392,11 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
         use holochain_wasmer_host::module::PlruCache;
+        {
+            let instance = instance.lock();
+            wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
+        }
+
         // Clear the context as the call is done.
         {
             CONTEXT_MAP.lock().remove(&context_key);
@@ -256,9 +405,8 @@ impl RealRibosome {
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(zome_name)
-                .map_err(DnaError::from)?
-                .wasm_hash,
+                .get_wasm_zome_hash(zome_name)
+                .map_err(DnaError::from)?,
             self.dna_file.dna_hash(),
             context_key,
         );
@@ -269,31 +417,49 @@ impl RealRibosome {
         Ok(())
     }
 
+    pub fn build_instance(
+        &self,
+        zome: &Zome<ZomeDef>,
+        context_key: u64,
+    ) -> RibosomeResult<Arc<Mutex<Instance>>> {
+        let module = match &zome.def {
+            ZomeDef::Wasm(wasm_zome) => {
+                if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                    self.precompiled_module(path)?
+                } else {
+                    self.runtime_compiled_module(zome.zome_name())?
+                }
+            }
+            _ => {
+                return RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
+                    ZomeError::NonWasmZome(zome.zome_name().clone()),
+                )));
+            }
+        };
+        let imports: ImportObject = Self::imports(self, context_key, module.store());
+        let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
+            |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
+        )?));
+        RibosomeResult::Ok(instance)
+    }
+
+    fn next_context_key() -> u64 {
+        CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+
     pub fn instance(
         &self,
         call_context: CallContext,
     ) -> RibosomeResult<(Arc<Mutex<Instance>>, u64)> {
         use holochain_wasmer_host::module::PlruCache;
-        let zome_name = call_context.zome.zome_name().clone();
-
-        // Fallback to creating an instance if we don't have a cache hit.
-        let fallback = |context_key| {
-            let module = self.module(&zome_name)?;
-            let imports: ImportObject = Self::imports(self, context_key, module.store());
-            let instance = Arc::new(Mutex::new(
-                Instance::new(&module, &imports).map_err(|e| WasmError::Compile(e.to_string()))?,
-            ));
-            RibosomeResult::Ok(instance)
-        };
 
         // Get the start of the possible keys.
         let key_start = instance_cache_key(
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(&zome_name)
-                .map_err(DnaError::from)?
-                .wasm_hash,
+                .get_wasm_zome_hash(call_context.zome.zome_name())
+                .map_err(DnaError::from)?,
             self.dna_file.dna_hash(),
             0,
         );
@@ -302,9 +468,8 @@ impl RealRibosome {
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(&zome_name)
-                .map_err(DnaError::from)?
-                .wasm_hash,
+                .get_wasm_zome_hash(call_context.zome.zome_name())
+                .map_err(DnaError::from)?,
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );
@@ -333,7 +498,9 @@ impl RealRibosome {
             }
         }
         // We didn't get an instance hit so create a new key.
-        let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let context_key = Self::next_context_key();
+        let instance = self.build_instance(&call_context.zome, context_key)?;
+
         // Update the context.
         {
             CONTEXT_MAP
@@ -341,105 +508,259 @@ impl RealRibosome {
                 .insert(context_key, Arc::new(call_context));
         }
         // Fallback to creating the instance.
-        let instance = fallback(context_key)?;
         Ok((instance, context_key))
     }
 
+    pub async fn tooling_imports() -> RibosomeResult<Vec<String>> {
+        let empty_dna_def = DnaDef {
+            name: Default::default(),
+            modifiers: DnaModifiers {
+                network_seed: Default::default(),
+                properties: Default::default(),
+                origin_time: Timestamp(0),
+                quantum_time: Default::default(),
+            },
+            integrity_zomes: Default::default(),
+            coordinator_zomes: Default::default(),
+        };
+        let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
+        let empty_ribosome = RealRibosome::new(empty_dna_file)?;
+        let context_key = RealRibosome::next_context_key();
+        let imports = empty_ribosome.imports(
+            context_key,
+            &Store::new(&Universal::new(Cranelift::default()).engine()),
+        );
+        let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
+        imports.sort();
+        Ok(imports)
+    }
+
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
-        let env = Env::default();
+        let db = Env::default();
         let mut imports = imports! {};
         let mut ns = Exports::new();
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
         let ribosome_arc = std::sync::Arc::new((*self).clone());
 
-        // standard memory handling used by the holochain_wasmer guest and host macros
-        ns.insert(
-            "__import_data",
-            Function::new_native_with_env(
-                store,
-                env.clone(),
-                holochain_wasmer_host::import::__import_data,
-            ),
-        );
-
         let host_fn_builder = HostFnBuilder {
             store: store.clone(),
-            env,
+            db,
             ribosome_arc,
             context_key,
         };
 
         host_fn_builder
-            .with_host_function(&mut ns, "__trace", trace)
-            .with_host_function(&mut ns, "__hash", hash)
-            .with_host_function(&mut ns, "__version", version)
-            .with_host_function(&mut ns, "__verify_signature", verify_signature)
-            .with_host_function(&mut ns, "__sign", sign)
-            .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
-            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_encrypt",
+                "__hc__accept_countersigning_preflight_request_1",
+                accept_countersigning_preflight_request,
+            )
+            .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
+            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, "__hc__trace_1", trace)
+            .with_host_function(&mut ns, "__hc__hash_1", hash)
+            .with_host_function(&mut ns, "__hc__version_1", version)
+            .with_host_function(&mut ns, "__hc__verify_signature_1", verify_signature)
+            .with_host_function(&mut ns, "__hc__sign_1", sign)
+            .with_host_function(&mut ns, "__hc__sign_ephemeral_1", sign_ephemeral)
+            .with_host_function(
+                &mut ns,
+                "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
+                x_salsa20_poly1305_shared_secret_create_random,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__x_salsa20_poly1305_shared_secret_export_1",
+                x_salsa20_poly1305_shared_secret_export,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
+                x_salsa20_poly1305_shared_secret_ingest,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__x_salsa20_poly1305_encrypt_1",
                 x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_decrypt",
+                "__hc__x_salsa20_poly1305_decrypt_1",
                 x_salsa20_poly1305_decrypt,
             )
             .with_host_function(
                 &mut ns,
-                "__x_25519_x_salsa20_poly1305_encrypt",
+                "__hc__create_x25519_keypair_1",
+                create_x25519_keypair,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
                 x_25519_x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
-                "__x_25519_x_salsa20_poly1305_decrypt",
+                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
                 x_25519_x_salsa20_poly1305_decrypt,
             )
-            .with_host_function(&mut ns, "__zome_info", zome_info)
-            .with_host_function(&mut ns, "__dna_info", dna_info)
-            .with_host_function(&mut ns, "__call_info", call_info)
-            .with_host_function(&mut ns, "__random_bytes", random_bytes)
-            .with_host_function(&mut ns, "__sys_time", sys_time)
-            .with_host_function(&mut ns, "__sleep", sleep)
-            .with_host_function(&mut ns, "__agent_info", agent_info)
-            .with_host_function(&mut ns, "__capability_claims", capability_claims)
-            .with_host_function(&mut ns, "__capability_grants", capability_grants)
-            .with_host_function(&mut ns, "__capability_info", capability_info)
-            .with_host_function(&mut ns, "__get", get)
-            .with_host_function(&mut ns, "__get_details", get_details)
-            .with_host_function(&mut ns, "__get_links", get_links)
-            .with_host_function(&mut ns, "__get_link_details", get_link_details)
-            .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
-            .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
-            .with_host_function(&mut ns, "__must_get_header", must_get_header)
-            .with_host_function(&mut ns, "__must_get_valid_element", must_get_valid_element)
+            .with_host_function(&mut ns, "__hc__zome_info_1", zome_info)
+            .with_host_function(&mut ns, "__hc__dna_info_1", dna_info_1)
+            .with_host_function(&mut ns, "__hc__dna_info_2", dna_info_2)
+            .with_host_function(&mut ns, "__hc__call_info_1", call_info)
+            .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
+            .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
+            .with_host_function(&mut ns, "__hc__sleep_1", sleep)
+            .with_host_function(&mut ns, "__hc__capability_claims_1", capability_claims)
+            .with_host_function(&mut ns, "__hc__capability_grants_1", capability_grants)
+            .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
+            .with_host_function(&mut ns, "__hc__get_1", get)
+            .with_host_function(&mut ns, "__hc__get_details_1", get_details)
+            .with_host_function(&mut ns, "__hc__get_links_1", get_links)
+            .with_host_function(&mut ns, "__hc__get_link_details_1", get_link_details)
+            .with_host_function(&mut ns, "__hc__count_links_1", count_links)
+            .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
+            .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
+            .with_host_function(&mut ns, "__hc__must_get_action_1", must_get_action)
             .with_host_function(
                 &mut ns,
-                "__accept_countersigning_preflight_request",
-                accept_countersigning_preflight_request,
+                "__hc__must_get_valid_record_1",
+                must_get_valid_record,
             )
-            .with_host_function(&mut ns, "__query", query)
-            .with_host_function(&mut ns, "__remote_signal", remote_signal)
-            .with_host_function(&mut ns, "__call", call)
-            .with_host_function(&mut ns, "__create", create)
-            .with_host_function(&mut ns, "__emit_signal", emit_signal)
-            .with_host_function(&mut ns, "__create_link", create_link)
-            .with_host_function(&mut ns, "__delete_link", delete_link)
-            .with_host_function(&mut ns, "__update", update)
-            .with_host_function(&mut ns, "__delete", delete)
-            .with_host_function(&mut ns, "__schedule", schedule);
+            .with_host_function(
+                &mut ns,
+                "__hc__must_get_agent_activity_1",
+                must_get_agent_activity,
+            )
+            .with_host_function(&mut ns, "__hc__query_1", query)
+            .with_host_function(&mut ns, "__hc__remote_signal_1", remote_signal)
+            .with_host_function(&mut ns, "__hc__call_1", call)
+            .with_host_function(&mut ns, "__hc__create_1", create)
+            .with_host_function(&mut ns, "__hc__emit_signal_1", emit_signal)
+            .with_host_function(&mut ns, "__hc__create_link_1", create_link)
+            .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
+            .with_host_function(&mut ns, "__hc__update_1", update)
+            .with_host_function(&mut ns, "__hc__delete_1", delete)
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
 
         imports.register("env", ns);
 
         imports
     }
+
+    pub fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeIndex]> {
+        Ok(self
+            .zome_dependencies
+            .get(zome_name)
+            .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
+    }
+
+    pub fn do_wasm_call_for_module<I: Invocation>(
+        &self,
+        call_context: CallContext,
+        invocation: &I,
+        zome: &Zome,
+        to_call: &FunctionName,
+        module: Arc<Module>,
+    ) -> Result<Option<ExternIO>, RibosomeError> {
+        if module.info().exports.contains_key(to_call.as_ref()) {
+            // there is a callback to_call and it is implemented in the wasm
+            // it is important to fully instantiate this (e.g. don't try to use the module above)
+            // because it builds guards against memory leaks and handles imports correctly
+            let (instance, context_key) = self.instance(call_context)?;
+
+            let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
+                instance.clone(),
+                to_call.as_ref(),
+                // be aware of this clone!
+                // the whole invocation is cloned!
+                // @todo - is this a problem for large payloads like entries?
+                invocation.to_owned().host_input()?,
+            );
+
+            // a bit of typefu to avoid cloning the result.
+            let (can_cache, result) = match result {
+                Err(runtime_error) => {
+                    // This will bubble up and be logged later but capture zome/function that was called while the context is available
+                    tracing::error!(?runtime_error, ?zome, ?to_call);
+                    match runtime_error.downcast::<WasmError>() {
+                        Ok(wasm_error) => {
+                            (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
+                        }
+                        Err(result) => (false, Err(result)),
+                    }
+                }
+                result => (true, result),
+            };
+
+            // Cache this instance.
+            if can_cache {
+                self.cache_instance(context_key, instance, zome.zome_name())?;
+            }
+
+            Ok(Some(result?))
+        } else {
+            // the func doesn't exist
+            // the callback is not implemented
+            Ok(None)
+        }
+    }
+
+    pub fn get_const_fn_for_wasm(
+        &self,
+        call_context: CallContext,
+        name: &str,
+        module: Arc<Module>,
+    ) -> Result<Option<i32>, RibosomeError> {
+        // Check if the wasm has a function that matches this type.
+        if module.exports().functions().any(|f| {
+            f.name() == name && f.ty().params().is_empty() && f.ty().results() == [Type::I32]
+        }) {
+            let (instance, context_key) = self.instance(call_context)?;
+
+            // Call the function as a native function.
+            let result = instance
+                .lock()
+                .exports
+                .get_native_function::<(), i32>(name)
+                .ok()
+                .map_or(Ok(None), |func| Ok(Some(func.call()?)))
+                .map_err(|e: RuntimeError| {
+                    RibosomeError::WasmRuntimeError(
+                        wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                    )
+                })?;
+
+            // Remove the blank context.
+            CONTEXT_MAP.lock().remove(&context_key);
+
+            Ok(result)
+        } else {
+            // the func doesn't exist
+            // the callback is not implemented
+            Ok(None)
+        }
+    }
+
+    pub fn get_extern_fns_for_wasm(&self, module: Arc<Module>) -> Vec<FunctionName> {
+        let mut extern_fns: Vec<FunctionName> = module
+            .info()
+            .exports
+            .iter()
+            .filter(|(name, _)| {
+                name.as_str() != "__num_entry_types" && name.as_str() != "__num_link_types"
+            })
+            .map(|(name, _index)| FunctionName::new(name))
+            .collect();
+        extern_fns.sort();
+        extern_fns
+    }
 }
 
 /// General purpose macro which relies heavily on various impls of the form:
-/// From<Vec<(ZomeName, $callback_result)>> for ValidationPackageResult
+/// From<Vec<(ZomeName, $callback_result)>> for ValidationResult
 macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
@@ -448,10 +769,16 @@ macro_rules! do_callback {
         loop {
             let (zome_name, callback_result): (ZomeName, $callback_result) =
                 match call_iterator.next() {
-                    Ok(Some((zome, extern_io))) => (zome.into(), extern_io.decode()?),
-                    Err((zome, RibosomeError::WasmError(wasm_error))) => (
+                    Ok(Some((zome, extern_io))) => (
                         zome.into(),
-                        <$callback_result>::try_from_wasm_error(wasm_error)?,
+                        extern_io
+                            .decode()
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
+                    ),
+                    Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
+                        zome.into(),
+                        <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
+                            .map_err(|e| -> RuntimeError { e.into() })?,
                     ),
                     Err((_zome, other_error)) => return Err(other_error),
                     Ok(None) => break,
@@ -468,52 +795,84 @@ macro_rules! do_callback {
     }};
 }
 
+impl RealRibosome {
+    fn run_genesis_self_check_v1(
+        &self,
+        host_access: GenesisSelfCheckHostAccessV1,
+        invocation: GenesisSelfCheckInvocationV1,
+    ) -> RibosomeResult<GenesisSelfCheckResultV1> {
+        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+
+    fn run_genesis_self_check_v2(
+        &self,
+        host_access: GenesisSelfCheckHostAccessV2,
+        invocation: GenesisSelfCheckInvocationV2,
+    ) -> RibosomeResult<GenesisSelfCheckResultV1> {
+        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+}
+
 impl RibosomeT for RealRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
     }
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
+        // Get the dependencies for this zome.
+        let zome_dependencies = self.get_zome_dependencies(zome.zome_name())?;
+        // Scope the zome types to these dependencies.
+        let zome_types = self.zome_types.in_scope_subset(zome_dependencies);
+
         Ok(ZomeInfo {
             name: zome.zome_name().clone(),
             id: self
-                .zome_to_id(&zome)
+                .zome_name_to_id(zome.zome_name())
                 .expect("Failed to get ID for current zome"),
             properties: SerializedBytes::default(),
             entry_defs: {
                 match self
                     .run_entry_defs(EntryDefsHostAccess, EntryDefsInvocation)
-                    .map_err(|e| WasmError::Host(e.to_string()))?
-                {
+                    .map_err(|e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                    })? {
                     EntryDefsResult::Err(zome, error_string) => {
-                        return Err(RibosomeError::WasmError(WasmError::Host(format!(
-                            "{}: {}",
-                            zome, error_string
-                        ))))
+                        return Err(RibosomeError::WasmRuntimeError(
+                            wasm_error!(WasmErrorInner::Host(format!(
+                                "{}: {}",
+                                zome, error_string
+                            )))
+                            .into(),
+                        ))
                     }
-                    EntryDefsResult::Defs(defs) => match defs.get(zome.zome_name()) {
-                        Some(entry_defs) => entry_defs.clone(),
-                        None => Vec::new().into(),
-                    },
+                    EntryDefsResult::Defs(defs) => {
+                        let vec = zome_dependencies
+                            .iter()
+                            .filter_map(|zome_index| {
+                                self.dna_def().integrity_zomes.get(zome_index.0 as usize)
+                            })
+                            .flat_map(|(zome_name, _)| {
+                                defs.get(zome_name).map(|e| e.0.clone()).unwrap_or_default()
+                            })
+                            .collect::<Vec<_>>();
+                        vec.into()
+                    }
                 }
             },
             extern_fns: {
                 match zome.zome_def() {
-                    ZomeDef::Wasm(_) => {
-                        let module = self.module(zome.zome_name())?;
-
-                        let mut extern_fns: Vec<FunctionName> = module
-                            .info()
-                            .exports
-                            .iter()
-                            .map(|(name, _index)| FunctionName::new(name))
-                            .collect();
-                        extern_fns.sort();
-                        extern_fns
+                    ZomeDef::Wasm(wasm_zome) => {
+                        let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                            self.precompiled_module(path)?
+                        } else {
+                            self.runtime_compiled_module(zome.zome_name())?
+                        };
+                        self.get_extern_fns_for_wasm(module)
                     }
-                    ZomeDef::Inline(zome) => zome.callbacks(),
+                    ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
                 }
             },
+            zome_types,
         })
     }
 
@@ -534,40 +893,46 @@ impl RibosomeT for RealRibosome {
         };
 
         match zome.zome_def() {
-            ZomeDef::Wasm(_) => {
-                let module = self.module(zome.zome_name())?;
-
-                if module.info().exports.contains_key(to_call.as_ref()) {
-                    // there is a callback to_call and it is implemented in the wasm
-                    // it is important to fully instantiate this (e.g. don't try to use the module above)
-                    // because it builds guards against memory leaks and handles imports correctly
-                    let (instance, context_key) = self.instance(call_context)?;
-
-                    let result: Result<ExternIO, WasmError> = holochain_wasmer_host::guest::call(
-                        instance.clone(),
-                        to_call.as_ref(),
-                        // be aware of this clone!
-                        // the whole invocation is cloned!
-                        // @todo - is this a problem for large payloads like entries?
-                        invocation.to_owned().host_input()?,
-                    );
-
-                    // Cache this instance.
-                    self.cache_instance(context_key, instance, zome.zome_name())?;
-
-                    Ok(Some(result?))
+            ZomeDef::Wasm(wasm_zome) => {
+                let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                    self.precompiled_module(path)?
                 } else {
-                    // the func doesn't exist
-                    // the callback is not implemented
-                    Ok(None)
-                }
+                    self.runtime_compiled_module(zome.zome_name())?
+                };
+                self.do_wasm_call_for_module::<I>(call_context, invocation, zome, to_call, module)
             }
-            ZomeDef::Inline(zome) => {
+            ZomeDef::Inline {
+                inline_zome: zome, ..
+            } => {
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                let result = zome.maybe_call(Box::new(api), to_call, input)?;
+                let result = zome.0.maybe_call(Box::new(api), to_call, input)?;
                 Ok(result)
             }
+        }
+    }
+
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
+        // Create a blank context as this is not actually used.
+        let call_context = CallContext {
+            zome: zome.clone(),
+            function_name: name.into(),
+            host_context: HostContext::EntryDefs(EntryDefsHostAccess {}),
+            auth: super::InvocationAuth::LocalCallback,
+        };
+
+        match zome.zome_def() {
+            ZomeDef::Wasm(wasm_zome) => {
+                let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                    self.precompiled_module(path)?
+                } else {
+                    self.runtime_compiled_module(zome.zome_name())?
+                };
+                self.get_const_fn_for_wasm(call_context, name, module)
+            }
+            ZomeDef::Inline {
+                inline_zome: zome, ..
+            } => Ok(zome.0.get_global(name).map(|i| i as i32)),
         }
     }
 
@@ -619,7 +984,20 @@ impl RibosomeT for RealRibosome {
         host_access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult> {
-        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+        let (invocation_v1, invocation_v2): (
+            GenesisSelfCheckInvocationV1,
+            GenesisSelfCheckInvocationV2,
+        ) = invocation.into();
+        let (host_access_v1, host_access_v2): (
+            GenesisSelfCheckHostAccessV1,
+            GenesisSelfCheckHostAccessV2,
+        ) = host_access.into();
+        match self.run_genesis_self_check_v1(host_access_v1, invocation_v1) {
+            Ok(GenesisSelfCheckResultV1::Valid) => Ok(self
+                .run_genesis_self_check_v2(host_access_v2, invocation_v2)?
+                .into()),
+            result => Ok(result?.into()),
+        }
     }
 
     fn run_validate(
@@ -628,14 +1006,6 @@ impl RibosomeT for RealRibosome {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
-    }
-
-    fn run_validate_link<I: Invocation + 'static>(
-        &self,
-        host_access: ValidateLinkHostAccess,
-        invocation: ValidateLinkInvocation<I>,
-    ) -> RibosomeResult<ValidateLinkResult> {
-        do_callback!(self, host_access, invocation, ValidateLinkCallbackResult)
     }
 
     fn run_init(
@@ -662,51 +1032,57 @@ impl RibosomeT for RealRibosome {
         do_callback!(self, host_access, invocation, MigrateAgentCallbackResult)
     }
 
-    fn run_validation_package(
-        &self,
-        host_access: ValidationPackageHostAccess,
-        invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackageResult> {
-        do_callback!(
-            self,
-            host_access,
-            invocation,
-            ValidationPackageCallbackResult
-        )
+    fn zome_types(&self) -> &Arc<GlobalZomeTypes> {
+        &self.zome_types
+    }
+
+    fn dna_hash(&self) -> &DnaHash {
+        self.dna_file.dna_hash()
+    }
+
+    fn dna_file(&self) -> &DnaFile {
+        &self.dna_file
+    }
+
+    fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome> {
+        self.dna_file
+            .dna_def()
+            .integrity_zomes
+            .get(zome_index.0 as usize)
+            .cloned()
+            .map(|(name, def)| IntegrityZome::new(name, def))
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern])
-            .await
-            .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey],
-                &[dna_file.into()],
-            )
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
             .await
             .unwrap();
 
@@ -721,16 +1097,28 @@ pub mod wasm_test {
 
         assert_eq!("foobar", &bar_result);
 
+        let now = Timestamp::now();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         let infallible_result = conductor
-            .handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "infallible".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .raw_handle()
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "infallible".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await
             .unwrap()
             .unwrap();
@@ -740,5 +1128,93 @@ pub mod wasm_test {
         } else {
             unreachable!();
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn wasm_tooling_test() {
+        holochain_trace::test_run().ok();
+
+        assert_eq!(
+            vec![
+                "__hc__accept_countersigning_preflight_request_1",
+                "__hc__agent_info_1",
+                "__hc__block_agent_1",
+                "__hc__call_1",
+                "__hc__call_info_1",
+                "__hc__capability_claims_1",
+                "__hc__capability_grants_1",
+                "__hc__capability_info_1",
+                "__hc__count_links_1",
+                "__hc__create_1",
+                "__hc__create_link_1",
+                "__hc__create_x25519_keypair_1",
+                "__hc__delete_1",
+                "__hc__delete_link_1",
+                "__hc__dna_info_1",
+                "__hc__dna_info_2",
+                "__hc__emit_signal_1",
+                "__hc__get_1",
+                "__hc__get_agent_activity_1",
+                "__hc__get_details_1",
+                "__hc__get_link_details_1",
+                "__hc__get_links_1",
+                "__hc__hash_1",
+                "__hc__must_get_action_1",
+                "__hc__must_get_agent_activity_1",
+                "__hc__must_get_entry_1",
+                "__hc__must_get_valid_record_1",
+                "__hc__query_1",
+                "__hc__random_bytes_1",
+                "__hc__remote_signal_1",
+                "__hc__schedule_1",
+                "__hc__sign_1",
+                "__hc__sign_ephemeral_1",
+                "__hc__sleep_1",
+                "__hc__sys_time_1",
+                "__hc__trace_1",
+                "__hc__unblock_agent_1",
+                "__hc__update_1",
+                "__hc__verify_signature_1",
+                "__hc__version_1",
+                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
+                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
+                "__hc__x_salsa20_poly1305_decrypt_1",
+                "__hc__x_salsa20_poly1305_encrypt_1",
+                "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
+                "__hc__x_salsa20_poly1305_shared_secret_export_1",
+                "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
+                "__hc__zome_info_1"
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>(),
+            super::RealRibosome::tooling_imports().await.unwrap()
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_incredible_halt_test() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
+
+        // This will run infinitely until our metering kicks in and traps it.
+        // Also we stop it running after 10 seconds.
+        let result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_secs(60),
+            conductor.call_fallible(&alice, "smash", ()),
+        )
+        .await;
+        assert!(result.unwrap().is_err());
+
+        // The same thing will happen when we commit an entry due to a loop in
+        // the validation logic.
+        let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
+            std::time::Duration::from_secs(60),
+            conductor.call_fallible(&alice, "create_a_thing", ()),
+        )
+        .await;
+        assert!(create_result.unwrap().is_err());
     }
 }

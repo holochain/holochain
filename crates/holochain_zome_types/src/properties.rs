@@ -3,7 +3,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 
-/// A type to allow json values to be used as [SerializedBytes]
+/// A type to allow json values to be used as [`derive@SerializedBytes`]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct YamlProperties(serde_yaml::Value);
 
@@ -43,7 +43,7 @@ impl Default for YamlProperties {
 }
 
 /// Not a great implementation: always returns null
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
     fn arbitrary(_: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(serde_yaml::Value::Null.into())

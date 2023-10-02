@@ -5,9 +5,8 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
+    pub use ::holochain_trace;
     pub use ::lair_keystore_api;
-    pub use ::lair_keystore_api_0_0;
-    pub use ::observability;
     pub use ::paste;
     pub use ::rustls;
     pub use ::serde;
@@ -47,21 +46,60 @@ pub fn unit_ok_fut<E1, E2>() -> Result<MustBoxFuture<'static, Result<(), E2>>, E
     Ok(async move { Ok(()) }.boxed().into())
 }
 
-/// Helper function for the common case of returning this nested Unit type.
+/// Helper function for the common case of returning this boxed future type.
 pub fn ok_fut<E1, R: Send + 'static>(result: R) -> Result<MustBoxFuture<'static, R>, E1> {
     use futures::FutureExt;
     Ok(async move { result }.boxed().into())
 }
 
+/// Helper function for the common case of returning this boxed future type.
+pub fn box_fut_plain<'a, R: Send + 'a>(result: R) -> BoxFuture<'a, R> {
+    use futures::FutureExt;
+    async move { result }.boxed()
+}
+
+/// Helper function for the common case of returning this boxed future type.
+pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
+    box_fut_plain(result).into()
+}
+
 use ::ghost_actor::dependencies::tracing;
+use futures::future::BoxFuture;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
-pub use ::lair_keystore_api_0_0::actor::CertDigest;
+/// 32 byte binary TLS certificate digest.
+pub type CertDigest = lair_keystore_api::encoding_types::BinDataSized<32>;
+
+/// Extension trait for working with CertDigests.
+pub trait CertDigestExt {
+    /// Construct from a slice. Panicks if `slice.len() != 32`.
+    fn from_slice(slice: &[u8]) -> Self;
+}
+
+impl CertDigestExt for CertDigest {
+    fn from_slice(slice: &[u8]) -> Self {
+        let mut out = [0; 32];
+        out.copy_from_slice(slice);
+        out.into()
+    }
+}
 
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
+
+impl From<Tx2Cert> for Arc<[u8; 32]> {
+    fn from(f: Tx2Cert) -> Self {
+        f.0 .0 .0.clone()
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self::from(u.bytes(32)?.to_vec()))
+    }
+}
 
 impl Tx2Cert {
     /// get the tls cert digest
@@ -136,7 +174,7 @@ impl std::convert::AsRef<CertDigest> for Tx2Cert {
 
 impl std::convert::AsRef<[u8]> for Tx2Cert {
     fn as_ref(&self) -> &[u8] {
-        &self.0 .0
+        &*self.0 .0
     }
 }
 
@@ -148,21 +186,19 @@ impl std::convert::AsRef<str> for Tx2Cert {
 
 impl From<Vec<u8>> for Tx2Cert {
     fn from(v: Vec<u8>) -> Self {
-        let d: CertDigest = v.into();
-        d.into()
+        Arc::new(v).into()
     }
 }
 
 impl From<Arc<Vec<u8>>> for Tx2Cert {
     fn from(v: Arc<Vec<u8>>) -> Self {
-        let d: CertDigest = v.into();
-        d.into()
+        CertDigest::from_slice(&v).into()
     }
 }
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(&**c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(*c);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -190,6 +226,7 @@ impl From<&Tx2Cert> for CertDigest {
     }
 }
 
+use base64::Engine;
 use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
@@ -203,11 +240,15 @@ pub enum KitsuneErrorKind {
 
     /// The operation timed out.
     #[error("Operation timed out")]
-    TimedOut,
+    TimedOut(String),
 
     /// This object is closed, calls on it are invalid.
     #[error("This object is closed, calls on it are invalid.")]
     Closed,
+
+    /// The operation is unauthorized by the host.
+    #[error("Unauthorized")]
+    Unauthorized,
 
     /// Unspecified error.
     #[error(transparent)]
@@ -216,20 +257,12 @@ pub enum KitsuneErrorKind {
 
 impl PartialEq for KitsuneErrorKind {
     fn eq(&self, oth: &Self) -> bool {
-        match self {
-            Self::TimedOut => {
-                if let Self::TimedOut = oth {
-                    return true;
-                }
-            }
-            Self::Closed => {
-                if let Self::Closed = oth {
-                    return true;
-                }
-            }
-            _ => (),
+        #[allow(clippy::match_like_matches_macro)]
+        match (self, oth) {
+            (Self::TimedOut(a), Self::TimedOut(b)) => a == b,
+            (Self::Closed, Self::Closed) => true,
+            _ => false,
         }
-        false
     }
 }
 
@@ -301,24 +334,32 @@ pub use timeout::*;
 
 pub mod agent_info;
 pub mod async_lazy;
-mod auto_stream_select;
-pub use auto_stream_select::*;
-pub mod bin_types;
 pub mod bootstrap;
 pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
 pub mod metrics;
-pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
-pub mod transport;
-pub mod transport_mem;
-pub mod transport_pool;
+pub use kitsune_p2p_bin_data as bin_types;
+
+#[cfg(feature = "tx2")]
 pub mod tx2;
 
+pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
+
+/// KitsuneAgent in an Arc
+pub type KAgent = Arc<bin_types::KitsuneAgent>;
+/// KitsuneBasis in an Arc
+pub type KBasis = Arc<bin_types::KitsuneBasis>;
+/// KitsuneOpHash in an Arc
+pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
+/// KitsuneSpace in an Arc
+pub type KSpace = Arc<bin_types::KitsuneSpace>;
+/// KitsuneOpData in an Arc
+pub type KOpData = Arc<bin_types::KitsuneOpData>;
 
 use metrics::metric_task;
 
@@ -327,6 +368,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "tx2")]
     async fn test_tx2_digest() {
         let d: Tx2Cert = vec![0xdb; 32].into();
         println!("raw_debug: {:?}", d);

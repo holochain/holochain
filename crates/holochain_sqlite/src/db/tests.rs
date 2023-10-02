@@ -1,8 +1,9 @@
 use tempfile::TempDir;
 
-use crate::prelude::DatabaseResult;
+use crate::prelude::{DatabaseResult, DbKindWasm};
 
-use super::{num_read_threads, DbKind, DbWrite};
+use super::pool::num_read_threads;
+use super::DbWrite;
 
 /// This test does prove that making all transactions
 /// synchronous fixes the db timeout issue but it's slow
@@ -10,15 +11,15 @@ use super::{num_read_threads, DbKind, DbWrite};
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "This is too slow for CI as it has to wait for the timeouts"]
 async fn db_connection_doesnt_timeout() {
-    let td = TempDir::new("lots_of_dbs").unwrap();
-    let db = DbWrite::test(&td, DbKind::Wasm).unwrap();
+    let td = TempDir::new().unwrap();
+    let db = DbWrite::test(td.path(), DbKindWasm).unwrap();
     let num_readers = num_read_threads() * 2;
     let mut jhs = Vec::new();
 
     for _ in 0..num_readers {
         let db = db.clone();
         let jh = tokio::spawn(async move {
-            db.async_reader(|txn| {
+            db.read_async(|txn| {
                 let _c: usize = txn
                     .query_row("SELECT COUNT(rowid) FROM Wasm", [], |row| row.get(0))
                     .unwrap();
@@ -37,7 +38,7 @@ async fn db_connection_doesnt_timeout() {
     for _ in 0..2 {
         let db = db.clone();
         let jh = tokio::spawn(async move {
-            db.async_commit(|txn| {
+            db.write_async(|txn| {
                 txn.execute(
                     "INSERT INTO Wasm (hash, blob) VALUES(?, ?)",
                     [vec![0], vec![0]],
@@ -67,7 +68,7 @@ async fn db_connection_doesnt_timeout() {
     for _ in 0..num_readers {
         let db = db.clone();
         let jh = tokio::spawn(async move {
-            db.async_reader(|txn| {
+            db.write_async(|txn| {
                 let _c: usize = txn
                     .query_row("SELECT COUNT(rowid) FROM Wasm", [], |row| row.get(0))
                     .unwrap();
@@ -86,19 +87,17 @@ async fn db_connection_doesnt_timeout() {
     for _ in 0..num_readers {
         let db = db.clone();
         let jh = tokio::spawn(async move {
-            db.conn()
-                .unwrap()
-                .with_reader_test(|txn| {
-                    let _c: usize = txn
-                        .query_row("SELECT COUNT(rowid) FROM Wasm", [], |row| row.get(0))
-                        .unwrap();
-                    std::thread::sleep(std::time::Duration::from_secs(40));
-                    let _c: usize = txn
-                        .query_row("SELECT COUNT(rowid) FROM Wasm", [], |row| row.get(0))
-                        .unwrap();
-                    DatabaseResult::Ok(())
-                })
-                .unwrap();
+            db.test_read(|txn| {
+                let _c: usize = txn
+                    .query_row("SELECT COUNT(rowid) FROM Wasm", [], |row| row.get(0))
+                    .unwrap();
+                std::thread::sleep(std::time::Duration::from_secs(40));
+                let _c: usize = txn
+                    .query_row("SELECT COUNT(rowid) FROM Wasm", [], |row| row.get(0))
+                    .unwrap();
+                DatabaseResult::Ok(())
+            })
+            .unwrap();
         });
         jhs.push(jh)
     }
@@ -106,7 +105,7 @@ async fn db_connection_doesnt_timeout() {
     for _ in 0..2 {
         let db = db.clone();
         let jh = tokio::spawn(async move {
-            db.async_commit(|txn| {
+            db.write_async(|txn| {
                 txn.execute(
                     "INSERT INTO Wasm (hash, blob) VALUES(?, ?)",
                     [vec![0], vec![0]],

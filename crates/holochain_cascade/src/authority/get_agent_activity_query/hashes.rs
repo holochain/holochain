@@ -28,32 +28,32 @@ impl GetAgentActivityQuery {
 
 #[derive(Debug, Default)]
 pub struct State {
-    valid: Vec<HeaderHashed>,
-    rejected: Vec<HeaderHashed>,
-    pending: Vec<HeaderHashed>,
+    valid: Vec<ActionHashed>,
+    rejected: Vec<ActionHashed>,
+    pending: Vec<ActionHashed>,
     status: Option<ChainStatus>,
 }
 
 #[derive(Debug)]
 pub enum Item {
-    Integrated(HeaderHashed),
-    Pending(HeaderHashed),
+    Integrated(ActionHashed),
+    Pending(ActionHashed),
 }
 
 impl Query for GetAgentActivityQuery {
     type Item = Judged<Item>;
     type State = State;
-    type Output = AgentActivityResponse<HeaderHash>;
+    type Output = AgentActivityResponse<ActionHash>;
 
     fn query(&self) -> String {
         "
-            SELECT Header.hash, DhtOp.validation_status, Header.blob AS header_blob,
+            SELECT Action.hash, DhtOp.validation_status, Action.blob AS action_blob,
             DhtOp.when_integrated
-            FROM Header
-            JOIN DhtOp ON DhtOp.header_hash = Header.hash
-            WHERE Header.author = :author
+            FROM Action
+            JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            WHERE Action.author = :author
             AND DhtOp.type = :op_type
-            ORDER BY Header.seq ASC
+            ORDER BY Action.seq ASC
         "
         .to_string()
     }
@@ -77,14 +77,14 @@ impl Query for GetAgentActivityQuery {
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
         Arc::new(move |row| {
             let validation_status: Option<ValidationStatus> = row.get("validation_status")?;
-            let hash: HeaderHash = row.get("hash")?;
-            from_blob::<SignedHeader>(row.get("header_blob")?).and_then(|header| {
+            let hash: ActionHash = row.get("hash")?;
+            from_blob::<SignedAction>(row.get("action_blob")?).and_then(|action| {
                 let integrated: Option<Timestamp> = row.get("when_integrated")?;
-                let header = HeaderHashed::with_pre_hashed(header.0, hash);
+                let action = ActionHashed::with_pre_hashed(action.0, hash);
                 let item = if integrated.is_some() {
-                    Item::Integrated(header)
+                    Item::Integrated(action)
                 } else {
-                    Item::Pending(header)
+                    Item::Pending(action)
                 };
                 Ok(Judged::raw(item, validation_status))
             })
@@ -94,11 +94,11 @@ impl Query for GetAgentActivityQuery {
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let status = item.validation_status();
         match (status, item.data) {
-            (Some(ValidationStatus::Valid), Item::Integrated(header)) => {
-                let seq = header.header_seq();
+            (Some(ValidationStatus::Valid), Item::Integrated(action)) => {
+                let seq = action.action_seq();
                 if state.status.is_none() {
                     let fork = state.valid.last().and_then(|v| {
-                        if seq == v.header_seq() {
+                        if seq == v.action_seq() {
                             Some(v)
                         } else {
                             None
@@ -107,22 +107,22 @@ impl Query for GetAgentActivityQuery {
                     if let Some(fork) = fork {
                         state.status = Some(ChainStatus::Forked(ChainFork {
                             fork_seq: seq,
-                            first_header: header.as_hash().clone(),
-                            second_header: fork.as_hash().clone(),
+                            first_action: action.get_hash().clone(),
+                            second_action: fork.get_hash().clone(),
                         }));
                     }
                 }
 
-                state.valid.push(header);
+                state.valid.push(action);
             }
-            (Some(ValidationStatus::Rejected), Item::Integrated(header)) => {
+            (Some(ValidationStatus::Rejected), Item::Integrated(action)) => {
                 if state.status.is_none() {
                     state.status = Some(ChainStatus::Invalid(ChainHead {
-                        header_seq: header.header_seq(),
-                        hash: header.as_hash().clone(),
+                        action_seq: action.action_seq(),
+                        hash: action.get_hash().clone(),
                     }));
                 }
-                state.rejected.push(header);
+                state.rejected.push(action);
             }
             (_, Item::Pending(data)) => state.pending.push(data),
             _ => (),
@@ -142,9 +142,9 @@ impl Query for GetAgentActivityQuery {
         let valid_activity = if self.options.include_valid_activity {
             let valid = self
                 .filter
-                .filter_headers(valid)
+                .filter_actions(valid)
                 .into_iter()
-                .map(|h| (h.header_seq(), h.into_hash()))
+                .map(|h| (h.action_seq(), h.into_hash()))
                 .collect();
             ChainItems::Hashes(valid)
         } else {
@@ -153,9 +153,9 @@ impl Query for GetAgentActivityQuery {
         let rejected_activity = if self.options.include_rejected_activity {
             let rejected = self
                 .filter
-                .filter_headers(rejected)
+                .filter_actions(rejected)
                 .into_iter()
-                .map(|h| (h.header_seq(), h.into_hash()))
+                .map(|h| (h.action_seq(), h.into_hash()))
                 .collect();
             ChainItems::Hashes(rejected)
         } else {
@@ -179,8 +179,8 @@ fn compute_chain_status(state: &State) -> ChainStatus {
         } else {
             let last = state.valid.last().expect("Safe due to is_empty check");
             ChainStatus::Valid(ChainHead {
-                header_seq: last.header_seq(),
-                hash: last.as_hash().clone(),
+                action_seq: last.action_seq(),
+                hash: last.get_hash().clone(),
             })
         }
     })
@@ -189,7 +189,7 @@ fn compute_chain_status(state: &State) -> ChainStatus {
 fn compute_highest_observed(state: &State) -> Option<HighestObserved> {
     let mut highest_observed = None;
     let mut hashes = Vec::new();
-    let mut check_highest = |seq: u32, hash: &HeaderHash| {
+    let mut check_highest = |seq: u32, hash: &ActionHash| {
         if highest_observed.is_none() {
             highest_observed = Some(seq);
             hashes.push(hash.clone());
@@ -209,16 +209,16 @@ fn compute_highest_observed(state: &State) -> Option<HighestObserved> {
         }
     };
     if let Some(valid) = state.valid.last() {
-        check_highest(valid.header_seq(), valid.as_hash());
+        check_highest(valid.action_seq(), valid.get_hash());
     }
     if let Some(rejected) = state.rejected.last() {
-        check_highest(rejected.header_seq(), rejected.as_hash());
+        check_highest(rejected.action_seq(), rejected.get_hash());
     }
     if let Some(pending) = state.pending.last() {
-        check_highest(pending.header_seq(), pending.as_hash());
+        check_highest(pending.action_seq(), pending.get_hash());
     }
-    highest_observed.map(|header_seq| HighestObserved {
-        header_seq,
+    highest_observed.map(|action_seq| HighestObserved {
+        action_seq,
         hash: hashes,
     })
 }

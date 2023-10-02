@@ -82,9 +82,9 @@ impl KitsuneTimeout {
     }
 
     /// `Ok(())` if not expired, `Err(KitsuneError::TimedOut)` if expired.
-    pub fn ok(&self) -> KitsuneResult<()> {
+    pub fn ok(&self, ctx: &str) -> KitsuneResult<()> {
         if self.is_expired() {
-            Err(KitsuneErrorKind::TimedOut.into())
+            Err(KitsuneErrorKind::TimedOut(ctx.into()).into())
         } else {
             Ok(())
         }
@@ -93,6 +93,7 @@ impl KitsuneTimeout {
     /// Wrap a future with one that will timeout when this timeout expires.
     pub fn mix<'a, 'b, R, F>(
         &'a self,
+        ctx: &str,
         f: F,
     ) -> impl std::future::Future<Output = KitsuneResult<R>> + 'b + Send
     where
@@ -100,10 +101,11 @@ impl KitsuneTimeout {
         F: std::future::Future<Output = KitsuneResult<R>> + 'b + Send,
     {
         let time_remaining = self.time_remaining();
+        let ctx = ctx.to_string();
         async move {
             match tokio::time::timeout(time_remaining, f).await {
                 Ok(r) => r,
-                Err(_) => Err(KitsuneErrorKind::TimedOut.into()),
+                Err(_) => Err(KitsuneErrorKind::TimedOut(ctx).into()),
             }
         }
     }

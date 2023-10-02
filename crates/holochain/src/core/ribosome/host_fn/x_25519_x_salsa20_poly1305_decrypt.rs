@@ -1,18 +1,21 @@
 use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
-use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
+use crate::core::ribosome::RibosomeT;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::*;
+use std::sync::Arc;
 
 pub fn x_25519_x_salsa20_poly1305_decrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: X25519XSalsa20Poly1305Decrypt,
-) -> Result<Option<XSalsa20Poly1305Data>, WasmError> {
+) -> Result<Option<XSalsa20Poly1305Data>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ keystore_deterministic: Permission::Allow, .. } => {
+        HostFnAccess {
+            keystore_deterministic: Permission::Allow,
+            ..
+        } => {
             tokio_helper::block_forever_on(async move {
                 // zome_types too restrictive,
                 // causing us to have to clone everything because there's
@@ -36,12 +39,16 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
                 // why is this an Option #&*(*#@&*&????????
                 holochain_keystore::LairResult::Ok(Some(res.to_vec().into()))
             })
-            .map_err(|keystore_error| WasmError::Host(keystore_error.to_string()))
-        },
-        _ => Err(WasmError::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "x_25519_x_salsa20_poly1305_decrypt".into()
-        ).to_string()))
+            .map_err(|keystore_error| -> RuntimeError { wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into() })
+        }
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "x_25519_x_salsa20_poly1305_decrypt".into()
+            )
+            .to_string()
+        ))
+        .into()),
     }
 }

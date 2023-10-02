@@ -10,7 +10,7 @@ use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
 fn fake_holo_hash<T: holo_hash::HashType>(name: u8, hash_type: T) -> HoloHash<T> {
-    HoloHash::from_raw_36_and_type([name; HOLO_HASH_UNTYPED_LEN].to_vec(), hash_type)
+    HoloHash::from_raw_32_and_type([name; 32].to_vec(), hash_type)
 }
 
 /// A fixture DnaHash for unit testing.
@@ -18,9 +18,9 @@ pub fn fake_dna_hash(name: u8) -> DnaHash {
     fake_holo_hash(name, hash_type::Dna::new())
 }
 
-/// A fixture HeaderHash for unit testing.
-pub fn fake_header_hash(name: u8) -> HeaderHash {
-    fake_holo_hash(name, hash_type::Header::new())
+/// A fixture ActionHash for unit testing.
+pub fn fake_action_hash(name: u8) -> ActionHash {
+    fake_holo_hash(name, hash_type::Action::new())
 }
 
 /// A fixture DhtOpHash for unit testing.

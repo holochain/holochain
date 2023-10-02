@@ -17,21 +17,23 @@ fixturator!(
     curve Empty vec![];
     curve Unpredictable {
         let mut rng = ::fixt::rng();
-        let vec_len = rng.gen_range(0, 5);
+        let vec_len = rng.gen_range(1..3);
         let mut ret = vec![];
 
         for _ in 0..vec_len {
-            ret.push(url2!("https://example.com/{}", fixt!(String)).into());
+            let s = fixt!(String).chars().take(10).collect::<String>();
+            ret.push(url2!("https://example.com/{}", s).into());
         }
         ret
     };
     curve Predictable {
         let mut rng = ::fixt::rng();
-        let vec_len = rng.gen_range(0, 5);
+        let vec_len = rng.gen_range(1..3);
         let mut ret = vec![];
 
         for _ in 0..vec_len {
-            ret.push(url2!("https://example.com/{}", fixt!(String, Predictable)).into());
+            let s = fixt!(String, Predictable).chars().take(10).collect::<String>();
+            ret.push(url2!("https://example.com/{}", s).into());
         }
         ret
     };
@@ -89,7 +91,7 @@ fixturator!(
                 Arc::new(fixt!(KitsuneSpace, Unpredictable)),
                 Arc::new(fixt!(KitsuneAgent, Unpredictable)),
                 u32::MAX / 4,
-                fixt!(UrlList, Empty),
+                fixt!(UrlList, Unpredictable),
                 0,
                 0,
                 |_| async move {

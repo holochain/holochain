@@ -1,8 +1,8 @@
 use crate::*;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_zome_types::prelude::*;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::LairResult;
+use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
@@ -27,7 +27,7 @@ pub trait AgentPubKeyExt {
         &self,
         signature: &Signature,
         data: Arc<[u8]>,
-    ) -> MustBoxFuture<'static, bool>;
+    ) -> MustBoxFuture<'static, KeystoreResult<bool>>;
 
     // -- provided -- //
 
@@ -40,7 +40,7 @@ pub trait AgentPubKeyExt {
     where
         S: Serialize + std::fmt::Debug,
     {
-        use ghost_actor::dependencies::futures::future::FutureExt;
+        use futures::future::FutureExt;
 
         let data = match holochain_serialized_bytes::encode(&input) {
             Err(e) => {
@@ -53,16 +53,20 @@ pub trait AgentPubKeyExt {
     }
 
     /// verify a signature for given data with this agent public_key is valid
-    fn verify_signature<D>(&self, signature: &Signature, data: D) -> MustBoxFuture<'static, bool>
+    fn verify_signature<D>(
+        &self,
+        signature: &Signature,
+        data: D,
+    ) -> MustBoxFuture<'static, KeystoreResult<bool>>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
-        use ghost_actor::dependencies::futures::future::FutureExt;
+        use futures::future::FutureExt;
 
         let data = match data.try_into() {
             Err(e) => {
                 tracing::error!("Serialization Error: {:?}", e);
-                return async move { false }.boxed().into();
+                return async move { Err(e.into()) }.boxed().into();
             }
             Ok(data) => data,
         };
@@ -81,7 +85,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         Self: Sized,
     {
         let f = keystore.new_sign_keypair_random();
-        MustBoxFuture::new(async move { f.await })
+        MustBoxFuture::new(f)
     }
 
     fn sign_raw(
@@ -90,24 +94,24 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         data: Arc<[u8]>,
     ) -> MustBoxFuture<'static, LairResult<Signature>> {
         let f = keystore.sign(self.clone(), data);
-        MustBoxFuture::new(async move { f.await })
+        MustBoxFuture::new(f)
     }
 
     fn verify_signature_raw(
         &self,
         signature: &Signature,
         data: Arc<[u8]>,
-    ) -> MustBoxFuture<'static, bool> {
+    ) -> MustBoxFuture<'static, KeystoreResult<bool>> {
         let mut pub_key = [0; 32];
         pub_key.copy_from_slice(self.get_raw_32());
         let pub_key = <lair_keystore_api::prelude::BinDataSized<32>>::from(pub_key);
         let sig = signature.0;
 
         MustBoxFuture::new(async move {
-            match pub_key.verify_detached(sig.into(), data).await {
-                Ok(b) => b,
-                _ => false,
-            }
+            pub_key
+                .verify_detached(sig.into(), data)
+                .await
+                .map_err(KeystoreError::LairError)
         })
     }
 }

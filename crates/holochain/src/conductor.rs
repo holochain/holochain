@@ -15,22 +15,24 @@
 
 pub mod api;
 mod cell;
+#[cfg(feature = "chc")]
+pub mod chc;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 pub mod conductor;
 #[allow(missing_docs)]
 pub mod config;
-#[allow(missing_docs)]
-pub mod dna_store;
 pub mod entry_def_store;
 #[allow(missing_docs)]
 pub mod error;
-pub mod handle;
 pub mod interactive;
 pub mod interface;
+pub mod kitsune_host_impl;
 pub mod manager;
 pub mod p2p_agent_store;
 pub mod paths;
+#[allow(missing_docs)]
+pub mod ribosome_store;
 pub mod space;
 pub mod state;
 
@@ -38,5 +40,8 @@ pub use cell::error::CellError;
 pub use cell::Cell;
 pub use conductor::Conductor;
 pub use conductor::ConductorBuilder;
+pub use conductor::ConductorHandle;
 pub use conductor::{full_integration_dump, integration_dump};
-pub use handle::ConductorHandle;
+
+#[cfg(test)]
+mod tests;

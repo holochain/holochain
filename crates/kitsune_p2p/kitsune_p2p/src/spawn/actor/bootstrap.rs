@@ -1,3 +1,4 @@
+use crate::types::actor::KitsuneP2pResult;
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use once_cell::sync::Lazy;
@@ -5,6 +6,22 @@ use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use url2::Url2;
+
+/// The "net" flag / bucket to use when talking to the bootstrap server.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BootstrapNet {
+    Tx2,
+    Tx5,
+}
+
+impl BootstrapNet {
+    fn value(&self) -> &'static str {
+        match self {
+            BootstrapNet::Tx2 => "tx2",
+            BootstrapNet::Tx5 => "tx5",
+        }
+    }
+}
 
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
@@ -24,6 +41,8 @@ const OP_PUT: &str = "put";
 const OP_NOW: &str = "now";
 /// The header op to tell the service to return a random set of agents in a specific space.
 const OP_RANDOM: &str = "random";
+/// The header op to fetch the proxy_list from the bootstrap service
+const OP_PROXY_LIST: &str = "proxy_list";
 
 /// Standard interface to the remote bootstrap service.
 ///
@@ -37,11 +56,14 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     url: Option<Url2>,
     op: &str,
     input: I,
+    net: BootstrapNet,
 ) -> crate::types::actor::KitsuneP2pResult<Option<O>> {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
     match url {
         Some(url) => {
+            let url = format!("{}?net={}", url.as_str(), net.value());
+
             let res = CLIENT
                 .post(url.as_str())
                 .body(body_data)
@@ -65,13 +87,14 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
 
 /// `do_api` wrapper for the `put` op.
 ///
-/// Input must be an AgentInfoSigned with a valid siganture otherwise the remote service will not
+/// Input must be an AgentInfoSigned with a valid signature otherwise the remote service will not
 /// accept the data.
 pub async fn put(
     url: Option<Url2>,
     agent_info_signed: crate::types::agent_store::AgentInfoSigned,
+    net: BootstrapNet,
 ) -> crate::types::actor::KitsuneP2pResult<()> {
-    match do_api(url, OP_PUT, agent_info_signed).await {
+    match do_api(url, OP_PUT, agent_info_signed, net).await {
         Ok(Some(())) => Ok(()),
         Ok(None) => Ok(()),
         Err(e) => Err(e),
@@ -90,8 +113,11 @@ fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
 ///
 /// There is no input to the `now` endpoint, just `()` to be encoded as nil in messagepack.
 #[allow(dead_code)]
-pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
-    match do_api(url, OP_NOW, ()).await {
+pub async fn now(
+    url: Option<Url2>,
+    net: BootstrapNet,
+) -> crate::types::actor::KitsuneP2pResult<u64> {
+    match do_api(url, OP_NOW, (), net).await {
         // If the server gives us something useful we use it.
         Ok(Some(v)) => Ok(v),
         // If we don't have a server url we should trust ourselves.
@@ -106,11 +132,14 @@ pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64
 ///
 /// Calculates the offset on the first call and caches it in the cell above.
 /// Only calls `now` once then keeps the offset for the static lifetime.
-pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
+pub async fn now_once(
+    url: Option<Url2>,
+    net: BootstrapNet,
+) -> crate::types::actor::KitsuneP2pResult<u64> {
     match NOW_OFFSET_MILLIS.get() {
         Some(offset) => Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?),
         None => {
-            let offset: i64 = match now(url.clone()).await {
+            let offset: i64 = match now(url.clone(), net).await {
                 Ok(v) => {
                     let offset = v as i64 - local_now()? as i64;
                     match NOW_OFFSET_MILLIS.set(offset) {
@@ -148,8 +177,9 @@ pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResul
 pub async fn random(
     url: Option<Url2>,
     query: RandomQuery,
+    net: BootstrapNet,
 ) -> crate::types::actor::KitsuneP2pResult<Vec<AgentInfoSigned>> {
-    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url, OP_RANDOM, query).await {
+    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url, OP_RANDOM, query, net).await {
         Ok(Some(v)) => v,
         Ok(None) => Vec::new(),
         Err(e) => return Err(e),
@@ -161,6 +191,19 @@ pub async fn random(
     Ok(ret?)
 }
 
+/// `do_api` wrapper around the `proxy_list` op.
+///
+/// Fetches the list of proxy servers currently stored in the bootstrap service.
+#[allow(dead_code)]
+pub async fn proxy_list(url: Url2, net: BootstrapNet) -> KitsuneP2pResult<Vec<Url2>> {
+    Ok(do_api::<_, Vec<String>>(Some(url), OP_PROXY_LIST, (), net)
+        .await?
+        .unwrap_or_default()
+        .into_iter()
+        .map(Url2::parse)
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,21 +212,21 @@ mod tests {
     use crate::types::KitsuneBinType;
     use crate::types::KitsuneSignature;
     use ::fixt::prelude::*;
-    use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
-    use kitsune_p2p_types::KitsuneError;
+    use ed25519_dalek::ed25519::signature::Signature;
+    use ed25519_dalek::Keypair;
+    use ed25519_dalek::Signer;
     use std::convert::TryInto;
+    use std::net::SocketAddr;
     use std::sync::Arc;
-
-    // TODO - FIXME - davidb
-    // I'm disabling all these tests that depend on outside systems
-    // we need local testing to prove these out in a ci environment.
+    use tokio::task::AbortHandle;
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky"]
     async fn test_bootstrap() {
-        let keypair = sign_ed25519_keypair_new_from_entropy().await.unwrap();
+        let (addr, abort_handle) = start_bootstrap().await;
+
+        let keypair = create_test_keypair();
         let space = fixt!(KitsuneSpace);
-        let agent = KitsuneAgent::new((*keypair.pub_key.0).clone());
+        let agent = KitsuneAgent::new(keypair.public.as_bytes().to_vec());
         let urls = fixt!(UrlList);
         let now = std::time::SystemTime::now();
         let millis = now
@@ -201,12 +244,10 @@ mod tests {
             expires_at_ms,
             |d| {
                 let d = Arc::new(d.to_vec());
-                async {
-                    keypair
-                        .sign(d)
-                        .await
-                        .map(|s| Arc::new(KitsuneSignature(s.0.to_vec())))
-                        .map_err(KitsuneError::other)
+                async move {
+                    Ok(Arc::new(KitsuneSignature(
+                        keypair.sign(d.clone().as_slice()).as_bytes().to_vec(),
+                    )))
                 }
             },
         )
@@ -214,25 +255,34 @@ mod tests {
         .unwrap();
 
         // Simply hitting the endpoint should be OK.
-        super::put(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+        put(
+            Some(url2::url2!("http://{:?}", addr)),
             agent_info_signed,
+            BootstrapNet::Tx5,
         )
         .await
         .unwrap();
 
         // We should get back an error if we don't have a good signature.
-        assert!(super::put(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            fixt!(AgentInfoSigned)
+        let bad = fixt!(AgentInfoSigned);
+        let mut bad = Arc::try_unwrap(bad.0).unwrap();
+        bad.signature = Arc::new(vec![].into());
+        let bad = AgentInfoSigned(Arc::new(bad));
+        let res = put(
+            Some(url2::url2!("http://{:?}", addr)),
+            bad,
+            BootstrapNet::Tx5,
         )
-        .await
-        .is_err());
+        .await;
+        assert!(res.is_err());
+
+        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky"]
     async fn test_now() {
+        let (addr, abort_handle) = start_bootstrap().await;
+
         let local_now = std::time::SystemTime::now();
         let local_millis: u64 = local_now
             .duration_since(std::time::UNIX_EPOCH)
@@ -242,46 +292,40 @@ mod tests {
             .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now: u64 = super::now(Some(url2::url2!(
-            "{}",
-            crate::config::BOOTSTRAP_SERVICE_DEV
-        )))
-        .await
-        .unwrap();
+        let remote_now: u64 = now(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
+            .await
+            .unwrap();
         let threshold = 5000;
 
         assert!((remote_now - local_millis) < threshold);
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(Some(url2::url2!(
-            "{}",
-            crate::config::BOOTSTRAP_SERVICE_DEV
-        )))
-        .await
-        .unwrap();
-        assert!(super::NOW_OFFSET_MILLIS.get().is_some());
+        let _: u64 = now_once(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
+            .await
+            .unwrap();
+        assert!(NOW_OFFSET_MILLIS.get().is_some());
+
+        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky"]
     // Fixturator seed: 17591570467001263546
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
-        let space = fixt!(KitsuneSpace, Unpredictable);
-        let now = super::now(Some(url2::url2!(
-            "{}",
-            crate::config::BOOTSTRAP_SERVICE_DEV
-        )))
-        .await
-        .unwrap();
+        let (addr, abort_handle) = start_bootstrap().await;
 
-        let alice = sign_ed25519_keypair_new_from_entropy().await.unwrap();
-        let bob = sign_ed25519_keypair_new_from_entropy().await.unwrap();
+        let space = fixt!(KitsuneSpace, Unpredictable);
+        let now = now(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
+            .await
+            .unwrap();
+
+        let alice = create_test_keypair();
+        let bob = create_test_keypair();
 
         let mut expected: Vec<AgentInfoSigned> = Vec::new();
-        for agent in vec![alice.clone(), bob.clone()] {
-            let kitsune_agent = KitsuneAgent::new((*agent.pub_key.0).clone());
+        for agent in vec![alice, bob] {
+            let kitsune_agent = KitsuneAgent::new(agent.public.as_bytes().to_vec());
             let signed_at_ms = now;
             let expires_at_ms = now + 1000 * 60 * 20;
             let agent_info_signed = AgentInfoSigned::sign(
@@ -293,21 +337,20 @@ mod tests {
                 expires_at_ms,
                 |d| {
                     let d = Arc::new(d.to_vec());
-                    async {
-                        agent
-                            .sign(d)
-                            .await
-                            .map(|s| Arc::new(KitsuneSignature(s.0.to_vec())))
-                            .map_err(KitsuneError::other)
+                    async move {
+                        Ok(Arc::new(KitsuneSignature(
+                            agent.sign(d.clone().as_slice()).as_bytes().to_vec(),
+                        )))
                     }
                 },
             )
             .await
             .unwrap();
 
-            super::put(
-                Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+            put(
+                Some(url2::url2!("http://{:?}", addr)),
                 agent_info_signed.clone(),
+                BootstrapNet::Tx5,
             )
             .await
             .unwrap();
@@ -316,11 +359,12 @@ mod tests {
         }
 
         let mut random = super::random(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            super::RandomQuery {
+            Some(url2::url2!("http://{:?}", addr)),
+            RandomQuery {
                 space: Arc::new(space.clone()),
                 ..Default::default()
             },
+            BootstrapNet::Tx2,
         )
         .await
         .unwrap();
@@ -332,16 +376,39 @@ mod tests {
         assert!(random == expected);
 
         let random_single = super::random(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            super::RandomQuery {
+            Some(url2::url2!("http://{:?}", addr)),
+            RandomQuery {
                 space: Arc::new(space.clone()),
                 limit: 1.into(),
             },
+            BootstrapNet::Tx5,
         )
         .await
         .unwrap();
 
         assert!(random_single.len() == 1);
         assert!(expected[0] == random_single[0] || expected[1] == random_single[0]);
+
+        abort_handle.abort();
+    }
+
+    async fn start_bootstrap() -> (SocketAddr, AbortHandle) {
+        let (bs_driver, bs_addr, shutdown) =
+            kitsune_p2p_bootstrap::run("127.0.0.1:0".parse::<SocketAddr>().unwrap(), vec![])
+                .await
+                .expect("Could not start bootstrap server");
+
+        let abort_handle = tokio::spawn(async move {
+            let _shutdown_cb = shutdown;
+            bs_driver.await;
+        })
+        .abort_handle();
+
+        (bs_addr, abort_handle)
+    }
+
+    fn create_test_keypair() -> Keypair {
+        let mut rng = rand_dalek::thread_rng();
+        Keypair::generate(&mut rng)
     }
 }

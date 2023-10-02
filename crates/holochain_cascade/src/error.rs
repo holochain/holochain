@@ -1,10 +1,12 @@
-use holo_hash::{AnyDhtHash, HeaderHash};
+#![allow(missing_docs)]
+
+use holo_hash::{ActionHash, AnyDhtHash};
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_zome_types::header::conversions::WrongHeaderError;
+use holochain_zome_types::action::conversions::WrongActionError;
 // use holochain::conductor::CellError;
 // use holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use thiserror::Error;
@@ -16,13 +18,13 @@ pub enum CascadeError {
     DatabaseError(#[from] DatabaseError),
 
     #[error(transparent)]
-    ElementGroupError(#[from] ElementGroupError),
+    RecordGroupError(#[from] RecordGroupError),
 
     #[error(transparent)]
-    HeaderError(#[from] HeaderError),
+    ActionError(#[from] ActionError),
 
-    #[error("Expected this Header to contain an Entry: {0}")]
-    EntryMissing(HeaderHash),
+    #[error("Expected this Action to contain an Entry: {0}")]
+    EntryMissing(ActionHash),
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
@@ -43,7 +45,7 @@ pub enum CascadeError {
     SerializedBytesError(#[from] SerializedBytesError),
 
     #[error(transparent)]
-    WrongHeaderError(#[from] WrongHeaderError),
+    WrongActionError(#[from] WrongActionError),
 
     #[error("Cell is an authority for is missing or incorrect: {0}")]
     AuthorityDataError(#[from] AuthorityDataError),
@@ -65,10 +67,10 @@ pub enum AuthorityDataError {
     // #[error(transparent)]
     // DhtOpConvertError(#[from] DhtOpConvertError),
     #[error(transparent)]
-    WrongHeaderError(#[from] WrongHeaderError),
+    WrongActionError(#[from] WrongActionError),
     #[error(transparent)]
-    HeaderError(#[from] HeaderError),
-    #[error("Missing element data: {0:?}")]
+    ActionError(#[from] ActionError),
+    #[error("Missing record data: {0:?}")]
     MissingData(String),
     #[error("Missing metadata: {0:?}")]
     MissingMetadata(String),
@@ -76,10 +78,10 @@ pub enum AuthorityDataError {
 
 impl AuthorityDataError {
     pub fn missing_data<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingData(format!("Missing header {:?}", data)).into()
+        Self::MissingData(format!("Missing action {:?}", data)).into()
     }
     pub fn missing_data_entry<T: std::fmt::Debug>(data: T) -> CascadeError {
-        Self::MissingData(format!("Missing entry for header {:?}", data)).into()
+        Self::MissingData(format!("Missing entry for action {:?}", data)).into()
     }
     pub fn missing_metadata<T: std::fmt::Debug>(data: T) -> CascadeError {
         Self::MissingMetadata(format!("{:?}", data)).into()
