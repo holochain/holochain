@@ -6,6 +6,7 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
+use holochain_zome_types::fixt::ActionFixturator;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -321,10 +322,10 @@ mod tests {
                     cell_id: CellId::new(dna.clone(), a2.clone()),
                     zome_name: zome_name.clone(),
                     fn_name: fn_name.clone(),
-                    cap_secret: cap_secret.clone(),
+                    cap_secret: cap_secret,
                     payload: payload.clone(),
-                    nonce: nonce.clone(),
-                    expires_at: expires_at.clone(),
+                    nonce: nonce,
+                    expires_at: expires_at,
                 }
                 .data_to_sign()
                 .unwrap(),

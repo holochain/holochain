@@ -35,9 +35,15 @@ tokio = { version = "1.27", features = [ "full" ] }
 tokio-stream = "0.1"
 holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util" }
 
+[dev-dependencies]
+holochain_p2p = { path = ".", features = ["test_utils"] }
+
 [features]
 
 test_utils = [
+  "holochain_zome_types/test_utils",
+  "holochain_zome_types/fixturators",
+  "holochain_types/test_utils",
   "kitsune_p2p/test_utils",
   "ghost_actor/test_utils",
 ]

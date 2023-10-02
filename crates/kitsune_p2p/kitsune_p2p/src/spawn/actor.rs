@@ -1012,6 +1012,6 @@ mod tests {
         })
         .abort_handle();
 
-        (addr_list.first().unwrap().clone(), abort_handle)
+        (*addr_list.first().unwrap(), abort_handle)
     }
 }

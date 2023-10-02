@@ -42,10 +42,10 @@ pub fn tui_crossterm_setup<
     Ok(res?)
 }
 
-pub fn enter_tui(stdout: &mut io::Stdout) -> Result<(), crossterm::ErrorKind> {
+pub fn enter_tui(stdout: &mut io::Stdout) -> Result<(), std::io::Error> {
     execute!(stdout, EnterAlternateScreen /* , EnableMouseCapture */)
 }
 
-pub fn exit_tui<B: Backend + io::Write>(backend: &mut B) -> Result<(), crossterm::ErrorKind> {
+pub fn exit_tui<B: Backend + io::Write>(backend: &mut B) -> Result<(), std::io::Error> {
     execute!(backend, LeaveAlternateScreen)
 }
