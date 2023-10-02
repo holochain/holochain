@@ -11,5 +11,6 @@ edition = "2021"
 serde = { version = "1.0", features = [ "derive" ] }
 paste = "1.0"
 
-# TODO: Figure out how to remove these dependencies.
+# TODO: Figure out if we can keep this dependency behind a feature flag,
+#       or limit it to test-only code, to reduce Wasm code bloat
 subtle = "2"
