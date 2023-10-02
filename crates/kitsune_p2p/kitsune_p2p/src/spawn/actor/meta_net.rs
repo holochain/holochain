@@ -660,8 +660,8 @@ impl MetaNet {
                     });
                 }
             }
-            let f = tx2_proxy(f, conf)?;
-            f
+
+            tx2_proxy(f, conf)?
         } else {
             f
         };

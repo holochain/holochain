@@ -274,7 +274,8 @@ impl SourceChain {
         .await
     }
 
-    #[cfg(feature = "test_utils")]
+    // TODO: when we fully hook up rate limiting, make this test-only
+    // #[cfg(feature = "test_utils")]
     pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
@@ -711,6 +712,7 @@ where
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
+    #[allow(clippy::let_and_return)] // required to drop temporary
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         if query.sequence_range != ChainQueryFilterRange::Unbounded
             && (query.action_type.is_some()

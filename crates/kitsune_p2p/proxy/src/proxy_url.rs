@@ -242,7 +242,7 @@ mod tests {
             .decode(TEST_CERT)
             .unwrap();
         let digest = CertDigest::from_slice(&cert_digest);
-        let u = ProxyUrl::new(TEST_BASE, digest.into()).unwrap();
+        let u = ProxyUrl::new(TEST_BASE, digest).unwrap();
         assert_eq!(TEST_FULL, u.as_full_str());
         assert_eq!(TEST_BASE, u.as_base_str());
     }

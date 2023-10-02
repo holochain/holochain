@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,21 +25,21 @@ getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.3.0-beta-dev.8", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "^0.3.0-beta-dev.18", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.3.0-beta-dev.18", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "^0.3.0-beta-dev.19", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.19", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "^0.3.0-beta-dev.13", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.3.0-beta-dev.17", path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.3.0-beta-dev.15", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "^0.3.0-beta-dev.17", path = "../holochain_state" }
-holochain_types = { version = "^0.3.0-beta-dev.15", path = "../holochain_types" }
+holochain_p2p = { version = "^0.3.0-beta-dev.18", path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.3.0-beta-dev.16", path = "../holochain_sqlite" }
+holochain_serialized_bytes = "=0.0.53"
+holochain_state = { version = "^0.3.0-beta-dev.18", path = "../holochain_state" }
+holochain_types = { version = "^0.3.0-beta-dev.16", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.0", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.84"
+holochain_wasmer_host = "=0.0.85"
 holochain_websocket = { version = "^0.3.0-beta-dev.3", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
-kitsune_p2p = { version = "^0.3.0-beta-dev.15", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/types" }
 kitsune_p2p_block = { version = "^0.3.0-beta-dev.7", path = "../kitsune_p2p/block" }
 lazy_static = "1.4.0"
@@ -82,7 +82,7 @@ url = "2.4"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.16", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.17", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
 wasmer-middlewares = "2"
@@ -178,6 +178,7 @@ test_utils = [
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
+  "holochain_cascade/test_utils",
   "kitsune_p2p/test_utils",
   "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",

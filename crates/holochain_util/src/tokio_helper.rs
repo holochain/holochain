@@ -34,7 +34,7 @@ where
     F: futures::future::Future,
 {
     let _g = runtime.enter();
-    tokio::task::block_in_place(|| runtime.block_on(async { f.await }))
+    tokio::task::block_in_place(|| runtime.block_on(f))
 }
 
 /// Run a blocking thread on `TOKIO` with a timeout.

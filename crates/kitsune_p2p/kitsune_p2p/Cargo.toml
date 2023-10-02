@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.15"
+version = "0.3.0-beta-dev.16"
 description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -47,8 +47,8 @@ tx5 = { version = "=0.0.3-alpha", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.2.0"}
 
-# arbitrary could be made optional
-arbitrary = { version = "1.0", features = ["derive"] }
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+contrafact = { version = "0.2.0-rc.1", optional = true }
 
 blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
@@ -56,10 +56,9 @@ mockall = { version = "0.11.3", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = ".", features = ["test_utils", "sqlite"]}
+kitsune_p2p = { path = ".", features = ["test_utils", "fuzzing", "sqlite"]}
 
 kitsune_p2p_fetch = { path = "../fetch", features = ["test_utils"] }
-contrafact = { version = "0.2.0-rc.1" }
 kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
@@ -76,6 +75,13 @@ rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 [features]
 default = [ "tx2", "tx5" ]
 
+fuzzing = [
+  "arbitrary",
+  "contrafact",
+  "kitsune_p2p_timestamp/fuzzing",
+  "kitsune_p2p_types/fuzzing",
+]
+
 test_utils = [
   "blake2b_simd",
   "tokio/test-util",
@@ -83,8 +89,8 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "maplit",
   "mockall",
-  "kitsune_p2p_timestamp/arbitrary",
 ]
+
 mock_network = [
   "kitsune_p2p_types/test_utils",
   "mockall",

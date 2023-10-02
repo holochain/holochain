@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     // Choose an app id and properties.
     let app_id = "my-cool-app".to_string();
 
-    for _ in 0..5 as usize {
+    for _ in 0..5_usize {
         let app_id = app_id.clone();
 
         // Create a conductor config with the network.

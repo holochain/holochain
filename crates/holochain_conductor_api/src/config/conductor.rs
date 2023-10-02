@@ -256,7 +256,7 @@ pub mod tests {
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
-                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
+                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,

@@ -19,12 +19,14 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 pub use spawn::*;
+#[cfg(feature = "test_utils")]
 pub use test::stub_network;
+#[cfg(feature = "test_utils")]
 pub use test::HolochainP2pDnaFixturator;
 
 pub use kitsune_p2p;
 
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -413,4 +415,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
 pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
+#[allow(unused)]
+#[cfg(any(test, feature = "test_utils"))]
 mod test;

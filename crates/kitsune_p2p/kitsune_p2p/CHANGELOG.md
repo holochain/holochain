@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Add additional configuration options to network_tuning for setting the allowed ephemeral port range for tx5 connections: tx5_min_ephemeral_udp_port and tx5_max_ephemeral_udp_port
 
+## 0.3.0-beta-dev.16
+
 ## 0.3.0-beta-dev.15
 
 ## 0.3.0-beta-dev.14
