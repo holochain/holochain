@@ -29,15 +29,6 @@ enum SendOutcome {
     AuthorUnavailable,
 }
 
-pub async fn pending_receipts(
-    vault: &DbRead<DbKindDht>,
-    validators: Vec<AgentPubKey>,
-) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
-    vault
-        .read_async(move |txn| get_pending_validation_receipts(&txn, validators))
-        .await
-}
-
 #[instrument(skip(vault, network, keystore, apply_block))]
 /// Send validation receipts to their authors in serial and without waiting for responses.
 pub async fn validation_receipt_workflow<B>(
