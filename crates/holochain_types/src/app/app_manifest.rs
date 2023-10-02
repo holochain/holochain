@@ -29,7 +29,7 @@
 //! installation.
 //!
 //! Each Role definition is made up of:
-//! - a RoleId, which only needs to be unique within this App
+//! - a RoleName, which only needs to be unique within this App
 //! - a provisioning strategy, [`CellProvisioning`], which describes if and how a Cell
 //!   should be created freshly for this app, or whether an existing Cell should
 //!   occupy this role
