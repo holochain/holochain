@@ -133,3 +133,17 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for RoughSized<T>
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    proptest::proptest! {
+        #[test]
+        fn roughsized_roundtrip(v: usize) {
+            let r = RoughInt::from(v);
+            let v = r.get();
+            assert_eq!(r, RoughInt::from(v));
+        }
+    }
+}
