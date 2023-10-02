@@ -5,18 +5,20 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::*;
 
 /// Shared access to FetchPoolState
-#[derive(Clone, Debug, derive_more::Deref)]
-pub struct RecordActions<S, C = FileCassette<S>> {
+#[derive(Clone, derive_more::Deref, derive_more::DerefMut, derivative::Derivative)]
+#[derivative(Debug)]
+pub struct RecordActions<S> {
     #[deref]
+    #[deref_mut]
     state: S,
-    cassette: Arc<C>,
+    #[derivative(Debug = "ignore")]
+    cassette: Arc<dyn Cassette<S> + Send + Sync>,
 }
 
-impl<S, R> State<'static> for RecordActions<S, R>
+impl<S> State<'static> for RecordActions<S>
 where
     S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
-    R: Cassette<S>,
 {
     type Action = S::Action;
     type Effect = S::Effect;
@@ -27,18 +29,19 @@ where
     }
 }
 
-impl<S, C> RecordActions<S, C>
+impl<S> RecordActions<S>
 where
     S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
-    C: Cassette<S>,
 {
-    pub fn new(cassette: C, state: S) -> Self {
+    pub fn new(cassette: Option<impl Cassette<S> + Send + Sync + 'static>, state: S) -> Self {
+        let cassette: Arc<dyn Cassette<S> + Send + Sync> = if let Some(c) = cassette {
+            Arc::new(c)
+        } else {
+            Arc::new(())
+        };
         cassette.initialize().unwrap();
-        Self {
-            cassette: Arc::new(cassette),
-            state,
-        }
+        Self { cassette, state }
     }
 }
 
@@ -46,12 +49,19 @@ where
 fn action_recording_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("actions.stef");
-    let mut rec = RecordActions::new(FileCassette::from(path.clone()), ());
+    let cassette = FileCassette::<()>::from(path.clone());
+    let mut rec = RecordActions::new(Some(cassette), ());
     rec.transition(());
     rec.transition(());
     rec.transition(());
-    let actions: Vec<()> = FileCassette::<()>::from(path.clone())
+    drop(rec);
+
+    let cassette = FileCassette::<()>::from(path.clone());
+    let actions: Vec<()> = cassette
         .retrieve_actions()
-        .unwrap();
+        .unwrap()
+        .into_iter()
+        .map(|a| a.action)
+        .collect();
     assert_eq!(actions, vec![(), (), ()]);
 }
