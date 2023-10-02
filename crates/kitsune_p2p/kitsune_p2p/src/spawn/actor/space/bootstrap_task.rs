@@ -695,11 +695,10 @@ mod tests {
                         "test error".to_string().into_boxed_str(),
                     ))
                 }
-                .boxed()
-                .into();
+                .boxed();
             }
 
-            async move { Ok(self.agents.clone()) }.boxed().into()
+            async move { Ok(self.agents.clone()) }.boxed()
         }
     }
 }

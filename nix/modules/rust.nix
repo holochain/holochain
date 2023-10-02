@@ -23,7 +23,7 @@
 
       config.rustHelper = {
         defaultTrack = "stable";
-        defaultVersion = "1.66.1";
+        defaultVersion = "1.71.1";
 
         defaultExtensions = [
           "rust-src"
