@@ -18,9 +18,11 @@ jobs:
           stale-issue-label: "stale"
           stale-issue-message: "This item has been open for 30 days with no activity."
           close-issue-message: "This item has been inactive for 14 days since being marked as stale."
+          exempt-issue-labels: "permanent"
           days-before-pr-stale: 30
           days-before-pr-close: 14
           stale-pr-label: "stale"
           stale-pr-message: "This item has been open for 30 days with no activity."
           close-pr-message: "This item has been inactive for 14 days since being marked as stale."
+          exempt-pr-labels: "permanent"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
