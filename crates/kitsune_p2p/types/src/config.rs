@@ -462,39 +462,6 @@ pub enum TransportConfig {
     /// (this is mainly for testing)
     #[cfg(feature = "tx2")]
     Mem {},
-    /*
-    /// A transport that uses the QUIC protocol
-    #[cfg(feature = "tx2")]
-    Quic {
-        /// Network interface / port to bind to
-        /// Default: "kitsune-quic://0.0.0.0:0"
-        bind_to: Option<Url2>,
-
-        /// If you have port-forwarding set up,
-        /// or wish to apply a vanity domain name,
-        /// you may need to override the local NIC IP.
-        /// Default: None = use NIC IP
-        override_host: Option<String>,
-
-        /// If you have port-forwarding set up,
-        /// you may need to override the local NIC port.
-        /// Default: None = use NIC port
-        override_port: Option<u16>,
-    },
-    /// A transport that TLS tunnels through a sub-transport (ALPN kitsune-proxy/0)
-    #[cfg(feature = "tx2")]
-    Proxy {
-        /// The 'Proxy' transport is a wrapper around a sub-transport.
-        /// We also need to define the sub-transport.
-        sub_transport: Box<TransportConfig>,
-
-        /// Determines whether we wish to:
-        /// - proxy through a remote
-        /// - be a proxy server for others
-        /// - be directly addressable, but not proxy for others
-        proxy_config: ProxyConfig,
-    },
-    */
     /// A mock network for testing
     #[cfg(feature = "tx2")]
     #[serde(skip)]
