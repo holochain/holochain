@@ -5,6 +5,7 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
+use holochain_zome_types::fixt::ActionFixturator;
 
 struct StubNetwork;
 
