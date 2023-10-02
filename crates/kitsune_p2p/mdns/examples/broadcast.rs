@@ -7,7 +7,7 @@ async fn main() {
     // let buffer = [0, 1, 2];
     // let buffer: [u8; 190] = [42; 190];
     let mut buffer: Vec<u8> = Vec::new();
-    for i in 0..12 as u32 {
+    for i in 0..12_u32 {
         buffer.push((i % 255) as u8);
     }
     // Launch thread

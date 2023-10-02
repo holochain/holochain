@@ -7,6 +7,7 @@ use rusqlite::named_params;
 use crate::conductor::error::ConductorResult;
 
 /// Get all op hashes within a region
+#[allow(clippy::let_and_return)] // required to drop temporary
 pub async fn query_region_op_hashes(
     db: DbWrite<DbKindDht>,
     bounds: RegionBounds,

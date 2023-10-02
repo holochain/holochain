@@ -121,7 +121,7 @@ impl Active {
         for i in self.0.iter() {
             f = i.fut(f).boxed();
         }
-        async move { f.await }
+        f
     }
 }
 
