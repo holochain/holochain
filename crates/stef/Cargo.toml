@@ -9,6 +9,7 @@ anyhow = { version = "*" }
 derivative = "2.2.0"
 derive_more = { version = "*" }
 futures = { version = "*" }
+kitsune_p2p_timestamp = { version = "0.3.0-beta-dev.2", path = "../kitsune_p2p/timestamp", features = ["now"] }
 must_future = { version = "*" }
 parking_lot = { version = "*" }
 
@@ -21,6 +22,7 @@ proptest = { version = "*", optional = true }
 
 # recording
 serde = { version = "*", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 rmp-serde = { version = "*", optional = true }
 
 [dev-dependencies]
@@ -44,6 +46,7 @@ diagramming = [
 
 recording = [
     "rmp-serde",
+    "serde_json",
     "serde",
     "stef_derive?/recording",
 ]

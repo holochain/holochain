@@ -100,7 +100,7 @@ impl FetchPool {
     /// Constructor
     pub fn new(config: FetchConfig, storage_path: Option<PathBuf>) -> Self {
         Self(stef::Share::new(stef::RecordActions::new(
-            storage_path.map(FileCassette::from),
+            storage_path.map(FileCassette::<_, stef::RmpEncoder>::from),
             FetchPoolState::new(config),
         )))
     }

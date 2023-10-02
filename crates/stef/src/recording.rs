@@ -49,12 +49,19 @@ where
 fn action_recording_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("actions.stef");
-    let mut rec = RecordActions::new(Some(FileCassette::from(path.clone())), ());
+    let cassette = FileCassette::<()>::from(path.clone());
+    let mut rec = RecordActions::new(Some(cassette), ());
     rec.transition(());
     rec.transition(());
     rec.transition(());
-    let actions: Vec<()> = FileCassette::<()>::from(path.clone())
+    drop(rec);
+
+    let cassette = FileCassette::<()>::from(path.clone());
+    let actions: Vec<()> = cassette
         .retrieve_actions()
-        .unwrap();
+        .unwrap()
+        .into_iter()
+        .map(|a| a.action)
+        .collect();
     assert_eq!(actions, vec![(), (), ()]);
 }
