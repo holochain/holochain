@@ -13,7 +13,7 @@ enum LinkZomes {
 
 fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
     ScopedZomeTypes(
-        ids.into_iter()
+        ids.iter()
             .map(|(zome_index, len)| ((*zome_index).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )
@@ -21,7 +21,7 @@ fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
 
 fn make_entry_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<EntryDefIndex> {
     ScopedZomeTypes(
-        ids.into_iter()
+        ids.iter()
             .map(|(zome_index, len)| ((*zome_index).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )

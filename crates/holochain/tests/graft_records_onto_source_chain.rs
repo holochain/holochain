@@ -1,15 +1,9 @@
 #![cfg(feature = "test_utils")]
 
-use ::fixt::prelude::*;
 use hdk::prelude::*;
-use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
-use holochain::test_utils::inline_zomes::simple_crud_zome;
-use holochain_conductor_api::conductor::ConductorConfig;
+
 use holochain_keystore::MetaLairClient;
-use holochain_sqlite::db::{DbKindAuthored, DbWrite};
-use holochain_sqlite::error::DatabaseResult;
-use holochain_state::prelude::{StateMutationError, Store, Txn};
+
 use holochain_types::record::SignedActionHashedExt;
 
 /// Test that records can be manually grafted onto a source chain.
@@ -236,12 +230,9 @@ async fn grafting() {
 }
 
 async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
-    let sah = SignedActionHashed::sign(
-        keystore,
-        ActionHashed::from_content_sync(action.clone().into()),
-    )
-    .await
-    .unwrap();
+    let sah = SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action.clone()))
+        .await
+        .unwrap();
     let entry = Entry::app(().try_into().unwrap()).unwrap();
     Record::new(sah, Some(entry.clone()))
 }
