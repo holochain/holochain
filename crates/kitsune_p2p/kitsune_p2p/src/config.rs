@@ -59,6 +59,10 @@ pub struct KitsuneP2pConfig {
 
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
+
+    /// Enables stef action recording at the specified path.
+    #[serde(default)]
+    pub stef_cassette_path: Option<std::path::PathBuf>,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -68,6 +72,7 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
+            stef_cassette_path: None,
         }
     }
 }

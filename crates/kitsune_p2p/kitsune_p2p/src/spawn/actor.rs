@@ -19,8 +19,8 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
+use stef::FileCassette;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
@@ -166,9 +166,9 @@ impl KitsuneP2pActor {
         let fetch_response_queue =
             FetchResponseQueue::new(FetchResponseConfig::new(config.tuning_params.clone()));
 
+        let cassette = config.stef_cassette_path.clone().map(FileCassette::from);
         // TODO - use a real config, i.e. use `FetchPool::new`
-        let storage_path = std::option_env!("STEF_RECORD_FETCHPOOL").map(PathBuf::from);
-        let fetch_pool = FetchPool::new_bitwise_or(storage_path);
+        let fetch_pool = FetchPool::new_bitwise_or(cassette);
 
         // Start a loop to handle our fetch queue fetch items.
         FetchTask::spawn(
@@ -915,9 +915,8 @@ mod tests {
         let (_, _, bootstrap_net) = test_create_meta_net(KitsuneP2pConfig {
             // Anything other than WebRTC will do here but the tx2 transport isn't available any more
             transport_pool: vec![TransportConfig::Mem {}],
-            bootstrap_service: None,
-            tuning_params: Default::default(),
             network_type: NetworkType::QuicMdns,
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -934,9 +933,8 @@ mod tests {
             transport_pool: vec![TransportConfig::WebRTC {
                 signal_url: format!("ws://{:?}", signal_addr),
             }],
-            bootstrap_service: None,
-            tuning_params: Default::default(),
             network_type: NetworkType::QuicMdns,
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -957,8 +955,8 @@ mod tests {
                 signal_url: format!("ws://{:?}", signal_addr),
             }],
             bootstrap_service: Some(url2!("ws://not-a-bootstrap.test")),
-            tuning_params: Default::default(),
             network_type: NetworkType::QuicBootstrap,
+            ..Default::default()
         })
         .await
         .unwrap();

@@ -10,8 +10,8 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::{path::PathBuf, sync::Arc};
-use stef::FileCassette;
+use std::sync::Arc;
+use stef::{FileCassette, JsonEncoder};
 use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{KAgent, KSpace};
@@ -96,19 +96,22 @@ impl Default for FetchPoolState {
 
 type NextItem = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 
+/// Cassette type for recording FetchPool actions
+pub type FetchPoolCassette = FileCassette<FetchPoolState, JsonEncoder>;
+
 impl FetchPool {
     /// Constructor
-    pub fn new(config: FetchConfig, storage_path: Option<PathBuf>) -> Self {
+    pub fn new(config: FetchConfig, cassette: Option<FetchPoolCassette>) -> Self {
         Self(stef::Share::new(stef::RecordActions::new(
-            storage_path.map(FileCassette::<_, stef::RmpEncoder>::from),
+            cassette,
             FetchPoolState::new(config),
         )))
     }
 
     /// Constructor, using only the "hardcoded" config (TODO: remove)
-    pub fn new_bitwise_or(storage_path: Option<PathBuf>) -> Self {
+    pub fn new_bitwise_or(cassette: Option<FetchPoolCassette>) -> Self {
         let config = Arc::new(FetchPoolConfigBitwiseOr);
-        Self::new(config, storage_path)
+        Self::new(config, cassette)
     }
 
     /// Get a list of the next items that should be fetched.
