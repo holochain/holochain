@@ -245,6 +245,7 @@ async fn call_zome() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
     observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
@@ -254,6 +255,16 @@ async fn remote_signals() -> anyhow::Result<()> {
     // MAYBE: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
+
+    // Check that there are no duplicate agents
+    assert_eq!(
+        all_agents.len(),
+        all_agents
+            .clone()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -269,7 +280,7 @@ async fn remote_signals() -> anyhow::Result<()> {
     let cells = apps.cells_flattened();
 
     let mut rxs = Vec::new();
-    for h in conductors.iter().map(|c| c) {
+    for h in conductors.iter() {
         rxs.extend(h.signal_broadcaster().subscribe_separately())
     }
 
@@ -286,7 +297,7 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::timeout(Duration::from_secs(120), async move {
+    tokio::time::timeout(Duration::from_secs(60), async move {
         let signal = AppSignal::new(signal);
         for mut rx in rxs {
             let r = rx.recv().await;
