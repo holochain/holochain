@@ -7122,6 +7122,7 @@ dependencies = [
  "derive_more",
  "either",
  "futures",
+ "kitsune_p2p_timestamp",
  "must_future",
  "parking_lot 0.12.1",
  "petgraph",

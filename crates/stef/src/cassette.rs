@@ -1,13 +1,32 @@
 use std::{
+    borrow::Borrow,
     fs::File,
     io::{Read, Write},
     marker::PhantomData,
     path::PathBuf,
 };
 
+use kitsune_p2p_timestamp::Timestamp;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::*;
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct CassetteAction<A, B: Borrow<A> = A> {
+    pub action: B,
+    pub timestamp: Timestamp,
+    phantom: PhantomData<A>,
+}
+
+impl<A, B: Borrow<A>> CassetteAction<A, B> {
+    pub fn new(action: B) -> Self {
+        Self {
+            action,
+            timestamp: Timestamp::now(),
+            phantom: PhantomData,
+        }
+    }
+}
 
 pub trait Cassette<S: State<'static>> {
     fn initialize(&self) -> anyhow::Result<()>;
@@ -15,13 +34,13 @@ pub trait Cassette<S: State<'static>> {
     fn record_action(&self, action: &S::Action) -> anyhow::Result<()>;
 
     // TODO: use fallible_iterator for lazy retrieval
-    fn retrieve_actions(&self) -> anyhow::Result<Vec<S::Action>>;
+    fn retrieve_actions(&self) -> anyhow::Result<Vec<CassetteAction<S::Action>>>;
 
     fn playback_actions(&self, state: &mut S) -> anyhow::Result<Vec<S::Effect>> {
         Ok(self
             .retrieve_actions()?
             .into_iter()
-            .map(|action| state.transition(action))
+            .map(|action| state.transition(action.action))
             .collect())
     }
 }
@@ -35,7 +54,7 @@ impl<S: State<'static>> Cassette<S> for () {
         Ok(())
     }
 
-    fn retrieve_actions(&self) -> anyhow::Result<Vec<S::Action>> {
+    fn retrieve_actions(&self) -> anyhow::Result<Vec<CassetteAction<S::Action>>> {
         unimplemented!("The unit ActionRecorder `()` can't record or playback actions!")
     }
 }
@@ -44,7 +63,7 @@ pub struct FileCassette<S, E = RmpEncoder>
 where
     S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
-    E: Encoder<S::Action>,
+    E: Encoder,
 {
     path: PathBuf,
     encoder: E,
@@ -55,7 +74,7 @@ impl<S, E> From<PathBuf> for FileCassette<S, E>
 where
     S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
-    E: Encoder<S::Action>,
+    E: Encoder,
 {
     fn from(path: PathBuf) -> Self {
         Self::new(path, Default::default())
@@ -66,7 +85,7 @@ impl<S, E> FileCassette<S, E>
 where
     S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
-    E: Encoder<S::Action>,
+    E: Encoder,
 {
     pub fn new(path: PathBuf, encoder: E) -> Self {
         Self {
@@ -81,7 +100,8 @@ impl<S, E> Cassette<S> for FileCassette<S, E>
 where
     S: State<'static>,
     S::Action: Serialize + DeserializeOwned,
-    E: Encoder<S::Action>,
+    for<'a> &'a S::Action: Serialize,
+    E: Encoder,
 {
     fn initialize(&self) -> anyhow::Result<()> {
         File::options()
@@ -92,7 +112,9 @@ where
     }
 
     fn record_action(&self, action: &S::Action) -> anyhow::Result<()> {
-        let bytes = self.encoder.encode(action)?;
+        let action: CassetteAction<S::Action, &<S as state::State<'static>>::Action> =
+            CassetteAction::new(action);
+        let bytes = self.encoder.encode(&action)?;
         let mut f = File::options().append(true).open(&self.path)?;
         let len = bytes.len() as u32;
         f.write_all(&len.to_le_bytes())?;
@@ -100,7 +122,7 @@ where
         Ok(())
     }
 
-    fn retrieve_actions(&self) -> anyhow::Result<Vec<S::Action>> {
+    fn retrieve_actions(&self) -> anyhow::Result<Vec<CassetteAction<S::Action>>> {
         let mut f = File::open(&self.path)?;
         let mut lbuf = [0; 4];
         let mut abuf = Vec::new();
@@ -128,13 +150,98 @@ where
     }
 }
 
+// pub struct FileCassetteJson<S>
+// where
+//     S: State<'static>,
+//     S::Action: Serialize + DeserializeOwned,
+// {
+//     path: PathBuf,
+//     encoder: JsonEncoder,
+//     state: PhantomData<S>,
+// }
+
+// impl<S> From<PathBuf> for FileCassetteJson<S>
+// where
+//     S: State<'static>,
+//     S::Action: Serialize + DeserializeOwned,
+// {
+//     fn from(path: PathBuf) -> Self {
+//         Self::new(path, Default::default())
+//     }
+// }
+
+// impl<S> FileCassetteJson<S>
+// where
+//     S: State<'static>,
+//     S::Action: Serialize + DeserializeOwned,
+// {
+//     pub fn new(path: PathBuf, encoder: JsonEncoder) -> Self {
+//         Self {
+//             path,
+//             encoder,
+//             state: PhantomData,
+//         }
+//     }
+// }
+
+// impl<S> Cassette<S> for FileCassetteJson<S>
+// where
+//     S: State<'static>,
+//     S::Action: Serialize + DeserializeOwned,
+// {
+//     fn initialize(&self) -> anyhow::Result<()> {
+//         File::options()
+//             .write(true)
+//             .create_new(true)
+//             .open(&self.path)?;
+//         Ok(())
+//     }
+
+//     fn record_action(&self, action: &S::Action) -> anyhow::Result<()> {
+//         let json = serde_json::to_string(action)?;
+//         let mut f = File::options().append(true).open(&self.path)?;
+//         f.write_all(json.as_bytes())?;
+//         f.write_fmt(format_args!("\n"))?;
+//         Ok(())
+//     }
+
+//     fn retrieve_actions(&self) -> anyhow::Result<Vec<S::Action>> {
+//         let mut r = BufReader::new(File::open(&self.path)?);
+//         let mut line = String::new();
+//         let mut actions = Vec::new();
+//         loop {
+//             match r.read_line(&mut line) {
+//                 Ok(0) => return Ok(actions),
+//                 Err(e) => {
+//                     if e.kind() == std::io::ErrorKind::UnexpectedEof {
+//                         {
+//                             return Ok(actions);
+//                         }
+//                     } else {
+//                         return Err(e.into());
+//                     }
+//                 }
+//                 Ok(_) => {
+//                     actions.push(serde_json::from_str(&line).unwrap());
+//                 }
+//             }
+//         }
+//     }
+// }
+
 #[derive(Clone)]
-pub struct MemoryCassette<S: State<'static>> {
-    actions: Share<Vec<S::Action>>,
+pub struct MemoryCassette<S: State<'static>>
+where
+    S::Action: Clone + Serialize + DeserializeOwned,
+{
+    actions: Share<Vec<CassetteAction<S::Action, S::Action>>>,
     state: PhantomData<S>,
 }
 
-impl<S: State<'static>> MemoryCassette<S> {
+impl<S: State<'static>> MemoryCassette<S>
+where
+    S::Action: Clone + Serialize + DeserializeOwned,
+{
     pub fn new() -> Self {
         Self {
             actions: Default::default(),
@@ -145,19 +252,19 @@ impl<S: State<'static>> MemoryCassette<S> {
 
 impl<S: State<'static>> Cassette<S> for MemoryCassette<S>
 where
-    S::Action: Serialize + DeserializeOwned + Clone,
+    S::Action: Clone + Serialize + DeserializeOwned,
 {
     fn initialize(&self) -> anyhow::Result<()> {
         Ok(())
     }
 
     fn record_action(&self, action: &S::Action) -> anyhow::Result<()> {
-        dbg!();
-        self.actions.write(|aa| aa.push(action.clone()));
+        let action = CassetteAction::new(action.clone());
+        self.actions.write(|aa| aa.push(action));
         Ok(())
     }
 
-    fn retrieve_actions(&self) -> anyhow::Result<Vec<S::Action>> {
+    fn retrieve_actions(&self) -> anyhow::Result<Vec<CassetteAction<S::Action>>> {
         Ok(self.actions.read(|aa| aa.clone()))
     }
 }

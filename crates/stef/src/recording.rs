@@ -55,8 +55,13 @@ fn action_recording_roundtrip() {
     rec.transition(());
     rec.transition(());
     drop(rec);
-    
+
     let cassette = FileCassette::<()>::from(path.clone());
-    let actions: Vec<()> = cassette.retrieve_actions().unwrap();
+    let actions: Vec<()> = cassette
+        .retrieve_actions()
+        .unwrap()
+        .into_iter()
+        .map(|a| a.action)
+        .collect();
     assert_eq!(actions, vec![(), (), ()]);
 }
