@@ -155,7 +155,7 @@ pub fn add_if_unique(
 pub fn get_pending_validation_receipts(
     txn: &Transaction,
     validators: Vec<AgentPubKey>,
-) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
+) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
     let mut stmt = txn.prepare(
         "
             SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
@@ -180,13 +180,12 @@ pub fn get_pending_validation_receipts(
             let when_integrated = r.get("when_integrated")?;
             Ok((
                 ValidationReceipt {
-                    dht_op_hash: dht_op_hash.clone(),
+                    dht_op_hash,
                     validation_status,
                     validators: validators.clone(),
                     when_integrated,
                 },
                 author,
-                dht_op_hash,
             ))
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
@@ -436,7 +435,7 @@ mod tests {
 
         let pending = env
             .read_async(
-                move |txn| -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
+                move |txn| -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
                     get_pending_validation_receipts(&txn, vec![])
                 },
             )
@@ -445,7 +444,8 @@ mod tests {
 
         assert_eq!(3, pending.len());
 
-        let pending_ops: HashSet<DhtOpHash> = pending.into_iter().map(|p| p.2).collect();
+        let pending_ops: HashSet<DhtOpHash> =
+            pending.into_iter().map(|p| p.0.dht_op_hash).collect();
         assert!(pending_ops.contains(&valid_op_hash));
         assert!(pending_ops.contains(&rejected_op_hash));
         assert!(pending_ops.contains(&abandoned_op_hash));

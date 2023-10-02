@@ -1,4 +1,5 @@
 use futures::future::BoxFuture;
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -65,39 +66,28 @@ where
 
     let validators: HashSet<_> = validators.into_iter().collect();
 
-    // If we fail to connect to an author once during the workflow run, don't try again. The send already has a
-    // retry mechanism so it doesn't make sense to keep sending receipts to an author we can't connect to.
-    let mut unavailable_authors = HashSet::new();
-
     // Try to send the validation receipts
-    for (receipt, author, dht_op_hash) in receipts {
-        if !unavailable_authors.contains(&author) {
-            match sign_and_send_receipt(
-                &dna_hash,
-                &network,
-                &keystore,
-                &validators,
-                &author,
-                receipt,
-                apply_block.clone(),
-            )
-            .await
-            {
-                Ok(SendOutcome::Attempted) => {
-                    // Success, nothing more to do
-                }
-                Ok(SendOutcome::AuthorUnavailable) => {
-                    unavailable_authors.insert(author);
-                }
-                Err(e) => {
-                    info!(failed_to_sign_and_send_receipt = ?e);
-                }
+    for (author, receipts) in &receipts.iter().group_by(|(_, author)| author) {
+        match sign_and_send_receipts_to_author(
+            &dna_hash,
+            &network,
+            &keystore,
+            &validators,
+            &author,
+            receipts.collect(),
+            apply_block.clone(),
+        )
+        .await
+        {
+            Ok(SendOutcome::Attempted) => {
+                // Success, nothing more to do
             }
-        } else {
-            info!(
-                "Skipping sending validation receipt to {:?} because they are unavailable: {:?}",
-                author, receipt
-            );
+            Ok(SendOutcome::AuthorUnavailable) => {
+                unavailable_authors.insert(author);
+            }
+            Err(e) => {
+                info!(failed_to_sign_and_send_receipt = ?e);
+            }
         }
 
         // Attempted to send the receipt so we now mark it to not send in the future.
@@ -109,13 +99,15 @@ where
     Ok(WorkComplete::Complete)
 }
 
-async fn sign_and_send_receipt<B>(
+/// Perform the signing and sending of
+/// Requires that the receipts to send are all by the same author.
+async fn sign_and_send_receipts_to_author<B>(
     dna_hash: &DnaHash,
     network: &impl HolochainP2pDnaT,
     keystore: &MetaLairClient,
     validators: &HashSet<AgentPubKey>,
     op_author: &AgentPubKey,
-    receipt: ValidationReceipt,
+    receipts: Vec<ValidationReceipt>,
     apply_block: B,
 ) -> WorkflowResult<SendOutcome>
 where
