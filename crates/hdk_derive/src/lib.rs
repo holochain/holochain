@@ -8,6 +8,7 @@ use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
 
+mod dna_properties;
 mod entry_def_registration;
 mod entry_defs;
 mod entry_defs_conversions;
@@ -19,14 +20,12 @@ mod link_zomes;
 mod to_coordinates;
 mod unit_enum;
 mod util;
-mod dna_properties;
 
 struct EntryDef(holochain_integrity_types::entry_def::EntryDef);
 struct EntryDefId(holochain_integrity_types::entry_def::EntryDefId);
 struct EntryVisibility(holochain_integrity_types::entry_def::EntryVisibility);
 struct RequiredValidations(holochain_integrity_types::entry_def::RequiredValidations);
 struct RequiredValidationType(holochain_integrity_types::validate::RequiredValidationType);
-
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
