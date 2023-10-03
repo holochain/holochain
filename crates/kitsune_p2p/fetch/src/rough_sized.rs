@@ -25,6 +25,9 @@ impl std::fmt::Debug for RoughInt {
 }
 
 impl RoughInt {
+    /// Maximum value representable by RoughInt, currently 134_213_632
+    pub const MAX: usize = i16::MAX as usize * GRAN;
+
     /// Get the full value from the rough int
     pub fn get(&self) -> usize {
         if self.0 > 0 {
@@ -137,13 +140,79 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for RoughSized<T>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
-    proptest::proptest! {
+    /// The percent error is always less than 12%, and the max error occurs right around
+    /// i16::MAX, tapering off as values grow larger
+    #[test]
+    fn error_upper_bound() {
+        let m16 = i16::MAX as usize;
+        for m in [
+            m16,
+            m16 + 2,
+            m16 + GRAN - 1,
+            m16 + GRAN * 10 - 1,
+            RoughInt::MAX - 1,
+            RoughInt::MAX,
+        ] {
+            let r = RoughInt::from(m).get();
+            let error = r.abs_diff(m) as f64 / m as f64;
+            dbg!(r, m, error);
+            assert!(error < 0.13);
+        }
+    }
+
+    proptest! {
         #[test]
-        fn roughsized_roundtrip(v: usize) {
+        fn roughint_roundtrip(v: usize) {
             let r = RoughInt::from(v);
             let v = r.get();
             assert_eq!(r, RoughInt::from(v));
+        }
+
+        #[test]
+        fn roughint_always_underestimates(actual: usize) {
+            let rough = RoughInt::from(actual);
+            assert!(rough.get() <= actual);
+        }
+
+        /// Test that the sum of roughints is less than the max error for a single roughint,
+        /// even in the most problematic range
+        #[test]
+        fn roughint_sum_error_problematic_range(
+            real in proptest::collection::vec(i16::MAX as usize..i16::MAX as usize + GRAN, 1..10)
+        ) {
+            let rough = real.iter().copied().map(RoughInt::from).map(|r| r.get());
+            let both: Vec<(usize, usize)> = real.iter().copied().zip(rough).collect();
+            let real_sum: usize = both.iter().map(|(r, _)| r).sum();
+            let rough_sum: usize = both.iter().map(|(_, r)| r).sum();
+
+            if real_sum == 0 || rough_sum == 0 {
+                unreachable!("zero sum");
+            }
+
+            let error = (rough_sum.abs_diff(real_sum)) as f64 / real_sum as f64;
+            dbg!(error);
+            assert!(error <= 0.13);
+        }
+
+        /// Test that the sum of roughints is less than the max error for a single roughint,
+        /// across the range of all possible values
+        fn roughint_sum_error_full_range(
+            real in proptest::collection::vec(1..RoughInt::MAX, 1..10)
+        ) {
+            let rough = real.iter().copied().map(RoughInt::from).map(|r| r.get());
+            let both: Vec<(usize, usize)> = real.iter().copied().zip(rough).collect();
+            let real_sum: usize = both.iter().map(|(r, _)| r).sum();
+            let rough_sum: usize = both.iter().map(|(_, r)| r).sum();
+
+            if real_sum == 0 || rough_sum == 0 {
+                unreachable!("zero sum");
+            }
+
+            let error = (rough_sum.abs_diff(real_sum)) as f64 / real_sum as f64;
+            dbg!(error);
+            assert!(error <= 0.13);
         }
     }
 }
