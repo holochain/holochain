@@ -23,17 +23,17 @@
 
       config.rustHelper = {
         defaultTrack = "stable";
-        defaultVersion = "1.66.1";
+        defaultVersion = "1.71.1";
 
-        defaultExtensions = [ "rust-src" ];
+        defaultExtensions = [
+          "rust-src"
+          "rust-analyzer"
+          "clippy"
+          "rustfmt"
+        ];
 
         defaultTargets = [
-          "aarch64-unknown-linux-musl"
           "wasm32-unknown-unknown"
-          "x86_64-pc-windows-gnu"
-          "x86_64-unknown-linux-musl"
-          "x86_64-apple-darwin"
-          "aarch64-apple-darwin"
         ];
 
         defaultStdenv = pkgs:
@@ -55,7 +55,7 @@
 
               (final: prev: {
                 rustToolchain =
-                  (prev.rust-bin."${track}"."${version}".default.override ({
+                  (prev.rust-bin."${track}"."${version}".minimal.override ({
                     inherit extensions targets;
                   }));
 
@@ -63,15 +63,16 @@
                 cargo = final.rustToolchain;
               })
 
-              (final: prev: {
-              })
+              (final: prev: { })
             ];
           };
 
         mkRust =
           { track ? config.rustHelper.defaultTrack
           , version ? config.rustHelper.defaultVersion
-          }: (config.rustHelper.mkRustPkgs { inherit track version; }).rustToolchain;
+          , extensions ? config.rustHelper.defaultExtensions
+          , targets ? config.rustHelper.defaultTargets
+          }: (config.rustHelper.mkRustPkgs { inherit track version extensions targets; }).rustToolchain;
 
         crate2nixTools = { pkgs }: import "${inputs.crate2nix}/tools.nix" {
           inherit pkgs;
