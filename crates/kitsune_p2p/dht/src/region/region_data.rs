@@ -65,6 +65,7 @@ impl From<OpHash> for RegionHash {
 /// gossip algorithm, although currently they are unused (except for the purpose
 /// of disambiguation in the rare case of an XOR hash collision).
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[serde(from = "RegionDataCompact")]
 #[serde(into = "RegionDataCompact")]
 pub struct RegionData {
