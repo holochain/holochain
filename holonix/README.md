@@ -48,10 +48,11 @@ please see the following examples to learn more about common and more specific u
 
 ## Customizing the holochain binary build parameters
 
-The `holochain` is customisable by means of [nixpkgs.lib.makeOverridable](https://nixos.org/manual/nixpkgs/stable/#sec-lib-makeOverridable).
+The top-level flake output `packages.holochain` and `devShells.holonix` are customisable by means of [nixpkgs.lib.makeOverridable](https://nixos.org/manual/nixpkgs/stable/#sec-lib-makeOverridable).
 
 ### Example: pass `--feature chc` to the `cargo build` command
 
-This means that you can pass e.g. `holochain.override { cargoExtraArgs = "--feature chc"; }` or any other desirable attribute to override the attributes that are passed to [craneLib.buildPackage](https://crane.dev/API.html#cranelibbuildpackage).
+This means that you can pass e.g. `holochain.override { cargoExtraArgs = " --feature chc"; }` or any other desirable attribute to override the attributes that are passed to [craneLib.buildPackage](https://crane.dev/API.html#cranelibbuildpackage).
 
-For an example please see [this flake](examples/custom_holochain_feature/flake.nix).
+Creating a devShell based on holonix this, can be achieved by passing `holonix.override { holochainOverrides = { cargoExtraArgs = "--features chc"; }}`.
+Please see [this flake](examples/custom_holochain_feature/flake.nix) for a complete example.
