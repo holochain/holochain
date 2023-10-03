@@ -2793,8 +2793,6 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.6",
- "hdk",
- "hdk_derive",
  "holo_hash",
  "holochain_cascade",
  "holochain_nonce",
