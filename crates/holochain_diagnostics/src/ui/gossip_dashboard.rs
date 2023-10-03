@@ -84,7 +84,7 @@ impl Node {
             })
             .collect();
         assert_eq!(ids.len(), 1);
-        let id = ids.pop().unwrap();
+        let id = ids.pop().unwrap().into();
 
         Self {
             conductor,

@@ -153,7 +153,7 @@ pub enum MetaNetAuth {
     UnauthorizedDisconnect,
 }
 
-async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, now: Timestamp) -> MetaNetAuth {
+async fn node_is_authorized(host: &HostApi, node_id: NodeCert, now: Timestamp) -> MetaNetAuth {
     match host.is_blocked(BlockTargetId::Node(node_id), now).await {
         Ok(true) => MetaNetAuth::UnauthorizedDisconnect,
         Ok(false) => MetaNetAuth::Authorized,
@@ -163,7 +163,7 @@ async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, now: Timesta
 
 pub async fn nodespace_is_authorized(
     host: &HostApi,
-    node_id: Arc<[u8; 32]>,
+    node_id: NodeCert,
     maybe_space: Option<Arc<KitsuneSpace>>,
     now: Timestamp,
 ) -> MetaNetAuth {
@@ -480,7 +480,7 @@ impl MetaNetCon {
         result
     }
 
-    pub fn peer_id(&self) -> Arc<[u8; 32]> {
+    pub fn peer_id(&self) -> NodeCert {
         #[cfg(test)]
         {
             if let MetaNetCon::Test { state } = self {
@@ -499,7 +499,7 @@ impl MetaNetCon {
         {
             if let MetaNetCon::Tx5 { rem_url, .. } = self {
                 let id = rem_url.id().unwrap();
-                return Arc::new(id.0);
+                return Arc::new(id.0).into();
             }
         }
 
@@ -510,7 +510,7 @@ impl MetaNetCon {
 #[cfg(test)]
 #[derive(Debug)]
 pub struct MetaNetConTest {
-    pub id: Arc<[u8; 32]>,
+    pub id: NodeCert,
     pub closed: bool,
 
     pub notify_succeed: bool,
@@ -521,7 +521,7 @@ pub struct MetaNetConTest {
 impl Default for MetaNetConTest {
     fn default() -> Self {
         Self {
-            id: Arc::new([0; 32]),
+            id: NodeCert::from(Arc::new([0; 32])),
             closed: false,
             notify_succeed: true,
             notify_call_count: 0,
@@ -533,12 +533,12 @@ impl Default for MetaNetConTest {
 impl MetaNetConTest {
     pub fn new_with_id(id: u8) -> Self {
         Self {
-            id: Arc::new(vec![id; 32].try_into().unwrap()),
+            id: NodeCert::from(Arc::new(vec![id; 32].try_into().unwrap())),
             ..Default::default()
         }
     }
 
-    pub fn id(&self) -> Arc<[u8; 32]> {
+    pub fn id(&self) -> NodeCert {
         self.id.clone()
     }
 }
@@ -1049,7 +1049,7 @@ impl MetaNet {
         panic!("invalid features");
     }
 
-    pub fn local_id(&self) -> Arc<[u8; 32]> {
+    pub fn local_id(&self) -> NodeCert {
         #[cfg(feature = "tx2")]
         {
             if let MetaNet::Tx2(ep, _) = self {
@@ -1061,7 +1061,7 @@ impl MetaNet {
         {
             if let MetaNet::Tx5 { url, .. } = self {
                 if let Some(id) = url.id() {
-                    return Arc::new(id.0);
+                    return Arc::new(id.0).into();
                 }
             }
         }

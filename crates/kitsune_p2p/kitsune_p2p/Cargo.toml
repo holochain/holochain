@@ -27,6 +27,7 @@ kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.2", path = "../timestamp", 
 kitsune_p2p_block = { version = "^0.3.0-beta-dev.7", path = "../block" }
 kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.9", path = "../transport_quic", optional = true }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../types", default-features = false }
+holochain_util = { version = "^0.3.0-beta-dev.0", path = "../../holochain_util", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
