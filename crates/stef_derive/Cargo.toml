@@ -5,16 +5,16 @@ edition = "2021"
 #[stef_derive::state(wrapper(PeopleShare<D>))]#[stef_derive::state(wrapper(PeopleShare<D>))]
 
 [dependencies]
-heck = "*"
+heck = "0.4"
 proc-macro2 = "1"
-proc-macro-error = "*"
+proc-macro-error = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
 
 [dev-dependencies]
 stef_derive = { path = ".", features = ["recording"]}
-derive_more = "*"
-proptest-derive = "*"
+derive_more = "0.99"
+proptest-derive = "0"
 stef = { path = "../stef", features = ["recording"] }
 
 [lib]

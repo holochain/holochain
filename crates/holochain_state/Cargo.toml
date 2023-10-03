@@ -29,7 +29,7 @@ holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zo
 kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p" }
 mockall = "0.11.3"
 one_err = "0.0.8"
-parking_lot = "0.10"
+parking_lot = "0.12.1"
 shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
