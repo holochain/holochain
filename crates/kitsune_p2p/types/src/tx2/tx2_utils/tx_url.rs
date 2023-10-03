@@ -74,14 +74,14 @@ impl From<&str> for TxUrl {
     }
 }
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for TxUrl {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         String::arbitrary(u).map(Into::into)
     }
 }
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(feature = "fuzzing")]
 impl proptest::arbitrary::Arbitrary for TxUrl {
     type Parameters = ();
     type Strategy = proptest::strategy::BoxedStrategy<TxUrl>;

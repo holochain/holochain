@@ -107,7 +107,7 @@ macro_rules! write_codec_enum {
                 $(#[doc = $var_doc])*
                 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
                 // NOTE: calling crate must depend on kitsune_p2p_types with feature fuzzing
-                #[cfg_attr(any(test, feature = "fuzzing"), derive($crate::dependencies::proptest_derive::Arbitrary))]
+                #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
                 pub struct [< $var_name:camel >] {
                     $(
                         $(#[doc = $type_doc])* pub [< $type_name:snake >]: $type_ty,
@@ -166,7 +166,7 @@ macro_rules! write_codec_enum {
             $(#[doc = $codec_doc])*
             #[derive(Clone, Debug, PartialEq, Eq)]
             // NOTE: calling crate must depend on kitsune_p2p_types with feature fuzzing
-            #[cfg_attr(any(test, feature = "fuzzing"), derive($crate::dependencies::proptest_derive::Arbitrary))]
+            #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
             pub enum [< $codec_name:camel >] {
                 $(
                     $(#[doc = $var_doc])*

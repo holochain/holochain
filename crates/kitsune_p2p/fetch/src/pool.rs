@@ -920,7 +920,7 @@ mod tests {
 
         // We created an item that will always fail, so should have at least one left
         assert!(
-            fetch_pool.get_items_to_fetch().len() >= 1,
+            !fetch_pool.get_items_to_fetch().is_empty(),
             "Pool should have had at least one item but got \n {}",
             fetch_pool.state.share_ref(|s| format!(
                 "{}\n{}",

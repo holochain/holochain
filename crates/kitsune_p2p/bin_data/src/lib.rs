@@ -3,9 +3,9 @@
 use kitsune_p2p_dht_arc::DhtLocation;
 
 pub mod dependencies {
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(feature = "fuzzing")]
     pub use proptest;
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(feature = "fuzzing")]
     pub use proptest_derive;
 }
 
@@ -59,11 +59,11 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
-            #[cfg_attr(any(test, feature = "fuzzing"), derive($crate::dependencies::proptest_derive::Arbitrary))]
+            #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
             #[shrinkwrap(mutable)]
             pub struct $name(
                 #[serde(with = "serde_bytes")]
-                #[cfg_attr(any(test, feature = "fuzzing"), proptest(strategy = "proptest::collection::vec(0u8..128, 36)"))]
+                #[cfg_attr(feature = "fuzzing", proptest(strategy = "proptest::collection::vec(0u8..128, 36)"))]
                 pub Vec<u8>);
 
             impl KitsuneBinType for $name {
