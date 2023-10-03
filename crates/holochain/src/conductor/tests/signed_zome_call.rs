@@ -1,10 +1,9 @@
+use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
-    CapSecret, GrantZomeCallCapabilityPayload, GrantedFunction, GrantedFunctions,
-    RoleName,
+    CapSecret, GrantZomeCallCapabilityPayload, GrantedFunction, GrantedFunctions, RoleName,
 };
-use holochain_nonce::Nonce256Bits;
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;

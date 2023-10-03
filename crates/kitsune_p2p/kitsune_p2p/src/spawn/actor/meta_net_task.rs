@@ -12,11 +12,11 @@ use crate::spawn::meta_net::{
 };
 use crate::wire::WireData;
 use crate::{wire, HostApiLegacy, KitsuneAgent, KitsuneP2pError, KitsuneSpace};
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use futures::StreamExt;
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

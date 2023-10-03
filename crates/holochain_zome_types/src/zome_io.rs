@@ -4,8 +4,8 @@ use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
 pub use holochain_integrity_types::zome_io::*;
-use holochain_serialized_bytes::prelude::*;
 use holochain_nonce::Nonce256Bits;
+use holochain_serialized_bytes::prelude::*;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.

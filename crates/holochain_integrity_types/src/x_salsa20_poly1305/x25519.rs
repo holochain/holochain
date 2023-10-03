@@ -1,5 +1,5 @@
-use holochain_serialized_bytes::prelude::*;
 use holochain_secure_primitive::secure_primitive;
+use holochain_serialized_bytes::prelude::*;
 
 pub const X25519_PUB_KEY_BYTES: usize = 32;
 

@@ -1291,8 +1291,8 @@ mod network_impls {
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
-            let (nonce, expires_at) = holochain_nonce::fresh_nonce(now)
-                .map_err(|e| ConductorApiError::Other(e))?;
+            let (nonce, expires_at) =
+                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),

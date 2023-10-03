@@ -6,9 +6,9 @@ use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use clap::Parser;
 

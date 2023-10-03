@@ -238,9 +238,9 @@ mod tests {
     use holochain_types::prelude::AgentPubKeyExt;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p::*;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
+    use kitsune_p2p_types::tls::TlsConfig;
     use std::sync::Mutex;
 
     macro_rules! newhash {

@@ -1,7 +1,7 @@
 //! Signature for authenticity of data
 use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::prelude::*;
 use holochain_secure_primitive::secure_primitive;
+use holochain_serialized_bytes::prelude::*;
 
 /// Ed25519 signatures are always the same length, 64 bytes.
 pub const SIGNATURE_BYTES: usize = 64;

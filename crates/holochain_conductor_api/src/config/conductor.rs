@@ -2,7 +2,7 @@
 //! This module is used to configure the conductor
 
 use holochain_types::db::DbSyncStrategy;
-use kitsune_p2p_types::config::{KitsuneP2pTuningParams, KitsuneP2pConfig};
+use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -107,10 +107,10 @@ impl ConductorConfig {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
-    use kitsune_p2p_types::config::TransportConfig;
 
     #[test]
     fn test_config_load_yaml() {

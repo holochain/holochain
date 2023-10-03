@@ -1,6 +1,6 @@
 pub use paste;
-pub use subtle;
 pub use serde;
+pub use subtle;
 
 mod types;
 pub use types::*;
@@ -73,7 +73,6 @@ macro_rules! fixed_array_serialization {
         }
     };
 }
-
 
 #[macro_export]
 /// Cryptographic secrets are fiddly at the best of times.

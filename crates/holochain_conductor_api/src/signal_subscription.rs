@@ -1,8 +1,8 @@
+use holochain_serialized_bytes::prelude::*;
 use holochain_types::app::InstalledAppId;
 use holochain_zome_types::cell::CellId;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use holochain_serialized_bytes::prelude::*;
-use serde::{Serialize, Deserialize};
 
 /// Declares updated Signal subscription settings for an App.
 /// This message is part of the AppInterfaceApi

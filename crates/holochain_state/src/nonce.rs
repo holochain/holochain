@@ -1,4 +1,5 @@
 use crate::mutations;
+use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::nonce::nonce_already_seen;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::prelude::DbWrite;
@@ -6,7 +7,6 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DbKindConductor;
-use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::Timestamp;
 use std::time::Duration;
 
@@ -53,13 +53,10 @@ pub async fn witness_nonce(
 pub mod test {
     use fixt::prelude::*;
     use hdk::prelude::AgentPubKeyFixturator;
-    use holochain_zome_types::Timestamp;
     use holochain_nonce::fresh_nonce;
-    
-    use crate::{
-        nonce::WitnessNonceResult,
-        prelude::test_conductor_db,
-    };
+    use holochain_zome_types::Timestamp;
+
+    use crate::{nonce::WitnessNonceResult, prelude::test_conductor_db};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_witness_nonce() {

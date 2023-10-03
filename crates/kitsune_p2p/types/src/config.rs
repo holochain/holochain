@@ -1,8 +1,8 @@
 //! Kitsune Config Tuning Params
 #![allow(missing_docs)]
 
-use crate::tx2::tx2_utils::TxUrl;
 use crate::tx2::tx2_adapter::AdapterFactory;
+use crate::tx2::tx2_utils::TxUrl;
 use crate::KitsuneResult;
 use url2::Url2;
 
@@ -346,7 +346,6 @@ pub mod tuning_params_struct {
 /// They should normally be passed around as an Arc.
 pub type KitsuneP2pTuningParams = std::sync::Arc<tuning_params_struct::KitsuneP2pTuningParams>;
 
-
 /// Configure the kitsune actor.
 #[non_exhaustive]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -514,7 +513,6 @@ pub struct KitsuneP2pTx2Config {
     pub use_proxy: KitsuneP2pTx2ProxyConfig,
 }
 
-
 /// Proxy configuration options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -569,7 +567,6 @@ pub enum NetworkType {
     // MAYBE: Remove the "Quic" from this?
     QuicMdns,
 }
-
 
 #[cfg(feature = "tx2")]
 #[derive(Clone)]

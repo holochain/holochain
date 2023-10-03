@@ -2,10 +2,10 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_state_types::SourceChainJsonDump;
 use holochain_types::dht_op::DhtOp;
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
-use kitsune_p2p_bin_data::{KitsuneSpace, KitsuneAgent};
 
 #[derive(Serialize, Deserialize)]
 pub struct JsonDump {

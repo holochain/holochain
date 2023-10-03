@@ -1,5 +1,5 @@
-use holochain_serialized_bytes::prelude::*;
 use holochain_secure_primitive::secure_primitive;
+use holochain_serialized_bytes::prelude::*;
 
 /// The number of bits we want for a comfy secret.
 pub const CAP_SECRET_BITS: usize = 512;

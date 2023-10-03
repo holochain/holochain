@@ -1,5 +1,5 @@
-use holochain_serialized_bytes::prelude::*;
 use holochain_secure_primitive::secure_primitive;
+use holochain_serialized_bytes::prelude::*;
 
 pub const NONCE_BYTES: usize = 24;
 

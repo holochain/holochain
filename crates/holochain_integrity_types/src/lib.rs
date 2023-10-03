@@ -81,7 +81,6 @@ impl UnitEnum for () {
     }
 }
 
-
 /// A full UnitEnum, or just the unit type of that UnitEnum
 #[derive(Clone, Debug)]
 pub enum UnitEnumEither<E: UnitEnum> {

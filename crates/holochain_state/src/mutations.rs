@@ -7,6 +7,7 @@ use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
+use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
@@ -23,7 +24,6 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
-use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::*;
 use std::str::FromStr;
 
