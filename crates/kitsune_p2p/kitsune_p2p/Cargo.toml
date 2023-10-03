@@ -86,6 +86,7 @@ fuzzing = [
   "proptest",
   "proptest-derive",
   "test-strategy",
+  "kitsune_p2p_fetch/fuzzing",
   "kitsune_p2p_timestamp/fuzzing",
   "kitsune_p2p_types/fuzzing",
 ]
