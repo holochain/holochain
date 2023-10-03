@@ -56,7 +56,6 @@ holochain_state = { path = ".", features = ["test_utils"] }
 anyhow = "1.0.26"
 arbitrary = "1.0"
 fixt = { path = "../fixt" }
-hdk = { path = "../hdk" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 matches = "0.1.8"
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }

@@ -1342,11 +1342,13 @@ impl From<SourceChain> for SourceChainRead {
 
 #[cfg(test)]
 pub mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use hdk::prelude::*;
     use holochain_p2p::MockHolochainP2pDnaT;
+    use holochain_zome_types::prelude::*;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;

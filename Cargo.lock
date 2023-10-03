@@ -3019,7 +3019,6 @@ name = "holochain_nonce"
 version = "0.3.0-beta-dev.18"
 dependencies = [
  "getrandom 0.2.10",
- "hdk",
  "holochain_secure_primitive",
  "holochain_zome_types",
  "kitsune_p2p_timestamp",
@@ -3157,7 +3156,6 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "hdk",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",

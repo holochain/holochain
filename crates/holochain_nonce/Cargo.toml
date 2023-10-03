@@ -15,4 +15,3 @@ holochain_secure_primitive = { version = "^0.3.0-beta-dev.18", path = "../holoch
 
 [dev-dependencies]
 holochain_zome_types = { version = "^0.3.0-beta-dev.12", path = "../holochain_zome_types", features = ["full"] }
-hdk = { path = "../hdk", version = "^0.3.0-beta-dev.15" }

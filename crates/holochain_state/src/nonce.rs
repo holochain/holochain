@@ -51,10 +51,9 @@ pub async fn witness_nonce(
 
 #[cfg(test)]
 pub mod test {
-    use fixt::prelude::*;
-    use hdk::prelude::AgentPubKeyFixturator;
+    use ::fixt::prelude::*;
     use holochain_nonce::fresh_nonce;
-    use holochain_zome_types::Timestamp;
+    use holochain_zome_types::prelude::*;
 
     use crate::{nonce::WitnessNonceResult, prelude::test_conductor_db};
 
