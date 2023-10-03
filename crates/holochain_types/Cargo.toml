@@ -42,7 +42,7 @@ mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-b
 must_future = "0.1.1"
 nanoid = "0.3"
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
-parking_lot = "0.10"
+parking_lot = "0.12.1"
 rand = "0.8.5"
 regex = "1.4"
 rusqlite = { version = "0.29" }

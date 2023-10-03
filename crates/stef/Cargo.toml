@@ -5,30 +5,30 @@ edition = "2021"
 
 
 [dependencies]
-anyhow = { version = "*" }
+anyhow = { version = "1" }
 derivative = "2.2.0"
-derive_more = { version = "*" }
-futures = { version = "*" }
+derive_more = { version = "0.99" }
+futures = { version = "0.3" }
 kitsune_p2p_timestamp = { version = "0.3.0-beta-dev.2", path = "../kitsune_p2p/timestamp", features = ["now"] }
-must_future = { version = "*" }
-parking_lot = { version = "*" }
+must_future = { version = "0.1" }
+parking_lot = { version = "0.12" }
 
 # derive
 stef_derive = { path = "../stef_derive", optional = true }
 
 # diagramming
-petgraph = { version = "*", optional = true }
-proptest = { version = "*", optional = true }
+petgraph = { version = "0.6", optional = true }
+proptest = { version = "1", optional = true }
 
 # recording
-serde = { version = "*", features = ["derive"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
-rmp-serde = { version = "*", optional = true }
+rmp-serde = { version = "0.15", optional = true }
 
 [dev-dependencies]
 either = { version = "*" }
 proptest = { version = "*" }
-proptest-derive = { version = "*" }
+proptest-derive = { version = "0" }
 tempfile = "3"
 tokio = { version = "*", features = ["full"] }
 
