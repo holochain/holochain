@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Added a macro `#![dna_properties]` which when applied to a struct, exposes a function `get_from_dna_properties()` on that struct
+- Added a macro `#![dna_properties]` which when applied to a struct, exposes a function `try_from_dna_properties()` on that struct
 
 ## 0.3.0-beta-dev.13
 
