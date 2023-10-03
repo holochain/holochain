@@ -26,7 +26,6 @@ struct EntryDefId(holochain_integrity_types::entry_def::EntryDefId);
 struct EntryVisibility(holochain_integrity_types::entry_def::EntryVisibility);
 struct RequiredValidations(holochain_integrity_types::entry_def::RequiredValidations);
 struct RequiredValidationType(holochain_integrity_types::validate::RequiredValidationType);
-struct DnaProperties;
 
 
 impl Parse for EntryDef {
