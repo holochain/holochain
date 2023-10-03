@@ -15,9 +15,9 @@ pub mod dependencies {
     pub use ::tokio;
     pub use ::url2;
 
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(feature = "fuzzing")]
     pub use ::proptest;
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(feature = "fuzzing")]
     pub use ::proptest_derive;
 }
 

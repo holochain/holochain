@@ -756,7 +756,7 @@ mod tests {
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds(&topo);
             let interval = arq.to_dht_arc_range(&topo);
-            let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval.clone()).unwrap();
+            let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval).unwrap();
             assert!(ArqBounds::equivalent(&topo, &arq, &arq2));
         }
     }

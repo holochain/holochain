@@ -170,7 +170,7 @@ mod tests {
         let ops = op_grid(
             &topo,
             &ArqLocated::new(pow, 0u32.into(), 8.into()),
-            (1000..11000 as i64).step_by(1000),
+            (1000..11000_i64).step_by(1000),
         );
         assert_eq!(ops.len(), nx * nt);
         store.integrate_ops(ops.into_iter());
@@ -201,8 +201,8 @@ mod tests {
 
         let tt_a = TelescopingTimes::new(TimeQuantum::from(20));
         let tt_b = TelescopingTimes::new(TimeQuantum::from(30));
-        let coords_a = RegionCoordSetLtcs::new(tt_a, ArqSet::single(arq.clone()));
-        let coords_b = RegionCoordSetLtcs::new(tt_b, ArqSet::single(arq.clone()));
+        let coords_a = RegionCoordSetLtcs::new(tt_a, ArqSet::single(arq));
+        let coords_b = RegionCoordSetLtcs::new(tt_b, ArqSet::single(arq));
 
         let mut rset_a = RegionSetLtcs::from_store(&store, coords_a);
         let mut rset_b = RegionSetLtcs::from_store(&store, coords_b);
@@ -250,11 +250,11 @@ mod tests {
 
         let coords_a = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(20)),
-            ArqSet::single(arq.clone()),
+            ArqSet::single(arq),
         );
         let coords_b = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(21)),
-            ArqSet::single(arq.clone()),
+            ArqSet::single(arq),
         );
 
         let rset_a = RegionSetLtcs::from_store(&store1, coords_a);
@@ -312,11 +312,11 @@ mod tests {
 
         let coords_a = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(20)),
-            ArqSet::single(arq.clone()),
+            ArqSet::single(arq),
         );
         let coords_b = RegionCoordSetLtcs::new(
             TelescopingTimes::new(TimeQuantum::from(21)),
-            ArqSet::single(arq.clone()),
+            ArqSet::single(arq),
         );
 
         let rset_a = RegionSetLtcs::from_store(&store1, coords_a);
