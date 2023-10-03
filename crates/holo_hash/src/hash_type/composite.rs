@@ -81,7 +81,10 @@ impl From<AnyDhtSerial> for AnyDht {
     derive(serde::Deserialize, serde::Serialize, SerializedBytes),
     serde(from = "AnyLinkableSerial", into = "AnyLinkableSerial")
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum AnyLinkable {
     /// The hash of an Entry
     Entry,

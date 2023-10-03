@@ -18,12 +18,20 @@ derive_more = "0.99.7"
 serde = { version = "1", features = [ "derive", "rc" ] }
 base64 = "0.13"
 serde_bytes = "0.11"
+
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
 
 [features]
+
 fuzzing = [
-  "arbitrary"
+  "arbitrary",
+  "proptest",
+  "proptest-derive",
+  "kitsune_p2p_dht_arc/fuzzing",
 ]
+
 test_utils = [ ]
 
 sqlite-encrypted = [

@@ -44,6 +44,22 @@ impl Location {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for Location {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    // XXX: this is a bad arbitrary impl, could be derived automatically when
+    // https://github.com/proptest-rs/proptest/pull/362 lands
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        proptest::prelude::any::<String>()
+            .prop_map(|s| Self::Path(s.into()))
+            .boxed()
+    }
+}
+
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
     Ok(ffs::read(path).await?.into())
 }
