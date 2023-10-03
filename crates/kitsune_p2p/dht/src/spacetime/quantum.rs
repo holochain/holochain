@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn to_bounds_standard_topo() {
         let origin = Timestamp::ZERO;
-        let topo = Topology::standard(origin.clone(), Duration::ZERO);
+        let topo = Topology::standard(origin, Duration::ZERO);
         let epoch = origin.as_micros();
         let xq = topo.space.quantum;
         let tq = topo.time.quantum as i64;

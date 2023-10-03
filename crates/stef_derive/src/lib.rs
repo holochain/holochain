@@ -83,7 +83,7 @@ pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let mut generics = strukt.generics.clone();
     let name = &strukt.ident;
-    
+
     proc_macro::TokenStream::from(if strukt.fields.len() == 1 {
         let field = strukt.fields.into_iter().next().unwrap();
         let ty = field.ty;
@@ -125,7 +125,7 @@ pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let effect_variant = quote!(#variant_name(<#ty as stef::State<'static>>::Effect) ,);
 
             let case = quote!(#action_enum_name::#variant_name(s) => #effect_enum_name::#variant_name(self.#ident.transition(s)), );
-            
+
             let predicate: syn::WherePredicate = syn::parse_quote! {
                 #ty: stef::State<'static>
             };
