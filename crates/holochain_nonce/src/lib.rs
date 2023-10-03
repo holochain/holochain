@@ -28,7 +28,7 @@ pub fn fresh_nonce(
 
 #[cfg(test)]
 pub mod test {
-    use holochain_zome_types::Timestamp;
+    use kitsune_p2p_timestamp::Timestamp;
 
     use crate::{fresh_nonce, FRESH_NONCE_EXPIRES_AFTER};
 
