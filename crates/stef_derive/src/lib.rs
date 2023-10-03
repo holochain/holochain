@@ -56,7 +56,7 @@
 //! effects, or granting shared access in a specific way. The `stef::combinators` module contains some
 //! built-in wrappers. TODO: write more
 
-use heck::CamelCase;
+use heck::ToPascalCase;
 use proc_macro2::TokenStream;
 use proc_macro_error::{abort, abort_call_site};
 use quote::{quote, ToTokens};
@@ -109,18 +109,18 @@ pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl_state.into_token_stream()
     } else {
         let action_enum_name = syn::Ident::new(
-            &format!("{}Action", strukt.ident.to_string()).to_camel_case(),
+            &format!("{}Action", strukt.ident.to_string()).to_pascal_case(),
             strukt.span(),
         );
         let effect_enum_name = syn::Ident::new(
-            &format!("{}Effect", strukt.ident.to_string()).to_camel_case(),
+            &format!("{}Effect", strukt.ident.to_string()).to_pascal_case(),
             strukt.span(),
         );
 
         let rows: Vec<_> = strukt.fields.iter().map(|field| {
             let Field { ty, ident, .. } = field;
             let ident = ident.clone().unwrap();
-            let variant_name = syn::Ident::new(&ident.to_string().to_camel_case(), ident.span());
+            let variant_name = syn::Ident::new(&ident.to_string().to_pascal_case(), ident.span());
             let action_variant = quote!(#variant_name(<#ty as stef::State<'static>>::Action) ,);
             let effect_variant = quote!(#variant_name(<#ty as stef::State<'static>>::Effect) ,);
 
