@@ -36,11 +36,16 @@ where
 {
     pub fn new(cassette: Option<impl Cassette<S> + Send + Sync + 'static>, state: S) -> Self {
         let cassette: Arc<dyn Cassette<S> + Send + Sync> = if let Some(c) = cassette {
-            Arc::new(c)
+            if let Err(err) = c.initialize() {
+                tracing::error!("Could not initialize stef cassette: {:?}", err);
+                Arc::new(())
+            } else {
+                Arc::new(c)
+            }
         } else {
             Arc::new(())
         };
-        cassette.initialize().unwrap();
+
         Self { cassette, state }
     }
 }

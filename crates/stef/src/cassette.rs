@@ -67,6 +67,7 @@ where
 {
     path: PathBuf,
     encoder: E,
+    erase_existing: bool,
     state: PhantomData<(S, E)>,
 }
 
@@ -77,7 +78,7 @@ where
     E: Encoder,
 {
     fn from(path: PathBuf) -> Self {
-        Self::new(path, Default::default())
+        Self::new(path, Default::default(), true)
     }
 }
 
@@ -87,10 +88,11 @@ where
     S::Action: Serialize + DeserializeOwned,
     E: Encoder,
 {
-    pub fn new(path: PathBuf, encoder: E) -> Self {
+    pub fn new(path: PathBuf, encoder: E, erase_existing: bool) -> Self {
         Self {
             path,
             encoder,
+            erase_existing,
             state: PhantomData,
         }
     }
@@ -104,10 +106,15 @@ where
     E: Encoder,
 {
     fn initialize(&self) -> anyhow::Result<()> {
-        File::options()
-            .write(true)
-            .create_new(true)
-            .open(&self.path)?;
+        let mut f = File::options();
+        f.write(true);
+        if self.erase_existing {
+            if let Err(err) = f.truncate(true).open(&self.path) {
+                tracing::error!("Error opening stef cassette: {:?}", err);
+            }
+        } else {
+            f.create_new(true).open(&self.path)?;
+        };
         Ok(())
     }
 

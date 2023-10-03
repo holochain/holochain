@@ -12,6 +12,7 @@ futures = { version = "0.3" }
 kitsune_p2p_timestamp = { version = "0.3.0-beta-dev.2", path = "../kitsune_p2p/timestamp", features = ["now"] }
 must_future = { version = "0.1" }
 parking_lot = { version = "0.12" }
+tracing = "0.1"
 
 # derive
 stef_derive = { path = "../stef_derive", optional = true }
