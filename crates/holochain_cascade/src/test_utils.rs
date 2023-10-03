@@ -258,7 +258,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,
@@ -464,7 +464,7 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
         _receipt: holochain_serialized_bytes::SerializedBytes,

@@ -141,7 +141,7 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
-    fn handle_send_validation_receipt(
+    fn handle_send_validation_receipts(
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -389,7 +389,7 @@ mod tests {
         p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
         p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
-        p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
+        p2p.send_validation_receipts(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
             .await
             .unwrap();
 

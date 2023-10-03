@@ -347,7 +347,7 @@ ghost_actor::ghost_chan! {
         ) -> Vec<MustGetAgentActivityResponse>;
 
         /// Send a validation receipt to a remote node.
-        fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
+        fn send_validation_receipts(dna_hash: DnaHash, to_agent: AgentPubKey, receipts: SerializedBytes) -> ();
 
         /// New data has been integrated and is ready for gossiping.
         fn new_integrated_data(dna_hash: DnaHash) -> ();

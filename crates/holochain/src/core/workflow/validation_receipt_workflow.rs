@@ -1,4 +1,5 @@
 use futures::future::BoxFuture;
+use futures::{stream, StreamExt};
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -24,11 +25,6 @@ mod unit_tests;
 
 #[cfg(test)]
 mod unit_tests;
-
-enum SendOutcome {
-    Attempted,
-    AuthorUnavailable,
-}
 
 #[instrument(skip(vault, network, keystore, apply_block))]
 /// Send validation receipts to their authors in serial and without waiting for responses.
@@ -66,34 +62,45 @@ where
 
     let validators: HashSet<_> = validators.into_iter().collect();
 
+    let grouped_by_author = receipts
+        .into_iter()
+        .group_by(|(_, author)| author.clone())
+        .into_iter()
+        .map(|(author, receipts)| {
+            (
+                author,
+                receipts.into_iter().map(|r| r.0).collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<(AgentPubKey, Vec<ValidationReceipt>)>>();
+
     // Try to send the validation receipts
-    for (author, receipts) in &receipts.iter().group_by(|(_, author)| author) {
+    for (author, receipts) in grouped_by_author {
         match sign_and_send_receipts_to_author(
             &dna_hash,
             &network,
             &keystore,
             &validators,
             &author,
-            receipts.collect(),
+            receipts.clone(),
             apply_block.clone(),
         )
         .await
         {
-            Ok(SendOutcome::Attempted) => {
+            Ok(()) => {
                 // Success, nothing more to do
-            }
-            Ok(SendOutcome::AuthorUnavailable) => {
-                unavailable_authors.insert(author);
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);
             }
         }
 
-        // Attempted to send the receipt so we now mark it to not send in the future.
-        vault
-            .write_async(move |txn| set_require_receipt(txn, &dht_op_hash, false))
-            .await?;
+        // Attempted to send the receipts so we now mark them to not send in the next workflow run.
+        for receipt in receipts {
+            vault
+                .write_async(move |txn| set_require_receipt(txn, &receipt.dht_op_hash, false))
+                .await?;
+        }
     }
 
     Ok(WorkComplete::Complete)
@@ -109,66 +116,85 @@ async fn sign_and_send_receipts_to_author<B>(
     op_author: &AgentPubKey,
     receipts: Vec<ValidationReceipt>,
     apply_block: B,
-) -> WorkflowResult<SendOutcome>
+) -> WorkflowResult<()>
 where
     B: Fn(Block) -> BoxFuture<'static, DatabaseResult<()>>,
 {
     // Don't send receipt to self. Don't block self.
     if validators.contains(op_author) {
-        return Ok(SendOutcome::Attempted);
+        return Ok(());
     }
 
-    // Block authors of invalid ops.
-    if matches!(receipt.validation_status, ValidationStatus::Rejected) {
-        // Block BEFORE we integrate the outcome because this is not atomic
-        // and if something goes wrong we know the integration will retry.
-        apply_block(Block::new(
-            BlockTarget::Cell(
-                CellId::new((*dna_hash).clone(), op_author.clone()),
-                CellBlockReason::InvalidOp(receipt.dht_op_hash.clone()),
-            ),
-            InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)?,
-        ))
-        .await?;
-    }
+    let num_recripts = receipts.len();
 
-    // Sign on the dotted line.
-    let receipt = match ValidationReceipt::sign(receipt.clone(), keystore).await {
-        Ok(Some(r)) => r,
-        Ok(None) => {
-            // This branch should not be reachable, log an error if we somehow hit it to help diagnose the problem.
-            error!("No agents found to sign the validation receipt after checking that there was at least 1: {:?}", receipt);
-            return Ok(SendOutcome::Attempted);
-        }
-        Err(e) => {
-            // TODO Which errors are retryable here? A fatal error would keep being retried and we don't want that;
-            //      aggressively give up for now.
-            info!(failed_to_sign_receipt = ?e);
-            return Ok(SendOutcome::Attempted);
-        }
-    };
+    let receipts: Vec<SignedValidationReceipt> = stream::iter(receipts)
+        .filter_map(|receipt| async {
+            // Block authors of invalid ops.
+            if matches!(receipt.validation_status, ValidationStatus::Rejected) {
+                // Block BEFORE we integrate the outcome because this is not atomic
+                // and if something goes wrong we know the integration will retry.
+                if let Err(e) = apply_block(Block::new(
+                    BlockTarget::Cell(
+                        CellId::new((*dna_hash).clone(), op_author.clone()),
+                        CellBlockReason::InvalidOp(receipt.dht_op_hash.clone()),
+                    ),
+                    match InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX) {
+                        Ok(interval) => interval,
+                        Err(e) => {
+                            error!("Failed to create timestamp interval: {:?}", e);
+                            return None;
+                        }
+                    },
+                ))
+                .await
+                {
+                    error!("Failed to apply block to author {:?}: {:?}", op_author, e)
+                }
+            }
+
+            // Sign on the dotted line.
+            match ValidationReceipt::sign(receipt.clone(), keystore).await {
+                Ok(r) => r,
+                Err(e) => {
+                    // TODO Which errors are retryable here? A fatal error would keep being retried and we don't want that;
+                    //      aggressively give up for now.
+                    info!(failed_to_sign_receipt = ?e);
+                    None
+                }
+            }
+        })
+        .collect()
+        .await;
+
+    if num_recripts < receipts.len() {
+        info!(
+            "Dropped {} validation receipts, check previous errors to see why",
+            num_recripts - receipts.len()
+        );
+    }
 
     // Send it and don't wait for response.
-    match holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
+    if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
         network,
         op_author.clone(),
-        receipt.try_into()?,
+        receipts
+            .into_iter()
+            .map(|r| r.try_into())
+            .collect::<Result<SerializedBytes, _>>()?,
     )
     .await
     {
-        Ok(_) => Ok(SendOutcome::Attempted),
-        Err(e) => {
-            // No one home, they will need to publish again.
-            info!(failed_send_receipt = ?e);
-            Ok(SendOutcome::AuthorUnavailable)
-        }
+        // No one home, they will need to publish again.
+        info!(failed_send_receipt = ?e);
     }
+
+    Ok(())
 }
 
 async fn pending_receipts(
     vault: &DbRead<DbKindDht>,
     validators: Vec<AgentPubKey>,
-) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
+) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
     vault
         .read_async(move |txn| get_pending_validation_receipts(&txn, validators))
         .await

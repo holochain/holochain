@@ -36,7 +36,7 @@ async fn no_running_cells() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt().never(); // Verify no receipts sent
+    dna.expect_send_validation_receipts().never(); // Verify no receipts sent
 
     let work_complete = validation_receipt_workflow(
         Arc::new(fixt!(DnaHash)),
@@ -80,7 +80,7 @@ async fn do_not_block_or_send_to_self() {
 
     let mut dna = MockHolochainP2pDnaT::new();
 
-    dna.expect_send_validation_receipt().never(); // Verify no receipts sent
+    dna.expect_send_validation_receipts().never(); // Verify no receipts sent
 
     let validator = CellId::new(dna_hash.clone(), author);
 
@@ -116,7 +116,7 @@ async fn block_invalid_op_author() {
 
     // We'll still send a validation receipt, but we should also block them
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
 
     let dna_hash = fixt!(DnaHash);
@@ -175,7 +175,7 @@ async fn continues_if_receipt_cannot_be_signed() {
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt().never();
+    dna.expect_send_validation_receipts().never();
 
     let dna_hash = fixt!(DnaHash);
 
@@ -213,7 +213,7 @@ async fn send_validation_receipt() {
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
 
     let dna_hash = fixt!(DnaHash);
@@ -267,7 +267,7 @@ async fn skips_sending_to_same_unavailable_author() {
     .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .return_once(|_, _| Err("I'm a test timeout".into()));
 
     let dna_hash = fixt!(DnaHash);
@@ -294,7 +294,7 @@ async fn skips_sending_to_same_unavailable_author() {
     assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
     assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
 
-    // Note that the key assertion is built into the `expect_send_validation_receipt` setup. It will return an error the
+    // Note that the key assertion is built into the `expect_send_validation_receipts` setup. It will return an error the
     // first time but panic if it is called more than once.
 }
 
@@ -316,13 +316,13 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     let mut dna = MockHolochainP2pDnaT::new();
     let mut seq = mockall::Sequence::new();
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .times(1)
         .withf(move |author: &AgentPubKey, _| *author == author1)
         .in_sequence(&mut seq)
         .returning(|_, _| Err("I'm a test error".into()));
 
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .times(1)
         .withf(move |author: &AgentPubKey, _| *author == author2)
         .in_sequence(&mut seq)
