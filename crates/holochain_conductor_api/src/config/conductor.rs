@@ -191,6 +191,8 @@ pub mod tests {
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
+        tx5_min_ephemeral_udp_port: 40000
+        tx5_max_ephemeral_udp_port: 40255
       network_type: quic_bootstrap
 
     db_sync_strategy: Fast
@@ -211,6 +213,8 @@ pub mod tests {
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
         tuning_params.proxy_to_expire_ms = 42;
+        tuning_params.tx5_min_ephemeral_udp_port = 40000;
+        tuning_params.tx5_max_ephemeral_udp_port = 40255;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
         assert_eq!(
             result.unwrap(),
