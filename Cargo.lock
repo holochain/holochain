@@ -2659,6 +2659,8 @@ dependencies = [
  "holochain_wasmer_common",
  "kitsune_p2p_dht_arc",
  "must_future",
+ "proptest",
+ "proptest-derive",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -2957,6 +2959,8 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_timestamp",
  "paste",
+ "proptest",
+ "proptest-derive",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3232,6 +3236,8 @@ dependencies = [
  "one_err",
  "parking_lot 0.10.2",
  "pretty_assertions 0.7.2",
+ "proptest",
+ "proptest-derive",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3366,6 +3372,7 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
+ "holochain_zome_types",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
@@ -3376,6 +3383,7 @@ dependencies = [
  "once_cell",
  "paste",
  "proptest",
+ "proptest-derive",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3959,6 +3967,8 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.1",
  "pretty_assertions 1.4.0",
+ "proptest",
+ "proptest-derive",
  "rand 0.7.3",
  "rand 0.8.5",
  "reqwest",
@@ -3986,6 +3996,8 @@ dependencies = [
  "derive_more",
  "holochain_util",
  "kitsune_p2p_dht_arc",
+ "proptest",
+ "proptest-derive",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -4023,6 +4035,7 @@ dependencies = [
 name = "kitsune_p2p_dht"
 version = "0.3.0-beta-dev.6"
 dependencies = [
+ "arbitrary",
  "colored",
  "derivative",
  "derive_more",
@@ -4038,6 +4051,7 @@ dependencies = [
  "once_cell",
  "pretty_assertions 1.4.0",
  "proptest",
+ "proptest-derive",
  "rand 0.8.5",
  "serde",
  "statrs",
@@ -4050,13 +4064,17 @@ dependencies = [
 name = "kitsune_p2p_dht_arc"
 version = "0.3.0-beta-dev.5"
 dependencies = [
+ "arbitrary",
  "derive_more",
  "gcollections",
  "holochain_trace",
  "intervallum",
+ "kitsune_p2p_timestamp",
  "maplit",
  "num-traits",
  "pretty_assertions 1.4.0",
+ "proptest",
+ "proptest-derive",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4074,9 +4092,12 @@ dependencies = [
  "holochain_trace",
  "human-repr",
  "kitsune_p2p_fetch",
+ "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "linked-hash-map",
  "pretty_assertions 1.4.0",
+ "proptest",
+ "proptest-derive",
  "rand 0.8.5",
  "serde",
  "test-case 1.2.3",
@@ -4122,6 +4143,8 @@ dependencies = [
  "arbitrary",
  "chrono",
  "holochain_serialized_bytes",
+ "proptest",
+ "proptest-derive",
  "rusqlite",
  "serde",
  "serde_yaml",
@@ -4161,6 +4184,8 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.1",
  "paste",
+ "proptest",
+ "proptest-derive",
  "rmp-serde 0.15.5",
  "rustls 0.20.9",
  "serde",
@@ -4668,6 +4693,8 @@ dependencies = [
  "holochain_util",
  "maplit",
  "matches",
+ "proptest",
+ "proptest-derive",
  "reqwest",
  "rmp-serde 0.15.5",
  "serde",
@@ -4675,6 +4702,7 @@ dependencies = [
  "serde_derive",
  "serde_yaml",
  "tempfile",
+ "test-strategy",
  "thiserror",
  "tokio",
 ]
@@ -7140,6 +7168,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
+name = "structmeta"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78ad9e09554f0456d67a69c1584c9798ba733a5b50349a6c0d0948710523922d"
+dependencies = [
+ "proc-macro2 1.0.67",
+ "quote 1.0.33",
+ "structmeta-derive",
+ "syn 2.0.37",
+]
+
+[[package]]
+name = "structmeta-derive"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a60bcaff7397072dca0017d1db428e30d5002e00b6847703e2e42005c95fbe00"
+dependencies = [
+ "proc-macro2 1.0.67",
+ "quote 1.0.33",
+ "syn 2.0.37",
+]
+
+[[package]]
 name = "structopt"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7486,6 +7537,18 @@ dependencies = [
  "serde",
  "sha-1 0.10.1",
  "test-fuzz-internal",
+]
+
+[[package]]
+name = "test-strategy"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8361c808554228ad09bfed70f5c823caf8a3450b6881cc3a38eb57e8c08c1d9"
+dependencies = [
+ "proc-macro2 1.0.67",
+ "quote 1.0.33",
+ "structmeta",
+ "syn 2.0.37",
 ]
 
 [[package]]

@@ -105,7 +105,9 @@ macro_rules! write_codec_enum {
         $crate::dependencies::paste::item! {
             $(
                 $(#[doc = $var_doc])*
-                #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+                #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+                // NOTE: calling crate must depend on kitsune_p2p_types with feature fuzzing
+                #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
                 pub struct [< $var_name:camel >] {
                     $(
                         $(#[doc = $type_doc])* pub [< $type_name:snake >]: $type_ty,
@@ -162,7 +164,9 @@ macro_rules! write_codec_enum {
             )*
 
             $(#[doc = $codec_doc])*
-            #[derive(Clone, Debug, PartialEq)]
+            #[derive(Clone, Debug, PartialEq, Eq)]
+            // NOTE: calling crate must depend on kitsune_p2p_types with feature fuzzing
+            #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
             pub enum [< $codec_name:camel >] {
                 $(
                     $(#[doc = $var_doc])*
@@ -236,7 +240,15 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[derive(
+        Clone,
+        Debug,
+        PartialEq,
+        Eq,
+        serde::Serialize,
+        serde::Deserialize,
+        proptest_derive::Arbitrary,
+    )]
     pub struct Sub(pub Vec<u8>);
 
     write_codec_enum! {

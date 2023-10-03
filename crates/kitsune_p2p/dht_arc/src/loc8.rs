@@ -10,6 +10,10 @@ use crate::{loc_downscale, loc_upscale, DhtArcRange, DhtLocation};
 ///
 /// Loc8 has custom `Eq`, `Ord`, and other impls which disregard the `sign`.
 #[derive(Copy, Clone)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct Loc8 {
     /// The unsigned value
     val: u8,
@@ -150,7 +154,7 @@ impl DhtArcRange {
     }
 }
 
-impl<L> DhtArcRange<L>
+impl<L: Copy> DhtArcRange<L>
 where
     Loc8: From<L>,
 {
