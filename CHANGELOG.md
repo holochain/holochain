@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20231003.022829
+
+## [holochain\_cli-0.1.7-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.1.7-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.1.7-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.7-beta-rc.0)
+
+## [holochain-0.1.7-beta-rc.0](crates/holochain/CHANGELOG.md#0.1.7-beta-rc.0)
+
+- Fix: App interfaces are persisted when shutting down conductor. After restart, app interfaces without connected receiver websocket had signal emission fail altogether. Send errors are only logged now instead.
+
+## [holochain\_conductor\_api-0.1.7-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.1.7-beta-rc.0)
+
 # 20230825.121713
 
 ## [holochain\_cli-0.1.6](crates/holochain_cli/CHANGELOG.md#0.1.6)
