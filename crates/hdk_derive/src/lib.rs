@@ -19,12 +19,15 @@ mod link_zomes;
 mod to_coordinates;
 mod unit_enum;
 mod util;
+mod dna_properties;
 
 struct EntryDef(holochain_integrity_types::entry_def::EntryDef);
 struct EntryDefId(holochain_integrity_types::entry_def::EntryDefId);
 struct EntryVisibility(holochain_integrity_types::entry_def::EntryVisibility);
 struct RequiredValidations(holochain_integrity_types::entry_def::RequiredValidations);
 struct RequiredValidationType(holochain_integrity_types::validate::RequiredValidationType);
+struct DnaProperties;
+
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -283,4 +286,10 @@ pub fn hdk_dependent_link_types(attrs: TokenStream, code: TokenStream) -> TokenS
 #[proc_macro_attribute]
 pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_helper::build(attrs, code)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn dna_properties(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    dna_properties::build(attrs, code)
 }
