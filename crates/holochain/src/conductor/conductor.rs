@@ -1451,6 +1451,8 @@ mod clone_cell_impls {
 
 /// Methods related to management of app and cell status
 mod app_status_impls {
+    use std::borrow::Borrow;
+
     use super::*;
 
     impl Conductor {
@@ -1737,7 +1739,7 @@ mod app_status_impls {
         pub(crate) fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
             for cell_id in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id) {
+                    if let Some(cell) = cells.get_mut(cell_id.borrow()) {
                         cell.status = status.clone();
                     }
                 });

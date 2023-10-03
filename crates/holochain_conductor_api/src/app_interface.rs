@@ -69,6 +69,10 @@ pub enum AppRequest {
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Info about networking processes
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::NetworkInfo`]
     NetworkInfo(Box<NetworkInfoRequestPayload>),
 }
 
