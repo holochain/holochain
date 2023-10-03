@@ -92,16 +92,29 @@ impl LocalBehavior2 {
                     let mut query_behavior = Vec::new();
 
                     for cell in 0..dna_count {
-                        pub_behavior.push((
-                            cell,
-                            BehaviorPublish::Publish {
-                                byte_count_min: 1024,
-                                byte_count_max: 4096,
-                                publish_count: Some(1),
-                                wait_min: std::time::Duration::from_secs(20),
-                                wait_max: std::time::Duration::from_secs(60),
-                            },
-                        ));
+                        if cell == 0 {
+                            pub_behavior.push((
+                                cell,
+                                BehaviorPublish::Publish {
+                                    byte_count_min: 1024,
+                                    byte_count_max: 4096,
+                                    publish_count: None,
+                                    wait_min: std::time::Duration::from_secs(60 * 60 * 24 * 2),
+                                    wait_max: std::time::Duration::from_secs(60 * 60 * 24 * 3),
+                                },
+                            ));
+                        } else {
+                            pub_behavior.push((
+                                cell,
+                                BehaviorPublish::Publish {
+                                    byte_count_min: 1024,
+                                    byte_count_max: 4096,
+                                    publish_count: Some(1),
+                                    wait_min: std::time::Duration::from_secs(20),
+                                    wait_max: std::time::Duration::from_secs(60),
+                                },
+                            ));
+                        }
                         query_behavior.push((
                             cell,
                             BehaviorQuery::Full {
@@ -122,119 +135,6 @@ impl LocalBehavior2 {
                     // booting holochain is very CPU intensive.
                     tokio::time::sleep(std::time::Duration::from_secs(20)).await;
                 }
-
-                loop {
-                    // TODO - occasional additional entries + queries
-                    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
-                }
-
-                /*
-                println!("spawn 1 null node that shuts down after ~30 s");
-                let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                    node,
-                    SHUTDOWN_30_S,
-                    BehaviorPublish::None,
-                    BehaviorQuery::None,
-                );
-
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-                println!("spawn 1 full query large publisher, pub every ~5 m, query every ~15 s");
-                let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                    node,
-                    BehaviorLifetime::Forever,
-                    PUBLISH_LARGE_5_M,
-                    QUERY_FULL_15_S,
-                );
-                this.lock()
-                    .unwrap()
-                    .shallow_validate_nodes
-                    .insert(node_id, std::time::Instant::now());
-                this.lock()
-                    .unwrap()
-                    .full_validate_nodes
-                    .insert(node_id, std::time::Instant::now());
-
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-                println!("spawn 1 full query small publisher, pub every ~1 m, query every ~15 s");
-                let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                    node,
-                    BehaviorLifetime::Forever,
-                    PUBLISH_SMALL_1_M,
-                    QUERY_FULL_15_S,
-                );
-                this.lock()
-                    .unwrap()
-                    .shallow_validate_nodes
-                    .insert(node_id, std::time::Instant::now());
-                this.lock()
-                    .unwrap()
-                    .full_validate_nodes
-                    .insert(node_id, std::time::Instant::now());
-
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-                println!(
-                    "spawn 1 shallow query small publisher, pub every ~1 m, query every ~15 s"
-                );
-                let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                    node,
-                    BehaviorLifetime::Forever,
-                    PUBLISH_SMALL_1_M,
-                    QUERY_SHALLOW_15_S,
-                );
-                this.lock()
-                    .unwrap()
-                    .shallow_validate_nodes
-                    .insert(node_id, std::time::Instant::now());
-
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-                println!("spawn 1 small single publisher that shuts down after ~3 m");
-                let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                    node,
-                    SHUTDOWN_3_M,
-                    PUBLISH_SMALL_SINGLE,
-                    BehaviorQuery::None,
-                );
-
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
-                println!("spawn 1 large single publisher that shuts down after ~3 m");
-                let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                    node,
-                    SHUTDOWN_3_M,
-                    PUBLISH_LARGE_SINGLE,
-                    BehaviorQuery::None,
-                );
-
-                loop {
-                    for _ in 0..6 {
-                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                        this.lock().unwrap().validate();
-                    }
-
-                    println!("spawn shallow query only node that shuts down after ~3 m, query every ~15 s");
-                    let node = loc_test_conductor(network_seed.clone(), rendezvous.clone()).await;
-                    let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
-                        node,
-                        SHUTDOWN_3_M,
-                        BehaviorPublish::None,
-                        QUERY_SHALLOW_15_S,
-                    );
-                    this.lock()
-                        .unwrap()
-                        .shallow_validate_nodes
-                        .insert(node_id, std::time::Instant::now());
-                }
-                */
             });
         }
 
