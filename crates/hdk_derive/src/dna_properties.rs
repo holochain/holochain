@@ -3,7 +3,6 @@ use proc_macro_error::abort;
 use syn::parse_macro_input;
 use syn::Item;
 use syn::ItemStruct;
-use std::any::type_name;
 
 pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Item);
