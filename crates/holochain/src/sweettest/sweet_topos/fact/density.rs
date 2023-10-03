@@ -49,7 +49,7 @@ impl<'a> Fact<'a, NetworkTopology> for DenseNetworkFact {
         mut graph: NetworkTopology,
     ) -> Mutation<NetworkTopology> {
         let target_edge_count = self.target_edge_count(&graph);
-        let mut rng: _ = super::rng_from_generator(g);
+        let mut rng = super::rng_from_generator(g);
 
         // Add edges until we reach the desired density.
         while graph.edge_count() < target_edge_count {

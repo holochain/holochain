@@ -29,7 +29,7 @@ impl<'a> Fact<'a, NetworkTopology> for StrictlyPartitionedNetworkFact {
         g: &mut Generator<'a>,
         mut graph: NetworkTopology,
     ) -> Mutation<NetworkTopology> {
-        let mut rng: _ = super::rng_from_generator(g);
+        let mut rng = super::rng_from_generator(g);
         let efficiency_cutoff = (self.efficiency * u64::MAX as f64) as u64;
 
         // Remove edges until the graph is partitioned into the desired number of
