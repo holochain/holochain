@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+## Holonix
+
+- Slim down the Rust toolchain [#2854](https://github.com/holochain/holochain/pull/2854)
+    - choose a manual set of toolchain components and effectively exclude _rust-docs_.
+    - only keep `wasm32-unknown-unknown` as a cross-compilation target.
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
+
 
 # 20230927.003337
 
