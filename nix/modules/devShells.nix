@@ -19,7 +19,7 @@
 
       devShells = {
         default = self'.devShells.holonix;
-        holonix = pkgs.mkShell {
+        holonix = pkgs.mkShell.override ({ stdenv = config.rustHelper.defaultStdenv pkgs; }) {
           inputsFrom = [ self'.devShells.rustDev ];
           packages = holonixPackages ++ [ hn-introspect ];
           shellHook = ''
@@ -92,7 +92,7 @@
                 );
 
           in
-          pkgs.mkShell {
+          pkgs.mkShell.override ({ stdenv = config.rustHelper.defaultStdenv pkgs; }) {
             inputsFrom = [ self'.devShells.rustDev ] ++ (
               # filter out the holochain binary crates from the shell because it's at best unnecessary in local development
               # it's currently a nativeBuildInput because one of the unit tests requires `holochain` and `hc-sandbox` in PATH
@@ -161,7 +161,7 @@
           };
 
         rustDev =
-          pkgs.mkShell
+          pkgs.mkShell.override ({ stdenv = config.rustHelper.defaultStdenv pkgs; })
             {
               inputsFrom = [
                 self'.packages.holochain
