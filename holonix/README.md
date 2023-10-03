@@ -50,7 +50,7 @@ please see the following examples to learn more about common and more specific u
 
 The top-level flake output `packages.holochain` and `devShells.holonix` are customisable by means of [nixpkgs.lib.makeOverridable](https://nixos.org/manual/nixpkgs/stable/#sec-lib-makeOverridable).
 
-### Example: pass `--feature chc` to holochain's `cargo build` command
+### Example: pass `--features chc` to holochain's `cargo build` command
 
 This means that you can pass e.g. `holochain.override { cargoExtraArgs = " --feature chc"; }` or any other desirable attribute to override the attributes that are passed to [craneLib.buildPackage](https://crane.dev/API.html#cranelibbuildpackage).
 
