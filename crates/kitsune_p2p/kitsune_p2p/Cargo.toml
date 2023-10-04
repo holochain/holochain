@@ -102,6 +102,7 @@ mock_network = [
 ]
 
 tx2 = [ "kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic" ]
+tx5 = [ "dep:tx5", "kitsune_p2p_types/tx5"]
 
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",

@@ -366,7 +366,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
-        use holochain_state::nonce::fresh_nonce;
+        use holochain_nonce::fresh_nonce;
 
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -487,7 +487,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
-        use holochain_state::nonce::fresh_nonce;
+        use holochain_nonce::fresh_nonce;
 
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {

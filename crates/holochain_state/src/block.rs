@@ -39,13 +39,13 @@ pub fn query_is_blocked(
 #[cfg(test)]
 mod test {
     use crate::test_utils::test_conductor_db;
-    use hdk::prelude::Timestamp;
     use holochain_types::prelude::CellIdFixturator;
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTarget;
     use holochain_zome_types::block::BlockTargetId;
     use holochain_zome_types::block::CellBlockReason;
     use holochain_zome_types::InclusiveTimestampInterval;
+    use holochain_zome_types::Timestamp;
     use holochain_zome_types::TimestampFixturator;
 
     // More complex setups.
