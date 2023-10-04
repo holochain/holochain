@@ -14,6 +14,11 @@ pub mod dependencies {
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;
+
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest;
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest_derive;
 }
 
 /// Typedef for result of `proc_count_now()`.

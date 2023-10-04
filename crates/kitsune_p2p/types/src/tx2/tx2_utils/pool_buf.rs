@@ -25,6 +25,10 @@ pub(crate) const POOL_BUF_PRE_WRITE_SPACE: usize = 128;
 ///
 /// We avoid initialization by using `extend_from_slice()`.
 #[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct PoolBuf(Option<(usize, Vec<u8>)>);
 
 impl std::fmt::Debug for PoolBuf {

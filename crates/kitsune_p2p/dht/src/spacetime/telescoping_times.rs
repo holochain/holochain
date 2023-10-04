@@ -11,6 +11,7 @@ use super::*;
 /// to be covered.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Derivative, serde::Serialize, serde::Deserialize)]
 #[derivative(PartialOrd, Ord)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct TelescopingTimes {
     time: TimeQuantum,
 
