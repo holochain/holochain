@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_patch beta-rc
+default_semver_increment_mode: !pre-patch rc
 ---
 # Changelog
 
