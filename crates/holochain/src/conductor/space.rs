@@ -188,7 +188,7 @@ impl Spaces {
                     kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
                         .digest()
                         .0
-                        == node_id
+                        == *node_id
                 })
             })
             .map(|agent_info| {

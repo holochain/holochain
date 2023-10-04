@@ -3991,6 +3991,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.6",
  "governor",
  "holochain_trace",
+ "holochain_util",
  "itertools 0.11.0",
  "kitsune_p2p",
  "kitsune_p2p_block",
