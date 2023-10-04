@@ -1,8 +1,8 @@
+use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
-    CapSecret, GrantZomeCallCapabilityPayload, GrantedFunction, GrantedFunctions, Nonce256Bits,
-    RoleName,
+    CapSecret, GrantZomeCallCapabilityPayload, GrantedFunction, GrantedFunctions, RoleName,
 };
 use std::collections::BTreeSet;
 
@@ -15,7 +15,7 @@ use arbitrary::Arbitrary;
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call() {
     use holochain_conductor_api::ZomeCall;
-    use holochain_state::nonce::fresh_nonce;
+    use holochain_nonce::fresh_nonce;
     use holochain_zome_types::{
         CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
     };
@@ -158,7 +158,7 @@ async fn signed_zome_call() {
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call_wildcard() {
     use holochain_conductor_api::ZomeCall;
-    use holochain_state::nonce::fresh_nonce;
+    use holochain_nonce::fresh_nonce;
     use holochain_zome_types::{
         CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
     };

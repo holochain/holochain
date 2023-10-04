@@ -50,9 +50,6 @@ pub use types::*;
 pub mod gossip;
 pub use gossip::sharded_gossip::KitsuneDiagnostics;
 
-mod config;
-pub use config::*;
-
 mod spawn;
 pub use spawn::*;
 

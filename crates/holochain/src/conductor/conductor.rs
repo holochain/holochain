@@ -276,13 +276,14 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
+            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
-                task_manager: TaskManagerClient::new(outcome_sender),
+                task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
                 // Must be initialized later, since it requires an Arc<Conductor>
                 outcomes_task: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),
@@ -1183,7 +1184,7 @@ mod network_impls {
                 | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
-                | ValidationReceiptReceived { .. } => {
+                | ValidationReceiptsReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                     let cell = self.cell_by_id(&cell_id, true).await?;
@@ -1291,7 +1292,8 @@ mod network_impls {
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
-            let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(now)?;
+            let (nonce, expires_at) =
+                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),

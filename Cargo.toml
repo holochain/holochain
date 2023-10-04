@@ -66,6 +66,7 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+# task-motel = { path = "../task-motel" }
 # proptest = { path = "/home/michael/gitfork/proptest/proptest" }
 # proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
 

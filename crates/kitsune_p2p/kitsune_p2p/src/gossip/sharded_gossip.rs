@@ -157,7 +157,7 @@ impl ShardedGossip {
     /// Constructor
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host_api: HostApiLegacy,
@@ -176,6 +176,8 @@ impl ShardedGossip {
 
         #[cfg(not(feature = "test"))]
         let state = Default::default();
+
+        let tuning_params = config.tuning_params.clone();
 
         let this = Arc::new(Self {
             ep_hnd,
@@ -196,7 +198,7 @@ impl ShardedGossip {
         let mut all_agents = vec![];
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
-        metric_task({
+        metric_task_instrumented(config.tracing_scope.clone(), {
             let this = this.clone();
 
             async move {
@@ -1382,7 +1384,7 @@ impl ShardedRecentGossipFactory {
 impl AsGossipModuleFactory for ShardedRecentGossipFactory {
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host: HostApiLegacy,
@@ -1390,7 +1392,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
-            tuning_params,
+            config,
             space,
             ep_hnd,
             host,
@@ -1415,7 +1417,7 @@ impl ShardedHistoricalGossipFactory {
 impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host: HostApiLegacy,
@@ -1423,7 +1425,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
-            tuning_params,
+            config,
             space,
             ep_hnd,
             host,

@@ -8,6 +8,8 @@ use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
+use kitsune_p2p_types::config::NetworkType;
 use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -1422,7 +1424,7 @@ impl Space {
                     (
                         module,
                         factory.spawn_gossip_task(
-                            config.tuning_params.clone(),
+                            config.clone(),
                             space.clone(),
                             ep_hnd.clone(),
                             host_api.clone(),

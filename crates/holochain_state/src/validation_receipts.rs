@@ -1,117 +1,17 @@
 //! Module for items related to aggregating validation_receipts
 
-use futures::Stream;
-use futures::StreamExt;
-use futures::TryStreamExt;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_keystore::MetaLairClient;
-use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::Timestamp;
-use holochain_zome_types::ValidationStatus;
+use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
 use mutations::StateMutationResult;
 
 use crate::mutations;
 use crate::prelude::from_blob;
 use crate::prelude::StateQueryResult;
-
-/// Validation receipt content - to be signed.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-)]
-pub struct ValidationReceipt {
-    /// the op this validation receipt is for.
-    pub dht_op_hash: DhtOpHash,
-
-    /// the result of this validation.
-    pub validation_status: ValidationStatus,
-
-    /// the remote validator which is signing this receipt.
-    pub validators: Vec<AgentPubKey>,
-
-    /// Time when the op was integrated
-    pub when_integrated: Timestamp,
-}
-
-impl ValidationReceipt {
-    /// Sign this validation receipt.
-    pub async fn sign(
-        self,
-        keystore: &MetaLairClient,
-    ) -> holochain_keystore::LairResult<Option<SignedValidationReceipt>> {
-        if self.validators.is_empty() {
-            return Ok(None);
-        }
-        let this = self.clone();
-        // Try to sign with all validators but silently fail on
-        // any that cannot sign.
-        // If all signatures fail then return an error.
-        let futures = self
-            .validators
-            .iter()
-            .map(|validator| {
-                let this = this.clone();
-                let validator = validator.clone();
-                let keystore = keystore.clone();
-                async move { validator.sign(&keystore, this).await }
-            })
-            .collect::<Vec<_>>();
-        let stream = futures::stream::iter(futures);
-        let signatures = try_stream_of_results(stream).await?;
-        if signatures.is_empty() {
-            unreachable!("Signatures cannot be empty because the validators vec is not empty");
-        }
-        Ok(Some(SignedValidationReceipt {
-            receipt: self,
-            validators_signatures: signatures,
-        }))
-    }
-}
-
-/// Try to collect a stream of futures that return results into a vec.
-async fn try_stream_of_results<T, U, E>(stream: U) -> Result<Vec<T>, E>
-where
-    U: Stream,
-    <U as Stream>::Item: futures::Future<Output = Result<T, E>>,
-{
-    stream.buffer_unordered(10).map(|r| r).try_collect().await
-}
-
-/// A full, signed validation receipt.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-)]
-pub struct SignedValidationReceipt {
-    /// the content of the validation receipt.
-    pub receipt: ValidationReceipt,
-
-    /// the signature of the remote validator.
-    pub validators_signatures: Vec<Signature>,
-}
 
 pub fn list_receipts(
     txn: &Transaction,
@@ -155,7 +55,7 @@ pub fn add_if_unique(
 pub fn get_pending_validation_receipts(
     txn: &Transaction,
     validators: Vec<AgentPubKey>,
-) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
+) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
     let mut stmt = txn.prepare(
         "
             SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
@@ -180,13 +80,12 @@ pub fn get_pending_validation_receipts(
             let when_integrated = r.get("when_integrated")?;
             Ok((
                 ValidationReceipt {
-                    dht_op_hash: dht_op_hash.clone(),
+                    dht_op_hash,
                     validation_status,
                     validators: validators.clone(),
                     when_integrated,
                 },
                 author,
-                dht_op_hash,
             ))
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
@@ -201,9 +100,12 @@ mod tests {
     use crate::prelude::{set_require_receipt, set_validation_status};
     use fixt::prelude::*;
     use holo_hash::{HasHash, HoloHashOf};
+    use holochain_keystore::MetaLairClient;
     use holochain_types::dht_op::DhtOp;
     use holochain_types::dht_op::DhtOpHashed;
+    use holochain_types::prelude::Timestamp;
     use holochain_zome_types::fixt::*;
+    use holochain_zome_types::ValidationStatus;
     use std::collections::HashSet;
 
     async fn fake_vr(
@@ -283,32 +185,6 @@ mod tests {
         .await
         .unwrap();
         Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_try_stream_of_results() {
-        let iter: Vec<futures::future::Ready<Result<i32, String>>> = vec![];
-        let stream = futures::stream::iter(iter);
-        assert_eq!(Ok(vec![]), try_stream_of_results(stream).await);
-
-        let iter = vec![async move { Result::<_, String>::Ok(0) }];
-        let stream = futures::stream::iter(iter);
-        assert_eq!(Ok(vec![0]), try_stream_of_results(stream).await);
-
-        let iter = (0..10).map(|i| async move { Result::<_, String>::Ok(i) });
-        let stream = futures::stream::iter(iter);
-        assert_eq!(
-            Ok((0..10).collect::<Vec<_>>()),
-            try_stream_of_results(stream).await
-        );
-
-        let iter = vec![async move { Result::<i32, String>::Err("test".to_string()) }];
-        let stream = futures::stream::iter(iter);
-        assert_eq!(Err("test".to_string()), try_stream_of_results(stream).await);
-
-        let iter = (0..10).map(|_| async move { Result::<i32, String>::Err("test".to_string()) });
-        let stream = futures::stream::iter(iter);
-        assert_eq!(Err("test".to_string()), try_stream_of_results(stream).await);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -436,7 +312,7 @@ mod tests {
 
         let pending = env
             .read_async(
-                move |txn| -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
+                move |txn| -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
                     get_pending_validation_receipts(&txn, vec![])
                 },
             )
@@ -445,7 +321,8 @@ mod tests {
 
         assert_eq!(3, pending.len());
 
-        let pending_ops: HashSet<DhtOpHash> = pending.into_iter().map(|p| p.2).collect();
+        let pending_ops: HashSet<DhtOpHash> =
+            pending.into_iter().map(|p| p.0.dht_op_hash).collect();
         assert!(pending_ops.contains(&valid_op_hash));
         assert!(pending_ops.contains(&rejected_op_hash));
         assert!(pending_ops.contains(&abandoned_op_hash));
