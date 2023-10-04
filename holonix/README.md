@@ -54,5 +54,5 @@ The top-level flake output `packages.holochain` and `devShells.holonix` are cust
 
 This means that you can pass e.g. `holochain.override { cargoExtraArgs = " --feature chc"; }` or any other desirable attribute to override the attributes that are passed to [craneLib.buildPackage](https://crane.dev/API.html#cranelibbuildpackage).
 
-Creating a devShell based on holonix this, can be achieved by passing `holonix.override { holochainOverrides = { cargoExtraArgs = "--features chc"; }}`.
+In a devShell based on holonix, this can be achieved by specifying `holonix.override { holochainOverrides = { cargoExtraArgs = "--features chc"; }}`.
 Please see [this flake](examples/custom_holochain_feature/flake.nix) for a complete example.
