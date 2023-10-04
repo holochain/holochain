@@ -513,7 +513,7 @@ impl Cell {
                 .await;
             }
 
-            ValidationReceiptReceived {
+            ValidationReceiptsReceived {
                 span_context: _,
                 respond,
                 receipts,
