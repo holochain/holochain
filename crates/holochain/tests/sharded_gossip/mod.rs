@@ -496,6 +496,14 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     }))
     .await;
 
+    println!(
+        "Initial agents: {:#?}",
+        cells
+            .iter()
+            .map(|c| c.agent_pubkey().to_kitsune())
+            .collect::<Vec<_>>()
+    );
+
     let zomes: Vec<_> = cells
         .iter()
         .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
@@ -511,7 +519,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    consistency_60s([&cells[0], &cells[1]]).await;
+    consistency_10s([&cells[0], &cells[1]]).await;
 
     println!(
         "Done waiting for consistency between first two nodes. Elapsed: {:?}",
@@ -548,9 +556,19 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
+    println!(
+        "Newcomer agent joined: {:#?}",
+        cell.agent_pubkey().to_kitsune()
+    );
+
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
+        .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(10))
         .await;
+
+    println!(
+        "Initial gossip activity completed. Elapsed: {:?}",
+        start.elapsed()
+    );
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
