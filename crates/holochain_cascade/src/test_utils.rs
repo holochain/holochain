@@ -54,6 +54,7 @@ use std::collections::HashSet;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
+use holochain_types::validation_receipt::ValidationReceiptBundle;
 pub use record_test_data::*;
 
 mod activity_test_data;
@@ -261,7 +262,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
-        _receipt: holochain_serialized_bytes::SerializedBytes,
+        _receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -467,7 +468,7 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
-        _receipt: holochain_serialized_bytes::SerializedBytes,
+        _receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

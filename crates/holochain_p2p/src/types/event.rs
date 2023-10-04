@@ -240,10 +240,10 @@ ghost_actor::ghost_chan! {
         ) -> MustGetAgentActivityResponse;
 
         /// A remote node has sent us a validation receipt.
-        fn validation_receipt_received(
+        fn validation_receipts_received(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            receipt: SerializedBytes,
+            receipts: ValidationReceiptBundle,
         ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
@@ -294,7 +294,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::CountLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
-            HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
+            HolochainP2pEvent::ValidationReceiptsReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }
             $($t2)*

@@ -189,7 +189,7 @@ async fn continues_if_receipt_cannot_be_signed() {
         vault.clone(),
         dna,
         keystore,
-        vec![invalid_validator].into_iter().collect(), // No running cells
+        vec![invalid_validator].into_iter().collect(),
         |_block| unreachable!("Should not try to block"),
     )
     .await

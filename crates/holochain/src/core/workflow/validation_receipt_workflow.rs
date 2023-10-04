@@ -23,9 +23,6 @@ mod tests;
 #[cfg(test)]
 mod unit_tests;
 
-#[cfg(test)]
-mod unit_tests;
-
 #[instrument(skip(vault, network, keystore, apply_block))]
 /// Send validation receipts to their authors in serial and without waiting for responses.
 pub async fn validation_receipt_workflow<B>(
@@ -69,13 +66,13 @@ where
         .map(|(author, receipts)| {
             (
                 author,
-                receipts.into_iter().map(|r| r.0).collect::<Vec<_>>(),
+                receipts.into_iter().map(|(r, _)| r).collect::<Vec<_>>(),
             )
         })
         .collect::<Vec<(AgentPubKey, Vec<ValidationReceipt>)>>();
 
-    // Try to send the validation receipts
     for (author, receipts) in grouped_by_author {
+        // Try to send the validation receipts
         match sign_and_send_receipts_to_author(
             &dna_hash,
             &network,
@@ -88,7 +85,7 @@ where
         .await
         {
             Ok(()) => {
-                // Success, nothing more to do
+                // Success, move on to mark them as sent
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);
@@ -125,7 +122,7 @@ where
         return Ok(());
     }
 
-    let num_recripts = receipts.len();
+    let num_receipts = receipts.len();
 
     let receipts: Vec<SignedValidationReceipt> = stream::iter(receipts)
         .filter_map(|receipt| async {
@@ -153,7 +150,7 @@ where
             }
 
             // Sign on the dotted line.
-            match ValidationReceipt::sign(receipt.clone(), keystore).await {
+            match ValidationReceipt::sign(receipt, keystore).await {
                 Ok(r) => r,
                 Err(e) => {
                     // TODO Which errors are retryable here? A fatal error would keep being retried and we don't want that;
@@ -166,10 +163,15 @@ where
         .collect()
         .await;
 
-    if num_recripts < receipts.len() {
+    if receipts.len() == 0 {
+        info!("Dropped all validation receipts for author {:?}", op_author);
+        return Ok(());
+    } else if num_receipts < receipts.len() {
         info!(
-            "Dropped {} validation receipts, check previous errors to see why",
-            num_recripts - receipts.len()
+            "Dropped {}/{} validation receipts for author {:?}, check previous errors to see why",
+            num_receipts - receipts.len(),
+            num_receipts,
+            op_author,
         );
     }
 
@@ -177,10 +179,7 @@ where
     if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
         network,
         op_author.clone(),
-        receipts
-            .into_iter()
-            .map(|r| r.try_into())
-            .collect::<Result<SerializedBytes, _>>()?,
+        receipts.into(),
     )
     .await
     {

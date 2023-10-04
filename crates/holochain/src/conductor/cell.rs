@@ -516,12 +516,12 @@ impl Cell {
             ValidationReceiptReceived {
                 span_context: _,
                 respond,
-                receipt,
+                receipts,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_validation_receipt(receipt)
+                        .handle_validation_receipts(receipts)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -721,84 +721,91 @@ impl Cell {
             .map_err(Into::into)
     }
 
-    /// a remote agent is sending us a validation receipt.
-    #[tracing::instrument(skip(self, receipt))]
-    async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
-        let receipt: SignedValidationReceipt = receipt.try_into()?;
-        tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+    /// A remote agent is sending us a validation receipt bundle.
+    #[tracing::instrument(skip(self, receipts))]
+    async fn handle_validation_receipts(
+        &self,
+        receipts: ValidationReceiptBundle,
+    ) -> CellResult<()> {
+        for receipt in receipts.into_iter() {
+            tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
-        // Get the action for this op so we can check the entry type.
-        let hash = receipt.receipt.dht_op_hash.clone();
-        let action: Option<SignedAction> = self
-            .space
-            .authored_db
-            .read_async(move |txn| {
-                let h: Option<Vec<u8>> = txn
-                    .query_row(
-                        "SELECT Action.blob as action_blob
+            // Get the action for this op so we can check the entry type.
+            let hash = receipt.receipt.dht_op_hash.clone();
+            let action: Option<SignedAction> = self
+                .space
+                .authored_db
+                .read_async(move |txn| {
+                    let h: Option<Vec<u8>> = txn
+                        .query_row(
+                            "SELECT Action.blob as action_blob
                     FROM DhtOp
                     JOIN Action ON Action.hash = DhtOp.action_hash
                     WHERE DhtOp.hash = :hash",
+                            named_params! {
+                                ":hash": hash,
+                            },
+                            |row| row.get("action_blob"),
+                        )
+                        .optional()?;
+                    match h {
+                        Some(h) => from_blob(h),
+                        None => Ok(None),
+                    }
+                })
+                .await?;
+
+            // If the action has an app entry type get the entry def
+            // from the conductor.
+            let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
+                Some(EntryType::App(AppEntryDef {
+                    zome_index,
+                    entry_index,
+                    ..
+                })) => {
+                    let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                    let zome = ribosome.get_integrity_zome(zome_index);
+                    match zome {
+                        Some(zome) => self
+                            .conductor_api
+                            .get_entry_def(&EntryDefBufferKey::new(
+                                zome.into_inner().1,
+                                *entry_index,
+                            ))
+                            .map(|e| u8::from(e.required_validations)),
+                        None => None,
+                    }
+                }
+                _ => None,
+            };
+
+            // If no required receipt count was found then fallback to the default.
+            let required_validation_count = required_receipt_count.unwrap_or(
+                crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+            );
+
+            self.space
+                .dht_db
+                .write_async(move |txn| {
+                    // Get the current count for this dhtop.
+                    let receipt_count: usize = txn.query_row(
+                        "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
                         named_params! {
-                            ":hash": hash,
+                            ":op_hash": receipt.receipt.dht_op_hash,
                         },
-                        |row| row.get("action_blob"),
-                    )
-                    .optional()?;
-                match h {
-                    Some(h) => from_blob(h),
-                    None => Ok(None),
-                }
-            })
-            .await?;
+                        |row| row.get(0),
+                    )?;
 
-        // If the action has an app entry type get the entry def
-        // from the conductor.
-        let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(AppEntryDef {
-                zome_index,
-                entry_index,
-                ..
-            })) => {
-                let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                let zome = ribosome.get_integrity_zome(zome_index);
-                match zome {
-                    Some(zome) => self
-                        .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *entry_index))
-                        .map(|e| u8::from(e.required_validations)),
-                    None => None,
-                }
-            }
-            _ => None,
-        };
+                    // If we have enough receipts then set receipts to complete.
+                    if receipt_count >= required_validation_count as usize {
+                        set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
+                    }
 
-        // If no required receipt count was found then fallback to the default.
-        let required_validation_count = required_receipt_count.unwrap_or(
-            crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
-        );
-
-        self.space
-            .dht_db
-            .write_async(move |txn| {
-                // Get the current count for this dhtop.
-                let receipt_count: usize = txn.query_row(
-                    "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
-                    named_params! {
-                        ":op_hash": receipt.receipt.dht_op_hash,
-                    },
-                    |row| row.get(0),
-                )?;
-
-                // If we have enough receipts then set receipts to complete.
-                if receipt_count >= required_validation_count as usize {
-                    set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
-                }
-
-                // Add to receipts db
-                validation_receipts::add_if_unique(txn, receipt)
-            })
-            .await?;
+                    // Add to receipts db
+                    validation_receipts::add_if_unique(txn, receipt)
+                })
+                .await?;
+        }
 
         Ok(())
     }

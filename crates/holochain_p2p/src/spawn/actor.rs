@@ -247,16 +247,16 @@ impl WrapEvtSender {
         )
     }
 
-    fn validation_receipt_received(
+    fn validation_receipts_received(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         timing_trace!(
             {
                 self.0
-                    .validation_receipt_received(dna_hash, to_agent, receipt)
+                    .validation_receipts_received(dna_hash, to_agent, receipts)
             },
             "(hp2p:handle) validation_receipt_received",
         )
@@ -561,13 +561,12 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
-        receipt: Vec<u8>,
+        receipts: ValidationReceiptBundle,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
-        let receipt: SerializedBytes = UnsafeBytes::from(receipt).into();
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             evt_sender
-                .validation_receipt_received(dna_hash, agent_pub_key, receipt)
+                .validation_receipts_received(dna_hash, agent_pub_key, receipts)
                 .await?;
 
             // validation receipts don't need a response
@@ -764,14 +763,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::MustGetAgentActivity { agent, filter } => {
                 self.handle_incoming_must_get_agent_activity(space, to_agent, agent, filter)
             }
-            crate::wire::WireMessage::ValidationReceipt { receipt } => {
-                // TODO This shouldn't be removed immediately because existing conductors will will be sending these messages.
-                //      Once this change has been back-ported, it can be removed on develop.
-                warn!("Got a validation receipt in a call, this is deprecated and will be removed in a future release.");
-                Ok(self
-                    .handle_incoming_validation_receipt(space, to_agent, receipt)?
-                    .map(|_| Ok(vec![]))
-                    .boxed()
+            crate::wire::WireMessage::ValidationReceipts { .. } => {
+                Err(HolochainP2pError::invalid_p2p_message(
+                    "invalid: validation receipts are now notifications rather than requests, please upgrade".to_string(),
+                )
                     .into())
             }
             // holochain_p2p only broadcasts this message.
@@ -863,8 +858,8 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     None => Err(HolochainP2pError::RoutingAgentError(to_agent).into()),
                 }
             }
-            WireMessage::ValidationReceipt { receipt } => {
-                self.handle_incoming_validation_receipt(space, to_agent, receipt)
+            WireMessage::ValidationReceipts { receipts } => {
+                self.handle_incoming_validation_receipt(space, to_agent, receipts)
             }
             crate::wire::WireMessage::CountersigningSessionNegotiation { message } => {
                 self.handle_incoming_countersigning_session_negotiation(space, to_agent, message)
@@ -1412,12 +1407,12 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let to_agent = to_agent.into_kitsune();
 
-        let req = crate::wire::WireMessage::validation_receipt(receipt).encode()?;
+        let req = crate::wire::WireMessage::validation_receipts(receipts).encode()?;
 
         let timeout = self.tuning_params.implicit_timeout();
 
