@@ -769,7 +769,7 @@ async fn mock_network_sharded_gossip() {
                             }
                         }
                         */
-                        holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
+                        holochain_p2p::WireMessage::ValidationReceipts { receipts: _ } => {
                             debug!("Validation Receipt")
                         }
                         holochain_p2p::WireMessage::Get { dht_hash, options } => {
@@ -1272,7 +1272,7 @@ async fn mock_network_sharding() {
                             debug!("CallRemoteMulti")
                         }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
-                        holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
+                        holochain_p2p::WireMessage::ValidationReceipts { receipts: _ } => {
                             debug!("Validation Receipt")
                         }
                         holochain_p2p::WireMessage::Get { dht_hash, options } => {
