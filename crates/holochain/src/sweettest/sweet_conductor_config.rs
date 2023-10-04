@@ -64,7 +64,7 @@ impl SweetConductorConfig {
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
         let mut config: Self = KitsuneP2pConfig::default().into();
-        config.tracing_scope = nanoid!();
+        config.random_scope();
         config
     }
 
@@ -125,6 +125,14 @@ impl SweetConductorConfig {
             .expect("failed to tune network")
             .tuning_params = Arc::new(tuning_params);
         self
+    }
+
+    /// Set the tracing scope to a new random value
+    pub fn random_scope(&mut self) {
+        let scope = nanoid!();
+        let network = self.network.get_or_insert_with(Default::default);
+        network.tracing_scope = Some(scope.clone());
+        self.tracing_scope = Some(scope);
     }
 
     /// Completely disable networking

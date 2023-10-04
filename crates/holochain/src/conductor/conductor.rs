@@ -276,7 +276,7 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
-            let tracing_scope = config.tracing_scope.clone();
+            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),

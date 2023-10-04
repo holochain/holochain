@@ -77,7 +77,7 @@ pub trait AsGossipModuleFactory: 'static + Send + Sync {
     #[allow(clippy::too_many_arguments)]
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host: HostApiLegacy,
@@ -92,7 +92,7 @@ impl GossipModuleFactory {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host: HostApiLegacy,
@@ -100,6 +100,6 @@ impl GossipModuleFactory {
         fetch_pool: FetchPool,
     ) -> GossipModule {
         self.0
-            .spawn_gossip_task(tuning_params, space, ep_hnd, host, metrics, fetch_pool)
+            .spawn_gossip_task(config, space, ep_hnd, host, metrics, fetch_pool)
     }
 }
