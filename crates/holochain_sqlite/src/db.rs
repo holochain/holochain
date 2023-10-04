@@ -184,10 +184,10 @@ impl<Kind: DbKindT> DbRead<Kind> {
         self.num_readers
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         let mut conn = self.conn()?;
-        let r = tokio::task::spawn_blocking(move || conn.with_reader(f))
+
+        tokio::task::spawn_blocking(move || conn.with_reader(f))
             .await
-            .map_err(DatabaseError::from)?;
-        r
+            .map_err(DatabaseError::from)?
     }
 
     async fn acquire_reader_permit(&self) -> OwnedSemaphorePermit {
@@ -338,10 +338,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     {
         let _g = self.acquire_writer_permit().await;
         let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
+
+        task::spawn_blocking(move || conn.with_commit_sync(f))
             .await
-            .map_err(DatabaseError::from)?;
-        r
+            .map_err(DatabaseError::from)?
     }
 
     #[cfg(any(test, feature = "test_utils"))]

@@ -53,6 +53,7 @@ pub fn get(txn: &Transaction<'_>, key: EntryDefBufferKey) -> StateQueryResult<Op
     }
 }
 
+#[allow(clippy::let_and_return)]
 pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let mut stmt = txn.prepare(
         "

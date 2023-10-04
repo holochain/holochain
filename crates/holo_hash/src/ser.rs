@@ -258,7 +258,7 @@ mod tests {
         let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
         assert_eq!(hash_type_from_sb, hash_type::AnyDht::Action);
 
-        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(&hash_type_json).unwrap();
+        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(hash_type_json).unwrap();
         assert_eq!(hash_type_from_json, hash_type::AnyDht::Action);
     }
 

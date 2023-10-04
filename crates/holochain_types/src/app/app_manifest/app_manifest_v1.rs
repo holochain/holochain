@@ -169,7 +169,7 @@ impl AppManifestV1 {
     // rather than simply updating the manifest. Let's hold off on that until
     // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
-        for mut role in self.roles.iter_mut() {
+        for role in self.roles.iter_mut() {
             if !matches!(
                 role.provisioning.clone().unwrap_or_default(),
                 CellProvisioning::CreateClone { .. } | CellProvisioning::UseExisting { .. }

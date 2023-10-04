@@ -226,7 +226,7 @@ mod tests {
     fn proxy_url_from_base() {
         let cert_digest = base64::decode_config(TEST_CERT, base64::URL_SAFE_NO_PAD).unwrap();
         let digest = CertDigest::from_slice(&cert_digest);
-        let u = ProxyUrl::new(TEST_BASE, digest.into()).unwrap();
+        let u = ProxyUrl::new(TEST_BASE, digest).unwrap();
         assert_eq!(TEST_FULL, u.as_full_str());
         assert_eq!(TEST_BASE, u.as_base_str());
     }

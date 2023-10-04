@@ -35,8 +35,8 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
     #[derive(Copy, Clone, Debug, Serialize, Deserialize, SerializedBytes)]
     struct RandNum(u64);
 
-    impl RandNum {
-        pub fn new() -> Self {
+    impl Default for RandNum {
+        fn default() -> Self {
             Self(rand::thread_rng().gen())
         }
     }
@@ -47,7 +47,7 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
                 api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
                     EntryVisibility::Public,
-                    Entry::app(RandNum::new().try_into().unwrap()).unwrap(),
+                    Entry::app(RandNum::default().try_into().unwrap()).unwrap(),
                     ChainTopOrdering::default(),
                 ))
                 .unwrap()

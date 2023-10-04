@@ -58,7 +58,7 @@ impl Drop for SupervisedChild {
             self.1
                 .kill()
                 .await
-                .expect(&format!("Failed to kill {}", self.0));
+                .unwrap_or_else(|_| panic!("Failed to kill {}", self.0));
         });
     }
 }
@@ -136,7 +136,7 @@ pub async fn call_zome_fn<S>(
         fn_name: fn_name.clone(),
         provenance: signing_key,
         payload: ExternIO::encode(input).unwrap(),
-        nonce: Nonce256Bits::from(nonce),
+        nonce,
         expires_at,
     };
     let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
@@ -264,13 +264,9 @@ pub async fn register_and_install_dna_named(
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
 
-    let bundle = AppBundle::new(
-        manifest.clone().into(),
-        resources,
-        PathBuf::from(dna_path.clone()),
-    )
-    .await
-    .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
+        .await
+        .unwrap();
 
     let payload = InstallAppPayload {
         agent_key,
@@ -393,10 +389,8 @@ pub async fn dump_full_state(
     let response = client.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let full_state = match response {
+    match response {
         AdminResponse::FullStateDumped(state) => state,
         _ => panic!("DumpFullState failed: {:?}", response),
-    };
-
-    full_state
+    }
 }

@@ -21,7 +21,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
-use observability;
+
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -189,7 +189,7 @@ async fn call_zome() {
         &mut app_tx,
         cell_id.clone(),
         &signing_keypair,
-        cap_secret.clone(),
+        cap_secret,
         zome_name.clone(),
         fn_name.clone(),
         &(),
@@ -235,7 +235,7 @@ async fn call_zome() {
         &mut app_tx,
         cell_id.clone(),
         &signing_keypair,
-        cap_secret.clone(),
+        cap_secret,
         zome_name.clone(),
         fn_name.clone(),
         &(),
@@ -435,10 +435,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
-    let dna = fake_dna_zomes(
-        "".into(),
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-    );
+    let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
         modifiers: DnaModifiersOpt::none(),
@@ -480,7 +477,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // There should be no app interfaces listed
-    assert_matches!(response, Ok(Ok(AdminResponse::AppInterfacesListed(interfaces))) if interfaces.len() == 0);
+    assert_matches!(response, Ok(Ok(AdminResponse::AppInterfacesListed(interfaces))) if interfaces.is_empty());
 
     Ok(())
 }
@@ -527,10 +524,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     info!("About to make failing request");
 
-    let dna = fake_dna_zomes(
-        "".into(),
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-    );
+    let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
         modifiers: DnaModifiersOpt::none(),
@@ -605,7 +599,7 @@ async fn concurrent_install_dna() {
 
     //let before = std::time::Instant::now();
 
-    let install_tasks_stream = futures::stream::iter((0..NUM_DNA).into_iter().map(|i| {
+    let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
         tokio::spawn(async move {
