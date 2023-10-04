@@ -3,17 +3,16 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.66.1";
+        version = "1.71.1";
       };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
 
         pname = "hc-scaffold";
-        src = inputs.scaffolding;
+        src = flake.config.reconciledInputs.scaffolding;
 
         CARGO_PROFILE = "release";
 
@@ -22,21 +21,22 @@
         buildInputs =
           (with pkgs; [
             openssl
-          ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
-            (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+          ]) ++ (lib.optionals pkgs.stdenv.isDarwin
+            (with self'.legacyPackages.apple_sdk'.frameworks; [
               AppKit
               CoreFoundation
               CoreServices
               Security
             ])
-          );
+          )
+        ;
 
         nativeBuildInputs =
           (with pkgs; [
             perl
             pkg-config
             makeBinaryWrapper
+            self'.packages.goWrapper
           ])
           ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
             xcbuild
@@ -58,7 +58,6 @@
             --prefix PATH : ${rustToolchain}/bin
         '';
       });
-
     in
     {
       packages = {

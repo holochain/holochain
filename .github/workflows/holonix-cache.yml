@@ -1,0 +1,94 @@
+name: "Holonix cache"
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs: { }
+
+jobs:
+  # ensures the cache is regularly updated for the supported versions on multiple platforms
+  cache-update:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - ".#packages.{0}.build-holonix-tests-integration"
+          - ".#devShells.{0}.holonix"
+        extra_args:
+          - '--override-input versions "./versions/0_1"'
+          - '--override-input versions "./versions/0_2"'
+          - '--override-input versions "./versions/weekly"'
+        platform:
+          - x86_64-darwin
+          - aarch64-darwin
+          - x86_64-linux
+
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Print matrix
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
+        run: echo ${MATRIX}
+
+      - name: "Cache packages ${{ matrix.extra_args }}"
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI }}"
+        run: |
+          set -xe
+
+          target=${{ matrix.target }}
+
+          # See https://docs.cachix.org/pushing#id1
+          nix build -L \
+            ${{ matrix.extra_args }} \
+            ${{ format(matrix.target, matrix.platform) }}
+
+          # Don't exit if this fails so we can clean up the profile
+          for i in result*; do
+            cachix push holochain-ci $i || true
+          done
+
+          rm result*
+  cache-check:
+    needs:
+      - cache-update
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - ".#devShells.{0}.holonix"
+          - ".#packages.{0}.hc-scaffold"
+        extra_args:
+          - ''
+          - '--override-input versions ./versions/0_1'
+          - '--override-input versions ./versions/0_2'
+          - '--override-input versions ./versions/weekly'
+        platform:
+          - x86_64-darwin
+          - aarch64-darwin
+          - x86_64-linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: cachix/install-nix-action@v22
+      - uses: cachix/cachix-action@v12
+        with:
+          name: holochain-ci
+      - name: Check the Holonix cache
+        uses: holochain/nix-cache-check@v1
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+        with:
+          derivation: ${{ format(matrix.target, matrix.platform) }}
+          extra_build_args: ${{ matrix.extra_args }}
