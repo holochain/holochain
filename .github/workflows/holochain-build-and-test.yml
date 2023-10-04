@@ -31,18 +31,12 @@ jobs:
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+            extra_arg: "--override-input versions ./versions/0_1 --override-input holochain ${{ inputs.repo_path }}"
 
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/0_1"
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2"
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly"
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
@@ -55,7 +49,7 @@ jobs:
                 - build-holochain-build-crates-standalone
                 - build-holochain-tests-static-all
                 - build-release-automation-tests-unit
-              extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
+              extra_arg: "--override-input versions './versions/0_1' --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
 
