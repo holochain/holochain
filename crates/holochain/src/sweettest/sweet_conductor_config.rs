@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
-use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+use kitsune_p2p_types::{
+    config::{KitsuneP2pConfig, TransportConfig},
+    dependencies::lair_keystore_api::dependencies::nanoid::nanoid,
+};
 
 /// Wrapper around ConductorConfig with some helpful builder methods
 #[derive(
@@ -60,7 +63,9 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        KitsuneP2pConfig::default().into()
+        let mut config: Self = KitsuneP2pConfig::default().into();
+        config.tracing_scope = nanoid!();
+        config
     }
 
     /// Rendezvous config for SweetConductors
