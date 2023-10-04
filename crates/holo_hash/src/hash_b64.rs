@@ -52,6 +52,21 @@ impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl<T: HashType + proptest::arbitrary::Arbitrary + 'static> proptest::arbitrary::Arbitrary
+    for HoloHashB64<T>
+where
+    T::Strategy: 'static,
+{
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHashB64<T>>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+        HoloHash::arbitrary().prop_map(Into::into).boxed()
+    }
+}
+
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
 

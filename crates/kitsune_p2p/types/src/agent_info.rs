@@ -57,6 +57,10 @@ pub mod agent_info_helper {
 }
 
 /// The inner constructable AgentInfo struct
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AgentInfoInner {
     /// The space this agent info is relevant to.
     pub space: Arc<KitsuneSpace>,
@@ -124,6 +128,10 @@ impl std::hash::Hash for AgentInfoInner {
 
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AgentInfoSigned(pub Arc<AgentInfoInner>);
 
 impl std::ops::Deref for AgentInfoSigned {

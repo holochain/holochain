@@ -1140,8 +1140,12 @@ fn time_range(start: Duration, end: Duration) -> TimeWindow {
     start..end
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 /// An encoded timed bloom filter of missing op hashes.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum EncodedTimedBloomFilter {
     /// I have no overlap with your agents
     /// Please don't send any ops.

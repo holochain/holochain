@@ -21,7 +21,10 @@ pub mod facts;
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 /// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
     /// A action which simply creates a new entry
@@ -460,7 +463,6 @@ impl<'a> From<&'a NewEntryAction> for NewEntryActionRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
     use crate::test_utils::fake_dna_hash;
     use crate::test_utils::fake_entry_hash;
     use ::fixt::prelude::Unpredictable;
