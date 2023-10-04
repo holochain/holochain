@@ -96,6 +96,8 @@ pub struct SignedValidationReceipt {
     /// the content of the validation receipt.
     pub receipt: ValidationReceipt,
 
+    // TODO This is just the signature and not the original message, should this be a full signature and get validated
+    //      when it is received? https://github.com/holochain/holochain/pull/2848#discussion_r1346160783
     /// the signature of the remote validator.
     pub validators_signatures: Vec<Signature>,
 }
