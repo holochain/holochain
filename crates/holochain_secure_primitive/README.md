@@ -1,3 +1,3 @@
 # holochain_secure_primitive
 
-License: Apache-2.0
+License: CAL-1.0

@@ -1,3 +1,3 @@
 # holochain_nonce
 
-License: Apache-2.0
+License: CAL-1.0

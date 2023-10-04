@@ -1,3 +1,3 @@
 # holochain_state_types
 
-License: Apache-2.0
+License: CAL-1.0
