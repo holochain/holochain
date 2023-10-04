@@ -31,8 +31,8 @@ For both, this is the complete list of valid variants:
 * _minor_
 * _patch_
 * _!pre \<pre-release-suffix\>_ (e.g. `!pre dev`)
-* _!pre\_major \<pre-release-suffix\>_ (e.g. `!pre_patch rc`)
-* _!pre\_minor \<pre-release-suffix\>_ (e.g. `!pre_patch beta`)
+* _!pre\_major \<pre-release-suffix\>_ (e.g. `!pre_major rc`)
+* _!pre\_minor \<pre-release-suffix\>_ (e.g. `!pre_minor beta`)
 * _!pre\_patch \<pre-release-suffix\>_ (e.g. `!pre_patch alpha`)
 
 **The exclamation mark is required for the values that take a pre-release-suffix**, as the parser relies on [YAML tags for explicit type hints](https://yaml.org/spec/1.2.2/#tags).*
