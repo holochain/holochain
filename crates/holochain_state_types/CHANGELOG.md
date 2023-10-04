@@ -7,8 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- New package to extract types from `holochain_state` 
-
 ## 0.3.0-beta-dev.19
 
 - New package to extract types from `holochain_state` 
