@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.1.7-rc.0
+
 ## 0.1.6
 
 ## 0.1.6-beta-rc.0
