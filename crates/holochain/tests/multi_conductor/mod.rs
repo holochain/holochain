@@ -21,7 +21,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use std::sync::Arc;
 
     use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
-    use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
 
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;

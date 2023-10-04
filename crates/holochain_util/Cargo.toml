@@ -19,6 +19,7 @@ derive_more = "0.99"
 dunce = "1.0"
 rpassword = { version = "7.0.0", optional = true }
 sodoken = { version = "0.0.9", optional = true }
+getrandom = "0.2.7"
 
 [features]
 default = [ "fs", "tokio" ]

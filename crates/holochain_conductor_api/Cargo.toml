@@ -11,10 +11,10 @@ edition = "2021"
 [dependencies]
 directories = "2.0.2"
 derive_more = "0.99.3"
-kitsune_p2p = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/types" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.6", path = "../kitsune_p2p/bin_data" }
 holo_hash = { version = "^0.3.0-beta-dev.9", path = "../holo_hash", features = ["full"] }
-holochain_p2p = { version = "^0.3.0-beta-dev.19", path = "../holochain_p2p" }
-holochain_state = { version = "^0.3.0-beta-dev.19", path = "../holochain_state" }
+holochain_state_types = { version = "^0.3.0-beta-dev.19", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.53"
 holochain_types = { version = "^0.3.0-beta-dev.17", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.13", path = "../holochain_zome_types" }
@@ -28,25 +28,21 @@ url2 = "0.0.6"
 holochain_keystore = { version = "^0.3.0-beta-dev.14", path = "../holochain_keystore" }
 
 [dev-dependencies]
+serde_json = "1.0"
 matches = {version = "0.1.8"}
 holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
+kitsune_p2p = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/kitsune_p2p" }
 
 [features]
 chc = []
 sqlite-encrypted = [
     "holo_hash/sqlite-encrypted",
-    "kitsune_p2p/sqlite-encrypted",
-    "holochain_p2p/sqlite-encrypted",
-    "holochain_state/sqlite-encrypted",
     "holochain_types/sqlite-encrypted",
     "holochain_zome_types/sqlite-encrypted",
     "holochain_keystore/sqlite-encrypted",
 ]
 sqlite = [
     "holo_hash/sqlite",
-    "kitsune_p2p/sqlite",
-    "holochain_p2p/sqlite",
-    "holochain_state/sqlite",
     "holochain_types/sqlite",
     "holochain_zome_types/sqlite",
     "holochain_keystore/sqlite",
