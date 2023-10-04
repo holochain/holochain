@@ -1183,7 +1183,7 @@ mod network_impls {
                 | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
-                | ValidationReceiptReceived { .. } => {
+                | ValidationReceiptsReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                     let cell = self.cell_by_id(&cell_id, true).await?;
@@ -1291,7 +1291,8 @@ mod network_impls {
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
-            let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(now)?;
+            let (nonce, expires_at) =
+                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),

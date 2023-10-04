@@ -9,6 +9,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
+use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
@@ -42,7 +43,6 @@ use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::{CountLinksResponse, WireEntryOps};
 use holochain_types::record::WireRecordOps;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
@@ -54,6 +54,7 @@ use std::collections::HashSet;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
+use holochain_types::validation_receipt::ValidationReceiptBundle;
 pub use record_test_data::*;
 
 mod activity_test_data;
@@ -258,10 +259,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
-        _receipt: holochain_serialized_bytes::SerializedBytes,
+        _receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -464,10 +465,10 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
-        _receipt: holochain_serialized_bytes::SerializedBytes,
+        _receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

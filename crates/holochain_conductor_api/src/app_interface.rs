@@ -3,7 +3,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
+use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -452,7 +452,7 @@ pub struct NetworkInfo {
 
 #[test]
 fn status_serialization() {
-    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
+    use serde_json;
 
     let status: AppInfoStatus =
         AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();

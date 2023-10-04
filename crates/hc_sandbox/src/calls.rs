@@ -16,7 +16,6 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
@@ -25,6 +24,7 @@ use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;

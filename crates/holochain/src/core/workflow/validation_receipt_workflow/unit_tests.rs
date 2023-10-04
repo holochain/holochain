@@ -24,7 +24,7 @@ use holochain_zome_types::cell::CellId;
 use holochain_zome_types::prelude::ValidationStatus;
 use holochain_zome_types::{Block, BlockTarget, CellBlockReason};
 use parking_lot::RwLock;
-use rusqlite::named_params;
+use rusqlite::{named_params, Transaction};
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -36,7 +36,7 @@ async fn no_running_cells() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt().never(); // Verify no receipts sent
+    dna.expect_send_validation_receipts().never(); // Verify no receipts sent
 
     let work_complete = validation_receipt_workflow(
         Arc::new(fixt!(DnaHash)),
@@ -80,7 +80,7 @@ async fn do_not_block_or_send_to_self() {
 
     let mut dna = MockHolochainP2pDnaT::new();
 
-    dna.expect_send_validation_receipt().never(); // Verify no receipts sent
+    dna.expect_send_validation_receipts().never(); // Verify no receipts sent
 
     let validator = CellId::new(dna_hash.clone(), author);
 
@@ -116,7 +116,7 @@ async fn block_invalid_op_author() {
 
     // We'll still send a validation receipt, but we should also block them
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
 
     let dna_hash = fixt!(DnaHash);
@@ -162,7 +162,7 @@ async fn block_invalid_op_author() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stops_if_receipt_cannot_be_signed() {
+async fn continues_if_receipt_cannot_be_signed() {
     holochain_trace::test_run().ok();
 
     let test_db = holochain_state::test_utils::test_dht_db();
@@ -170,12 +170,12 @@ async fn stops_if_receipt_cannot_be_signed() {
     let keystore = holochain_state::test_utils::test_keystore();
 
     // Any op created by somebody else, which is valid
-    create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+    let (_, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
         .await
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt().never();
+    dna.expect_send_validation_receipts().never();
 
     let dna_hash = fixt!(DnaHash);
 
@@ -186,16 +186,17 @@ async fn stops_if_receipt_cannot_be_signed() {
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
-        vault,
+        vault.clone(),
         dna,
         keystore,
-        vec![invalid_validator].into_iter().collect(), // No running cells
+        vec![invalid_validator].into_iter().collect(),
         |_block| unreachable!("Should not try to block"),
     )
     .await
     .unwrap();
 
-    assert_eq!(WorkComplete::Incomplete, work_complete);
+    assert_eq!(WorkComplete::Complete, work_complete);
+    assert!(!get_requires_receipt(vault, op_hash).await);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -212,7 +213,7 @@ async fn send_validation_receipt() {
         .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-    dna.expect_send_validation_receipt()
+    dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
 
     let dna_hash = fixt!(DnaHash);
@@ -237,6 +238,61 @@ async fn send_validation_receipt() {
 
     // Should no longer require a receipt
     assert!(!get_requires_receipt(vault.clone(), op_hash).await);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
+    holochain_trace::test_run().ok();
+
+    let test_db = holochain_state::test_utils::test_dht_db();
+    let vault = test_db.to_db();
+    let keystore = holochain_state::test_utils::test_keystore();
+
+    let (author1, op_hash1) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
+
+    let (author2, op_hash2) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
+        .await
+        .unwrap();
+
+    let mut dna = MockHolochainP2pDnaT::new();
+    let mut seq = mockall::Sequence::new();
+    dna.expect_send_validation_receipts()
+        .times(1)
+        .withf(move |author: &AgentPubKey, _| *author == author1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| Err("I'm a test error".into()));
+
+    dna.expect_send_validation_receipts()
+        .times(1)
+        .withf(move |author: &AgentPubKey, _| *author == author2)
+        .in_sequence(&mut seq)
+        .returning(|_, _| Ok(()));
+
+    let dna_hash = fixt!(DnaHash);
+
+    let validator = CellId::new(
+        dna_hash.clone(),
+        keystore.new_sign_keypair_random().await.unwrap(),
+    );
+
+    let work_complete = validation_receipt_workflow(
+        Arc::new(dna_hash),
+        vault.clone(),
+        dna,
+        keystore,
+        vec![validator].into_iter().collect(), // No running cells
+        |_block| unreachable!("Should not try to block"),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(WorkComplete::Complete, work_complete);
+
+    // Should no longer require a receipt for either
+    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+    assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
 }
 
 async fn create_op_with_status(

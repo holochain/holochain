@@ -75,6 +75,8 @@ test_utils = [
 
 tx2 = []
 
+tx5 = []
+
 sqlite-encrypted = [
   "kitsune_p2p_dht/sqlite-encrypted",
   "kitsune_p2p_dht_arc/sqlite-encrypted",
