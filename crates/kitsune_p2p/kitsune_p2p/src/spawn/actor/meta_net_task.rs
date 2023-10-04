@@ -589,6 +589,7 @@ mod tests {
     use kitsune_p2p_fetch::test_utils::{test_key_op, test_req_op, test_source, test_space};
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
     use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
+    use kitsune_p2p_types::bin_types::NodeCert;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
@@ -2267,7 +2268,7 @@ mod tests {
     }
 
     fn test_node_id(i: u8) -> NodeId {
-        Arc::new(vec![i; 32].try_into().unwrap())
+        NodeCert::from(Arc::new(vec![i; 32].try_into().unwrap()))
     }
 
     fn test_agent(i: u8) -> Arc<KitsuneAgent> {
