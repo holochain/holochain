@@ -3016,7 +3016,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "getrandom 0.2.10",
  "holochain_secure_primitive",
@@ -3055,7 +3055,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "paste",
  "serde",
@@ -3188,7 +3188,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state_types"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "holo_hash",
  "holochain_integrity_types",
