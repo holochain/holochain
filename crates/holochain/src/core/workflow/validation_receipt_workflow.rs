@@ -163,7 +163,7 @@ where
         .collect()
         .await;
 
-    if receipts.len() == 0 {
+    if receipts.is_empty() {
         info!("Dropped all validation receipts for author {:?}", op_author);
         return Ok(());
     } else if num_receipts < receipts.len() {
