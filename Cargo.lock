@@ -2686,6 +2686,7 @@ dependencies = [
  "bytes",
  "cfg-if 0.1.10",
  "chrono",
+ "clap 4.4.6",
  "contrafact",
  "criterion 0.3.6",
  "derive_more",
