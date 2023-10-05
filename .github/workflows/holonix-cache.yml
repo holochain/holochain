@@ -68,10 +68,10 @@ jobs:
           - ".#devShells.{0}.holonix"
           - ".#packages.{0}.hc-scaffold"
         extra_args:
-          - ''
-          - '--override-input versions "github:holochain/holochain?dir=versions/0_1"'
-          - '--override-input versions "github:holochain/holochain?dir=versions/0_2"'
-          - '--override-input versions "github:holochain/holochain?dir=versions/weekly"'
+          - '--refresh'
+          - '--refresh --override-input versions "github:holochain/holochain?dir=versions/0_1"'
+          - '--refresh --override-input versions "github:holochain/holochain?dir=versions/0_2"'
+          - '--refresh --override-input versions "github:holochain/holochain?dir=versions/weekly"'
         platform:
           - x86_64-darwin
           - aarch64-darwin
