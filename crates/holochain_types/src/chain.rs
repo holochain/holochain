@@ -194,12 +194,9 @@ impl BoundedMustGetAgentActivityResponse {
     /// Sort by the chain seq.
     /// Dedupe by action hash.
     pub fn normalize(&mut self) {
-        match self {
-            Self::Activity(activity, _) => {
-                activity.sort_unstable_by_key(|a| a.action.action().action_seq());
-                activity.dedup_by_key(|a| a.action.as_hash().clone());
-            }
-            _ => (),
+        if let Self::Activity(activity, _) = self {
+            activity.sort_unstable_by_key(|a| a.action.action().action_seq());
+            activity.dedup_by_key(|a| a.action.as_hash().clone());
         }
     }
 }
