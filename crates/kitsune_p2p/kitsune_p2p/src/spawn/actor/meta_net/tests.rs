@@ -436,9 +436,11 @@ async fn meta_net_sanity() {
 
     let (send1, recv1) = MetaNet::new_tx5(
         tuning_params.clone(),
-        Arc::new(test.clone()),
+        HostApiLegacy {
+            api: Arc::new(test.clone()),
+            legacy: evt_sender.clone(),
+        },
         i_s.clone(),
-        evt_sender.clone(),
         format!("ws://{sig_addr}"),
     )
     .await
@@ -447,9 +449,11 @@ async fn meta_net_sanity() {
 
     let (send2, recv2) = MetaNet::new_tx5(
         tuning_params.clone(),
-        Arc::new(test.clone()),
+        HostApiLegacy {
+            api: Arc::new(test.clone()),
+            legacy: evt_sender.clone(),
+        },
         i_s.clone(),
-        evt_sender.clone(),
         format!("ws://{sig_addr}"),
     )
     .await
