@@ -1,4 +1,5 @@
 mod app;
+mod components;
 mod tui;
 
 use crate::app::App;
