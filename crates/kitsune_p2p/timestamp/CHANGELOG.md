@@ -1,5 +1,6 @@
 ---
 default_semver_increment_mode: !pre_patch rc
+semver_increment_mode: !patch
 ---
 # Changelog
 

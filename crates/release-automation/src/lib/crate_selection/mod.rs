@@ -99,7 +99,8 @@ impl<'a> Crate<'a> {
         release_version: &semver::Version,
     ) -> Fallible<Vec<&'a Crate<'a>>> {
         debug!(
-            "setting version to {} in manifest at {:?}",
+            "[{}] setting version to {} in manifest at {:?}",
+            self.name(),
             release_version,
             self.manifest_path(),
         );
