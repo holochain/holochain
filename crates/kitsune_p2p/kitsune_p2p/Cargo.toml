@@ -84,6 +84,7 @@ fuzzing = [
   "contrafact",
   "proptest",
   "proptest-derive",
+  "kitsune_p2p_fetch/fuzzing",
   "kitsune_p2p_timestamp/fuzzing",
   "kitsune_p2p_types/fuzzing",
 ]
