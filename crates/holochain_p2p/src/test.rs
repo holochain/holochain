@@ -140,11 +140,11 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
-    fn handle_send_validation_receipt(
+    fn handle_send_validation_receipts(
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -363,11 +363,10 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
-                    ValidationReceiptReceived {
-                        respond, receipt, ..
+                    ValidationReceiptsReceived {
+                        respond, receipts, ..
                     } => {
-                        let receipt: Vec<u8> = UnsafeBytes::from(receipt).into();
-                        assert_eq!(b"receipt-test".to_vec(), receipt);
+                        assert_eq!(1, receipts.into_iter().count());
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
@@ -388,7 +387,16 @@ mod tests {
         p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
         p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
-        p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
+        let receipts = vec![SignedValidationReceipt {
+            receipt: ValidationReceipt {
+                dht_op_hash: fixt!(DhtOpHash),
+                validation_status: ValidationStatus::Valid,
+                validators: vec![],
+                when_integrated: Timestamp::now(),
+            },
+            validators_signatures: vec![],
+        }];
+        p2p.send_validation_receipts(dna, a1, receipts.into())
             .await
             .unwrap();
 
