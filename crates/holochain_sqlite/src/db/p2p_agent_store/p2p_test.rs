@@ -190,7 +190,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .unwrap();
     // NOTE - not sure this is right with <= num_nonzero... but it breaks
     //        sometimes if we just use '<'
-    assert!(all.len() > 0 && all.len() <= num_nonzero);
+    assert!(!all.is_empty() && all.len() <= num_nonzero);
 
     // near
     let tgt = u32::MAX / 2;
@@ -219,14 +219,12 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
                         deb = "one-span-after";
                         dist = std::cmp::min(tgt - end, (u32::MAX - tgt) + start);
                     }
+                } else if tgt <= end || tgt >= start {
+                    deb = "two-span-inside";
+                    dist = 0;
                 } else {
-                    if tgt <= end || tgt >= start {
-                        deb = "two-span-inside";
-                        dist = 0;
-                    } else {
-                        deb = "two-span-outside";
-                        dist = std::cmp::min(tgt - end, start - tgt);
-                    }
+                    deb = "two-span-outside";
+                    dist = std::cmp::min(tgt - end, start - tgt);
                 }
             }
             _ => (),

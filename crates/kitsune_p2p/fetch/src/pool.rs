@@ -377,7 +377,7 @@ mod tests {
         context: Option<FetchContext>,
     ) -> FetchPoolItem {
         FetchPoolItem {
-            sources: Sources(sources.into_iter().map(|s| SourceRecord::new(s)).collect()),
+            sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
             size: None,
@@ -408,13 +408,11 @@ mod tests {
             SourceRecord {
                 source: source(1),
                 last_request: Some(Instant::now()),
-            }
-            .into(),
+            },
             SourceRecord {
                 source: source(2),
                 last_request: None,
-            }
-            .into(),
+            },
         ]);
 
         tokio::time::advance(Duration::from_secs(1)).await;

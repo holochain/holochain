@@ -206,12 +206,9 @@ async fn grafting() {
 }
 
 async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
-    let sah = SignedActionHashed::sign(
-        keystore,
-        ActionHashed::from_content_sync(action.clone().into()),
-    )
-    .await
-    .unwrap();
+    let sah = SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action.clone()))
+        .await
+        .unwrap();
     let entry = Entry::app(().try_into().unwrap()).unwrap();
     Record::new(sah, Some(entry.clone()))
 }

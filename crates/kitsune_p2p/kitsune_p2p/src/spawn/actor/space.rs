@@ -812,7 +812,7 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_leave(
@@ -918,7 +918,7 @@ impl KitsuneP2pHandler for Space {
             self.ro_inner.clone(),
             local_agents_holding_basis,
         );
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_broadcast(

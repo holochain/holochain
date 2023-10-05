@@ -444,6 +444,7 @@ async fn validate_op_inner(
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
+#[allow(clippy::let_and_return)]
 pub async fn sys_validate_record(
     record: &Record,
     call_zome_workspace: &HostFnWorkspace,

@@ -219,6 +219,7 @@ impl<Network> Cascade<Network>
 where
     Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
+    #[allow(clippy::result_large_err)]
     fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
             op_light,
@@ -239,6 +240,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::result_large_err)]
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
         let RenderedOps { ops, entry } = ops;
         if let Some(entry) = entry {
@@ -251,6 +253,7 @@ where
     }
 
     /// Insert a set of agent activity into the Cache.
+    #[allow(clippy::result_large_err)]
     fn insert_activity(
         txn: &mut Transaction,
         ops: Vec<RegisterAgentActivity>,
@@ -937,6 +940,7 @@ where
     /// - include_entries will also fetch the entries in parallel (requires include_full_actions)
     /// - sequence_range will get all the activity in the exclusive range
     /// - action_type and entry_type will filter the activity (requires include_full_actions)
+    #[allow(clippy::result_large_err)]
     pub async fn get_agent_activity(
         &mut self,
         agent: AgentPubKey,
@@ -1052,6 +1056,7 @@ where
         Ok(r)
     }
 
+    #[allow(clippy::result_large_err)]
     fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)

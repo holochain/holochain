@@ -65,7 +65,7 @@ mod tests {
         let hn = not_(action_facts::is_new_entry_action()).build(u);
         let mut he = action_facts::is_new_entry_action().build(u);
         *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let he = Action::from(he);
+        let he = he;
 
         let pair1: Pair = (hn.clone(), None);
         let pair2: Pair = (hn.clone(), Some(e.clone()));

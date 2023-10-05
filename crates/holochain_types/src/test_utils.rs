@@ -136,11 +136,9 @@ pub async fn fake_unique_record(
 pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     tokio_helper::block_on(
         async move {
-            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+            holochain_keystore::test_keystore::spawn_test_keystore()
                 .await
-                .unwrap();
-
-            keystore
+                .unwrap()
         },
         std::time::Duration::from_secs(1),
     )

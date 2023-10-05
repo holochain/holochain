@@ -3,17 +3,17 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.66.1";
+        version = "1.71.1";
       };
+
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
 
         pname = "lair-keystore";
-        src = inputs.lair;
+        src = flake.config.reconciledInputs.lair;
 
         CARGO_PROFILE = "release";
 
@@ -39,7 +39,7 @@
       deps = craneLib.buildDepsOnly (commonArgs // { });
 
       # derivation with the main crates
-      package = craneLib.buildPackage (commonArgs // {
+      package = lib.makeOverridable craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
       });
 

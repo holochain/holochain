@@ -119,10 +119,7 @@ mod tests {
         let chain = build_seq(&mut u, 5, valid_chain());
         check_seq(chain.as_slice(), valid_chain()).unwrap();
 
-        let hashes: Vec<_> = chain
-            .iter()
-            .map(|h| ActionHash::with_data_sync(h))
-            .collect();
+        let hashes: Vec<_> = chain.iter().map(ActionHash::with_data_sync).collect();
         let backlinks: Vec<_> = chain
             .iter()
             .filter_map(|h| h.prev_action())
