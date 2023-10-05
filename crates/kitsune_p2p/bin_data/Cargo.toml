@@ -22,6 +22,7 @@ serde_bytes = "0.11"
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
+fixt = { version = "^0.3.0-beta-dev.0", path = "../../fixt", optional = true }
 
 [features]
 
@@ -32,7 +33,11 @@ fuzzing = [
   "kitsune_p2p_dht_arc/fuzzing",
 ]
 
-test_utils = [ ]
+test_utils = []
+
+fixt = [
+  "dep:fixt",
+]
 
 sqlite-encrypted = [
   "kitsune_p2p_dht_arc/sqlite-encrypted"

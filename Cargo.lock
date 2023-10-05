@@ -4037,6 +4037,7 @@ dependencies = [
  "arbitrary",
  "base64 0.13.1",
  "derive_more",
+ "fixt",
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
@@ -4064,6 +4065,8 @@ dependencies = [
  "fixt",
  "futures",
  "kitsune_p2p",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_bootstrap",
  "kitsune_p2p_types",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -4072,6 +4075,26 @@ dependencies = [
  "serde_bytes",
  "tokio",
  "warp",
+]
+
+[[package]]
+name = "kitsune_p2p_bootstrap_client"
+version = "0.3.0-beta-dev.17"
+dependencies = [
+ "ed25519-dalek",
+ "fixt",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_bootstrap",
+ "kitsune_p2p_bootstrap_client",
+ "kitsune_p2p_types",
+ "once_cell",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_bytes",
+ "thiserror",
+ "tokio",
+ "url2",
 ]
 
 [[package]]
@@ -4214,6 +4237,7 @@ dependencies = [
  "base64 0.21.4",
  "criterion 0.5.1",
  "derive_more",
+ "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.6",
  "holochain_trace",

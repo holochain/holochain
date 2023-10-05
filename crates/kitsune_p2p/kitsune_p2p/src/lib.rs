@@ -63,8 +63,6 @@ pub mod test_util;
 #[cfg(test)]
 mod test;
 
-pub mod fixt;
-
 /// 10MB of entropy free for the taking.
 /// Useful for initializing arbitrary::Unstructured data
 #[cfg(any(test, feature = "test_utils"))]
