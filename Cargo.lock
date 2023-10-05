@@ -8114,8 +8114,6 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c20ea30df2cb7172c8410c51ae620cb61e8fb63c3f2b0e560646a81cbe6ac04d"
 dependencies = [
  "bytes",
  "futures",
@@ -8138,8 +8136,6 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef6c9332a03a5dec9bc20c227ca52d6918ad74472b37921252179f190dc5e312"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8156,8 +8152,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "943dd802f81376a72a38a7eeaa7ee128bc221826495f0346b875358db2c53d56"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
@@ -8170,8 +8164,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f7f7a8f6dcf97e956cc8f899f01233b83e7a684b95a4ab9d501ec25596f6b7"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8189,8 +8181,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13c585cb964f1bffba37ab1bfc4f372ede0c7906e2c92ce69231ecf2d8857613"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8207,8 +8197,6 @@ dependencies = [
 [[package]]
 name = "tx5-signal"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ed634434030914bf893eb5d3c3f32b0c0516c9352ca14ccccbcc997178eb23"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8236,8 +8224,6 @@ dependencies = [
 [[package]]
 name = "tx5-signal-srv"
 version = "0.0.3-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "811e5205cef837d9aae13933a6b42677e193845d03ff708dbae29131b89e019e"
 dependencies = [
  "clap 4.4.6",
  "dirs 5.0.1",

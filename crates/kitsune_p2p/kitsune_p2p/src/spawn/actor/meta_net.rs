@@ -132,6 +132,35 @@ pub enum MetaNetEvt {
     },
 }
 
+impl std::fmt::Debug for MetaNetEvt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connected { remote_url, .. } => f
+                .debug_struct("Connected")
+                .field("remote_url", remote_url)
+                .finish(),
+            Self::Disconnected { remote_url, .. } => f
+                .debug_struct("Disconnected")
+                .field("remote_url", remote_url)
+                .finish(),
+            Self::Request {
+                remote_url, data, ..
+            } => f
+                .debug_struct("Request")
+                .field("remote_url", remote_url)
+                .field("data", data)
+                .finish(),
+            Self::Notify {
+                remote_url, data, ..
+            } => f
+                .debug_struct("Notify")
+                .field("remote_url", remote_url)
+                .field("data", data)
+                .finish(),
+        }
+    }
+}
+
 impl MetaNetEvt {
     pub fn con(&self) -> &MetaNetCon {
         match self {
@@ -1083,8 +1112,10 @@ impl MetaNet {
 
         #[cfg(feature = "tx2")]
         {
-            tracing::debug!("broadcast on tx2");
-            return Ok(());
+            if matches!(self, MetaNet::Tx2 { .. }) {
+                tracing::debug!("broadcast on tx2");
+                return Ok(());
+            }
         }
 
         #[cfg(feature = "tx5")]
