@@ -1,6 +1,8 @@
 use crate::actor::*;
 use crate::event::*;
 use crate::HostApi;
+use crate::HostApiLegacy;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod actor;
 pub(crate) use actor::meta_net;
@@ -13,7 +15,7 @@ use ghost_actor::GhostSender;
 
 /// Spawn a new KitsuneP2p actor.
 pub async fn spawn_kitsune_p2p(
-    config: crate::KitsuneP2pConfig,
+    config: KitsuneP2pConfig,
     tls_config: kitsune_p2p_types::tls::TlsConfig,
     host: HostApi,
 ) -> KitsuneP2pResult<(
@@ -28,20 +30,11 @@ pub async fn spawn_kitsune_p2p(
     let internal_sender = channel_factory.create_channel::<Internal>().await?;
 
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
+    let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(
-        builder.spawn(
-            KitsuneP2pActor::new(
-                config,
-                tls_config,
-                channel_factory,
-                internal_sender,
-                evt_send,
-                host,
-            )
-            .await?,
-        ),
-    );
+    tokio::task::spawn(builder.spawn(
+        KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host).await?,
+    ));
 
     Ok((sender, evt_recv))
 }
@@ -50,7 +43,7 @@ pub async fn spawn_kitsune_p2p(
 /// Used for some test cases where the HostApi requires some of the intermediate
 /// values created by this function.
 pub async fn spawn_kitsune_p2p_with_fn<F, T>(
-    config: crate::KitsuneP2pConfig,
+    config: KitsuneP2pConfig,
     tls_config: kitsune_p2p_types::tls::TlsConfig,
     build_host: F,
 ) -> KitsuneP2pResult<(
@@ -71,20 +64,11 @@ where
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
 
     let (t, host) = build_host(sender.clone()).await;
+    let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(
-        builder.spawn(
-            KitsuneP2pActor::new(
-                config,
-                tls_config,
-                channel_factory,
-                internal_sender,
-                evt_send,
-                host,
-            )
-            .await?,
-        ),
-    );
+    tokio::task::spawn(builder.spawn(
+        KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host).await?,
+    ));
 
     Ok((sender, evt_recv, t))
 }

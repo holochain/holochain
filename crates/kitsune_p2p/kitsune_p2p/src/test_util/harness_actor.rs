@@ -1,4 +1,5 @@
 use super::*;
+use kitsune_p2p_types::config::TransportConfig;
 
 type KAgent = Arc<KitsuneAgent>;
 type KInfo = Arc<AgentInfoSigned>;
@@ -380,7 +381,7 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.inject_gossip_data(data);
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_inject_peer_info(
@@ -396,7 +397,7 @@ impl HarnessControlApiHandler for HarnessActor {
             info.agent.clone() => info
         };
         let fut = ctrl.inject_agent_info(map);
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_dump_local_gossip_data(
@@ -408,7 +409,7 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.dump_local_gossip_data();
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_dump_local_peer_data(
@@ -420,6 +421,6 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.dump_local_peer_data();
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 }

@@ -2,6 +2,7 @@ use super::*;
 
 use kitsune_p2p_types::tx2::tx2_adapter::test_utils::*;
 use kitsune_p2p_types::tx2::tx2_adapter::*;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use once_cell::sync::Lazy;
 

@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.15"
+version = "0.3.0-beta-dev.17"
 description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,13 +20,14 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
 itertools = "0.11.0"
-kitsune_p2p_fetch = { version = "^0.3.0-beta-dev.11", path = "../fetch" }
-kitsune_p2p_mdns = { version = "^0.3.0-beta-dev.0", path = "../mdns" }
-kitsune_p2p_proxy = { version = "^0.3.0-beta-dev.9", path = "../proxy" }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.2", path = "../timestamp", features = ["now"] }
-kitsune_p2p_block = { version = "^0.3.0-beta-dev.7", path = "../block" }
-kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.9", path = "../transport_quic", optional = true }
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.9", path = "../types", default-features = false }
+holochain_util = { version = "^0.3.0-beta-dev.0", path = "../../holochain_util", default-features = false }
+kitsune_p2p_fetch = { version = "^0.3.0-beta-dev.12", path = "../fetch" }
+kitsune_p2p_mdns = { version = "^0.3.0-beta-dev.1", path = "../mdns" }
+kitsune_p2p_proxy = { version = "^0.3.0-beta-dev.10", path = "../proxy" }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.3", path = "../timestamp", features = ["now"] }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.8", path = "../block" }
+kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.10", path = "../transport_quic", optional = true }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.10", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -43,12 +44,15 @@ thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.0.2-alpha", optional = true }
+tx5 = { version = "=0.0.3-alpha", optional = true }
 url2 = "0.0.6"
-fixt = { path = "../../fixt", version = "^0.2.0"}
+fixt = { path = "../../fixt", version = "^0.3.0-beta-dev.0"}
 
-# arbitrary could be made optional
-arbitrary = { version = "1.0", features = ["derive"] }
+# fuzzing
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+contrafact = { version = "0.2.0-rc.1", optional = true }
+proptest = { version = "1", optional = true }
+proptest-derive = { version = "0", optional = true }
 
 blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
@@ -56,10 +60,9 @@ mockall = { version = "0.11.3", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = ".", features = ["test_utils", "sqlite"]}
+kitsune_p2p = { path = ".", features = ["test_utils", "fuzzing", "sqlite"]}
 
 kitsune_p2p_fetch = { path = "../fetch", features = ["test_utils"] }
-contrafact = { version = "0.2.0-rc.1" }
 kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
@@ -69,12 +72,21 @@ pretty_assertions = "1.4.0"
 test-case = "1.0.0"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
-tx5-signal-srv = "=0.0.1-alpha.9"
+tx5-signal-srv = "=0.0.3-alpha"
 ed25519-dalek = "1"
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
 [features]
 default = [ "tx2", "tx5" ]
+
+fuzzing = [
+  "arbitrary",
+  "contrafact",
+  "proptest",
+  "proptest-derive",
+  "kitsune_p2p_timestamp/fuzzing",
+  "kitsune_p2p_types/fuzzing",
+]
 
 test_utils = [
   "blake2b_simd",
@@ -83,14 +95,15 @@ test_utils = [
   "kitsune_p2p_types/test_utils",
   "maplit",
   "mockall",
-  "kitsune_p2p_timestamp/arbitrary",
 ]
+
 mock_network = [
   "kitsune_p2p_types/test_utils",
   "mockall",
 ]
 
 tx2 = [ "kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic" ]
+tx5 = [ "dep:tx5", "kitsune_p2p_types/tx5"]
 
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",

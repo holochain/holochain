@@ -17,8 +17,8 @@ use holochain_p2p::*;
 use holochain_sqlite::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
-use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
 fn make_tuning(
@@ -531,7 +531,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         records_1
             .iter()
             .enumerate()
-            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .filter_map(|(i, r)| r.is_none().then_some(i))
             .collect::<Vec<_>>()
     );
     assert_eq!(records_0, records_1);
@@ -572,7 +572,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         records_2
             .iter()
             .enumerate()
-            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .filter_map(|(i, r)| r.is_none().then_some(i))
             .collect::<Vec<_>>()
     );
     assert_eq!(records_2, records_1);
@@ -650,8 +650,8 @@ async fn mock_network_sharded_gossip() {
         },
     };
     use kitsune_p2p::gossip::sharded_gossip::test_utils::*;
-    use kitsune_p2p::TransportConfig;
     use kitsune_p2p::*;
+    use kitsune_p2p_types::config::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     // Get the env var settings for number of simulated agents and
@@ -769,7 +769,7 @@ async fn mock_network_sharded_gossip() {
                             }
                         }
                         */
-                        holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
+                        holochain_p2p::WireMessage::ValidationReceipts { receipts: _ } => {
                             debug!("Validation Receipt")
                         }
                         holochain_p2p::WireMessage::Get { dht_hash, options } => {
@@ -835,7 +835,7 @@ async fn mock_network_sharded_gossip() {
                                         // If we have info for alice check the overlap.
                                         if let Some(alice) = &alice {
                                             let a = alice.storage_arc;
-                                            let b = interval.clone();
+                                            let b = interval;
                                             debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
                                             let a: DhtArcSet = a.inner().into();
                                             let b: DhtArcSet = b.inner().into();
@@ -853,7 +853,7 @@ async fn mock_network_sharded_gossip() {
                                         // Accept the initiate.
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna: dna.clone(),
-                                            module: module.clone(),
+                                            module: module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
                                                     vec![interval.into()],
@@ -890,7 +890,7 @@ async fn mock_network_sharded_gossip() {
                                         };
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna: dna.clone(),
-                                            module: module.clone(),
+                                            module: module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::op_bloom(filter, true),
                                             ),
@@ -901,7 +901,7 @@ async fn mock_network_sharded_gossip() {
                                         if let Some(ref agent_bloom) = agent_bloom {
                                             let msg = HolochainP2pMockMsg::Gossip {
                                                 dna: dna.clone(),
-                                                module: module.clone(),
+                                                module: module,
                                                 gossip: GossipProtocol::Sharded(
                                                     ShardedGossipWire::agents(agent_bloom.clone()),
                                                 ),
@@ -1193,7 +1193,7 @@ async fn mock_network_sharding() {
     use holochain_types::dht_op::WireOps;
     use holochain_types::record::WireRecordOps;
     use kitsune_p2p::gossip::sharded_gossip::test_utils::check_agent_boom;
-    use kitsune_p2p::TransportConfig;
+    use kitsune_p2p_types::config::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 
     // Get the env var settings for number of simulated agents and
@@ -1272,7 +1272,7 @@ async fn mock_network_sharding() {
                             debug!("CallRemoteMulti")
                         }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
-                        holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
+                        holochain_p2p::WireMessage::ValidationReceipts { receipts: _ } => {
                             debug!("Validation Receipt")
                         }
                         holochain_p2p::WireMessage::Get { dht_hash, options } => {
@@ -1334,7 +1334,7 @@ async fn mock_network_sharding() {
                         basis_loc,
                         ..
                     }) => {
-                        let this_arc = data.agent_to_arc[&agent].clone();
+                        let this_arc = data.agent_to_arc[&agent];
                         let basis_loc_i = basis_loc.as_u32() as i64;
                         let mut agents = data
                             .agent_to_arc
@@ -1387,7 +1387,7 @@ async fn mock_network_sharding() {
                                         // Accept the initiate.
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna: dna.clone(),
-                                            module: module.clone(),
+                                            module: module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::accept(
                                                     vec![interval.into()],
@@ -1425,7 +1425,7 @@ async fn mock_network_sharding() {
                                         };
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna: dna.clone(),
-                                            module: module.clone(),
+                                            module: module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::op_bloom(filter, true),
                                             ),
@@ -1440,7 +1440,7 @@ async fn mock_network_sharding() {
                                         if let Some(agent_bloom) = agent_bloom {
                                             let msg = HolochainP2pMockMsg::Gossip {
                                                 dna: dna.clone(),
-                                                module: module.clone(),
+                                                module: module,
                                                 gossip: GossipProtocol::Sharded(
                                                     ShardedGossipWire::agents(agent_bloom),
                                                 ),

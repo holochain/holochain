@@ -73,7 +73,7 @@ pub struct HoloHash<T: HashType> {
     hash_type: T,
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; HOLO_HASH_FULL_LEN];
@@ -84,6 +84,32 @@ impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
             hash: buf.to_vec(),
             hash_type: P::new(),
         })
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl<T: HashType + proptest::arbitrary::Arbitrary> proptest::arbitrary::Arbitrary for HoloHash<T>
+where
+    T::Strategy: 'static,
+{
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHash<T>>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        let strat = T::arbitrary().prop_flat_map(move |hash_type| {
+            let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
+            gen_strat.prop_map(move |mut buf| {
+                assert_eq!(buf.len(), 39);
+                buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
+                HoloHash {
+                    hash: buf.to_vec(),
+                    hash_type,
+                }
+            })
+        });
+        strat.boxed()
     }
 }
 

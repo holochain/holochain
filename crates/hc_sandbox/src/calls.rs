@@ -16,7 +16,6 @@ use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
@@ -25,6 +24,7 @@ use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -246,6 +246,18 @@ pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyho
                 }
             }
         }
+
+        if cmds.is_empty() {
+            bail!(
+                "No running conductors found by searching the current directory. \
+                \nYou need to do one of: \
+                    \n\t1. Start a new sandbox conductor from this directory, \
+                    \n\t2. Change directory to where your sandbox conductor is running, \
+                    \n\t3. Use the --running flag to connect to a running conductor\
+                "
+            );
+        }
+
         cmds
     } else {
         let mut cmds = Vec::with_capacity(running.len());

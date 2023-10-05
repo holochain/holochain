@@ -14,6 +14,11 @@ pub mod dependencies {
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;
+
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest;
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest_derive;
 }
 
 /// Typedef for result of `proc_count_now()`.
@@ -88,13 +93,13 @@ impl CertDigestExt for CertDigest {
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
-impl From<Tx2Cert> for Arc<[u8; 32]> {
+impl From<Tx2Cert> for bin_types::NodeCert {
     fn from(f: Tx2Cert) -> Self {
-        f.0 .0 .0.clone()
+        f.0 .0 .0.clone().into()
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::from(u.bytes(32)?.to_vec()))
@@ -339,6 +344,7 @@ pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
+pub mod fetch_pool;
 pub mod metrics;
 pub mod task_agg;
 pub mod tls;

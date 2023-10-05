@@ -73,3 +73,25 @@ impl From<&str> for TxUrl {
         Self(Arc::new(url2::Url2::parse(r)))
     }
 }
+
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for TxUrl {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        String::arbitrary(u).map(Into::into)
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for TxUrl {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<TxUrl>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        proptest::string::string_regex(r"http://\w+")
+            .unwrap()
+            .prop_map(TxUrl::from)
+            .boxed()
+    }
+}

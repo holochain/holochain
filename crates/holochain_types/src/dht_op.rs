@@ -27,7 +27,7 @@ pub mod error;
 #[cfg(test)]
 pub mod tests;
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 pub mod facts;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
@@ -35,7 +35,10 @@ pub mod facts;
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum DhtOp {
     #[display(fmt = "StoreRecord")]
     /// Used to notify the authority for an action that it has been created.
@@ -428,6 +431,21 @@ impl DhtOp {
             }
         } else {
             None
+        }
+    }
+
+    /// Access to the Timestamp
+    pub fn timestamp(&self) -> Timestamp {
+        match self {
+            DhtOp::StoreRecord(_, h, _) => h.timestamp(),
+            DhtOp::StoreEntry(_, h, _) => h.timestamp(),
+            DhtOp::RegisterAgentActivity(_, h) => h.timestamp(),
+            DhtOp::RegisterUpdatedContent(_, h, _) => h.timestamp,
+            DhtOp::RegisterUpdatedRecord(_, h, _) => h.timestamp,
+            DhtOp::RegisterDeletedBy(_, h) => h.timestamp,
+            DhtOp::RegisterDeletedEntryAction(_, h) => h.timestamp,
+            DhtOp::RegisterAddLink(_, h) => h.timestamp,
+            DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
         }
     }
 }

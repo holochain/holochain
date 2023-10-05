@@ -6,9 +6,9 @@ use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
-use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use clap::Parser;
 
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     // Choose an app id and properties.
     let app_id = "my-cool-app".to_string();
 
-    for _ in 0..5 as usize {
+    for _ in 0..5_usize {
         let app_id = app_id.clone();
 
         // Create a conductor config with the network.

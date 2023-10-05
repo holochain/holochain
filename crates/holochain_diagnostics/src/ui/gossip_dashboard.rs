@@ -84,7 +84,7 @@ impl Node {
             })
             .collect();
         assert_eq!(ids.len(), 1);
-        let id = ids.pop().unwrap();
+        let id = ids.pop().unwrap().into();
 
         Self {
             conductor,
@@ -111,9 +111,10 @@ pub trait ClientState {
 }
 
 /// Distinct modes of input handling and display
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Focus {
     /// Nothing is selected
+    #[default]
     Empty,
     /// We've drilled into a particular Node, now we can select one of its gossip rounds
     Node(usize),
@@ -139,12 +140,6 @@ impl Focus {
 pub struct RoundInfo {
     our_diff: Vec<Region>,
     their_diff: Vec<Region>,
-}
-
-impl Default for Focus {
-    fn default() -> Self {
-        Focus::Empty
-    }
 }
 
 /// State specific to the UI
