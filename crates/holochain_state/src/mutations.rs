@@ -1,5 +1,4 @@
 use crate::entry_def::EntryDefStoreKey;
-use crate::prelude::SignedValidationReceipt;
 use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
@@ -15,9 +14,9 @@ use holochain_sqlite::sql::sql_conductor;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
-use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
+use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
 use holochain_types::sql::AsSql;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
