@@ -211,7 +211,7 @@ impl WebsocketSender {
             .send(msg)
             .await
             .map_err(|_| WebsocketError::Shutdown)?;
-        Ok(rx_resp.await.map_err(|_| WebsocketError::Shutdown)?)
+        rx_resp.await.map_err(|_| WebsocketError::Shutdown)
     }
 }
 

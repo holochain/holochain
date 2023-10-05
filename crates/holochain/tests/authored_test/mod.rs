@@ -79,7 +79,7 @@ async fn authored_test() {
         &bob_call_data.dht_db,
         expected_count,
         num_attempts,
-        delay_per_attempt.clone(),
+        delay_per_attempt,
     )
     .await;
 

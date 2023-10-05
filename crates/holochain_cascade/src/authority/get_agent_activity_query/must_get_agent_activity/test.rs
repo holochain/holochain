@@ -66,7 +66,7 @@ async fn returns_full_sequence_from_filter(
                 },
             )
             .collect(),
-        d @ _ => unreachable!("{:?}", d),
+        d => unreachable!("{:?}", d),
     };
     vec![(agent, data)]
 }

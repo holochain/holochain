@@ -6,6 +6,7 @@ use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
 
+#[allow(clippy::let_and_return)]
 pub(super) async fn query_region_op_hashes(
     db: DbWrite<DbKindDht>,
     bounds: RegionBounds,

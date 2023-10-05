@@ -95,7 +95,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     // Wait long enough for Bob to receive gossip
     wait_for_integration_1m(
         bobbo.dht_db(),
-        WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
+        WaitOps::start() + WaitOps::cold_start() * 2 + WaitOps::ENTRY,
     )
     .await;
 
@@ -331,7 +331,7 @@ async fn check_all_gets_for_private_entry(
             .into_iter()
             .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
     );
-    let records = records.into_iter().filter_map(|a| a).collect();
+    let records = records.into_iter().flatten().collect();
     check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))

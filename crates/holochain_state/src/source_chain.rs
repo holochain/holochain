@@ -744,6 +744,7 @@ where
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
+    #[allow(clippy::let_and_return)]
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         if query.sequence_range != ChainQueryFilterRange::Unbounded
             && (query.action_type.is_some()

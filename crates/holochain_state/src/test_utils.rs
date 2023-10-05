@@ -115,6 +115,7 @@ pub fn test_dbs_in(path: impl AsRef<Path>) -> TestDbs {
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
+#[allow(clippy::let_and_return)]
 pub fn test_keystore() -> holochain_keystore::MetaLairClient {
     tokio_helper::block_on(
         async move {

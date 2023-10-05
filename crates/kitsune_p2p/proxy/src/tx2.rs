@@ -18,9 +18,10 @@ use tokio::sync::Notify;
 
 /// Configuration for the remote connection portion
 /// of tx2 proxy wrapper
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum ProxyRemoteType {
     /// Don't connect to a remote proxy
+    #[default]
     NoProxy,
 
     /// Request proxying through this specific remote proxy address
@@ -35,12 +36,6 @@ pub enum ProxyRemoteType {
         /// optional specific proxy url fallback
         fallback_proxy_url: Option<TxUrl>,
     },
-}
-
-impl Default for ProxyRemoteType {
-    fn default() -> Self {
-        ProxyRemoteType::NoProxy
-    }
 }
 
 impl ProxyRemoteType {

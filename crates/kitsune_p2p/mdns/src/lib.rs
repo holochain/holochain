@@ -152,7 +152,6 @@ pub fn mdns_listen(service_type: String) -> impl Stream<Item = Result<MdnsRespon
                         //println!("PTR = {}", ptr);
                         service_name = ptr
                             .split('.')
-                            .into_iter()
                             .next()
                             .expect("Found service without a name")
                             .to_string();

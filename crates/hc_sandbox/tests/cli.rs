@@ -31,7 +31,7 @@ async fn call_app_interface(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
     let (mut app_tx, _) = websocket_client_by_port(port)
         .await
-        .expect(&format!("Failed to get port {}", port));
+        .unwrap_or_else(|_| panic!("Failed to get port {}", port));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };

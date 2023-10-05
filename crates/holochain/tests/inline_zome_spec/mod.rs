@@ -123,7 +123,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     for env in [bobbo_foo.dht_db(), carol_bar.dht_db()].iter() {
         wait_for_integration_1m(
             *env,
-            WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
+            WaitOps::start() + WaitOps::cold_start() * 2 + WaitOps::ENTRY,
         )
         .await;
     }
@@ -318,7 +318,7 @@ fn simple_validation_zome() -> InlineZomeSet {
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
-            if &s.0 == "" {
+            if s.0.is_empty() {
                 Ok(ValidateResult::Invalid("No empty strings allowed".into()))
             } else {
                 Ok(ValidateResult::Valid)

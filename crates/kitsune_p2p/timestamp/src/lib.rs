@@ -209,7 +209,7 @@ mod tests {
 
     use super::*;
 
-    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431Z";
+    const TEST_TS: &str = "2020-05-05T19:16:04.266431Z";
 
     #[test]
     fn timestamp_distance() {
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn micros_roundtrip() {
         for t in [Timestamp(1234567890), Timestamp(987654321)] {
-            let micros = t.clone().into_sql_lossy().as_micros();
+            let micros = t.into_sql_lossy().as_micros();
             let r = Timestamp::from_micros(micros);
             assert_eq!(t.0, r.0);
             assert_eq!(t, r);
