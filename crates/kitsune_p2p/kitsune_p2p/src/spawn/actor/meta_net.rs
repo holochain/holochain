@@ -1175,3 +1175,6 @@ impl MetaNet {
         async move { Err("invalid features".into()) }.boxed()
     }
 }
+
+#[cfg(test)]
+mod tests;
