@@ -26,7 +26,7 @@ pub enum IpBlockReason {
     DOS,
 }
 
-pub type NodeId = Arc<[u8; 32]>;
+pub type NodeId = kitsune_p2p_bin_data::NodeCert;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub enum BlockTarget {

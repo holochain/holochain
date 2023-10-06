@@ -3,8 +3,6 @@ use futures::FutureExt;
 use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
 
 use super::*;
-use crate::fixt::*;
-use fixt::prelude::*;
 
 mod bloom;
 mod common;
