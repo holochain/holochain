@@ -11,8 +11,10 @@ use kitsune_p2p::dependencies::url2::url2;
 use kitsune_p2p::fixt::*;
 use kitsune_p2p::KitsuneP2pResult;
 use kitsune_p2p::KitsuneSpace;
+use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 use kitsune_p2p_types::bootstrap::RandomLimit;
 use kitsune_p2p_types::bootstrap::RandomQuery;
+use kitsune_p2p_types::fixt::UrlListFixturator;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
 
@@ -107,14 +109,24 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
         .header("X-Op", op)
         .header(reqwest::header::CONTENT_TYPE, "application/octet")
         .send()
-        .await?;
+        .await
+        .map_err(BootstrapClientError::from)?;
     if res.status().is_success() {
         Ok(Some(kitsune_p2p_types::codec::rmp_decode(
-            &mut res.bytes().await?.as_ref(),
+            &mut res
+                .bytes()
+                .await
+                .map_err(BootstrapClientError::from)?
+                .as_ref(),
         )?))
     } else {
         Err(kitsune_p2p::KitsuneP2pError::Bootstrap(
-            res.text().await?.into_boxed_str(),
+            BootstrapClientError::Bootstrap(
+                res.text()
+                    .await
+                    .map_err(BootstrapClientError::from)?
+                    .into_boxed_str(),
+            ),
         ))
     }
 }
