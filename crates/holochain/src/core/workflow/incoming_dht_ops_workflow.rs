@@ -79,21 +79,11 @@ fn batch_process_entry(
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
     for (hash, op) in ops {
-        // TODO this has already been checked at this point hasn't it? We've filtered by ops that are already persisted
-        //      and have claimed the current set of ops as in-flight...
         if !op_exists_inner(txn, &hash)? {
             let op = DhtOpHashed::from_content_sync(op);
             to_pending.push(op);
-        } else {
-            // TODO so is it possible to get here? If not that seems quite critical.
-            //      That would actually mean that validation receipts on republish is broken I think?
-            //      UPDATE: This doesn't get called in any of our tests so we either can't reach this code or don't
-            //              have a test for a failed op ingest.
-            //      Update again, it is called if request_validation_receipt is set to true because the previous filter will not run...
-            // Check if we should set receipt to send.
-            if request_validation_receipt {
-                set_send_receipt(txn, &hash)?;
-            }
+        } else if request_validation_receipt {
+            set_require_receipt(txn, &hash, true)?;
         }
     }
 
@@ -106,12 +96,13 @@ fn batch_process_entry(
 #[derive(Default, Clone)]
 pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
-// TODO This can be called concurrently because it's called from the p2p_event_task!
 #[instrument(skip(space, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
-    mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    // TODO test what happens if the hash here doesn't match the actual op hash because the input is trusted for
+    //      claiming hashes to work on.
+    ops: Vec<(DhtOpHash, DhtOp)>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let Space {
@@ -121,38 +112,40 @@ pub async fn incoming_dht_ops_workflow(
         ..
     } = space;
 
-    // Filter out ops that are already being tracked, so we don't do duplicate work
-    let (_claim, mut ops) = OpsClaim::acquire(incoming_op_hashes, ops);
+    // Filter out ops that are already being tracked, to avoid doing duplicate work
+    let (_claim, ops) = OpsClaim::acquire(incoming_op_hashes, ops);
 
-    // TODO we empty check here but not after this so we can queue empty and launch a tokio task, should probably clean
-    //      that up.
+    // If everything we've been sent is already being worked on then this workflow run can be skipped
     if ops.is_empty() {
         return Ok(());
     }
 
-    let mut filter_ops = Vec::new();
-    if !request_validation_receipt {
-        // TODO not safe to exit here, should clear the incoming_op_hashes with hashes_to_remove before leaving
-        // Filter the list of ops to only include those that are not already in the database.
-        ops = filter_existing_ops(&dht_db, ops).await?;
-    }
-
+    let num_ops = ops.len();
+    let mut filter_ops = Vec::with_capacity(num_ops);
     for (hash, op) in ops {
-        // It's cheaper to check if the op exists before trying
-        // to check the signature or open a write transaction.
+        // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
         match should_keep(&op).await {
             Ok(()) => filter_ops.push((hash, op)),
             Err(e) => {
                 tracing::warn!(
-                    msg = "Dropping op because it failed counterfeit checks",
-                    ?op
+                    ?op,
+                    "Dropping batch of {} ops because the current op failed counterfeit checks",
+                    num_ops,
                 );
                 // TODO we are returning here without blocking this author?
-                // TODO Returning here means later ops will never be processed, so the log message should
-                //      at least try to tell us that all remaining ops passed to this workflow are being dropped.
                 return Err(e);
             }
         }
+    }
+
+    if !request_validation_receipt {
+        // Filter the list of ops to only include those that are not already in the database.
+        filter_ops = filter_existing_ops(&dht_db, filter_ops).await?;
+    }
+
+    // Check again whether everything has been filtered out and avoid launching a Tokio task if so
+    if filter_ops.is_empty() {
+        return Ok(());
     }
 
     let (mut maybe_batch, rcv) =
@@ -229,11 +222,12 @@ fn add_to_pending(
         insert_op(txn, op)?;
         set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
     }
-    StateMutationResult::Ok(())
+
+    Ok(())
 }
 
 fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> DatabaseResult<bool> {
-    DatabaseResult::Ok(txn.query_row(
+    Ok(txn.query_row(
         "
         SELECT EXISTS(
             SELECT
@@ -258,20 +252,12 @@ pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseR
 
 pub async fn filter_existing_ops(
     vault: &DbWrite<DbKindDht>,
-    mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-) -> DatabaseResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+    mut ops: Vec<(DhtOpHash, DhtOp)>,
+) -> DatabaseResult<Vec<(DhtOpHash, DhtOp)>> {
     vault
         .read_async(move |txn| {
             ops.retain(|(hash, _)| !op_exists_inner(&txn, hash).unwrap_or(true));
             Ok(ops)
         })
         .await
-}
-
-fn set_send_receipt(
-    txn: &mut rusqlite::Transaction<'_>,
-    hash: &DhtOpHash,
-) -> StateMutationResult<()> {
-    set_require_receipt(txn, hash, true)?;
-    StateMutationResult::Ok(())
 }
