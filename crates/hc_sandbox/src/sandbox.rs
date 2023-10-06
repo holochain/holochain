@@ -20,6 +20,7 @@ pub async fn default_with_network(
     directory: Option<PathBuf>,
     happ: PathBuf,
     app_id: InstalledAppId,
+    network_seed: Option<String>,
     structured: Output,
 ) -> anyhow::Result<PathBuf> {
     let Create {
@@ -40,7 +41,7 @@ pub async fn default_with_network(
         app_id: Some(app_id),
         agent_key: None,
         path: happ,
-        network_seed: None,
+        network_seed,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)
@@ -53,6 +54,7 @@ pub async fn default_n(
     create: Create,
     happ: PathBuf,
     app_id: InstalledAppId,
+    network_seed: Option<String>,
     structured: Output,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let num_sandboxes = create.num_sandboxes;
@@ -68,6 +70,7 @@ pub async fn default_n(
             create.directories.get(i).cloned(),
             happ.clone(),
             app_id.clone(),
+            network_seed.clone(),
             structured.clone(),
         )
         .await?;

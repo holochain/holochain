@@ -75,7 +75,7 @@ use func::*;
 pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let strukt: syn::ItemStruct = syn::parse(item).expect("State can only be derived for a struct");
 
-    if strukt.fields.len() == 0 {
+    if strukt.fields.is_empty() {
         proc_macro_error::abort_call_site!(
             "State can only be derived for structs with at least one field"
         )
@@ -109,11 +109,11 @@ pub fn derive_state(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl_state.into_token_stream()
     } else {
         let action_enum_name = syn::Ident::new(
-            &format!("{}Action", strukt.ident.to_string()).to_pascal_case(),
+            &format!("{}Action", strukt.ident).to_pascal_case(),
             strukt.span(),
         );
         let effect_enum_name = syn::Ident::new(
-            &format!("{}Effect", strukt.ident.to_string()).to_pascal_case(),
+            &format!("{}Effect", strukt.ident).to_pascal_case(),
             strukt.span(),
         );
 

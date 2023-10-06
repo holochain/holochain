@@ -53,7 +53,8 @@ mod tests {
 
     use super::*;
     use fixt::prelude::*;
-    use kitsune_p2p::fixt::*;
+    use kitsune_p2p_bin_data::fixt::*;
+    use kitsune_p2p_types::fixt::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {

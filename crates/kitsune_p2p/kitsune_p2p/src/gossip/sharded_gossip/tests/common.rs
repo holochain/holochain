@@ -1,14 +1,15 @@
+use super::*;
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
 use crate::{HostApi, KitsuneHost};
+use ::fixt::prelude::*;
+use kitsune_p2p_bin_data::fixt::*;
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::ArqStrat;
 use num_traits::Zero;
-
-use super::*;
 
 #[derive(Debug)]
 pub struct StandardResponsesHostApi {

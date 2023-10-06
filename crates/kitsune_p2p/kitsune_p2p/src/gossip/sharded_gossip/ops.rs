@@ -101,7 +101,7 @@ impl ShardedGossipLocal {
 
     pub(super) async fn queue_incoming_regions(
         &self,
-        peer_cert: &Arc<[u8; 32]>,
+        peer_cert: &NodeCert,
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
