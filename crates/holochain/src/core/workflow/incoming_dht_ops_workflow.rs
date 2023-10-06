@@ -2,91 +2,23 @@
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::counterfeit_check;
-use crate::{
-    conductor::{conductor::RwShare, space::Space},
-    core::queue_consumer::TriggerSender,
-};
+use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::prelude::*;
+use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
 use tracing::instrument;
 
+mod incoming_ops_batch;
+
+pub use incoming_ops_batch::IncomingOpsBatch;
+
 #[cfg(test)]
 mod test;
-
-type InOpBatchSnd = tokio::sync::oneshot::Sender<WorkflowResult<()>>;
-type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
-
-#[derive(Debug)]
-struct InOpBatchEntry {
-    snd: InOpBatchSnd,
-    request_validation_receipt: bool,
-    ops: Vec<(DhtOpHash, DhtOp)>,
-}
-
-/// A batch of incoming ops memory.
-#[derive(Clone)]
-pub struct IncomingOpsBatch(RwShare<InOpBatch>);
-
-#[derive(Default)]
-struct InOpBatch {
-    is_running: bool,
-    pending: Vec<InOpBatchEntry>,
-}
-
-impl Default for IncomingOpsBatch {
-    fn default() -> Self {
-        Self(RwShare::new(InOpBatch::default()))
-    }
-}
-
-/// if result.0.is_none() -- we queued it to send later
-/// if result.0.is_some() -- the batch should be run now
-fn batch_check_insert(
-    batch: &IncomingOpsBatch,
-    request_validation_receipt: bool,
-    ops: Vec<(DhtOpHash, DhtOp)>,
-) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
-    let (snd, rcv) = tokio::sync::oneshot::channel();
-    let entry = InOpBatchEntry {
-        snd,
-        request_validation_receipt,
-        ops,
-    };
-    batch.0.share_mut(|batch| {
-        if batch.is_running {
-            // there is already a batch running, just queue this
-            batch.pending.push(entry);
-            (None, rcv)
-        } else {
-            // no batch running, run this (and assert we never collect stragglers)
-            assert!(batch.pending.is_empty());
-            batch.is_running = true;
-            (Some(vec![entry]), rcv)
-        }
-    })
-}
-
-/// if result.is_none() -- we are done, end the loop for now
-/// if result.is_some() -- we got more items to process
-fn batch_check_end(batch: &IncomingOpsBatch) -> Option<Vec<InOpBatchEntry>> {
-    batch.0.share_mut(|batch| {
-        assert!(batch.is_running);
-        let out: Vec<InOpBatchEntry> = batch.pending.drain(..).collect();
-        if out.is_empty() {
-            // pending was empty, we can end the loop for now
-            batch.is_running = false;
-            None
-        } else {
-            // we have some more pending, continue the running loop
-            Some(out)
-        }
-    })
-}
 
 #[instrument(skip(txn, ops))]
 fn batch_process_entry(
@@ -190,7 +122,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     let (mut maybe_batch, rcv) =
-        batch_check_insert(&incoming_ops_batch, request_validation_receipt, filter_ops);
+        incoming_ops_batch.check_insert(request_validation_receipt, filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
     if maybe_batch.is_some() {
@@ -233,7 +165,7 @@ pub async fn incoming_dht_ops_workflow(
                     );
                     sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
 
-                    maybe_batch = batch_check_end(&incoming_ops_batch);
+                    maybe_batch = incoming_ops_batch.check_end();
                 }
             }
         });
