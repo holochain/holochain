@@ -10,6 +10,7 @@ use url2::Url2;
 mod error;
 
 pub mod prelude {
+    pub use super::{now, now_once, proxy_list, put, random, BootstrapNet};
     pub use crate::error::{BootstrapClientError, BootstrapClientResult};
 }
 
