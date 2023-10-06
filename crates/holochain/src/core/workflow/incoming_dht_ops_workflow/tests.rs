@@ -153,15 +153,13 @@ async fn republish_to_request_validation_receipt() {
 }
 
 async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: DhtOpHash) {
-    let receipts = env
-        .read_async(|txn| get_pending_validation_receipts(&txn, vec![]))
-        .await
-        .unwrap();
+    let pending_hashes = get_pending_op_hashes(env).await;
 
-    // Check that the validation receipt is found with the `require_receipt` is set
-    assert!(receipts
-        .iter()
-        .find(|(r, _)| r.dht_op_hash == hash)
+    tracing::info!("Found {} ops", pending_hashes.len());
+
+    assert!(pending_hashes
+        .into_iter()
+        .find(|pending_hash| *pending_hash == hash)
         .is_some());
 }
 
@@ -190,6 +188,29 @@ async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, 
     })
     .await
     .unwrap();
+}
+
+async fn get_pending_op_hashes(env: DbWrite<DbKindDht>) -> Vec<DhtOpHash> {
+    env.read_async(|txn| -> StateQueryResult<_> {
+        let mut stmt = txn.prepare(
+            "
+        SELECT hash FROM DhtOP
+        WHERE when_integrated IS NULL
+        AND require_receipt = 1
+    ",
+        )?;
+
+        let ops = stmt
+            .query_and_then([], |r| {
+                let dht_op_hash: DhtOpHash = r.get("hash")?;
+                Ok(dht_op_hash)
+            })?
+            .collect::<StateQueryResult<Vec<_>>>()?;
+
+        Ok(ops)
+    })
+    .await
+    .unwrap()
 }
 
 async fn clear_requires_receipt(env: DbWrite<DbKindDht>, op_hashes: Vec<DhtOpHash>) {
