@@ -63,9 +63,8 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        let mut config: Self = KitsuneP2pConfig::default().into();
-        config.random_scope();
-        config
+        let config: Self = KitsuneP2pConfig::default().into();
+        config.random_scope()
     }
 
     /// Rendezvous config for SweetConductors
@@ -128,11 +127,13 @@ impl SweetConductorConfig {
     }
 
     /// Set the tracing scope to a new random value
-    pub fn random_scope(&mut self) {
+    pub fn random_scope(&self) -> Self {
         let scope = nanoid!();
-        let network = self.network.get_or_insert_with(Default::default);
+        let mut this = self.clone();
+        let network = this.network.get_or_insert_with(Default::default);
         network.tracing_scope = Some(scope.clone());
-        self.tracing_scope = Some(scope);
+        this.tracing_scope = Some(scope);
+        this
     }
 
     /// Completely disable networking

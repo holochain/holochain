@@ -546,8 +546,10 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     conductors[0].shutdown().await;
 
+    let new_config = config.random_scope();
+    let new_scope = new_config.tracing_scope.clone().unwrap();
     // Bring a third conductor online
-    conductors.add_conductor_from_config(config).await;
+    conductors.add_conductor_from_config(new_config).await;
 
     let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
@@ -557,7 +559,8 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
     println!(
-        "Newcomer agent joined: {:#?}",
+        "Newcomer agent joined: scope={}, agent={:#?}",
+        new_scope,
         cell.agent_pubkey().to_kitsune()
     );
 
@@ -572,7 +575,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        30,
+        10,
         std::time::Duration::from_secs(1),
     )
     .await;
