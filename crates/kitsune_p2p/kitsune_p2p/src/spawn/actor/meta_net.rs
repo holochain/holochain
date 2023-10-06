@@ -669,9 +669,9 @@ impl MetaNet {
                     };
                     conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
                         Box::pin(async move {
-                            match crate::spawn::actor::bootstrap::proxy_list(
+                            match kitsune_p2p_bootstrap_client::proxy_list(
                                 bootstrap_url.into(),
-                                crate::spawn::actor::bootstrap::BootstrapNet::Tx2,
+                                kitsune_p2p_bootstrap_client::BootstrapNet::Tx2,
                             )
                             .await
                             {
