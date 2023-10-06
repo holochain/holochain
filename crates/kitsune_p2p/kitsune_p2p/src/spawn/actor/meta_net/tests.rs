@@ -3,7 +3,7 @@ use super::*;
 use kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
-use std::sync::Arc;
+use std::sync::{atomic, Arc};
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
@@ -407,13 +407,217 @@ fn start_signal_srv() -> (std::net::SocketAddr, tokio::task::AbortHandle) {
     (addr_list.first().unwrap().clone(), abort_handle)
 }
 
+struct Setup2Nodes {
+    tuning_params: KitsuneP2pTuningParams,
+    sig_abort: tokio::task::AbortHandle,
+    pub addr1: String,
+    pub send1: MetaNet,
+    pub addr2: String,
+    pub send2: MetaNet,
+}
+
+impl Setup2Nodes {
+    pub async fn new(test: Test) -> Self {
+        let tuning_params = KitsuneP2pTuningParams::default();
+        let (sig_addr, sig_abort) = start_signal_srv();
+        let (test, i_s, evt_sender) = test.spawn().await;
+
+        let (send1, recv1) = MetaNet::new_tx5(
+            tuning_params.clone(),
+            HostApiLegacy {
+                api: Arc::new(test.clone()),
+                legacy: evt_sender.clone(),
+            },
+            i_s.clone(),
+            format!("ws://{sig_addr}"),
+        )
+        .await
+        .unwrap();
+        test.spawn_receiver(recv1);
+        let addr1 = send1.local_addr().unwrap();
+
+        let (send2, recv2) = MetaNet::new_tx5(
+            tuning_params.clone(),
+            HostApiLegacy {
+                api: Arc::new(test.clone()),
+                legacy: evt_sender.clone(),
+            },
+            i_s.clone(),
+            format!("ws://{sig_addr}"),
+        )
+        .await
+        .unwrap();
+        test.spawn_receiver(recv2);
+        let addr2 = send2.local_addr().unwrap();
+
+        Self {
+            tuning_params,
+            sig_abort,
+            addr1,
+            send1,
+            addr2,
+            send2,
+        }
+    }
+
+    pub async fn shutdown(self) {
+        let Self {
+            sig_abort,
+            send1,
+            send2,
+            ..
+        } = self;
+        send1.close(0, "").await;
+        send2.close(0, "").await;
+        sig_abort.abort();
+    }
+}
+
+/// notify helper
+struct Notify(Arc<tokio::sync::Notify>);
+
+impl Notify {
+    pub fn notify(&self) {
+        self.0.notify_waiters();
+    }
+}
+
+/// notify helper
+type NotifyWait = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'static + Send>>;
+
+/// notify helper
+fn notify_pair() -> (Notify, NotifyWait) {
+    let n = Arc::new(tokio::sync::Notify::new());
+    let n2 = n.clone();
+    let w = tokio::task::spawn(async move {
+        n2.notified().await;
+    });
+    let w = Box::pin(async move {
+        let _ = w.await;
+    });
+    (Notify(n), w)
+}
+
 #[tokio::test(flavor = "multi_thread")]
-async fn meta_net_sanity() {
-    let tuning_params = KitsuneP2pTuningParams::default();
+async fn basic_connected() {
+    let (recv_not, recv_wait) = notify_pair();
 
-    let (sig_addr, sig_abort) = start_signal_srv();
+    let mut test = Test::default();
 
-    let recv_done = Arc::new(tokio::sync::Notify::new());
+    test.recv = Arc::new(move |evt| {
+        if let MetaNetEvt::Connected { .. } = evt {
+            recv_not.notify();
+        }
+    });
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    con.notify(
+        &wire::Wire::failure("Hello World!".into()),
+        nodes.tuning_params.implicit_timeout(),
+    )
+    .await
+    .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(10), recv_wait)
+        .await
+        .unwrap();
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn close_and_disconnected() {
+    let (recvc_not, recvc_wait) = notify_pair();
+    let (recvd_not, recvd_wait) = notify_pair();
+
+    let mut test = Test::default();
+
+    test.recv = Arc::new(move |evt| {
+        if matches!(evt, MetaNetEvt::Connected { .. }) {
+            recvc_not.notify();
+        } else if matches!(evt, MetaNetEvt::Disconnected { .. }) {
+            recvd_not.notify();
+        }
+    });
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    con.notify(
+        &wire::Wire::failure("Hello World!".into()),
+        nodes.tuning_params.implicit_timeout(),
+    )
+    .await
+    .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        recvc_wait.await;
+
+        con.close(0, "").await;
+
+        recvd_wait.await;
+    })
+    .await
+    .unwrap();
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn basic_notify() {
+    let (recv_not, recv_wait) = notify_pair();
+
+    let mut test = Test::default();
+
+    test.recv = Arc::new(move |evt| {
+        if let MetaNetEvt::Notify { data, .. } = evt {
+            assert!(matches!(
+                data,
+                wire::Wire::Failure(wire::Failure {
+                    reason,
+                }) if reason == "Hello World!",
+            ));
+            recv_not.notify();
+        }
+    });
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    con.notify(
+        &wire::Wire::failure("Hello World!".into()),
+        nodes.tuning_params.implicit_timeout(),
+    )
+    .await
+    .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(10), recv_wait)
+        .await
+        .unwrap();
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn basic_broadcast() {
+    let recv_done = Arc::new(atomic::AtomicUsize::new(0));
 
     let mut test = Test::default();
 
@@ -427,58 +631,285 @@ async fn meta_net_sanity() {
                         reason,
                     }) if reason == "Hello World!",
                 ));
-                recv_done.notify_waiters();
+                recv_done.fetch_add(1, atomic::Ordering::SeqCst);
             }
         });
     }
 
-    let (test, i_s, evt_sender) = test.spawn().await;
+    let nodes = Setup2Nodes::new(test).await;
 
-    let (send1, recv1) = MetaNet::new_tx5(
-        tuning_params.clone(),
-        HostApiLegacy {
-            api: Arc::new(test.clone()),
-            legacy: evt_sender.clone(),
-        },
-        i_s.clone(),
-        format!("ws://{sig_addr}"),
-    )
-    .await
-    .unwrap();
-    test.spawn_receiver(recv1);
-
-    let (send2, recv2) = MetaNet::new_tx5(
-        tuning_params.clone(),
-        HostApiLegacy {
-            api: Arc::new(test.clone()),
-            legacy: evt_sender.clone(),
-        },
-        i_s.clone(),
-        format!("ws://{sig_addr}"),
-    )
-    .await
-    .unwrap();
-    test.spawn_receiver(recv2);
-
-    let addr2 = send2.local_addr().unwrap();
-
-    let con = send1
-        .get_connection(addr2, tuning_params.implicit_timeout())
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
         .await
         .unwrap();
 
     con.notify(
         &wire::Wire::failure("Hello World!".into()),
-        tuning_params.implicit_timeout(),
+        nodes.tuning_params.implicit_timeout(),
     )
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(10), recv_done.notified())
+    nodes
+        .send1
+        .broadcast(
+            &wire::Wire::failure("Hello World!".into()),
+            nodes.tuning_params.implicit_timeout(),
+        )
         .await
         .unwrap();
 
-    send1.close(0, "").await;
-    send2.close(0, "").await;
-    sig_abort.abort();
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        // broadcast requires an open connection, so wait for two
+        // notifies... the one from the initial notify to open the con
+        // and the second from the actual broadcast
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+            if recv_done.load(atomic::Ordering::SeqCst) == 2 {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn basic_request() {
+    let mut test = Test::default();
+
+    test.recv = Arc::new(move |evt| {
+        if let MetaNetEvt::Request { data, respond, .. } = evt {
+            assert!(matches!(
+                data,
+                wire::Wire::Failure(wire::Failure {
+                    reason,
+                }) if reason == "hello",
+            ));
+            tokio::task::spawn(respond(wire::Wire::failure("world".into())));
+        }
+    });
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    let resp = con
+        .request(
+            &wire::Wire::failure("hello".into()),
+            nodes.tuning_params.implicit_timeout(),
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        resp,
+        wire::Wire::Failure(wire::Failure {
+            reason,
+        }) if reason == "world",
+    ));
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn preflight() {
+    let (recv_not, recv_wait) = notify_pair();
+
+    let mut test = Test::default();
+
+    {
+        let agent_info = crate::test_util::data::mk_agent_info(1).await;
+        test.handle_get_all_local_joined_agent_infos = Arc::new(move || {
+            let agent_info = agent_info.clone();
+            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![agent_info]) }).into())
+        });
+        test.handle_put_agent_info_signed = Arc::new(move |_| {
+            recv_not.notify();
+            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
+        });
+    }
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    con.notify(
+        &wire::Wire::failure("Hello World!".into()),
+        nodes.tuning_params.implicit_timeout(),
+    )
+    .await
+    .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(10), recv_wait)
+        .await
+        .unwrap();
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn notify_unauthorized() {
+    let mut test = Test::default();
+    test.is_blocked = Arc::new(|_, _| Box::pin(async move { Ok(true) }));
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    // note - notifies are fire-and-forget... so we get an okay here...
+    assert!(con
+        .notify(
+            &wire::Wire::call(
+                Arc::new(KitsuneSpace::new(vec![1; 36])),
+                Arc::new(KitsuneAgent::new(vec![2; 36])),
+                WireData(vec![]),
+            ),
+            nodes.tuning_params.implicit_timeout(),
+        )
+        .await
+        .is_ok());
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn notify_unauthorized_err() {
+    let mut test = Test::default();
+    test.is_blocked = Arc::new(|_, _| Box::pin(async move { Err("test".into()) }));
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    // note - notifies are fire-and-forget... so we get an okay here...
+    assert!(con
+        .notify(
+            &wire::Wire::call(
+                Arc::new(KitsuneSpace::new(vec![1; 36])),
+                Arc::new(KitsuneAgent::new(vec![2; 36])),
+                WireData(vec![]),
+            ),
+            nodes.tuning_params.implicit_timeout(),
+        )
+        .await
+        .is_ok());
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn request_unauthorized() {
+    let mut test = Test::default();
+    test.is_blocked = Arc::new(|_, _| Box::pin(async move { Ok(true) }));
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    assert!(con
+        .request(
+            &wire::Wire::call(
+                Arc::new(KitsuneSpace::new(vec![1; 36])),
+                Arc::new(KitsuneAgent::new(vec![2; 36])),
+                WireData(vec![]),
+            ),
+            nodes.tuning_params.implicit_timeout(),
+        )
+        .await
+        .is_err());
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn request_unauthorized_err() {
+    let mut test = Test::default();
+    test.is_blocked = Arc::new(|_, _| Box::pin(async move { Err("test".into()) }));
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    assert!(con
+        .request(
+            &wire::Wire::call(
+                Arc::new(KitsuneSpace::new(vec![1; 36])),
+                Arc::new(KitsuneAgent::new(vec![2; 36])),
+                WireData(vec![]),
+            ),
+            nodes.tuning_params.implicit_timeout(),
+        )
+        .await
+        .is_err());
+
+    nodes.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn request_timeout() {
+    let mut test = Test::default();
+
+    test.recv = Arc::new(move |evt| {
+        if let MetaNetEvt::Request { data, respond, .. } = evt {
+            assert!(matches!(
+                data,
+                wire::Wire::Failure(wire::Failure {
+                    reason,
+                }) if reason == "hello",
+            ));
+            // just never respond
+            std::mem::forget(respond);
+        }
+    });
+
+    let nodes = Setup2Nodes::new(test).await;
+
+    let con = nodes
+        .send1
+        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
+        .await
+        .unwrap();
+
+    let resp = con
+        .request(
+            &wire::Wire::failure("hello".into()),
+            KitsuneTimeout::from_millis(100),
+        )
+        .await;
+
+    assert!(matches!(
+        resp,
+        Err(e) if format!("{e:?}").contains("timeout"),
+    ));
+
+    nodes.shutdown().await;
 }
