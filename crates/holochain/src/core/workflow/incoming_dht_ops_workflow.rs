@@ -18,7 +18,57 @@ mod incoming_ops_batch;
 pub use incoming_ops_batch::IncomingOpsBatch;
 
 #[cfg(test)]
-mod test;
+mod tests;
+
+struct OpsClaim {
+    incoming_op_hashes: IncomingOpHashes,
+    working_hashes: Vec<DhtOpHash>,
+}
+
+impl OpsClaim {
+    fn acquire(
+        incoming_op_hashes: IncomingOpHashes,
+        ops: Vec<(DhtOpHash, DhtOp)>,
+    ) -> (Self, Vec<(DhtOpHash, DhtOp)>) {
+        let keep_incoming_op_hashes = incoming_op_hashes.clone();
+
+        // Lock the shared state while we claim the ops we're going to work on
+        let mut set = incoming_op_hashes.0.lock();
+
+        // Track the hashes that we're going to work on, and should be removed from the shared state
+        // when this claim is dropped.
+        let mut working_hashes = Vec::with_capacity(ops.len());
+        let mut working_ops = Vec::with_capacity(ops.len());
+
+        for (hash, op) in ops {
+            if !set.contains(&hash) {
+                set.insert(hash.clone());
+                working_hashes.push(hash.clone());
+                working_ops.push((hash, op));
+            }
+        }
+
+        (
+            Self {
+                incoming_op_hashes: keep_incoming_op_hashes,
+                working_hashes,
+            },
+            working_ops,
+        )
+    }
+}
+
+impl Drop for OpsClaim {
+    fn drop(&mut self) {
+        // Lock the shared state while we remove the ops we're finished working with
+        let incoming_op_hashes = self.incoming_op_hashes.clone();
+        let mut set = incoming_op_hashes.0.lock();
+
+        for hash in &self.working_hashes {
+            set.remove(hash);
+        }
+    }
+}
 
 #[instrument(skip(txn, ops))]
 fn batch_process_entry(
@@ -39,6 +89,7 @@ fn batch_process_entry(
             //      That would actually mean that validation receipts on republish is broken I think?
             //      UPDATE: This doesn't get called in any of our tests so we either can't reach this code or don't
             //              have a test for a failed op ingest.
+            //      Update again, it is called if request_validation_receipt is set to true because the previous filter will not run...
             // Check if we should set receipt to send.
             if request_validation_receipt {
                 set_send_receipt(txn, &hash)?;
@@ -69,27 +120,9 @@ pub async fn incoming_dht_ops_workflow(
         dht_db,
         ..
     } = space;
-    let mut filter_ops = Vec::new();
-    let mut hashes_to_remove = Vec::with_capacity(ops.len());
 
-    // TODO This marks ops as in-flight but there's no guarantee that they'll be removed again if the workflow fails.
-    //      That effectively means a hash that has been seen once but fails to get processed for any reason will never
-    //      be processed again?
-    // TODO use an expiry based cache instead of a hashset? That way there's a recovery mechanism. <- This is what
-    //      the hashes_to_remove variable is supposed to be for but that relies on the workflow completing successfully.
     // Filter out ops that are already being tracked, so we don't do duplicate work
-    {
-        let mut set = incoming_op_hashes.0.lock();
-        let mut o = Vec::with_capacity(ops.len());
-        for (hash, op) in ops {
-            if !set.contains(&hash) {
-                set.insert(hash.clone());
-                hashes_to_remove.push(hash.clone());
-                o.push((hash, op));
-            }
-        }
-        ops = o;
-    }
+    let (_claim, mut ops) = OpsClaim::acquire(incoming_op_hashes, ops);
 
     // TODO we empty check here but not after this so we can queue empty and launch a tokio task, should probably clean
     //      that up.
@@ -97,6 +130,7 @@ pub async fn incoming_dht_ops_workflow(
         return Ok(());
     }
 
+    let mut filter_ops = Vec::new();
     if !request_validation_receipt {
         // TODO not safe to exit here, should clear the incoming_op_hashes with hashes_to_remove before leaving
         // Filter the list of ops to only include those that are not already in the database.
@@ -174,14 +208,6 @@ pub async fn incoming_dht_ops_workflow(
     let r = rcv
         .await
         .map_err(|_| super::error::WorkflowError::RecvError)?;
-
-    // TODO won't always run, but absolutely has to because global state has been modified
-    {
-        let mut set = incoming_op_hashes.0.lock();
-        for hash in hashes_to_remove {
-            set.remove(&hash);
-        }
-    }
 
     r
 }

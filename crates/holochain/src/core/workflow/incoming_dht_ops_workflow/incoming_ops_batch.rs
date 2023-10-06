@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn adds_to_pending_while_running() {
         let batch = IncomingOpsBatch::default();
-        batch_check_insert(&batch, false, vec![]);
+        batch.check_insert(false, vec![]);
         assert!(batch.is_running());
 
         batch.check_insert(false, vec![]);
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    async fn can_crash_by_calling_end_when_not_running() {
+    fn can_crash_by_calling_end_when_not_running() {
         let batch = IncomingOpsBatch::default();
         batch.check_end();
     }
