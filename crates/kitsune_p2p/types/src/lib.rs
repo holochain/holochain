@@ -93,9 +93,9 @@ impl CertDigestExt for CertDigest {
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
-impl From<Tx2Cert> for Arc<[u8; 32]> {
+impl From<Tx2Cert> for bin_types::NodeCert {
     fn from(f: Tx2Cert) -> Self {
-        f.0 .0 .0.clone()
+        f.0 .0 .0.clone().into()
     }
 }
 
@@ -344,10 +344,13 @@ pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
+pub mod fetch_pool;
 pub mod metrics;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+#[cfg(feature = "fixt")]
+pub mod fixt;
 
 #[cfg(feature = "tx2")]
 pub mod tx2;

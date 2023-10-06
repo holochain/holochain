@@ -4,6 +4,7 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::interface::error::InterfaceError;
 use holo_hash::AnyDhtHash;
 use holochain_cascade::error::CascadeError;
+use holochain_secure_primitive::SecurePrimitiveError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
@@ -88,9 +89,7 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    SecurePrimitive(
-        #[from] holochain_zome_types::dependencies::holochain_integrity_types::SecurePrimitiveError,
-    ),
+    SecurePrimitive(#[from] SecurePrimitiveError),
 
     /// Zome function doesn't have permissions to call a Host function.
     #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]

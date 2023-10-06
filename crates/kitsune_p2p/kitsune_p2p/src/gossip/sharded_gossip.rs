@@ -464,21 +464,19 @@ pub struct ShardedGossipLocal {
     fetch_pool: FetchPool,
 }
 
-type StateKey = Arc<[u8; 32]>;
-
 /// Incoming gossip.
 type Incoming = (MetaNetCon, String, ShardedGossipWire, usize);
 /// Outgoing gossip.
-type Outgoing = (StateKey, HowToConnect, ShardedGossipWire);
+type Outgoing = (NodeCert, HowToConnect, ShardedGossipWire);
 
 /// A peer (from the perspective of any other node) is uniquely identified by its Cert
-pub type NodeId = StateKey;
+pub type NodeId = NodeCert;
 
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
 pub(crate) struct ShardedGossipTarget {
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
-    pub(crate) cert: StateKey,
+    pub(crate) cert: NodeCert,
     pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
     #[allow(dead_code)]
@@ -508,7 +506,7 @@ impl ShardedGossipLocalState {
 
     fn remove_state(
         &mut self,
-        state_key: &StateKey,
+        state_key: &NodeCert,
         gossip_type: GossipType,
         error: bool,
     ) -> Option<RoundState> {
@@ -772,17 +770,17 @@ impl ShardedGossipLocal {
         ))
     }
 
-    fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn get_state(&self, id: &NodeCert) -> KitsuneResult<Option<RoundState>> {
         self.inner
             .share_mut(|i, _| Ok(i.round_map.get(id).cloned()))
     }
 
-    fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
+    fn remove_state(&self, id: &NodeCert, error: bool) -> KitsuneResult<Option<RoundState>> {
         self.inner
             .share_mut(|i, _| Ok(i.remove_state(id, self.gossip_type, error)))
     }
 
-    fn remove_target(&self, id: &StateKey, error: bool) -> KitsuneResult<()> {
+    fn remove_target(&self, id: &NodeCert, error: bool) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
@@ -801,7 +799,7 @@ impl ShardedGossipLocal {
     }
 
     /// If the round is still active then update the state.
-    fn update_state_if_active(&self, key: StateKey, state: RoundState) -> KitsuneResult<()> {
+    fn update_state_if_active(&self, key: NodeCert, state: RoundState) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
             if i.round_map.round_exists(&key) {
                 if state.is_finished() {
@@ -816,7 +814,7 @@ impl ShardedGossipLocal {
 
     fn incoming_op_blooms_finished(
         &self,
-        state_id: &StateKey,
+        state_id: &NodeCert,
     ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let finished = i
@@ -835,7 +833,7 @@ impl ShardedGossipLocal {
         })
     }
 
-    fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn decrement_op_blooms(&self, state_id: &NodeCert) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let remove_state = |state: &mut RoundState| {
                 let num_op_blooms = state.num_expected_op_blooms.saturating_sub(1);
@@ -858,7 +856,7 @@ impl ShardedGossipLocal {
 
     async fn process_incoming(
         &self,
-        peer_cert: StateKey,
+        peer_cert: NodeCert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
