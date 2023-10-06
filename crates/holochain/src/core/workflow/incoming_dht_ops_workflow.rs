@@ -63,7 +63,7 @@ fn batch_check_insert(
             batch.pending.push(entry);
             (None, rcv)
         } else {
-            // no batch running, run this (and assert we never collect straglers
+            // no batch running, run this (and assert we never collect stragglers)
             assert!(batch.pending.is_empty());
             batch.is_running = true;
             (Some(vec![entry]), rcv)
@@ -97,10 +97,16 @@ fn batch_process_entry(
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
     for (hash, op) in ops {
+        // TODO this has already been checked at this point hasn't it? We've filtered by ops that are already persisted
+        //      and have claimed the current set of ops as in-flight...
         if !op_exists_inner(txn, &hash)? {
             let op = DhtOpHashed::from_content_sync(op);
             to_pending.push(op);
         } else {
+            // TODO so is it possible to get here? If not that seems quite critical.
+            //      That would actually mean that validation receipts on republish is broken I think?
+            //      UPDATE: This doesn't get called in any of our tests so we either can't reach this code or don't
+            //              have a test for a failed op ingest.
             // Check if we should set receipt to send.
             if request_validation_receipt {
                 set_send_receipt(txn, &hash)?;
@@ -117,6 +123,7 @@ fn batch_process_entry(
 #[derive(Default, Clone)]
 pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
+// TODO This can be called concurrently because it's called from the p2p_event_task!
 #[instrument(skip(space, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
     space: Space,
@@ -133,6 +140,11 @@ pub async fn incoming_dht_ops_workflow(
     let mut filter_ops = Vec::new();
     let mut hashes_to_remove = Vec::with_capacity(ops.len());
 
+    // TODO This marks ops as in-flight but there's no guarantee that they'll be removed again if the workflow fails.
+    //      That effectively means a hash that has been seen once but fails to get processed for any reason will never
+    //      be processed again?
+    // TODO use an expiry based cache instead of a hashset? That way there's a recovery mechanism. <- This is what
+    //      the hashes_to_remove variable is supposed to be for but that relies on the workflow completing successfully.
     // Filter out ops that are already being tracked, so we don't do duplicate work
     {
         let mut set = incoming_op_hashes.0.lock();
@@ -147,11 +159,15 @@ pub async fn incoming_dht_ops_workflow(
         ops = o;
     }
 
+    // TODO we empty check here but not after this so we can queue empty and launch a tokio task, should probably clean
+    //      that up.
     if ops.is_empty() {
         return Ok(());
     }
 
     if !request_validation_receipt {
+        // TODO not safe to exit here, should clear the incoming_op_hashes with hashes_to_remove before leaving
+        // Filter the list of ops to only include those that are not already in the database.
         ops = filter_existing_ops(&dht_db, ops).await?;
     }
 
@@ -165,6 +181,9 @@ pub async fn incoming_dht_ops_workflow(
                     msg = "Dropping op because it failed counterfeit checks",
                     ?op
                 );
+                // TODO we are returning here without blocking this author?
+                // TODO Returning here means later ops will never be processed, so the log message should
+                //      at least try to tell us that all remaining ops passed to this workflow are being dropped.
                 return Err(e);
             }
         }
@@ -193,7 +212,7 @@ pub async fn incoming_dht_ops_workflow(
                                 let res = batch_process_entry(txn, request_validation_receipt, ops);
 
                                 // we can't send the results here...
-                                // we haven't comitted
+                                // we haven't committed
                                 senders2.lock().push((snd, res));
                             }
 
@@ -209,6 +228,9 @@ pub async fn incoming_dht_ops_workflow(
                     }
 
                     // trigger validation of queued ops
+                    tracing::info!(
+                        "Incoming dht ops workflow is now triggering the sys_validation_trigger"
+                    );
                     sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
 
                     maybe_batch = batch_check_end(&incoming_ops_batch);
@@ -221,12 +243,14 @@ pub async fn incoming_dht_ops_workflow(
         .await
         .map_err(|_| super::error::WorkflowError::RecvError)?;
 
+    // TODO won't always run, but absolutely has to because global state has been modified
     {
         let mut set = incoming_op_hashes.0.lock();
         for hash in hashes_to_remove {
             set.remove(&hash);
         }
     }
+
     r
 }
 
