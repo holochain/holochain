@@ -45,30 +45,7 @@ async fn incoming_ops_to_limbo() {
 
     futures::future::try_join_all(all).await.unwrap();
 
-    env.read_async(move |txn| -> DatabaseResult<()> {
-        for hash in hash_list {
-            let found: bool = txn
-                .query_row(
-                    "
-                SELECT EXISTS(
-                    SELECT 1 FROM DhtOP
-                    WHERE when_integrated IS NULL
-                    AND hash = :hash
-                )
-                ",
-                    named_params! {
-                        ":hash": hash,
-                    },
-                    |row| row.get(0),
-                )
-                .unwrap();
-            assert!(found);
-        }
-
-        Ok(())
-    })
-    .await
-    .unwrap();
+    verify_ops_present(env, hash_list, true).await;
 }
 
 // Checks that there is no other record of the op hash being held onto outside of the database that will prevent
@@ -186,6 +163,33 @@ async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: Dht
         .iter()
         .find(|(r, _)| r.dht_op_hash == hash)
         .is_some());
+}
+
+async fn verify_ops_present(env: DbWrite<DbKindDht>, hash_list: Vec<DhtOpHash>, present: bool) {
+    env.read_async(move |txn| -> DatabaseResult<()> {
+        for hash in hash_list {
+            let found: bool = txn
+                .query_row(
+                    "
+                SELECT EXISTS(
+                    SELECT 1 FROM DhtOP
+                    WHERE when_integrated IS NULL
+                    AND hash = :hash
+                )
+                ",
+                    named_params! {
+                        ":hash": hash,
+                    },
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(present, found);
+        }
+
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 async fn clear_requires_receipt(env: DbWrite<DbKindDht>, op_hashes: Vec<DhtOpHash>) {
