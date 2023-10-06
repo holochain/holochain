@@ -170,6 +170,7 @@ impl stef::State<'static> for FetchPoolState {
             space,
             source,
             size,
+            cause: _,
         } = args;
 
         match self.queue.entry(key) {
@@ -398,6 +399,7 @@ pub enum FetchSource {
 #[cfg(test)]
 mod tests {
     use crate::test_utils::*;
+    use crate::FetchCause;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;
@@ -862,6 +864,7 @@ mod tests {
             size: None,   // Not important for this test
             author: None, // Unused field, ignore
             context: test_ctx(u32::arbitrary(&mut u).unwrap()),
+            cause: FetchCause::Publish,
         });
 
         let mut failed_count = 0;
@@ -875,6 +878,7 @@ mod tests {
                     size: None,   // Not important for this test
                     author: None, // Unused field, ignore
                     context: test_ctx(u32::arbitrary(&mut u).unwrap()),
+                    cause: FetchCause::Publish,
                 });
             }
 

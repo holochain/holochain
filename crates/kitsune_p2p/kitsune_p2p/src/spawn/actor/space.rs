@@ -513,6 +513,7 @@ impl SpaceInternalHandler for Space {
                         // TODO - get the author from somewhere
                         author: None,
                         context: Some(context),
+                        cause: FetchCause::Publish,
                     });
 
                     // Register a callback if maybe_delegate.is_some()

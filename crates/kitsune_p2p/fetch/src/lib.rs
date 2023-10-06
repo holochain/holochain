@@ -4,7 +4,7 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
+use kitsune_p2p_types::{gossip::GossipType, KAgent, KOpHash, KSpace};
 
 mod pool;
 mod respond;
@@ -31,6 +31,19 @@ pub enum FetchKey {
     Op(KOpHash),
 }
 
+/// The reason why an item needs to be fetched
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub enum FetchCause {
+    /// The item was discovered via published
+    Publish,
+    /// The item was discovered via gossip
+    Gossip(GossipType),
+}
+
 /// A fetch "unit" that can be de-duplicated.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(
@@ -46,6 +59,9 @@ pub struct FetchPoolPush {
 
     /// The source to fetch the op from
     pub source: FetchSource,
+
+    /// The reason why this item is being pushed
+    pub cause: FetchCause,
 
     /// The approximate size of the item
     pub size: Option<RoughInt>,
