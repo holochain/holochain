@@ -32,6 +32,7 @@ members = [
   "crates/hc_demo_cli",
 
   "crates/kitsune_p2p/bootstrap",
+  "crates/kitsune_p2p/bootstrap_client",
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",
   "crates/kitsune_p2p/fetch",

@@ -349,6 +349,8 @@ pub mod metrics;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+#[cfg(feature = "fixt")]
+pub mod fixt;
 
 #[cfg(feature = "tx2")]
 pub mod tx2;
