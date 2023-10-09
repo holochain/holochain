@@ -146,7 +146,7 @@ fn next_remote_node(
 
 #[cfg(test)]
 mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
 

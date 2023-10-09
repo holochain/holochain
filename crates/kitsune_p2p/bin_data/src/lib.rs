@@ -2,6 +2,9 @@
 
 use kitsune_p2p_dht_arc::DhtLocation;
 
+#[cfg(feature = "fixt")]
+pub mod fixt;
+
 pub mod dependencies {
     #[cfg(feature = "fuzzing")]
     pub use proptest;

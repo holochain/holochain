@@ -255,8 +255,8 @@ pub mod test {
     use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
-    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
+    use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
