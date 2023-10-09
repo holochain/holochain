@@ -26,8 +26,8 @@ async fn incoming_ops_to_limbo() {
 
         let op = DhtOp::RegisterAgentActivity(signature, action);
         let hash = DhtOpHash::with_data_sync(&op);
-        hash_list.push(hash.clone());
-        op_list.push((hash, op));
+        hash_list.push(hash);
+        op_list.push(op);
     }
 
     let mut all = Vec::new();
@@ -74,7 +74,7 @@ async fn can_retry_failed_op() {
     let workflow_result = incoming_dht_ops_workflow(
         space.space.clone(),
         sys_validation_trigger.clone(),
-        vec![(hash.clone(), op)],
+        vec![op],
         true,
     )
     .await;
@@ -89,14 +89,9 @@ async fn can_retry_failed_op() {
     let hash = DhtOpHash::with_data_sync(&op);
 
     // Run the workflow again to simulate a re-send of the op...
-    incoming_dht_ops_workflow(
-        space.space.clone(),
-        sys_validation_trigger,
-        vec![(hash.clone(), op)],
-        true,
-    )
-    .await
-    .unwrap();
+    incoming_dht_ops_workflow(space.space.clone(), sys_validation_trigger, vec![op], true)
+        .await
+        .unwrap();
 
     // ... and now it should succeed
     verify_is_pending_validation_receipt(env, hash).await;
@@ -128,7 +123,7 @@ async fn republish_to_request_validation_receipt() {
     let workflow_result = incoming_dht_ops_workflow(
         space.space.clone(),
         sys_validation_trigger.clone(),
-        vec![(hash.clone(), op.clone())],
+        vec![op.clone()],
         true,
     )
     .await
@@ -143,7 +138,7 @@ async fn republish_to_request_validation_receipt() {
     let workflow_result = incoming_dht_ops_workflow(
         space.space.clone(),
         sys_validation_trigger.clone(),
-        vec![(hash.clone(), op)],
+        vec![op],
         true,
     )
     .await

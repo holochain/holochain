@@ -1,6 +1,7 @@
 use crate::core::workflow::error::WorkflowResult;
 use holo_hash::DhtOpHash;
 use holochain_types::dht_op::DhtOp;
+use holochain_types::prelude::DhtOpHashed;
 use holochain_types::share::RwShare;
 
 type InOpBatchSnd = tokio::sync::oneshot::Sender<WorkflowResult<()>>;
@@ -10,7 +11,7 @@ type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
 pub struct InOpBatchEntry {
     pub snd: InOpBatchSnd,
     pub request_validation_receipt: bool,
-    pub ops: Vec<(DhtOpHash, DhtOp)>,
+    pub ops: Vec<DhtOpHashed>,
 }
 
 /// A batch of incoming ops memory.
@@ -27,7 +28,7 @@ impl IncomingOpsBatch {
     pub fn check_insert(
         &self,
         request_validation_receipt: bool,
-        ops: Vec<(DhtOpHash, DhtOp)>,
+        ops: Vec<DhtOpHashed>,
     ) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
         let (snd, rcv) = tokio::sync::oneshot::channel();
         let entry = InOpBatchEntry {

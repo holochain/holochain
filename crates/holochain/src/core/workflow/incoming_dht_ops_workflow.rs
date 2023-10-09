@@ -28,8 +28,8 @@ struct OpsClaim {
 impl OpsClaim {
     fn acquire(
         incoming_op_hashes: IncomingOpHashes,
-        ops: Vec<(DhtOpHash, DhtOp)>,
-    ) -> (Self, Vec<(DhtOpHash, DhtOp)>) {
+        ops: Vec<DhtOpHashed>,
+    ) -> (Self, Vec<DhtOpHashed>) {
         let keep_incoming_op_hashes = incoming_op_hashes.clone();
 
         // Lock the shared state while we claim the ops we're going to work on
@@ -40,11 +40,11 @@ impl OpsClaim {
         let mut working_hashes = Vec::with_capacity(ops.len());
         let mut working_ops = Vec::with_capacity(ops.len());
 
-        for (hash, op) in ops {
-            if !set.contains(&hash) {
-                set.insert(hash.clone());
-                working_hashes.push(hash.clone());
-                working_ops.push((hash, op));
+        for op in ops {
+            if !set.contains(&op.hash) {
+                set.insert(op.hash.clone());
+                working_hashes.push(op.hash.clone());
+                working_ops.push(op);
             }
         }
 
@@ -74,16 +74,15 @@ impl Drop for OpsClaim {
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
     request_validation_receipt: bool,
-    ops: Vec<(DhtOpHash, DhtOp)>,
+    ops: Vec<DhtOpHashed>,
 ) -> WorkflowResult<()> {
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
-    for (hash, op) in ops {
-        if !op_exists_inner(txn, &hash)? {
-            let op = DhtOpHashed::from_content_sync(op);
+    for op in ops {
+        if !op_exists_inner(txn, &op.hash)? {
             to_pending.push(op);
         } else if request_validation_receipt {
-            set_require_receipt(txn, &hash, true)?;
+            set_require_receipt(txn, &op.hash, true)?;
         }
     }
 
@@ -100,9 +99,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
-    // TODO test what happens if the hash here doesn't match the actual op hash because the input is trusted for
-    //      claiming hashes to work on.
-    ops: Vec<(DhtOpHash, DhtOp)>,
+    ops: Vec<DhtOp>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let Space {
@@ -111,6 +108,12 @@ pub async fn incoming_dht_ops_workflow(
         dht_db,
         ..
     } = space;
+
+    // Compute hashes for all the ops
+    let ops = ops
+        .into_iter()
+        .map(DhtOpHashed::from_content_sync)
+        .collect();
 
     // Filter out ops that are already being tracked, to avoid doing duplicate work
     let (_claim, ops) = OpsClaim::acquire(incoming_op_hashes, ops);
@@ -122,10 +125,10 @@ pub async fn incoming_dht_ops_workflow(
 
     let num_ops = ops.len();
     let mut filter_ops = Vec::with_capacity(num_ops);
-    for (hash, op) in ops {
+    for op in ops {
         // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
-        match should_keep(&op).await {
-            Ok(()) => filter_ops.push((hash, op)),
+        match should_keep(&op.content).await {
+            Ok(()) => filter_ops.push(op),
             Err(e) => {
                 tracing::warn!(
                     ?op,
@@ -252,11 +255,11 @@ pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseR
 
 pub async fn filter_existing_ops(
     vault: &DbWrite<DbKindDht>,
-    mut ops: Vec<(DhtOpHash, DhtOp)>,
-) -> DatabaseResult<Vec<(DhtOpHash, DhtOp)>> {
+    mut ops: Vec<DhtOpHashed>,
+) -> DatabaseResult<Vec<DhtOpHashed>> {
     vault
         .read_async(move |txn| {
-            ops.retain(|(hash, _)| !op_exists_inner(&txn, hash).unwrap_or(true));
+            ops.retain(|op| !op_exists_inner(&txn, &op.hash).unwrap_or(true));
             Ok(ops)
         })
         .await
