@@ -201,11 +201,8 @@ pub async fn incoming_dht_ops_workflow(
         });
     }
 
-    let r = rcv
-        .await
-        .map_err(|_| super::error::WorkflowError::RecvError)?;
-
-    r
+    rcv.await
+        .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
 #[instrument(skip(op))]
