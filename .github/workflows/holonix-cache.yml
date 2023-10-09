@@ -48,7 +48,11 @@ jobs:
           target=${{ matrix.target }}
 
           # See https://docs.cachix.org/pushing#id1
-          nix develop --build -L --profile result \
+          nix develop --build -L --profile result-develop \
+            ${{ matrix.extra_args }} \
+            ${{ format(matrix.target, matrix.platform) }}
+
+          nix build -L --profile result-build \
             ${{ matrix.extra_args }} \
             ${{ format(matrix.target, matrix.platform) }}
 
