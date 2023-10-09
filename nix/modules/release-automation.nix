@@ -15,8 +15,6 @@
         version = "workspace";
         src = flake.config.srcCleanedReleaseAutomationRepo;
 
-        cargoExtraArgs = "--all-targets";
-
         buildInputs = (with pkgs; [ openssl ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
@@ -44,6 +42,7 @@
       });
 
       tests = craneLib.cargoNextest (commonArgs // {
+        src = flake.config.srcCleanedReleaseAutomationWithTestsRepo;
         pname = "${commonArgs.pname}-tests";
         __noChroot = pkgs.stdenv.isLinux;
 
