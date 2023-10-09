@@ -987,17 +987,21 @@ where
         })
             .await??;
 
-        // For each response run the chain filter and check the invariants hold.
-        for response in results {
-            let result =
-                authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
-                    response,
-                )?;
+        let merged_results = results.iter().fold(
+            // It's sort of arbitrary what the initial value is as long as it's
+            // not an activity response.
+            BoundedMustGetAgentActivityResponse::EmptyRange,
+            holochain_types::chain::merge_bounded_agent_activity_responses,
+        );
 
-            // Short circuit if we have a result.
-            if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
-                return Ok(result);
-            }
+        let result =
+            authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
+                merged_results,
+            );
+
+        // Short circuit if we have a result.
+        if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+            return Ok(result);
         }
 
         // If we are the authority then don't go to the network.
