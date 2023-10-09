@@ -198,6 +198,8 @@ mod tests {
 
         // TODO +1 for another author and +1 for recency threshold. Check the usage of the query and see if it's supposed
         //      to match or not.
+        //      Update: The recency threshold should not be included because we want to keep retrying until we have validation
+        //      receipts but the author should be because the publish task is run per cell
         assert_eq!(expected.results.len() + 2, num_to_publish);
     }
 

@@ -42,10 +42,11 @@ pub async fn publish_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
+    let to_publish_count = to_publish.values().map(Vec::len).sum();
 
     // Commit to the network
-    tracing::info!("publishing {} ops", to_publish.len());
-    let mut success = Vec::new();
+    info!("publishing {} ops", to_publish_count);
+    let mut success = Vec::with_capacity(to_publish.len());
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
         match network
@@ -65,7 +66,7 @@ pub async fn publish_dht_ops_workflow(
                 if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
                     complete = WorkComplete::Incomplete;
                 }
-                tracing::warn!(failed_to_send_publish = ?e);
+                warn!(failed_to_send_publish = ?e);
             }
             Ok(()) => {
                 success.extend(op_hash_list);
@@ -73,16 +74,17 @@ pub async fn publish_dht_ops_workflow(
         }
     }
 
-    tracing::info!("published {} ops", success.len());
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+    info!("published {} ops", success.len());
+
+    let now = time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     let continue_publish = db
-        .write_async(move |writer| {
+        .write_async(move |txn| {
             for hash in success {
                 use holochain_p2p::DhtOpHashExt;
                 let hash = DhtOpHash::from_kitsune(hash.data_ref());
-                mutations::set_last_publish_time(writer, &hash, now)?;
+                set_last_publish_time(txn, &hash, now)?;
             }
-            WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
+            WorkflowResult::Ok(publish_query::num_still_needing_publish(txn)? > 0)
         })
         .await?;
 
@@ -93,7 +95,8 @@ pub async fn publish_dht_ops_workflow(
         trigger_self.pause_loop();
     }
 
-    tracing::debug!("committed published ops");
+    debug!("committed published ops");
+
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(complete)
