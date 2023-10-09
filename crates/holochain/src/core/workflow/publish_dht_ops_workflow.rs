@@ -107,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in publish_query::get_ops_to_publish(agent, &db).await? {
+    for (basis, op_hash, op) in get_ops_to_publish(agent, &db).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish

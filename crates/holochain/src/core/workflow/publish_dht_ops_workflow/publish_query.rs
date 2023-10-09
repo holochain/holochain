@@ -117,9 +117,11 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         JOIN
         DhtOp ON DhtOp.action_hash = Action.hash
         WHERE
-        DhtOp.receipts_complete IS NULL
+        DhtOp.withhold_publish IS NULL
         AND
         (DhtOp.type != :store_entry OR Action.private_entry = 0)
+        AND
+        DhtOp.receipts_complete IS NULL
         ",
         named_params! {
             ":store_entry": DhtOpType::StoreEntry,
@@ -136,10 +138,10 @@ mod tests {
     use holo_hash::HasHash;
     use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::prelude::DatabaseResult;
-    use holochain_state::prelude::insert_op;
     use holochain_state::prelude::set_last_publish_time;
     use holochain_state::prelude::set_receipts_complete;
     use holochain_state::prelude::test_authored_db;
+    use holochain_state::prelude::{insert_op, set_withhold_publish};
     use holochain_types::action::NewEntryAction;
     use holochain_types::dht_op::DhtOpHashed;
     use holochain_zome_types::fixt::*;
@@ -156,6 +158,7 @@ mod tests {
         has_required_receipts: bool,
         is_this_agent: bool,
         store_entry: bool,
+        withold_publish: bool,
     }
 
     struct Consistent {
@@ -181,10 +184,21 @@ mod tests {
                 .collect::<Vec<_>>(),
             expected
                 .results
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|op| op.into_inner().1.to_kitsune())
                 .collect::<Vec<_>>(),
         );
+
+        let num_to_publish = db
+            .to_db()
+            .read_async(|txn| num_still_needing_publish(&txn))
+            .await
+            .unwrap();
+
+        // TODO +1 for another author and +1 for recency threshold. Check the usage of the query and see if it's supposed
+        //      to match or not.
+        assert_eq!(expected.results.len() + 2, num_to_publish);
     }
 
     async fn create_and_insert_op(
@@ -247,6 +261,9 @@ mod tests {
                 insert_op(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
+                if facts.withold_publish {
+                    set_withhold_publish(txn, &hash).unwrap();
+                }
                 Ok(())
             }
         })
@@ -265,13 +282,15 @@ mod tests {
         // - WithinMinPeriod: false.
         // - HasRequireReceipts: false.
         // - IsThisAgent: true.
-        // - StoreEntry: true
+        // - StoreEntry: true.
+        // - WitholdPublish: false.
         let facts = Facts {
             private: false,
             within_min_period: false,
             has_required_receipts: false,
             is_this_agent: true,
             store_entry: true,
+            withold_publish: false,
         };
         let op = create_and_insert_op(db, facts, &cd).await;
         results.push(op);
@@ -305,6 +324,11 @@ mod tests {
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
+        create_and_insert_op(db, f, &cd).await;
+
+        // - WitholdPublish: true.
+        let mut f = facts;
+        f.withold_publish = true;
         create_and_insert_op(db, f, &cd).await;
 
         Expected {
