@@ -25,6 +25,9 @@ use tracing::*;
 mod publish_query;
 pub use publish_query::get_ops_to_publish;
 
+#[cfg(test)]
+mod unit_tests;
+
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
@@ -42,7 +45,7 @@ pub async fn publish_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
-    let to_publish_count = to_publish.values().map(Vec::len).sum();
+    let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     // Commit to the network
     info!("publishing {} ops", to_publish_count);
