@@ -80,7 +80,7 @@ impl ShardedGossipLocal {
     /// - Only send the agent bloom if this is a recent gossip type.
     pub(super) async fn incoming_initiate(
         &self,
-        peer_cert: Arc<[u8; 32]>,
+        peer_cert: NodeCert,
         remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,

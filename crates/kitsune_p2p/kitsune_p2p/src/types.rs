@@ -28,21 +28,9 @@ pub enum KitsuneP2pError {
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
 
-    /// Reqwest crate.
-    #[error(transparent)]
-    Reqwest(#[from] reqwest::Error),
-
     /// Bootstrap call failed.
-    #[error("Bootstrap Error: {0}")]
-    Bootstrap(Box<str>),
-
-    /// SystemTime call failed.
     #[error(transparent)]
-    SystemTime(#[from] std::time::SystemTimeError),
-
-    /// Integer casting failed.
-    #[error(transparent)]
-    TryFromInt(#[from] std::num::TryFromIntError),
+    Bootstrap(#[from] BootstrapClientError),
 
     /// Other
     #[error("Other: {0}")]
@@ -97,6 +85,7 @@ pub(crate) mod gossip;
 pub mod wire;
 
 pub use gossip::GossipModuleType;
+use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 pub use kitsune_p2p_types::dht;
 pub use kitsune_p2p_types::dht_arc;
 

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
-use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use crate::config::create_config;
 use crate::config::write_config;

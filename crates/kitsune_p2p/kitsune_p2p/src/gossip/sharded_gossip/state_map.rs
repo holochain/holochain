@@ -3,13 +3,13 @@ use super::*;
 /// Map of gossip round state that checks for timed out rounds on gets.
 #[derive(Default, Debug)]
 pub(super) struct RoundStateMap {
-    map: HashMap<StateKey, RoundState>,
-    timed_out: Vec<(StateKey, RoundState)>,
+    map: HashMap<NodeCert, RoundState>,
+    timed_out: Vec<(NodeCert, RoundState)>,
 }
 
 impl RoundStateMap {
     /// Check if round has timed out and remove it if it has.
-    pub(super) fn check_timeout(&mut self, key: &StateKey) -> bool {
+    pub(super) fn check_timeout(&mut self, key: &NodeCert) -> bool {
         let mut timed_out = false;
         let mut finished = false;
         if let Some(state) = self.map.get(key) {
@@ -30,30 +30,30 @@ impl RoundStateMap {
     }
 
     /// Get the state if it hasn't timed out.
-    pub(super) fn get(&mut self, key: &StateKey) -> Option<&RoundState> {
+    pub(super) fn get(&mut self, key: &NodeCert) -> Option<&RoundState> {
         self.touch(key);
         self.map.get(key)
     }
 
     /// Get the mutable state if it hasn't timed out.
-    pub(super) fn get_mut(&mut self, key: &StateKey) -> Option<&mut RoundState> {
+    pub(super) fn get_mut(&mut self, key: &NodeCert) -> Option<&mut RoundState> {
         self.touch(key);
         self.check_timeout(key);
         self.map.get_mut(key)
     }
 
     /// Remove the state.
-    pub(super) fn remove(&mut self, key: &StateKey) -> Option<RoundState> {
+    pub(super) fn remove(&mut self, key: &NodeCert) -> Option<RoundState> {
         self.map.remove(key)
     }
 
     /// Insert new state and return the old state if there was any.
-    pub(super) fn insert(&mut self, key: StateKey, round_state: RoundState) -> Option<RoundState> {
+    pub(super) fn insert(&mut self, key: NodeCert, round_state: RoundState) -> Option<RoundState> {
         self.map.insert(key, round_state)
     }
 
     /// Get the set of current rounds and remove any expired rounds.
-    pub(super) fn current_rounds(&mut self) -> HashSet<Arc<[u8; 32]>> {
+    pub(super) fn current_rounds(&mut self) -> HashSet<NodeCert> {
         for (k, v) in std::mem::take(&mut self.map) {
             if v.last_touch.elapsed() < v.round_timeout {
                 self.map.insert(k, v);
@@ -65,26 +65,26 @@ impl RoundStateMap {
     }
 
     /// Check if a non-expired round exists.
-    pub(super) fn round_exists(&mut self, key: &StateKey) -> bool {
+    pub(super) fn round_exists(&mut self, key: &NodeCert) -> bool {
         self.check_timeout(key);
         self.map.contains_key(key)
     }
 
     /// Get all timed out rounds.
-    pub(super) fn take_timed_out_rounds(&mut self) -> Vec<(StateKey, RoundState)> {
+    pub(super) fn take_timed_out_rounds(&mut self) -> Vec<(NodeCert, RoundState)> {
         std::mem::take(&mut self.timed_out)
     }
 
     /// Touch a round to reset its timeout.
-    fn touch(&mut self, key: &StateKey) {
+    fn touch(&mut self, key: &NodeCert) {
         if let Some(state) = self.map.get_mut(key) {
             state.last_touch = Instant::now();
         }
     }
 }
 
-impl From<HashMap<StateKey, RoundState>> for RoundStateMap {
-    fn from(map: HashMap<StateKey, RoundState>) -> Self {
+impl From<HashMap<NodeCert, RoundState>> for RoundStateMap {
+    fn from(map: HashMap<NodeCert, RoundState>) -> Self {
         Self {
             map,
             ..Default::default()
