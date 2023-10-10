@@ -89,7 +89,7 @@ pub fn render_bootstrap_widget<B: Backend>(
             .write()
             .expect("Should have been able to read network type");
 
-        let new_net = match network_type.clone() {
+        let new_net = match *network_type {
             BootstrapNet::Tx2 => BootstrapNet::Tx5,
             BootstrapNet::Tx5 => BootstrapNet::Tx2,
         };
@@ -102,6 +102,7 @@ pub fn render_bootstrap_widget<B: Backend>(
 
         match block_on(
             async {
+                let network_type = { *NETWORK_TYPE.read().unwrap() };
                 random(
                     Some(bootstrap_url.into()),
                     RandomQuery {
@@ -109,7 +110,7 @@ pub fn render_bootstrap_widget<B: Backend>(
                         space: Arc::new(KitsuneSpace::new(dna_hash.get_raw_36().to_vec())),
                         limit: RandomLimit(30),
                     },
-                    *NETWORK_TYPE.read().unwrap(),
+                    network_type,
                 )
                 .await
             },
@@ -151,7 +152,6 @@ pub fn render_bootstrap_widget<B: Backend>(
     let list = List::new(list_items)
         .block(Block::default().title("Agents").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">> ");
 
     let selected = *SELECTED.read().unwrap();
@@ -191,10 +191,7 @@ pub fn render_bootstrap_widget<B: Backend>(
     );
 
     let timeout_remaining = 10
-        - LAST_REFRESH_AT
-            .read()
-            .unwrap()
-            .clone()
+        - (*LAST_REFRESH_AT.read().unwrap())
             .map(|i| i.elapsed().as_secs())
             .unwrap_or(10) as i64;
     let refresh_timeout_message = if timeout_remaining > 0 {

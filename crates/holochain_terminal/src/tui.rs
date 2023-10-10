@@ -93,7 +93,7 @@ fn render<B: Backend>(app: &mut App, frame: &mut Frame<B>) {
             frame.render_widget(p, root_layout[1]);
         }
         1 => {
-            render_bootstrap_widget(&app.args(), events, frame, root_layout[1]);
+            render_bootstrap_widget(app.args(), events, frame, root_layout[1]);
         }
         _ => {
             panic!("Page not implemented");
