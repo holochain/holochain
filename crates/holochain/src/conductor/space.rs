@@ -625,20 +625,20 @@ impl Spaces {
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        use futures::StreamExt;
-        let ops = futures::stream::iter(ops.into_iter().map(|op| {
-            let hash = DhtOpHash::with_data_sync(&op);
-            (hash, op)
-        }))
-        .collect()
-        .await;
-
         // If this is a countersigning session then
         // send it to the countersigning workflow otherwise
         // send it to the incoming ops workflow.
         if countersigning_session {
+            use futures::StreamExt;
+            let ops = futures::stream::iter(ops.into_iter().map(|op| {
+                let hash = DhtOpHash::with_data_sync(&op);
+                (hash, op)
+            }))
+            .collect()
+            .await;
+
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
                     space.countersigning_workspace.clone(),

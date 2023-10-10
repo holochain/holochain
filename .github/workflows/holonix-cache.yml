@@ -48,12 +48,16 @@ jobs:
           target=${{ matrix.target }}
 
           # See https://docs.cachix.org/pushing#id1
-          nix develop --build -L --profile result \
+          nix develop --build -L --profile result-develop \
+            ${{ matrix.extra_args }} \
+            ${{ format(matrix.target, matrix.platform) }}
+
+          nix build -L --profile result-build \
             ${{ matrix.extra_args }} \
             ${{ format(matrix.target, matrix.platform) }}
 
           # Don't exit if this fails so we can clean up the profile
-          for i in result*; do
+          for i in result-*; do
             cachix push holochain-ci $i || true
           done
 
