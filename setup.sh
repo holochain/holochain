@@ -16,11 +16,7 @@ if ! command -v nix &>/dev/null; then
     echo "Installing Nix"
     echo
 
-    if [[ $(uname -r) == *"WSL2" ]]; then
-        run_cmd bash <(curl -L "${NIX_INSTALLER_URL}") --no-daemon
-    else
-        run_cmd bash <(curl -L "${NIX_INSTALLER_URL}") --daemon
-    fi
+    run_cmd bash <(curl -L "${NIX_INSTALLER_URL}") --daemon
 
     echo
     echo "Sourcing the nix config files"
