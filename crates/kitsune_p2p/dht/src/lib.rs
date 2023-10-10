@@ -173,8 +173,10 @@ pub mod prelude {
     pub use super::error::*;
     pub use super::hash::*;
     pub use super::op::*;
-    pub use super::persistence::*;
     pub use super::region::*;
     pub use super::region_set::*;
     pub use super::spacetime::*;
+
+    #[cfg(feature = "test_utils")]
+    pub use super::persistence::*;
 }

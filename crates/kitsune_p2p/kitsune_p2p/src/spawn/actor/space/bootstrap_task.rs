@@ -1,11 +1,11 @@
 use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender, PutAgentInfoSignedEvt};
-use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalSender};
 use crate::{KitsuneP2pError, KitsuneP2pResult, KitsuneSpace};
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use ghost_actor::{GhostControlSender, GhostError, GhostSender};
+use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use parking_lot::RwLock;
@@ -33,7 +33,9 @@ struct DefaultBootstrapService {
 
 impl BootstrapService for DefaultBootstrapService {
     fn random(&self, query: RandomQuery) -> BoxFuture<KitsuneP2pResult<Vec<AgentInfoSigned>>> {
-        super::bootstrap::random(self.url.clone(), query, self.net).boxed()
+        async move {
+            Ok(kitsune_p2p_bootstrap_client::random(self.url.clone(), query, self.net).await?)
+        }.boxed()
     }
 }
 
@@ -164,9 +166,7 @@ impl BootstrapTask {
 
 #[cfg(test)]
 mod tests {
-    use crate::event::{KitsuneP2pEvent, PutAgentInfoSignedEvt};
-    use crate::fixt::AgentInfoSignedFixturator;
-    use crate::fixt::KitsuneSpaceFixturator;
+    use crate::event::PutAgentInfoSignedEvt;
     use crate::spawn::actor::space::bootstrap_task::{BootstrapService, BootstrapTask};
     use crate::spawn::actor::space::DhtArc;
     use crate::spawn::actor::space::{
@@ -174,27 +174,29 @@ mod tests {
         SpaceInternalHandler, SpaceInternalHandlerResult, VecMXM, WireConHnd,
     };
     use crate::spawn::actor::MetaNetCon;
+    use crate::spawn::test_util::HostStub;
     use crate::types::actor::BroadcastData;
     use crate::wire::Wire;
     use crate::KitsuneP2pResult;
     use crate::{GossipModuleType, KitsuneP2pError};
     use fixt::prelude::*;
-    use futures::channel::mpsc::{channel, Receiver};
+    use futures::channel::mpsc::channel;
     use futures::future::BoxFuture;
     use futures::{FutureExt, SinkExt, StreamExt};
     use ghost_actor::actor_builder::GhostActorBuilder;
     use ghost_actor::{GhostControlHandler, GhostControlSender, GhostHandler, GhostSender};
+    use kitsune_p2p_bin_data::fixt::*;
+    use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
     use kitsune_p2p_fetch::FetchContext;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
     use kitsune_p2p_types::bootstrap::RandomQuery;
+    use kitsune_p2p_types::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
     use std::collections::HashSet;
-    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::{Duration, Instant};
-    use tokio::task::AbortHandle;
-    use tokio::time::error::Elapsed;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn bootstrap_task_relays_agent_info_from_boostrap_server_to_host() {
@@ -692,78 +694,14 @@ mod tests {
 
             if self.every_other_call_fails && calls % 2 == 1 {
                 return async move {
-                    Err(KitsuneP2pError::Bootstrap(
+                    Err(KitsuneP2pError::Bootstrap(BootstrapClientError::Bootstrap(
                         "test error".to_string().into_boxed_str(),
-                    ))
+                    )))
                 }
-                .boxed()
-                .into();
+                .boxed();
             }
 
-            async move { Ok(self.agents.clone()) }.boxed().into()
-        }
-    }
-
-    struct HostStub {
-        respond_with_error: Arc<AtomicBool>,
-        put_events: Receiver<PutAgentInfoSignedEvt>,
-        abort_handle: AbortHandle,
-    }
-
-    impl HostStub {
-        fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
-            let (mut sender, receiver) = channel(10);
-
-            let respond_with_error = Arc::new(AtomicBool::new(false));
-            let handle = tokio::spawn({
-                let task_respond_with_error = respond_with_error.clone();
-                async move {
-                    while let Some(evt) = host_receiver.next().await {
-                        match evt {
-                            KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
-                                println!("Responding to requests");
-
-                                if task_respond_with_error.load(Ordering::SeqCst) {
-                                    respond.respond(Ok(async move {
-                                        Err(KitsuneP2pError::other("a test error"))
-                                    }
-                                    .boxed()
-                                    .into()));
-                                    continue;
-                                }
-
-                                sender.send(input).await.unwrap();
-                                respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                            }
-                            _ => panic!("Unexpected event - {:?}", evt),
-                        }
-                    }
-                }
-            });
-
-            HostStub {
-                respond_with_error,
-                put_events: receiver,
-                abort_handle: handle.abort_handle(),
-            }
-        }
-
-        async fn next_event(&mut self, timeout: Duration) -> PutAgentInfoSignedEvt {
-            tokio::time::timeout(timeout, self.put_events.next())
-                .await
-                .unwrap()
-                .unwrap()
-        }
-
-        async fn try_next_event(
-            &mut self,
-            timeout: Duration,
-        ) -> Result<Option<PutAgentInfoSignedEvt>, Elapsed> {
-            tokio::time::timeout(timeout, self.put_events.next()).await
-        }
-
-        fn abort(&self) {
-            self.abort_handle.abort();
+            async move { Ok(self.agents.clone()) }.boxed()
         }
     }
 }

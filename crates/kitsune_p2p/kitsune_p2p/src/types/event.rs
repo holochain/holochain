@@ -6,6 +6,7 @@ use kitsune_p2p_types::{
     bin_types::KOp,
     dht::region::RegionBounds,
     dht_arc::{DhtArcSet, DhtLocation},
+    KOpHash,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -64,7 +65,7 @@ pub struct SignNetworkDataEvt {
 }
 
 /// Store the AgentInfo as signed by the agent themselves.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -164,8 +165,7 @@ pub fn full_time_window_inclusive() -> TimeWindowInclusive {
 
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
-type KOpHash = Arc<super::KitsuneOpHash>;
-type Payload = Vec<u8>;
+pub(crate) type Payload = Vec<u8>;
 type Ops = Vec<KOp>;
 type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
 

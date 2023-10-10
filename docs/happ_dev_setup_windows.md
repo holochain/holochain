@@ -12,14 +12,14 @@ Get `rustup` from [here](https://www.rust-lang.org/tools/install). This will set
 preferable to use the same version that Holochain is using. You can optionally install a specific version of rust using
 
 ```shell
-rustup toolchain install 1.66.1
+rustup toolchain install 1.71.1
 ```
 
 Find the installed toolchain with `rustup toolchain list`, then select it using a command like this, with your toolchain 
 in place of the example given here.
 
 ```shell
-rustup default 1.66.1-x86_64-pc-windows-msvc
+rustup default 1.71.1-x86_64-pc-windows-msvc
 ```
 
 You can find the current version used by Holochain [here](https://github.com/holochain/holochain/blob/develop/nix/modules/holochain.nix#L8).
@@ -80,3 +80,7 @@ and you may want to learn from their experiences and documentation:
 
 - https://github.com/NextGenSoftwareUK/OASIS-Holochain-hApp
 - https://github.com/holochain-open-dev/wiki/wiki/Installing-Holochain--&-Building-hApps-Natively-On-Windows
+
+There is also the c# client HoloNET which you may want to check out:
+
+https://github.com/holochain-open-dev/holochain-client-csharp

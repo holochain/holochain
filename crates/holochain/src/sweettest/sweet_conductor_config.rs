@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 
 /// Wrapper around ConductorConfig with some helpful builder methods
 #[derive(
@@ -44,7 +44,7 @@ impl SweetConductorConfig {
             #[cfg(feature = "tx5")]
             {
                 for t in n.transport_pool.iter_mut() {
-                    if let kitsune_p2p::TransportConfig::WebRTC { signal_url } = t {
+                    if let TransportConfig::WebRTC { signal_url } = t {
                         if signal_url == "rendezvous:" {
                             *signal_url = rendezvous.sig_addr().to_string();
                         }
@@ -74,7 +74,7 @@ impl SweetConductorConfig {
 
         /*#[cfg(not(feature = "tx5"))]
         {
-            network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+            network.transport_pool = vec![TransportConfig::Quic {
                 bind_to: None,
                 override_host: None,
                 override_port: None,
@@ -83,7 +83,7 @@ impl SweetConductorConfig {
 
         #[cfg(feature = "tx5")]
         {
-            network.transport_pool = vec![kitsune_p2p::TransportConfig::WebRTC {
+            network.transport_pool = vec![TransportConfig::WebRTC {
                 signal_url: "rendezvous:".into(),
             }];
         }

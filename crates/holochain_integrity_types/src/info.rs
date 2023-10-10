@@ -54,14 +54,23 @@ pub type NetworkSeed = String;
 
 #[allow(dead_code)]
 const fn standard_quantum_time() -> Duration {
-    kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
+    // TODO - put this in a common place that is imported
+    //        from both this crate and kitsune_p2p_dht
+    //        we do *not* want kitsune_p2p_dht imported into
+    //        this crate, because that pulls getrandom into
+    //        something that is supposed to be compiled
+    //        into integrity wasms.
+    Duration::from_secs(60 * 5)
 }
 
 /// Modifiers of this DNA - the network seed, properties and origin time - as
 /// opposed to the actual DNA code. These modifiers are included in the DNA
 /// hash computation.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 pub struct DnaModifiers {
     /// The network seed of a DNA is included in the computation of the DNA hash.
@@ -103,7 +112,10 @@ impl DnaModifiers {
 
 /// [`DnaModifiers`] options of which all are optional.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct DnaModifiersOpt<P = SerializedBytes> {
     /// see [`DnaModifiers`]
     pub network_seed: Option<NetworkSeed>,

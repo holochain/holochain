@@ -20,6 +20,7 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
+use holochain_state_types::{SourceChainJsonDump, SourceChainJsonRecord};
 use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
@@ -58,7 +59,6 @@ use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Record;
-use holochain_zome_types::Signature;
 use holochain_zome_types::SignedAction;
 use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
@@ -106,22 +106,6 @@ impl HeadInfo {
 
 /// A source chain with read only access to the underlying databases.
 pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
-
-// TODO fix this.  We shouldn't really have nil values but this would
-// show if the database is corrupted and doesn't have a record
-#[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct SourceChainJsonDump {
-    pub records: Vec<SourceChainJsonRecord>,
-    pub published_ops_count: usize,
-}
-
-#[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
-pub struct SourceChainJsonRecord {
-    pub signature: Signature,
-    pub action_address: ActionHash,
-    pub action: Action,
-    pub entry: Option<Entry>,
-}
 
 // TODO: document that many functions here are only reading from the scratch,
 //       not the entire source chain!
@@ -274,7 +258,8 @@ impl SourceChain {
         .await
     }
 
-    #[cfg(feature = "test_utils")]
+    // TODO: when we fully hook up rate limiting, make this test-only
+    // #[cfg(feature = "test_utils")]
     pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
@@ -711,6 +696,7 @@ where
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     // FIXME: This query needs to be tested.
+    #[allow(clippy::let_and_return)] // required to drop temporary
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         if query.sequence_range != ChainQueryFilterRange::Unbounded
             && (query.action_type.is_some()
@@ -1356,11 +1342,13 @@ impl From<SourceChain> for SourceChainRead {
 
 #[cfg(test)]
 pub mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use hdk::prelude::*;
     use holochain_p2p::MockHolochainP2pDnaT;
+    use holochain_zome_types::prelude::*;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;

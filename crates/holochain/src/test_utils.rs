@@ -17,6 +17,7 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
+use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht::prelude::Topology;
 use holochain_p2p::dht::ArqStrat;
@@ -28,7 +29,6 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
@@ -37,7 +37,7 @@ use holochain_state::source_chain;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashSet;
@@ -51,12 +51,16 @@ pub use itertools;
 
 pub mod conductor_setup;
 pub mod consistency;
+pub mod hc_stress_test;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
 
 mod wait_for;
 pub use wait_for::*;
+
+mod big_stack_test;
+pub use big_stack_test::*;
 
 mod generate_records;
 pub use generate_records::*;
@@ -227,7 +231,7 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let mut config = holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default();
+    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::default();
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;
@@ -566,17 +570,6 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     num_attempts: usize,
     delay: Duration,
 ) {
-    fn display_op(op: &DhtOp) -> String {
-        format!(
-            "{} {:>3}  {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            // op.to_light().action_hash().clone(),
-            op.get_type(),
-            op.action().action_type(),
-        )
-    }
-
     for i in 0..num_attempts {
         let num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {

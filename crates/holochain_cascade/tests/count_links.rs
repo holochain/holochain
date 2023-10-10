@@ -1,4 +1,3 @@
-use hdk::prelude::Timestamp;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -9,6 +8,7 @@ use holochain_state::prelude::test_dht_db;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::{CountLinksResponse, WireLinkQuery};
 use holochain_types::test_utils::chain::action_hash;
+use holochain_zome_types::Timestamp;
 use holochain_zome_types::{fake_agent_pub_key, ChainTopOrdering};
 
 // Checks that links can be counted by asking a remote peer who is an authority on the base for the count

@@ -4,7 +4,8 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use futures::FutureExt;
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
-use holochain_keystore::MetaLairClient;
+use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
+use holochain_nonce::Nonce256Bits;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::prelude::*;
 use must_future::MustBoxFuture;
@@ -46,7 +47,6 @@ pub trait ChainHeadCoordinatorExt:
         let (keystore, agent) = self.signing_info();
         async move {
             let payload = AddRecordPayload::from_records(keystore, agent, records).await?;
-            serde_json::to_string(&payload).unwrap();
             self.add_records_request(payload).await
         }
         .boxed()
@@ -58,13 +58,13 @@ pub trait ChainHeadCoordinatorExt:
         self: Arc<Self>,
         since_hash: Option<ActionHash>,
     ) -> MustBoxFuture<'static, ChcResult<Vec<Record>>> {
-        let mut bytes = [0; 32];
-        let _ = getrandom::getrandom(&mut bytes);
-        let nonce = Nonce256Bits::from(bytes);
-        let payload = GetRecordsPayload { since_hash, nonce };
-        // TODO: real signature
-        let signature = Signature::from([0; 64]);
+        let (keystore, agent) = self.signing_info();
         async move {
+            let mut bytes = [0; 32];
+            getrandom::getrandom(&mut bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+            let nonce = Nonce256Bits::from(bytes);
+            let payload = GetRecordsPayload { since_hash, nonce };
+            let signature = agent.sign(&keystore, &payload).await?;
             self.get_record_data_request(GetRecordsRequest { payload, signature })
                 .await?
                 .into_iter()
@@ -82,6 +82,7 @@ pub trait ChainHeadCoordinatorExt:
     }
 
     /// Just a convenience for testing. Should not be used otherwise.
+    #[cfg(feature = "test_utils")]
     fn head(self: Arc<Self>) -> MustBoxFuture<'static, ChcResult<Option<ActionHash>>> {
         async move {
             Ok(self
@@ -102,10 +103,20 @@ pub trait ChainHeadCoordinatorExt:
 /// is signed by the agent. This ensures that only the correct agent is adding
 /// records to its CHC. This EncryptedEntry signature is not used anywhere
 /// outside the context of the CHC.
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct AddRecordPayload<A = SignedActionHashed> {
-    /// The signed, hashed Action for the Record
-    pub action: A,
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AddRecordPayload {
+    /// The msgpack-encoded SignedActionHashed for the Record. This is encoded as such because the CHC
+    /// needs to verify the signature, and these are the exact bytes which are signed, so
+    /// this removes the need to deserialize and then re-serialize.
+    ///
+    /// This must be deserialized as `SignedActionHashed`.
+    #[serde(with = "serde_bytes")]
+    pub signed_action_msgpack: Vec<u8>,
+
+    /// The signature of the SignedActionHashed
+    /// (NOTE: usually signatures are of just the Action, but in this case we want to
+    /// include the entire struct in the signature so we don't have to recalculate that on the CHC)
+    pub signed_action_signature: Signature,
 
     /// The entry, encrypted (TODO: by which key?), with the signature of
     /// of the encrypted bytes
@@ -128,7 +139,6 @@ impl AddRecordPayload {
                 let keystore = keystore.clone();
                 let agent_pubkey = agent_pubkey.clone();
                 async move {
-                    let action = signed_action;
                     let encrypted_entry_bytes = entry
                         .into_option()
                         .map(|entry| {
@@ -148,8 +158,23 @@ impl AddRecordPayload {
                     } else {
                         None
                     };
+                    let signed_action_msgpack = holochain_serialized_bytes::encode(&signed_action)?;
+                    let author = signed_action.action().author();
+
+                    let signed_action_signature = author
+                        .sign_raw(&keystore, signed_action_msgpack.clone().into())
+                        .await?;
+
+                    assert!(author
+                        .verify_signature_raw(
+                            &signed_action_signature,
+                            signed_action_msgpack.clone().into()
+                        )
+                        .await
+                        .unwrap());
                     ChcResult::Ok(AddRecordPayload {
-                        action,
+                        signed_action_msgpack,
+                        signed_action_signature,
                         encrypted_entry,
                     })
                 }
@@ -172,7 +197,7 @@ pub type AddRecordsRequest = Vec<AddRecordPayload>;
 ///
 /// Since this payload is signed, including a unique nonce helps prevent replay
 /// attacks.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetRecordsPayload {
     /// Only records beyond and including this hash are returned
     pub since_hash: Option<ActionHash>,
@@ -181,7 +206,7 @@ pub struct GetRecordsPayload {
 }
 
 /// The full request for get_record_data
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetRecordsRequest {
     /// The payload
     pub payload: GetRecordsPayload,
@@ -190,7 +215,7 @@ pub struct GetRecordsRequest {
 }
 
 /// Encrypted bytes of an Entry
-#[derive(serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub struct EncryptedEntry(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Assemble records from a list of Actions and a map of Entries
@@ -240,8 +265,8 @@ pub enum ChcError {
     /// - Vec<AddRecordPayload> must be sorted by `seq_number`
     /// - There is a gap between the first action and the current CHC head
     /// - The `Vec<AddRecordPayload>` does not constitute a valid chain (prev_action must be correct)
-    #[error("Invalid `add_records` payload. Reason: {0}")]
-    NoRecordsAdded(String),
+    #[error("Invalid `add_records` payload. Seq number: {0}")]
+    NoRecordsAdded(u32),
 
     /// An Action which has an entry was returned without the Entry
     #[error("Missing Entry for ActionHash: {0}")]

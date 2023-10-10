@@ -29,10 +29,7 @@ pub fn action_and_entry_match<'a>(must_be_public: bool) -> impl Fact<'a, Pair> {
             move |(action, entry): &Pair| {
                 let data = action.entry_data();
                 match (data, entry) {
-                    (
-                        Some((_entry_hash, entry_type)),
-                        RecordEntry::Present(_) | RecordEntry::NotStored,
-                    ) => {
+                    (Some((_entry_hash, entry_type)), RecordEntry::Present(_)) => {
                         // Ensure that entries are public
                         !must_be_public || entry_type.visibility().is_public()
                     }
@@ -79,7 +76,7 @@ mod tests {
             let a0 = action_facts::is_not_entry_action().build(g);
             let mut a1 = action_facts::is_new_entry_action().build(g);
             *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-            let a1 = Action::from(a1);
+            let a1 = a1;
 
             let pair1: Pair = (a0.clone(), RecordEntry::NA);
             let pair2: Pair = (a0.clone(), RecordEntry::Present(e.clone()));
