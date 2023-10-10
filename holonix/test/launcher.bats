@@ -11,6 +11,7 @@ teardown() {
 }
 
 @test "expected hc-launch to be available" {
-  hc-launch --help
-  [[ "$?" == "0" ]]
+  result="$(hc-launch --version)"
+  echo $result
+  [[ "$result" == "holochain_cli_launch"* ]]
 }
