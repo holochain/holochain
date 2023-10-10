@@ -2,6 +2,9 @@
 
 use kitsune_p2p_dht_arc::DhtLocation;
 
+#[cfg(feature = "fixt")]
+pub mod fixt;
+
 pub mod dependencies {
     #[cfg(feature = "fuzzing")]
     pub use proptest;
@@ -231,5 +234,26 @@ impl std::fmt::Debug for KitsuneSignature {
         }
         f.write_fmt(format_args!(")"))?;
         Ok(())
+    }
+}
+
+/// A 32 byte cert identifying a peer
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Deref,
+    derive_more::From,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct NodeCert(std::sync::Arc<[u8; 32]>);
+
+impl std::fmt::Debug for NodeCert {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("NodeCert")
+            .field(&holochain_util::hex::many_bytes_string(self.0.as_slice()))
+            .finish()
     }
 }

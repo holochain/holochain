@@ -50,9 +50,6 @@ pub use types::*;
 pub mod gossip;
 pub use gossip::sharded_gossip::KitsuneDiagnostics;
 
-mod config;
-pub use config::*;
-
 mod spawn;
 pub use spawn::*;
 
@@ -65,8 +62,6 @@ pub mod test_util;
 
 #[cfg(test)]
 mod test;
-
-pub mod fixt;
 
 /// 10MB of entropy free for the taking.
 /// Useful for initializing arbitrary::Unstructured data

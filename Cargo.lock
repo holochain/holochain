@@ -2686,6 +2686,7 @@ dependencies = [
  "bytes",
  "cfg-if 0.1.10",
  "chrono",
+ "clap 4.4.6",
  "contrafact",
  "criterion 0.3.6",
  "derive_more",
@@ -2706,7 +2707,9 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_metrics",
+ "holochain_nonce",
  "holochain_p2p",
+ "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_state",
@@ -2724,8 +2727,10 @@ dependencies = [
  "isotest",
  "itertools 0.10.5",
  "kitsune_p2p",
+ "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
+ "kitsune_p2p_bootstrap_client",
  "kitsune_p2p_types",
  "lazy_static",
  "maplit",
@@ -2797,6 +2802,7 @@ dependencies = [
  "hdk_derive",
  "holo_hash",
  "holochain_cascade",
+ "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
@@ -2892,6 +2898,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_websocket",
+ "kitsune_p2p_types",
  "matches",
  "nanoid 0.3.0",
  "once_cell",
@@ -2914,16 +2921,18 @@ dependencies = [
  "directories",
  "holo_hash",
  "holochain_keystore",
- "holochain_p2p",
  "holochain_serialized_bytes",
- "holochain_state",
+ "holochain_state_types",
  "holochain_trace",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_types",
  "matches",
  "serde",
  "serde_derive",
+ "serde_json",
  "serde_yaml",
  "structopt",
  "thiserror",
@@ -2955,6 +2964,7 @@ dependencies = [
  "derive_builder",
  "holo_hash",
  "holochain_integrity_types",
+ "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_util",
  "kitsune_p2p_timestamp",
@@ -2977,6 +2987,7 @@ dependencies = [
  "base64 0.13.1",
  "futures",
  "holo_hash",
+ "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_zome_types",
  "kitsune_p2p_types",
@@ -3013,6 +3024,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_nonce"
+version = "0.3.0-beta-dev.19"
+dependencies = [
+ "getrandom 0.2.10",
+ "holochain_secure_primitive",
+ "kitsune_p2p_timestamp",
+]
+
+[[package]]
 name = "holochain_p2p"
 version = "0.3.0-beta-dev.19"
 dependencies = [
@@ -3023,6 +3043,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.6",
  "holo_hash",
  "holochain_keystore",
+ "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_trace",
@@ -3039,6 +3060,15 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+]
+
+[[package]]
+name = "holochain_secure_primitive"
+version = "0.3.0-beta-dev.19"
+dependencies = [
+ "paste",
+ "serde",
+ "subtle",
 ]
 
 [[package]]
@@ -3081,6 +3111,7 @@ dependencies = [
  "futures",
  "getrandom 0.2.10",
  "holo_hash",
+ "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_trace",
@@ -3133,14 +3164,14 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "getrandom 0.2.10",
- "hdk",
  "holo_hash",
  "holochain_keystore",
+ "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_state",
+ "holochain_state_types",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -3162,6 +3193,15 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-futures",
+]
+
+[[package]]
+name = "holochain_state_types"
+version = "0.3.0-beta-dev.19"
+dependencies = [
+ "holo_hash",
+ "holochain_integrity_types",
+ "serde",
 ]
 
 [[package]]
@@ -3216,6 +3256,7 @@ dependencies = [
  "getrandom 0.2.10",
  "holo_hash",
  "holochain_keystore",
+ "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_trace",
@@ -3235,7 +3276,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "proptest",
  "proptest-derive",
  "rand 0.8.5",
@@ -3267,6 +3308,7 @@ dependencies = [
  "derive_more",
  "dunce",
  "futures",
+ "getrandom 0.2.10",
  "num_cpus",
  "once_cell",
  "rpassword 7.2.0",
@@ -3370,6 +3412,8 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
+ "holochain_nonce",
+ "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "holochain_zome_types",
@@ -3951,8 +3995,10 @@ dependencies = [
  "holochain_trace",
  "itertools 0.11.0",
  "kitsune_p2p",
+ "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
+ "kitsune_p2p_bootstrap_client",
  "kitsune_p2p_fetch",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
@@ -3971,7 +4017,6 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rand 0.8.5",
- "reqwest",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3994,6 +4039,7 @@ dependencies = [
  "arbitrary",
  "base64 0.13.1",
  "derive_more",
+ "fixt",
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
@@ -4021,6 +4067,8 @@ dependencies = [
  "fixt",
  "futures",
  "kitsune_p2p",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_bootstrap",
  "kitsune_p2p_types",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -4029,6 +4077,26 @@ dependencies = [
  "serde_bytes",
  "tokio",
  "warp",
+]
+
+[[package]]
+name = "kitsune_p2p_bootstrap_client"
+version = "0.3.0-beta-dev.17"
+dependencies = [
+ "ed25519-dalek",
+ "fixt",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_bootstrap",
+ "kitsune_p2p_bootstrap_client",
+ "kitsune_p2p_types",
+ "once_cell",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_bytes",
+ "thiserror",
+ "tokio",
+ "url2",
 ]
 
 [[package]]
@@ -4171,6 +4239,7 @@ dependencies = [
  "base64 0.21.4",
  "criterion 0.5.1",
  "derive_more",
+ "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.6",
  "holochain_trace",

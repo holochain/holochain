@@ -141,10 +141,10 @@ pub trait HolochainP2pDnaT: Send + Sync {
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Check if an agent is an authority for a hash.
@@ -371,13 +371,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// Send a validation receipt to a remote node.
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .send_validation_receipt((*self.dna_hash).clone(), to_agent, receipt)
+            .send_validation_receipts((*self.dna_hash).clone(), to_agent, receipts)
             .await
     }
 

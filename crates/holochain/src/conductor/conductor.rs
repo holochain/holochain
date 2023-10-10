@@ -1183,7 +1183,7 @@ mod network_impls {
                 | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
-                | ValidationReceiptReceived { .. } => {
+                | ValidationReceiptsReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                     let cell = self.cell_by_id(&cell_id, true).await?;
@@ -1291,7 +1291,8 @@ mod network_impls {
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
-            let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(now)?;
+            let (nonce, expires_at) =
+                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),
@@ -1766,6 +1767,7 @@ mod clone_cell_impls {
 /// Methods related to management of app and cell status
 mod app_status_impls {
     use super::*;
+    use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
@@ -2080,9 +2082,9 @@ mod app_status_impls {
         fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
             match e {
                 // TODO this is brittle because some other network access could fail first if Kitune changes.
-                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Reqwest(e)) => {
-                    e.is_connect()
-                }
+                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Bootstrap(
+                    BootstrapClientError::Reqwest(e),
+                )) => e.is_connect(),
                 _ => false,
             }
         }

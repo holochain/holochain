@@ -37,9 +37,13 @@ holochain_util = { version = "^0.3.0-beta-dev.1", path = "../holochain_util", fe
 holochain_wasmer_host = "=0.0.85"
 holochain_websocket = { version = "^0.3.0-beta-dev.4", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.13", path = "../holochain_zome_types", features = ["full"] }
+holochain_nonce = { version = "0.3.0-beta-dev.19", path = "../holochain_nonce" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.19", path = "../holochain_secure_primitive" }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/bootstrap_client" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.7", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/types" }
 kitsune_p2p_block = { version = "^0.3.0-beta-dev.8", path = "../kitsune_p2p/block" }
 lazy_static = "1.4.0"
@@ -118,6 +122,7 @@ holochain = { path = ".", features = ["test_utils"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
+clap = "4.0"
 contrafact = "0.2.0-rc.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
@@ -182,6 +187,8 @@ test_utils = [
   "kitsune_p2p/test_utils",
   "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",
+  "kitsune_p2p_bin_data/fixt",
+  "kitsune_p2p_types/fixt",
   "arbitrary",
   "matches",
   "holochain_test_wasm_common",

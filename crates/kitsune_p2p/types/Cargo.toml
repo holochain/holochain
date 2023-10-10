@@ -36,6 +36,8 @@ tokio = { version = "1.27", features = [ "full" ] }
 url = "2"
 url2 = "0.0.6"
 
+fixt = { version = "^0.3.0-beta-dev.0", path = "../../fixt", optional = true }
+
 # arbitrary
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 
@@ -71,9 +73,17 @@ test_utils = [
   "ghost_actor/test_utils",
   "mockall",
   "fuzzing",
+  "fixt",
+]
+
+fixt = [
+  "dep:fixt",
+  "kitsune_p2p_bin_data/fixt"
 ]
 
 tx2 = []
+
+tx5 = []
 
 sqlite-encrypted = [
   "kitsune_p2p_dht/sqlite-encrypted",
