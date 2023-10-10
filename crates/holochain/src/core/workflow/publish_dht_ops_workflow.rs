@@ -88,7 +88,7 @@ pub async fn publish_dht_ops_workflow(
                 let hash = DhtOpHash::from_kitsune(hash.data_ref());
                 set_last_publish_time(txn, &hash, now)?;
             }
-            WorkflowResult::Ok(publish_query::num_still_needing_publish(txn)? > 0)
+            WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
         })
         .await?;
 
@@ -323,48 +323,6 @@ mod tests {
         });
     }
 
-    /// There is a test that shows that if the receipt is set to complete
-    /// for a DHTOp we don't re-publish it
-    #[test_case(1, 1)]
-    #[test_case(1, 10)]
-    #[test_case(1, 100)]
-    #[test_case(10, 1)]
-    #[test_case(10, 10)]
-    #[test_case(10, 100)]
-    #[test_case(100, 1)]
-    #[test_case(100, 10)]
-    #[test_case(100, 100)]
-    fn test_no_republish(num_agents: u32, num_hash: u32) {
-        tokio_helper::block_forever_on(async {
-            holochain_trace::test_run().ok();
-
-            // Create test db
-            let test_db = test_authored_db();
-            let db = test_db.to_db();
-
-            // Setup
-            let (_network, dna_network, author, _, _) =
-                setup(db.clone(), num_agents, num_hash, true).await;
-
-            // Update the authored to have complete receipts
-            db.write_async(move |txn| -> DatabaseResult<()> {
-                txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])?;
-                Ok(())
-            })
-            .await
-            .unwrap();
-
-            // Call the workflow
-            call_workflow(db.clone().into(), dna_network, author).await;
-
-            // If we can wait a while without receiving any publish, we have succeeded
-            tokio::time::sleep(Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
-            ))
-            .await;
-        });
-    }
-
     /// There is a test to shows that DHTOps that were produced on private entries are not published.
     /// Some do get published
     /// Current private constraints:
@@ -372,10 +330,10 @@ mod tests {
     /// - No StoreEntry
     /// - This workflow does not have access to private entries
     /// - Add / Remove links: Currently publish all.
-    /// ## Explication
+    /// ## Explanation
     /// This test is a little big so a quick run down:
     /// 1. All ops that can contain entries are created with entries (StoreRecord, StoreEntry and RegisterUpdatedContent)
-    /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
+    /// 2. Then we create identical versions of these ops without the entries (set to None) (except StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced

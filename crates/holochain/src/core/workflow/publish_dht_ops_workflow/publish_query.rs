@@ -108,7 +108,7 @@ where
 }
 
 /// Get the number of ops that might need to publish again in the future.
-pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
+pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> WorkflowResult<usize> {
     let count = txn.query_row(
         "
         SELECT
@@ -117,6 +117,8 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         JOIN
         DhtOp ON DhtOp.action_hash = Action.hash
         WHERE
+        Action.author = :author
+        AND
         DhtOp.withhold_publish IS NULL
         AND
         (DhtOp.type != :store_entry OR Action.private_entry = 0)
@@ -124,6 +126,7 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         DhtOp.receipts_complete IS NULL
         ",
         named_params! {
+            ":author": agent,
             ":store_entry": DhtOpType::StoreEntry,
         },
         |row| row.get("num_ops"),
@@ -173,8 +176,10 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         holochain_trace::test_run().ok();
+
+        let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
-        let expected = test_data(&db.to_db().into()).await;
+        let expected = test_data(&db.to_db().into(), agent.clone()).await;
         let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
@@ -192,15 +197,13 @@ mod tests {
 
         let num_to_publish = db
             .to_db()
-            .read_async(|txn| num_still_needing_publish(&txn))
+            .read_async(|txn| num_still_needing_publish(&txn, agent))
             .await
             .unwrap();
 
-        // TODO +1 for another author and +1 for recency threshold. Check the usage of the query and see if it's supposed
-        //      to match or not.
-        //      Update: The recency threshold should not be included because we want to keep retrying until we have validation
-        //      receipts but the author should be because the publish task is run per cell
-        assert_eq!(expected.results.len() + 2, num_to_publish);
+        // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
+        // not because those ops may need publishing again in the future if we don't get enough validation receipts.
+        assert_eq!(expected.results.len() + 1, num_to_publish);
     }
 
     async fn create_and_insert_op(
@@ -274,11 +277,9 @@ mod tests {
         state
     }
 
-    async fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
+    async fn test_data(db: &DbWrite<DbKindAuthored>, agent: AgentPubKey) -> Expected {
         let mut results = Vec::new();
-        let cd = Consistent {
-            this_agent: fixt!(AgentPubKey),
-        };
+        let cd = Consistent { this_agent: agent };
         // We **do** expect any of these in the results:
         // - Private: false.
         // - WithinMinPeriod: false.

@@ -77,6 +77,38 @@ async fn workflow_incomplete_on_routing_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn workflow_handles_publish_errors() {
+    holochain_trace::test_run().ok();
+
+    let test_db = holochain_state::test_utils::test_authored_db();
+    let vault = test_db.to_db();
+
+    let agent = fixt!(AgentPubKey);
+
+    let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_publish().return_once(|_, _, _, _, _, _, _| {
+        Err(holochain_p2p::HolochainP2pError::InvalidP2pMessage(
+            "test error".to_string(),
+        ))
+    });
+
+    let (tx, rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+
+    let work_complete = publish_dht_ops_workflow(vault.clone(), Arc::new(network), tx, agent)
+        .await
+        .unwrap();
+
+    let publish_timestamp = get_publish_time(vault, op_hash).await;
+
+    assert_eq!(WorkComplete::Complete, work_complete);
+    assert!(!rx.is_paused());
+    assert!(publish_timestamp.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn retry_publish_until_receipts_received() {
     holochain_trace::test_run().ok();
 
@@ -153,6 +185,7 @@ async fn loop_resumes_on_new_data() {
 
     let network = Arc::new(network);
 
+    // Do a publish with no data to get into a paused state
     let work_complete =
         publish_dht_ops_workflow(vault.clone(), network.clone(), tx.clone(), agent.clone())
             .await
@@ -161,6 +194,7 @@ async fn loop_resumes_on_new_data() {
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(rx.is_paused()); // No work to do, so it should pause
 
+    // Now create an op and try to publish again
     let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
 
     let work_complete = publish_dht_ops_workflow(vault, network, tx, agent.clone())
@@ -169,6 +203,36 @@ async fn loop_resumes_on_new_data() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(!rx.is_paused()); // No validation receipts yet so might need to publish again, should it should resume
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ignores_data_by_other_authors() {
+    holochain_trace::test_run().ok();
+
+    let test_db = holochain_state::test_utils::test_authored_db();
+    let vault = test_db.to_db();
+
+    // Create an op for some other author
+    create_op(vault.clone(), fixt!(AgentPubKey)).await.unwrap();
+
+    let agent = fixt!(AgentPubKey);
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network.expect_publish().never();
+
+    let (tx, rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(5)..Duration::from_secs(30), true);
+
+    let network = Arc::new(network);
+
+    let work_complete =
+        publish_dht_ops_workflow(vault.clone(), network.clone(), tx.clone(), agent.clone())
+            .await
+            .unwrap();
+
+    // Should be nothing to do, so complete and paused
+    assert_eq!(WorkComplete::Complete, work_complete);
+    assert!(rx.is_paused());
 }
 
 async fn create_op(
