@@ -1,6 +1,7 @@
 use crate::cli::Args;
 use crate::event::ScreenEvent;
 use chrono::{DateTime, Utc};
+use holo_hash::AgentPubKey;
 use holochain_util::tokio_helper::block_on;
 use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_bootstrap_client::{random, BootstrapNet};
@@ -156,7 +157,10 @@ pub fn render_bootstrap_widget<B: Backend>(
     let selected = *SELECTED.read().unwrap();
     let selected = if !agents.is_empty() && selected < agents.len() {
         let detail_line = List::new(vec![
-            ListItem::new(format!("agent       : {:?}", agents[selected].agent)),
+            ListItem::new(format!(
+                "agent       : {:?}",
+                AgentPubKey::from_raw_36((*agents[selected].agent).clone().into())
+            )),
             ListItem::new(format!("storage arc : {:?}", agents[selected].storage_arc)),
             ListItem::new(format!("url list    : {:?}", agents[selected].url_list)),
             ListItem::new(format!(
