@@ -1,13 +1,19 @@
 { self, lib, ... }: {
   perSystem = { config, self', inputs', pkgs, ... }:
     let
-      holonixPackages = with self'.packages; [ holochain lair-keystore hc-launch hc-scaffold ];
+      holonixPackages = { holochainOverrides ? { } }:
+        with self'.packages; [
+          (holochain.override holochainOverrides)
+          lair-keystore
+          hc-launch
+          hc-scaffold
+        ];
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
             (package: ''
               echo ${package.pname} \($(${package}/bin/${package.pname} -V)\): ${package.src.rev or "na"}'')
-            holonixPackages
+            (holonixPackages { })
         );
       hn-introspect =
         pkgs.writeShellScriptBin "hn-introspect" versionsFileText;
@@ -21,14 +27,18 @@
 
       devShells = {
         default = self'.devShells.holonix;
-        holonix = mkRustShell {
-          inputsFrom = [ self'.devShells.rustDev ];
-          packages = holonixPackages ++ [ hn-introspect ];
-          shellHook = ''
-            echo Holochain development shell spawned. Type 'exit' to leave.
-            export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
-          '';
-        };
+        holonix = pkgs.lib.makeOverridable
+          ({ holochainOverrides }: mkRustShell {
+            inputsFrom = [ self'.devShells.rustDev ];
+            packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
+            shellHook = ''
+              echo Holochain development shell spawned. Type 'exit' to leave.
+              export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
+            '';
+          })
+          {
+            holochainOverrides = { };
+          };
 
         holochainBinaries = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
