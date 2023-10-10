@@ -1,5 +1,5 @@
 use crate::app::App;
-use anyhow::anyhow;
+use crate::components::bootstrap::render_bootstrap_widget;
 use crossterm::terminal;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::Backend;
@@ -9,7 +9,6 @@ use ratatui::symbols::DOT;
 use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
 use ratatui::{Frame, Terminal};
 use std::io;
-use std::io::stderr;
 use std::panic;
 
 #[derive(Debug)]
@@ -86,14 +85,15 @@ fn render<B: Backend>(app: &mut App, frame: &mut Frame<B>) {
 
     frame.render_widget(tabs, root_layout[0]);
 
+    let events = app.drain_events();
+
     match app.tab_index() {
         0 => {
             let p = Paragraph::new("Network info").block(Block::default().borders(Borders::ALL));
             frame.render_widget(p, root_layout[1]);
         }
         1 => {
-            let p = Paragraph::new("Bootstrap info").block(Block::default().borders(Borders::ALL));
-            frame.render_widget(p, root_layout[1]);
+            render_bootstrap_widget(&app.args(), events, frame, root_layout[1]);
         }
         _ => {
             panic!("Page not implemented");

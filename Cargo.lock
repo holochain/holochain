@@ -2519,8 +2519,17 @@ name = "hcterm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "clap 4.4.6",
  "crossterm 0.27.0",
+ "holo_hash",
+ "holochain_util",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_bootstrap_client",
+ "kitsune_p2p_types",
+ "once_cell",
  "ratatui",
+ "url 2.4.1",
 ]
 
 [[package]]
