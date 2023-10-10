@@ -998,6 +998,7 @@ mod tests {
             bootstrap_service: None,
             tuning_params: Default::default(),
             network_type: NetworkType::QuicMdns,
+            tracing_scope: None,
         })
         .await
         .unwrap();
@@ -1017,6 +1018,7 @@ mod tests {
             bootstrap_service: None,
             tuning_params: Default::default(),
             network_type: NetworkType::QuicMdns,
+            tracing_scope: None,
         })
         .await
         .unwrap();
@@ -1039,6 +1041,7 @@ mod tests {
             bootstrap_service: Some(url2!("ws://not-a-bootstrap.test")),
             tuning_params: Default::default(),
             network_type: NetworkType::QuicBootstrap,
+            tracing_scope: None,
         })
         .await
         .unwrap();

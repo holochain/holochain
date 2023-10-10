@@ -1,6 +1,8 @@
 //! Utilities for helping with metric tracking.
 
 use crate::tracing;
+use futures::FutureExt;
+use holochain_trace::tracing::Instrument;
 use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Once,
@@ -141,14 +143,35 @@ where
     E: 'static + Send + std::fmt::Debug,
     F: 'static + Send + std::future::Future<Output = Result<T, E>>,
 {
+    metric_task_instrumented(None, f)
+}
+
+/// Spawns a tokio task with given future/async block.
+/// Captures a new TaskCounter instance to track task count.
+pub fn metric_task_instrumented<T, E, F>(
+    scope: Option<String>,
+    f: F,
+) -> tokio::task::JoinHandle<Result<T, E>>
+where
+    T: 'static + Send,
+    E: 'static + Send + std::fmt::Debug,
+    F: 'static + Send + std::future::Future<Output = Result<T, E>>,
+{
     let counter = MetricTaskCounter::new();
-    tokio::task::spawn(async move {
+    let task = async move {
         let _counter = counter;
         let res = f.await;
         if let Err(e) = &res {
             ghost_actor::dependencies::tracing::error!(?e, "METRIC TASK ERROR");
         }
         res
+    };
+
+    tokio::task::spawn(if let Some(scope) = scope {
+        task.instrument(tracing::error_span!("kitsune metric task", scope = scope))
+            .boxed()
+    } else {
+        task.boxed()
     })
 }
 

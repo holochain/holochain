@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
 use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::nanoid::nanoid;
 
 /// Wrapper around ConductorConfig with some helpful builder methods
 #[derive(
@@ -60,7 +61,9 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        KitsuneP2pConfig::default().into()
+        let mut config: Self = KitsuneP2pConfig::default().into();
+        config.random_scope();
+        config
     }
 
     /// Rendezvous config for SweetConductors
@@ -120,6 +123,14 @@ impl SweetConductorConfig {
             .expect("failed to tune network")
             .tuning_params = Arc::new(tuning_params);
         self
+    }
+
+    /// Set the tracing scope to a new random value
+    pub fn random_scope(&mut self) {
+        let scope = nanoid!();
+        let network = self.network.get_or_insert_with(Default::default);
+        network.tracing_scope = Some(scope.clone());
+        self.tracing_scope = Some(scope);
     }
 
     /// Completely disable networking
