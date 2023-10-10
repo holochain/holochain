@@ -153,19 +153,6 @@ async fn retry_publish_until_receipts_received() {
     assert!(rx.is_paused()); // Should now pause, no more work to do
 }
 
-async fn verify_published_recently(vault: DbWrite<DbKindAuthored>, op_hash: DhtOpHash) {
-    let publish_timestamp = get_publish_time(vault.clone(), op_hash.clone())
-        .await
-        .expect("Expected published time to have been set");
-
-    assert!(
-        publish_timestamp
-            .checked_add_signed(chrono::Duration::seconds(1))
-            .unwrap()
-            > chrono::DateTime::<Utc>::from(SystemTime::now())
-    );
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn loop_resumes_on_new_data() {
     holochain_trace::test_run().ok();
@@ -233,6 +220,19 @@ async fn ignores_data_by_other_authors() {
     // Should be nothing to do, so complete and paused
     assert_eq!(WorkComplete::Complete, work_complete);
     assert!(rx.is_paused());
+}
+
+async fn verify_published_recently(vault: DbWrite<DbKindAuthored>, op_hash: DhtOpHash) {
+    let publish_timestamp = get_publish_time(vault.clone(), op_hash.clone())
+        .await
+        .expect("Expected published time to have been set");
+
+    assert!(
+        publish_timestamp
+            .checked_add_signed(chrono::Duration::seconds(1))
+            .unwrap()
+            > chrono::DateTime::<Utc>::from(SystemTime::now())
+    );
 }
 
 async fn create_op(
