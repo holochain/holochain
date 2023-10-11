@@ -982,6 +982,10 @@ async fn test_dpki_agent_update() {
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
 #[tokio::test(flavor = "multi_thread")]
+// XXX: the valid_arbitrary_chain as used here can't handle actions with
+// sys validation dependencies, so we filter out those action types.
+// Also, there are several other problems here that need to be addressed
+// to make this not flaky.
 #[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
@@ -989,17 +993,7 @@ async fn valid_chain_fact_test() {
     let author = SweetAgents::one(keystore.clone()).await;
     let mut g = random_generator();
 
-    // XXX: the valid_arbitrary_chain as used here can't handle actions with
-    // sys validation dependencies, so we filter out those action types.
-    // Also, there are several other problems here that need to be addressed
-    // to make this not flaky.
-    let filter = contrafact::brute("only approved action types", |(a, r)| {
-        !matches!(
-            a,
-            Action::DeleteLink(_) | Action::Update(_) | Action::Delete(_)
-        )
-    });
-    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n, Some(filter)).await;
+    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n).await;
 
     validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
 
