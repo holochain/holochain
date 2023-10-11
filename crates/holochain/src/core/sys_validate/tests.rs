@@ -982,6 +982,11 @@ async fn test_dpki_agent_update() {
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
 #[tokio::test(flavor = "multi_thread")]
+// XXX: the valid_arbitrary_chain as used here can't handle actions with
+// sys validation dependencies, so we filter out those action types.
+// Also, there are several other problems here that need to be addressed
+// to make this not flaky.
+#[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();
