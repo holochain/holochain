@@ -1,7 +1,8 @@
 use crate::cli::Args;
+use crate::client::{AdminClient, AppClient};
 use crate::event::ScreenEvent;
+use std::sync::{Arc, Mutex};
 
-#[derive(Debug)]
 pub struct App {
     /// Whether the app should keep running
     running: bool,
@@ -17,16 +18,29 @@ pub struct App {
 
     /// The command line args provided to the terminal on launch
     args: Args,
+
+    /// An admin client if the `admin_url` flag was provided
+    admin_client: Option<Arc<Mutex<AdminClient>>>,
+
+    /// An app client if the `admin_url` flag was provided
+    app_client: Option<Arc<Mutex<AppClient>>>,
 }
 
 impl App {
-    pub fn new(args: Args, tab_count: usize) -> Self {
+    pub fn new(
+        args: Args,
+        admin_client: Option<AdminClient>,
+        app_client: Option<AppClient>,
+        tab_count: usize,
+    ) -> Self {
         Self {
             running: true,
             tab_index: 0,
             tab_count,
             pending_events: vec![ScreenEvent::Refresh],
             args,
+            admin_client: admin_client.map(|c| Arc::new(Mutex::new(c))),
+            app_client: app_client.map(|c| Arc::new(Mutex::new(c))),
         }
     }
 
@@ -57,5 +71,13 @@ impl App {
 
     pub fn args(&self) -> &Args {
         &self.args
+    }
+
+    pub fn admin_client(&mut self) -> Option<Arc<Mutex<AdminClient>>> {
+        self.admin_client.clone()
+    }
+
+    pub fn app_client(&mut self) -> Option<Arc<Mutex<AppClient>>> {
+        self.app_client.clone()
     }
 }

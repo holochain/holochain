@@ -1,4 +1,5 @@
 use crate::cli::Args;
+use crate::components::common::show_message;
 use crate::event::ScreenEvent;
 use chrono::{DateTime, Utc};
 use holo_hash::AgentPubKey;
@@ -125,9 +126,11 @@ pub fn render_bootstrap_widget<B: Backend>(
                     frame,
                     rect,
                 );
+                return;
             }
             Err(_) => {
                 show_message("Timeout while fetching agents", frame, rect);
+                return;
             }
         };
     }
@@ -150,7 +153,7 @@ pub fn render_bootstrap_widget<B: Backend>(
         .collect();
 
     let list = List::new(list_items)
-        .block(Block::default().title("Agents").borders(Borders::ALL))
+        .block(Block::default().title(" Agents ").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
         .highlight_symbol(">> ");
 
@@ -174,7 +177,7 @@ pub fn render_bootstrap_widget<B: Backend>(
                     .unwrap_or(DateTime::default())
             )),
         ])
-        .block(Block::default().title("Detail").borders(Borders::ALL))
+        .block(Block::default().title(" Detail ").borders(Borders::ALL))
         .style(Style::default().fg(Color::White));
 
         frame.render_widget(detail_line, content_layout[1]);
@@ -223,9 +226,4 @@ pub fn render_bootstrap_widget<B: Backend>(
         Paragraph::new(Text::from(vec![menu_line])),
         screen_layout[1],
     );
-}
-
-fn show_message<B: Backend>(message: &str, frame: &mut Frame<B>, rect: Rect) {
-    let p = Paragraph::new(message).block(Block::default());
-    frame.render_widget(p, rect);
 }

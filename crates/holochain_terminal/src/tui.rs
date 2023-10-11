@@ -1,5 +1,6 @@
 use crate::app::App;
 use crate::components::bootstrap::render_bootstrap_widget;
+use crate::components::network_info::render_network_info_widget;
 use crossterm::terminal;
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::Backend;
@@ -89,8 +90,8 @@ fn render<B: Backend>(app: &mut App, frame: &mut Frame<B>) {
 
     match app.tab_index() {
         0 => {
-            let p = Paragraph::new("Network info").block(Block::default().borders(Borders::ALL));
-            frame.render_widget(p, root_layout[1]);
+            let app_client = app.app_client();
+            render_network_info_widget(app.args(), app_client, events, frame, root_layout[1]);
         }
         1 => {
             render_bootstrap_widget(app.args(), events, frame, root_layout[1]);

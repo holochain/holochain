@@ -7,16 +7,20 @@ use url::Url;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// The websocket URL to connect to the conductor admin API. For example ws://localhost:8000
-    #[arg(short, long)]
+    #[arg(long)]
     pub admin_url: Option<Url>,
 
     /// The bootstrap URL to connect to for debugging peer discovery. For example http://localhost:3000
-    #[arg(short, long)]
+    #[arg(long)]
     pub bootstrap_url: Option<Url>,
 
     /// The DNA hash in Base64 format to use for
-    #[arg(short, long, value_parser = dna_hash_parser)]
+    #[arg(long, value_parser = dna_hash_parser)]
     pub dna_hash: Option<DnaHash>,
+
+    /// The app ID to discover information for
+    #[arg(long)]
+    pub app_id: Option<String>,
 }
 
 impl Args {
