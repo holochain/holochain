@@ -1,5 +1,5 @@
 use holo_hash::ActionHash;
-use holochain::core::workflow::publish_dht_ops_workflow::get_ops_to_publish;
+use holochain::core::workflow::publish_dht_ops_workflow::num_still_needing_publish;
 use holochain::sweettest::{
     consistency_60s, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
@@ -33,13 +33,24 @@ async fn publish_termination() {
     consistency_60s([&alice, &bobbo, &carol, &danny, &emma, &fred]).await;
 
     let ops_to_publish = tokio::time::timeout(Duration::from_secs(30), async {
+        let alice_pub_key = alice.agent_pubkey().clone();
         loop {
-            let ops_to_publish =
-                get_ops_to_publish(alice.agent_pubkey().clone(), alice.authored_db())
-                    .await
-                    .unwrap();
+            let ops_to_publish = alice
+                .authored_db()
+                .read_async({
+                    let alice_pub_key = alice_pub_key.clone();
+                    // Note that this test is relying on this being the same check that the publish workflow uses.
+                    // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
+                    // observing that behaviour but it's close enough given that there are unit tests for the actual
+                    // behavior.
+                    move |txn| num_still_needing_publish(&txn, alice_pub_key)
+                })
+                .await
+                .unwrap();
 
-            if ops_to_publish.is_empty() {
+            println!("Ops to publish {}", ops_to_publish);
+
+            if ops_to_publish == 0 {
                 return ops_to_publish;
             }
 
@@ -49,5 +60,5 @@ async fn publish_termination() {
     .await
     .unwrap();
 
-    assert!(ops_to_publish.is_empty());
+    assert_eq!(0, ops_to_publish);
 }
