@@ -248,7 +248,6 @@ async fn create_op(
     let test_op_hash = op.as_hash().clone();
     vault
         .write_async({
-            let test_op_hash = test_op_hash.clone();
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op(txn, &op)?;
                 Ok(())
