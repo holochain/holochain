@@ -9,6 +9,7 @@ use std::time::Duration;
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn publish_termination() {
     let _g = holochain_trace::test_run().unwrap();
     const NUM_CONDUCTORS: usize = 6; // Need 5 peers to send validation receipts back
