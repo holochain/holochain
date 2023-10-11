@@ -6,7 +6,6 @@ use anyhow::anyhow;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::NetworkInfo;
 use holochain_util::tokio_helper::block_on;
-use kitsune_p2p_bin_data::KitsuneBinType;
 use once_cell::sync::Lazy;
 use ratatui::{prelude::*, widgets::*};
 use std::sync::{Arc, Mutex, RwLock};

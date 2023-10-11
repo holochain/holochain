@@ -7,7 +7,7 @@ use ratatui::backend::Backend;
 use ratatui::layout::{Alignment, Constraint};
 use ratatui::prelude::{Color, Direction, Layout, Line, Style};
 use ratatui::symbols::DOT;
-use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
+use ratatui::widgets::{Block, Tabs};
 use ratatui::{Frame, Terminal};
 use std::io;
 use std::panic;

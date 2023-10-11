@@ -1,8 +1,7 @@
 use anyhow::anyhow;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppInfo, AppRequest, AppResponse, AppStatusFilter, CellInfo,
-    NetworkInfo,
+    AdminRequest, AdminResponse, AppInfo, AppRequest, AppResponse, CellInfo, NetworkInfo,
 };
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_websocket::{

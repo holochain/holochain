@@ -12,7 +12,7 @@ use crate::event::handle_events;
 use crate::tui::Tui;
 use anyhow::anyhow;
 use clap::Parser;
-use holochain_util::tokio_helper::{block_forever_on, block_on};
+use holochain_util::tokio_helper::block_on;
 use ratatui::prelude::*;
 use std::io::{self};
 use std::time::Duration;

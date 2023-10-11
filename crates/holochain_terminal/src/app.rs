@@ -20,6 +20,7 @@ pub struct App {
     args: Args,
 
     /// An admin client if the `admin_url` flag was provided
+    #[allow(dead_code)]
     admin_client: Option<Arc<Mutex<AdminClient>>>,
 
     /// An app client if the `admin_url` flag was provided
@@ -73,6 +74,7 @@ impl App {
         &self.args
     }
 
+    #[allow(dead_code)]
     pub fn admin_client(&mut self) -> Option<Arc<Mutex<AdminClient>>> {
         self.admin_client.clone()
     }
