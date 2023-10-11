@@ -1,7 +1,9 @@
 use crate::cli::Args;
 use crate::client::{AdminClient, AppClient};
 use crate::event::ScreenEvent;
-use std::sync::{Arc, Mutex};
+use kitsune_p2p_types::dependencies::tokio;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct App {
     /// Whether the app should keep running

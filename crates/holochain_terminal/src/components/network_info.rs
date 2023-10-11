@@ -6,12 +6,16 @@ use anyhow::anyhow;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::NetworkInfo;
 use holochain_util::tokio_helper::block_on;
+use kitsune_p2p_types::dependencies::tokio;
 use once_cell::sync::Lazy;
 use ratatui::{prelude::*, widgets::*};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tokio::sync::Mutex;
 
-static NETWORK_INFO_PARAMS: Lazy<Arc<RwLock<Option<(AgentPubKey, Vec<(String, DnaHash)>)>>>> =
+type NetworkInfoParams = (AgentPubKey, Vec<(String, DnaHash)>);
+
+static NETWORK_INFO_PARAMS: Lazy<Arc<RwLock<Option<NetworkInfoParams>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 static SELECTED: Lazy<RwLock<usize>> = Lazy::new(|| RwLock::new(0));
 
@@ -151,8 +155,8 @@ fn get_network_info_params(
         async {
             app_client
                 .lock()
-                .unwrap()
-                .discover_network_info_params(app_id.into())
+                .await
+                .discover_network_info_params(app_id)
                 .await
         },
         Duration::from_secs(10),
@@ -169,7 +173,7 @@ fn get_network_info(app_client: Arc<Mutex<AppClient>>) -> anyhow::Result<Vec<Net
         async {
             app_client
                 .lock()
-                .unwrap()
+                .await
                 .network_info(
                     agent,
                     named_dna_hashes.into_iter().map(|(_, h)| h).collect(),
