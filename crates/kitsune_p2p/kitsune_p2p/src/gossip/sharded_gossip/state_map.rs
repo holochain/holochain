@@ -96,7 +96,7 @@ impl From<HashMap<NodeCert, RoundState>> for RoundStateMap {
 mod tests {
     use crate::dht_arc::DhtArcSet;
     use crate::gossip::sharded_gossip::state_map::RoundStateMap;
-    use crate::gossip::sharded_gossip::{RoundState, StateKey};
+    use crate::gossip::sharded_gossip::{NodeCert, RoundState};
     use crate::NOISE;
     use arbitrary::{Arbitrary, Unstructured};
     use kitsune_p2p_types::Tx2Cert;
@@ -303,7 +303,7 @@ mod tests {
         assert!(state.is_none());
     }
 
-    fn test_round_state_map_with_single_key(u: &mut Unstructured) -> (RoundStateMap, StateKey) {
+    fn test_round_state_map_with_single_key(u: &mut Unstructured) -> (RoundStateMap, NodeCert) {
         let mut state_map = RoundStateMap::default();
         let key = insert_new_state(&mut state_map, u);
 
@@ -319,9 +319,9 @@ mod tests {
         )
     }
 
-    fn insert_new_state(state_map: &mut RoundStateMap, u: &mut Unstructured) -> StateKey {
+    fn insert_new_state(state_map: &mut RoundStateMap, u: &mut Unstructured) -> NodeCert {
         let cert = Tx2Cert::arbitrary(u).unwrap();
-        let key: StateKey = cert.into();
+        let key: NodeCert = cert.into();
         state_map.insert(key.clone(), test_round_state());
 
         key
