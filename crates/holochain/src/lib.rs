@@ -42,9 +42,8 @@ pub mod prelude {
     #[cfg(feature = "hdk")]
     pub use hdk::link::GetLinksInputBuilder;
     pub use holo_hash;
-    pub use holochain_p2p::AgentPubKeyExt;
-    pub use holochain_p2p::*;
-    pub use holochain_types::prelude::*;
+    pub use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt, HolochainP2pSender};
+    pub use holochain_types::prelude::{fixt, NOISE, *};
     pub use kitsune_p2p::*;
 
     #[cfg(feature = "test_utils")]

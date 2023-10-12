@@ -636,7 +636,11 @@ async fn concurrent_install_dna() {
             let name = format!("fake_dna_{}", i);
 
             // Install Dna
-            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &name, zomes.clone());
+            let dna = holochain_types::test_utils::fake_dna_zomes_named(
+                &uuid::Uuid::new_v4().to_string(),
+                &name,
+                zomes.clone(),
+            );
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;

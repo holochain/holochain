@@ -1,7 +1,5 @@
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::CoordinatorZomes;
-use holochain_zome_types::WasmZome;
-use holochain_zome_types::ZomeDef;
+use holochain_zome_types::prelude::*;
 use mr_bundle::Manifest;
 
 use crate::prelude::DnaResult;

@@ -139,6 +139,7 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_state::mutations;
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::*;
@@ -350,7 +351,7 @@ mod tests {
 
                 // Create test db
                 let test_db = test_authored_db();
-                let keystore = holochain_state::test_utils::test_keystore();
+                let keystore = holochain_keystore::test_keystore();
                 let dht_db = test_dht_db();
                 let db = test_db.to_db();
 

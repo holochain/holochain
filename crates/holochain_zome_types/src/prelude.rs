@@ -42,11 +42,9 @@ pub use crate::x_salsa20_poly1305::encrypted_data::*;
 pub use crate::x_salsa20_poly1305::key_ref::*;
 pub use crate::x_salsa20_poly1305::x25519::*;
 pub use crate::x_salsa20_poly1305::*;
-pub use crate::zome::error::*;
 pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
-pub use crate::*;
 
 pub use holochain_integrity_types::prelude::*;
 
@@ -60,6 +58,9 @@ pub use crate::fixt::*;
 
 #[cfg(feature = "test_utils")]
 pub use crate::test_utils::*;
+
+#[cfg(feature = "fuzzing")]
+pub use crate::facts::ActionRefMut;
 
 #[cfg(all(any(test, feature = "test_utils"), feature = "fuzzing"))]
 pub use crate::entropy::*;

@@ -2,8 +2,8 @@ use crate::conductor::space::TestSpace;
 
 use super::*;
 use ::fixt::prelude::*;
+use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_state::test_utils::test_keystore;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {

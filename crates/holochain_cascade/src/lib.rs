@@ -39,6 +39,9 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::mutations::insert_action;
+use holochain_state::mutations::insert_entry;
+use holochain_state::mutations::insert_op_lite;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
@@ -50,10 +53,6 @@ use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
-use holochain_types::prelude::*;
-use mutations::insert_action;
-use mutations::insert_entry;
-use mutations::insert_op_lite;
 use tracing::*;
 
 #[cfg(feature = "test_utils")]

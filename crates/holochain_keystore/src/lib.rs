@@ -42,7 +42,11 @@ pub use agent_pubkey_ext::*;
 
 pub mod crude_mock_keystore;
 pub mod lair_keystore;
-pub mod test_keystore;
+
+#[cfg(feature = "test_utils")]
+mod test_keystore;
+#[cfg(feature = "test_utils")]
+pub use test_keystore::*;
 
 /// Construct a simple in-memory in-process keystore.
 pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {

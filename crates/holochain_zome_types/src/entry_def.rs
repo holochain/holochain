@@ -1,6 +1,6 @@
 pub use holochain_integrity_types::entry_def::*;
 
-use crate::CallbackResult;
+use crate::prelude::*;
 use holochain_wasmer_common::WasmError;
 
 impl CallbackResult for EntryDefsCallbackResult {

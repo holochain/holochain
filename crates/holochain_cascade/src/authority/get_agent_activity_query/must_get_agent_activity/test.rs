@@ -7,7 +7,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_sqlite::prelude::DbKindDht;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::ChainFilter;
 use isotest::Iso;
 use test_case::test_case;
 

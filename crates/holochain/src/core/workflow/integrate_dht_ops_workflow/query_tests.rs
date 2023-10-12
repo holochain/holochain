@@ -214,7 +214,8 @@ async fn create_and_insert_op(
             insert_op(txn, &query_state).unwrap();
             set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
             if facts.integrated {
-                set_when_integrated(txn, &hash, holochain_zome_types::Timestamp::now()).unwrap();
+                set_when_integrated(txn, &hash, holochain_zome_types::prelude::Timestamp::now())
+                    .unwrap();
             }
             if facts.awaiting_integration {
                 set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)

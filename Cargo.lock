@@ -2949,6 +2949,7 @@ dependencies = [
  "crossterm 0.26.1",
  "holochain",
  "human-repr",
+ "kitsune_p2p",
  "rand 0.8.5",
  "tracing",
  "tracing-appender",
@@ -2989,6 +2990,7 @@ dependencies = [
  "holo_hash",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
+ "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p_types",
  "lair_keystore",
@@ -4075,6 +4077,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_bytes",
+ "thiserror",
  "tokio",
  "warp",
 ]
@@ -4094,7 +4097,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_bytes",
- "thiserror",
  "tokio",
  "url2",
 ]

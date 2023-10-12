@@ -5501,7 +5501,7 @@ keystore:
 
 ### Changed
 
-- HDK `sys_time` now returns a `holochain_zome_types::Timestamp` instead of a `core::time::Duration`.
+- HDK `sys_time` now returns a `holochain_zome_types::prelude::Timestamp` instead of a `core::time::Duration`.
 - Exposes `UninstallApp` in the conductor admin API.
 
 ## [holochain\_test\_wasm\_common-0.0.6](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.6)

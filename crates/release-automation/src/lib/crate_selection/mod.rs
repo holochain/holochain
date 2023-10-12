@@ -1447,4 +1447,4 @@ pub fn ensure_release_order_consistency<'a>(
 }
 
 #[cfg(test)]
-pub mod tests;
+mod tests;

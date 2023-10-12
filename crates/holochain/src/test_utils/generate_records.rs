@@ -2,7 +2,7 @@ use contrafact::Fact;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_types::record::SignedActionHashedExt;
-use holochain_zome_types::{Action, ActionHashed, ActionRefMut, Entry, Record, SignedActionHashed};
+use holochain_zome_types::prelude::*;
 
 /// Generate a chain of Records which constitutes a valid source chain:
 /// - Each action will refer to the one prior
@@ -14,11 +14,11 @@ pub async fn valid_arbitrary_chain<'a>(
     n: usize,
 ) -> Vec<Record> {
     let fact = contrafact::facts![
-        holochain_zome_types::record::facts::action_and_entry_match(false),
+        holochain_zome_types::facts::action_and_entry_match(false),
         contrafact::lens1(
             "action is valid",
             |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain_action(author.clone()),
+            holochain_zome_types::facts::valid_chain_action(author.clone()),
         ),
     ];
 

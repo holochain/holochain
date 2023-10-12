@@ -1,8 +1,9 @@
 //! Facts about DhtOps
 
-use super::*;
+use crate::prelude::*;
 use ::contrafact::*;
 use holochain_keystore::MetaLairClient;
+use holochain_zome_types::facts::ActionRefMut;
 
 /// Fact: The DhtOp is internally consistent in all of its references:
 /// - TODO: The DhtOp variant matches the Action variant
@@ -72,10 +73,10 @@ pub fn valid_dht_op(
 #[cfg(test)]
 mod tests {
     use arbitrary::Arbitrary;
-    use holochain_keystore::test_keystore::spawn_test_keystore;
+    use holochain_keystore::spawn_test_keystore;
 
     use super::*;
-    use holochain_zome_types::action::facts as action_facts;
+    use holochain_zome_types::facts;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_valid_dht_op() {
@@ -88,10 +89,10 @@ mod tests {
 
         let e = Entry::arbitrary(g).unwrap();
 
-        let mut a0 = action_facts::is_not_entry_action().build(g);
+        let mut a0 = facts::is_not_entry_action().build(g);
         *a0.author_mut() = agent.clone();
 
-        let mut a1 = action_facts::is_new_entry_action().build(g);
+        let mut a1 = facts::is_new_entry_action().build(g);
         *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
         let mut a1 = Action::from(a1);
         *a1.author_mut() = agent.clone();
@@ -173,7 +174,7 @@ impl DhtOp {
     pub fn action_seq_mut(&mut self) -> Option<&mut u32> {
         match self {
             DhtOp::StoreRecord(_, ref mut h, _) => h.action_seq_mut(),
-            DhtOp::StoreEntry(_, ref mut h, _) => Some(h.action_seq_mut()),
+            DhtOp::StoreEntry(_, ref mut h, _) => h.action_seq_mut(),
             DhtOp::RegisterAgentActivity(_, ref mut h) => h.action_seq_mut(),
             DhtOp::RegisterUpdatedContent(_, ref mut h, _) => Some(&mut h.action_seq),
             DhtOp::RegisterUpdatedRecord(_, ref mut h, _) => Some(&mut h.action_seq),
@@ -188,7 +189,7 @@ impl DhtOp {
     pub fn action_entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)> {
         match self {
             DhtOp::StoreRecord(_, ref mut h, _) => h.entry_data_mut(),
-            DhtOp::StoreEntry(_, ref mut h, _) => Some(h.entry_data_mut()),
+            DhtOp::StoreEntry(_, ref mut h, _) => h.entry_data_mut(),
             DhtOp::RegisterAgentActivity(_, ref mut h) => h.entry_data_mut(),
             DhtOp::RegisterUpdatedContent(_, ref mut h, _) => {
                 Some((&mut h.entry_hash, &mut h.entry_type))
@@ -198,5 +199,62 @@ impl DhtOp {
             }
             _ => None,
         }
+    }
+}
+
+impl ActionRefMut for NewEntryAction {
+    fn author_mut(&mut self) -> &mut AgentPubKey {
+        match self {
+            Self::Create(Create { ref mut author, .. }) => author,
+            Self::Update(Update { ref mut author, .. }) => author,
+        }
+    }
+
+    fn action_seq_mut(&mut self) -> Option<&mut u32> {
+        Some(match self {
+            Self::Create(Create {
+                ref mut action_seq, ..
+            }) => action_seq,
+            Self::Update(Update {
+                ref mut action_seq, ..
+            }) => action_seq,
+        })
+    }
+
+    fn prev_action_mut(&mut self) -> Option<&mut ActionHash> {
+        todo!()
+    }
+
+    fn entry_data_mut(&mut self) -> Option<(&mut EntryHash, &mut EntryType)> {
+        Some(match self {
+            Self::Create(Create {
+                ref mut entry_hash,
+                ref mut entry_type,
+                ..
+            }) => (entry_hash, entry_type),
+            Self::Update(Update {
+                ref mut entry_hash,
+                ref mut entry_type,
+                ..
+            }) => (entry_hash, entry_type),
+        })
+    }
+
+    fn timestamp_mut(&mut self) -> &mut Timestamp {
+        match self {
+            Self::Create(Create {
+                ref mut timestamp, ..
+            }) => timestamp,
+            Self::Update(Update {
+                ref mut timestamp, ..
+            }) => timestamp,
+        }
+    }
+}
+
+impl NewEntryAction {
+    /// Mutable access to the entry hash
+    pub fn entry_hash_mut(&mut self) -> &mut EntryHash {
+        self.entry_data_mut().unwrap().0
     }
 }
