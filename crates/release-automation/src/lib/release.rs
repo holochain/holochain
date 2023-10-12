@@ -28,6 +28,7 @@ use std::{
 };
 use structopt::StructOpt;
 
+use crate::crate_selection::flatten_forest;
 use crate::{
     changelog::{Changelog, WorkspaceCrateReleaseHeading},
     common::{increment_semver, SemverIncrementMode},
@@ -418,8 +419,7 @@ fn latest_release_crates<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<Vec<&Crat
     };
     debug!("{}: {:#?}", release_title, crate_release_titles);
 
-    let crates = ws
-        .members()?
+    let crates = flatten_forest(ws.members_unsorted()?)?
         .iter()
         .filter_map(|member| {
             if crate_release_titles.contains(&member.name_version()) {
@@ -648,7 +648,7 @@ impl PublishError {
 
 /// Try to publish the given crates to crates.io.
 ///
-/// If dry-run is given, the following error conditoins are tolerated:
+/// If dry-run is given, the following error conditions are tolerated:
 /// - a dependency is not found but is part of the release
 /// - a version of a dependency is not found bu the dependency is part of the release
 ///

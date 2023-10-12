@@ -25,6 +25,9 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod forest;
+pub use forest::flatten_forest;
+
 pub mod aliases {
     pub use cargo::core::dependency::DepKind as CargoDepKind;
     pub use cargo::core::package::Package as CargoPackage;
@@ -1035,7 +1038,7 @@ impl<'a> ReleaseWorkspace<'a> {
         Ok(release_selection)
     }
 
-    fn members_unsorted(&'a self) -> Fallible<&'a Vec<Crate<'a>>> {
+    pub fn members_unsorted(&'a self) -> Fallible<&'a Vec<Crate<'a>>> {
         self.members_unsorted.get_or_try_init(|| {
             let mut members = vec![];
 
