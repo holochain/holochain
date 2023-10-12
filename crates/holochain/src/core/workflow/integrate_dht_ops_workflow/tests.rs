@@ -8,7 +8,6 @@ use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_state::mutations;
-use holochain_state::prelude::*;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_trace;
 

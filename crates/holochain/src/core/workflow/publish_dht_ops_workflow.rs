@@ -142,7 +142,6 @@ mod tests {
     use holochain_state::mutations;
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
-    use holochain_types::prelude::*;
     use std::collections::HashMap;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;

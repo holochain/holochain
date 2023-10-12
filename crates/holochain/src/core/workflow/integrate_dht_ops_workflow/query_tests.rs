@@ -6,7 +6,6 @@ use holo_hash::HasHash;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::*;
 use holochain_types::dht_op::DhtOpHashed;
-use holochain_zome_types::fixt::*;
 
 use crate::test_utils::test_network;
 

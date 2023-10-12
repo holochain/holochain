@@ -105,7 +105,6 @@ mod tests {
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
     use holochain_state::validation_db::ValidationLimboStatus;
-    use holochain_zome_types::fixt::*;
 
     use super::*;
 

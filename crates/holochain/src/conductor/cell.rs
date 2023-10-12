@@ -41,7 +41,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
-use holochain_state::validation_receipts;
 use holochain_types::db_cache::DhtDbQueryCache;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
