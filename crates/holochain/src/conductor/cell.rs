@@ -796,6 +796,8 @@ impl Cell {
                         |row| row.get(0),
                     )?;
 
+                    // TODO This flag is being set in the DHT database but the publish workflow reads from the authored
+                    //      database so that will never see it... See `get_ops_to_publish`.
                     // If we have enough receipts then set receipts to complete.
                     if receipt_count >= required_validation_count as usize {
                         set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
