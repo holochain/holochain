@@ -109,7 +109,7 @@ async fn republish_to_request_validation_receipt() {
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
     let keystore = test_keystore();
-    let (sys_validation_trigger, mut sys_validation_rx) = TriggerSender::new();
+    let (sys_validation_trigger, _sys_validation_rx) = TriggerSender::new();
 
     let author = keystore.new_sign_keypair_random().await.unwrap();
 
@@ -120,7 +120,7 @@ async fn republish_to_request_validation_receipt() {
     let op = DhtOp::RegisterAgentActivity(signature, action);
     let hash = DhtOpHash::with_data_sync(&op);
 
-    let workflow_result = incoming_dht_ops_workflow(
+    incoming_dht_ops_workflow(
         space.space.clone(),
         sys_validation_trigger.clone(),
         vec![op.clone()],
@@ -135,7 +135,7 @@ async fn republish_to_request_validation_receipt() {
     clear_requires_receipt(env.clone(), vec![hash.clone()]).await;
 
     // Run the incoming workflow again with the same input
-    let workflow_result = incoming_dht_ops_workflow(
+    incoming_dht_ops_workflow(
         space.space.clone(),
         sys_validation_trigger.clone(),
         vec![op],

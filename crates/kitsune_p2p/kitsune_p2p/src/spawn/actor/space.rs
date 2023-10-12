@@ -1424,7 +1424,7 @@ impl Space {
                     (
                         module,
                         factory.spawn_gossip_task(
-                            config.tuning_params.clone(),
+                            config.clone(),
                             space.clone(),
                             ep_hnd.clone(),
                             host_api.clone(),

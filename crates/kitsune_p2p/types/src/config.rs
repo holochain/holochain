@@ -365,6 +365,11 @@ pub struct KitsuneP2pConfig {
 
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
+
+    /// All tracing logs from kitsune tasks will be instrumented to contain this string,
+    /// so that logs from multiple instances in the same process can be disambiguated.
+    #[serde(default)]
+    pub tracing_scope: Option<String>,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -374,6 +379,7 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
+            tracing_scope: None,
         }
     }
 }

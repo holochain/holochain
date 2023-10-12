@@ -61,7 +61,15 @@ impl SweetConductorBatch {
         num: usize,
         config: C,
     ) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat(config).take(num)).await
+        let mut config = config.into();
+        Self::from_configs(
+            std::iter::repeat_with(|| {
+                config.random_scope();
+                config.clone()
+            })
+            .take(num),
+        )
+        .await
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -70,11 +78,15 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig> + Clone,
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
+        let mut config = config.into();
         Self::new(
             future::join_all(
-                std::iter::repeat(config)
-                    .take(num)
-                    .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
+                std::iter::repeat_with(|| {
+                    config.random_scope();
+                    config.clone()
+                })
+                .take(num)
+                .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
         )
