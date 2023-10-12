@@ -118,7 +118,7 @@ mod tests {
         let (mut batch_entry, first_recv) = batch.check_insert(false, vec![]);
         assert!(batch.is_running());
 
-        let handle = tokio::spawn({
+        tokio::spawn({
             let batch = batch.clone();
             async move {
                 while let Some(entry) = batch_entry {

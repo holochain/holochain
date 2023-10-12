@@ -23,7 +23,7 @@ use std::time;
 use tracing::*;
 
 mod publish_query;
-pub use publish_query::get_ops_to_publish;
+pub use publish_query::{get_ops_to_publish, num_still_needing_publish};
 
 #[cfg(test)]
 mod unit_tests;
