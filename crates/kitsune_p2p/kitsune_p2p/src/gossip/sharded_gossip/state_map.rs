@@ -32,6 +32,7 @@ impl RoundStateMap {
     /// Get the state if it hasn't timed out.
     pub(super) fn get(&mut self, key: &NodeCert) -> Option<&RoundState> {
         self.touch(key);
+        self.check_timeout(key);
         self.map.get(key)
     }
 
@@ -149,14 +150,12 @@ mod tests {
         let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
 
         {
+            // We must use a zero timeout here, unlike the other tests which just set the last_touch in the past,
+            // because `get` also performs a touch, which would undo that change.
             let state = state_map.get_mut(&key).unwrap();
-            state.last_touch = state.last_touch - Duration::from_secs(10);
+            state.round_timeout = Duration::ZERO;
             assert!(state.last_touch.elapsed() > state.round_timeout);
         }
-
-        // TODO would have to check if the round exists to trigger the timeout.
-        // let exists = state_map.round_exists(&key);
-        // assert!(!exists);
 
         let state = state_map.get(&key);
         assert!(state.is_none());
@@ -168,14 +167,12 @@ mod tests {
         let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
 
         {
+            // We must use a zero timeout here, unlike the other tests which just set the last_touch in the past,
+            // because `get` also performs a touch, which would undo that change.
             let state = state_map.get_mut(&key).unwrap();
-            state.last_touch = state.last_touch - Duration::from_secs(10);
+            state.round_timeout = Duration::ZERO;
             assert!(state.last_touch.elapsed() > state.round_timeout);
         }
-
-        // TODO Would have to check if the round exists, or list current rounds, to trigger the timeout.
-        // let exists = state_map.round_exists(&key);
-        // assert!(!exists);
 
         let state = state_map.get_mut(&key);
         assert!(state.is_none());
