@@ -12,7 +12,11 @@ use std::time::Duration;
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn publish_termination() {
     let _g = holochain_trace::test_run().unwrap();
-    const NUM_CONDUCTORS: usize = 6; // Need 5 peers to send validation receipts back
+
+    // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
+    const NUM_CONDUCTORS: usize =
+        holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
+            + 1;
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
@@ -36,6 +40,8 @@ async fn publish_termination() {
     let ops_to_publish = tokio::time::timeout(Duration::from_secs(30), async {
         let alice_pub_key = alice.agent_pubkey().clone();
         loop {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+
             let ops_to_publish = alice
                 .authored_db()
                 .read_async({
@@ -49,17 +55,12 @@ async fn publish_termination() {
                 .await
                 .unwrap();
 
-            println!("Ops to publish {}", ops_to_publish);
-
             if ops_to_publish == 0 {
                 return ops_to_publish;
             }
-
-            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })
-    .await
-    .unwrap();
+    .await;
 
-    assert_eq!(0, ops_to_publish);
+    assert_eq!(Ok(0), ops_to_publish);
 }
