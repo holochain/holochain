@@ -122,7 +122,7 @@ async fn retry_publish_until_receipts_received() {
 
     let network = Arc::new(network);
 
-    for i in 0..3 {
+    for _ in 0..3 {
         let work_complete =
             publish_dht_ops_workflow(vault.clone(), network.clone(), tx.clone(), agent.clone())
                 .await
@@ -175,7 +175,7 @@ async fn loop_resumes_on_new_data() {
     assert!(rx.is_paused()); // No work to do, so it should pause
 
     // Now create an op and try to publish again
-    let op_hash = create_op(vault.clone(), agent.clone()).await.unwrap();
+    create_op(vault.clone(), agent.clone()).await.unwrap();
 
     let work_complete = publish_dht_ops_workflow(vault, network, tx, agent.clone())
         .await
@@ -241,7 +241,6 @@ async fn create_op(
     let test_op_hash = op.as_hash().clone();
     vault
         .write_async({
-            let test_op_hash = test_op_hash.clone();
             move |txn| -> StateMutationResult<()> {
                 holochain_state::mutations::insert_op(txn, &op)?;
                 Ok(())
