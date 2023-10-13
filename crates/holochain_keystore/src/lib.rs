@@ -40,8 +40,10 @@ pub use meta_lair_client::*;
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
 
-pub mod crude_mock_keystore;
 pub mod lair_keystore;
+
+#[cfg(feature = "test_utils")]
+pub mod crude_mock_keystore;
 
 #[cfg(feature = "test_utils")]
 mod test_keystore;
