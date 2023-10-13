@@ -419,7 +419,7 @@ fn latest_release_crates<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<Vec<&Crat
     };
     debug!("{}: {:#?}", release_title, crate_release_titles);
 
-    let crates = flatten_forest(ws.members_unsorted()?)?
+    let crates = ws.members()?
         .iter()
         .filter_map(|member| {
             if crate_release_titles.contains(&member.name_version()) {

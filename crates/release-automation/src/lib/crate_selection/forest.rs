@@ -68,14 +68,14 @@ fn build_forest<'a>(crates: &'a Vec<Crate<'a>>) -> HashMap::<String, Node> {
         forest.insert(c.name(), node);
     }
 
-    let workspace: HashSet<String> = forest.iter().map(|(name, _)| {
+    let workspace_packages: HashSet<String> = forest.iter().map(|(name, _)| {
         name.clone()
     }).collect();
 
     let mut in_degrees = HashMap::<String, usize>::new();
 
     for node in forest.values_mut() {
-        let deps = direct_workspace_deps(node.c, &workspace);
+        let deps = node.c.direct_workspace_dependencies(&workspace_packages);
         node.direct_ws_deps = deps.iter().cloned().collect();
         node.out_degree = deps.len();
         for d in deps {
@@ -91,19 +91,4 @@ fn build_forest<'a>(crates: &'a Vec<Crate<'a>>) -> HashMap::<String, Node> {
     }
 
     forest
-}
-
-fn direct_workspace_deps<'a>(c: &'a Crate<'a>, workspace: &HashSet<String>) -> Vec<cargo::core::Dependency> {
-    c.package().dependencies().iter().filter_map(|dep| {
-        let dep_name = dep.package_name().to_string();
-        if c.name() == dep_name {
-            None // Ignore self
-        } else if !workspace.contains(&dep_name) {
-            None // Ignore deps that aren't part of the workspace
-        } else if !dep.specified_req() || dep.version_req().to_string() == "*" {
-            None // Ignore deps without a version or with a "*" version
-        } else {
-            Some(dep.clone())
-        }
-    }).collect()
 }

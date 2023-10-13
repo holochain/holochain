@@ -339,6 +339,21 @@ impl<'a> Crate<'a> {
         })
     }
 
+    fn direct_workspace_dependencies(&'a self, workspace_packages: &HashSet<String>) -> Vec<cargo::core::Dependency> {
+        self.package().dependencies().iter().filter_map(|dep| {
+            let dep_name = dep.package_name().to_string();
+            if self.name() == dep_name {
+                None // Ignore self
+            } else if !workspace_packages.contains(&dep_name) {
+                None // Ignore deps that aren't part of the workspace
+            } else if !dep.specified_req() || dep.version_req().to_string() == "*" {
+                None // Ignore deps without a version or with a "*" version
+            } else {
+                Some(dep.clone())
+            }
+        }).collect()
+    }
+    
     /// Returns a reference to all workspace crates that depend on this crate.
     pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.dependants_in_workspace
@@ -1038,7 +1053,7 @@ impl<'a> ReleaseWorkspace<'a> {
         Ok(release_selection)
     }
 
-    pub fn members_unsorted(&'a self) -> Fallible<&'a Vec<Crate<'a>>> {
+    fn members_unsorted(&'a self) -> Fallible<&'a Vec<Crate<'a>>> {
         self.members_unsorted.get_or_try_init(|| {
             let mut members = vec![];
 
@@ -1081,68 +1096,7 @@ impl<'a> ReleaseWorkspace<'a> {
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            let mut members = self
-                .members_unsorted()?
-                .iter()
-                .enumerate()
-                .collect::<Vec<_>>();
-
-            let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
-                LinkedHashMap::<String, LinkedHashSet<String>>::new(),
-                |mut acc, elem| -> Fallible<_> {
-                    acc.insert(
-                        elem.name(),
-                        elem.dependencies_in_workspace()?
-                            .into_iter()
-                            .filter_map(|(dep_name, deps)| {
-                                deps.into_iter()
-                                    .find(|dep| {
-                                        dep.specified_req() && dep.version_req().to_string() != "*"
-                                    })
-                                    .map(|_| dep_name.clone())
-                            })
-                            .collect(),
-                    );
-
-                    Ok(acc)
-                },
-            )?;
-
-            // ensure members are ordered respecting their dependency tree
-            members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
-                use std::cmp::Ordering::{Equal, Greater, Less};
-
-                let a_deps = workspace_dependencies
-                    .get(&a.name())
-                    .unwrap_or_else(|| panic!("dependencies for {} not found", a.name()));
-                let b_deps = workspace_dependencies
-                    .get(&b.name())
-                    .unwrap_or_else(|| panic!("dependencies for {} not found", b.name()));
-
-                // understand whether one is a direct dependency of the other
-                let comparison = (a_deps.contains(&b.name()), b_deps.contains(&a.name()));
-                let result = match comparison {
-                    (true, true) => {
-                        panic!("cyclic dependency between {} and {}", a.name(), b.name())
-                    }
-                    (true, false) => Greater,
-                    (false, true) => Less,
-                    (false, false) => a_i.cmp(b_i),
-                };
-
-                trace!(
-                    "comparing \n{} ({:?}) with \n{} ({:?})\n{:?} => {:?}",
-                    a.name(),
-                    a_deps,
-                    b.name(),
-                    b_deps,
-                    comparison,
-                    result
-                );
-                result
-            });
-
-            Ok(members.into_iter().map(|(_, member)| member).collect())
+            flatten_forest(self.members_unsorted()?)
         })
     }
 
