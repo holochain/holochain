@@ -39,12 +39,21 @@ pub use tracing;
 mod local_network_tests;
 
 pub mod prelude {
-    #[cfg(feature = "hdk")]
-    pub use hdk::link::GetLinksInputBuilder;
     pub use holo_hash;
     pub use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt, HolochainP2pSender};
-    pub use holochain_types::prelude::{fixt, NOISE, *};
+
+    #[cfg(feature = "hdk")]
+    pub use hdk::link::GetLinksInputBuilder;
+
+    #[cfg(not(feature = "fuzzing"))]
+    pub use holochain_types::prelude::{fixt, *};
+    #[cfg(not(feature = "fuzzing"))]
     pub use kitsune_p2p::*;
+
+    #[cfg(feature = "fuzzing")]
+    pub use holochain_types::prelude::{fixt, *};
+    #[cfg(feature = "fuzzing")]
+    pub use kitsune_p2p::{NOISE, *};
 
     #[cfg(feature = "test_utils")]
     pub use holochain_types::inline_zome::*;
