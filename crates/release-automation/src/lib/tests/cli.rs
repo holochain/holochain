@@ -272,10 +272,6 @@ fn bump_versions_on_selection() {
 
         The text beneath this heading will be retained which allows adding overarching release notes.
 
-        ## [crate_e-0.0.1](crates/crate_e/CHANGELOG.md#0.0.1)
-
-        Awesome changes\!
-
         ## [crate_a-0.1.0](crates/crate_a/CHANGELOG.md#0.1.0)
 
         ### Added
@@ -287,6 +283,10 @@ fn bump_versions_on_selection() {
 
         - BREAKING:  `InstallAppDnaPayload`
         - BREAKING: `DnaSource(Path)`
+
+        ## [crate_e-0.0.1](crates/crate_e/CHANGELOG.md#0.0.1)
+
+        Awesome changes\!
 
         ## [crate_b-0.0.0](crates/crate_b/CHANGELOG.md#0.0.0)
 
@@ -339,8 +339,8 @@ fn bump_versions_on_selection() {
 
         - crate_g-0.0.2
         - crate_b-0.0.0
-        - crate_a-0.1.0
         - crate_e-0.0.1
+        - crate_a-0.1.0
         "#,
             topmost_workspace_release
         ),
