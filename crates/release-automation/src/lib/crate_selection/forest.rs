@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::bail;
+use itertools::Itertools;
 
 use crate::Fallible;
 
@@ -45,7 +46,7 @@ pub fn flatten_forest<'a>(crates: &'a Vec<Crate<'a>>) -> Fallible<Vec<&'a Crate<
         }
 
         // Push those same nodes to the final list
-        order.extend(working_order.into_iter().map(|(c, _)| c));
+        order.extend(working_order.into_iter().map(|(c, _)| c).sorted_by(|a, b| a.name().cmp(&b.name())));
     }
 
     if crates.len() != order.len() {
