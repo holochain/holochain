@@ -6,6 +6,7 @@ mod integrity_zome;
 mod multi_conductor;
 mod network_tests;
 mod new_lair;
+mod publish;
 mod ser_regression;
 #[cfg(not(target_os = "macos"))]
 mod sharded_gossip;
