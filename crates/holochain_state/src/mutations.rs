@@ -33,7 +33,6 @@ mod error;
 #[derive(Debug)]
 pub enum Dependency {
     Action(ActionHash),
-    Entry(AnyDhtHash),
     Null,
 }
 
@@ -417,11 +416,6 @@ pub fn set_dependency(
 ) -> StateMutationResult<()> {
     match dependency {
         Dependency::Action(dep) => {
-            dht_op_update!(txn, hash, {
-                "dependency": dep,
-            })?;
-        }
-        Dependency::Entry(dep) => {
             dht_op_update!(txn, hash, {
                 "dependency": dep,
             })?;

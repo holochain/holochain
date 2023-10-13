@@ -784,29 +784,42 @@ impl Cell {
                 crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
             );
 
-            self.space
+            let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
+
+            let receipt_count = self
+                .space
                 .dht_db
-                .write_async(move |txn| {
-                    // Get the current count for this dhtop.
-                    let receipt_count: usize = txn.query_row(
-                        "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
-                        named_params! {
-                            ":op_hash": receipt.receipt.dht_op_hash,
-                        },
-                        |row| row.get(0),
-                    )?;
+                .write_async({
+                    let receipt_op_hash = receipt_op_hash.clone();
+                    move |txn| -> StateMutationResult<usize> {
+                        // Add the new receipts to the db
+                        add_if_unique(txn, receipt)?;
 
-                    // TODO This flag is being set in the DHT database but the publish workflow reads from the authored
-                    //      database so that will never see it... See `get_ops_to_publish`.
-                    // If we have enough receipts then set receipts to complete.
-                    if receipt_count >= required_validation_count as usize {
-                        set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
+                        // Get the current count for this DhtOp.
+                        let receipt_count: usize = txn.query_row(
+                            "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
+                            named_params! {
+                                ":op_hash": receipt_op_hash,
+                            },
+                            |row| row.get(0),
+                        )?;
+
+                        Ok(receipt_count)
                     }
-
-                    // Add to receipts db
-                    validation_receipts::add_if_unique(txn, receipt)
                 })
                 .await?;
+
+            // If we have enough receipts then set receipts to complete.
+            if receipt_count >= required_validation_count as usize {
+                // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
+                // whether to republish the op for more validation receipts.
+                self.space
+                    .authored_db
+                    .write_async(move |txn| -> StateMutationResult<()> {
+                        set_receipts_complete(txn, &receipt_op_hash, true)
+                    })
+                    .await?;
+            }
         }
 
         Ok(())
