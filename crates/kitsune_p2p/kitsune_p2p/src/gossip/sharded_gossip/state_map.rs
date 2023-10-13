@@ -283,7 +283,6 @@ mod tests {
         assert!(state.is_none());
     }
 
-    // TODO behaves differently to `get_mut`
     #[test]
     fn round_state_removed_if_finished_on_get() {
         let mut u = Unstructured::new(&NOISE);
