@@ -20,7 +20,7 @@ pub fn flatten_forest<'a>(crates: &'a Vec<Crate<'a>>) -> Fallible<Vec<&'a Crate<
     let mut forest = build_forest(crates);
 
     let mut order = Vec::<&'a Crate<'a>>::new();
-    
+
     loop {
         let mut working_order = Vec::<(&'a Crate<'a>, HashSet<cargo::core::Dependency>)>::new();
         for node in forest.values() {
@@ -40,7 +40,7 @@ pub fn flatten_forest<'a>(crates: &'a Vec<Crate<'a>>) -> Fallible<Vec<&'a Crate<
                     n.in_degree -= 1
                 }
             }
-            
+
             forest.remove(&c.name());
         }
 
@@ -55,7 +55,7 @@ pub fn flatten_forest<'a>(crates: &'a Vec<Crate<'a>>) -> Fallible<Vec<&'a Crate<
     Ok(order.into_iter().rev().collect())
 }
 
-fn build_forest<'a>(crates: &'a Vec<Crate<'a>>) -> HashMap::<String, Node> {
+fn build_forest<'a>(crates: &'a Vec<Crate<'a>>) -> HashMap<String, Node> {
     let mut forest = HashMap::<String, Node>::new();
     for c in crates {
         let node = Node {
@@ -68,9 +68,7 @@ fn build_forest<'a>(crates: &'a Vec<Crate<'a>>) -> HashMap::<String, Node> {
         forest.insert(c.name(), node);
     }
 
-    let workspace_packages: HashSet<String> = forest.iter().map(|(name, _)| {
-        name.clone()
-    }).collect();
+    let workspace_packages: HashSet<String> = forest.iter().map(|(name, _)| name.clone()).collect();
 
     let mut in_degrees = HashMap::<String, usize>::new();
 

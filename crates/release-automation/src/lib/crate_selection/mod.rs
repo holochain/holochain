@@ -339,21 +339,28 @@ impl<'a> Crate<'a> {
         })
     }
 
-    fn direct_workspace_dependencies(&'a self, workspace_packages: &HashSet<String>) -> Vec<cargo::core::Dependency> {
-        self.package().dependencies().iter().filter_map(|dep| {
-            let dep_name = dep.package_name().to_string();
-            if self.name() == dep_name {
-                None // Ignore self
-            } else if !workspace_packages.contains(&dep_name) {
-                None // Ignore deps that aren't part of the workspace
-            } else if !dep.specified_req() || dep.version_req().to_string() == "*" {
-                None // Ignore deps without a version or with a "*" version
-            } else {
-                Some(dep.clone())
-            }
-        }).collect()
+    fn direct_workspace_dependencies(
+        &'a self,
+        workspace_packages: &HashSet<String>,
+    ) -> Vec<cargo::core::Dependency> {
+        self.package()
+            .dependencies()
+            .iter()
+            .filter_map(|dep| {
+                let dep_name = dep.package_name().to_string();
+                if self.name() == dep_name {
+                    None // Ignore self
+                } else if !workspace_packages.contains(&dep_name) {
+                    None // Ignore deps that aren't part of the workspace
+                } else if !dep.specified_req() || dep.version_req().to_string() == "*" {
+                    None // Ignore deps without a version or with a "*" version
+                } else {
+                    Some(dep.clone())
+                }
+            })
+            .collect()
     }
-    
+
     /// Returns a reference to all workspace crates that depend on this crate.
     pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.dependants_in_workspace
@@ -1095,9 +1102,8 @@ impl<'a> ReleaseWorkspace<'a> {
     /// Returns all non-excluded workspace members.
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            flatten_forest(self.members_unsorted()?)
-        })
+        self.members_sorted
+            .get_or_try_init(|| -> Fallible<_> { flatten_forest(self.members_unsorted()?) })
     }
 
     /// Return the root path of the workspace.
