@@ -199,7 +199,7 @@
                 self'.devShells.rustDev
               ];
 
-              shellHook = self'.devShells.rustDev + ''
+              shellHook = ''
                 export RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
               '';
 
