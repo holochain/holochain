@@ -26,7 +26,7 @@ kitsune_p2p_types = { version = "^0.2.2", path = "../kitsune_p2p/types" }
 mockall = "0.11.3"
 holochain_trace = { version = "^0.2.2", path = "../holochain_trace" }
 rand = "0.8.5"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = ">=1.0, <=1.0.166", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 thiserror = "1.0.22"
