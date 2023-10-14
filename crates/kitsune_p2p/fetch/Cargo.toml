@@ -15,7 +15,7 @@ edition = "2021"
 derive_more = "0.99"
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.4", path = "../timestamp"}
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.11", path = "../types" }
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = ">=1.0, <=1.0.166", features = [ "derive" ] }
 tokio = { version = "1.27", features = [ "full" ] }
 tracing = "0.1.29"
 linked-hash-map = "0.5.6"

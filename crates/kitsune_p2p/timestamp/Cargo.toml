@@ -11,7 +11,7 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = ">=1.0, <=1.0.166", features = ["derive"] }
 
 # Dependencies not needed for integrity.
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"], optional = true }

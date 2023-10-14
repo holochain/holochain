@@ -56,7 +56,7 @@ members = [
 opt-level = "z"
 
 [workspace.dependencies]
-serde = "1.0"
+serde = ">=1.0, <=1.0.166"
 hdi = { path = "../../../hdi" }
 hdk = { path = "../../../hdk" }
 

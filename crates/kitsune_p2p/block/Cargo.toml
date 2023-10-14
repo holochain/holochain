@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.4", path = "../timestamp", features = ["now"] }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.8", path = "../bin_data" }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = ">=1.0, <=1.0.166", features = ["derive"] }
 
 [features]
 sqlite-encrypted = [

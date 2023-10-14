@@ -14,4 +14,4 @@ path = "src/lib.rs"
 
 [dependencies]
 hdk = { path = "../../hdk", version = "^0.3.0-beta-dev.17"}
-serde = "1.0"
+serde = ">=1.0, <=1.0.166"
