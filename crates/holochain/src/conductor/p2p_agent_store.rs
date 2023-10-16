@@ -322,7 +322,7 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use holochain_state::test_utils::test_p2p_agents_db;
-    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
+    use kitsune_p2p_types::fixt::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {

@@ -48,12 +48,9 @@ use holochain_types::{
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
-use kitsune_p2p::{
-    event::{TimeWindow, TimeWindowInclusive},
-    KitsuneP2pConfig,
-};
+use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::{agent_info::AgentInfoSigned, config::KitsuneP2pConfig};
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use tracing::instrument;
@@ -191,7 +188,7 @@ impl Spaces {
                     kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
                         .digest()
                         .0
-                        == node_id
+                        == *node_id
                 })
             })
             .map(|agent_info| {
@@ -628,20 +625,20 @@ impl Spaces {
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        use futures::StreamExt;
-        let ops = futures::stream::iter(ops.into_iter().map(|op| {
-            let hash = DhtOpHash::with_data_sync(&op);
-            (hash, op)
-        }))
-        .collect()
-        .await;
-
         // If this is a countersigning session then
         // send it to the countersigning workflow otherwise
         // send it to the incoming ops workflow.
         if countersigning_session {
+            use futures::StreamExt;
+            let ops = futures::stream::iter(ops.into_iter().map(|op| {
+                let hash = DhtOpHash::with_data_sync(&op);
+                (hash, op)
+            }))
+            .collect()
+            .await;
+
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
                     space.countersigning_workspace.clone(),

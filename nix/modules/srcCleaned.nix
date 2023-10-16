@@ -36,6 +36,20 @@ in
       "src"
       "examples"
     ];
+    exclude = excludeCommon ++
+      [
+        "src/lib/tests"
+        "src/lib/crate_selection/tests"
+      ];
+    root = "${self}/crates/release-automation";
+  };
+
+  options.srcCleanedReleaseAutomationWithTestsRepo = lib.mkOption { type = lib.types.raw; };
+  config.srcCleanedReleaseAutomationWithTestsRepo = inputs.nix-filter.lib {
+    include = includeCommon ++ [
+      "src"
+      "examples"
+    ];
     exclude = excludeCommon;
     root = "${self}/crates/release-automation";
   };

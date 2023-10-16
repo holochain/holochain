@@ -8,6 +8,11 @@ use kitsune_p2p_types::*;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+
 /// The type of gossip module running this gossip.
 pub enum GossipModuleType {
     /// Recent sharded gossip.
@@ -72,7 +77,7 @@ pub trait AsGossipModuleFactory: 'static + Send + Sync {
     #[allow(clippy::too_many_arguments)]
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host: HostApiLegacy,
@@ -87,7 +92,7 @@ impl GossipModuleFactory {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         host: HostApiLegacy,
@@ -95,6 +100,6 @@ impl GossipModuleFactory {
         fetch_pool: FetchPool,
     ) -> GossipModule {
         self.0
-            .spawn_gossip_task(tuning_params, space, ep_hnd, host, metrics, fetch_pool)
+            .spawn_gossip_task(config, space, ep_hnd, host, metrics, fetch_pool)
     }
 }

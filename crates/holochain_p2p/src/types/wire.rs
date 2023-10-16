@@ -48,9 +48,8 @@ pub enum WireMessage {
         nonce: Box<Nonce256Bits>,
         expires_at: Timestamp,
     },
-    ValidationReceipt {
-        #[serde(with = "serde_bytes")]
-        receipt: Vec<u8>,
+    ValidationReceipts {
+        receipts: ValidationReceiptBundle,
     },
     Get {
         dht_hash: holo_hash::AnyDhtHash,
@@ -148,10 +147,8 @@ impl WireMessage {
         }
     }
 
-    pub fn validation_receipt(receipt: SerializedBytes) -> WireMessage {
-        Self::ValidationReceipt {
-            receipt: UnsafeBytes::from(receipt).into(),
-        }
+    pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
+        Self::ValidationReceipts { receipts }
     }
 
     pub fn get(dht_hash: holo_hash::AnyDhtHash, options: event::GetOptions) -> WireMessage {

@@ -169,8 +169,8 @@ impl<R: Report> HcStressTestRunner<R> {
         &self,
         mut node: HcStressTest,
         lifetime: BehaviorLifetime,
-        publish: BehaviorPublish,
-        query: BehaviorQuery,
+        publish: Vec<(u8, BehaviorPublish)>,
+        query: Vec<(u8, BehaviorQuery)>,
     ) -> usize {
         use rand::Rng;
 
@@ -201,21 +201,91 @@ impl<R: Report> HcStressTestRunner<R> {
                     .unwrap(),
             };
 
-            let (mut publish_at, mut publish_count, byte_count_min, byte_count_max) = match publish
-            {
-                BehaviorPublish::None => (now.checked_add(MAX).unwrap(), Some(0), 0, 0),
-                BehaviorPublish::Publish {
-                    publish_count,
-                    byte_count_min,
-                    byte_count_max,
-                    ..
-                } => (now, publish_count, byte_count_min, byte_count_max),
-            };
+            struct PubData {
+                pub next_at: std::time::Instant,
+                pub cell: u8,
+                pub count: usize,
+                pub bc_min: usize,
+                pub bc_max: usize,
+                pub w_min: std::time::Duration,
+                pub w_max: std::time::Duration,
+            }
 
-            let mut query_at = match query {
-                BehaviorQuery::None => now.checked_add(MAX).unwrap(),
-                _ => now,
-            };
+            let mut next_publish_at = Vec::new();
+
+            for p in &publish {
+                next_publish_at.push(match p {
+                    (cell, BehaviorPublish::None) => PubData {
+                        next_at: now.checked_add(MAX).unwrap(),
+                        cell: *cell,
+                        count: 0,
+                        bc_min: 0,
+                        bc_max: 0,
+                        w_min: std::time::Duration::MAX,
+                        w_max: std::time::Duration::MAX,
+                    },
+                    (
+                        cell,
+                        BehaviorPublish::Publish {
+                            byte_count_min,
+                            byte_count_max,
+                            publish_count,
+                            wait_min,
+                            wait_max,
+                        },
+                    ) => {
+                        let count = match publish_count {
+                            None => usize::MAX,
+                            Some(c) => *c,
+                        };
+                        PubData {
+                            next_at: now,
+                            cell: *cell,
+                            count,
+                            bc_min: *byte_count_min,
+                            bc_max: *byte_count_max,
+                            w_min: *wait_min,
+                            w_max: *wait_max,
+                        }
+                    }
+                });
+            }
+
+            struct QueryData {
+                pub next_at: std::time::Instant,
+                pub cell: u8,
+                pub is_full: bool,
+                pub w_min: std::time::Duration,
+                pub w_max: std::time::Duration,
+            }
+
+            let mut next_query_at = Vec::new();
+
+            for q in &query {
+                next_query_at.push(match q {
+                    (cell, BehaviorQuery::None) => QueryData {
+                        next_at: now.checked_add(MAX).unwrap(),
+                        cell: *cell,
+                        is_full: false,
+                        w_min: std::time::Duration::MAX,
+                        w_max: std::time::Duration::MAX,
+                    },
+                    (cell, BehaviorQuery::Shallow { wait_min, wait_max }) => QueryData {
+                        next_at: now,
+                        cell: *cell,
+                        is_full: false,
+                        w_min: *wait_min,
+                        w_max: *wait_max,
+                    },
+                    (cell, BehaviorQuery::Full { wait_min, wait_max }) => QueryData {
+                        next_at: now,
+                        cell: *cell,
+                        is_full: true,
+                        w_min: *wait_min,
+                        w_max: *wait_max,
+                    },
+                });
+            }
 
             loop {
                 now = std::time::Instant::now();
@@ -224,39 +294,38 @@ impl<R: Report> HcStressTestRunner<R> {
                     break;
                 }
 
-                if now >= publish_at {
-                    publish_at = match publish {
-                        BehaviorPublish::None => unreachable!(),
-                        BehaviorPublish::Publish {
-                            wait_min, wait_max, ..
-                        } => now
-                            .checked_add(rand::thread_rng().gen_range(wait_min..=wait_max))
-                            .unwrap(),
+                let mut next_check_at = shutdown_at;
+
+                for p in &mut next_publish_at {
+                    now = std::time::Instant::now();
+
+                    let should_publish = if now >= p.next_at {
+                        p.next_at = now
+                            .checked_add(rand::thread_rng().gen_range(p.w_min..=p.w_max))
+                            .unwrap();
+                        if p.count > 0 {
+                            p.count -= 1;
+                            true
+                        } else {
+                            p.next_at = now.checked_add(MAX).unwrap();
+                            false
+                        }
+                    } else {
+                        false
                     };
 
-                    let should_publish = {
-                        match &mut publish_count {
-                            Some(cnt) => {
-                                if *cnt == 0 {
-                                    publish_at = now.checked_add(MAX).unwrap();
-                                    false
-                                } else {
-                                    *cnt -= 1;
-                                    true
-                                }
-                            }
-                            None => true,
-                        }
-                    };
+                    if p.next_at < next_check_at {
+                        next_check_at = p.next_at;
+                    }
 
                     if should_publish {
                         let bytes = {
                             let mut rng = rand::thread_rng();
-                            let count = rng.gen_range(byte_count_min..=byte_count_max);
+                            let count = rng.gen_range(p.bc_min..=p.bc_max);
                             rand_utf8::rand_utf8(&mut rng, count)
                         };
 
-                        let rec = node.create_file(&bytes).await;
+                        let rec = node.create_file(p.cell, &bytes).await;
                         let hash = HcStressTest::record_to_action_hash(&rec);
 
                         report.lock().unwrap().publish(
@@ -268,52 +337,44 @@ impl<R: Report> HcStressTestRunner<R> {
                     }
                 }
 
-                now = std::time::Instant::now();
+                for q in &mut next_query_at {
+                    now = std::time::Instant::now();
 
-                if now >= query_at {
-                    query_at = match query {
-                        BehaviorQuery::None => unreachable!(),
-                        BehaviorQuery::Shallow {
-                            wait_min, wait_max, ..
-                        }
-                        | BehaviorQuery::Full {
-                            wait_min, wait_max, ..
-                        } => now
-                            .checked_add(rand::thread_rng().gen_range(wait_min..=wait_max))
-                            .unwrap(),
-                    };
+                    if now >= q.next_at {
+                        q.next_at = now
+                            .checked_add(rand::thread_rng().gen_range(q.w_min..=q.w_max))
+                            .unwrap();
 
-                    let shallow_list = node.get_all_images().await;
+                        let shallow_list = node.get_all_images(q.cell).await;
 
-                    report.lock().unwrap().fetch_shallow(
-                        node_id,
-                        init_time.elapsed(),
-                        shallow_list.clone(),
-                    );
+                        report.lock().unwrap().fetch_shallow(
+                            node_id,
+                            init_time.elapsed(),
+                            shallow_list.clone(),
+                        );
 
-                    if matches!(query, BehaviorQuery::Full { .. }) {
-                        for hash in shallow_list {
-                            if let Some(rec) = node.get_file(hash).await {
-                                let hash = HcStressTest::record_to_action_hash(&rec);
-                                report.lock().unwrap().fetch_full(
-                                    node_id,
-                                    init_time.elapsed(),
-                                    hash,
-                                );
+                        if q.is_full {
+                            for hash in shallow_list {
+                                if let Some(rec) = node.get_file(q.cell, hash).await {
+                                    let hash = HcStressTest::record_to_action_hash(&rec);
+                                    report.lock().unwrap().fetch_full(
+                                        node_id,
+                                        init_time.elapsed(),
+                                        hash,
+                                    );
+                                }
                             }
                         }
+                    }
+
+                    if q.next_at < next_check_at {
+                        next_check_at = q.next_at;
                     }
                 }
 
                 now = std::time::Instant::now();
 
-                let wait_dur = std::cmp::min(
-                    shutdown_at.saturating_duration_since(now),
-                    std::cmp::min(
-                        publish_at.saturating_duration_since(now),
-                        query_at.saturating_duration_since(now),
-                    ),
-                );
+                let wait_dur = next_check_at.saturating_duration_since(now);
 
                 tokio::time::sleep(wait_dur).await;
             }
@@ -331,7 +392,7 @@ fn uid() -> i64 {
 /// A conductor running the hc_stress_test app.
 pub struct HcStressTest {
     conductor: Option<SweetConductor>,
-    cell: SweetCell,
+    cells: Vec<SweetCell>,
 }
 
 impl Drop for HcStressTest {
@@ -369,13 +430,13 @@ impl HcStressTest {
     /// Given a new/blank sweet conductor and the hc_stress_test dna
     /// (see [HcStressTest::test_dna]), install the dna, returning
     /// a conductor running the hc_stress_test app.
-    pub async fn new(mut conductor: SweetConductor, dna: DnaFile) -> Self {
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
-        let mut cells = app.into_cells();
+    pub async fn new(mut conductor: SweetConductor, dna_files: &[DnaFile]) -> Self {
+        let app = conductor.setup_app("app", dna_files).await.unwrap();
+        let cells = app.into_cells();
 
         Self {
             conductor: Some(conductor),
-            cell: cells.remove(0),
+            cells,
         }
     }
 
@@ -406,7 +467,7 @@ impl HcStressTest {
     }
 
     /// Call the `create_file` zome function.
-    pub async fn create_file(&mut self, data: &str) -> Record {
+    pub async fn create_file(&mut self, cell: u8, data: &str) -> Record {
         #[derive(Debug, serde::Serialize)]
         struct F<'a> {
             #[serde(with = "serde_bytes")]
@@ -417,7 +478,7 @@ impl HcStressTest {
             .as_ref()
             .unwrap()
             .call(
-                &self.cell.zome(TestCoordinatorWasm::HcStressTestCoordinator),
+                &self.cells[cell as usize].zome(TestCoordinatorWasm::HcStressTestCoordinator),
                 "create_file",
                 F {
                     data: data.as_bytes(),
@@ -428,12 +489,12 @@ impl HcStressTest {
     }
 
     /// Call the `get_all_images` zome function.
-    pub async fn get_all_images(&mut self) -> Vec<ActionHash> {
+    pub async fn get_all_images(&mut self, cell: u8) -> Vec<ActionHash> {
         self.conductor
             .as_ref()
             .unwrap()
             .call(
-                &self.cell.zome(TestCoordinatorWasm::HcStressTestCoordinator),
+                &self.cells[cell as usize].zome(TestCoordinatorWasm::HcStressTestCoordinator),
                 "get_all_images",
                 (),
             )
@@ -441,12 +502,12 @@ impl HcStressTest {
     }
 
     /// Call the `get_file` zome function.
-    pub async fn get_file(&mut self, hash: ActionHash) -> Option<Record> {
+    pub async fn get_file(&mut self, cell: u8, hash: ActionHash) -> Option<Record> {
         self.conductor
             .as_ref()
             .unwrap()
             .call_fallible(
-                &self.cell.zome(TestCoordinatorWasm::HcStressTestCoordinator),
+                &self.cells[cell as usize].zome(TestCoordinatorWasm::HcStressTestCoordinator),
                 "get_file",
                 hash,
             )
@@ -457,3 +518,6 @@ impl HcStressTest {
 
 mod local_behavior_1;
 pub use local_behavior_1::*;
+
+mod local_behavior_2;
+pub use local_behavior_2::*;
