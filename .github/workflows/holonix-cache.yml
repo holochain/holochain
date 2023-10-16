@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - ".#packages.{0}.build-holonix-tests-integration"
-          - ".#devShells.{0}.holonix"
+          - "github:holochain/holochain#packages.{0}.build-holonix-tests-integration"
+          - "github:holochain/holochain#devShells.{0}.holonix"
         extra_args:
           - ''
           - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_1'
@@ -28,11 +28,6 @@ jobs:
 
     runs-on: [ self-hosted, multi-arch ]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          lfs: false
-
       - name: Print matrix
         env:
           MATRIX: ${{ toJSON(matrix) }}
@@ -69,8 +64,8 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - ".#devShells.{0}.holonix"
-          - ".#packages.{0}.hc-scaffold"
+          - "github:holochain/holochain#devShells.{0}.holonix"
+          - "github:holochain/holochain#packages.{0}.hc-scaffold"
         extra_args:
           - ''
           - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_1'
@@ -82,10 +77,6 @@ jobs:
           - x86_64-linux
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          lfs: false
       - uses: cachix/install-nix-action@v22
       - uses: cachix/cachix-action@v12
         with:
