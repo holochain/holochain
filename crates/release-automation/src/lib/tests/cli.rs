@@ -123,21 +123,23 @@ fn get_crate_versions<'a>(
     expected_crates
         .clone()
         .iter()
-        .map(|name| {
-            let cargo_toml_path = workspace
-                .root()
-                .join("crates")
-                .join(name)
-                .join("Cargo.toml");
-            cargo_next::get_version(&cargo_toml_path)
-                .context(format!(
-                    "trying to parse version in Cargo.toml at {:?}",
-                    cargo_toml_path
-                ))
-                .unwrap()
-                .to_string()
-        })
+        .map(|name| get_crate_version(name, workspace))
         .collect::<Vec<_>>()
+}
+
+fn get_crate_version<'a>(name: &str, workspace: &'a ReleaseWorkspace<'a>) -> String {
+    let cargo_toml_path = workspace
+        .root()
+        .join("crates")
+        .join(name)
+        .join("Cargo.toml");
+    cargo_next::get_version(&cargo_toml_path)
+        .context(format!(
+            "trying to parse version in Cargo.toml at {:?}",
+            cargo_toml_path
+        ))
+        .unwrap()
+        .to_string()
 }
 
 // todo(backlog): ensure all of these conditions have unit tests?
@@ -270,10 +272,6 @@ fn bump_versions_on_selection() {
 
         The text beneath this heading will be retained which allows adding overarching release notes.
 
-        ## [crate_e-0.0.1](crates/crate_e/CHANGELOG.md#0.0.1)
-
-        Awesome changes\!
-
         ## [crate_a-0.1.0](crates/crate_a/CHANGELOG.md#0.1.0)
 
         ### Added
@@ -285,6 +283,10 @@ fn bump_versions_on_selection() {
 
         - BREAKING:  `InstallAppDnaPayload`
         - BREAKING: `DnaSource(Path)`
+
+        ## [crate_e-0.0.1](crates/crate_e/CHANGELOG.md#0.0.1)
+
+        Awesome changes\!
 
         ## [crate_b-0.0.0](crates/crate_b/CHANGELOG.md#0.0.0)
 
@@ -337,8 +339,8 @@ fn bump_versions_on_selection() {
 
         - crate_g-0.0.2
         - crate_b-0.0.0
-        - crate_a-0.1.0
         - crate_e-0.0.1
+        - crate_a-0.1.0
         "#,
             topmost_workspace_release
         ),
@@ -379,7 +381,14 @@ fn changelog_aggregation() {
         ChangelogT::<WorkspaceChangelog>::at_path(&workspace.root().join("CHANGELOG.md"));
     let result = sanitize(std::fs::read_to_string(workspace_changelog.path()).unwrap());
 
-    let expected = example_workspace_1_aggregated_changelog();
+    let expected = example_workspace_1_aggregated_changelog(
+        workspace
+            .members()
+            .unwrap()
+            .iter()
+            .map(|c| c.name())
+            .collect(),
+    );
     assert_eq!(
         result,
         expected,
@@ -523,15 +532,14 @@ fn post_release_version_bumps() {
 #[test]
 fn multiple_subsequent_releases() {
     let workspace_mocker = example_workspace_1().unwrap();
-    type A = (PathBuf, Vec<String>, Vec<String>);
+    type A = (PathBuf, Vec<(String, String)>);
     type F = Box<dyn Fn(A)>;
 
     for (
         i,
         (
             description,
-            expected_versions,
-            expected_crates,
+            expected_crate_versions,
             allowed_missing_dependencies,
             expect_new_release,
             maybe_match_filter,
@@ -540,8 +548,7 @@ fn multiple_subsequent_releases() {
     ) in [
         (
             "bump the first time as they're initially released",
-            vec!["0.0.0", "0.1.0", "0.0.1", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e", "crate_g"],
+            vec![("crate_b", "0.0.0"), ("crate_a", "0.1.0"), ("crate_e", "0.0.1"), ("crate_g", "0.0.2")],
             // allowed missing dependencies
             Vec::<&str>::new(),
             true,
@@ -550,8 +557,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "should not bump the second time without making any changes",
-            vec!["0.0.0", "0.1.0", "0.0.1"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec![("crate_b", "0.0.0"), ("crate_a", "0.1.0"), ("crate_e", "0.0.1")],
             // allowed missing dependencies
             Vec::<&str>::new(),
             false,
@@ -560,8 +566,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "only crate_a and crate_e have changed, expect these to be bumped",
-            vec!["0.0.0", "0.1.1", "0.0.2", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e", "crate_g"],
+            vec![("crate_b", "0.0.0"), ("crate_a",  "0.1.1"), ("crate_e", "0.0.2"), ("crate_g", "0.0.2")],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
             vec!["crate_b"],
             true,
@@ -587,8 +592,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "matching only crate_a, a change of its transitive dependency crate_g leads to bump in the dependency chain",
-            vec!["0.0.1", "0.1.2", "0.0.3"],
-            vec!["crate_b", "crate_a", "crate_g"],
+            vec![("crate_b", "0.0.1"), ("crate_a", "0.1.2"), ("crate_g", "0.0.3")],
             // allowed missing dependencies
             vec![],
             true,
@@ -613,8 +617,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "add a pre-release for crate_b",
-            vec!["1.0.0-rc.0", "0.1.3", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec![("crate_b", "1.0.0-rc.0"), ("crate_a", "0.1.3"), ("crate_e", "0.0.2")],
             // allowed missing dependencies
             vec![],
             true,
@@ -655,8 +658,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "do another pre-release for crate_b",
-            vec!["1.0.0-rc.1", "0.1.4", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec![("crate_b", "1.0.0-rc.1"), ("crate_a", "0.1.4"), ("crate_e", "0.0.2")],
             // allowed missing dependencies
             vec![],
             true,
@@ -681,8 +683,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "do major release for crate_b",
-            vec!["1.0.0", "0.1.5", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec![("crate_b", "1.0.0"), ("crate_a", "0.1.5"), ("crate_e", "0.0.2")],
             // allowed missing dependencies
             vec![],
             true,
@@ -723,8 +724,7 @@ fn multiple_subsequent_releases() {
         ),
         (
             "and a default patch release for crate_b again",
-            vec!["1.0.1", "0.1.6", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec![("crate_b", "1.0.1"), ("crate_a", "0.1.6"), ("crate_e", "0.0.2")],
             // allowed missing dependencies
             vec![],
             true,
@@ -755,15 +755,10 @@ fn multiple_subsequent_releases() {
 
         pre_release_fn((
             workspace_mocker.root(),
-            expected_versions
+            expected_crate_versions
                 .clone()
                 .into_iter()
-                .map(String::from)
-                .collect(),
-            expected_crates
-                .clone()
-                .into_iter()
-                .map(String::from)
+                .map(|(name, ver)| (name.to_string(), ver.to_string()))
                 .collect(),
         ));
 
@@ -814,13 +809,15 @@ fn multiple_subsequent_releases() {
             // todo: figure out how we can make the workspace re-read its data instead of creating a new one
             let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
 
-            assert_eq!(
-                expected_versions,
-                &get_crate_versions(expected_crates, &workspace),
-                "{} ({})",
-                description,
-                i
-            );
+            for (expected_name, expected_ver) in expected_crate_versions {
+                assert_eq!(
+                    expected_ver,
+                    &get_crate_version(expected_name, &workspace),
+                    "{} ({})",
+                    description,
+                    i
+                );
+            }
 
             let topmost_release_title = match workspace
                 .changelog()
