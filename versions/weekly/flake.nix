@@ -2,7 +2,7 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.3.0-beta-dev.20";
+        url = "github:holochain/holochain/holochain-0.3.0-beta-dev.21";
         flake = false;
       };
 
@@ -13,7 +13,7 @@
 
       # holochain_cli_launch
       launcher = {
-        url = "github:holochain/launcher/holochain-0.2";
+        url = "github:holochain/launcher/holochain-weekly";
         flake = false;
       };
 

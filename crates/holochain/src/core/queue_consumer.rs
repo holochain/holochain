@@ -561,6 +561,11 @@ impl TriggerReceiver {
         }
         Ok(())
     }
+
+    /// Check whether the backoff loop is paused. Will always return false if there is no backoff for this receiver.
+    pub fn is_paused(&self) -> bool {
+        self.back_off.as_ref().map_or(false, |b| b.is_paused())
+    }
 }
 
 /// Create a future that will be ok with either a recv or a lagged.

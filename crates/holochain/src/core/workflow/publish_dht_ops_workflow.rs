@@ -23,7 +23,10 @@ use std::time;
 use tracing::*;
 
 mod publish_query;
-pub use publish_query::get_ops_to_publish;
+pub use publish_query::{get_ops_to_publish, num_still_needing_publish};
+
+#[cfg(test)]
+mod unit_tests;
 
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
@@ -42,10 +45,11 @@ pub async fn publish_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
+    let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     // Commit to the network
-    tracing::info!("publishing {} ops", to_publish.len());
-    let mut success = Vec::new();
+    info!("publishing {} ops", to_publish_count);
+    let mut success = Vec::with_capacity(to_publish.len());
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
         match network
@@ -63,9 +67,10 @@ pub async fn publish_dht_ops_workflow(
             Err(e) => {
                 // If we get a routing error it means the space hasn't started yet and we should try publishing again.
                 if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
+                    // TODO if this doesn't change what is the loop terminate condition?
                     complete = WorkComplete::Incomplete;
                 }
-                tracing::warn!(failed_to_send_publish = ?e);
+                warn!(failed_to_send_publish = ?e);
             }
             Ok(()) => {
                 success.extend(op_hash_list);
@@ -73,16 +78,17 @@ pub async fn publish_dht_ops_workflow(
         }
     }
 
-    tracing::info!("published {} ops", success.len());
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+    info!("published {} ops", success.len());
+
+    let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
     let continue_publish = db
-        .write_async(move |writer| {
+        .write_async(move |txn| {
             for hash in success {
                 use holochain_p2p::DhtOpHashExt;
                 let hash = DhtOpHash::from_kitsune(hash.data_ref());
-                mutations::set_last_publish_time(writer, &hash, now)?;
+                set_last_publish_time(txn, &hash, now)?;
             }
-            WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
+            WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
         })
         .await?;
 
@@ -93,7 +99,8 @@ pub async fn publish_dht_ops_workflow(
         trigger_self.pause_loop();
     }
 
-    tracing::debug!("committed published ops");
+    debug!("committed published ops");
+
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(complete)
@@ -107,7 +114,7 @@ pub async fn publish_dht_ops_workflow_inner(
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in publish_query::get_ops_to_publish(agent, &db).await? {
+    for (basis, op_hash, op) in get_ops_to_publish(agent, &db).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -316,48 +323,6 @@ mod tests {
         });
     }
 
-    /// There is a test that shows that if the receipt is set to complete
-    /// for a DHTOp we don't re-publish it
-    #[test_case(1, 1)]
-    #[test_case(1, 10)]
-    #[test_case(1, 100)]
-    #[test_case(10, 1)]
-    #[test_case(10, 10)]
-    #[test_case(10, 100)]
-    #[test_case(100, 1)]
-    #[test_case(100, 10)]
-    #[test_case(100, 100)]
-    fn test_no_republish(num_agents: u32, num_hash: u32) {
-        tokio_helper::block_forever_on(async {
-            holochain_trace::test_run().ok();
-
-            // Create test db
-            let test_db = test_authored_db();
-            let db = test_db.to_db();
-
-            // Setup
-            let (_network, dna_network, author, _, _) =
-                setup(db.clone(), num_agents, num_hash, true).await;
-
-            // Update the authored to have complete receipts
-            db.write_async(move |txn| -> DatabaseResult<()> {
-                txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])?;
-                Ok(())
-            })
-            .await
-            .unwrap();
-
-            // Call the workflow
-            call_workflow(db.clone().into(), dna_network, author).await;
-
-            // If we can wait a while without receiving any publish, we have succeeded
-            tokio::time::sleep(Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
-            ))
-            .await;
-        });
-    }
-
     /// There is a test to shows that DHTOps that were produced on private entries are not published.
     /// Some do get published
     /// Current private constraints:
@@ -365,10 +330,10 @@ mod tests {
     /// - No StoreEntry
     /// - This workflow does not have access to private entries
     /// - Add / Remove links: Currently publish all.
-    /// ## Explication
+    /// ## Explanation
     /// This test is a little big so a quick run down:
     /// 1. All ops that can contain entries are created with entries (StoreRecord, StoreEntry and RegisterUpdatedContent)
-    /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
+    /// 2. Then we create identical versions of these ops without the entries (set to None) (except StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced

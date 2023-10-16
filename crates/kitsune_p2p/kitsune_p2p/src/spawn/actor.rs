@@ -5,13 +5,13 @@ use crate::actor::*;
 use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::gossip::sharded_gossip::KitsuneDiagnostics;
-use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModuleType;
 use crate::types::metrics::KitsuneMetrics;
 use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
+use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
@@ -24,7 +24,6 @@ use std::sync::Arc;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
-mod bootstrap;
 mod discover;
 pub(crate) mod meta_net;
 use meta_net::*;
@@ -894,7 +893,6 @@ impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
 mod tests {
-    use crate::spawn::actor::bootstrap::BootstrapNet;
     use crate::spawn::actor::create_meta_net;
     use crate::spawn::actor::MetaNet;
     use crate::spawn::actor::MetaNetEvtRecv;
@@ -903,6 +901,7 @@ mod tests {
     use crate::HostStub;
     use crate::KitsuneP2pResult;
     use ghost_actor::actor_builder::GhostActorBuilder;
+    use kitsune_p2p_bootstrap_client::BootstrapNet;
     use kitsune_p2p_types::config::{KitsuneP2pConfig, NetworkType, TransportConfig};
     use kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
