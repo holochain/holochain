@@ -132,7 +132,7 @@ mod tests {
 
         assert_eq!(chc.clone().head().await.unwrap(), None);
 
-        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20, None).await;
         let hash = |i: usize| chain[i].action_address().clone();
 
         let t0 = &chain[0..3];

@@ -993,7 +993,7 @@ async fn valid_chain_fact_test() {
     let author = SweetAgents::one(keystore.clone()).await;
     let mut g = random_generator();
 
-    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n).await;
+    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n, None).await;
 
     validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
 

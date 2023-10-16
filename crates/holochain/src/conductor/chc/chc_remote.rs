@@ -145,7 +145,7 @@ mod tests {
 
         let mut g = random_generator();
 
-        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20, None).await;
 
         let t0 = &chain[0..3];
         let t1 = &chain[3..6];
