@@ -1,4 +1,3 @@
-use crate::conductor::api::error::ConductorApiResult;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
@@ -13,7 +12,6 @@ use holochain_types::prelude::*;
 use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "flaky"]
 async fn test_validation_receipt() {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
@@ -252,65 +250,4 @@ async fn test_block_invalid_receipt() {
             "warrant block never happened";
         );
     }
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_not_block_self_receipt() {
-    holochain_trace::test_run().ok();
-
-    let unit_entry_def = EntryDef::default_from_id("unit");
-    let zomes = InlineZomeSet::new_single(
-        "integrity",
-        "coordinator",
-        "a",
-        "b",
-        vec![unit_entry_def.clone()],
-        0,
-    )
-    .function("coordinator", "create", move |api, ()| {
-        let entry = Entry::app(().try_into().unwrap()).unwrap();
-        let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-            EntryVisibility::Public,
-            entry,
-            ChainTopOrdering::default(),
-        ))?;
-        Ok(hash)
-    })
-    .function("integrity", "validate", |_api, op: Op| match op {
-        Op::StoreEntry(StoreEntry { action, .. })
-            if action.hashed.content.app_entry_def().is_some() =>
-        {
-            Ok(ValidateResult::Invalid("Entry defs are bad".into()))
-        }
-        _ => Ok(ValidateResult::Valid),
-    });
-
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let alice_pubkey = SweetAgents::alice();
-    let (dna, _, _) = SweetDnaFile::from_inline_zomes("network_seed".into(), zomes).await;
-
-    let apps = conductor
-        .setup_app_for_agents("app-", &[alice_pubkey.clone()], &[dna])
-        .await
-        .unwrap();
-
-    let ((alice_cell,),) = apps.into_tuples();
-
-    let maybe_action_hash: ConductorApiResult<ActionHash> = conductor
-        .call_fallible(&alice_cell.zome("coordinator"), "create", ())
-        .await;
-    assert!(maybe_action_hash.is_err());
-
-    let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
-
-    // Give some time to ensure alice clears workflows.
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-
-    // Alice should not block herself for finding her own invalid entry.
-    assert!(!conductor
-        .spaces
-        .is_blocked(alice_block_target, Timestamp::now())
-        .await
-        .unwrap());
 }

@@ -26,7 +26,7 @@ async fn main() {
 
         let signature = agent_pubkey.sign(&keystore, &my_data_1).await.unwrap();
 
-        assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await);
+        assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await.unwrap());
     }).await.unwrap();
 }
 ```

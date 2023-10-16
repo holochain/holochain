@@ -23,7 +23,6 @@ mod sweet_conductor_config_rendezvous;
 mod sweet_conductor_handle;
 pub mod sweet_consistency;
 mod sweet_dna;
-mod sweet_network;
 /// Generation of network topologies.
 pub mod sweet_topos;
 mod sweet_zome;
@@ -39,6 +38,5 @@ pub use sweet_conductor_config_rendezvous::*;
 pub use sweet_conductor_handle::*;
 pub use sweet_consistency::*;
 pub use sweet_dna::*;
-pub use sweet_network::*;
 pub use sweet_topos::*;
 pub use sweet_zome::*;

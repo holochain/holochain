@@ -19,7 +19,9 @@ use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 pub use spawn::*;
+#[cfg(feature = "test_utils")]
 pub use test::stub_network;
+#[cfg(feature = "test_utils")]
 pub use test::HolochainP2pDnaFixturator;
 
 pub use kitsune_p2p;
@@ -139,10 +141,10 @@ pub trait HolochainP2pDnaT: Send + Sync {
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Check if an agent is an authority for a hash.
@@ -369,13 +371,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// Send a validation receipt to a remote node.
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .send_validation_receipt((*self.dna_hash).clone(), to_agent, receipt)
+            .send_validation_receipts((*self.dna_hash).clone(), to_agent, receipts)
             .await
     }
 
@@ -413,4 +415,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
 pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
+#[allow(unused)]
+#[cfg(any(test, feature = "test_utils"))]
 mod test;

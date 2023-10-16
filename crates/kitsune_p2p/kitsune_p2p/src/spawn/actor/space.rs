@@ -1,13 +1,15 @@
 use super::*;
 use crate::metrics::*;
-use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModule;
 use base64::Engine;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
+use kitsune_p2p_types::config::NetworkType;
 use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -317,7 +319,6 @@ impl SpaceInternalHandler for Space {
         let agent_infos: Vec<AgentInfoSigned> = self
             .local_joined_agents
             .values()
-            .into_iter()
             .filter_map(|maybe_agent_info| maybe_agent_info.as_ref())
             .cloned()
             .collect();
@@ -683,7 +684,7 @@ async fn update_single_agent_info(
     // Update the agents arc through the internal sender.
     internal_sender.update_agent_arc(agent.clone(), arc).await?;
 
-    let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None, bootstrap_net).await?;
+    let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
     let expires_at_ms = signed_at_ms + expires_after;
 
     let agent_info_signed = AgentInfoSigned::sign(
@@ -743,7 +744,7 @@ async fn update_single_agent_info(
             }
         }
         NetworkType::QuicBootstrap => {
-            crate::spawn::actor::bootstrap::put(
+            kitsune_p2p_bootstrap_client::put(
                 bootstrap_service.clone(),
                 agent_info_signed.clone(),
                 bootstrap_net,
@@ -852,7 +853,7 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_leave(
@@ -945,7 +946,7 @@ impl KitsuneP2pHandler for Space {
         let local_joined_agents = self.local_joined_agents.keys().cloned().collect();
         let fut =
             rpc_multi_logic::handle_rpc_multi(input, self.ro_inner.clone(), local_joined_agents);
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_broadcast(
@@ -1423,7 +1424,7 @@ impl Space {
                     (
                         module,
                         factory.spawn_gossip_task(
-                            config.tuning_params.clone(),
+                            config.clone(),
                             space.clone(),
                             ep_hnd.clone(),
                             host_api.clone(),
@@ -1506,8 +1507,7 @@ impl Space {
         let host = self.host_api.clone();
 
         Ok(async move {
-            let signed_at_ms =
-                crate::spawn::actor::bootstrap::now_once(None, bootstrap_net).await?;
+            let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
             let expires_at_ms = signed_at_ms + expires_after;
             let agent_info_signed = AgentInfoSigned::sign(
                 space.clone(),
@@ -1547,7 +1547,7 @@ impl Space {
             match network_type {
                 NetworkType::QuicMdns => tracing::warn!("NOT publishing leaves to mdns"),
                 NetworkType::QuicBootstrap => {
-                    crate::spawn::actor::bootstrap::put(
+                    kitsune_p2p_bootstrap_client::put(
                         bootstrap_service.clone(),
                         agent_info_signed,
                         bootstrap_net,

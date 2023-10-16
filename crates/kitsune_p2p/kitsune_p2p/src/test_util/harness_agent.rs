@@ -1,4 +1,5 @@
 use super::*;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 type KAgent = Arc<KitsuneAgent>;
 type KAgentMap = HashMap<KAgent, Arc<AgentInfoSigned>>;
