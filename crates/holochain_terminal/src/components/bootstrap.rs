@@ -4,6 +4,7 @@ use crate::event::ScreenEvent;
 use chrono::{DateTime, Utc};
 use holo_hash::AgentPubKey;
 use holochain_util::tokio_helper::block_on;
+use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_bootstrap_client::{random, BootstrapNet};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
@@ -149,7 +150,7 @@ pub fn render_bootstrap_widget<B: Backend>(
 
     let list_items: Vec<ListItem> = agents
         .iter()
-        .map(|a| ListItem::new(format!("Agent {:?}", a.agent)))
+        .map(|a| ListItem::new(format!("{:?}", kitsune_agent_to_pub_key(a.agent.clone()))))
         .collect();
 
     let list = List::new(list_items)
@@ -162,7 +163,7 @@ pub fn render_bootstrap_widget<B: Backend>(
         let detail_line = List::new(vec![
             ListItem::new(format!(
                 "agent       : {:?}",
-                AgentPubKey::from_raw_36((*agents[selected].agent).clone().into())
+                kitsune_agent_to_pub_key(agents[selected].agent.clone())
             )),
             ListItem::new(format!("storage arc : {:?}", agents[selected].storage_arc)),
             ListItem::new(format!("url list    : {:?}", agents[selected].url_list)),
@@ -226,4 +227,8 @@ pub fn render_bootstrap_widget<B: Backend>(
         Paragraph::new(Text::from(vec![menu_line])),
         screen_layout[1],
     );
+}
+
+fn kitsune_agent_to_pub_key(agent: Arc<KitsuneAgent>) -> AgentPubKey {
+    AgentPubKey::from_raw_36((*agent).clone().into())
 }
