@@ -51,7 +51,7 @@ impl BootstrapTask {
         let this = Arc::new(RwLock::new(BootstrapTask {
             is_finished: false,
             current_delay: Duration::from_secs(1),
-            max_delay: Duration::from_secs(60 * 60),
+            max_delay: Duration::from_secs(60 * 5),
         }));
         let bootstrap_query = DefaultBootstrapService {
             url: bootstrap_service,
