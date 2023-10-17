@@ -2479,6 +2479,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc-sleuth"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "hc-sleuth",
+ "holochain_state",
+ "kitsune_p2p",
+]
+
+[[package]]
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [

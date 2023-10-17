@@ -66,6 +66,11 @@ tempfile = "3.3"
 [features]
 default = []
 
+fuzzing = [
+    "holochain_types/fuzzing",
+    "holochain_zome_types/fuzzing",
+]
+
 test_utils = [
     "holochain_keystore/test_utils",
     "holochain_types/test_utils",
