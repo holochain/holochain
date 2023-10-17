@@ -47,12 +47,18 @@ impl BootstrapTask {
         bootstrap_service: Option<Url2>,
         bootstrap_net: BootstrapNet,
         bootstrap_check_delay_backoff_multiplier: u32,
+        mut bootstrap_max_delay_s: u32,
     ) -> Arc<RwLock<Self>> {
+        if bootstrap_max_delay_s < 60 {
+            bootstrap_max_delay_s = 60;
+        }
+
         let this = Arc::new(RwLock::new(BootstrapTask {
             is_finished: false,
             current_delay: Duration::from_secs(1),
-            max_delay: Duration::from_secs(60 * 5),
+            max_delay: Duration::from_secs(bootstrap_max_delay_s as u64),
         }));
+
         let bootstrap_query = DefaultBootstrapService {
             url: bootstrap_service,
             net: bootstrap_net,
