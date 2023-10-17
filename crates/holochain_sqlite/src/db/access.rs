@@ -17,6 +17,10 @@ use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
+use super::metrics::{
+    create_connection_use_time_metric, create_pool_usage_metric, PoolUsageMetric, UseTimeMetric,
+};
+
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 
 #[async_trait::async_trait]
@@ -80,6 +84,8 @@ pub struct DbRead<Kind: DbKindT> {
     statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
+    pool_usage_metric: PoolUsageMetric,
+    use_time_metric: UseTimeMetric,
 }
 
 impl<Kind: DbKindT> std::fmt::Debug for DbRead<Kind> {
@@ -149,6 +155,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         }
 
         let permit = Self::acquire_reader_permit(semaphore).await?;
+
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
         let mut conn = self.get_connection_from_pool()?;
@@ -156,7 +163,12 @@ impl<Kind: DbKindT> DbRead<Kind> {
             conn.trace(self.statement_trace_fn);
         }
 
-        Ok(PConnGuard::new(conn, permit))
+        Ok(PConnGuard::new(
+            conn,
+            permit,
+            self.pool_usage_metric.clone(),
+            self.use_time_metric.clone(),
+        ))
     }
 
     /// Get a connection from the pool.
@@ -290,6 +302,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
+        // Create pool usage metric and initialize it to the size of the pool
+        let pool_usage_metric = create_pool_usage_metric(kind.kind());
+        pool_usage_metric.add(pool.max_size() as i64, &[]);
+
+        let use_time_metric = create_connection_use_time_metric(kind.kind());
+
         Ok(DbWrite(DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
@@ -300,6 +318,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             path: path.unwrap_or_default(),
             connection_pool: pool,
             statement_trace_fn,
+            pool_usage_metric,
+            use_time_metric,
         }))
     }
 
