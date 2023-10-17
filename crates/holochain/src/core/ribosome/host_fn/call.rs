@@ -9,6 +9,7 @@ use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn call(
     ribosome: Arc<impl RibosomeT>,

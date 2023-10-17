@@ -80,6 +80,8 @@ use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::module::SerializedModuleCache;
+use wasmer::RuntimeError;
+use wasmer::Store;
 // This is here because there were errors about different crate versions
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;

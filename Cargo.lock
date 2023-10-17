@@ -2826,6 +2826,8 @@ dependencies = [
  "url2",
  "url_serde",
  "uuid 0.7.4",
+ "wasmer",
+ "wasmer-middlewares",
 ]
 
 [[package]]

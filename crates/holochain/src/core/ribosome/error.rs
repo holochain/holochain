@@ -22,7 +22,7 @@ pub enum RibosomeError {
 
     /// Wasm runtime error while working with Ribosome.
     #[error("Wasm runtime error while working with Ribosome: {0}")]
-    WasmRuntimeError(#[from] RuntimeError),
+    WasmRuntimeError(#[from] wasmer::RuntimeError),
 
     /// Serialization error while working with Ribosome.
     #[error("Serialization error while working with Ribosome: {0}")]
