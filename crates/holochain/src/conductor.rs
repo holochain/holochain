@@ -15,6 +15,7 @@
 
 pub mod api;
 mod cell;
+mod metrics;
 #[cfg(feature = "chc")]
 pub mod chc;
 #[allow(clippy::module_inception)]

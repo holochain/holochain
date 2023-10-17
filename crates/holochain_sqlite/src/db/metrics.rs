@@ -1,19 +1,18 @@
+use opentelemetry_api::{global::meter_with_version, KeyValue, metrics::*};
 use std::sync::Arc;
-
 use tokio::sync::Semaphore;
-
 use super::DbKind;
 
-pub type UseTimeMetric = opentelemetry_api::metrics::Histogram<u64>;
+pub type UseTimeMetric = Histogram<f64>;
 
 pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>) {
-    let meter = opentelemetry_api::global::meter_with_version(
+    let meter = meter_with_version(
         "hc.db",
         None::<&'static str>,
         None::<&'static str>,
         Some(vec![
-            opentelemetry_api::KeyValue::new("kind", db_kind_name(kind.clone())),
-            opentelemetry_api::KeyValue::new("id", format!("{}", kind)),
+            KeyValue::new("kind", db_kind_name(kind.clone())),
+            KeyValue::new("id", format!("{}", kind)),
         ]),
     );
 
@@ -40,17 +39,17 @@ pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>
 }
 
 pub fn create_connection_use_time_metric(kind: DbKind) -> UseTimeMetric {
-    opentelemetry_api::global::meter_with_version(
+    meter_with_version(
         "hc.db",
         None::<&'static str>,
         None::<&'static str>,
         Some(vec![
-            opentelemetry_api::KeyValue::new("kind", db_kind_name(kind.clone())),
-            opentelemetry_api::KeyValue::new("id", format!("{}", kind)),
+            KeyValue::new("kind", db_kind_name(kind.clone())),
+            KeyValue::new("id", format!("{}", kind)),
         ]),
     )
-    .u64_histogram("hc.db.connections.use_time")
-    .with_unit(opentelemetry_api::metrics::Unit::new("ms"))
+    .f64_histogram("hc.db.connections.use_time")
+    .with_unit(Unit::new("s"))
     .with_description("The time between borrowing a connection and returning it to the pool")
     .init()
 }
