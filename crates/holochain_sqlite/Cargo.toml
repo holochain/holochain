@@ -41,7 +41,7 @@ r2d2 = "0.8"
 r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
 rmp-serde = "0.15"
 scheduled-thread-pool = "0.2"
-serde = "1.0"
+serde = ">= 1.0, <= 1.0.166"
 serde_derive = "1.0"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
