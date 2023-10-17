@@ -528,7 +528,7 @@ impl RealRibosome {
         let context_key = RealRibosome::next_context_key();
         let imports = empty_ribosome.imports(
             context_key,
-            &Store::new(&Universal::new(Cranelift::default()).engine()),
+            &Store::default()
         );
         let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
         imports.sort();
@@ -537,7 +537,7 @@ impl RealRibosome {
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
         let db = Env::default();
-        let mut imports = imports! {};
+        let mut imports = wasmer::imports! {};
         let mut ns = Exports::new();
 
         // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here

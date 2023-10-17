@@ -131,7 +131,7 @@ pub fn call(
                                             .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
-                                                    RuntimeError::from(wasm_error!(
+                                                    wasmer::RuntimeError::from(wasm_error!(
                                                         WasmErrorInner::Host(
                                                             "Role not found.".to_string()
                                                         )

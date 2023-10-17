@@ -24,7 +24,7 @@ pub fn verify_signature(
             } = input;
             key.verify_signature_raw(&signature, data.into())
                 .await
-                .map_err(|e| RuntimeError::user(Box::new(e)))
+                .map_err(|e| wasmer::RuntimeError::user(Box::new(e)))
         }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
