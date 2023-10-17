@@ -69,6 +69,10 @@ overflow-checks = false
 incremental = false
 codegen-units = 16
 
+[profile.release]
+opt-level = "z"
+lto = true
+
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }
 # proptest = { path = "/home/michael/gitfork/proptest/proptest" }
