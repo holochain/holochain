@@ -51,7 +51,7 @@ pub fn create_connection_use_time_metric(kind: DbKind) -> UseTimeMetric {
     )
     .u64_histogram("hc.db.connections.use_time")
     .with_unit(opentelemetry_api::metrics::Unit::new("ms"))
-    .with_description("	The time between borrowing a connection and returning it to the pool")
+    .with_description("The time between borrowing a connection and returning it to the pool")
     .init()
 }
 
