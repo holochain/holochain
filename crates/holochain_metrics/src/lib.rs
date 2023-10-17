@@ -26,7 +26,7 @@
 //! - InfluxDB as a pre-existing system process.
 //!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_EXTERNAL=1`
 //!   - Configure via environment variables:
-//!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST=[my influxdb url]` where a default InfluxDB install will need `http://localhost:8086`
+//!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST=[my influxdb url]` where a default InfluxDB install will need `http://localhost:8086` and otherwise can be found by running `influx config` in a terminal.
 //!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET=[my influxdb bucket name]` but it's simplest to use `influxive` if you plan to import the provided dashboards.
 //!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN=[my influxdb auth token]`
 //!   - The influxdb auth token must have permission to write to all buckets
