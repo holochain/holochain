@@ -801,8 +801,92 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     }
 
     fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
-        let fut = self.ep_hnd.dump_network_stats();
-        Ok(async move { Ok(fut.await?) }.boxed().into())
+        let peer_fut_list = self
+            .spaces
+            .keys()
+            .map(|space| {
+                self.host_api
+                    .legacy
+                    .query_agents(QueryAgentsEvt::new(space.clone()))
+            })
+            .collect::<Vec<_>>();
+        let stat_fut = self.ep_hnd.dump_network_stats();
+        Ok(async move {
+            let mut stats = stat_fut.await?;
+
+            let this_id: String = stats
+                .as_object()
+                .and_then(|obj| obj.get("thisId"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(String::new);
+
+            let all_peers = futures::future::join_all(peer_fut_list).await;
+
+            let now_ms = std::time::SystemTime::UNIX_EPOCH
+                .elapsed()
+                .unwrap()
+                .as_millis() as f64;
+
+            #[derive(serde::Serialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Agent {
+                pub agent_pub_key: String,
+                pub dna_hash: String,
+                pub expires_in_seconds: f64,
+            }
+
+            let mut correlation: HashMap<String, Vec<Agent>> = HashMap::new();
+
+            for peer in all_peers {
+                for peer in peer? {
+                    use base64::Engine;
+                    if let Some(net_key) = peer.url_list.get(0).map(|u| {
+                        kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
+                            .digest()
+                            .to_string()
+                    }) {
+                        if net_key == this_id {
+                            continue;
+                        }
+
+                        let agent_pub_key = format!(
+                            "uhCAk{}",
+                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.agent)
+                        );
+                        let dna_hash = format!(
+                            "uhC0k{}",
+                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.space)
+                        );
+                        let agent = Agent {
+                            agent_pub_key,
+                            dna_hash,
+                            expires_in_seconds: (peer.expires_at_ms as f64 - now_ms) / 1000.0,
+                        };
+
+                        match correlation.entry(net_key) {
+                            Entry::Occupied(mut e) => {
+                                e.get_mut().push(agent);
+                            }
+                            Entry::Vacant(e) => {
+                                e.insert(vec![agent]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(obj) = stats.as_object_mut() {
+                obj.insert(
+                    "netToHcAgentCorrelation".to_string(),
+                    serde_json::json!(correlation),
+                );
+            }
+
+            Ok(stats)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_get_diagnostics(

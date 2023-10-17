@@ -77,9 +77,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous();
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -112,7 +112,11 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // See if we can fetch metric data from bobbo
     let metrics = conductors[1].dump_network_metrics(None).await?;
-    println!("@!@! - metrics: {}", metrics);
+    println!("@!@! - metrics: {metrics}");
+
+    // See if we can fetch network stats from bobbo
+    let stats = conductors[1].dump_network_stats().await?;
+    println!("@!@! - stats: {stats}");
 
     Ok(())
 }
