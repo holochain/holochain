@@ -1,36 +1,71 @@
+use std::sync::Arc;
+
+use tokio::sync::Semaphore;
+
 use super::DbKind;
 
-pub type PoolUsageMetric = opentelemetry_api::metrics::UpDownCounter<i64>;
 pub type UseTimeMetric = opentelemetry_api::metrics::Histogram<u64>;
 
-pub fn create_pool_usage_metric(kind: DbKind) -> PoolUsageMetric {
-    opentelemetry_api::global::meter_with_version(
-        "hc.db.connections",
+pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>) {
+    let meter = opentelemetry_api::global::meter_with_version(
+        "hc.db",
         None::<&'static str>,
         None::<&'static str>,
         Some(vec![
-            opentelemetry_api::KeyValue::new("state", "idle"),
-            opentelemetry_api::KeyValue::new("kind", format!("{}", kind)),
+            opentelemetry_api::KeyValue::new("kind", db_kind_name(kind.clone())),
+            opentelemetry_api::KeyValue::new("id", format!("{}", kind)),
         ]),
-    )
-    .i64_up_down_counter("connections")
-    .with_unit(opentelemetry_api::metrics::Unit::new("connections"))
-    .with_description("The number of idle connections in the pool")
-    .init()
+    );
+
+    let gauge = meter
+        .f64_observable_gauge("hc.db.pool.utilization")
+        .with_description("The utilisation of connections in the pool")
+        .init();
+
+    let total_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
+    match meter.register_callback(&[gauge.as_any()], move |observer| {
+        let current_permits: usize = db_semaphores.iter().map(|s| s.available_permits()).sum();
+
+        observer.observe_f64(
+            &gauge,
+            (total_permits - current_permits) as f64 / total_permits as f64,
+            &[],
+        )
+    }) {
+        Ok(_) => {},
+        Err(e) => {
+            tracing::error!("Failed to register callback for metric: {:?}", e);
+        }
+    };
 }
 
 pub fn create_connection_use_time_metric(kind: DbKind) -> UseTimeMetric {
     opentelemetry_api::global::meter_with_version(
-        "hc.db.connections.use_time",
+        "hc.db",
         None::<&'static str>,
         None::<&'static str>,
-        Some(vec![opentelemetry_api::KeyValue::new(
-            "kind",
-            format!("{}", kind),
-        )]),
+        Some(vec![
+            opentelemetry_api::KeyValue::new("kind", db_kind_name(kind.clone())),
+            opentelemetry_api::KeyValue::new("id", format!("{}", kind)),
+        ]),
     )
-    .u64_histogram("use_time")
+    .u64_histogram("hc.db.connections.use_time")
     .with_unit(opentelemetry_api::metrics::Unit::new("ms"))
     .with_description("	The time between borrowing a connection and returning it to the pool")
     .init()
+}
+
+fn db_kind_name(kind: DbKind) -> String {
+    match kind {
+        DbKind::Authored(_) => "authored",
+        DbKind::Dht(_) => "dht",
+        DbKind::Cache(_) => "cache",
+        DbKind::Conductor => "conductor",
+        DbKind::Wasm => "wasm",
+        DbKind::P2pAgentStore(_) => "p2p_agent_store",
+        DbKind::P2pMetrics(_) => "p2p_metrics",
+        #[cfg(feature = "test_utils")]
+        DbKind::Test(_) => "test",
+    }
+    .to_string()
 }

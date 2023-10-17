@@ -17,9 +17,7 @@ use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-use super::metrics::{
-    create_connection_use_time_metric, create_pool_usage_metric, PoolUsageMetric, UseTimeMetric,
-};
+use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 
@@ -84,7 +82,6 @@ pub struct DbRead<Kind: DbKindT> {
     statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
-    pool_usage_metric: PoolUsageMetric,
     use_time_metric: UseTimeMetric,
 }
 
@@ -163,12 +160,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
             conn.trace(self.statement_trace_fn);
         }
 
-        Ok(PConnGuard::new(
-            conn,
-            permit,
-            self.pool_usage_metric.clone(),
-            self.use_time_metric.clone(),
-        ))
+        Ok(PConnGuard::new(conn, permit, self.use_time_metric.clone()))
     }
 
     /// Get a connection from the pool.
@@ -302,25 +294,31 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
-        // Create pool usage metric and initialize it to the size of the pool
-        let pool_usage_metric = create_pool_usage_metric(kind.kind());
-        pool_usage_metric.add(pool.max_size() as i64, &[]);
-
         let use_time_metric = create_connection_use_time_metric(kind.kind());
 
-        Ok(DbWrite(DbRead {
+        let db_read = DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
             long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
             max_readers: num_read_threads() * 2,
             num_readers: Arc::new(AtomicUsize::new(0)),
-            kind,
+            kind: kind.clone(),
             path: path.unwrap_or_default(),
             connection_pool: pool,
             statement_trace_fn,
-            pool_usage_metric,
             use_time_metric,
-        }))
+        };
+
+        create_pool_usage_metric(
+            kind.kind(),
+            vec![
+                db_read.write_semaphore.clone(),
+                db_read.read_semaphore.clone(),
+                db_read.long_read_semaphore.clone(),
+            ],
+        );
+
+        Ok(DbWrite(db_read))
     }
 
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>

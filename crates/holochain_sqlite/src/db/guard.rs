@@ -5,12 +5,11 @@ use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 use tokio::sync::OwnedSemaphorePermit;
 
-use super::metrics::{PoolUsageMetric, UseTimeMetric};
+use super::metrics::UseTimeMetric;
 
 pub(super) struct PConnGuard {
     conn: PConn,
     created: Instant,
-    pool_usage_metric: PoolUsageMetric,
     use_time_metric: UseTimeMetric,
     _permit: OwnedSemaphorePermit,
 }
@@ -19,14 +18,11 @@ impl PConnGuard {
     pub(super) fn new(
         conn: PConn,
         permit: OwnedSemaphorePermit,
-        pool_usage_metric: PoolUsageMetric,
         use_time_metric: UseTimeMetric,
     ) -> Self {
-        pool_usage_metric.add(-1, &[]);
         PConnGuard {
             conn,
             created: Instant::now(),
-            pool_usage_metric,
             use_time_metric,
             _permit: permit,
         }
@@ -49,8 +45,7 @@ impl DerefMut for PConnGuard {
 
 impl Drop for PConnGuard {
     fn drop(&mut self) {
-        self.pool_usage_metric.add(1, &[]);
-        self.use_time_metric.record(self.created.elapsed().as_millis() as u64, &[]);
+        self.use_time_metric.record(&opentelemetry_api::Context::new(), self.created.elapsed().as_millis() as u64, &[]);
     }
 }
 

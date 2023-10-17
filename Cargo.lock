@@ -3219,6 +3219,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "ts_opentelemetry_api",
 ]
 
 [[package]]
