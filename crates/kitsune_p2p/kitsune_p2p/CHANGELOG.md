@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
+
 ## 0.3.0-beta-dev.18
 
 ## 0.3.0-beta-dev.17
