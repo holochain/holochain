@@ -82,6 +82,15 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::module::SerializedModuleCache;
 use wasmer::RuntimeError;
 use wasmer::Store;
+use wasmer::Exports;
+use wasmer::Function;
+use wasmer::FunctionEnv;
+use wasmer::FunctionEnvMut;
+use wasmer::Module;
+use wasmer::Instance;
+use wasmer::Imports;
+use wasmer::Type;
+use wasmer::AsStoreMut;
 // This is here because there were errors about different crate versions
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
@@ -117,14 +126,14 @@ pub struct RealRibosome {
 
 struct HostFnBuilder {
     store: Store,
-    db: Env,
+    function_env: FunctionEnv<Env>,
     ribosome_arc: Arc<RealRibosome>,
     // context_arc: Arc<CallContext>,
     context_key: u64,
 }
 
 impl HostFnBuilder {
-    const SIGNATURE: ([Type; 2], [Type; 1]) = ([Type::I32, Type::I32], [Type::I64]);
+    // const SIGNATURE: ([Type; 2], [Type; 1]) = ([Type::I32, Type::I32], [Type::I64]);
 
     fn with_host_function<I: 'static, O: 'static>(
         &self,
@@ -140,31 +149,30 @@ impl HostFnBuilder {
         let context_key = self.context_key;
         ns.insert(
             host_function_name,
-            Function::new_with_env(
-                &self.store,
-                Self::SIGNATURE,
-                self.db.clone(),
-                move |db: &Env, args: &[Value]| -> Result<Vec<Value>, RuntimeError> {
-                    let guest_ptr: GuestPtr = match args[0] {
-                        Value::I32(i) => i.try_into().map_err(|_| {
-                            RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
-                        })?,
-                        _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
-                                WasmErrorInner::PointerMap
-                            )))
-                        }
-                    };
-                    let len: Len = match args[1] {
-                        Value::I32(i) => i.try_into().map_err(|_| {
-                            RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
-                        })?,
-                        _ => {
-                            return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
-                                WasmErrorInner::PointerMap
-                            )))
-                        }
-                    };
+            Function::new_typed_with_env(
+                &mut self.store.as_store_mut(),
+                &self.function_env,
+                move |mut function_env_mut: FunctionEnvMut<Env>, guest_ptr: GuestPtr, len: Len| -> Result<u64, RuntimeError> {
+                    // let guest_ptr: GuestPtr = match args[0] {
+                    //     Value::I32(i) => i.try_into().map_err(|_| {
+                    //         RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
+                    //     })?,
+                    //     _ => {
+                    //         return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
+                    //             WasmErrorInner::PointerMap
+                    //         )))
+                    //     }
+                    // };
+                    // let len: Len = match args[1] {
+                    //     Value::I32(i) => i.try_into().map_err(|_| {
+                    //         RuntimeError::new(wasm_error!(WasmErrorInner::PointerMap))
+                    //     })?,
+                    //     _ => {
+                    //         return Err::<_, RuntimeError>(RuntimeError::new(wasm_error!(
+                    //             WasmErrorInner::PointerMap
+                    //         )))
+                    //     }
+                    // };
                     let context_arc = {
                         CONTEXT_MAP
                             .lock()
@@ -177,12 +185,13 @@ impl HostFnBuilder {
                             })
                             .clone()
                     };
-                    let result = match db.consume_bytes_from_guest(guest_ptr, len) {
+                    let (env, mut store_mut) = function_env_mut.data_and_store_mut();
+                    let result = match env.consume_bytes_from_guest(&mut store_mut, guest_ptr, len) {
                         Ok(input) => host_function(Arc::clone(&ribosome_arc), context_arc, input),
                         Err(runtime_error) => Result::<_, RuntimeError>::Err(runtime_error),
                     };
-                    Ok(vec![Value::I64(i64::from_le_bytes(
-                        db.move_data_to_guest(match result {
+                    Ok(u64::from_le_bytes(
+                        env.move_data_to_guest(&mut store_mut, match result {
                             Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
                                 Ok(wasm_error) => match wasm_error {
                                     WasmError {
@@ -196,7 +205,7 @@ impl HostFnBuilder {
                             Ok(o) => Result::<_, WasmError>::Ok(o),
                         })?
                         .to_le_bytes(),
-                    ))])
+                    ))
                 },
             ),
         );
@@ -353,7 +362,7 @@ impl RealRibosome {
         }
     }
 
-    pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+    pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<ModuleWithStore>> {
         if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
             .get()
             .is_none()
@@ -390,14 +399,14 @@ impl RealRibosome {
     pub fn cache_instance(
         &self,
         context_key: u64,
-        instance: Arc<Mutex<Instance>>,
+        instance_with_store: Arc<Mutex<InstanceWithStore>>,
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
         use holochain_wasmer_host::module::PlruCache;
-        {
-            let instance = instance.lock();
-            wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
-        }
+        // {
+        //     let instance = instance.lock();
+        //     wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
+        // }
 
         // Clear the context as the call is done.
         {
@@ -414,7 +423,7 @@ impl RealRibosome {
         );
         holochain_wasmer_host::module::INSTANCE_CACHE
             .write()
-            .put_item(key, instance);
+            .put_item(key, instance_with_store);
 
         Ok(())
     }
@@ -438,8 +447,8 @@ impl RealRibosome {
                 )));
             }
         };
-        let imports: ImportObject = Self::imports(self, context_key, module.store());
-        let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
+        let imports = Self::imports(self, context_key, module.store());
+        let instance = Arc::new(Mutex::new(Instance::new(&mut module.store().as_store_mut(), &module, &imports).map_err(
             |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
         )?));
         RibosomeResult::Ok(instance)
@@ -452,7 +461,7 @@ impl RealRibosome {
     pub fn instance(
         &self,
         call_context: CallContext,
-    ) -> RibosomeResult<(Arc<Mutex<Instance>>, u64)> {
+    ) -> RibosomeResult<(Arc<Mutex<InstanceWithStore>>, u64)> {
         use holochain_wasmer_host::module::PlruCache;
 
         // Get the start of the possible keys.
@@ -530,15 +539,15 @@ impl RealRibosome {
         let context_key = RealRibosome::next_context_key();
         let imports = empty_ribosome.imports(
             context_key,
-            &Store::default()
+            Store::default()
         );
         let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
         imports.sort();
         Ok(imports)
     }
 
-    fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
-        let db = Env::default();
+    fn imports(&self, context_key: u64, store: Store) -> Imports {
+        let function_env = FunctionEnv::new(&mut store.as_store_mut(), Env::default());
         let mut imports = wasmer::imports! {};
         let mut ns = Exports::new();
 
@@ -546,8 +555,8 @@ impl RealRibosome {
         let ribosome_arc = std::sync::Arc::new((*self).clone());
 
         let host_fn_builder = HostFnBuilder {
-            store: store.clone(),
-            db,
+            store: store,
+            function_env,
             ribosome_arc,
             context_key,
         };
