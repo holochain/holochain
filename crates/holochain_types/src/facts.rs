@@ -73,7 +73,6 @@ pub fn valid_dht_op(
 #[cfg(test)]
 mod tests {
     use arbitrary::Arbitrary;
-    use holochain_keystore::spawn_test_keystore;
 
     use super::*;
     use holochain_zome_types::facts;
@@ -84,7 +83,7 @@ mod tests {
 
         let mut gg = Generator::from(unstructured_noise());
         let g = &mut gg;
-        let keystore = spawn_test_keystore().await.unwrap();
+        let keystore = holochain_keystore::spawn_test_keystore().await.unwrap();
         let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
         let e = Entry::arbitrary(g).unwrap();
