@@ -674,7 +674,11 @@ async fn queue_consumer_main_task_impl<
                 _ => (),
             }
 
-            duration_metric.record(&opentelemetry_api::Context::new(), start.elapsed().as_secs_f64(), &[]);
+            duration_metric.record(
+                &opentelemetry_api::Context::new(),
+                start.elapsed().as_secs_f64(),
+                &[],
+            );
         } else {
             tracing::info!("Cell is shutting down: stopping queue consumer '{}'", name);
             break;
@@ -693,7 +697,9 @@ fn queue_consumer_dna_bound<Fut: 'static + Send + Future<Output = WorkflowResult
     let workflow_name = name.to_string();
     let task_dna_hash = dna_hash.clone();
     tm.add_dna_task_critical(name, dna_hash, {
-        move |stop| queue_consumer_main_task_impl(workflow_name, task_dna_hash, None, (tx, rx), stop, fut)
+        move |stop| {
+            queue_consumer_main_task_impl(workflow_name, task_dna_hash, None, (tx, rx), stop, fut)
+        }
     });
 }
 
@@ -710,7 +716,16 @@ fn queue_consumer_cell_bound<
     let dna_hash = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
     tm.add_cell_task_critical(name, cell_id, {
-        move |stop| queue_consumer_main_task_impl(workflow_name, Arc::new(dna_hash), Some(agent), (tx, rx), stop, fut)
+        move |stop| {
+            queue_consumer_main_task_impl(
+                workflow_name,
+                Arc::new(dna_hash),
+                Some(agent),
+                (tx, rx),
+                stop,
+                fut,
+            )
+        }
     });
 }
 

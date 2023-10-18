@@ -15,7 +15,6 @@
 
 pub mod api;
 mod cell;
-mod metrics;
 #[cfg(feature = "chc")]
 pub mod chc;
 #[allow(clippy::module_inception)]
@@ -30,6 +29,7 @@ pub mod interactive;
 pub mod interface;
 pub mod kitsune_host_impl;
 pub mod manager;
+mod metrics;
 pub mod p2p_agent_store;
 pub mod paths;
 #[allow(missing_docs)]

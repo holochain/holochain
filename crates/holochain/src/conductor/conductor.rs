@@ -3083,9 +3083,7 @@ async fn p2p_event_task(
             let duration_metric = duration_metric.clone();
             async move {
                 let start = Instant::now();
-
                 let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            
                 let evt_dna_hash = evt.dna_hash().clone();
 
                 // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently

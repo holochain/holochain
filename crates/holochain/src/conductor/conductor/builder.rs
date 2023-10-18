@@ -224,10 +224,20 @@ impl ConductorBuilder {
                         }
                     }
 
-                    duration_metric.record(&opentelemetry_api::Context::new(), start.elapsed().as_secs_f64(), &[
-                        opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", cell_id.dna_hash())),
-                        opentelemetry_api::KeyValue::new("agent", format!("{:?}", cell_id.agent_pubkey())),
-                    ]);
+                    duration_metric.record(
+                        &opentelemetry_api::Context::new(),
+                        start.elapsed().as_secs_f64(),
+                        &[
+                            opentelemetry_api::KeyValue::new(
+                                "dna_hash",
+                                format!("{:?}", cell_id.dna_hash()),
+                            ),
+                            opentelemetry_api::KeyValue::new(
+                                "agent",
+                                format!("{:?}", cell_id.agent_pubkey()),
+                            ),
+                        ],
+                    );
                 }
             })
             .await;
@@ -252,7 +262,13 @@ impl ConductorBuilder {
         let conductor2 = conductor.clone();
         let post_commit_duration_metric = create_post_commit_duration_metric();
         tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
-            Self::spawn_post_commit(conductor2, post_commit_receiver, stop, post_commit_duration_metric).map(Ok)
+            Self::spawn_post_commit(
+                conductor2,
+                post_commit_receiver,
+                stop,
+                post_commit_duration_metric,
+            )
+            .map(Ok)
         });
 
         let configs = conductor_config.admin_interfaces.unwrap_or_default();

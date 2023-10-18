@@ -1,7 +1,7 @@
-use opentelemetry_api::{global::meter_with_version, KeyValue, metrics::*};
+use super::DbKind;
+use opentelemetry_api::{global::meter_with_version, metrics::*, KeyValue};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
-use super::DbKind;
 
 pub type UseTimeMetric = Histogram<f64>;
 
@@ -31,7 +31,7 @@ pub fn create_pool_usage_metric(kind: DbKind, db_semaphores: Vec<Arc<Semaphore>>
             &[],
         )
     }) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             tracing::error!("Failed to register callback for metric: {:?}", e);
         }
