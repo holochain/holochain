@@ -114,7 +114,7 @@ pub struct CascadeImpl<Network: Send + Sync = HolochainP2pDna> {
     scratch: Option<SyncScratch>,
     network: Option<Network>,
     private_data: Option<Arc<AgentPubKey>>,
-    duration_metric: Option<CascadeDurationMetric>,
+    duration_metric: &'static CascadeDurationMetric,
 }
 
 impl<Network> CascadeImpl<Network>
@@ -174,7 +174,7 @@ where
             private_data: self.private_data,
             cache: Some(cache_db),
             network: Some(network),
-            duration_metric: Some(create_cascade_duration_metric()),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 }
@@ -189,7 +189,7 @@ impl CascadeImpl<HolochainP2pDna> {
             cache: None,
             scratch: None,
             private_data: None,
-            duration_metric: None,
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 
@@ -217,7 +217,7 @@ impl CascadeImpl<HolochainP2pDna> {
             private_data,
             scratch,
             network: Some(network),
-            duration_metric: Some(create_cascade_duration_metric()),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 
@@ -236,7 +236,7 @@ impl CascadeImpl<HolochainP2pDna> {
             scratch,
             network: None,
             private_data: author,
-            duration_metric: Some(create_cascade_duration_metric()),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 }
@@ -625,13 +625,11 @@ where
         })
         .await??;
 
-        if let Some(m) = &self.duration_metric {
-            m.record(
-                &opentelemetry_api::Context::new(),
-                start.elapsed().as_secs_f64(),
-                &[],
-            );
-        }
+        self.duration_metric.record(
+            &opentelemetry_api::Context::new(),
+            start.elapsed().as_secs_f64(),
+            &[],
+        );
 
         Ok(results)
     }
