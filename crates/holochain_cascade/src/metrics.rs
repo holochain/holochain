@@ -3,7 +3,7 @@ use opentelemetry_api::{global::meter_with_version, metrics::*};
 
 pub type CascadeDurationMetric = Histogram<f64>;
 
-static DURATION_METRIC: OnceCell::<CascadeDurationMetric> = OnceCell::new();
+static DURATION_METRIC: OnceCell<CascadeDurationMetric> = OnceCell::new();
 
 pub fn create_cascade_duration_metric() -> &'static CascadeDurationMetric {
     DURATION_METRIC.get_or_init(|| {
