@@ -4,49 +4,18 @@ use kitsune_p2p::gossip::sharded_gossip::GossipType;
 #[cfg(test)]
 mod tests;
 
-pub fn action_report(dbs: &Dbs, hash: ActionHash, expected_status: ItemStatus) -> ActionReport {
-    todo!()
-}
+pub mod query;
 
-pub struct OpInfo {
-    validation_status: Option<ValidationStatus>,
-    when_integrated: Option<Timestamp>,
-}
-
-fn op_info(txn: &mut Transaction) -> anyhow::Result<Option<OpInfo>>  {
-    let sql = "
-    SELECT 
-        DhtOp.validation_status,
-        DhtOp.when_integrated
-    FROM DhtOp
-    JOIN Action On DhtOp.action_hash = Action.hash
-    WHERE DhtOp.type IN (:create_type, :delete_type, :update_type)
-    AND DhtOp.basis_hash = :action_hash
-    AND DhtOp.when_integrated IS NOT NULL
-    AND DhtOp.validation_status IS NOT NULL
-    ";
-    Ok(txn.prepare(sql)?.query_row((), |row: &Row| {
-        // let action =
-        //     from_blob::<SignedAction>(row.get(row.as_ref().column_index("action_blob")?)?)?;
-        // let op_type = row.get(row.as_ref().column_index("dht_type")?)?;
-        let validation_status = row.get(row.as_ref().column_index("DhtOp.validation_status")?)?;
-        let when_integrated = row.get(row.as_ref().column_index("DhtOp.when_integrated")?)?;
-        Ok(OpInfo {validation_status, when_integrated})
-    }).optional()?)
-}
-
-pub fn op_report(
+pub fn action_report(
     subject: &Dbs,
     peers: &[Dbs],
-    hash: DhtOpHash,
+    hash: ActionHash,
     expected_status: ItemStatus,
-) -> anyhow::Result<OpReport> {
+) -> anyhow::Result<ActionReport> {
     match expected_status {
-        ItemStatus::Unseen => {
-            subject.
-        }
+        ItemStatus::Unseen => todo!(),
         ItemStatus::Exists => todo!(),
-        ItemStatus::Integrated => todo!(),
+        ItemStatus::Integrated(kind) => todo!(),
     }
 }
 
@@ -59,11 +28,25 @@ pub struct Dbs {
 }
 
 impl Dbs {
-    pub async fn as_authority<R>(&self, f: impl Fn(&mut Transaction) -> anyhow::Result<Option<R>>) -> anyhow::Result<Option<R>> {
-        if let Some(r) = self.authored.read_async(f).await {
+    pub async fn integrated<R: Send + 'static>(
+        &self,
+        f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
+    ) -> anyhow::Result<Option<R>> {
+        if let Some(r) = self.authored.write_async(f.clone()).await? {
             Ok(Some(r))
         } else {
-            todo!()
+            self.dht.write_async(f.clone()).await
+        }
+    }
+
+    pub async fn exists<R: Send + 'static>(
+        &self,
+        f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
+    ) -> anyhow::Result<Option<R>> {
+        if let Some(r) = self.authored.write_async(f.clone()).await? {
+            Ok(Some(r))
+        } else {
+            self.dht.write_async(f.clone()).await
         }
     }
 }
@@ -90,8 +73,8 @@ pub enum ItemStatus {
     /// The item exists either in the cache via a `get`, or is pending integration.
     /// The significance of this is that it will be available for `must_get_*` calls.
     Exists,
-    /// The item is fully integrated
-    Integrated,
+    /// The item is fully integrated under this authority type
+    Integrated(DhtOpType),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -241,7 +224,10 @@ pub struct Integrated {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ActionReport {}
+pub enum ActionReport {
+    Pass { step: Option<Step> },
+    Fail { step: Option<Step> },
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OpReport {
