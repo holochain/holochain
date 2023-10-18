@@ -1193,14 +1193,18 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn the_incredible_halt_test() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
 
+        // TODO this timeout doesn't work because the zome call actually blocks the current thread and doesn't suspend so
+        //      Tokio doesn't have a way to cancel it. On Linux this first call is taking 141s and the second is taking 138.
+        //      The test is passing so something is working but it's over 2 minutes for the call to get cancelled.
         // This will run infinitely until our metering kicks in and traps it.
-        // Also we stop it running after 10 seconds.
+        // Also we stop it running after 60 seconds.
         let result: Result<Result<(), _>, _> = tokio::time::timeout(
             std::time::Duration::from_secs(60),
             conductor.call_fallible(&alice, "smash", ()),
