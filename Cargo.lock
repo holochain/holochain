@@ -2885,6 +2885,7 @@ dependencies = [
  "kitsune_p2p",
  "matches",
  "mockall",
+ "once_cell",
  "pretty_assertions 0.7.2",
  "serde",
  "serde_derive",
