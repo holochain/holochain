@@ -826,24 +826,14 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
             let all_peers = futures::future::join_all(peer_fut_list).await;
 
-            let now_ms = std::time::SystemTime::UNIX_EPOCH
-                .elapsed()
-                .unwrap()
-                .as_millis() as f64;
-
             #[derive(serde::Serialize)]
             #[serde(rename_all = "camelCase")]
             struct Agent {
-                pub agent_pub_key: String,
-                pub dna_hash: String,
-                pub expires_in_seconds: f64,
+                pub expires_at_millis: u64,
             }
-
-            let mut correlation: HashMap<String, Vec<Agent>> = HashMap::new();
 
             for peer in all_peers {
                 for peer in peer? {
-                    use base64::Engine;
                     if let Some(net_key) = peer.url_list.get(0).map(|u| {
                         kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
                             .digest()
@@ -853,37 +843,45 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                             continue;
                         }
 
-                        let agent_pub_key = format!(
-                            "uhCAk{}",
-                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.agent)
-                        );
+                        let r = stats
+                            .as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .entry(net_key)
+                            .or_insert_with(|| serde_json::json!({}));
+
+                        let r = r
+                            .as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .entry("hcDnaHashesToAgents".to_string())
+                            .or_insert_with(|| serde_json::json!({}));
+
+                        use base64::Engine;
+
                         let dna_hash = format!(
                             "uhC0k{}",
                             base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.space)
                         );
+
+                        let r = r
+                            .as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .entry(dna_hash)
+                            .or_insert_with(|| serde_json::json!({}));
+
+                        let agent_pub_key = format!(
+                            "uhCAk{}",
+                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.agent)
+                        );
+
                         let agent = Agent {
-                            agent_pub_key,
-                            dna_hash,
-                            expires_in_seconds: (peer.expires_at_ms as f64 - now_ms) / 1000.0,
+                            expires_at_millis: peer.expires_at_ms,
                         };
 
-                        match correlation.entry(net_key) {
-                            Entry::Occupied(mut e) => {
-                                e.get_mut().push(agent);
-                            }
-                            Entry::Vacant(e) => {
-                                e.insert(vec![agent]);
-                            }
-                        }
+                        r.as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .insert(agent_pub_key, serde_json::json!(agent));
                     }
                 }
-            }
-
-            if let Some(obj) = stats.as_object_mut() {
-                obj.insert(
-                    "netToHcAgentCorrelation".to_string(),
-                    serde_json::json!(correlation),
-                );
             }
 
             Ok(stats)

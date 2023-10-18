@@ -112,11 +112,11 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // See if we can fetch metric data from bobbo
     let metrics = conductors[1].dump_network_metrics(None).await?;
-    println!("@!@! - metrics: {metrics}");
+    tracing::info!(target: "TEST", "@!@! - metrics: {metrics}");
 
     // See if we can fetch network stats from bobbo
     let stats = conductors[1].dump_network_stats().await?;
-    println!("@!@! - stats: {stats}");
+    tracing::info!(target: "TEST", "@!@! - stats: {stats}");
 
     Ok(())
 }
