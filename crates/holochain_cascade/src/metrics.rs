@@ -15,7 +15,7 @@ pub fn create_cascade_duration_metric() -> &'static CascadeDurationMetric {
         )
         .f64_histogram("hc.cascade.duration")
         .with_unit(Unit::new("s"))
-        .with_description("The duration in milliseconds to execute a cascade query")
+        .with_description("The time taken to execute a cascade query")
         .init()
     })
 }

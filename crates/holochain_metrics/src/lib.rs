@@ -94,6 +94,12 @@
 //! | `tx5.conn.data.recv` | `u64_observable_counter` | `By` | Bytes received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.send.message.count` | `u64_observable_counter` | | Message count sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.recv.message.count` | `u64_observable_counter` | | Message count received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `hc.conductor.p2p_event.duration`  | `f64_histogram` | `s` | The time spent processing a p2p event. |- `dna_hash`: The DNA hash that this event is being sent on behalf of. |
+//! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
+//! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
+//! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
+//! | `hc.db.pool.utilization` | `f64_gauge` | | The utilisation of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
+//! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 
 #[cfg(feature = "influxive")]
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
