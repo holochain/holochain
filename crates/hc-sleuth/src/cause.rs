@@ -18,8 +18,10 @@ impl<T: Fact + 'static> From<T> for ACause {
 }
 
 pub trait Cause: std::fmt::Debug {
-    fn backtrack(&self) -> (bool, Vec<AFact>);
+    fn backtrack(&self) -> FactPath;
 }
+
+pub type FactPath = Vec<AFact>;
 
 #[derive(Clone, Debug, derive_more::Constructor)]
 pub struct Any(Vec<AFact>);
@@ -28,19 +30,19 @@ pub struct Any(Vec<AFact>);
 pub struct Every(Vec<AFact>);
 
 impl Cause for () {
-    fn backtrack(&self) -> (bool, Vec<AFact>) {
+    fn backtrack(&self) -> FactPath {
         unreachable!()
     }
 }
 
 impl Cause for Any {
-    fn backtrack(&self) -> (bool, Vec<AFact>) {
+    fn backtrack(&self) -> FactPath {
         todo!()
     }
 }
 
 impl Cause for Every {
-    fn backtrack(&self) -> (bool, Vec<AFact>) {
+    fn backtrack(&self) -> FactPath {
         todo!()
     }
 }

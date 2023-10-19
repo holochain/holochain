@@ -17,16 +17,16 @@ impl AFact {
 }
 
 impl Cause for AFact {
-    fn backtrack(&self) -> (bool, Vec<AFact>) {
+    fn backtrack(&self) -> FactPath {
         let pass = self.check();
         if pass {
-            return (true, vec![]);
+            // Terminate backtrack as soon as a passing check is reached
+            vec![]
         } else {
-            let (cause_pass, mut passes) = self.cause().backtrack();
-            if cause_pass {
-                passes.push(self.clone());
-            }
-            (false, passes)
+            // Add this fact to the path
+            let mut facts = self.cause().backtrack();
+            facts.push(self.clone());
+            facts
         }
     }
 }
