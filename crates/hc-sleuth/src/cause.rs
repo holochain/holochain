@@ -13,15 +13,15 @@ impl ACause {
 
 impl<T: Fact + 'static> From<T> for ACause {
     fn from(f: T) -> Self {
-        ACause(Arc::new(AFact::new(f)))
+        ACause(Arc::new(f))
     }
 }
 
 pub trait Cause: std::fmt::Debug {
-    fn backtrack(&self) -> FactPath;
+    fn backtrack(&self) -> Report;
 }
 
-pub type FactPath = Vec<AFact>;
+pub type Report = Vec<String>;
 
 #[derive(Clone, Debug, derive_more::Constructor)]
 pub struct Any(Vec<AFact>);
@@ -29,20 +29,14 @@ pub struct Any(Vec<AFact>);
 #[derive(Clone, Debug, derive_more::Constructor)]
 pub struct Every(Vec<AFact>);
 
-impl Cause for () {
-    fn backtrack(&self) -> FactPath {
-        unreachable!()
-    }
-}
-
 impl Cause for Any {
-    fn backtrack(&self) -> FactPath {
+    fn backtrack(&self) -> Report {
         todo!()
     }
 }
 
 impl Cause for Every {
-    fn backtrack(&self) -> FactPath {
+    fn backtrack(&self) -> Report {
         todo!()
     }
 }
@@ -69,23 +63,23 @@ macro_rules! any {
 mod tests {
     use std::sync::atomic::AtomicU8;
 
-    use crate::{ACause, AFact, Cause, Fact};
+    use crate::{ACause, Cause, Fact};
 
-    #[derive(Clone)]
-    struct F(u8, bool, ACause);
+    #[derive(Clone, PartialEq, Eq)]
+    struct F<C>(u8, bool, C);
 
     static ID: AtomicU8 = AtomicU8::new(0);
 
-    impl std::fmt::Debug for F {
+    impl<C> std::fmt::Debug for F<C> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_tuple("F").field(&self.0).finish()
         }
     }
 
-    impl F {
-        pub fn new(check: bool, cause: impl Cause + 'static) -> AFact {
-            let id = ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            AFact::new(Self(dbg!(id), dbg!(check), ACause::new(cause)))
+    impl<C: Cause> F<C> {
+        pub fn new(id: u8, check: bool, cause: C) -> Self {
+            // let id = ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Self(id, check, cause)
         }
 
         pub fn id(&self) -> u8 {
@@ -93,9 +87,13 @@ mod tests {
         }
     }
 
-    impl Fact for F {
+    impl<C: Cause + Clone + 'static> Fact for F<C> {
         fn cause(&self) -> ACause {
-            self.2.clone()
+            ACause::new(self.2.clone())
+        }
+
+        fn report(&self) -> String {
+            format!("F({})", self.id())
         }
 
         fn check(&self) -> bool {
@@ -105,10 +103,10 @@ mod tests {
 
     #[test]
     fn complex() {
-        let a = F::new(true, ());
-        let b = F::new(true, a);
-        let c = F::new(false, b);
-        let d = F::new(false, c);
+        let a = F::new(1, true, ());
+        let b = F::new(2, true, a);
+        let c = F::new(3, false, b);
+        let d = F::new(4, false, c);
 
         dbg!(d.backtrack());
     }
