@@ -1,23 +1,11 @@
-use holochain_state::prelude::*;
-use kitsune_p2p::gossip::sharded_gossip::GossipType;
+pub use holochain_state::prelude::*;
+pub use kitsune_p2p::gossip::sharded_gossip::GossipType;
 
 #[cfg(test)]
 mod tests;
 
+mod fact;
 pub mod query;
-
-pub fn action_report(
-    subject: &Dbs,
-    peers: &[Dbs],
-    hash: ActionHash,
-    expected_status: ItemStatus,
-) -> anyhow::Result<ActionReport> {
-    match expected_status {
-        ItemStatus::Unseen => todo!(),
-        ItemStatus::Exists => todo!(),
-        ItemStatus::Integrated(kind) => todo!(),
-    }
-}
 
 pub struct Dbs {
     pub authored: TestDb<DbKindAuthored>,
@@ -43,11 +31,7 @@ impl Dbs {
         &self,
         f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
     ) -> anyhow::Result<Option<R>> {
-        if let Some(r) = self.authored.write_async(f.clone()).await? {
-            Ok(Some(r))
-        } else {
-            self.dht.write_async(f.clone()).await
-        }
+        todo!()
     }
 }
 

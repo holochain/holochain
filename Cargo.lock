@@ -2484,9 +2484,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
+ "derive_more",
  "hc-sleuth",
  "holochain_state",
  "kitsune_p2p",
+ "once_cell",
 ]
 
 [[package]]

@@ -7,7 +7,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
+derive_more = "0.99"
 holochain_state = { path = "../holochain_state" }
+once_cell = "1.18"
 kitsune_p2p = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/kitsune_p2p" }
 
 [dev-dependencies]
