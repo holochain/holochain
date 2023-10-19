@@ -1,11 +1,15 @@
 pub use holochain_state::prelude::*;
 pub use kitsune_p2p::gossip::sharded_gossip::GossipType;
 
+#[macro_use]
+mod cause;
+mod fact;
+pub use cause::*;
+pub use fact::*;
+pub mod query;
+
 #[cfg(test)]
 mod tests;
-
-mod fact;
-pub mod query;
 
 pub struct Dbs {
     pub authored: TestDb<DbKindAuthored>,

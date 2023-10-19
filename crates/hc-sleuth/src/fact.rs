@@ -2,170 +2,161 @@ use std::sync::Arc;
 
 use crate::*;
 
-#[derive(Clone, derive_more::Deref)]
+pub trait Fact: std::fmt::Debug {
+    fn cause(&self) -> ACause;
+    fn check(&self) -> bool;
+}
+
+#[derive(Clone, Debug, derive_more::Deref)]
 pub struct AFact(Arc<dyn Fact>);
 
-impl<F: Fact + 'static> From<F> for AFact {
-    fn from(f: F) -> Self {
-        AFact(Arc::new(f))
+impl AFact {
+    pub fn new(f: impl Fact + 'static) -> Self {
+        Self(Arc::new(f))
     }
 }
 
-macro_rules! causes {
-    ( $($c:expr),+ ) => {
-        vec![$(AFact::from($c)),+]
-    };
-}
-
-macro_rules! every {
-    ( $($c:expr),+ ) => {
-        AFact::from(Every(causes![$(($c)),+]))
-    };
-}
-
-macro_rules! any {
-    ( $($c:expr),+ ) => {
-        AFact::from(Any(causes![$(($c)),+]))
-    };
-}
-
-pub trait Fact {
-    fn cause(&self) -> AFact;
-    fn check(&self) -> anyhow::Result<bool>;
-    fn traverse(&self) -> Vec<AFact> {
-        self.cause().traverse()
+impl Cause for AFact {
+    fn backtrack(&self) -> (bool, Vec<AFact>) {
+        let pass = self.check();
+        if pass {
+            return (true, vec![]);
+        } else {
+            let (cause_pass, mut passes) = self.cause().backtrack();
+            if cause_pass {
+                passes.push(self.clone());
+            }
+            (false, passes)
+        }
     }
 }
 
-pub struct Every(Vec<AFact>);
-pub struct Any(Vec<AFact>);
-
-impl Fact for Any {
-    fn cause(&self) -> AFact {
-        todo!()
+impl Fact for () {
+    fn cause(&self) -> ACause {
+        ().into()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
-        todo!()
+    fn check(&self) -> bool {
+        unreachable!()
     }
 }
 
 pub type OpRef = (ActionHash, DhtOpType);
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct ActionIntegrated {
     op: OpRef,
 }
 impl Fact for ActionIntegrated {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         OpIntegrated::new(self.op.clone()).into()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct OpIntegrated {
     op: OpRef,
 }
 impl Fact for OpIntegrated {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         OpAppValidated::new(self.op.clone()).into()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct OpAppValidated {
     op: OpRef,
 }
 impl Fact for OpAppValidated {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         OpSysValidated::new(self.op.clone()).into()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct OpSysValidated {
     op: OpRef,
 }
 impl Fact for OpSysValidated {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         any![
             ActionAuthored::new(self.op.0.clone()),
             OpFetched::new(self.op.clone())
         ]
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct OpFetched {
     op: OpRef,
 }
 impl Fact for OpFetched {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         any![
             PublishReceived::new(self.op.clone()),
             GossipReceived::new(self.op.clone())
         ]
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct GossipReceived {
     op: OpRef,
 }
 impl Fact for GossipReceived {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         todo!()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct PublishReceived {
     op: OpRef,
 }
 impl Fact for PublishReceived {
-    fn cause(&self) -> AFact {
+    fn cause(&self) -> ACause {
         todo!()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }
 
-#[derive(derive_more::Constructor)]
+#[derive(Debug, derive_more::Constructor)]
 pub struct ActionAuthored {
     action: ActionHash,
 }
 impl Fact for ActionAuthored {
-    fn cause(&self) -> AFact {
-        todo!()
+    fn cause(&self) -> ACause {
+        ().into()
     }
 
-    fn check(&self) -> anyhow::Result<bool> {
+    fn check(&self) -> bool {
         todo!()
     }
 }

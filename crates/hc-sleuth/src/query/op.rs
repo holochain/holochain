@@ -5,7 +5,7 @@ pub struct OpInfo {
     when_integrated: Option<Timestamp>,
 }
 
-pub fn op_info(txn: &mut Transaction) -> anyhow::Result<Option<OpInfo>> {
+pub fn op_valid(txn: &mut Transaction) -> anyhow::Result<Option<OpInfo>> {
     let sql = "
     SELECT 
         DhtOp.validation_status,
