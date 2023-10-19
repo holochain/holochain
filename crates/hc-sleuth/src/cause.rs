@@ -92,7 +92,7 @@ mod tests {
             ACause::new(self.2.clone())
         }
 
-        fn report(&self) -> String {
+        fn explain(&self) -> String {
             format!("F({})", self.id())
         }
 

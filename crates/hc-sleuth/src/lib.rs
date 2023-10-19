@@ -8,6 +8,8 @@ pub use cause::*;
 pub use fact::*;
 pub mod query;
 
+mod holochain;
+
 #[cfg(test)]
 mod tests;
 
