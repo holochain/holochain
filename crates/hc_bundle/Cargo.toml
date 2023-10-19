@@ -19,7 +19,7 @@ name = "hc-dna"
 path = "src/bin/hc-dna.rs"
 
 [dependencies]
-holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
+holochain_wasmer_host = "=0.0.86"
 wasmer = "=4.2.2"
 futures = "0.3"
 anyhow = "1.0"

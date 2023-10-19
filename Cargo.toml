@@ -90,9 +90,9 @@ lto = true
 # tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
-holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
-holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
-holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
+# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }

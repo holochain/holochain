@@ -354,26 +354,47 @@ impl RealRibosome {
     }
 
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<ModuleWithStore>> {
-        if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-            .get()
-            .is_none()
-        {
-            holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-                .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
-                    cranelift,
-                )))
-                // An error here means the cell is full when we tried to set it, so
-                // some other thread must have done something in between the get
-                // above and the set here. In this case we don't care as we don't
-                // have any competing code paths that could set it to something
-                // unexpected.
-                .ok();
+        match holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.get() {
+            Some(cache) => {
+                Ok(cache.write().get(
+                    self.wasm_cache_key(zome_name)?,
+                    &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+                )?)
+            },
+            None => {
+                // This can stampede but we don't really care. Just ignore any errors
+                // as the initialization is always the same.
+                let _ = holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+                    .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
+                        cranelift,
+                    )));
+                // This will recurse at most once because the only condition of recursion
+                // is if the cache is empty, which we just set above.
+                self.runtime_compiled_module(zome_name)
+            }
         }
 
-        Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
-            self.wasm_cache_key(zome_name)?,
-            &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-        )?)
+
+        // if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+        //     .get()
+        //     .is_none()
+        // {
+        //     holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
+        //         .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
+        //             cranelift,
+        //         )))
+        //         // An error here means the cell is full when we tried to set it, so
+        //         // some other thread must have done something in between the get
+        //         // above and the set here. In this case we don't care as we don't
+        //         // have any competing code paths that could set it to something
+        //         // unexpected.
+        //         .ok();
+        // }
+
+        // Ok(holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.get(
+        //     self.wasm_cache_key(zome_name)?,
+        //     &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+        // )?)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
