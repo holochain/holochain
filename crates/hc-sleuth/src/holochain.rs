@@ -1,5 +1,13 @@
 use crate::*;
 
+mod action_integrated;
+mod op_app_validated;
+mod op_integrated;
+
+pub use action_integrated::*;
+pub use op_app_validated::*;
+pub use op_integrated::*;
+
 pub type OpRef = (ActionHash, DhtOpType);
 
 #[derive(Debug, derive_more::Constructor)]
@@ -11,7 +19,7 @@ impl Fact for ActionIntegrated {
         OpIntegrated::new(self.op.clone()).into()
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 
@@ -39,7 +47,7 @@ impl Fact for OpIntegrated {
         )
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }
@@ -57,7 +65,7 @@ impl Fact for OpAppValidated {
         format!("Op is not app validated")
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }
@@ -78,7 +86,7 @@ impl Fact for OpSysValidated {
         format!("Op is not sys validated")
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }
@@ -99,7 +107,7 @@ impl Fact for OpFetched {
         format!("Op was not fetched")
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }
@@ -117,7 +125,7 @@ impl Fact for GossipReceived {
         format!("Op was not received via gossip")
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }
@@ -135,7 +143,7 @@ impl Fact for PublishReceived {
         format!("Op was not received via publish")
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }
@@ -153,7 +161,7 @@ impl Fact for ActionAuthored {
         format!("Action {} was never authored", self.action)
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         todo!()
     }
 }

@@ -1,4 +1,4 @@
-use crate::{ACause, Cause, Fact, Report, ReportItem};
+use crate::{ACause, Cause, Context, Fact, Report, ReportItem};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct F<C>(u8, bool, C);
@@ -29,7 +29,7 @@ impl<C: Cause + Clone + 'static> Fact for F<C> {
         self.id().to_string()
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, ctx: &Context) -> bool {
         self.1
     }
 }

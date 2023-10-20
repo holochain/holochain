@@ -4,7 +4,7 @@ use crate::*;
 
 pub trait Fact: std::fmt::Debug {
     fn cause(&self) -> ACause;
-    fn check(&self) -> bool;
+    fn check(&self, ctx: &Context) -> bool;
     fn explain(&self) -> String;
 }
 
@@ -24,14 +24,14 @@ impl AFact {
 }
 
 impl<F: Fact> Cause for F {
-    fn backtrack(&self) -> Report {
-        let pass = self.check();
+    fn backtrack(&self, ctx: &Context) -> Report {
+        let pass = self.check(ctx);
         if pass {
             // Terminate backtracking as soon as a passing check is reached
             Report::from(vec![])
         } else {
             // Add this fact to the path
-            let mut report = self.cause().backtrack();
+            let mut report = self.cause().backtrack(ctx);
             report.push(ReportItem::Line(self.explain()));
             report
         }
@@ -43,7 +43,7 @@ impl Fact for () {
         ().into()
     }
 
-    fn check(&self) -> bool {
+    fn check(&self, _: &Context) -> bool {
         true
     }
 

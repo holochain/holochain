@@ -1,6 +1,8 @@
 // TODO: remove
 #![allow(warnings)]
 
+use std::collections::HashMap;
+
 pub use holochain_state::prelude::*;
 pub use kitsune_p2p::gossip::sharded_gossip::GossipType;
 
@@ -22,7 +24,7 @@ mod holochain;
 #[cfg(test)]
 mod tests;
 
-pub struct Dbs {
+pub struct NodeEnv {
     pub authored: TestDb<DbKindAuthored>,
     pub cache: TestDb<DbKindCache>,
     pub dht: TestDb<DbKindDht>,
@@ -30,7 +32,20 @@ pub struct Dbs {
     pub metrics: TestDb<DbKindP2pMetrics>,
 }
 
-impl Dbs {
+#[derive(Default)]
+pub struct NodeGroup {
+    pub nodes: Vec<NodeEnv>,
+    pub agent_map: HashMap<AgentPubKey, NodeId>,
+}
+
+pub type NodeId = usize;
+
+#[derive(Default)]
+pub struct Context {
+    nodes: NodeGroup,
+}
+
+impl NodeEnv {
     pub async fn integrated<R: Send + 'static>(
         &self,
         f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
@@ -51,7 +66,7 @@ impl Dbs {
 }
 
 #[cfg(feature = "test_utils")]
-impl Dbs {
+impl NodeEnv {
     pub fn test() -> Self {
         Self {
             authored: test_authored_db(),
