@@ -2489,6 +2489,7 @@ dependencies = [
  "holochain_state",
  "kitsune_p2p",
  "once_cell",
+ "pretty_assertions 0.6.1",
 ]
 
 [[package]]

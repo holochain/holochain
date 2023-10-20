@@ -11,6 +11,12 @@ impl ACause {
     }
 }
 
+impl Cause for ACause {
+    fn backtrack(&self) -> Report {
+        self.0.backtrack()
+    }
+}
+
 impl<T: Fact + 'static> From<T> for ACause {
     fn from(f: T) -> Self {
         ACause(Arc::new(f))
@@ -21,17 +27,23 @@ pub trait Cause: std::fmt::Debug {
     fn backtrack(&self) -> Report;
 }
 
-pub type Report = Vec<String>;
+#[derive(Clone, Debug, derive_more::Constructor)]
+pub struct Any(Vec<ACause>);
 
 #[derive(Clone, Debug, derive_more::Constructor)]
-pub struct Any(Vec<AFact>);
-
-#[derive(Clone, Debug, derive_more::Constructor)]
-pub struct Every(Vec<AFact>);
+pub struct Every(Vec<ACause>);
 
 impl Cause for Any {
     fn backtrack(&self) -> Report {
-        todo!()
+        let mut reports = vec![];
+        for c in self.0.iter() {
+            let report = c.backtrack();
+            if report.is_empty() {
+                return vec![];
+            }
+            reports.push(report)
+        }
+        vec![ReportItem::Fork(reports)]
     }
 }
 
@@ -41,73 +53,63 @@ impl Cause for Every {
     }
 }
 
-macro_rules! facts {
+macro_rules! causes {
     ( $($c:expr),+ ) => {
-        vec![$(AFact::new($c)),+]
+        vec![$($crate::ACause::new($c)),+]
     };
 }
 
+#[macro_export]
 macro_rules! every {
     ( $($c:expr),+ ) => {
-        ACause::new(Every::new(facts![$(($c)),+]))
+        $crate::ACause::new($crate::Every::new(causes![$(($c)),+]))
     };
 }
 
+#[macro_export]
 macro_rules! any {
     ( $($c:expr),+ ) => {
-        ACause::new(Any::new(facts![$(($c)),+]))
+        $crate::ACause::new($crate::Any::new(causes![$(($c)),+]))
     };
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::AtomicU8;
 
-    use crate::{ACause, Cause, Fact};
+    use pretty_assertions::assert_eq;
 
-    #[derive(Clone, PartialEq, Eq)]
-    struct F<C>(u8, bool, C);
-
-    static ID: AtomicU8 = AtomicU8::new(0);
-
-    impl<C> std::fmt::Debug for F<C> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_tuple("F").field(&self.0).finish()
-        }
-    }
-
-    impl<C: Cause> F<C> {
-        pub fn new(id: u8, check: bool, cause: C) -> Self {
-            // let id = ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Self(id, check, cause)
-        }
-
-        pub fn id(&self) -> u8 {
-            self.0
-        }
-    }
-
-    impl<C: Cause + Clone + 'static> Fact for F<C> {
-        fn cause(&self) -> ACause {
-            ACause::new(self.2.clone())
-        }
-
-        fn explain(&self) -> String {
-            format!("F({})", self.id())
-        }
-
-        fn check(&self) -> bool {
-            self.1
-        }
-    }
+    use crate::{report, test_fact::F, Cause};
 
     #[test]
-    fn complex() {
+    fn single_path() {
         let a = F::new(1, true, ());
         let b = F::new(2, true, a);
         let c = F::new(3, false, b);
         let d = F::new(4, false, c);
+        let e = F::new(5, true, d);
 
-        dbg!(d.backtrack());
+        assert_eq!(a.backtrack(), report![]);
+        assert_eq!(b.backtrack(), report![]);
+        assert_eq!(c.backtrack(), report![c]);
+        assert_eq!(d.backtrack(), report![d, e]);
+        assert_eq!(e.backtrack(), report![]);
+    }
+
+    #[test]
+    fn any() {
+        let a0 = F::new(1, true, ());
+        let a1 = F::new(2, true, a0);
+
+        let b0 = F::new(3, true, ());
+        let b1 = F::new(4, false, b0);
+
+        let c0 = F::new(5, false, ());
+        let c1 = F::new(6, false, c0);
+
+        let d = F::new(7, false, any![a1, b1, c1]);
+        let e = F::new(8, false, any![b1, c1]);
+
+        assert_eq!(d.backtrack(), report!(d));
+        // assert_eq!(e.backtrack(), report![[b1, [c0, c1]], e]);
     }
 }

@@ -1,3 +1,6 @@
+// TODO: remove
+#![allow(warnings)]
+
 pub use holochain_state::prelude::*;
 pub use kitsune_p2p::gossip::sharded_gossip::GossipType;
 
@@ -7,6 +10,12 @@ mod fact;
 pub use cause::*;
 pub use fact::*;
 pub mod query;
+#[macro_use]
+pub(crate) mod report;
+pub use report::*;
+
+#[cfg(test)]
+pub mod test_fact;
 
 mod holochain;
 

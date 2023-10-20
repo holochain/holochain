@@ -15,6 +15,7 @@ kitsune_p2p = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/kitsune_p
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }
 hc-sleuth = { path = ".", features = ["test_utils"]}
+pretty_assertions = "*"
 
 [features]
 

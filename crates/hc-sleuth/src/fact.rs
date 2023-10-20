@@ -32,7 +32,7 @@ impl<F: Fact> Cause for F {
         } else {
             // Add this fact to the path
             let mut report = self.cause().backtrack();
-            report.push(self.explain());
+            report.push(ReportItem::Line(self.explain()));
             report
         }
     }
