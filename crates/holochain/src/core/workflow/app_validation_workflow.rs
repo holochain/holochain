@@ -93,9 +93,9 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
-    let start_len = sorted_ops.len();
-    tracing::debug!("validating {} ops", start_len);
-    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
+    let num_ops_to_validate = sorted_ops.len();
+    tracing::debug!("validating {num_ops_to_validate} ops");
+    let start = (num_ops_to_validate >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
 
     // Validate all the ops
@@ -165,7 +165,7 @@ async fn app_validation_workflow_inner(
     let mut iter =
         tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
 
-    let mut total = 0;
+    let mut ops_validated = 0;
     let mut round_time = start.is_some().then(std::time::Instant::now);
     // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
@@ -246,15 +246,16 @@ async fn app_validation_workflow_inner(
                     .await?;
             }
         }
-        total += t;
+        ops_validated += t;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();
             *round_time = std::time::Instant::now();
-            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let avg_ops_ps =
+                ops_validated as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
             let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
             tracing::warn!(
                 "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
-                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
+                (num_ops_to_validate - ops_validated) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
                 avg_ops_ps,
                 ops_ps
             );
@@ -264,12 +265,11 @@ async fn app_validation_workflow_inner(
             t,
             a,
             r,
-            total
+            ops_validated
         );
     }
     jh.await?;
-    tracing::debug!("accepted {} ops", total);
-    Ok(if saturated {
+    Ok(if saturated || ops_validated < num_ops_to_validate {
         WorkComplete::Incomplete
     } else {
         WorkComplete::Complete
