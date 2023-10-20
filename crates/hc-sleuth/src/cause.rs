@@ -39,11 +39,11 @@ impl Cause for Any {
         for c in self.0.iter() {
             let report = c.backtrack();
             if report.is_empty() {
-                return vec![];
+                return Report::from(vec![]);
             }
-            reports.push(report)
+            reports.push(report.into())
         }
-        vec![ReportItem::Fork(reports)]
+        Report::from(vec![ReportItem::Fork(reports)])
     }
 }
 
@@ -78,7 +78,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    use crate::{report, test_fact::F, Cause};
+    use crate::{item, report, test_fact::F, Cause, Report};
 
     #[test]
     fn single_path() {
@@ -96,6 +96,14 @@ mod tests {
     }
 
     #[test]
+    fn all_fail() {
+        let a = F::new(1, false, ());
+        let b = F::new(2, false, a);
+        let c = F::new(3, false, b);
+        assert_eq!(c.backtrack(), report![a, b, c]);
+    }
+
+    #[test]
     fn any() {
         let a0 = F::new(1, true, ());
         let a1 = F::new(2, true, a0);
@@ -109,7 +117,33 @@ mod tests {
         let d = F::new(7, false, any![a1, b1, c1]);
         let e = F::new(8, false, any![b1, c1]);
 
+        // a1 passes, so d is the sole failure
         assert_eq!(d.backtrack(), report!(d));
-        // assert_eq!(e.backtrack(), report![[b1, [c0, c1]], e]);
+        // a1 passes, so d is the sole failure
+        assert_eq!(
+            e.backtrack(),
+            Report::from(vec![item!([b1], [c0, c1]), item!(e)])
+        );
+    }
+
+    #[test]
+    fn every() {
+        let a0 = F::new(1, true, ());
+        let a1 = F::new(2, true, a0);
+
+        let b0 = F::new(3, true, ());
+        let b1 = F::new(4, false, b0);
+
+        let c0 = F::new(5, false, ());
+        let c1 = F::new(6, false, c0);
+
+        let d = F::new(7, false, every![a1, b0]);
+        let e = F::new(8, false, every![a1, b1]);
+
+        assert_eq!(d.backtrack(), report!(d));
+        assert_eq!(
+            e.backtrack(),
+            Report::from(vec![item!([b1], [c0, c1]), item!(e)])
+        );
     }
 }

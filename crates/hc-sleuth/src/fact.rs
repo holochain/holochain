@@ -28,7 +28,7 @@ impl<F: Fact> Cause for F {
         let pass = self.check();
         if pass {
             // Terminate backtracking as soon as a passing check is reached
-            vec![]
+            Report::from(vec![])
         } else {
             // Add this fact to the path
             let mut report = self.cause().backtrack();
