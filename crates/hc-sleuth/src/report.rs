@@ -9,12 +9,12 @@ pub enum ReportItem {
 }
 
 #[macro_export]
-macro_rules! report_item {
-    ( [ $( [ $($f:expr),+ ] ),+ ] ) => {
+macro_rules! item {
+    ( $( [ $($f:expr),+ ] ),+ ) => {
         $crate::ReportItem::Fork(vec![
             $(
                 vec![ $(
-                    report_item![ $f ]
+                    item![ $f ]
                 ),+ ]
             ),+
         ])
@@ -25,28 +25,27 @@ macro_rules! report_item {
             $crate::ReportItem::Line($f.explain())
         }
     };
-
 }
 
 #[macro_export]
 macro_rules! report {
-    ( $( $f:expr ),* ) => {
-        vec![ $( $crate::report_item![$f] ),* ]
-    };
-
+    ( $( $f:expr ),* ) => {{
+        use $crate::Fact;
+        vec![ $( $crate::item!($f) ),* ]
+    }};
 }
 
 #[test]
-fn report_item() {
+fn item() {
     use crate::test_fact::F;
     use pretty_assertions::assert_eq;
 
     let f = |id| F::new(id, false, ());
 
-    assert_eq!(report_item!(f(1)), ReportItem::Line(f(1).explain()));
+    assert_eq!(item!(f(1)), ReportItem::Line(f(1).explain()));
 
     assert_eq!(
-        report_item!([[f(1)], [f(2), f(3)]]),
+        item!([f(1)], [f(2), f(3)]),
         ReportItem::Fork(vec![
             vec![ReportItem::Line(f(1).explain())],
             vec![
@@ -79,9 +78,9 @@ fn reports() {
     ];
 
     assert_eq!(report1, report![f(11), f(12), f(13)]);
-    assert_eq!(report2, report![f(21), f(22), f(23)]);
+    assert_eq!(report2, report![f(21), f(22)]);
 
-    let item = report_item!([[f(11), f(12), f(13)], [f(21), f(22)]]);
-    let expected3 = report![f(31), [[f(11), f(12), f(13)], [f(21), f(22)]]];
+    let item = item!([f(11), f(12), f(13)], [f(21), f(22)]);
+    let expected3 = vec![item!(f(31)), item!([f(11), f(12), f(13)], [f(21), f(22)])];
     assert_eq!(dbg!(report3), dbg!(expected3));
 }
