@@ -43,6 +43,7 @@ pub struct Every(Vec<ACause>);
 
 impl Cause for Any {
     fn backtrack(&self, ctx: &Context) -> Report {
+        // TODO: prune paths that don't have a single True
         let mut reports = vec![];
         for c in self.0.iter() {
             let report = c.backtrack(ctx);

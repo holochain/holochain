@@ -43,7 +43,9 @@ impl Fact for OpPublished {
                 },
                 |row| row.get::<_, Option<i64>>(0),
             )
+            .optional()
             .unwrap()
+            .flatten()
             .is_some()
         })
     }
@@ -83,7 +85,9 @@ impl Fact for OpIntegrated {
                 },
                 |row| row.get::<_, Option<i64>>(0),
             )
+            .optional()
             .unwrap()
+            .flatten()
             .is_some()
         })
     }
