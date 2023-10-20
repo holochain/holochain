@@ -25,6 +25,14 @@ impl<T: Fact + 'static> From<T> for ACause {
 
 pub trait Cause: std::fmt::Debug {
     fn backtrack(&self, ctx: &Context) -> Report;
+
+    fn report(&self, ctx: &Context) {
+        let report = self.backtrack(ctx);
+        if !report.is_empty() {
+            println!("hc_sleuth fact check failed. Report:\n{}", report.pretty());
+            panic!("hc_sleuth fact check failed");
+        }
+    }
 }
 
 #[derive(Clone, Debug, derive_more::Constructor)]

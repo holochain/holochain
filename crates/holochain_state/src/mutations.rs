@@ -3,7 +3,7 @@ use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
-use crate::validation_db::ValidationLimboStatus;
+use crate::validation_db::ValidationStage;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
@@ -441,15 +441,8 @@ pub fn set_require_receipt(
 pub fn set_validation_stage(
     txn: &mut Transaction,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    stage: ValidationStage,
 ) -> StateMutationResult<()> {
-    let stage = match status {
-        ValidationLimboStatus::Pending => None,
-        ValidationLimboStatus::AwaitingSysDeps(_) => Some(0),
-        ValidationLimboStatus::SysValidated => Some(1),
-        ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
-        ValidationLimboStatus::AwaitingIntegration => Some(3),
-    };
     let now = holochain_zome_types::prelude::Timestamp::now();
     txn.execute(
         "

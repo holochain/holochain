@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use hc_sleuth::Cause;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -489,12 +490,23 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let start = Instant::now();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let dna_hash = dna_file.dna_hash();
 
     let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
         let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
         cell
     }))
     .await;
+
+    let mut sleuth_ctx = hc_sleuth::Context::default();
+    sleuth_ctx.nodes.add(
+        conductors[0].sleuth_env(dna_hash),
+        &[cells[0].agent_pubkey().clone()],
+    );
+    sleuth_ctx.nodes.add(
+        conductors[1].sleuth_env(dna_hash),
+        &[cells[1].agent_pubkey().clone()],
+    );
 
     let zomes: Vec<_> = cells
         .iter()
@@ -548,16 +560,30 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
+    sleuth_ctx.nodes.add(
+        conductors[2].sleuth_env(dna_hash),
+        &[cell.agent_pubkey().clone()],
+    );
+
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
+        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
         .await;
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        30,
+        10,
         std::time::Duration::from_secs(1),
     )
     .await;
+
+    hc_sleuth::holochain::OpIntegrated {
+        by: 2,
+        op: (
+            hashes[0].clone(),
+            holochain_types::prelude::DhtOpType::StoreRecord,
+        ),
+    }
+    .report(&sleuth_ctx);
 
     println!(
         "Done waiting for consistency between last two nodes. Elapsed: {:?}",

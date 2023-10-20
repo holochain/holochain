@@ -104,7 +104,7 @@ mod tests {
     use holo_hash::HashableContentExtSync;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
-    use holochain_state::validation_db::ValidationLimboStatus;
+    use holochain_state::validation_db::ValidationStage;
 
     use super::*;
 
@@ -159,7 +159,7 @@ mod tests {
                     set_validation_stage(
                         txn,
                         &hash,
-                        ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
+                        ValidationStage::AwaitingSysDeps(fixt!(AnyDhtHash)),
                     )
                     .unwrap();
                 }

@@ -206,7 +206,7 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::AwaitingDeps(deps) => {
                             awaiting += 1;
-                            let status = ValidationLimboStatus::AwaitingAppDeps(deps);
+                            let status = ValidationStage::AwaitingAppDeps(deps);
                             put_validation_limbo(txn, &op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {
@@ -802,7 +802,7 @@ impl AppValidationWorkspace {
 pub fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    status: ValidationStage,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
     Ok(())
@@ -814,7 +814,7 @@ pub fn put_integration_limbo(
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     Ok(())
 }
 
@@ -826,7 +826,7 @@ pub fn put_integrated(
     set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationStage::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
 
     // If the op is rejected then force a receipt to be processed because the

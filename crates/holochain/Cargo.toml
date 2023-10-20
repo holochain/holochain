@@ -107,6 +107,8 @@ tx5-signal-srv = { version = "=0.0.3-alpha", optional = true }
 bytes = { version = "1", optional = true }
 reqwest = { version = "0.11.2", features = ["json"], optional = true }
 
+hc-sleuth = { path = "../hc-sleuth", optional = true }
+
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
 
@@ -177,6 +179,7 @@ test_utils = [
   "contrafact",
   "diff",
   "ghost_actor/test_utils",
+  "hc-sleuth",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",

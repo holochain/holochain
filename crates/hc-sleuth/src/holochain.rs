@@ -1,106 +1,200 @@
 use crate::*;
 
+mod action_authored;
 mod action_integrated;
 mod op_app_validated;
 mod op_integrated;
 
+pub use action_authored::*;
 pub use action_integrated::*;
 pub use op_app_validated::*;
 pub use op_integrated::*;
 
 pub type OpRef = (ActionHash, DhtOpType);
 
-#[derive(Debug, derive_more::Constructor)]
-pub struct ActionIntegrated {
-    op: OpRef,
+#[derive(Clone, Debug, derive_more::Constructor)]
+pub struct OpPublished {
+    pub by: NodeId,
+    pub op: OpRef,
 }
-impl Fact for ActionIntegrated {
-    fn cause(&self) -> ACause {
-        OpIntegrated::new(self.op.clone()).into()
-    }
-
-    fn check(&self, ctx: &Context) -> bool {
-        todo!()
+impl Fact for OpPublished {
+    fn cause(&self, ctx: &Context) -> ACause {
+        OpIntegrated::new(self.by.clone(), self.op.clone()).into()
     }
 
     fn explain(&self) -> String {
-        format!(
-            "Action {} is not integrated wrt OpType {}",
-            self.op.0, self.op.1
-        )
+        format!("Node {} published Op {:?} at least once", self.by, self.op)
+    }
+
+    fn check(&self, ctx: &Context) -> bool {
+        let env = ctx.nodes.envs.get(self.by).unwrap();
+        let Self {
+            by,
+            op: (action_hash, op_type),
+        } = self.clone();
+        env.dht.test_read(move |txn| {
+            txn.query_row(
+                "SELECT last_publish_time FROM DhtOp 
+                WHERE action_hash = :action_hash 
+                  AND type = :type",
+                named_params! {
+                    ":action_hash": action_hash,
+                    ":type": op_type,
+                },
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .unwrap()
+            .is_some()
+        })
     }
 }
 
-#[derive(Debug, derive_more::Constructor)]
+#[derive(Debug, Clone, derive_more::Constructor)]
 pub struct OpIntegrated {
-    op: OpRef,
+    pub by: NodeId,
+    pub op: OpRef,
 }
 impl Fact for OpIntegrated {
-    fn cause(&self) -> ACause {
-        OpAppValidated::new(self.op.clone()).into()
+    fn cause(&self, ctx: &Context) -> ACause {
+        OpAppValidated::new(self.by.clone(), self.op.clone()).into()
     }
 
     fn explain(&self) -> String {
         format!(
-            "Op {} is not integrated wrt OpType {}",
-            self.op.0, self.op.1
+            "Action {} is integrated wrt OpType {} by node {}",
+            self.op.0, self.op.1, self.by
         )
     }
 
     fn check(&self, ctx: &Context) -> bool {
-        todo!()
+        let env = ctx.nodes.envs.get(self.by).unwrap();
+        let Self {
+            by,
+            op: (action_hash, op_type),
+        } = self.clone();
+        env.dht.test_read(move |txn| {
+            txn.query_row(
+                "SELECT when_integrated FROM DhtOp 
+                WHERE action_hash = :action_hash 
+                  AND type = :type",
+                named_params! {
+                    ":action_hash": action_hash,
+                    ":type": op_type,
+                },
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .unwrap()
+            .is_some()
+        })
     }
 }
 
-#[derive(Debug, derive_more::Constructor)]
+#[derive(Debug, Clone, derive_more::Constructor)]
 pub struct OpAppValidated {
-    op: OpRef,
+    pub by: NodeId,
+    pub op: OpRef,
 }
 impl Fact for OpAppValidated {
-    fn cause(&self) -> ACause {
-        OpSysValidated::new(self.op.clone()).into()
+    fn cause(&self, ctx: &Context) -> ACause {
+        OpSysValidated::new(self.by.clone(), self.op.clone()).into()
     }
 
     fn explain(&self) -> String {
-        format!("Op is not app validated")
+        format!(
+            "Action {} is app validated wrt OpType {} by node {}",
+            self.op.0, self.op.1, self.by
+        )
     }
 
     fn check(&self, ctx: &Context) -> bool {
-        todo!()
+        let env = ctx.nodes.envs.get(self.by).unwrap();
+        let Self {
+            by,
+            op: (action_hash, op_type),
+        } = self.clone();
+        env.dht.test_read(move |txn| {
+            txn.query_row(
+                "SELECT rowid FROM DhtOp 
+                WHERE action_hash = :action_hash 
+                  AND type = :type 
+                  AND validation_stage >= :stage
+                ",
+                named_params! {
+                    ":action_hash": action_hash,
+                    ":type": op_type,
+                    ":stage": ValidationStage::AwaitingIntegration
+                },
+                |row| row.get::<_, usize>(0),
+            )
+            .optional()
+            .unwrap()
+            .is_some()
+        })
     }
 }
 
-#[derive(Debug, derive_more::Constructor)]
+#[derive(Debug, Clone, derive_more::Constructor)]
 pub struct OpSysValidated {
-    op: OpRef,
+    pub by: NodeId,
+    pub op: OpRef,
 }
 impl Fact for OpSysValidated {
-    fn cause(&self) -> ACause {
+    fn cause(&self, ctx: &Context) -> ACause {
         any![
-            ActionAuthored::new(self.op.0.clone()),
-            OpFetched::new(self.op.clone())
+            ActionAuthored::new(self.by.clone(), self.op.0.clone()),
+            OpFetched::new(self.by.clone(), self.op.clone())
         ]
     }
 
     fn explain(&self) -> String {
-        format!("Op is not sys validated")
+        format!(
+            "Action {} is sys validated wrt OpType {} by node {}",
+            self.op.0, self.op.1, self.by
+        )
     }
 
     fn check(&self, ctx: &Context) -> bool {
-        todo!()
+        let env = ctx.nodes.envs.get(self.by).unwrap();
+        let Self {
+            by,
+            op: (action_hash, op_type),
+        } = self.clone();
+        env.dht.test_read(move |txn| {
+            txn.query_row(
+                "SELECT rowid FROM DhtOp
+                WHERE action_hash = :action_hash 
+                  AND type = :type 
+                  AND validation_stage >= :stage
+                ",
+                named_params! {
+                    ":action_hash": action_hash,
+                    ":type": op_type,
+                    ":stage": ValidationStage::SysValidated
+                },
+                |row| row.get::<_, usize>(0),
+            )
+            .optional()
+            .unwrap()
+            .is_some()
+        })
     }
 }
 
-#[derive(Debug, derive_more::Constructor)]
+#[derive(Debug, Clone, derive_more::Constructor)]
 pub struct OpFetched {
-    op: OpRef,
+    pub by: NodeId,
+    pub op: OpRef,
 }
 impl Fact for OpFetched {
-    fn cause(&self) -> ACause {
-        any![
-            PublishReceived::new(self.op.clone()),
-            GossipReceived::new(self.op.clone())
-        ]
+    fn cause(&self, ctx: &Context) -> ACause {
+        let mut causes = vec![];
+        for n in 0..ctx.nodes.len() {
+            causes.push(OpPublished::new(n, self.op.clone()).into());
+        }
+        // for n in 0..ctx.nodes.len() {
+        //     causes.push(OpGossiped(n, self.op.clone()).into());
+        // }
+        ACause::new(Any::new(causes))
     }
 
     fn explain(&self) -> String {
@@ -108,16 +202,39 @@ impl Fact for OpFetched {
     }
 
     fn check(&self, ctx: &Context) -> bool {
-        todo!()
+        // TODO: should do a check involving the actual FetchPool
+        let env = ctx.nodes.envs.get(self.by).unwrap();
+        let Self {
+            by,
+            op: (action_hash, op_type),
+        } = self.clone();
+        env.dht.test_read(move |txn| {
+            txn.query_row(
+                "SELECT rowid FROM DhtOp
+                WHERE action_hash = :action_hash 
+                  AND type = :type 
+                ",
+                named_params! {
+                    ":action_hash": action_hash,
+                    ":type": op_type,
+                },
+                |row| row.get::<_, usize>(0),
+            )
+            .optional()
+            .unwrap()
+            .is_some()
+        })
     }
 }
 
+/*
 #[derive(Debug, derive_more::Constructor)]
 pub struct GossipReceived {
-    op: OpRef,
+    pub by: NodeId,
+    pub op: OpRef,
 }
 impl Fact for GossipReceived {
-    fn cause(&self) -> ACause {
+    fn cause(&self, ctx: &Context) -> ACause {
         todo!()
     }
 
@@ -126,42 +243,27 @@ impl Fact for GossipReceived {
     }
 
     fn check(&self, ctx: &Context) -> bool {
-        todo!()
+        todo!("this info is not available in Holochain databases yet")
     }
 }
 
-#[derive(Debug, derive_more::Constructor)]
+#[derive(Debug)]
 pub struct PublishReceived {
-    op: OpRef,
+    pub by: NodeId,
+    pub from: NodeId,
+    pub op: OpRef,
 }
 impl Fact for PublishReceived {
-    fn cause(&self) -> ACause {
-        todo!()
+    fn cause(&self, ctx: &Context) -> ACause {
+        OpPublished::new(self.from.clone(), self.op.clone()).into()
     }
 
     fn explain(&self) -> String {
-        format!("Op was not received via publish")
+        format!("Op {:?} was received via publish by {}", self.op, self.by)
     }
 
     fn check(&self, ctx: &Context) -> bool {
-        todo!()
+        todo!("this info is not available in Holochain databases yet")
     }
 }
-
-#[derive(Debug, derive_more::Constructor)]
-pub struct ActionAuthored {
-    action: ActionHash,
-}
-impl Fact for ActionAuthored {
-    fn cause(&self) -> ACause {
-        ().into()
-    }
-
-    fn explain(&self) -> String {
-        format!("Action {} was never authored", self.action)
-    }
-
-    fn check(&self, ctx: &Context) -> bool {
-        todo!()
-    }
-}
+*/

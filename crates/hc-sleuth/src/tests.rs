@@ -6,9 +6,9 @@ use crate::{query::*, *};
 #[test]
 fn all_integrated() {
     let mut u = unstructured_noise();
-    let alice = NodeEnv::test();
-    let bobbo = NodeEnv::test();
-    let carol = NodeEnv::test();
+    let alice = NodeEnv::mem();
+    let bobbo = NodeEnv::mem();
+    let carol = NodeEnv::mem();
 
     let op = DhtOpHashed::arbitrary(&mut u).unwrap();
     let op1 = op.clone();

@@ -680,6 +680,17 @@ impl SweetConductor {
             }
         }
     }
+
+    /// Get the databases needed to use hc-sleuth
+    pub fn sleuth_env(&self, dna_hash: &DnaHash) -> hc_sleuth::NodeEnv {
+        hc_sleuth::NodeEnv {
+            authored: self.spaces.authored_db(dna_hash).unwrap(),
+            cache: self.spaces.cache(dna_hash).unwrap(),
+            dht: self.spaces.dht_db(dna_hash).unwrap(),
+            peers: self.spaces.p2p_agents_db(dna_hash).unwrap(),
+            metrics: self.spaces.p2p_metrics_db(dna_hash).unwrap(),
+        }
+    }
 }
 
 /// Get a websocket client on localhost at the specified port

@@ -147,11 +147,7 @@ async fn sys_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
-                            put_validation_limbo(
-                                txn,
-                                &op_hash,
-                                ValidationLimboStatus::SysValidated,
-                            )?;
+                            put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
                             awaiting += 1;
@@ -164,13 +160,13 @@ async fn sys_validation_workflow_inner(
                             // We need to be holding the dependency because
                             // we were meant to get a StoreRecord or StoreEntry or
                             // RegisterAgentActivity or RegisterAddLink.
-                            let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+                            let status = ValidationStage::AwaitingSysDeps(missing_dep);
                             put_validation_limbo(txn, &op_hash, status)?;
                         }
                         Outcome::MissingDhtDep => {
                             missing += 1;
                             // TODO: Not sure what missing dht dep is. Check if we need this.
-                            put_validation_limbo(txn, &op_hash, ValidationLimboStatus::Pending)?;
+                            put_validation_limbo(txn, &op_hash, ValidationStage::Pending)?;
                         }
                         Outcome::Rejected => {
                             rejected += 1;
@@ -837,7 +833,7 @@ impl SysValidationWorkspace {
 fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    status: ValidationStage,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
     Ok(())
@@ -849,7 +845,7 @@ fn put_integration_limbo(
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     Ok(())
 }
 
@@ -861,7 +857,7 @@ pub fn put_integrated(
     set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationStage::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }

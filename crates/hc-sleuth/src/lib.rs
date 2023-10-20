@@ -3,13 +3,15 @@
 
 use std::collections::HashMap;
 
-pub use holochain_state::prelude::*;
-pub use kitsune_p2p::gossip::sharded_gossip::GossipType;
+pub(crate) use holochain_state::prelude::*;
+pub(crate) use kitsune_p2p::gossip::sharded_gossip::GossipType;
 
 #[macro_use]
 mod cause;
+mod context;
 mod fact;
 pub use cause::*;
+pub use context::*;
 pub use fact::*;
 pub mod query;
 #[macro_use]
@@ -19,64 +21,10 @@ pub use report::*;
 #[cfg(test)]
 pub mod test_fact;
 
-mod holochain;
+pub mod holochain;
 
 #[cfg(test)]
 mod tests;
-
-pub struct NodeEnv {
-    pub authored: TestDb<DbKindAuthored>,
-    pub cache: TestDb<DbKindCache>,
-    pub dht: TestDb<DbKindDht>,
-    pub peers: TestDb<DbKindP2pAgents>,
-    pub metrics: TestDb<DbKindP2pMetrics>,
-}
-
-#[derive(Default)]
-pub struct NodeGroup {
-    pub nodes: Vec<NodeEnv>,
-    pub agent_map: HashMap<AgentPubKey, NodeId>,
-}
-
-pub type NodeId = usize;
-
-#[derive(Default)]
-pub struct Context {
-    nodes: NodeGroup,
-}
-
-impl NodeEnv {
-    pub async fn integrated<R: Send + 'static>(
-        &self,
-        f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
-    ) -> anyhow::Result<Option<R>> {
-        if let Some(r) = self.authored.write_async(f.clone()).await? {
-            Ok(Some(r))
-        } else {
-            self.dht.write_async(f.clone()).await
-        }
-    }
-
-    pub async fn exists<R: Send + 'static>(
-        &self,
-        f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
-    ) -> anyhow::Result<Option<R>> {
-        todo!()
-    }
-}
-
-#[cfg(feature = "test_utils")]
-impl NodeEnv {
-    pub fn test() -> Self {
-        Self {
-            authored: test_authored_db(),
-            cache: test_cache_db(),
-            dht: test_dht_db(),
-            peers: test_p2p_agents_db(),
-            metrics: test_p2p_metrics_db(),
-        }
-    }
-}
 
 /// The primary significant states an item can be in from a node's perspective
 pub enum ItemStatus {

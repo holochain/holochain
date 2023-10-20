@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::*;
 
 pub trait Fact: std::fmt::Debug {
-    fn cause(&self) -> ACause;
+    fn cause(&self, ctx: &Context) -> ACause;
     fn check(&self, ctx: &Context) -> bool;
     fn explain(&self) -> String;
 }
@@ -31,7 +31,7 @@ impl<F: Fact> Cause for F {
             Report::from(vec![])
         } else {
             // Add this fact to the path
-            let mut report = self.cause().backtrack(ctx);
+            let mut report = self.cause(ctx).backtrack(ctx);
             report.push(ReportItem::Line(self.explain()));
             report
         }
@@ -39,7 +39,7 @@ impl<F: Fact> Cause for F {
 }
 
 impl Fact for () {
-    fn cause(&self) -> ACause {
+    fn cause(&self, ctx: &Context) -> ACause {
         ().into()
     }
 

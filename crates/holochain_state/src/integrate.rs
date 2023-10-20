@@ -111,10 +111,10 @@ fn insert_locally_validated_op(
     if let Dependency::Null = dependency {
         // This set the validation stage to pending which is correct when
         // it's integrated.
-        set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+        set_validation_stage(txn, hash, ValidationStage::Pending)?;
         set_when_integrated(txn, hash, holochain_zome_types::prelude::Timestamp::now())?;
     } else {
-        set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+        set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     }
     if matches!(op_type, DhtOpType::RegisterAgentActivity) {
         Ok(Some(op))

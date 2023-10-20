@@ -21,7 +21,7 @@ impl<C: Cause> F<C> {
 }
 
 impl<C: Cause + Clone + 'static> Fact for F<C> {
-    fn cause(&self) -> ACause {
+    fn cause(&self, ctx: &Context) -> ACause {
         ACause::new(self.2.clone())
     }
 
