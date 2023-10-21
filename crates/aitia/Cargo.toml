@@ -1,0 +1,13 @@
+[package]
+name = "aitia"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+anyhow = "1.0"
+derive_more = "0.99"
+petgraph = "0.6"
+
+[dev-dependencies]
+pretty_assertions = "*"
