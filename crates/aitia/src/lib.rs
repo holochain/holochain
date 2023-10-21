@@ -134,19 +134,31 @@ fn traverse<F: Fact>(
     }
 }
 
-pub fn graph<T: Eq + Hash>(table: &Table<T>) -> DiGraph<&Cause<T>, ()> {
+pub fn graph<'a, 'b: 'a, T: Eq + Hash>(
+    table: &'a Table<T>,
+    start: &'b Cause<T>,
+) -> DiGraph<&'a Cause<T>, ()> {
     let mut g = DiGraph::new();
-    let rows: Vec<_> = table.iter().collect();
+
+    let mut sub = HashMap::<&Cause<T>, &[Cause<T>]>::new();
+    let mut to_add = vec![start];
+
+    while let Some(next) = to_add.pop() {
+        to_add.extend(table[&next].iter());
+        sub.insert(next, table[next].as_slice());
+    }
+
+    let rows: Vec<_> = sub.iter().collect();
     let mut nodemap = HashMap::new();
     for (i, (k, _)) in rows.iter().enumerate() {
-        let id = g.add_node(*k);
-        nodemap.insert(*k, id);
+        let id = g.add_node(**k);
+        nodemap.insert(**k, id);
         assert_eq!(id.index(), i);
     }
 
     for (k, v) in rows.iter() {
         for c in v.iter() {
-            g.add_edge(nodemap[k], nodemap[c], ());
+            g.add_edge(nodemap[**k], nodemap[c], ());
         }
     }
 
@@ -252,6 +264,7 @@ mod tests {
 
         let checks: StepValues = Box::new(|step: &Step| match (step.which, step.stage) {
             (true, Stage::Create) => true,
+            // (false, Stage::Create) => true,
             _ => false,
             // (true, Stage::Fetch) => todo!(),
             // (true, Stage::ReceiveA) => todo!(),
@@ -269,7 +282,7 @@ mod tests {
         });
 
         let t = fatma_store.table(&checks);
-        let g = graph(&t);
+        let g = graph(&t, &fatma_store);
 
         println!(
             "{:?}",
