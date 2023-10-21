@@ -25,7 +25,23 @@ use petgraph::{
 // pub struct Context;
 
 pub type Tree<T> = petgraph::graph::DiGraph<Cause<T>, ()>;
-pub type Table<T> = HashMap<Cause<T>, Vec<Cause<T>>>;
+
+pub type Table<T> = HashMap<Cause<T>, Option<Check<T>>>;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Check<T: Fact> {
+    Pass,
+    Fail(Vec<Cause<T>>),
+}
+
+impl<T: Fact> Check<T> {
+    pub fn causes(&self) -> &[Cause<T>] {
+        match self {
+            Check::Pass => &[],
+            Check::Fail(cs) => cs.as_slice(),
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Cause<T> {
@@ -87,7 +103,7 @@ fn traverse<F: Fact>(
         // Prevent loops
         return Some(Traversal::Loop);
     } else {
-        table.insert(current.clone(), vec![]);
+        table.insert(current.clone(), None);
     }
 
     match &current {
@@ -101,8 +117,8 @@ fn traverse<F: Fact>(
                 let cause = f.cause(ctx)?;
                 let t = traverse(&cause, ctx, table, iter - 1)?;
                 if t != Traversal::Pass {
-                    let old = table.insert(current.clone(), vec![cause]);
-                    assert_eq!(old, Some(vec![]));
+                    let old = table.insert(current.clone(), Some(Check::Fail(vec![cause])));
+                    assert_eq!(old, Some(None));
                 }
                 Some(Traversal::Fail)
             }
@@ -119,29 +135,28 @@ fn traverse<F: Fact>(
             } else if ts.iter().any(|t| *t == Traversal::Pass) {
                 Some(Traversal::Pass)
             } else {
-                table.insert(current.clone(), cs.to_vec());
+                table.insert(current.clone(), Some(Check::Fail(cs.to_vec())));
                 Some(Traversal::Fail)
             }
         }
         Cause::Every(cs) => {
             unimplemented!();
-            // XXX: the traversal could be short-circuited if any pass
-            let ts: Vec<_> = cs
-                .iter()
-                .filter_map(|c| Some((c, traverse(c, ctx, table, iter - 1)?)))
-                .collect();
-            if ts.is_empty() {
-                None
-            } else if ts.iter().all(|(_, t)| *t == Traversal::Pass) {
-                Some(Traversal::Pass)
-            } else {
-                let cs = ts
-                    .into_iter()
-                    .filter_map(|(c, t)| (t == Traversal::Fail).then_some(c.clone()))
-                    .collect();
-                table.insert(current.clone(), cs);
-                Some(Traversal::Fail)
-            }
+            // let ts: Vec<_> = cs
+            //     .iter()
+            //     .filter_map(|c| Some((c, traverse(c, ctx, table, iter - 1)?)))
+            //     .collect();
+            // if ts.is_empty() {
+            //     None
+            // } else if ts.iter().all(|(_, t)| *t == Traversal::Pass) {
+            //     Some(Traversal::Pass)
+            // } else {
+            //     let cs = ts
+            //         .into_iter()
+            //         .filter_map(|(c, t)| (t == Traversal::Fail).then_some(c.clone()))
+            //         .collect();
+            //     table.insert(current.clone(), cs);
+            //     Some(Traversal::Fail)
+            // }
         }
     }
 }
@@ -156,9 +171,11 @@ pub fn graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
-        dbg!(next);
-        to_add.extend(table[&next].iter());
-        sub.insert(next, table[next].as_slice());
+        let causes = table[&next].as_ref().map(|c| c.causes()).unwrap_or(&[]);
+        // if let Some(causes) = table[&next].as_ref().map(|c| c.causes()) {
+        to_add.extend(causes.iter());
+        sub.insert(next, causes);
+        // }
     }
 
     let rows: Vec<_> = sub.iter().collect();
