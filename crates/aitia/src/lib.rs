@@ -69,45 +69,39 @@ fn traverse<F: Fact>(
     ctx: &F::Context,
     table: &mut Table<F>,
 ) -> Option<Traversal> {
-    dbg!(current);
     if table.contains_key(&current) {
         // Prevent loops
         return Some(Traversal::Loop);
     } else {
         table.insert(current.clone(), vec![]);
     }
-    dbg!(current);
 
     match &current {
         Cause::Fact(f) => {
             if f.check(ctx) {
-                dbg!(current);
                 Some(Traversal::Pass)
             } else {
                 // If the check fails and there is no cause,
-                // then completely throw away this whole branch.
-                dbg!(current);
+                // then completely throw away this whole branch,
+                // since the branch is not rooted in a passing fact.
                 let cause = f.cause(ctx)?;
                 let t = traverse(&cause, ctx, table)?;
-                let old = table.insert(current.clone(), vec![cause]);
-                assert_eq!(old, Some(vec![]));
-                dbg!(current);
+                if t != Traversal::Pass {
+                    let old = table.insert(current.clone(), vec![cause]);
+                    assert_eq!(old, Some(vec![]));
+                }
                 Some(Traversal::Fail)
             }
         }
         Cause::Any(cs) => {
-            dbg!(current);
             // XXX: the traversal could be short-circuited if any pass
             let ts: Vec<_> = cs.iter().filter_map(|c| traverse(c, ctx, table)).collect();
             if ts.is_empty() {
-                dbg!(current);
                 None
             } else if ts.iter().any(|t| *t == Traversal::Pass) {
-                dbg!(current);
                 Some(Traversal::Pass)
             } else {
                 table.insert(current.clone(), cs.to_vec());
-                dbg!(current);
                 Some(Traversal::Fail)
             }
         }
