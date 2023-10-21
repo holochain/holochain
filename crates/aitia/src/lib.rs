@@ -35,9 +35,17 @@ pub enum Cause<T> {
 }
 
 impl<F: Fact> Cause<F> {
+    pub fn check(&self, ctx: &F::Context) -> bool {
+        match self {
+            Cause::Any(cs) => cs.iter().any(|c| c.check(ctx)),
+            Cause::Every(cs) => cs.iter().all(|c| c.check(ctx)),
+            Cause::Fact(f) => f.check(ctx),
+        }
+    }
+
     pub fn table(&self, ctx: &F::Context) -> Table<F> {
         let mut table = Table::new();
-        traverse(self, ctx, &mut table);
+        traverse(self, ctx, &mut table, 1024);
         table
     }
 }
@@ -68,7 +76,13 @@ fn traverse<F: Fact>(
     current: &Cause<F>,
     ctx: &F::Context,
     table: &mut Table<F>,
+    iter: u32,
 ) -> Option<Traversal> {
+    dbg!(current);
+    if iter == 0 {
+        panic!("max iters reached");
+    }
+
     if table.contains_key(&current) {
         // Prevent loops
         return Some(Traversal::Loop);
@@ -85,7 +99,7 @@ fn traverse<F: Fact>(
                 // then completely throw away this whole branch,
                 // since the branch is not rooted in a passing fact.
                 let cause = f.cause(ctx)?;
-                let t = traverse(&cause, ctx, table)?;
+                let t = traverse(&cause, ctx, table, iter - 1)?;
                 if t != Traversal::Pass {
                     let old = table.insert(current.clone(), vec![cause]);
                     assert_eq!(old, Some(vec![]));
@@ -95,7 +109,11 @@ fn traverse<F: Fact>(
         }
         Cause::Any(cs) => {
             // XXX: the traversal could be short-circuited if any pass
-            let ts: Vec<_> = cs.iter().filter_map(|c| traverse(c, ctx, table)).collect();
+            let ts: Vec<_> = cs
+                .iter()
+                .filter_map(|c| traverse(c, ctx, table, iter - 1))
+                .collect();
+            dbg!(cs);
             if ts.is_empty() {
                 None
             } else if ts.iter().any(|t| *t == Traversal::Pass) {
@@ -110,7 +128,7 @@ fn traverse<F: Fact>(
             // XXX: the traversal could be short-circuited if any pass
             let ts: Vec<_> = cs
                 .iter()
-                .filter_map(|c| Some((c, traverse(c, ctx, table)?)))
+                .filter_map(|c| Some((c, traverse(c, ctx, table, iter - 1)?)))
                 .collect();
             if ts.is_empty() {
                 None
@@ -128,7 +146,7 @@ fn traverse<F: Fact>(
     }
 }
 
-pub fn graph<'a, 'b: 'a, T: Eq + Hash>(
+pub fn graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a Table<T>,
     start: &'b Cause<T>,
 ) -> DiGraph<&'a Cause<T>, ()> {
@@ -138,6 +156,7 @@ pub fn graph<'a, 'b: 'a, T: Eq + Hash>(
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
+        dbg!(next);
         to_add.extend(table[&next].iter());
         sub.insert(next, table[next].as_slice());
     }
@@ -257,11 +276,18 @@ mod tests {
         });
 
         let checks: StepValues = Box::new(|step: &Step| match (step.which, step.stage) {
-            (true, Stage::Create) => true,
+            // (true, Stage::Create) => true,
             // (false, Stage::Create) => true,
+
+            // this leads to Trudy Create in the graph, which is wrong
+            // TODO: revisit pruning branches that terminate with false, including loops
+            //       basically we only want to create edges on the way back up from either
+            //       a None, or a Loop detection
+            (true, Stage::ReceiveA) => true,
+
+            // TODO: if all are false, then that doesn't work either
             _ => false,
             // (true, Stage::Fetch) => todo!(),
-            // (true, Stage::ReceiveA) => todo!(),
             // (true, Stage::ReceiveB) => todo!(),
             // (true, Stage::Store) => todo!(),
             // (true, Stage::SendA) => todo!(),
