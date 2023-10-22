@@ -136,7 +136,6 @@ struct HostFnBuilder {
 }
 
 impl HostFnBuilder {
-    // const SIGNATURE: ([Type; 2], [Type; 1]) = ([Type::I32, Type::I32], [Type::I64]);
 
     fn with_host_function<I: 'static, O: 'static>(
         &self,
@@ -373,27 +372,6 @@ impl RealRibosome {
                 self.runtime_compiled_module(zome_name)
             }
         }
-
-        // if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-        //     .get()
-        //     .is_none()
-        // {
-        //     holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-        //         .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
-        //             cranelift,
-        //         )))
-        //         // An error here means the cell is full when we tried to set it, so
-        //         // some other thread must have done something in between the get
-        //         // above and the set here. In this case we don't care as we don't
-        //         // have any competing code paths that could set it to something
-        //         // unexpected.
-        //         .ok();
-        // }
-
-        // Ok(holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.get(
-        //     self.wasm_cache_key(zome_name)?,
-        //     &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-        // )?)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
@@ -414,10 +392,6 @@ impl RealRibosome {
         zome_name: &ZomeName,
     ) -> RibosomeResult<()> {
         use holochain_wasmer_host::module::PlruCache;
-        // {
-        //     let instance = instance.lock();
-        //     wasmer_middlewares::metering::set_remaining_points(&instance, WASM_METERING_LIMIT);
-        // }
 
         // Clear the context as the call is done.
         {
@@ -612,12 +586,6 @@ impl RealRibosome {
         store: Arc<Mutex<Store>>,
         function_env: FunctionEnv<Env>,
     ) -> (FunctionEnv<Env>, Imports) {
-        // let function_env;
-        // {
-        //     let mut store_lock = store.lock();
-        //     let mut store_mut = store_lock.as_store_mut();
-        //     function_env = FunctionEnv::new(&mut store_mut, Env::default());
-        // }
         let mut imports = wasmer::imports! {};
         let mut ns = Exports::new();
 
