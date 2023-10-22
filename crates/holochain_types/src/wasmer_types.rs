@@ -1,13 +1,12 @@
 //! These types manage the consumption and configuration of the `wasmer` library
 //! in terms of middleware (metering), Target, Module, and Store.
 
-use wasmer::{
-    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target,
-    Triple,
-};
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::info;
+use wasmer::{
+    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target, Triple,
+};
 use wasmer_middlewares::*;
 
 #[cfg(not(test))]

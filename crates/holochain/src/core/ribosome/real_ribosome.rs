@@ -80,17 +80,17 @@ use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::module::SerializedModuleCache;
-use wasmer::RuntimeError;
-use wasmer::Store;
+use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
 use wasmer::FunctionEnv;
 use wasmer::FunctionEnvMut;
-use wasmer::Module;
-use wasmer::Instance;
 use wasmer::Imports;
+use wasmer::Instance;
+use wasmer::Module;
+use wasmer::RuntimeError;
+use wasmer::Store;
 use wasmer::Type;
-use wasmer::AsStoreMut;
 // This is here because there were errors about different crate versions
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
@@ -99,14 +99,14 @@ use crate::core::ribosome::host_fn::count_links::count_links;
 use holochain_types::wasmer_types::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
+use holochain_wasmer_host::module::InstanceWithStore;
+use holochain_wasmer_host::module::ModuleWithStore;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use holochain_wasmer_host::module::ModuleWithStore;
-use holochain_wasmer_host::module::InstanceWithStore;
 use wasmer::StoreMut;
 
 /// The only RealRibosome is a Wasm ribosome.
@@ -345,7 +345,7 @@ impl RealRibosome {
     pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<ModuleWithStore>> {
         let store = ios_dylib_headless_store();
         match unsafe { Module::deserialize_from_file(&store, dylib_path) } {
-            Ok(module) => Ok(Arc::new(ModuleWithStore{
+            Ok(module) => Ok(Arc::new(ModuleWithStore {
                 module: Arc::new(module),
                 store: Arc::new(Mutex::new(store)),
             })),
@@ -353,27 +353,26 @@ impl RealRibosome {
         }
     }
 
-    pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<ModuleWithStore>> {
+    pub fn runtime_compiled_module(
+        &self,
+        zome_name: &ZomeName,
+    ) -> RibosomeResult<Arc<ModuleWithStore>> {
         match holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.get() {
-            Some(cache) => {
-                Ok(cache.write().get(
-                    self.wasm_cache_key(zome_name)?,
-                    &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-                )?)
-            },
+            Some(cache) => Ok(cache.write().get(
+                self.wasm_cache_key(zome_name)?,
+                &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+            )?),
             None => {
                 // This can stampede but we don't really care. Just ignore any errors
                 // as the initialization is always the same.
-                let _ = holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-                    .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
-                        cranelift,
-                    )));
+                let _ = holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.set(RwLock::new(
+                    SerializedModuleCache::default_with_cranelift(cranelift),
+                ));
                 // This will recurse at most once because the only condition of recursion
                 // is if the cache is empty, which we just set above.
                 self.runtime_compiled_module(zome_name)
             }
         }
-
 
         // if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
         //     .get()
@@ -459,14 +458,51 @@ impl RealRibosome {
                 )));
             }
         };
-        let imports = Self::imports(self, context_key, module_with_store.store.clone());
+        let function_env = FunctionEnv::new(
+            &mut module_with_store.store.lock().as_store_mut(),
+            Env::default(),
+        );
+        let (function_env, imports) = Self::imports(
+            self,
+            context_key,
+            module_with_store.store.clone(),
+            function_env,
+        );
         let instance;
         {
             let mut store = module_with_store.store.lock();
             let mut store_mut = store.as_store_mut();
-            instance = Arc::new(Instance::new(&mut store_mut, &module_with_store.module, &imports).map_err(
-                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
-            )?);
+            instance = Arc::new(
+                Instance::new(&mut store_mut, &module_with_store.module, &imports).map_err(
+                    |e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                    },
+                )?,
+            );
+        }
+
+        // It is only possible to initialize the function env after the instance is created.
+        {
+            let mut store_lock = module_with_store.store.lock();
+            let mut function_env_mut = function_env.into_mut(&mut store_lock);
+            let (data_mut, store_mut) = function_env_mut.data_and_store_mut();
+            data_mut.memory = Some(instance.exports.get_memory("memory").unwrap().clone());
+            data_mut.deallocate = Some(
+                instance
+                    .exports
+                    .get_typed_function(&store_mut, "__hc__deallocate_1")
+                    .map_err(|e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                    })?,
+            );
+            data_mut.allocate = Some(
+                instance
+                    .exports
+                    .get_typed_function(&store_mut, "__hc__allocate_1")
+                    .map_err(|e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                    })?,
+            );
         }
 
         RibosomeResult::Ok(Arc::new(InstanceWithStore {
@@ -531,7 +567,8 @@ impl RealRibosome {
         }
         // We didn't get an instance hit so create a new key.
         let context_key = Self::next_context_key();
-        let instance_with_store = self.build_instance_with_store(&call_context.zome, context_key)?;
+        let instance_with_store =
+            self.build_instance_with_store(&call_context.zome, context_key)?;
 
         // Update the context.
         {
@@ -558,22 +595,29 @@ impl RealRibosome {
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(empty_dna_file)?;
         let context_key = RealRibosome::next_context_key();
-        let imports = empty_ribosome.imports(
-            context_key,
-            Arc::new(Mutex::new(Store::default()))
-        );
+        let mut store = Store::default();
+        // We just leave this Env uninitialized as default because we never make it
+        // to an instance that needs to run on this code path.
+        let function_env = FunctionEnv::new(&mut store.as_store_mut(), Env::default());
+        let (_function_env, imports) =
+            empty_ribosome.imports(context_key, Arc::new(Mutex::new(store)), function_env);
         let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
         imports.sort();
         Ok(imports)
     }
 
-    fn imports(&self, context_key: u64, store: Arc<Mutex<Store>>) -> Imports {
-        let function_env;
-        {
-            let mut store_lock = store.lock();
-            let mut store_mut = store_lock.as_store_mut();
-            function_env = FunctionEnv::new(&mut store_mut, Env::default());
-        }
+    fn imports(
+        &self,
+        context_key: u64,
+        store: Arc<Mutex<Store>>,
+        function_env: FunctionEnv<Env>,
+    ) -> (FunctionEnv<Env>, Imports) {
+        // let function_env;
+        // {
+        //     let mut store_lock = store.lock();
+        //     let mut store_mut = store_lock.as_store_mut();
+        //     function_env = FunctionEnv::new(&mut store_mut, Env::default());
+        // }
         let mut imports = wasmer::imports! {};
         let mut ns = Exports::new();
 
@@ -684,7 +728,7 @@ impl RealRibosome {
 
         imports.register_namespace("env", ns);
 
-        imports
+        (host_fn_builder.function_env, imports)
     }
 
     pub fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeIndex]> {
@@ -723,7 +767,6 @@ impl RealRibosome {
                     invocation.to_owned().host_input()?,
                 );
             }
-
 
             // a bit of typefu to avoid cloning the result.
             let (can_cache, result) = match result {
@@ -770,7 +813,8 @@ impl RealRibosome {
                 let mut store_lock = instance_with_store.store.lock();
                 let mut store_mut = store_lock.as_store_mut();
                 // Call the function as a native function.
-                result = instance_with_store.instance
+                result = instance_with_store
+                    .instance
                     .exports
                     .get_typed_function::<(), i32>(&mut store_mut, name)
                     .ok()
@@ -781,7 +825,6 @@ impl RealRibosome {
                         )
                     })?;
             }
-
 
             // Remove the blank context.
             CONTEXT_MAP.lock().remove(&context_key);
@@ -912,11 +955,12 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module_with_store = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                            self.precompiled_module(path)?
-                        } else {
-                            self.runtime_compiled_module(zome.zome_name())?
-                        };
+                        let module_with_store =
+                            if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                                self.precompiled_module(path)?
+                            } else {
+                                self.runtime_compiled_module(zome.zome_name())?
+                            };
                         self.get_extern_fns_for_wasm(module_with_store.module.clone())
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
@@ -949,7 +993,13 @@ impl RibosomeT for RealRibosome {
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
                 };
-                self.do_wasm_call_for_module::<I>(call_context, invocation, zome, to_call, module_with_store.module.clone())
+                self.do_wasm_call_for_module::<I>(
+                    call_context,
+                    invocation,
+                    zome,
+                    to_call,
+                    module_with_store.module.clone(),
+                )
             }
             ZomeDef::Inline {
                 inline_zome: zome, ..
