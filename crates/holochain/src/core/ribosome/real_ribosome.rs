@@ -136,7 +136,6 @@ struct HostFnBuilder {
 }
 
 impl HostFnBuilder {
-
     fn with_host_function<I: 'static, O: 'static>(
         &self,
         ns: &mut Exports,
@@ -460,7 +459,15 @@ impl RealRibosome {
             let mut store_lock = module_with_store.store.lock();
             let mut function_env_mut = function_env.into_mut(&mut store_lock);
             let (data_mut, store_mut) = function_env_mut.data_and_store_mut();
-            data_mut.memory = Some(instance.exports.get_memory("memory").unwrap().clone());
+            data_mut.memory = Some(
+                instance
+                    .exports
+                    .get_memory("memory")
+                    .map_err(|e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                    })?
+                    .clone(),
+            );
             data_mut.deallocate = Some(
                 instance
                     .exports
