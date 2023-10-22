@@ -791,7 +791,7 @@ impl RealRibosome {
                 result = instance_with_store
                     .instance
                     .exports
-                    .get_typed_function::<(), i32>(&mut store_mut, name)
+                    .get_typed_function::<(), i32>(&store_mut, name)
                     .ok()
                     .map_or(Ok(None), |func| Ok(Some(func.call(&mut store_mut)?)))
                     .map_err(|e: RuntimeError| {
