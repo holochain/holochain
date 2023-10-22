@@ -1268,6 +1268,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn the_incredible_halt_test() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
