@@ -1,17 +1,11 @@
-// TODO: remove
-#![allow(warnings)]
-
 use std::{
-    collections::{HashMap, HashSet},
-    fmt::{Debug, Display},
+    collections::HashMap,
+    fmt::Debug,
     hash::Hash,
     io::{Read, Write},
 };
 
-use petgraph::{
-    data::{Build, FromElements},
-    prelude::{DiGraph, DiGraphMap},
-};
+use petgraph::prelude::DiGraph;
 
 pub type Tree<T> = petgraph::graph::DiGraph<Cause<T>, ()>;
 
@@ -201,12 +195,6 @@ pub fn graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     g
 }
 
-#[derive(PartialEq, Eq)]
-enum Traversal {
-    Pass,
-    Fail,
-}
-
 pub trait Fact: Sized + Clone + Eq + std::fmt::Debug + std::hash::Hash {
     type Context;
 
@@ -231,8 +219,6 @@ pub fn graph_easy(dot: &str) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
 
-    use std::{process::Stdio, sync::Arc};
-
     use super::*;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
@@ -252,12 +238,12 @@ mod tests {
         SendB,
     }
 
-    pub type StepValues = Box<dyn Fn(&Step) -> bool>;
+    type StepValues = Box<dyn Fn(&Step) -> bool>;
 
     impl Fact for Step {
         type Context = StepValues;
 
-        fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>> {
+        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
             use Stage::*;
             match self.stage {
                 Create => None,
@@ -296,10 +282,6 @@ mod tests {
                 which: !self.which,
                 stage,
             })
-        }
-
-        pub fn any(cs: Vec<Arc<Cause<Self>>>) -> Arc<Cause<Self>> {
-            Arc::new(Cause::Any(cs.into_iter().map(|c| (*c).clone()).collect()))
         }
     }
 
