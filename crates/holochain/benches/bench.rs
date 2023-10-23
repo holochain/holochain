@@ -89,7 +89,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     .lock()
                     .unwrap()
                     .clone()
-                    .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
+                    .maybe_call(ha.clone().into(), i, &zome, &i.fn_name)
                     .unwrap();
             });
         });

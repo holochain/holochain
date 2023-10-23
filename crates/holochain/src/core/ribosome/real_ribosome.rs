@@ -660,7 +660,7 @@ impl RealRibosome {
     pub fn do_wasm_call_for_module<I: Invocation>(
         &self,
         call_context: CallContext,
-        invocation: &I,
+        invocation: I,
         zome: &Zome,
         to_call: &FunctionName,
         module: Arc<Module>,
@@ -674,10 +674,7 @@ impl RealRibosome {
             let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
                 instance.clone(),
                 to_call.as_ref(),
-                // be aware of this clone!
-                // the whole invocation is cloned!
-                // @todo - is this a problem for large payloads like entries?
-                invocation.to_owned().host_input()?,
+                invocation.host_input()?,
             );
 
             // a bit of typefu to avoid cloning the result.
@@ -881,7 +878,7 @@ impl RibosomeT for RealRibosome {
     fn maybe_call<I: Invocation>(
         &self,
         host_context: HostContext,
-        invocation: &I,
+        invocation: I,
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
@@ -904,7 +901,7 @@ impl RibosomeT for RealRibosome {
             ZomeDef::Inline {
                 inline_zome: zome, ..
             } => {
-                let input = invocation.clone().host_input()?;
+                let input = invocation.host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
                 let result = zome.0.maybe_call(Box::new(api), to_call, input)?;
                 Ok(result)
