@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Update to a tx5 version that includes go code that is statically linked for all platform that support it. Windows and Android will remain dynamically linked. [\#2967](https://github.com/holochain/holochain/pull/2967)
+
 ## 0.3.0-beta-dev.19
 
 ## 0.3.0-beta-dev.18
