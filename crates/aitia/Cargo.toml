@@ -1,0 +1,16 @@
+[package]
+name = "aitia"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+anyhow = "1.0"
+derive_more = "0.99"
+holochain_trace = "0.3.0-beta-dev.1"
+petgraph = "0.6"
+tracing = "0.1"
+
+[dev-dependencies]
+maplit = "*"
+pretty_assertions = "*"
