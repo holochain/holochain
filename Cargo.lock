@@ -2494,6 +2494,7 @@ dependencies = [
 name = "hc-sleuth"
 version = "0.1.0"
 dependencies = [
+ "aitia",
  "anyhow",
  "arbitrary",
  "derive_more",
@@ -2502,6 +2503,7 @@ dependencies = [
  "holochain_state",
  "kitsune_p2p",
  "once_cell",
+ "petgraph",
  "pretty_assertions 0.6.1",
 ]
 

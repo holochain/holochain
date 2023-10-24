@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use hc_sleuth::Cause;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -566,17 +565,17 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
 
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
+        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
         .await;
 
-    hc_sleuth::holochain::OpIntegrated {
+    let step = hc_sleuth::Step::Integrated {
         by: 2,
         op: (
             hashes[0].clone(),
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),
-    }
-    .report(&sleuth_ctx);
+    };
+    hc_sleuth::report(step, &sleuth_ctx);
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
