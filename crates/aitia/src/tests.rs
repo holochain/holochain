@@ -26,6 +26,14 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
     }
 }
 
+fn path_lengths<T: Fact>(graph: &TruthTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
+    let start_ix = graph.node_indices().find(|i| graph[*i] == start).unwrap();
+    let end_ix = graph.node_indices().find(|i| graph[*i] == end).unwrap();
+    petgraph::algo::all_simple_paths::<Vec<_>, _>(graph, start_ix, end_ix, 0, None)
+        .map(|c| c.len())
+        .collect()
+}
+
 #[test]
 fn singleton() {
     holochain_trace::test_run().ok().unwrap();
@@ -152,6 +160,20 @@ fn branching_any() {
         let tr = Cause::from(Branching(2)).traverse(&maplit::hashset![40, 64]);
         report(&tr);
         let graph = tr.fail().unwrap();
+        assert_eq!(
+            path_lengths(&graph, Branching(2).into(), Branching(20).into()),
+            vec![7]
+        );
+        assert_eq!(
+            path_lengths(&graph, Branching(2).into(), Branching(32).into()),
+            vec![9]
+        );
+    }
+    {
+        let tr = Cause::from(Branching(2)).traverse(&(32..128).collect());
+        report(&tr);
+        let _graph = tr.fail().unwrap();
+        // no assertion here, just a smoke test. It's a neat case.
     }
 }
 
