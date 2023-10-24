@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::graph::{traverse, Traversal};
 
 pub trait Fact: Sized + Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {
@@ -41,7 +43,7 @@ pub enum Cause<T> {
     #[from]
     Fact(T),
     Any(Vec<Cause<T>>),
-    // Every(Vec<Cause<T>>),
+    Every(Vec<Cause<T>>),
 }
 
 impl<T: Fact> Cause<T> {
@@ -50,23 +52,21 @@ impl<T: Fact> Cause<T> {
     }
 }
 
-impl<T: Fact> std::fmt::Debug for Cause<T> {
+impl<T: Display> std::fmt::Debug for Cause<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Cause::Fact(fact) => f.write_str(&fact.to_string()),
-            Cause::Any(cs) => f.write_fmt(format_args!("Any({:#?})", cs)),
-            // cs.into_iter()
-            //     .map(|c| format!("{:?}", c))
-            //     .collect::<Vec<_>>()
-            //     .join(", ")
-
-            // Cause::Every(cs) => f.write_fmt(format_args!(
-            //     "Every({})",
-            //     cs.into_iter()
-            //         .map(|c| format!("{:?}", c))
-            //         .collect::<Vec<_>>()
-            //         .join(", ")
-            // )),
+            Cause::Fact(fact) => f.write_str(&fact.to_string())?,
+            Cause::Any(cs) => {
+                f.write_str("Any(")?;
+                f.debug_list().entries(cs.iter()).finish()?;
+                f.write_str(")")?;
+            }
+            Cause::Every(cs) => {
+                f.write_str("Every(")?;
+                f.debug_list().entries(cs.iter()).finish()?;
+                f.write_str(")")?;
+            }
         }
+        Ok(())
     }
 }

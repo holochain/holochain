@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use petgraph::visit::IntoEdges;
+use maplit::hashmap;
+use maplit::hashset;
 
 use crate::cause::*;
 use crate::graph::*;
@@ -14,7 +15,7 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
         Traversal::Fail(tree) => {
             let dot = format!(
                 "{:?}",
-                petgraph::dot::Dot::with_config(&tree, &[petgraph::dot::Config::EdgeNoLabel],)
+                petgraph::dot::Dot::with_config(&**tree, &[petgraph::dot::Config::EdgeNoLabel],)
             );
 
             if let Ok(graph) = graph_easy(&dot) {
@@ -29,7 +30,7 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
 fn path_lengths<T: Fact>(graph: &TruthTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
     let start_ix = graph.node_indices().find(|i| graph[*i] == start).unwrap();
     let end_ix = graph.node_indices().find(|i| graph[*i] == end).unwrap();
-    petgraph::algo::all_simple_paths::<Vec<_>, _>(graph, start_ix, end_ix, 0, None)
+    petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
         .map(|c| c.len())
         .collect()
 }
@@ -54,20 +55,25 @@ fn singleton() {
     }
 
     // No basis in truth
-    assert!(matches!(
-        Cause::from(Singleton).traverse(&(false, false)),
-        Traversal::Groundless
-    ));
+    let graph = Cause::from(Singleton)
+        .traverse(&(false, false))
+        .fail()
+        .unwrap();
+    assert_eq!(graph.nodes(), maplit::hashset! {Singleton.into()});
+    assert_eq!(graph.edge_count(), 0);
+
     // Loop ending in falsity
     assert!(matches!(
         Cause::from(Singleton).traverse(&(true, false)),
         Traversal::Groundless
     ));
+
     // Self is true
     assert!(matches!(
         Cause::from(Singleton).traverse(&(false, true)),
         Traversal::Pass
     ));
+
     // Self is true and loopy
     assert!(matches!(
         Cause::from(Singleton).traverse(&(true, true)),
@@ -77,6 +83,8 @@ fn singleton() {
 
 #[test]
 fn single_path() {
+    holochain_trace::test_run().ok().unwrap();
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     struct Countdown(u8);
 
@@ -103,19 +111,37 @@ fn single_path() {
     let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
     let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
     {
-        let tr = Cause::from(Countdown(3)).traverse(&all_false);
-        assert!(matches!(tr, Traversal::Groundless));
+        let graph = Cause::from(Countdown(3))
+            .traverse(&all_false)
+            .fail()
+            .unwrap();
+        assert_eq!(
+            graph.nodes(),
+            maplit::hashset![
+                Cause::from(Countdown(0)),
+                Cause::from(Countdown(1)),
+                Cause::from(Countdown(2)),
+                Cause::from(Countdown(3)),
+            ]
+        );
+        assert_eq!(graph.edge_count(), 3);
     }
     {
-        let tr = Cause::from(Countdown(2)).traverse(&true_3);
-        assert!(matches!(tr, Traversal::Groundless));
+        let graph = Cause::from(Countdown(2)).traverse(&true_3).fail().unwrap();
+        assert_eq!(
+            graph.nodes(),
+            maplit::hashset![
+                Cause::from(Countdown(0)),
+                Cause::from(Countdown(1)),
+                Cause::from(Countdown(2)),
+            ]
+        );
+        assert_eq!(graph.edge_count(), 2);
     }
     {
         let graph = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
-        let nodes = graph.node_weights().cloned().collect::<HashSet<_>>();
-
         assert_eq!(
-            nodes,
+            graph.nodes(),
             maplit::hashset![
                 Cause::from(Countdown(1)),
                 Cause::from(Countdown(2)),
@@ -139,7 +165,63 @@ fn single_path() {
 }
 
 #[test]
+fn loopy() {
+    holochain_trace::test_run().ok().unwrap();
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+    struct Countdown(u8);
+
+    impl Fact for Countdown {
+        type Context = Checks<Self>;
+
+        fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
+            match self.0 {
+                3 => Some(Self(2).into()),
+                2 => Some(Self(1).into()),
+                1 => Some(Self(3).into()),
+                0 => None,
+                _ => unreachable!(),
+            }
+        }
+
+        fn check(&self, ctx: &Self::Context) -> bool {
+            (ctx)(self)
+        }
+    }
+
+    let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
+    let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
+    let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
+
+    assert!(matches!(
+        Cause::from(Countdown(3)).traverse(&true_0),
+        Traversal::Groundless
+    ));
+
+    {
+        let tr = Cause::from(Countdown(3)).traverse(&true_1);
+        let graph = tr.fail().unwrap();
+        assert_eq!(
+            graph.nodes(),
+            maplit::hashset![Cause::from(Countdown(3)), Cause::from(Countdown(2))]
+        );
+        assert_eq!(graph.edge_count(), 1);
+    }
+    {
+        let tr = Cause::from(Countdown(2)).traverse(&true_3);
+        let graph = tr.fail().unwrap();
+        assert_eq!(
+            graph.nodes(),
+            maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(1))]
+        );
+        assert_eq!(graph.edge_count(), 1);
+    }
+}
+
+#[test]
 fn branching_any() {
+    holochain_trace::test_run().ok().unwrap();
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     struct Branching(u8);
 
@@ -174,6 +256,112 @@ fn branching_any() {
         report(&tr);
         let _graph = tr.fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case.
+    }
+}
+
+#[test]
+fn simple_every() {
+    holochain_trace::test_run().ok().unwrap();
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+    enum Recipe {
+        Eggs,
+        Vinegar,
+        Mayo,
+        Tuna,
+        Cheese,
+        TunaSalad,
+        Bread,
+        TunaMelt,
+        GrilledCheese,
+    }
+
+    use Recipe::*;
+
+    impl Fact for Recipe {
+        type Context = HashSet<Recipe>;
+
+        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+            use Recipe::*;
+            match self {
+                Eggs => None,
+                Vinegar => None,
+                Mayo => Some(Cause::Every(vec![Eggs.into(), Vinegar.into()])),
+                Tuna => None,
+                Cheese => None,
+                Bread => None,
+                TunaSalad => Some(Cause::Every(vec![Tuna.into(), Mayo.into()])),
+                TunaMelt => Some(Cause::Every(vec![
+                    TunaSalad.into(),
+                    Cheese.into(),
+                    Bread.into(),
+                ])),
+                GrilledCheese => Some(Cause::Every(vec![Cheese.into(), Bread.into()])),
+            }
+        }
+
+        fn check(&self, ctx: &Self::Context) -> bool {
+            ctx.contains(&self)
+        }
+    }
+
+    {
+        // TODO:
+        // - loops with Every might take some more thought.
+
+        {
+            let tr = Cause::from(GrilledCheese).traverse(&maplit::hashset![Cheese, Bread]);
+            report(&tr);
+            let g = tr.fail().unwrap();
+            assert_eq!(g.nodes(), maplit::hashset!(Cause::from(GrilledCheese)));
+        }
+        {
+            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread]);
+            report(&tr);
+            let g = tr.fail().unwrap();
+            assert_eq!(
+                g.nodes()
+                    .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
+                    .count(),
+                3
+            );
+        }
+        {
+            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, TunaSalad]);
+            report(&tr);
+            let g = tr.fail().unwrap();
+            assert_eq!(g.nodes(), maplit::hashset!(Cause::from(TunaMelt)));
+        }
+
+        {
+            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Eggs, Tuna]);
+            report(&tr);
+            let g = tr.fail().unwrap();
+
+            // Only the Vinegar base ingredient is included
+            assert_eq!(
+                g.nodes()
+                    .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
+                    .cloned()
+                    .collect::<HashSet<_>>(),
+                hashset! {Cause::from(Vinegar)}
+            );
+        }
+
+        {
+            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Mayo]);
+            report(&tr);
+            let g = tr.fail().unwrap();
+
+            // Only the Tuna base ingredient is included
+            assert_eq!(
+                g.nodes()
+                    .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
+                    .cloned()
+                    .collect::<HashSet<_>>(),
+                hashset! {Cause::from(Tuna)}
+            );
+        }
     }
 }
 

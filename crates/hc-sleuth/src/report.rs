@@ -9,7 +9,7 @@ pub fn report(step: Step, ctx: &Context) {
         Traversal::Fail(graph) => {
             let dot = format!(
                 "{:?}",
-                petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel],)
+                petgraph::dot::Dot::with_config(&*graph, &[petgraph::dot::Config::EdgeNoLabel],)
             );
             if let Ok(graph) = graph_easy(&dot) {
                 println!("`graph-easy` output:\n{}", graph);

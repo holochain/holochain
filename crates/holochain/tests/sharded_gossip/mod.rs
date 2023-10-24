@@ -564,6 +564,15 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         &[cell.agent_pubkey().clone()],
     );
 
+    let step = hc_sleuth::Step::Integrated {
+        by: 2,
+        op: (
+            hashes[0].clone(),
+            holochain_types::prelude::DhtOpType::StoreRecord,
+        ),
+    };
+    hc_sleuth::report(step, &sleuth_ctx);
+
     conductors[2]
         .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
         .await;

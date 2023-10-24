@@ -1,12 +1,27 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::hash::Hash;
 use std::io::{Read, Write};
 
 use crate::cause::*;
 
-pub type TruthTree<T> = petgraph::graph::DiGraph<Cause<T>, ()>;
+#[derive(Debug, derive_more::From, derive_more::Deref, derive_more::DerefMut)]
+pub struct TruthTree<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
+
+impl<T: Display + Clone + Eq + Hash> TruthTree<T> {
+    pub fn nodes(&self) -> HashSet<Cause<T>> {
+        self.node_weights().cloned().collect::<HashSet<_>>()
+    }
+}
+
+impl<T: Display> Default for TruthTree<T> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
 
 #[derive(Debug, derive_more::From)]
+// #[cfg_attr(test, derive(PartialEq))]
 pub enum Traversal<T: Fact> {
     /// The target fact is true; nothing more needs to be said
     Pass,
@@ -58,7 +73,7 @@ fn traverse_inner<F: Fact>(
     ctx: &F::Context,
     table: &mut TraversalMap<F>,
 ) -> Option<Check<F>> {
-    tracing::trace!("enter");
+    tracing::trace!("enter {:?}", cause);
     match table.get(cause) {
         None => {
             tracing::trace!("marked visited");
@@ -91,7 +106,7 @@ fn traverse_inner<F: Fact>(
                     Check::Fail(vec![cause])
                 } else {
                     tracing::trace!("fact fail with no cause, terminating");
-                    return None;
+                    Check::Fail(vec![])
                 }
             }
         }
@@ -118,6 +133,26 @@ fn traverse_inner<F: Fact>(
                 Check::Fail(fails)
             }
         }
+        Cause::Every(cs) => {
+            let checks: Vec<_> = cs
+                .iter()
+                .filter_map(|c| Some((c.clone(), traverse_inner(c, ctx, table)?)))
+                .collect();
+            tracing::trace!("Every. checks: {:?}", checks);
+            if checks.is_empty() {
+                // All loops
+                tracing::debug!("All loops");
+                return None;
+            }
+            let fails = checks.iter().filter(|(_, check)| !check.is_pass()).count();
+            let causes: Vec<_> = checks.into_iter().map(|(cause, _)| cause).collect();
+            tracing::trace!("Every. num fails: {}", fails);
+            if fails == 0 {
+                Check::Pass
+            } else {
+                Check::Fail(causes)
+            }
+        }
     };
     table.insert(cause.clone(), Some(check.clone()));
     tracing::trace!("exit. check: {:?}", check);
@@ -135,10 +170,9 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
-        let causes = table[&next].as_ref().map(|c| c.causes()).unwrap_or(&[]);
-        if !causes.is_empty() {
+        if let Some(Check::Fail(causes)) = table[&next].as_ref() {
             to_add.extend(causes.iter());
-            sub.insert(next, causes);
+            sub.insert(next, causes.as_slice());
         }
     }
     sub
@@ -148,7 +182,7 @@ pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
 ) -> TruthTree<T> {
-    let mut g = TruthTree::new();
+    let mut g = TruthTree::default();
 
     let sub = prune_traversal(table, start);
 
