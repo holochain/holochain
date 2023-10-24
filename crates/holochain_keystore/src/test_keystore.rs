@@ -77,6 +77,7 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
+#[cfg(feature = "test_utils")]
 pub fn test_keystore() -> MetaLairClient {
     holochain_util::tokio_helper::block_on(
         async move { spawn_test_keystore().await.unwrap() },

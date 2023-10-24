@@ -73,7 +73,9 @@ impl ConductorBuilder {
                 }
             };
             match &self.config.keystore {
-                KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                KeystoreConfig::DangerTestKeystore => {
+                    holochain_keystore::spawn_test_keystore().await?
+                }
                 KeystoreConfig::LairServer { connection_url } => {
                     warn_no_encryption();
                     let passphrase = get_passphrase()?;

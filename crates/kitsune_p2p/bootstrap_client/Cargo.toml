@@ -11,7 +11,7 @@ categories = ["network-programming"]
 edition = "2021"
 
 [dependencies]
-kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
+kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.11", path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.11", path = "../types" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.8", path = "../bin_data" }
 tokio = "1"
