@@ -665,7 +665,7 @@ async fn queue_consumer_main_task_impl<
             match fut().await {
                 Ok(WorkComplete::Incomplete) => {
                     tracing::debug!("Work incomplete, retriggering workflow after a delay of {RETRIGGER_DELAY} ms.");
-                    tokio::time::sleep(Duration::from_millis(RETRIGGER_DELAY)).await;
+                    tokio::time::sleep(Duration::from_millis(RETRIGGER_DELAY as u64)).await;
                     tx.trigger(&"retrigger")
                 }
                 Err(err) => handle_workflow_error(&name, err)?,
