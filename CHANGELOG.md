@@ -14,6 +14,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20231018.005225
+
+- Optimize release build profile to minimize size
+
+## [holochain\_cli-0.3.0-beta-dev.22](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain-0.3.0-beta-dev.22](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.22)
+
+- Fix an issue where enough validation receipts being received would not prevent the publish workflow from continuing to run. This was a terrible waste of data and compute and would build up over time as Holochain is used. [2931](https://github.com/holochain/holochain/pull/2931)
+- Improve log output for op publishing to accurately reflect the number of ops to be published. The number published which is logged later is accurate and it was confusing to see more ops published than were supposed to be. [2922](https://github.com/holochain/holochain/pull/2922)
+- Fix an issue which prevented the publish loop for a cell from suspending if there was either 1. publish activity pending for other cells or 2. enough validation receipts received. [2922](https://github.com/holochain/holochain/pull/2922)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.20](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.22](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_cascade-0.3.0-beta-dev.22](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.22](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_metrics-0.3.0-beta-dev.4](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.20](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_state-0.3.0-beta-dev.21](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_p2p-0.3.0-beta-dev.21](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_types-0.3.0-beta-dev.19](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_sqlite-0.3.0-beta-dev.19](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [kitsune\_p2p-0.3.0-beta-dev.19](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.19)
+
 # 20231011.004956
 
 ## [holochain\_cli-0.3.0-beta-dev.21](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.21)
