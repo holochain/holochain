@@ -29,13 +29,16 @@ pub enum Traversal<T: Fact> {
     Groundless,
     /// The target fact is false, and all paths which lead to true facts
     /// are present in this graph
-    Fail(TruthTree<T>),
+    Fail {
+        tree: TruthTree<T>,
+        passes: Vec<Cause<T>>,
+    },
 }
 
 impl<T: Fact> Traversal<T> {
-    pub fn fail(self) -> Option<TruthTree<T>> {
+    pub fn fail(self) -> Option<(TruthTree<T>, Vec<Cause<T>>)> {
         match self {
-            Traversal::Fail(tree) => Some(tree),
+            Traversal::Fail { tree, passes } => Some((tree, passes)),
             _ => None,
         }
     }
@@ -61,7 +64,8 @@ pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
             if check.is_pass() {
                 Traversal::Pass
             } else {
-                Traversal::Fail(produce_graph(&table, cause))
+                let (tree, passes) = produce_graph(&table, cause);
+                Traversal::Fail { tree, passes }
             }
         }
         None => Traversal::Groundless,
@@ -162,29 +166,37 @@ fn traverse_inner<F: Fact>(
 /// Prune away any extraneous nodes or edges from a Traversal.
 /// After pruning, the graph contains all edges starting with the specified cause
 /// and ending with a true cause.
+/// Passing facts are returned separately.
 pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> HashMap<&'a Cause<T>, &'a [Cause<T>]> {
+) -> (HashMap<&'a Cause<T>, &'a [Cause<T>]>, Vec<&'a Cause<T>>) {
     let mut sub = HashMap::<&Cause<T>, &[Cause<T>]>::new();
+    let mut passes = vec![];
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
-        if let Some(Check::Fail(causes)) = table[&next].as_ref() {
-            to_add.extend(causes.iter());
-            sub.insert(next, causes.as_slice());
+        match table[&next].as_ref() {
+            Some(Check::Fail(causes)) => {
+                to_add.extend(causes.iter());
+                sub.insert(next, causes.as_slice());
+            }
+            Some(Check::Pass) => {
+                passes.push(next);
+            }
+            None => {}
         }
     }
-    sub
+    (sub, passes)
 }
 
 pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> TruthTree<T> {
+) -> (TruthTree<T>, Vec<Cause<T>>) {
     let mut g = TruthTree::default();
 
-    let sub = prune_traversal(table, start);
+    let (sub, passes) = prune_traversal(table, start);
 
     let rows: Vec<_> = sub.into_iter().collect();
     let mut nodemap = HashMap::new();
@@ -202,7 +214,7 @@ pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
         }
     }
 
-    g
+    (g, passes.into_iter().cloned().collect())
 }
 
 /// If a `graph-easy` binary is installed, render an ASCII graph from the

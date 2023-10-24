@@ -11,7 +11,7 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
     match traversal {
         Traversal::Pass => println!("PASS"),
         Traversal::Groundless => println!("GROUNDLESS"),
-        Traversal::Fail(tree) => {
+        Traversal::Fail { tree, passes } => {
             let dot = format!(
                 "{:?}",
                 petgraph::dot::Dot::with_config(&**tree, &[petgraph::dot::Config::EdgeNoLabel],)
@@ -22,6 +22,8 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
             } else {
                 println!("`graph-easy` not installed. Original dot output: {}", dot);
             }
+
+            println!("Passing checks: {:#?}", passes);
         }
     }
 }
@@ -54,7 +56,7 @@ fn singleton() {
     }
 
     // No basis in truth
-    let graph = Cause::from(Singleton)
+    let (graph, _passes) = Cause::from(Singleton)
         .traverse(&(false, false))
         .fail()
         .unwrap();
@@ -110,7 +112,7 @@ fn single_path() {
     let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
     let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
     {
-        let graph = Cause::from(Countdown(3))
+        let (graph, _passes) = Cause::from(Countdown(3))
             .traverse(&all_false)
             .fail()
             .unwrap();
@@ -126,7 +128,7 @@ fn single_path() {
         assert_eq!(graph.edge_count(), 3);
     }
     {
-        let graph = Cause::from(Countdown(2)).traverse(&true_3).fail().unwrap();
+        let (graph, _passes) = Cause::from(Countdown(2)).traverse(&true_3).fail().unwrap();
         assert_eq!(
             graph.nodes(),
             maplit::hashset![
@@ -138,7 +140,7 @@ fn single_path() {
         assert_eq!(graph.edge_count(), 2);
     }
     {
-        let graph = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
+        let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
         assert_eq!(
             graph.nodes(),
             maplit::hashset![
@@ -151,7 +153,7 @@ fn single_path() {
         assert_eq!(graph.edge_count(), 2);
     }
     {
-        let graph = Cause::from(Countdown(3)).traverse(&true_1).fail().unwrap();
+        let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_1).fail().unwrap();
         let nodes = graph.node_weights().cloned().collect::<HashSet<_>>();
 
         assert_eq!(
@@ -199,7 +201,7 @@ fn loopy() {
 
     {
         let tr = Cause::from(Countdown(3)).traverse(&true_1);
-        let graph = tr.fail().unwrap();
+        let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
             graph.nodes(),
             maplit::hashset![Cause::from(Countdown(3)), Cause::from(Countdown(2))]
@@ -208,7 +210,7 @@ fn loopy() {
     }
     {
         let tr = Cause::from(Countdown(2)).traverse(&true_3);
-        let graph = tr.fail().unwrap();
+        let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
             graph.nodes(),
             maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(1))]
@@ -240,7 +242,7 @@ fn branching_any() {
     {
         let tr = Cause::from(Branching(2)).traverse(&maplit::hashset![40, 64]);
         report(&tr);
-        let graph = tr.fail().unwrap();
+        let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
             path_lengths(&graph, Branching(2).into(), Branching(20).into()),
             vec![7]
@@ -253,7 +255,7 @@ fn branching_any() {
     {
         let tr = Cause::from(Branching(2)).traverse(&(32..128).collect());
         report(&tr);
-        let _graph = tr.fail().unwrap();
+        let _ = tr.fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case.
     }
 }
@@ -311,13 +313,13 @@ fn simple_every() {
         {
             let tr = Cause::from(GrilledCheese).traverse(&maplit::hashset![Cheese, Bread]);
             report(&tr);
-            let g = tr.fail().unwrap();
+            let (g, _) = tr.fail().unwrap();
             assert_eq!(g.nodes(), maplit::hashset!(Cause::from(GrilledCheese)));
         }
         {
             let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread]);
             report(&tr);
-            let g = tr.fail().unwrap();
+            let (g, _) = tr.fail().unwrap();
             assert_eq!(
                 g.nodes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
@@ -328,14 +330,14 @@ fn simple_every() {
         {
             let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, TunaSalad]);
             report(&tr);
-            let g = tr.fail().unwrap();
+            let (g, _) = tr.fail().unwrap();
             assert_eq!(g.nodes(), maplit::hashset!(Cause::from(TunaMelt)));
         }
 
         {
             let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Eggs, Tuna]);
             report(&tr);
-            let g = tr.fail().unwrap();
+            let (g, _) = tr.fail().unwrap();
 
             // Only the Vinegar base ingredient is included
             assert_eq!(
@@ -350,7 +352,7 @@ fn simple_every() {
         {
             let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Mayo]);
             report(&tr);
-            let g = tr.fail().unwrap();
+            let (g, _) = tr.fail().unwrap();
 
             // Only the Tuna base ingredient is included
             assert_eq!(

@@ -100,7 +100,9 @@ impl aitia::Fact for Step {
                 let mut others: Vec<_> = (0..ctx.nodes.len())
                     .filter(|i| *i != by)
                     .map(|i| {
-                        Published {
+                        // TODO: this should be Published | Gossiped, but we
+                        // don't have a good rule for Gossiped yet
+                        Integrated {
                             by: i,
                             op: op.clone(),
                         }
