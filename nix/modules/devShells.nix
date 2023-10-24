@@ -170,27 +170,34 @@
             '';
           };
 
-        rustDev =
-          pkgs.mkShell
-          {
-              stdenv = config.rustHelper.defaultStdenv pkgs;
-              inputsFrom = [
-                self'.packages.holochain
-              ];
+        rustDev = pkgs.mkShell {
+          inputsFrom = [
+            self'.packages.holochain
+          ];
 
-              shellHook = ''
-                export CARGO_HOME="$PWD/.cargo"
-                export CARGO_INSTALL_ROOT="$PWD/.cargo"
-                export CARGO_TARGET_DIR="$PWD/target"
-                export CARGO_CACHE_RUSTC_INFO=1
-                export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
-                export NIX_PATH="nixpkgs=${pkgs.path}"
-                export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
-                echo Rust development shell spawned. Type 'exit' to leave.
-              '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
-                export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
-              '');
-            };
+          packages = (lib.lists.optionals pkgs.stdenv.isLinux [
+            pkgs.mold
+          ]);
+
+          shellHook = ''
+            export CARGO_HOME="$PWD/.cargo"
+            export CARGO_INSTALL_ROOT="$PWD/.cargo"
+            export CARGO_TARGET_DIR="$PWD/target"
+            export CARGO_CACHE_RUSTC_INFO=1
+            export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
+            export NIX_PATH="nixpkgs=${pkgs.path}"
+            export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+            echo Rust development shell spawned. Type 'exit' to leave.
+          ''
+          + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
+            export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+          '')
+          + (lib.strings.optionalString pkgs.stdenv.isLinux ''
+            export RUSTFLAGS="$RUSTFLAGS -Clink-arg=-fuse-ld=mold"
+            export LD_LIBRARY_PATH=${lib.makeLibraryPath [ pkgs.openssl ]}
+          '')
+          ;
+        };
 
         nixDev =
           pkgs.mkShell
@@ -199,10 +206,6 @@
                 self'.devShells.rustDev
               ];
 
-              shellHook = ''
-                export RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
-              '';
-
               packages = [
                 (pkgs.callPackage self.inputs.crate2nix.outPath { })
                 pkgs.llvmPackages.bintools
@@ -210,7 +213,4 @@
             };
       };
     };
-
 }
-
-

@@ -3,12 +3,12 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rustHelper.mkRust {
+      rustPkgs = config.rustHelper.mkRustPkgs {
         track = "stable";
         version = "1.71.1";
       };
-
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      rustToolchain = rustPkgs.rustToolchain;
+      craneLib = (inputs.crane.mkLib rustPkgs).overrideToolchain rustToolchain;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -38,8 +38,6 @@
         nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
-
-        stdenv = config.rustHelper.defaultStdenv pkgs;
       };
 
       # derivation building all dependencies
@@ -68,7 +66,9 @@
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
         pname = "holochain-tests-nextest";
         CARGO_PROFILE = "fast-test";
-        nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.cargo-nextest ];
+        nativeBuildInputs = commonArgs.nativeBuildInputs
+          # ++ [ pkgs.cargo-nextest ]
+        ;
         buildPhase = ''
           cargo nextest run --no-run \
           ${import ../../.config/test-args.nix} \
@@ -213,7 +213,17 @@
 
     in
     {
-      packages =
+      options.holochain = lib.mkOption { type = lib.types.raw; };
+
+      config.holochain = {
+        inherit
+          craneLib
+          ;
+
+        craneShell = craneLib.devShell;
+      };
+
+      config.packages =
         {
           inherit
             holochain
