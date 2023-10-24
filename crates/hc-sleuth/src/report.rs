@@ -8,7 +8,7 @@ pub fn report(step: Step, ctx: &Context) {
         Traversal::Groundless => println!("GROUNDLESS"),
         Traversal::Fail(graph) => {
             let dot = format!(
-                "{:?}",
+                "{:#?}",
                 petgraph::dot::Dot::with_config(&*graph, &[petgraph::dot::Config::EdgeNoLabel],)
             );
             if let Ok(graph) = graph_easy(&dot) {

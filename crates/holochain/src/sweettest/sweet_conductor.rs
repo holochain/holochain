@@ -264,7 +264,7 @@ impl SweetConductor {
     }
 
     /// Make the temp db dir persistent
-    pub fn persist(&mut self) -> &Path {
+    pub fn persist_dbs(&mut self) -> &Path {
         self.db_dir.persist();
         &self.db_dir
     }

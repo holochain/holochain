@@ -39,20 +39,20 @@ pub struct NodeEnv {
 pub type NodeId = usize;
 
 impl NodeEnv {
-    pub async fn integrated<R: Send + 'static>(
+    pub fn integrated<R: Send + 'static>(
         &self,
-        f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
+        f: impl 'static + Clone + Send + FnOnce(Transaction) -> anyhow::Result<Option<R>>,
     ) -> anyhow::Result<Option<R>> {
-        if let Some(r) = self.authored.write_async(f.clone()).await? {
+        if let Some(r) = self.authored.test_read(f.clone())? {
             Ok(Some(r))
         } else {
-            self.dht.write_async(f.clone()).await
+            self.dht.test_read(f.clone())
         }
     }
 
-    pub async fn exists<R: Send + 'static>(
+    pub fn exists<R: Send + 'static>(
         &self,
-        f: impl 'static + Clone + Send + FnOnce(&mut Transaction) -> anyhow::Result<Option<R>>,
+        f: impl 'static + Clone + Send + FnOnce(Transaction) -> anyhow::Result<Option<R>>,
     ) -> anyhow::Result<Option<R>> {
         todo!()
     }

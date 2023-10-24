@@ -552,6 +552,8 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     // Bring a third conductor online
     conductors.add_conductor_from_config(config).await;
 
+    conductors.persist_dbs();
+
     let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
         .await

@@ -15,27 +15,27 @@ pub enum Step {
     // PublishReceived {},
 }
 
+impl Step {
+    fn deps_obtained() {}
+}
+
 impl std::fmt::Display for Step {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Step::Authored { by, action } => {
-                f.write_fmt(format_args!("Op Authored by node {}: {}", by, action))
+                f.write_fmt(format_args!("[{}] Authored: {}", by, action))
             }
-            Step::Published { by, op } => {
-                f.write_fmt(format_args!("Op Published by node {}: {:?}", by, op))
-            }
+            Step::Published { by, op } => f.write_fmt(format_args!("[{}] Published: {:?}", by, op)),
             Step::Integrated { by, op } => {
-                f.write_fmt(format_args!("Op Integrated by node {}: {:?}", by, op))
+                f.write_fmt(format_args!("[{}] Integrated: {:?}", by, op))
             }
             Step::AppValidated { by, op } => {
-                f.write_fmt(format_args!("Op AppValidated by node {}: {:?}", by, op))
+                f.write_fmt(format_args!("[{}] AppValidated: {:?}", by, op))
             }
             Step::SysValidated { by, op } => {
-                f.write_fmt(format_args!("Op SysValidated by node {}: {:?}", by, op))
+                f.write_fmt(format_args!("[{}] SysValidated: {:?}", by, op))
             }
-            Step::Fetched { by, op } => {
-                f.write_fmt(format_args!("Op Fetched by node {}: {:?}", by, op))
-            }
+            Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
         }
     }
 }
@@ -54,10 +54,48 @@ impl aitia::Fact for Step {
             Published { by, op } => Some(Integrated { by, op }.into()),
             Integrated { by, op } => Some(AppValidated { by, op }.into()),
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
-            SysValidated { by, op } => Some(aitia::Cause::Any(vec![
-                Fetched { by, op: op.clone() }.into(),
-                Authored { by, action: op.0 }.into(),
-            ])),
+            SysValidated { by, op } => {
+                let current = aitia::Cause::Any(vec![
+                    Fetched { by, op: op.clone() }.into(),
+                    Authored {
+                        by,
+                        action: op.0.clone(),
+                    }
+                    .into(),
+                ]);
+
+                let env = ctx.nodes.envs.get(by).unwrap();
+                let dep = env
+                    .integrated(move |txn| {
+                        Ok(txn
+                            .query_row(
+                                "
+                        SELECT dependency FROM DhtOp
+                        WHERE action_hash = :action_hash 
+                          AND type = :type",
+                                named_params! {
+                                    ":action_hash": op.0,
+                                    ":type": op.1,
+                                },
+                                |row| row.get::<_, Option<ActionHash>>(0),
+                            )
+                            .optional()?
+                            .flatten())
+                    })
+                    .unwrap();
+                let mut causes = vec![current];
+                causes.extend(
+                    dep.map(|action| {
+                        aitia::Cause::from(Integrated {
+                            by,
+                            op: (action, DhtOpType::StoreRecord),
+                        })
+                    })
+                    .into_iter(),
+                );
+
+                Some(aitia::Cause::Every(causes))
+            }
             Fetched { by, op } => {
                 let mut others: Vec<_> = (0..ctx.nodes.len())
                     .filter(|i| *i != by)
@@ -97,7 +135,7 @@ impl aitia::Fact for Step {
                 op: (action_hash, op_type),
             } => {
                 let env = ctx.nodes.envs.get(by).unwrap();
-                env.dht.test_read(move |txn| {
+                env.authored.test_read(move |txn| {
                     txn.query_row(
                         "
                         SELECT last_publish_time FROM DhtOp

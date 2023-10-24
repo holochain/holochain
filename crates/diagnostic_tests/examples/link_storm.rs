@@ -156,7 +156,7 @@ async fn setup_app(mut rng: StdRng) -> App {
 async fn construct_node(dna: DnaFile) -> Node {
     let (mut conductor, zome) =
         diagnostic_tests::setup_conductor_with_single_dna(config(), dna).await;
-    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist());
+    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist_dbs());
     let conductor = Arc::new(conductor);
 
     Node::new(conductor.clone(), zome).await

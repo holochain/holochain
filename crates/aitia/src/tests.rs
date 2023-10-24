@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use maplit::hashmap;
 use maplit::hashset;
 
 use crate::cause::*;
