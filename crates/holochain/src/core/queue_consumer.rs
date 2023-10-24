@@ -649,6 +649,8 @@ pub(super) fn trigger_stream(rx: TriggerReceiver, stop: StopReceiver) -> impl St
     })))
 }
 
+const RETRIGGER_DELAY: u8 = 100;
+
 async fn queue_consumer_main_task_impl<
     Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
 >(
@@ -662,7 +664,8 @@ async fn queue_consumer_main_task_impl<
         if let Some(()) = triggers.next().await {
             match fut().await {
                 Ok(WorkComplete::Incomplete) => {
-                    tracing::debug!("Work incomplete, retriggering workflow");
+                    tracing::debug!("Work incomplete, retriggering workflow after a delay of {RETRIGGER_DELAY} ms.");
+                    tokio::time::sleep(Duration::from_millis(RETRIGGER_DELAY)).await;
                     tx.trigger(&"retrigger")
                 }
                 Err(err) => handle_workflow_error(&name, err)?,
