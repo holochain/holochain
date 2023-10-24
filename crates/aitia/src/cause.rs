@@ -1,7 +1,9 @@
 pub trait Fact: Sized + Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {
     type Context;
 
-    fn explain(&self, ctx: &Self::Context) -> String;
+    fn explain(&self, ctx: &Self::Context) -> String {
+        self.to_string()
+    }
     fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>>;
     fn check(&self, ctx: &Self::Context) -> bool;
 }

@@ -127,8 +127,10 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
 
     while let Some(next) = to_add.pop() {
         let causes = table[&next].as_ref().map(|c| c.causes()).unwrap_or(&[]);
-        to_add.extend(causes.iter());
-        sub.insert(next, causes);
+        if !causes.is_empty() {
+            to_add.extend(causes.iter());
+            sub.insert(next, causes);
+        }
     }
     sub
 }
@@ -151,7 +153,9 @@ pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
 
     for (k, v) in rows.iter() {
         for c in v.iter() {
-            g.add_edge(nodemap[k], nodemap[&c], ());
+            if let (Some(k), Some(c)) = (nodemap.get(k), nodemap.get(&c)) {
+                g.add_edge(*k, *c, ());
+            }
         }
     }
 

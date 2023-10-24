@@ -1,86 +1,164 @@
 use crate::cause::*;
 use crate::graph::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
-struct Step {
-    which: bool,
-    stage: Stage,
-}
+type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
-impl std::fmt::Display for Step {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let who = match self.which {
-            false => "Fatma",
-            true => "Trudy",
-        };
-        f.write_fmt(format_args!("{} {:?}", who, self.stage))
+fn report<T: Fact>(tree: &Tree<T>) {
+    let dot = format!(
+        "{:?}",
+        petgraph::dot::Dot::with_config(&tree, &[petgraph::dot::Config::EdgeNoLabel],)
+    );
+
+    if let Ok(graph) = graph_easy(&dot) {
+        println!("`graph-easy` output:\n{}", graph);
+    } else {
+        println!("`graph-easy` not installed. Original dot output: {}", dot);
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum Stage {
-    Create,
-    Fetch,
-    ReceiveA,
-    ReceiveB,
-    Store,
-    SendA,
-    SendB,
-}
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+struct Countdown(u8);
 
-type StepValues = Box<dyn Fn(&Step) -> bool>;
+impl Fact for Countdown {
+    type Context = Checks<Self>;
 
-impl Fact for Step {
-    type Context = StepValues;
-
-    fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
-        use Stage::*;
-        match self.stage {
-            Create => None,
-            Fetch => Some(Cause::Any(vec![self.mine(ReceiveA), self.mine(ReceiveB)])),
-            ReceiveA => Some(self.theirs(SendA)),
-            ReceiveB => Some(self.theirs(SendB)),
-            Store => Some(Cause::Any(vec![self.mine(Create), self.mine(Fetch)])),
-            SendA => Some(self.mine(Store)),
-            SendB => Some(self.mine(Store)),
+    fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
+        match self.0 {
+            3 => Some(Self(2).into()),
+            2 => Some(Self(1).into()),
+            1 => Some(Self(0).into()),
+            0 => None,
+            _ => unreachable!(),
         }
     }
 
     fn check(&self, ctx: &Self::Context) -> bool {
         (ctx)(self)
     }
-
-    fn explain(&self, _ctx: &Self::Context) -> String {
-        self.to_string()
-    }
-}
-
-impl Step {
-    pub fn mine(&self, stage: Stage) -> Cause<Self> {
-        Cause::Fact(Self {
-            which: self.which,
-            stage,
-        })
-    }
-
-    pub fn theirs(&self, stage: Stage) -> Cause<Self> {
-        Cause::Fact(Self {
-            which: !self.which,
-            stage,
-        })
-    }
 }
 
 #[test]
-fn one() {
+fn singleton() {
     holochain_trace::test_run().ok().unwrap();
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+    struct Singleton;
+
+    impl Fact for Singleton {
+        type Context = (bool, bool);
+
+        fn cause(&self, (self_ref, _): &Self::Context) -> Option<Cause<Self>> {
+            self_ref.then_some(Self.into())
+        }
+
+        fn check(&self, (_, check): &Self::Context) -> bool {
+            *check
+        }
+    }
+
+    // No basis in truth
+    assert_eq!(
+        Cause::from(Singleton).graph(&(false, false)).node_count(),
+        0
+    );
+    // Loop ending in falsity
+    assert_eq!(Cause::from(Singleton).graph(&(true, false)).node_count(), 0);
+    // Self is true
+    assert_eq!(Cause::from(Singleton).graph(&(false, true)).node_count(), 1);
+    // Self is true and loopy
+    assert_eq!(Cause::from(Singleton).graph(&(true, true)).node_count(), 1);
+}
+
+#[test]
+fn no_truth() {
+    let all_false: Checks<Countdown> = Box::new(|_| false);
+    let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
+
+    let tree = Cause::from(Countdown(3)).graph(&all_false);
+    assert_eq!(tree.node_count(), 0);
+
+    let tree = Cause::from(Countdown(3)).graph(&true_0);
+    report(&tree);
+}
+
+#[test]
+fn holochain_like() {
+    holochain_trace::test_run().ok().unwrap();
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
+    struct Step {
+        which: bool,
+        stage: Stage,
+    }
+
+    impl std::fmt::Display for Step {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let who = match self.which {
+                false => "Fatma",
+                true => "Trudy",
+            };
+            f.write_fmt(format_args!("{} {:?}", who, self.stage))
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    enum Stage {
+        Create,
+        Fetch,
+        ReceiveA,
+        ReceiveB,
+        Store,
+        SendA,
+        SendB,
+    }
+
+    impl Fact for Step {
+        type Context = Checks<Self>;
+
+        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+            use Stage::*;
+            match self.stage {
+                Create => None,
+                Fetch => Some(Cause::Any(vec![self.mine(ReceiveA), self.mine(ReceiveB)])),
+                ReceiveA => Some(self.theirs(SendA)),
+                ReceiveB => Some(self.theirs(SendB)),
+                Store => Some(Cause::Any(vec![self.mine(Create), self.mine(Fetch)])),
+                SendA => Some(self.mine(Store)),
+                SendB => Some(self.mine(Store)),
+            }
+        }
+
+        fn check(&self, ctx: &Self::Context) -> bool {
+            (ctx)(self)
+        }
+
+        fn explain(&self, _ctx: &Self::Context) -> String {
+            self.to_string()
+        }
+    }
+
+    impl Step {
+        pub fn mine(&self, stage: Stage) -> Cause<Self> {
+            Cause::Fact(Self {
+                which: self.which,
+                stage,
+            })
+        }
+
+        pub fn theirs(&self, stage: Stage) -> Cause<Self> {
+            Cause::Fact(Self {
+                which: !self.which,
+                stage,
+            })
+        }
+    }
 
     let fatma_store = Cause::Fact(Step {
         which: false,
         stage: Stage::Store,
     });
 
-    let checks: StepValues = Box::new(|step: &Step| match (step.which, step.stage) {
+    let checks: Checks<Step> = Box::new(|step: &Step| match (step.which, step.stage) {
         (true, Stage::Create) => true,
         // (false, Stage::Create) => true,
 
