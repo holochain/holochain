@@ -1,39 +1,28 @@
+use std::collections::HashSet;
+
+use petgraph::visit::IntoEdges;
+
 use crate::cause::*;
 use crate::graph::*;
 
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
-fn report<T: Fact>(tree: &Tree<T>) {
-    let dot = format!(
-        "{:?}",
-        petgraph::dot::Dot::with_config(&tree, &[petgraph::dot::Config::EdgeNoLabel],)
-    );
+fn report<T: Fact>(traversal: &Traversal<T>) {
+    match traversal {
+        Traversal::Pass => println!("PASS"),
+        Traversal::Groundless => println!("GROUNDLESS"),
+        Traversal::Fail(tree) => {
+            let dot = format!(
+                "{:?}",
+                petgraph::dot::Dot::with_config(&tree, &[petgraph::dot::Config::EdgeNoLabel],)
+            );
 
-    if let Ok(graph) = graph_easy(&dot) {
-        println!("`graph-easy` output:\n{}", graph);
-    } else {
-        println!("`graph-easy` not installed. Original dot output: {}", dot);
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-struct Countdown(u8);
-
-impl Fact for Countdown {
-    type Context = Checks<Self>;
-
-    fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
-        match self.0 {
-            3 => Some(Self(2).into()),
-            2 => Some(Self(1).into()),
-            1 => Some(Self(0).into()),
-            0 => None,
-            _ => unreachable!(),
+            if let Ok(graph) = graph_easy(&dot) {
+                println!("`graph-easy` output:\n{}", graph);
+            } else {
+                println!("`graph-easy` not installed. Original dot output: {}", dot);
+            }
         }
-    }
-
-    fn check(&self, ctx: &Self::Context) -> bool {
-        (ctx)(self)
     }
 }
 
@@ -57,28 +46,113 @@ fn singleton() {
     }
 
     // No basis in truth
-    assert_eq!(
-        Cause::from(Singleton).graph(&(false, false)).node_count(),
-        0
-    );
+    assert!(matches!(
+        Cause::from(Singleton).traverse(&(false, false)),
+        Traversal::Groundless
+    ));
     // Loop ending in falsity
-    assert_eq!(Cause::from(Singleton).graph(&(true, false)).node_count(), 0);
+    assert!(matches!(
+        Cause::from(Singleton).traverse(&(true, false)),
+        Traversal::Groundless
+    ));
     // Self is true
-    assert_eq!(Cause::from(Singleton).graph(&(false, true)).node_count(), 1);
+    assert!(matches!(
+        Cause::from(Singleton).traverse(&(false, true)),
+        Traversal::Pass
+    ));
     // Self is true and loopy
-    assert_eq!(Cause::from(Singleton).graph(&(true, true)).node_count(), 1);
+    assert!(matches!(
+        Cause::from(Singleton).traverse(&(true, true)),
+        Traversal::Pass
+    ));
 }
 
 #[test]
-fn no_truth() {
+fn single_path() {
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+    struct Countdown(u8);
+
+    impl Fact for Countdown {
+        type Context = Checks<Self>;
+
+        fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
+            match self.0 {
+                3 => Some(Self(2).into()),
+                2 => Some(Self(1).into()),
+                1 => Some(Self(0).into()),
+                0 => None,
+                _ => unreachable!(),
+            }
+        }
+
+        fn check(&self, ctx: &Self::Context) -> bool {
+            (ctx)(self)
+        }
+    }
+
     let all_false: Checks<Countdown> = Box::new(|_| false);
     let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
+    let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
+    let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
+    {
+        let tr = Cause::from(Countdown(3)).traverse(&all_false);
+        assert!(matches!(tr, Traversal::Groundless));
+    }
+    {
+        let tr = Cause::from(Countdown(2)).traverse(&true_3);
+        assert!(matches!(tr, Traversal::Groundless));
+    }
+    {
+        let graph = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
+        let nodes = graph.node_weights().cloned().collect::<HashSet<_>>();
 
-    let tree = Cause::from(Countdown(3)).graph(&all_false);
-    assert_eq!(tree.node_count(), 0);
+        assert_eq!(
+            nodes,
+            maplit::hashset![
+                Cause::from(Countdown(1)),
+                Cause::from(Countdown(2)),
+                Cause::from(Countdown(3))
+            ]
+        );
 
-    let tree = Cause::from(Countdown(3)).graph(&true_0);
-    report(&tree);
+        assert_eq!(graph.edge_count(), 2);
+    }
+    {
+        let graph = Cause::from(Countdown(3)).traverse(&true_1).fail().unwrap();
+        let nodes = graph.node_weights().cloned().collect::<HashSet<_>>();
+
+        assert_eq!(
+            nodes,
+            maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(3))]
+        );
+
+        assert_eq!(graph.edge_count(), 1);
+    }
+}
+
+#[test]
+fn branching_any() {
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+    struct Branching(u8);
+
+    impl Fact for Branching {
+        type Context = HashSet<u8>;
+
+        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+            (self.0 <= 64)
+                .then(|| Cause::Any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()]))
+        }
+
+        fn check(&self, ctx: &Self::Context) -> bool {
+            ctx.contains(&self.0)
+        }
+    }
+
+    {
+        let tr = Cause::from(Branching(2)).traverse(&maplit::hashset![40, 64]);
+        report(&tr);
+        let graph = tr.fail().unwrap();
+    }
 }
 
 #[test]
@@ -184,22 +258,5 @@ fn holochain_like() {
         // (false, Stage::SendB) => todo!(),
     });
 
-    let table = traverse(&fatma_store, &checks);
-    let sub = prune_traversal(&table, &fatma_store);
-
-    println!("TABLE\n{:#?}", table);
-    println!("SUBTABLE\n{:#?}", sub);
-
-    let g = produce_graph(&table, &fatma_store);
-
-    let dot = format!(
-        "{:?}",
-        petgraph::dot::Dot::with_config(&g, &[petgraph::dot::Config::EdgeNoLabel],)
-    );
-
-    if let Ok(graph) = graph_easy(&dot) {
-        println!("`graph-easy` output:\n{}", graph);
-    } else {
-        println!("`graph-easy` not installed. Original dot output: {}", dot);
-    }
+    report(&fatma_store.traverse(&checks));
 }

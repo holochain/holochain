@@ -4,28 +4,29 @@ use std::io::{Read, Write};
 
 use crate::cause::*;
 
-pub type Tree<T> = petgraph::graph::DiGraph<Cause<T>, ()>;
+pub type TruthTree<T> = petgraph::graph::DiGraph<Cause<T>, ()>;
 
-#[derive(derive_more::Deref, derive_more::DerefMut, derive_more::From, derive_more::Into)]
-pub struct Traversal<T: Fact>(TraversalMap<T>);
+#[derive(Debug, derive_more::From)]
+pub enum Traversal<T: Fact> {
+    /// The target fact is true; nothing more needs to be said
+    Pass,
+    /// The target is false and there is no path to any true fact
+    Groundless,
+    /// The target fact is false, and all paths which lead to true facts
+    /// are present in this graph
+    Fail(TruthTree<T>),
+}
+
+impl<T: Fact> Traversal<T> {
+    pub fn fail(self) -> Option<TruthTree<T>> {
+        match self {
+            Traversal::Fail(tree) => Some(tree),
+            _ => None,
+        }
+    }
+}
 
 pub type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
-
-impl<T: Fact> Default for Traversal<T> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<T: Fact> std::fmt::Debug for Traversal<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut s = f.debug_struct("Traversal");
-        for (k, v) in self.iter() {
-            s.field(&format!("{:?}", k), v);
-        }
-        s.finish()
-    }
-}
 
 /// Traverse the causal graph implied by the specified Cause.
 ///
@@ -39,15 +40,23 @@ impl<T: Fact> std::fmt::Debug for Traversal<T> {
 /// a passing check, we don't add that path to the graph.
 #[tracing::instrument(skip(ctx))]
 pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
-    let mut table = Traversal::default();
-    traverse_inner(cause, ctx, &mut table);
-    table
+    let mut table = TraversalMap::default();
+    match traverse_inner(cause, ctx, &mut table) {
+        Some(check) => {
+            if check.is_pass() {
+                Traversal::Pass
+            } else {
+                Traversal::Fail(produce_graph(&table, cause))
+            }
+        }
+        None => Traversal::Groundless,
+    }
 }
 
 fn traverse_inner<F: Fact>(
     cause: &Cause<F>,
     ctx: &F::Context,
-    table: &mut Traversal<F>,
+    table: &mut TraversalMap<F>,
 ) -> Option<Check<F>> {
     tracing::trace!("enter");
     match table.get(cause) {
@@ -136,12 +145,12 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
 }
 
 pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
-    table: &'a Traversal<T>,
+    table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> Tree<T> {
-    let mut g = Tree::new();
+) -> TruthTree<T> {
+    let mut g = TruthTree::new();
 
-    let sub = prune_traversal(&**table, start);
+    let sub = prune_traversal(table, start);
 
     let rows: Vec<_> = sub.into_iter().collect();
     let mut nodemap = HashMap::new();

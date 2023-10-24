@@ -90,6 +90,7 @@ dependencies = [
  "anyhow",
  "derive_more",
  "holochain_trace 0.3.0-beta-dev.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "maplit",
  "petgraph",
  "pretty_assertions 0.6.1",
  "tracing",

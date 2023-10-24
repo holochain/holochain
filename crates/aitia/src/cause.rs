@@ -1,7 +1,9 @@
+use crate::graph::{traverse, Traversal};
+
 pub trait Fact: Sized + Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {
     type Context;
 
-    fn explain(&self, ctx: &Self::Context) -> String {
+    fn explain(&self, _ctx: &Self::Context) -> String {
         self.to_string()
     }
     fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>>;
@@ -43,11 +45,8 @@ pub enum Cause<T> {
 }
 
 impl<T: Fact> Cause<T> {
-    pub fn graph(&self, ctx: &T::Context) -> petgraph::graph::DiGraph<Self, ()> {
-        use crate::graph::*;
-
-        let t = traverse(self, ctx);
-        produce_graph(&t, self)
+    pub fn traverse(&self, ctx: &T::Context) -> Traversal<T> {
+        traverse(self, ctx)
     }
 }
 
