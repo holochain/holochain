@@ -554,7 +554,7 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
-                    tracing::error!("Tgt expired {:?}", cert);
+                    tracing::warn!("Gossip tgt expired {:?}", cert);
                     {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, true);
