@@ -270,7 +270,7 @@ async fn app_validation_workflow_inner(
     }
     jh.await?;
     Ok(if saturated || ops_validated < num_ops_to_validate {
-        WorkComplete::Incomplete
+        WorkComplete::Incomplete(Some(2500))
     } else {
         WorkComplete::Complete
     })

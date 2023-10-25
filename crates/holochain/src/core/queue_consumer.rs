@@ -631,8 +631,8 @@ impl BackOff {
 pub enum WorkComplete {
     /// The queue has been exhausted
     Complete,
-    /// Items still remain on the queue
-    Incomplete,
+    /// Items still remain on the queue. Optionally a delay in ms before retriggering.
+    Incomplete(Option<u64>),
 }
 
 /// The only error possible when attempting to trigger: the channel is closed
@@ -663,9 +663,10 @@ async fn queue_consumer_main_task_impl<
     loop {
         if let Some(()) = triggers.next().await {
             match fut().await {
-                Ok(WorkComplete::Incomplete) => {
-                    tracing::debug!("Work incomplete, retriggering workflow after a delay of {RETRIGGER_DELAY_MS} ms.");
-                    tokio::time::sleep(Duration::from_millis(RETRIGGER_DELAY_MS)).await;
+                Ok(WorkComplete::Incomplete(delay)) => {
+                    let delay = delay.unwrap_or_else(|| RETRIGGER_DELAY_MS);
+                    tracing::error!("Work incomplete, retriggering workflow after a delay of {delay} ms.");
+                    tokio::time::sleep(Duration::from_millis(delay)).await;
                     tx.trigger(&"retrigger")
                 }
                 Err(err) => handle_workflow_error(&name, err)?,
