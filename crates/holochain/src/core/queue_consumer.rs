@@ -664,7 +664,7 @@ async fn queue_consumer_main_task_impl<
         if let Some(()) = triggers.next().await {
             match fut().await {
                 Ok(WorkComplete::Incomplete(delay)) => {
-                    let delay = delay.unwrap_or_else(|| RETRIGGER_DELAY_MS);
+                    let delay = delay.unwrap_or(RETRIGGER_DELAY_MS);
                     tracing::error!(
                         "Work incomplete, retriggering workflow after a delay of {delay} ms."
                     );
