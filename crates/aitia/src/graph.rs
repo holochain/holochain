@@ -1,3 +1,5 @@
+//! Functions for constructing causal graphs
+
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::hash::Hash;
@@ -5,23 +7,25 @@ use std::io::{Read, Write};
 
 use crate::cause::*;
 
+/// A DAG of Facts linked by their causal relationships
 #[derive(Debug, derive_more::From, derive_more::Deref, derive_more::DerefMut)]
-pub struct TruthTree<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
+pub struct CausalGraph<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
 
-impl<T: Display + Clone + Eq + Hash> TruthTree<T> {
+impl<T: Display + Clone + Eq + Hash> CausalGraph<T> {
+    /// Just return the nodes.
     pub fn nodes(&self) -> HashSet<Cause<T>> {
         self.node_weights().cloned().collect::<HashSet<_>>()
     }
 }
 
-impl<T: Display> Default for TruthTree<T> {
+impl<T: Display> Default for CausalGraph<T> {
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
+/// A traversal of the causal graph, potentially resulting in a DAG of failing facts.
 #[derive(Debug, derive_more::From)]
-// #[cfg_attr(test, derive(PartialEq))]
 pub enum Traversal<T: Fact> {
     /// The target fact is true; nothing more needs to be said
     Pass,
@@ -30,21 +34,27 @@ pub enum Traversal<T: Fact> {
     /// The target fact is false, and all paths which lead to true facts
     /// are present in this graph
     Fail {
-        tree: TruthTree<T>,
+        /// The DAG of failing facts
+        graph: CausalGraph<T>,
+        /// The facts which did pass (the leaves of the DAG point to these)
         passes: Vec<Cause<T>>,
     },
 }
 
 impl<T: Fact> Traversal<T> {
-    pub fn fail(self) -> Option<(TruthTree<T>, Vec<Cause<T>>)> {
+    /// If failure, just return the contents
+    pub fn fail(self) -> Option<(CausalGraph<T>, Vec<Cause<T>>)> {
         match self {
-            Traversal::Fail { tree, passes } => Some((tree, passes)),
+            Traversal::Fail {
+                graph: tree,
+                passes,
+            } => Some((tree, passes)),
             _ => None,
         }
     }
 }
 
-pub type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
+type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
 
 /// Traverse the causal graph implied by the specified Cause.
 ///
@@ -64,8 +74,8 @@ pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
             if check.is_pass() {
                 Traversal::Pass
             } else {
-                let (tree, passes) = produce_graph(&table, cause);
-                Traversal::Fail { tree, passes }
+                let (graph, passes) = produce_graph(&table, cause);
+                Traversal::Fail { graph, passes }
             }
         }
         None => Traversal::Groundless,
@@ -167,7 +177,7 @@ fn traverse_inner<F: Fact>(
 /// After pruning, the graph contains all edges starting with the specified cause
 /// and ending with a true cause.
 /// Passing facts are returned separately.
-pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
+fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
 ) -> (HashMap<&'a Cause<T>, &'a [Cause<T>]>, Vec<&'a Cause<T>>) {
@@ -190,11 +200,11 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     (sub, passes)
 }
 
-pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
+fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> (TruthTree<T>, Vec<Cause<T>>) {
-    let mut g = TruthTree::default();
+) -> (CausalGraph<T>, Vec<Cause<T>>) {
+    let mut g = CausalGraph::default();
 
     let (sub, passes) = prune_traversal(table, start);
 

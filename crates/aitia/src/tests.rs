@@ -11,7 +11,10 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
     match traversal {
         Traversal::Pass => println!("PASS"),
         Traversal::Groundless => println!("GROUNDLESS"),
-        Traversal::Fail { tree, passes } => {
+        Traversal::Fail {
+            graph: tree,
+            passes,
+        } => {
             let dot = format!(
                 "{:?}",
                 petgraph::dot::Dot::with_config(&**tree, &[petgraph::dot::Config::EdgeNoLabel],)
@@ -28,7 +31,7 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
     }
 }
 
-fn path_lengths<T: Fact>(graph: &TruthTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
+fn path_lengths<T: Fact>(graph: &CausalGraph<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
     let start_ix = graph.node_indices().find(|i| graph[*i] == start).unwrap();
     let end_ix = graph.node_indices().find(|i| graph[*i] == end).unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
