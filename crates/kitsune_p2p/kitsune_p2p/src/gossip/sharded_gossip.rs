@@ -370,7 +370,9 @@ impl ShardedGossip {
             let cert = outgoing.0.clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
                 self.gossip.remove_state(&cert, true)?;
-                tracing::error!(
+                
+                // TODO: track all connection attempts, if all of them fail within a certain period of time, then log as error
+                tracing::warn!(
                     "Gossip failed to send outgoing message because of: {:?}",
                     err
                 );
