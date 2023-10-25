@@ -10,7 +10,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         Item::Struct(ItemStruct { ident, .. }) => (ident),
         _ => abort!(
             input,
-            "hdk_entry_def_conversions can only be used on Structs"
+            "dna_properties macro can only be used on Structs"
         ),
     };
 
@@ -23,7 +23,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
             T: Sized + TryFrom<SerializedBytes>
           {
               T::try_from(dna_info()?.modifiers.properties)
-                  .map_err(|_| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize dna properties into {:}", type_name::<T>()))))
+                  .map_err(|_| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize DNA properties into {:}", type_name::<T>()))))
           }
         }
     };
