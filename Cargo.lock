@@ -93,7 +93,12 @@ dependencies = [
  "maplit",
  "petgraph",
  "pretty_assertions 0.6.1",
+ "serde",
+ "serde_json",
  "tracing",
+ "tracing-core",
+ "tracing-serde",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2704,6 +2709,7 @@ dependencies = [
 name = "holochain"
 version = "0.3.0-beta-dev.22"
 dependencies = [
+ "aitia",
  "anyhow",
  "arbitrary",
  "assert_cmd 1.0.8",

@@ -499,6 +499,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     let mut sleuth_ctx = hc_sleuth::Context::default();
     sleuth_ctx.nodes.add(
+        conductors[0].id(), // TODO: consolidate this id with tracing_scope?
         conductors[0].sleuth_env(dna_hash),
         &[cells[0].agent_pubkey().clone()],
     );

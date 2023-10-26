@@ -203,6 +203,7 @@ async fn app_validation_workflow_inner(
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
                             }
+                            // aitia::trace!(hc_sleuth::OpFact::AppValidated);
                         }
                         Outcome::AwaitingDeps(deps) => {
                             awaiting += 1;

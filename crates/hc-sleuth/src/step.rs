@@ -1,10 +1,13 @@
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+
 use crate::*;
-use holochain_state::{prelude::named_params, validation_db::ValidationStage};
+use holochain_state::{prelude::*, validation_db::ValidationStage};
 
 pub type OpRef = (ActionHash, DhtOpType);
 
 #[derive(Clone, PartialEq, Eq, std::fmt::Debug, std::hash::Hash)]
-pub enum Step {
+pub enum Step<NodeId: aitia::Fact> {
     Authored { by: NodeId, action: ActionHash },
     Published { by: NodeId, op: OpRef },
     Integrated { by: NodeId, op: OpRef },
@@ -15,11 +18,7 @@ pub enum Step {
     // PublishReceived {},
 }
 
-impl Step {
-    fn deps_obtained() {}
-}
-
-impl std::fmt::Display for Step {
+impl<NodeId: aitia::Fact> std::fmt::Display for Step<NodeId> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Step::Authored { by, action } => {
@@ -40,8 +39,8 @@ impl std::fmt::Display for Step {
     }
 }
 
-impl aitia::Fact for Step {
-    type Context = crate::Context;
+impl<NodeId: aitia::Fact> aitia::Fact for Step<NodeId> {
+    type Context = crate::Context<NodeId>;
 
     fn explain(&self, ctx: &Self::Context) -> String {
         self.to_string()
@@ -55,16 +54,21 @@ impl aitia::Fact for Step {
             Integrated { by, op } => Some(AppValidated { by, op }.into()),
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
             SysValidated { by, op } => {
+                let env = ctx.nodes.envs.get(&by).unwrap();
+
                 let current = aitia::Cause::Any(vec![
-                    Fetched { by, op: op.clone() }.into(),
+                    Fetched {
+                        by: by.clone(),
+                        op: op.clone(),
+                    }
+                    .into(),
                     Authored {
-                        by,
+                        by: by.clone(),
                         action: op.0.clone(),
                     }
                     .into(),
                 ]);
 
-                let env = ctx.nodes.envs.get(by).unwrap();
                 let dep = env
                     .integrated(move |txn| {
                         Ok(txn
@@ -97,8 +101,11 @@ impl aitia::Fact for Step {
                 Some(aitia::Cause::Every(causes))
             }
             Fetched { by, op } => {
-                let mut others: Vec<_> = (0..ctx.nodes.len())
-                    .filter(|i| *i != by)
+                let mut others: Vec<_> = ctx
+                    .nodes
+                    .keys()
+                    .filter(|i| **i != by)
+                    .cloned()
                     .map(|i| {
                         // TODO: this should be Published | Gossiped, but we
                         // don't have a good rule for Gossiped yet
@@ -117,12 +124,11 @@ impl aitia::Fact for Step {
     fn check(&self, ctx: &Self::Context) -> bool {
         match self.clone() {
             Step::Authored { by, action } => {
-                let env = ctx.nodes.envs.get(by).unwrap();
+                let env = ctx.nodes.envs.get(&by).unwrap();
                 env.authored.test_read(move |txn| {
                     txn.query_row(
-                        "SELECT rowid FROM Action WHERE author = :author AND hash = :hash",
+                        "SELECT rowid FROM Action WHERE hash = :hash",
                         named_params! {
-                            ":author": by,
                             ":hash": action,
                         },
                         |row| row.get::<_, usize>(0),
@@ -136,7 +142,7 @@ impl aitia::Fact for Step {
                 by,
                 op: (action_hash, op_type),
             } => {
-                let env = ctx.nodes.envs.get(by).unwrap();
+                let env = ctx.nodes.envs.get(&by).unwrap();
                 env.authored.test_read(move |txn| {
                     txn.query_row(
                         "
@@ -159,7 +165,7 @@ impl aitia::Fact for Step {
                 by,
                 op: (action_hash, op_type),
             } => {
-                let env = ctx.nodes.envs.get(by).unwrap();
+                let env = ctx.nodes.envs.get(&by).unwrap();
                 env.dht.test_read(move |txn| {
                     txn.query_row(
                         "
@@ -182,7 +188,7 @@ impl aitia::Fact for Step {
                 by,
                 op: (action_hash, op_type),
             } => {
-                let env = ctx.nodes.envs.get(by).unwrap();
+                let env = ctx.nodes.envs.get(&by).unwrap();
                 env.dht.test_read(move |txn| {
                     txn.query_row(
                         "
@@ -207,7 +213,7 @@ impl aitia::Fact for Step {
                 by,
                 op: (action_hash, op_type),
             } => {
-                let env = ctx.nodes.envs.get(by).unwrap();
+                let env = ctx.nodes.envs.get(&by).unwrap();
                 env.dht.test_read(move |txn| {
                     txn.query_row(
                         "
@@ -233,7 +239,7 @@ impl aitia::Fact for Step {
                 op: (action_hash, op_type),
             } => {
                 // TODO: should do a check involving the actual FetchPool
-                let env = ctx.nodes.envs.get(by).unwrap();
+                let env = ctx.nodes.envs.get(&by).unwrap();
                 env.dht.test_read(move |txn| {
                     txn.query_row(
                         "

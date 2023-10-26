@@ -1,8 +1,11 @@
-use aitia::graph::{graph_easy, Traversal};
+use aitia::{
+    graph::{graph_easy, Traversal},
+    Fact,
+};
 
 use super::*;
 
-pub fn report(step: Step, ctx: &Context) {
+pub fn report<NodeId: Fact>(step: Step<NodeId>, ctx: &Context<NodeId>) {
     match aitia::Cause::from(step).traverse(ctx) {
         Traversal::Pass => println!("PASS"),
         Traversal::Groundless => println!("GROUNDLESS"),

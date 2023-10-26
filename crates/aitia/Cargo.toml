@@ -11,6 +11,23 @@ holochain_trace = "0.3.0-beta-dev.1"
 petgraph = "0.6"
 tracing = "0.1"
 
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+tracing-core = { version = "*", optional = true }
+tracing-serde = { version = "*", optional = true }
+tracing-subscriber = { version = "0.3.17", optional = true }
+
 [dev-dependencies]
 maplit = "*"
 pretty_assertions = "*"
+
+[features]
+default = ["tracing"]
+
+tracing = [
+    "serde",
+    "serde_json",
+    "tracing-core",
+    "tracing-serde",
+    "tracing-subscriber",
+]
