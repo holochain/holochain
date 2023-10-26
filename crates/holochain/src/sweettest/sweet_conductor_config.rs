@@ -121,7 +121,6 @@ impl SweetConductorConfig {
     pub fn random_scope(&mut self) {
         let scope = nanoid!();
         self.network.tracing_scope = Some(scope.clone());
-        self.tracing_scope = Some(scope);
     }
 
     /// Completely disable networking

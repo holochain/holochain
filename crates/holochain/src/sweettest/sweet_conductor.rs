@@ -97,7 +97,9 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 impl SweetConductor {
     /// Get the ID of this conductor for manual equality checks.
     pub fn id(&self) -> String {
-        self.config.tracing_scope.as_ref().unwrap().clone()
+        self.config
+            .tracing_scope()
+            .expect("SweetConductor must have a tracing scope set")
     }
 
     /// Create a SweetConductor from an already-built ConductorHandle and environments
@@ -133,8 +135,8 @@ impl SweetConductor {
 
         let keystore = handle.keystore().clone();
 
-        if config.tracing_scope.is_none() {
-            config.tracing_scope = Some(nanoid!(8));
+        if config.tracing_scope().is_none() {
+            config.network.tracing_scope = Some(nanoid!(8));
         }
 
         Self {
