@@ -435,7 +435,7 @@ pub async fn setup_app_inner(
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
-            network,
+            network: network.unwrap_or_default(),
             ..Default::default()
         })
         .test(db_dir, &[])

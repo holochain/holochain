@@ -19,6 +19,7 @@ use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
+use nanoid::nanoid;
 use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
@@ -45,7 +46,6 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
-    id: [u8; 32],
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
@@ -60,7 +60,7 @@ pub struct SweetConductor {
 /// independently no matter what kind of mutations/state might eventuate.
 impl PartialEq for SweetConductor {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.id() == other.id()
     }
 }
 
@@ -96,8 +96,10 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 
 impl SweetConductor {
     /// Get the ID of this conductor for manual equality checks.
-    pub fn id(&self) -> [u8; 32] {
-        self.id
+    pub fn id(&self) -> String {
+        self.config
+            .tracing_scope()
+            .expect("SweetConductor must have a tracing scope set")
     }
 
     /// Create a SweetConductor from an already-built ConductorHandle and environments
@@ -107,7 +109,7 @@ impl SweetConductor {
     pub async fn new(
         handle: ConductorHandle,
         env_dir: TestDir,
-        config: ConductorConfig,
+        mut config: ConductorConfig,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -133,10 +135,11 @@ impl SweetConductor {
 
         let keystore = handle.keystore().clone();
 
-        let mut rng = rand::thread_rng();
+        if config.tracing_scope().is_none() {
+            config.network.tracing_scope = Some(nanoid!(8));
+        }
 
         Self {
-            id: rng.gen(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,

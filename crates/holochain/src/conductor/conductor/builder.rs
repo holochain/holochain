@@ -112,7 +112,7 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone().unwrap_or_default();
+        let network_config = config.network.clone();
         let (cert_digest, cert, cert_priv_key) = keystore
             .get_or_create_tls_cert_by_tag(tag.0.clone())
             .await?;
@@ -312,7 +312,7 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = self.config.network.clone().unwrap_or_default();
+        let network_config = self.config.network.clone();
         let tuning_params = network_config.tuning_params.clone();
         let strat = tuning_params.to_arq_strat();
 
