@@ -1,16 +1,15 @@
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
-use holochain_keystore::MetaLairClient;
-use holochain_p2p::dht::prelude::Topology;
-use holochain_p2p::dht::PeerStrat;
-use holochain_p2p::dht_arc::DEFAULT_MIN_PEERS;
-use holochain_p2p::dht_arc::DEFAULT_MIN_REDUNDANCY;
-use holochain_p2p::dht_arc::MAX_HALF_LENGTH;
-use kitsune_p2p::dht_arc::DhtArc;
-use kitsune_p2p::*;
-use kitsune_p2p_types::dht_arc::check_redundancy;
+use holochain::sweettest::SweetDnaFile;
+use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::DnaModifiersOpt;
+use serde::{Serialize, Deserialize};
+use hdk::prelude::*;
 
-pub struct MyProperties {
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, SerializedBytes, Clone)]
+pub struct MyValidProperties {
     authority_agent: Vec<u8>,
     max_count: u32,
     contract_address: String
@@ -20,16 +19,15 @@ pub struct MyProperties {
 // Can specify dna properties and then read those properties via the #[dna_properties] helper macro
 async fn test_dna_properties_macro() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties])
-        .await
-        .unwrap();
+        .await;
 
-    // Set dna properties
-    let properties = MyProperties {
+    // Set DNA Properties
+    let properties = MyValidProperties {
         authority_agent: [0u8; 36].to_vec(),
         max_count: 500,
-        contract_address: "0x12345"
+        contract_address: String::from("0x12345"),
     };
-    let properties_sb = SerializedBytes::try_from(properties).unwrap();
+    let properties_sb: SerializedBytes = properties.clone().try_into().unwrap();
     let dnas = &[dna_file.update_modifiers(DnaModifiersOpt {
         network_seed: None,
         properties: Some(properties_sb),
@@ -38,23 +36,22 @@ async fn test_dna_properties_macro() {
     })];
     
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
-
-    let agents = SweetAgents::get(conductor.keystore(), 1).await;
-    let apps = conductor
-        .setup_app_for_agent("app", &agents, &[dna_file])
+    let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let app = conductor
+        .setup_app_for_agent("app", agent, dnas)
         .await
         .unwrap();
-    let cells = apps.cells_flattened();
-    let alice = cells[0].zome(TestWasm::DnaProperties);
+    let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
-    // Get dna properties via helper macro
-    let received_properties: MyProperties = conductor.call(&alice, "get_dna_properties", ()).await;
+    // Get DNA Properties via helper macro
+    let received_properties: MyValidProperties = conductor.call(&alice_zome, "get_dna_properties", ()).await;
 
     assert_eq!(received_properties, properties)    
 }
 
 
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, SerializedBytes)]
 pub struct MyInvalidProperties {
     bad_property: u32
 }
@@ -63,14 +60,13 @@ pub struct MyInvalidProperties {
 // Can specify dna properties and then read those properties via the #[dna_properties] helper macro
 async fn test_dna_properties_fails_with_invalid_properties() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties])
-        .await
-        .unwrap();
+        .await;
 
-    // Set dna properties
+    // Set DNA Properties
     let properties = MyInvalidProperties {
         bad_property: 500
     };
-    let properties_sb = SerializedBytes::try_from(properties).unwrap();
+    let properties_sb: SerializedBytes = properties.try_into().unwrap();
     let dnas = &[dna_file.update_modifiers(DnaModifiersOpt {
         network_seed: None,
         properties: Some(properties_sb),
@@ -79,18 +75,16 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     })];
     
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
-
-    let agents = SweetAgents::get(conductor.keystore(), 1).await;
-    let apps = conductor
-        .setup_app_for_agent("app", &agents, &[dna_file])
+    let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let app = conductor
+        .setup_app_for_agent("app", agent, dnas)
         .await
         .unwrap();
-    let cells = apps.cells_flattened();
-    let alice = cells[0].zome(TestWasm::DnaProperties);
+    let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
-    // Try to get dna properties via helper macro
-    let res = conductor.call_fallible(&alice, "get_dna_properties", ()).await;
+    // Fail to get DNA Properties via helper macro
+    let res: Result<MyValidProperties, _> = conductor.call_fallible(&alice_zome, "get_dna_properties", ()).await;
 
     assert!(res.is_err())
 }
