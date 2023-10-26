@@ -119,7 +119,7 @@ impl SweetConductorConfig {
 
     /// Set the tracing scope to a new random value
     pub fn random_scope(&mut self) {
-        let scope = nanoid!();
+        let scope = nanoid!(8);
         self.network.tracing_scope = Some(scope.clone());
     }
 
