@@ -8,10 +8,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Item);
     let ident = match &input {
         Item::Struct(ItemStruct { ident, .. }) => ident,
-        _ => abort!(
-            input,
-            "dna_properties macro can only be used on Structs"
-        ),
+        _ => abort!(input, "dna_properties macro can only be used on Structs"),
     };
 
     let output = quote::quote! {

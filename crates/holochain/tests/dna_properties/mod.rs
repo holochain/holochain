@@ -1,25 +1,24 @@
+use hdk::prelude::*;
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::DnaModifiersOpt;
-use serde::{Serialize, Deserialize};
-use hdk::prelude::*;
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, SerializedBytes, Clone)]
 pub struct MyValidProperties {
     authority_agent: Vec<u8>,
     max_count: u32,
-    contract_address: String
+    contract_address: String,
 }
 
 #[tokio::test(flavor = "multi_thread")]
 // Can specify dna properties and then read those properties via the #[dna_properties] helper macro
 async fn test_dna_properties_macro() {
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties])
-        .await;
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;
 
     // Set DNA Properties
     let properties = MyValidProperties {
@@ -34,7 +33,7 @@ async fn test_dna_properties_macro() {
         origin_time: None,
         quantum_time: None,
     })];
-    
+
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -45,27 +44,25 @@ async fn test_dna_properties_macro() {
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
     // Get DNA Properties via helper macro
-    let received_properties: MyValidProperties = conductor.call(&alice_zome, "get_dna_properties", ()).await;
+    let received_properties: MyValidProperties =
+        conductor.call(&alice_zome, "get_dna_properties", ()).await;
 
-    assert_eq!(received_properties, properties)    
+    assert_eq!(received_properties, properties)
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, SerializedBytes)]
 pub struct MyInvalidProperties {
-    bad_property: u32
+    bad_property: u32,
 }
 
 #[tokio::test(flavor = "multi_thread")]
 // Can specify dna properties and then read those properties via the #[dna_properties] helper macro
 async fn test_dna_properties_fails_with_invalid_properties() {
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties])
-        .await;
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;
 
     // Set DNA Properties
-    let properties = MyInvalidProperties {
-        bad_property: 500
-    };
+    let properties = MyInvalidProperties { bad_property: 500 };
     let properties_sb: SerializedBytes = properties.try_into().unwrap();
     let dnas = &[dna_file.update_modifiers(DnaModifiersOpt {
         network_seed: None,
@@ -73,7 +70,7 @@ async fn test_dna_properties_fails_with_invalid_properties() {
         origin_time: None,
         quantum_time: None,
     })];
-    
+
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -84,7 +81,9 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     let alice_zome = app.cells()[0].zome(TestWasm::DnaProperties);
 
     // Fail to get DNA Properties via helper macro
-    let res: Result<MyValidProperties, _> = conductor.call_fallible(&alice_zome, "get_dna_properties", ()).await;
+    let res: Result<MyValidProperties, _> = conductor
+        .call_fallible(&alice_zome, "get_dna_properties", ())
+        .await;
 
     assert!(res.is_err())
 }

@@ -197,7 +197,9 @@ impl From<TestWasm> for PathBuf {
             TestWasm::Crd => "wasm32-unknown-unknown/release/test_wasm_crd.wasm",
             TestWasm::Crud => "wasm32-unknown-unknown/release/test_wasm_crud.wasm",
             TestWasm::Debug => "wasm32-unknown-unknown/release/test_wasm_debug.wasm",
-            TestWasm::DnaProperties => "wasm32-unknown-unknown/release/test_wasm_dna_properties.wasm",
+            TestWasm::DnaProperties => {
+                "wasm32-unknown-unknown/release/test_wasm_dna_properties.wasm"
+            }
             TestWasm::EntryDefs => "wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm",
             TestWasm::EmitSignal => "wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm",
             TestWasm::HashEntry => "wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm",
