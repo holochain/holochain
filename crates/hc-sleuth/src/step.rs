@@ -2,12 +2,16 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 use crate::*;
+use aitia::logging::FactLogTraits;
+use aitia::FactTraits;
 use holochain_state::{prelude::*, validation_db::ValidationStage};
 
 pub type OpRef = (ActionHash, DhtOpType);
 
-#[derive(Clone, PartialEq, Eq, std::fmt::Debug, std::hash::Hash)]
-pub enum Step<NodeId: aitia::Fact> {
+#[derive(
+    Clone, PartialEq, Eq, std::fmt::Debug, std::hash::Hash, serde::Serialize, serde::Deserialize,
+)]
+pub enum Step<NodeId> {
     Authored { by: NodeId, action: ActionHash },
     Published { by: NodeId, op: OpRef },
     Integrated { by: NodeId, op: OpRef },
@@ -18,7 +22,9 @@ pub enum Step<NodeId: aitia::Fact> {
     // PublishReceived {},
 }
 
-impl<NodeId: aitia::Fact> std::fmt::Display for Step<NodeId> {
+impl<NodeId: FactLogTraits> aitia::logging::FactLogJson for Step<NodeId> {}
+
+impl<NodeId: Display> std::fmt::Display for Step<NodeId> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Step::Authored { by, action } => {
@@ -39,7 +45,7 @@ impl<NodeId: aitia::Fact> std::fmt::Display for Step<NodeId> {
     }
 }
 
-impl<NodeId: aitia::Fact> aitia::Fact for Step<NodeId> {
+impl<NodeId: FactTraits> aitia::Fact for Step<NodeId> {
     type Context = crate::Context<NodeId>;
 
     fn explain(&self, ctx: &Self::Context) -> String {

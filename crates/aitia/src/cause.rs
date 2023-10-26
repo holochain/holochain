@@ -2,14 +2,18 @@ use std::fmt::Display;
 
 use crate::graph::{traverse, Traversal};
 
-pub trait Fact: Sized + Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {
-    type Context;
+pub trait FactTraits: Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {}
+impl<T> FactTraits for T where T: Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {}
 
-    fn explain(&self, _ctx: &Self::Context) -> String {
+pub trait Context<F: Fact> {
+    fn check(&self, fact: &F) -> bool;
+}
+
+pub trait Fact: FactTraits {
+    fn explain(&self, _ctx: &impl Context<Self>) -> String {
         self.to_string()
     }
-    fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>>;
-    fn check(&self, ctx: &Self::Context) -> bool;
+    fn cause(&self, ctx: &impl Context<Self>) -> Option<Cause<Self>>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,7 +51,7 @@ pub enum Cause<T> {
 }
 
 impl<T: Fact> Cause<T> {
-    pub fn traverse(&self, ctx: &T::Context) -> Traversal<T> {
+    pub fn traverse(&self, ctx: &impl Context<T>) -> Traversal<T> {
         traverse(self, ctx)
     }
 }

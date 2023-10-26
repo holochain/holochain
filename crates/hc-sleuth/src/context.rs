@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use aitia::Fact;
+use aitia::{cause::FactTraits, Fact};
 use holochain_p2p::DnaHashExt;
 
 use super::*;
@@ -17,7 +17,7 @@ pub struct NodeGroup<NodeId> {
     pub agent_map: HashMap<AgentPubKey, NodeId>,
 }
 
-impl<NodeId: Fact> NodeGroup<NodeId> {
+impl<NodeId: FactTraits> NodeGroup<NodeId> {
     pub fn add(&mut self, id: NodeId, node: NodeEnv, agents: &[AgentPubKey]) {
         self.envs.insert(id.clone(), node);
         self.agent_map

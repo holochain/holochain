@@ -499,11 +499,12 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     let mut sleuth_ctx = hc_sleuth::Context::default();
     sleuth_ctx.nodes.add(
-        conductors[0].id(), // TODO: consolidate this id with tracing_scope?
+        conductors[0].id(),
         conductors[0].sleuth_env(dna_hash),
         &[cells[0].agent_pubkey().clone()],
     );
     sleuth_ctx.nodes.add(
+        conductors[1].id(),
         conductors[1].sleuth_env(dna_hash),
         &[cells[1].agent_pubkey().clone()],
     );
@@ -563,17 +564,19 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
     sleuth_ctx.nodes.add(
+        conductors[2].id(),
         conductors[2].sleuth_env(dna_hash),
         &[cell.agent_pubkey().clone()],
     );
 
     let step = hc_sleuth::Step::Integrated {
-        by: 2,
+        by: conductors[2].id(),
         op: (
             hashes[0].clone(),
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),
     };
+    aitia::trace!(&step);
     hc_sleuth::report(step, &sleuth_ctx);
 
     conductors[2]
@@ -581,7 +584,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .await;
 
     let step = hc_sleuth::Step::Integrated {
-        by: 2,
+        by: conductors[2].id(),
         op: (
             hashes[0].clone(),
             holochain_types::prelude::DhtOpType::StoreRecord,

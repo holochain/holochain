@@ -1,20 +1,29 @@
 //! Allows for adding serialized facts to logs, to be read out later
 
+use std::collections::HashSet;
+
 use tracing_core::Subscriber;
 use tracing_subscriber::{filter::filter_fn, registry::LookupSpan, Layer};
 
-use crate::Fact;
+use crate::FactTraits;
+
+pub trait FactLogTraits: FactTraits + serde::Serialize + serde::de::DeserializeOwned {}
+impl<T> FactLogTraits for T where T: FactTraits + serde::Serialize + serde::de::DeserializeOwned {}
 
 /// Add a JSON-serialized Fact to the tracing output at the Info level
 #[macro_export]
 macro_rules! trace {
     ($fact:expr) => {
-        tracing::info!(aitia = "json", "{}", FactLog::encode($fact));
+        tracing::info!(
+            aitia = "json",
+            "<AITIA>{}</AITIA>",
+            $crate::logging::FactLog::encode($fact)
+        );
     };
 }
 
 /// Adds encode/decode functionality to a Fact so it can be logged
-pub trait FactLog: Fact + serde::Serialize + serde::de::DeserializeOwned {
+pub trait FactLog: FactLogTraits {
     /// Encode as string
     fn encode(&self) -> String;
     /// Decode from string
@@ -34,6 +43,15 @@ impl<J: FactLogJson> FactLog for J {
     }
 }
 
+pub trait Log<F: FactLog> {
+    fn parse(line: &str) -> Option<F>;
+    fn apply(self, fact: F) -> Self;
+}
+
+// pub struct LogAccumulator<F: FactLog> {
+//     facts: HashSet<F>,
+// }
+
 /// A layer which only records logs emitted from aitia::trace!
 pub fn layer<S: Subscriber + for<'a> LookupSpan<'a>>() -> impl Layer<S> {
     tracing_subscriber::fmt::layer()
@@ -52,7 +70,7 @@ mod tests {
 
     use crate::Fact;
 
-    use super::{layer, FactLog, FactLogJson};
+    use super::{layer, FactLogJson};
 
     #[derive(
         Debug,
@@ -70,13 +88,7 @@ mod tests {
     }
 
     impl Fact for TestFact {
-        type Context = ();
-
-        fn cause(&self, _ctx: &Self::Context) -> Option<crate::Cause<Self>> {
-            todo!()
-        }
-
-        fn check(&self, _ctx: &Self::Context) -> bool {
+        fn cause(&self, _ctx: &()) -> Option<crate::Cause<Self>> {
             todo!()
         }
     }

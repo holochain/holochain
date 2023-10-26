@@ -5,7 +5,7 @@ pub mod graph;
 #[cfg(feature = "tracing")]
 pub mod logging;
 
-pub use cause::{Cause, Fact};
+pub use cause::{Cause, Fact, FactTraits};
 
 #[cfg(test)]
 mod tests;
