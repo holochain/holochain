@@ -49,7 +49,8 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    pub network: Option<KitsuneP2pConfig>,
+    #[serde(default)]
+    pub network: KitsuneP2pConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -100,10 +101,7 @@ impl ConductorConfig {
 
     /// Get tuning params for this config (default if not set)
     pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
-        self.network
-            .as_ref()
-            .map(|c| c.tuning_params.clone())
-            .unwrap_or_default()
+        self.network.tuning_params.clone()
     }
 }
 
@@ -147,7 +145,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
-                network: None,
+                network: Default::default(),
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
@@ -233,7 +231,7 @@ mod tests {
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
-                network: Some(network_config),
+                network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
@@ -258,7 +256,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
-                network: None,
+                network: Default::default(),
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),

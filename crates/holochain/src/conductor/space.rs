@@ -142,7 +142,7 @@ impl Spaces {
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
-            network_config: config.network.clone().unwrap_or_default(),
+            network_config: config.network.clone(),
         })
     }
 

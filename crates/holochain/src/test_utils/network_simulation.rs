@@ -384,7 +384,7 @@ async fn create_test_data(
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        network: Some(network),
+        network,
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;

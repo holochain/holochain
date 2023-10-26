@@ -433,7 +433,7 @@ async fn test_gossip_startup() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mk_conductor = || async {
         let cfg = config();
-        assert!(cfg.network.as_ref().unwrap().is_tx5());
+        assert!(cfg.network.is_tx5());
         let mut conductor =
             SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
         // let mut conductor = SweetConductor::from_config(config()).await;
@@ -1048,7 +1048,7 @@ async fn mock_network_sharded_gossip() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
@@ -1557,7 +1557,7 @@ async fn mock_network_sharding() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
