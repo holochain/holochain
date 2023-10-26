@@ -69,14 +69,6 @@ pub struct ConductorConfig {
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
-
-    /// All logs from all managed tasks will be instrumented to contain this string,
-    /// so that logs from multiple conductors in the same process can be disambiguated.
-    /// NOTE: Kitsune config has a similar option for its own tasks, because it has its
-    /// own task management system (or lack thereof). You probably want to ensure
-    /// that this value matches the one in KitsuneP2pConfig!
-    #[serde(default)]
-    pub tracing_scope: Option<String>,
 }
 
 /// Helper function to load a config from a YAML string.
@@ -102,6 +94,11 @@ impl ConductorConfig {
     /// Get tuning params for this config (default if not set)
     pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
         self.network.tuning_params.clone()
+    }
+
+    /// Get the tracing scope from the network config
+    pub fn tracing_scope(&self) -> Option<String> {
+        self.network.tracing_scope.clone()
     }
 }
 
@@ -150,7 +147,6 @@ mod tests {
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
-                tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
             }
@@ -233,7 +229,6 @@ mod tests {
                 }]),
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
             }
@@ -263,7 +258,6 @@ mod tests {
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
             }
