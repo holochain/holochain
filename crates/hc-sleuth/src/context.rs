@@ -1,23 +1,76 @@
-use std::hash::Hash;
+use std::{collections::HashSet, hash::Hash, io::BufRead};
 
-use aitia::{cause::FactTraits, Fact};
+use aitia::{cause::FactTraits, logging::FactLog, Fact};
 use holochain_p2p::DnaHashExt;
 
 use super::*;
 
 #[derive(Default)]
-pub struct Context<Id> {
-    pub nodes: NodeGroup<Id>,
+pub struct LogAccumulator {
+    facts: HashSet<Step>,
+    node_ids: HashSet<String>,
+    sysval_dep: HashMap<OpRef, Option<OpRef>>,
+    appval_deps: HashMap<OpRef, Vec<OpRef>>,
+}
+
+impl LogAccumulator {
+    pub fn from_file(mut r: impl BufRead) -> Self {
+        use aitia::logging::Log;
+        let mut la = Self::default();
+        let mut line = String::new();
+        while let Ok(_) = r.read_line(&mut line) {
+            if let Some(fact) = Self::parse(&line) {
+                la = la.apply(fact);
+            }
+        }
+        la
+    }
+
+    pub fn check(&self, fact: &Step) -> bool {
+        self.facts.contains(fact)
+    }
+
+    pub fn sysval_dep(&self, op: &OpRef) -> Option<&OpRef> {
+        self.sysval_dep.get(op)?.as_ref()
+    }
+
+    pub fn appval_deps(&self, op: &OpRef) -> Option<&Vec<OpRef>> {
+        self.appval_deps.get(op)
+    }
+
+    pub fn node_ids(&self) -> &HashSet<String> {
+        &self.node_ids
+    }
+}
+
+impl aitia::logging::Log<Step> for LogAccumulator {
+    fn parse(line: &str) -> Option<Step> {
+        regex::Regex::new("<AITIA>(.*?)</AITIA>")
+            .unwrap()
+            .captures(line)
+            .and_then(|m| m.get(1))
+            .map(|m| Step::decode(m.as_str()))
+    }
+
+    fn apply(mut self, fact: Step) -> Self {
+        self.facts.insert(fact);
+        self
+    }
+}
+
+#[derive(Default)]
+pub struct Context {
+    pub nodes: NodeGroup,
 }
 
 #[derive(Default, derive_more::Deref)]
-pub struct NodeGroup<NodeId> {
+pub struct NodeGroup {
     #[deref]
     pub envs: HashMap<NodeId, NodeEnv>,
     pub agent_map: HashMap<AgentPubKey, NodeId>,
 }
 
-impl<NodeId: FactTraits> NodeGroup<NodeId> {
+impl NodeGroup {
     pub fn add(&mut self, id: NodeId, node: NodeEnv, agents: &[AgentPubKey]) {
         self.envs.insert(id.clone(), node);
         self.agent_map

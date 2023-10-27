@@ -8,10 +8,12 @@ use holochain_state::{prelude::*, validation_db::ValidationStage};
 
 pub type OpRef = (ActionHash, DhtOpType);
 
+pub type NodeId = String;
+
 #[derive(
     Clone, PartialEq, Eq, std::fmt::Debug, std::hash::Hash, serde::Serialize, serde::Deserialize,
 )]
-pub enum Step<NodeId> {
+pub enum Step {
     Authored { by: NodeId, action: ActionHash },
     Published { by: NodeId, op: OpRef },
     Integrated { by: NodeId, op: OpRef },
@@ -22,9 +24,9 @@ pub enum Step<NodeId> {
     // PublishReceived {},
 }
 
-impl<NodeId: FactLogTraits> aitia::logging::FactLogJson for Step<NodeId> {}
+impl aitia::logging::FactLogJson for Step {}
 
-impl<NodeId: Display> std::fmt::Display for Step<NodeId> {
+impl std::fmt::Display for Step {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Step::Authored { by, action } => {
@@ -45,8 +47,8 @@ impl<NodeId: Display> std::fmt::Display for Step<NodeId> {
     }
 }
 
-impl<NodeId: FactTraits> aitia::Fact for Step<NodeId> {
-    type Context = crate::Context<NodeId>;
+impl aitia::Fact for Step {
+    type Context = crate::LogAccumulator;
 
     fn explain(&self, ctx: &Self::Context) -> String {
         self.to_string()
@@ -60,8 +62,6 @@ impl<NodeId: FactTraits> aitia::Fact for Step<NodeId> {
             Integrated { by, op } => Some(AppValidated { by, op }.into()),
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
             SysValidated { by, op } => {
-                let env = ctx.nodes.envs.get(&by).unwrap();
-
                 let current = aitia::Cause::Any(vec![
                     Fetched {
                         by: by.clone(),
@@ -75,30 +75,13 @@ impl<NodeId: FactTraits> aitia::Fact for Step<NodeId> {
                     .into(),
                 ]);
 
-                let dep = env
-                    .integrated(move |txn| {
-                        Ok(txn
-                            .query_row(
-                                "
-                        SELECT dependency FROM DhtOp
-                        WHERE action_hash = :action_hash 
-                          AND type = :type",
-                                named_params! {
-                                    ":action_hash": op.0,
-                                    ":type": op.1,
-                                },
-                                |row| row.get::<_, Option<ActionHash>>(0),
-                            )
-                            .optional()?
-                            .flatten())
-                    })
-                    .unwrap();
+                let dep = ctx.sysval_dep(&op);
                 let mut causes = vec![current];
                 causes.extend(
-                    dep.map(|action| {
+                    dep.map(|(action, _)| {
                         aitia::Cause::from(Integrated {
                             by,
-                            op: (action, DhtOpType::StoreRecord),
+                            op: (action.clone(), DhtOpType::StoreRecord),
                         })
                     })
                     .into_iter(),
@@ -108,8 +91,8 @@ impl<NodeId: FactTraits> aitia::Fact for Step<NodeId> {
             }
             Fetched { by, op } => {
                 let mut others: Vec<_> = ctx
-                    .nodes
-                    .keys()
+                    .node_ids()
+                    .iter()
                     .filter(|i| **i != by)
                     .cloned()
                     .map(|i| {
@@ -128,142 +111,6 @@ impl<NodeId: FactTraits> aitia::Fact for Step<NodeId> {
     }
 
     fn check(&self, ctx: &Self::Context) -> bool {
-        match self.clone() {
-            Step::Authored { by, action } => {
-                let env = ctx.nodes.envs.get(&by).unwrap();
-                env.authored.test_read(move |txn| {
-                    txn.query_row(
-                        "SELECT rowid FROM Action WHERE hash = :hash",
-                        named_params! {
-                            ":hash": action,
-                        },
-                        |row| row.get::<_, usize>(0),
-                    )
-                    .optional()
-                    .unwrap()
-                    .is_some()
-                })
-            }
-            Step::Published {
-                by,
-                op: (action_hash, op_type),
-            } => {
-                let env = ctx.nodes.envs.get(&by).unwrap();
-                env.authored.test_read(move |txn| {
-                    txn.query_row(
-                        "
-                        SELECT last_publish_time FROM DhtOp
-                        WHERE action_hash = :action_hash 
-                          AND type = :type",
-                        named_params! {
-                            ":action_hash": action_hash,
-                            ":type": op_type,
-                        },
-                        |row| row.get::<_, Option<i64>>(0),
-                    )
-                    .optional()
-                    .unwrap()
-                    .flatten()
-                    .is_some()
-                })
-            }
-            Step::Integrated {
-                by,
-                op: (action_hash, op_type),
-            } => {
-                let env = ctx.nodes.envs.get(&by).unwrap();
-                env.dht.test_read(move |txn| {
-                    txn.query_row(
-                        "
-                        SELECT when_integrated FROM DhtOp 
-                        WHERE action_hash = :action_hash 
-                          AND type = :type",
-                        named_params! {
-                            ":action_hash": action_hash,
-                            ":type": op_type,
-                        },
-                        |row| row.get::<_, Option<i64>>(0),
-                    )
-                    .optional()
-                    .unwrap()
-                    .flatten()
-                    .is_some()
-                })
-            }
-            Step::AppValidated {
-                by,
-                op: (action_hash, op_type),
-            } => {
-                let env = ctx.nodes.envs.get(&by).unwrap();
-                env.dht.test_read(move |txn| {
-                    txn.query_row(
-                        "
-                        SELECT rowid FROM DhtOp 
-                        WHERE action_hash = :action_hash 
-                          AND type = :type 
-                          AND validation_stage >= :stage
-                        ",
-                        named_params! {
-                            ":action_hash": action_hash,
-                            ":type": op_type,
-                            ":stage": ValidationStage::AwaitingIntegration
-                        },
-                        |row| row.get::<_, usize>(0),
-                    )
-                    .optional()
-                    .unwrap()
-                    .is_some()
-                })
-            }
-            Step::SysValidated {
-                by,
-                op: (action_hash, op_type),
-            } => {
-                let env = ctx.nodes.envs.get(&by).unwrap();
-                env.dht.test_read(move |txn| {
-                    txn.query_row(
-                        "
-                        SELECT rowid FROM DhtOp
-                        WHERE action_hash = :action_hash 
-                          AND type = :type 
-                          AND validation_stage >= :stage
-                        ",
-                        named_params! {
-                            ":action_hash": action_hash,
-                            ":type": op_type,
-                            ":stage": ValidationStage::SysValidated
-                        },
-                        |row| row.get::<_, usize>(0),
-                    )
-                    .optional()
-                    .unwrap()
-                    .is_some()
-                })
-            }
-            Step::Fetched {
-                by,
-                op: (action_hash, op_type),
-            } => {
-                // TODO: should do a check involving the actual FetchPool
-                let env = ctx.nodes.envs.get(&by).unwrap();
-                env.dht.test_read(move |txn| {
-                    txn.query_row(
-                        "
-                        SELECT rowid FROM DhtOp
-                        WHERE action_hash = :action_hash 
-                          AND type = :type
-                        ",
-                        named_params! {
-                            ":action_hash": action_hash,
-                            ":type": op_type,
-                        },
-                        |row| row.get::<_, usize>(0),
-                    )
-                    .optional()
-                    .unwrap()
-                    .is_some()
-                })
-            }
-        }
+        ctx.check(self)
     }
 }

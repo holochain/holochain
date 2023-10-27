@@ -1,6 +1,8 @@
+use std::io::BufReader;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use hc_sleuth::LogAccumulator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -497,17 +499,17 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     }))
     .await;
 
-    let mut sleuth_ctx = hc_sleuth::Context::default();
-    sleuth_ctx.nodes.add(
-        conductors[0].id(),
-        conductors[0].sleuth_env(dna_hash),
-        &[cells[0].agent_pubkey().clone()],
-    );
-    sleuth_ctx.nodes.add(
-        conductors[1].id(),
-        conductors[1].sleuth_env(dna_hash),
-        &[cells[1].agent_pubkey().clone()],
-    );
+    // let mut sleuth_ctx = hc_sleuth::Context::default();
+    // sleuth_ctx.nodes.add(
+    //     conductors[0].id(),
+    //     conductors[0].sleuth_env(dna_hash),
+    //     &[cells[0].agent_pubkey().clone()],
+    // );
+    // sleuth_ctx.nodes.add(
+    //     conductors[1].id(),
+    //     conductors[1].sleuth_env(dna_hash),
+    //     &[cells[1].agent_pubkey().clone()],
+    // );
 
     let zomes: Vec<_> = cells
         .iter()
@@ -563,11 +565,11 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
-    sleuth_ctx.nodes.add(
-        conductors[2].id(),
-        conductors[2].sleuth_env(dna_hash),
-        &[cell.agent_pubkey().clone()],
-    );
+    // sleuth_ctx.nodes.add(
+    //     conductors[2].id(),
+    //     conductors[2].sleuth_env(dna_hash),
+    //     &[cell.agent_pubkey().clone()],
+    // );
 
     let step = hc_sleuth::Step::Integrated {
         by: conductors[2].id(),
@@ -577,7 +579,10 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         ),
     };
     aitia::trace!(&step);
-    hc_sleuth::report(step, &sleuth_ctx);
+
+    let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
+
+    hc_sleuth::report(step, &ctx);
 
     conductors[2]
         .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
@@ -590,7 +595,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),
     };
-    hc_sleuth::report(step, &sleuth_ctx);
+    hc_sleuth::report(step, &ctx);
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],

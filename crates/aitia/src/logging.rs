@@ -88,7 +88,13 @@ mod tests {
     }
 
     impl Fact for TestFact {
-        fn cause(&self, _ctx: &()) -> Option<crate::Cause<Self>> {
+        type Context = ();
+
+        fn cause(&self, _ctx: &Self::Context) -> Option<crate::Cause<Self>> {
+            todo!()
+        }
+
+        fn check(&self, _ctx: &Self::Context) -> bool {
             todo!()
         }
     }

@@ -2511,6 +2511,7 @@ dependencies = [
  "once_cell",
  "petgraph",
  "pretty_assertions 0.6.1",
+ "regex",
  "serde",
 ]
 

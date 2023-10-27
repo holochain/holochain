@@ -5,7 +5,7 @@ use aitia::{
 
 use super::*;
 
-pub fn report<NodeId: FactTraits>(step: Step<NodeId>, ctx: &Context<NodeId>) {
+pub fn report(step: Step, ctx: &LogAccumulator) {
     match aitia::Cause::from(step).traverse(ctx) {
         Traversal::Pass => println!("PASS"),
         Traversal::Groundless => println!("GROUNDLESS"),
