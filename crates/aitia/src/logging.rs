@@ -45,7 +45,7 @@ impl<J: FactLogJson> FactLog for J {
 
 pub trait Log<F: FactLog> {
     fn parse(line: &str) -> Option<F>;
-    fn apply(self, fact: F) -> Self;
+    fn apply(&mut self, fact: F);
 }
 
 // pub struct LogAccumulator<F: FactLog> {

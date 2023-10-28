@@ -1,11 +1,15 @@
-use std::{collections::HashSet, hash::Hash, io::BufRead};
+use std::{collections::HashSet, hash::Hash, io::BufRead, sync::Arc};
 
-use aitia::{cause::FactTraits, logging::FactLog, Fact};
+use aitia::{
+    cause::FactTraits,
+    logging::{FactLog, Log},
+    Fact,
+};
 use holochain_p2p::DnaHashExt;
 
 use super::*;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct LogAccumulator {
     facts: HashSet<Step>,
     node_ids: HashSet<String>,
@@ -20,7 +24,7 @@ impl LogAccumulator {
         let mut line = String::new();
         while let Ok(_) = r.read_line(&mut line) {
             if let Some(fact) = Self::parse(&line) {
-                la = la.apply(fact);
+                la.apply(fact);
             }
         }
         la
@@ -52,9 +56,25 @@ impl aitia::logging::Log<Step> for LogAccumulator {
             .map(|m| Step::decode(m.as_str()))
     }
 
-    fn apply(mut self, fact: Step) -> Self {
+    fn apply(&mut self, fact: Step) {
         self.facts.insert(fact);
-        self
+    }
+}
+
+#[derive(Clone, Default, derive_more::Deref)]
+pub struct AitiaWriter(Arc<std::sync::Mutex<LogAccumulator>>);
+
+impl std::io::Write for AitiaWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut g = self.0.lock().unwrap();
+        let line = String::from_utf8_lossy(buf);
+        let step = <LogAccumulator as aitia::logging::Log<Step>>::parse(&line).unwrap();
+        g.apply(step);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 

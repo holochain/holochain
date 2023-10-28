@@ -23,6 +23,9 @@ use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
+use hc_sleuth::AitiaWriter;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
+
 fn make_tuning(
     publish: bool,
     recent: bool,
@@ -468,25 +471,50 @@ async fn test_gossip_startup() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    holochain_trace::test_run().ok();
+    // let la = Arc::new(std::sync::Mutex::new(LogAccumulator::default()));
+    let aw = AitiaWriter::default();
+    let aww = aw.clone();
+    let mw =
+        (move || aww.clone()).with_filter(|metadata| metadata.fields().field("aitia").is_some());
+
+    let sb = holochain_trace::standard_layer(std::io::stderr)
+        .unwrap()
+        .map_writer(|w| w.and(mw));
+
+    tracing::subscriber::set_global_default(sb.finish()).unwrap();
+
     let config = make_config(false, true, false, None);
-    three_way_gossip(config).await;
+    three_way_gossip(config, aw).await;
 }
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    holochain_trace::test_run().ok();
+    // let la = Arc::new(std::sync::Mutex::new(LogAccumulator::default()));
+    let aw = AitiaWriter::default();
+    let aww = aw.clone();
+
+    let mw = (move || aww.clone()).with_filter(|metadata| {
+        *metadata.level() >= tracing::Level::INFO && metadata.fields().field("aitia").is_some()
+    });
+
+    holochain_trace::standard_layer(std::io::stderr)
+        .unwrap()
+        .map_writer(|w| mw.and(w))
+        .init();
+
+    // tracing::subscriber::set_global_default(sb.finish()).unwrap();
+
     let config = make_config(false, false, true, Some(0));
-    three_way_gossip(config).await;
+    three_way_gossip(config, aw).await;
 }
 
 /// Test that:
 /// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
+async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig, aw: AitiaWriter) {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 
@@ -580,9 +608,13 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     };
     aitia::trace!(&step);
 
-    let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
+    // let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
 
-    hc_sleuth::report(step, &ctx);
+    {
+        let ctx = aw.lock().unwrap();
+        dbg!(&ctx);
+        hc_sleuth::report(step, &ctx);
+    }
 
     conductors[2]
         .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
@@ -595,7 +627,11 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),
     };
-    hc_sleuth::report(step, &ctx);
+
+    {
+        let ctx = aw.lock().unwrap();
+        hc_sleuth::report(step, &ctx);
+    }
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],

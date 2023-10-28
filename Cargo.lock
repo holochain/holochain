@@ -2509,6 +2509,7 @@ dependencies = [
  "holochain_state",
  "kitsune_p2p",
  "once_cell",
+ "parking_lot 0.10.2",
  "petgraph",
  "pretty_assertions 0.6.1",
  "regex",
