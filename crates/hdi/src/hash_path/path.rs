@@ -1,8 +1,8 @@
 use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
-use holochain_wasmer_guest::*;
 use holochain_integrity_types::link::LinkTag;
+use holochain_wasmer_guest::*;
 use std::str::FromStr;
 
 #[cfg(all(test, feature = "mock"))]
@@ -346,7 +346,6 @@ impl TypedPath {
             None
         }
     }
-
 }
 
 impl std::ops::Deref for TypedPath {

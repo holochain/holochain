@@ -38,7 +38,6 @@ impl From<&Anchor> for Path {
     }
 }
 
-
 #[cfg(test)]
 #[test]
 fn hash_path_root() {
