@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor.
+
 ## 0.3.0-beta-dev.17
 
 ## 0.3.0-beta-dev.16
