@@ -40,3 +40,16 @@ pub mod anchor;
 ///
 /// If an application knows `[ A B ]` then a link to `C` will be discoverable.
 pub mod path;
+
+/// A [ `String` ] based DSL for [ `path::Path` ] that builds trees based on lexical granularity.
+///
+/// The basic form is `width:depth#` in the string with `.` separators for each component.
+///
+/// For example `foo.2:3#holochain` would expand to a path with string components:
+///
+/// `[ "foo" ho lo ch holochain]`
+///
+/// The widths of strings are normalised as UTF32 as path components so multibyte characters count as 1.
+///
+/// The tests in the shard module include several examples of the DSL including multibyte characters.
+pub mod shard;
