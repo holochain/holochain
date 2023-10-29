@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Renamed macro `hdk_entry_defs` to `hdk_entry_types` to keep consistency with `hdk_link_types`
+
 ## 0.3.0-beta-dev.17
 
 - Added a macro `#![dna_properties]` which when applied to a struct, exposes a function `try_from_dna_properties()` on that struct
