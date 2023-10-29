@@ -10,7 +10,7 @@
 //! #[hdk_entry_helper]
 //! pub struct PrivMsg(pub String);
 //!
-//! #[hdk_entry_defs]
+//! #[hdk_entry_types]
 //! #[unit_enum(UnitEntryTypes)]
 //! pub enum EntryTypes {
 //!     Post(Post),
@@ -35,7 +35,7 @@ pub struct Msg(pub String);
 #[hdk_entry_helper]
 pub struct PrivMsg(pub String);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     Post(Post),

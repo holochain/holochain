@@ -63,7 +63,7 @@ where
 /// #[hdk_entry_helper]
 /// pub struct Foo(u32);
 ///
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -102,7 +102,7 @@ where
 /// #[hdk_entry_helper]
 /// struct Foo(u32);
 ///
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -142,7 +142,7 @@ where
 /// #[hdk_entry_helper]
 /// pub struct Foo(u32);
 ///
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }

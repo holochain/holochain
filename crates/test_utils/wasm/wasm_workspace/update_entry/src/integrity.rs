@@ -6,7 +6,7 @@ pub struct Post(pub String);
 #[hdk_entry_helper]
 pub struct Msg(pub String);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     #[entry_def(required_validations = 5)]

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub use hdk_derive::hdk_entry_defs;
+pub use hdk_derive::hdk_entry_types;
 pub use hdk_derive::hdk_entry_helper;
 
 #[cfg(doc)]

@@ -21,7 +21,7 @@ pub struct D {
     b: (),
 }
 
-#[hdk_entry_defs(skip_hdk_extern = true)]
+#[hdk_entry_types(skip_hdk_extern = true)]
 #[unit_enum(UnitEntryTypes)]
 #[derive(Clone, PartialEq, Eq)]
 pub enum EntryTypes {

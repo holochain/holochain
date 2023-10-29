@@ -41,7 +41,7 @@ mod integrity_zomes {
 
         use super::*;
 
-        #[hdk_entry_defs(skip_hdk_extern = true)]
+        #[hdk_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         pub enum EntryTypes {
             A(A),
@@ -60,7 +60,7 @@ mod integrity_zomes {
     pub mod integrity_b {
         use super::*;
 
-        #[hdk_entry_defs(skip_hdk_extern = true)]
+        #[hdk_entry_types(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
         pub enum EntryTypes {
             A(A),

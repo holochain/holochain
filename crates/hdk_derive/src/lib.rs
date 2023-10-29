@@ -216,7 +216,7 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 /// ```ignore
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// #[unit_enum(UnitEntryTypes)]
 /// pub enum EntryTypes {
 ///     Post(Post),
@@ -228,7 +228,7 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_defs(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdk_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_defs::build(attrs, code)
 }
 
@@ -247,13 +247,13 @@ pub fn hdk_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream 
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_defs_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdk_entry_types_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_defs_name_registration::build(attrs, code)
 }
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn hdk_entry_defs_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
+pub fn hdk_entry_types_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_defs_conversions::build(attrs, code)
 }
 
