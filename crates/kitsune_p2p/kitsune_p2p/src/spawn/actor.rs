@@ -808,8 +808,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             .spaces
             .keys()
             .map(|space| {
-                self.host_api
-                    .legacy
+                self.evt_sender
                     .query_agents(QueryAgentsEvt::new(space.clone()))
             })
             .collect::<Vec<_>>();
@@ -855,11 +854,9 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                             .entry("hcDnaHashesToAgents".to_string())
                             .or_insert_with(|| serde_json::json!({}));
 
-                        use base64::Engine;
-
                         let dna_hash = format!(
                             "uhC0k{}",
-                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.space)
+                            base64::encode_config(&**peer.space, base64::URL_SAFE_NO_PAD)
                         );
 
                         let r = r
@@ -870,7 +867,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
                         let agent_pub_key = format!(
                             "uhCAk{}",
-                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.agent)
+                            base64::encode_config(&**peer.agent, base64::URL_SAFE_NO_PAD)
                         );
 
                         let agent = Agent {
