@@ -2688,6 +2688,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_test_wasm_common",
  "serde",
 ]
 
