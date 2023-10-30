@@ -87,6 +87,7 @@ async fn sys_validation_workflow_inner(
             let cascade = cascade.clone();
             async move {
                 let (op, op_hash) = so.into_inner();
+                let op_action = hc_sleuth::OpAction::from(op.clone());
                 let op_type = op.get_type();
                 let action = op.action();
 
@@ -94,7 +95,7 @@ async fn sys_validation_workflow_inner(
                 let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
                 let r = validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
-                r.map(|o| (op_hash, o, dependency))
+                r.map(|o| (op_hash, o, dependency, op_action))
             }
         }
     });
@@ -143,11 +144,17 @@ async fn sys_validation_workflow_inner(
                 let mut missing = 0;
                 let mut rejected = 0;
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, outcome, dependency) = outcome?;
+                    let (op_hash, outcome, dependency, op_action) = outcome?;
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
                             put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
+
+                            let sleuth_id = todo!();
+                            aitia::trace!(&hc_sleuth::Step::SysValidated {
+                                by: sleuth_id,
+                                op: op_action
+                            });
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
                             awaiting += 1;

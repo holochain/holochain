@@ -26,8 +26,9 @@ pub fn init_subscriber() -> ContextWriter {
 pub struct Context {
     facts: HashSet<Step>,
     node_ids: HashSet<String>,
+    entry_actions: HashMap<EntryHash, ActionHash>,
     sysval_dep: HashMap<OpAction, Option<OpAction>>,
-    appval_deps: HashMap<OpAction, Vec<OpAction>>,
+    appval_deps: HashMap<OpAction, HashSet<OpAction>>,
 }
 
 impl Context {
@@ -51,7 +52,7 @@ impl Context {
         self.sysval_dep.get(op)?.as_ref()
     }
 
-    pub fn appval_deps(&self, op: &OpAction) -> Option<&Vec<OpAction>> {
+    pub fn appval_deps(&self, op: &OpAction) -> Option<&HashSet<OpAction>> {
         self.appval_deps.get(op)
     }
 

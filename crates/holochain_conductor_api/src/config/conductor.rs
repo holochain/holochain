@@ -100,6 +100,11 @@ impl ConductorConfig {
     pub fn tracing_scope(&self) -> Option<String> {
         self.network.tracing_scope.clone()
     }
+
+    /// Get the string used for hc_sleuth logging
+    pub fn sleuth_id(&self) -> String {
+        self.tracing_scope().unwrap_or("<NONE>".to_string())
+    }
 }
 
 #[cfg(test)]

@@ -93,6 +93,7 @@ async fn app_validation_workflow_inner(
     tracing::debug!("validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
+    let sleuth_id = conductor.config.sleuth_id();
 
     // Validate all the ops
     let iter = sorted_ops.into_iter().map({
@@ -169,6 +170,7 @@ async fn app_validation_workflow_inner(
             "Committing {} ops",
             chunk.iter().map(|c| c.len()).sum::<usize>()
         );
+        let sleuth_id = sleuth_id.clone();
         let (t, a, r, activity) = workspace
             .dht_db
             .write_async(move |txn| {
@@ -203,7 +205,10 @@ async fn app_validation_workflow_inner(
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
                             }
-                            // aitia::trace!(hc_sleuth::OpFact::AppValidated);
+                            aitia::trace!(&hc_sleuth::Step::AppValidated {
+                                by: sleuth_id.clone(),
+                                op: op_light.into()
+                            });
                         }
                         Outcome::AwaitingDeps(deps) => {
                             awaiting += 1;
