@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Add types for hash paths (migrated from hdk crate) and include in prelude: Anchor, Path, Component, TypedPath
+- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath
 
 ## 0.4.0-beta-dev.13
 
