@@ -12,18 +12,17 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let output = quote::quote! {
-        use std::any::type_name;
         #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
         #input
 
-        trait TryFromDnaProperties {
-            fn try_from_dna_properties() -> ExternResult<#ident> {
+        impl TryFromDnaProperties for #ident {
+            type Error = WasmError;
+
+            fn try_from_dna_properties() -> Result<#ident, WasmError> {
                 #ident::try_from(dna_info()?.modifiers.properties)
-                    .map_err(|_| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize DNA properties into {:}", type_name::<#ident>()))))
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize DNA properties into {}", std::any::type_name::<#ident>()))))
             }
         }
-
-        impl TryFromDnaProperties for #ident {}
     };
     output.into()
 }

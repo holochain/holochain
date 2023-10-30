@@ -71,6 +71,7 @@ pub use hdi::map_extern_infallible;
 pub use hdi::op::OpHelper;
 pub use hdi::prelude::app_entry;
 pub use hdk_derive;
+pub use hdk_derive::dna_properties;
 pub use hdk_derive::hdk_dependent_entry_types;
 pub use hdk_derive::hdk_dependent_link_types;
 pub use hdk_derive::hdk_entry_defs;
