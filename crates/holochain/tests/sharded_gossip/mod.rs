@@ -21,7 +21,6 @@ use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-use hc_sleuth::AitiaWriter;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -467,8 +466,8 @@ async fn test_gossip_startup() {
     assert_eq!(record.unwrap().action_address(), &hash);
 }
 
-fn experimental_logging() -> AitiaWriter {
-    let aw = AitiaWriter::default();
+fn experimental_logging() -> hc_sleuth::ContextWriter {
+    let aw = hc_sleuth::ContextWriter::default();
     let aww = aw.clone();
     let mw =
         (move || aww.clone()).with_filter(|metadata| metadata.fields().field("aitia").is_some());
@@ -503,7 +502,10 @@ async fn three_way_gossip_historical() {
 /// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig, aw: AitiaWriter) {
+async fn three_way_gossip(
+    config: holochain::sweettest::SweetConductorConfig,
+    aw: hc_sleuth::ContextWriter,
+) {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 

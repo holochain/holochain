@@ -48,7 +48,7 @@ impl std::fmt::Display for Step {
 }
 
 impl aitia::Fact for Step {
-    type Context = crate::LogAccumulator;
+    type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {
         self.to_string()

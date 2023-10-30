@@ -6,10 +6,12 @@ use std::collections::HashMap;
 pub(crate) use holochain_state::prelude::*;
 pub(crate) use kitsune_p2p::gossip::sharded_gossip::GossipType;
 
-mod context;
-pub use context::*;
+pub mod context_db;
+pub mod context_log;
 pub mod query;
 mod report;
+
+pub use context_log::{Context, ContextWriter};
 
 pub use report::*;
 

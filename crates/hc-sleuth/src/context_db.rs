@@ -2,81 +2,12 @@ use std::{collections::HashSet, hash::Hash, io::BufRead, sync::Arc};
 
 use aitia::{
     cause::FactTraits,
-    logging::{FactLog, Log},
+    logging::{Log, LogLine},
     Fact,
 };
 use holochain_p2p::DnaHashExt;
 
 use super::*;
-
-#[derive(Default, Debug)]
-pub struct LogAccumulator {
-    facts: HashSet<Step>,
-    node_ids: HashSet<String>,
-    sysval_dep: HashMap<OpRef, Option<OpRef>>,
-    appval_deps: HashMap<OpRef, Vec<OpRef>>,
-}
-
-impl LogAccumulator {
-    pub fn from_file(mut r: impl BufRead) -> Self {
-        use aitia::logging::Log;
-        let mut la = Self::default();
-        let mut line = String::new();
-        while let Ok(_) = r.read_line(&mut line) {
-            if let Some(fact) = Self::parse(&line) {
-                la.apply(fact);
-            }
-        }
-        la
-    }
-
-    pub fn check(&self, fact: &Step) -> bool {
-        self.facts.contains(fact)
-    }
-
-    pub fn sysval_dep(&self, op: &OpRef) -> Option<&OpRef> {
-        self.sysval_dep.get(op)?.as_ref()
-    }
-
-    pub fn appval_deps(&self, op: &OpRef) -> Option<&Vec<OpRef>> {
-        self.appval_deps.get(op)
-    }
-
-    pub fn node_ids(&self) -> &HashSet<String> {
-        &self.node_ids
-    }
-}
-
-impl aitia::logging::Log<Step> for LogAccumulator {
-    fn parse(line: &str) -> Option<Step> {
-        regex::Regex::new("<AITIA>(.*?)</AITIA>")
-            .unwrap()
-            .captures(line)
-            .and_then(|m| m.get(1))
-            .map(|m| Step::decode(m.as_str()))
-    }
-
-    fn apply(&mut self, fact: Step) {
-        self.facts.insert(fact);
-    }
-}
-
-#[derive(Clone, Default, derive_more::Deref)]
-pub struct AitiaWriter(Arc<std::sync::Mutex<LogAccumulator>>);
-
-impl std::io::Write for AitiaWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let mut g = self.0.lock().unwrap();
-        let line = String::from_utf8_lossy(buf);
-        let step = <LogAccumulator as aitia::logging::Log<Step>>::parse(&line).unwrap();
-        g.apply(step);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
 
 #[derive(Default)]
 pub struct Context {

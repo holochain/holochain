@@ -1,5 +1,7 @@
 //! Allows for adding serialized facts to logs, to be read out later
 
+use std::sync::Arc;
+
 use tracing_core::Subscriber;
 use tracing_subscriber::{filter::filter_fn, registry::LookupSpan, Layer};
 
@@ -12,16 +14,17 @@ impl<T> FactLogTraits for T where T: FactTraits + serde::Serialize + serde::de::
 #[macro_export]
 macro_rules! trace {
     ($fact:expr) => {
+        // The tracing level doesn't matter
         tracing::info!(
             aitia = "json",
             "<AITIA>{}</AITIA>",
-            $crate::logging::FactLog::encode($fact)
+            $crate::logging::LogLine::encode($fact)
         );
     };
 }
 
 /// Adds encode/decode functionality to a Fact so it can be logged
-pub trait FactLog: FactLogTraits {
+pub trait LogLine: FactLogTraits {
     /// Encode as string
     fn encode(&self) -> String;
     /// Decode from string
@@ -29,9 +32,9 @@ pub trait FactLog: FactLogTraits {
 }
 
 /// A JSON-encoded fact
-pub trait FactLogJson: FactLog {}
+pub trait FactLogJson: LogLine {}
 
-impl<J: FactLogJson> FactLog for J {
+impl<J: FactLogJson> LogLine for J {
     fn encode(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
@@ -41,9 +44,10 @@ impl<J: FactLogJson> FactLog for J {
     }
 }
 
-pub trait Log<F: FactLog> {
-    fn parse(line: &str) -> Option<F>;
-    fn apply(&mut self, fact: F);
+pub trait Log: Default {
+    type Fact: LogLine;
+    fn parse(line: &str) -> Option<Self::Fact>;
+    fn apply(&mut self, fact: Self::Fact);
 }
 
 // pub struct LogAccumulator<F: FactLog> {
@@ -60,6 +64,35 @@ pub fn layer<S: Subscriber + for<'a> LookupSpan<'a>>() -> impl Layer<S> {
         .with_filter(filter_fn(|metadata| {
             metadata.fields().field("aitia").is_some()
         }))
+}
+
+#[derive(derive_more::Deref)]
+pub struct AitiaWriter<L: Log>(Arc<std::sync::Mutex<L>>);
+
+impl<L: Log> Clone for AitiaWriter<L> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<L: Log> Default for AitiaWriter<L> {
+    fn default() -> Self {
+        Self(Arc::new(std::sync::Mutex::new(L::default())))
+    }
+}
+
+impl<L: Log> std::io::Write for AitiaWriter<L> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut g = self.0.lock().unwrap();
+        let line = String::from_utf8_lossy(buf);
+        let step = L::parse(&line).unwrap();
+        g.apply(step);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
