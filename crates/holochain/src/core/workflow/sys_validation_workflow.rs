@@ -7,7 +7,9 @@ use crate::core::sys_validate::check_and_hold_store_record;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use crate::core::workflow::error::WorkflowResult;
-use futures::future::BoxFuture;
+use crate::core::workflow::sys_validation_workflow::validation_batch::{
+    validate_ops_batch, NUM_CONCURRENT_OPS,
+};
 use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
@@ -21,15 +23,13 @@ use holochain_state::prelude::*;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::time::Instant;
 use tracing::*;
 use types::Outcome;
 
 pub mod types;
 
+mod validation_batch;
 pub mod validation_query;
-
-const NUM_CONCURRENT_OPS: usize = 50;
 
 #[cfg(test)]
 mod chain_test;
@@ -178,81 +178,6 @@ async fn sys_validation_workflow_inner(
     } else {
         WorkComplete::Complete
     })
-}
-
-async fn validate_ops_batch(
-    ops: Vec<DhtOpHashed>,
-    started_at: Option<Instant>,
-    validator_fn: impl Fn(
-        DhtOpHashed,
-    ) -> BoxFuture<'static, WorkflowResult<(DhtOpHash, Outcome, Dependency)>> + Send + 'static,
-    commit_outcome_batch_fn: impl Fn(
-        Vec<WorkflowResult<(DhtOpHash, Outcome, Dependency)>>,
-    ) -> BoxFuture<'static, WorkflowResult<OutcomeSummary>>,
-) -> WorkflowResult<()> {
-    let start_len = ops.len();
-
-    // Process each op
-    let iter = ops.into_iter().map(validator_fn);
-
-    // Create a stream of concurrent validation futures.
-    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
-    // return up to NUM_CONCURRENT_OPS * 100 results.
-    use futures::stream::StreamExt;
-    let mut iter = futures::stream::iter(iter)
-        .buffer_unordered(NUM_CONCURRENT_OPS) // TODO really? So why sort the ops if we're going to run this through in any order?
-        .ready_chunks(NUM_CONCURRENT_OPS * 100);
-
-    // Spawn a task to actually drive the stream.
-    // This allows the stream to make progress in the background while
-    // we are committing previous results to the database.
-    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
-    let jh = tokio::spawn(async move {
-        // Send the result to task that will commit to the database.
-        while let Some(op) = iter.next().await {
-            if tx
-                .send_timeout(op, std::time::Duration::from_secs(10))
-                .await
-                .is_err()
-            {
-                tracing::warn!("sys validation task has failed to send ops. This is not a problem if the conductor is shutting down");
-                break;
-            }
-        }
-    });
-
-    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
-    let mut iter =
-        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
-
-    let mut total = 0;
-    let mut round_time = started_at.is_some().then(std::time::Instant::now);
-    // Pull in a chunk of results.
-    while let Some(chunk) = iter.next().await {
-        let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
-        tracing::debug!("Committing {} ops", num_ops);
-        let summary = commit_outcome_batch_fn(chunk.into_iter().flatten().collect()).await?;
-
-        total += summary.total;
-        if let (Some(start), Some(round_time)) = (started_at, &mut round_time) {
-            let round_el = round_time.elapsed();
-            *round_time = std::time::Instant::now();
-            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-            let ops_ps = summary.total as f64 / round_el.as_micros() as f64 * 1_000_000.0;
-            tracing::info!(
-                "Sys validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
-                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
-                avg_ops_ps,
-                ops_ps
-            );
-        }
-        tracing::debug!("{} committed, {} awaiting sys dep, {} missing dht dep, {} rejected. {} committed this round", summary.total, summary.awaiting, summary.missing, summary.rejected, total);
-    }
-    jh.await?;
-
-    tracing::debug!("Accepted {} ops", total);
-
-    Ok(())
 }
 
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
