@@ -1454,6 +1454,7 @@ impl Space {
                 config
                     .tuning_params
                     .bootstrap_check_delay_backoff_multiplier,
+                config.tuning_params.bootstrap_max_delay_s,
             );
         }
 

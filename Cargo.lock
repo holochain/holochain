@@ -2557,6 +2557,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "hcterm"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap 4.4.6",
+ "crossterm 0.27.0",
+ "holo_hash",
+ "holochain_conductor_api",
+ "holochain_types",
+ "holochain_util",
+ "holochain_websocket",
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_bootstrap_client",
+ "kitsune_p2p_types",
+ "once_cell",
+ "ratatui",
+ "url 2.4.1",
+]
+
+[[package]]
 name = "hdi"
 version = "0.4.0-beta-dev.13"
 dependencies = [
@@ -2767,7 +2788,7 @@ dependencies = [
  "holochain_zome_types",
  "hostname",
  "human-panic",
- "indoc",
+ "indoc 1.0.9",
  "isotest",
  "itertools 0.10.5",
  "kitsune_p2p",
@@ -3744,6 +3765,12 @@ name = "indoc"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa799dd5ed20a7e349f3b4639aa80d74549c81716d9ec4f994c9b5815598306"
+
+[[package]]
+name = "indoc"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e186cfbae8084e513daff4240b4797e342f988cecda4fb6c939150f96315fd8"
 
 [[package]]
 name = "inferno"
@@ -6203,6 +6230,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratatui"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e2e4cd95294a85c3b4446e63ef054eea43e0205b1fd60120c16b74ff7ff96ad"
+dependencies = [
+ "bitflags 2.4.0",
+ "cassowary",
+ "crossterm 0.27.0",
+ "indoc 2.0.4",
+ "itertools 0.11.0",
+ "paste",
+ "strum 0.25.0",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7362,6 +7406,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 
 [[package]]
+name = "strum"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
+dependencies = [
+ "strum_macros 0.25.2",
+]
+
+[[package]]
 name = "strum_macros"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7384,6 +7437,19 @@ dependencies = [
  "quote 1.0.33",
  "rustversion",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.25.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad8d03b598d3d0fff69bf533ee3ef19b8eeb342729596df84bcc7e1f96ec4059"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro2 1.0.67",
+ "quote 1.0.33",
+ "rustversion",
+ "syn 2.0.37",
 ]
 
 [[package]]

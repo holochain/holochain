@@ -907,7 +907,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLight, DhtOpHash, OpOrder, Timestamp, Dependency)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, Dependency)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -936,7 +936,7 @@ fn build_ops_from_actions(
             // Put the action back by value.
             let dependency = get_dependency(op_type, &action);
             h = Some(action);
-            // Collect the DhtOpLight, DhtOpHash and OpOrder.
+            // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
         }
 
@@ -1071,7 +1071,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLight>,
+    ops: Vec<DhtOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();

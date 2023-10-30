@@ -329,10 +329,10 @@ fn from_type_op() {
 fn from_type_op_light() {
     let check_all_ops = |record| {
         let ops = produce_op_lights_from_records(vec![&record]).unwrap();
-        let check_identity = |light: DhtOpLight, action| {
+        let check_identity = |light: DhtOpLite, action| {
             let action_hash = ActionHash::with_data_sync(action);
             assert_eq!(
-                DhtOpLight::from_type(light.get_type(), action_hash, action).unwrap(),
+                DhtOpLite::from_type(light.get_type(), action_hash, action).unwrap(),
                 light
             )
         };
