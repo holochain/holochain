@@ -12,7 +12,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DnaDefHashed;
@@ -155,7 +155,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     Ok(())
 }
 
-/// Insert a [`DhtOpLight`] into an authored database.
+/// Insert a [`DhtOpLite`] into an authored database.
 /// This sets the sql fields so the authored database
 /// can be used in queries with other databases.
 /// Because we are sharing queries across databases
@@ -163,7 +163,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 #[tracing::instrument(skip(txn))]
 pub fn insert_op_lite_into_authored(
     txn: &mut Transaction,
-    op_lite: &DhtOpLight,
+    op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
@@ -174,10 +174,10 @@ pub fn insert_op_lite_into_authored(
     Ok(())
 }
 
-/// Insert a [`DhtOpLight`] into the database.
+/// Insert a [`DhtOpLite`] into the database.
 pub fn insert_op_lite(
     txn: &mut Transaction,
-    op_lite: &DhtOpLight,
+    op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
