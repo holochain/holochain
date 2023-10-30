@@ -1,7 +1,5 @@
 //! Allows for adding serialized facts to logs, to be read out later
 
-use std::collections::HashSet;
-
 use tracing_core::Subscriber;
 use tracing_subscriber::{filter::filter_fn, registry::LookupSpan, Layer};
 

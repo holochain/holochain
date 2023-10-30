@@ -1,8 +1,6 @@
-use std::io::BufReader;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use hc_sleuth::LogAccumulator;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -25,6 +23,8 @@ use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
 use hc_sleuth::AitiaWriter;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 fn make_tuning(
     publish: bool,
@@ -467,22 +467,25 @@ async fn test_gossip_startup() {
     assert_eq!(record.unwrap().action_address(), &hash);
 }
 
-#[cfg(feature = "slow_tests")]
-#[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
-async fn three_way_gossip_recent() {
-    // let la = Arc::new(std::sync::Mutex::new(LogAccumulator::default()));
+fn experimental_logging() -> AitiaWriter {
     let aw = AitiaWriter::default();
     let aww = aw.clone();
     let mw =
         (move || aww.clone()).with_filter(|metadata| metadata.fields().field("aitia").is_some());
 
-    let sb = holochain_trace::standard_layer(std::io::stderr)
-        .unwrap()
-        .map_writer(|w| w.and(mw));
+    tracing_subscriber::registry()
+        .with(holochain_trace::standard_layer(std::io::stderr).unwrap())
+        .with(tracing_subscriber::fmt::layer().with_writer(mw))
+        .init();
 
-    tracing::subscriber::set_global_default(sb.finish()).unwrap();
+    aw
+}
 
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
+async fn three_way_gossip_recent() {
+    let aw = experimental_logging();
     let config = make_config(false, true, false, None);
     three_way_gossip(config, aw).await;
 }
@@ -491,21 +494,7 @@ async fn three_way_gossip_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    // let la = Arc::new(std::sync::Mutex::new(LogAccumulator::default()));
-    let aw = AitiaWriter::default();
-    let aww = aw.clone();
-
-    let mw = (move || aww.clone()).with_filter(|metadata| {
-        *metadata.level() >= tracing::Level::INFO && metadata.fields().field("aitia").is_some()
-    });
-
-    holochain_trace::standard_layer(std::io::stderr)
-        .unwrap()
-        .map_writer(|w| mw.and(w))
-        .init();
-
-    // tracing::subscriber::set_global_default(sb.finish()).unwrap();
-
+    let aw = experimental_logging();
     let config = make_config(false, false, true, Some(0));
     three_way_gossip(config, aw).await;
 }

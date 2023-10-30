@@ -76,14 +76,10 @@
 use tracing::Subscriber;
 use tracing_subscriber::{
     filter::EnvFilter,
-    fmt::{
-        format::{self, DefaultFields, FmtSpan},
-        time::UtcTime,
-        SubscriberBuilder,
-    },
-    layer::{Layered, SubscriberExt},
+    fmt::{format::FmtSpan, time::UtcTime, SubscriberBuilder},
+    layer::SubscriberExt,
     registry::LookupSpan,
-    FmtSubscriber, Layer, Registry,
+    Layer,
 };
 
 use derive_more::Display;
@@ -389,7 +385,7 @@ where
     }
 }
 
-pub fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
+fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
 where
     S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
 {
