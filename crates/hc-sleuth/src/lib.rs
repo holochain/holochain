@@ -11,7 +11,7 @@ pub mod context_log;
 pub mod query;
 mod report;
 
-pub use context_log::{Context, ContextWriter};
+pub use context_log::{init_subscriber, Context, ContextWriter};
 
 pub use report::*;
 

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use hc_sleuth::OpAction;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -20,10 +21,6 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_ag
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
-
-use tracing_subscriber::fmt::writer::MakeWriterExt;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 
 fn make_tuning(
     publish: bool,
@@ -466,25 +463,11 @@ async fn test_gossip_startup() {
     assert_eq!(record.unwrap().action_address(), &hash);
 }
 
-fn experimental_logging() -> hc_sleuth::ContextWriter {
-    let aw = hc_sleuth::ContextWriter::default();
-    let aww = aw.clone();
-    let mw =
-        (move || aww.clone()).with_filter(|metadata| metadata.fields().field("aitia").is_some());
-
-    tracing_subscriber::registry()
-        .with(holochain_trace::standard_layer(std::io::stderr).unwrap())
-        .with(tracing_subscriber::fmt::layer().with_writer(mw))
-        .init();
-
-    aw
-}
-
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    let aw = experimental_logging();
+    let aw = hc_sleuth::init_subscriber();
     let config = make_config(false, true, false, None);
     three_way_gossip(config, aw).await;
 }
@@ -493,7 +476,7 @@ async fn three_way_gossip_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    let aw = experimental_logging();
+    let aw = hc_sleuth::init_subscriber();
     let config = make_config(false, false, true, Some(0));
     three_way_gossip(config, aw).await;
 }
@@ -592,7 +575,7 @@ async fn three_way_gossip(
 
     let step = hc_sleuth::Step::Integrated {
         by: conductors[2].id(),
-        op: (
+        op: OpAction(
             hashes[0].clone(),
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),
@@ -613,7 +596,7 @@ async fn three_way_gossip(
 
     let step = hc_sleuth::Step::Integrated {
         by: conductors[2].id(),
-        op: (
+        op: OpAction(
             hashes[0].clone(),
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),

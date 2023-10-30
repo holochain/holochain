@@ -2509,6 +2509,7 @@ dependencies = [
  "hc-sleuth",
  "holochain_p2p",
  "holochain_state",
+ "holochain_trace 0.3.0-beta-dev.1",
  "kitsune_p2p",
  "once_cell",
  "parking_lot 0.10.2",
@@ -2516,6 +2517,7 @@ dependencies = [
  "pretty_assertions 0.6.1",
  "regex",
  "serde",
+ "tracing-subscriber",
 ]
 
 [[package]]

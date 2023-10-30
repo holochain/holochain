@@ -6,17 +6,28 @@ use aitia::{
     Fact,
 };
 use holochain_p2p::DnaHashExt;
+use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 
 use super::*;
 
 pub type ContextWriter = aitia::logging::LogWriter<Context>;
 
+pub fn init_subscriber() -> ContextWriter {
+    let w = ContextWriter::default();
+    let ww = w.clone();
+    tracing_subscriber::registry()
+        .with(holochain_trace::standard_layer(std::io::stderr).unwrap())
+        .with(aitia::logging::tracing_layer(move || ww.clone()))
+        .init();
+    w
+}
+
 #[derive(Default, Debug)]
 pub struct Context {
     facts: HashSet<Step>,
     node_ids: HashSet<String>,
-    sysval_dep: HashMap<OpRef, Option<OpRef>>,
-    appval_deps: HashMap<OpRef, Vec<OpRef>>,
+    sysval_dep: HashMap<OpAction, Option<OpAction>>,
+    appval_deps: HashMap<OpAction, Vec<OpAction>>,
 }
 
 impl Context {
@@ -36,11 +47,11 @@ impl Context {
         self.facts.contains(fact)
     }
 
-    pub fn sysval_dep(&self, op: &OpRef) -> Option<&OpRef> {
+    pub fn sysval_dep(&self, op: &OpAction) -> Option<&OpAction> {
         self.sysval_dep.get(op)?.as_ref()
     }
 
-    pub fn appval_deps(&self, op: &OpRef) -> Option<&Vec<OpRef>> {
+    pub fn appval_deps(&self, op: &OpAction) -> Option<&Vec<OpAction>> {
         self.appval_deps.get(op)
     }
 

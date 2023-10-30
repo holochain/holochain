@@ -6,20 +6,35 @@ use aitia::logging::FactLogTraits;
 use aitia::FactTraits;
 use holochain_state::{prelude::*, validation_db::ValidationStage};
 
-pub type OpRef = (ActionHash, DhtOpType);
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, derive_more::From, serde::Serialize, serde::Deserialize,
+)]
+pub struct OpAction(pub ActionHash, pub DhtOpType);
+
+impl From<DhtOp> for OpAction {
+    fn from(value: DhtOp) -> Self {
+        let t = value.get_type();
+        Self(ActionHash::with_data_sync(&value.action()), t)
+    }
+}
+
+impl From<DhtOpLight> for OpAction {
+    fn from(value: DhtOpLight) -> Self {
+        let t = value.get_type();
+        Self(value.action_hash().clone(), t)
+    }
+}
 
 pub type NodeId = String;
 
-#[derive(
-    Clone, PartialEq, Eq, std::fmt::Debug, std::hash::Hash, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Step {
     Authored { by: NodeId, action: ActionHash },
-    Published { by: NodeId, op: OpRef },
-    Integrated { by: NodeId, op: OpRef },
-    AppValidated { by: NodeId, op: OpRef },
-    SysValidated { by: NodeId, op: OpRef },
-    Fetched { by: NodeId, op: OpRef },
+    Published { by: NodeId, op: OpAction },
+    Integrated { by: NodeId, op: OpAction },
+    AppValidated { by: NodeId, op: OpAction },
+    SysValidated { by: NodeId, op: OpAction },
+    Fetched { by: NodeId, op: OpAction },
     // GossipReceived {},
     // PublishReceived {},
 }
@@ -78,10 +93,10 @@ impl aitia::Fact for Step {
                 let dep = ctx.sysval_dep(&op);
                 let mut causes = vec![current];
                 causes.extend(
-                    dep.map(|(action, _)| {
+                    dep.map(|OpAction(action, _)| {
                         aitia::Cause::from(Integrated {
                             by,
-                            op: (action.clone(), DhtOpType::StoreRecord),
+                            op: OpAction(action.clone(), DhtOpType::StoreRecord),
                         })
                     })
                     .into_iter(),

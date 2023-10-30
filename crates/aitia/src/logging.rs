@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use tracing_core::Subscriber;
 use tracing_subscriber::{
-    filter::filter_fn,
     fmt::{writer::MakeWriterExt, MakeWriter},
     registry::LookupSpan,
     Layer,
@@ -64,19 +63,19 @@ pub trait Log: Default {
 }
 
 /// A layer which only records logs emitted from aitia::trace!
+/// This can be used to build up log state during a test run, instead of needing to
+/// parse an entire completed log file, since the log file is still being written while
+/// the test is running.
 pub fn tracing_layer<S: Subscriber + for<'a> LookupSpan<'a>>(
     mw: impl for<'w> MakeWriter<'w> + 'static,
 ) -> impl Layer<S> {
-    // let mw = mw.with_filter(|metadata| metadata.fields().field("aitia").is_some());
+    let mw = mw.with_filter(|metadata| metadata.fields().field("aitia").is_some());
     tracing_subscriber::fmt::layer()
+        .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
         .with_writer(mw)
-        // .with_test_writer()
         .with_level(false)
         .with_file(true)
         .with_line_number(true)
-    // .with_filter(filter_fn(|metadata| {
-    //     metadata.fields().field("aitia").is_some()
-    // }))
 }
 
 #[derive(derive_more::Deref)]
