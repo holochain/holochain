@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for claity
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity.
 
 ## 0.3.0-beta-dev.19
 
