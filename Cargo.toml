@@ -33,6 +33,7 @@ members = [
   "crates/hc_sandbox",
   "crates/hc_run_local_services",
   "crates/hc_demo_cli",
+  "crates/holochain_terminal",
 
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/bootstrap_client",
