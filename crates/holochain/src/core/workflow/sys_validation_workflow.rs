@@ -24,7 +24,6 @@ use holochain_state::prelude::*;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::time::Instant;
 use tracing::*;
 use types::Outcome;
 
