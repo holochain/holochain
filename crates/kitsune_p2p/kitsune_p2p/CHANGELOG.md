@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity.
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity. [\#2974](https://github.com/holochain/holochain/pull/2974)
+- Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
+- Adjust bootstrap max\_delay from 60 minutes -> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
 
 ## 0.3.0-beta-dev.19
 
