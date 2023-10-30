@@ -9,7 +9,7 @@ use holochain_p2p::DnaHashExt;
 
 use super::*;
 
-pub type ContextWriter = aitia::logging::AitiaWriter<Context>;
+pub type ContextWriter = aitia::logging::LogWriter<Context>;
 
 #[derive(Default, Debug)]
 pub struct Context {
@@ -51,14 +51,6 @@ impl Context {
 
 impl aitia::logging::Log for Context {
     type Fact = Step;
-
-    fn parse(line: &str) -> Option<Step> {
-        regex::Regex::new("<AITIA>(.*?)</AITIA>")
-            .unwrap()
-            .captures(line)
-            .and_then(|m| m.get(1))
-            .map(|m| Step::decode(m.as_str()))
-    }
 
     fn apply(&mut self, fact: Step) {
         self.facts.insert(fact);

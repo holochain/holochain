@@ -602,7 +602,7 @@ async fn three_way_gossip(
     // let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
 
     {
-        let ctx = aw.lock().unwrap();
+        let ctx = aw.lock();
         dbg!(&ctx);
         hc_sleuth::report(step, &ctx);
     }
@@ -620,7 +620,7 @@ async fn three_way_gossip(
     };
 
     {
-        let ctx = aw.lock().unwrap();
+        let ctx = aw.lock();
         hc_sleuth::report(step, &ctx);
     }
 

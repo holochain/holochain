@@ -3,7 +3,12 @@
 use std::sync::Arc;
 
 use tracing_core::Subscriber;
-use tracing_subscriber::{filter::filter_fn, registry::LookupSpan, Layer};
+use tracing_subscriber::{
+    filter::filter_fn,
+    fmt::{writer::MakeWriterExt, MakeWriter},
+    registry::LookupSpan,
+    Layer,
+};
 
 use crate::FactTraits;
 
@@ -46,44 +51,52 @@ impl<J: FactLogJson> LogLine for J {
 
 pub trait Log: Default {
     type Fact: LogLine;
-    fn parse(line: &str) -> Option<Self::Fact>;
+
+    fn parse(line: &str) -> Option<Self::Fact> {
+        regex::Regex::new("<AITIA>(.*?)</AITIA>")
+            .unwrap()
+            .captures(line)
+            .and_then(|m| m.get(1))
+            .map(|m| Self::Fact::decode(m.as_str()))
+    }
+
     fn apply(&mut self, fact: Self::Fact);
 }
 
-// pub struct LogAccumulator<F: FactLog> {
-//     facts: HashSet<F>,
-// }
-
 /// A layer which only records logs emitted from aitia::trace!
-pub fn layer<S: Subscriber + for<'a> LookupSpan<'a>>() -> impl Layer<S> {
+pub fn tracing_layer<S: Subscriber + for<'a> LookupSpan<'a>>(
+    mw: impl for<'w> MakeWriter<'w> + 'static,
+) -> impl Layer<S> {
+    // let mw = mw.with_filter(|metadata| metadata.fields().field("aitia").is_some());
     tracing_subscriber::fmt::layer()
-        .with_test_writer()
+        .with_writer(mw)
+        // .with_test_writer()
         .with_level(false)
         .with_file(true)
         .with_line_number(true)
-        .with_filter(filter_fn(|metadata| {
-            metadata.fields().field("aitia").is_some()
-        }))
+    // .with_filter(filter_fn(|metadata| {
+    //     metadata.fields().field("aitia").is_some()
+    // }))
 }
 
 #[derive(derive_more::Deref)]
-pub struct AitiaWriter<L: Log>(Arc<std::sync::Mutex<L>>);
+pub struct LogWriter<L: Log>(Arc<parking_lot::Mutex<L>>);
 
-impl<L: Log> Clone for AitiaWriter<L> {
+impl<L: Log> Clone for LogWriter<L> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<L: Log> Default for AitiaWriter<L> {
+impl<L: Log> Default for LogWriter<L> {
     fn default() -> Self {
-        Self(Arc::new(std::sync::Mutex::new(L::default())))
+        Self(Arc::new(parking_lot::Mutex::new(L::default())))
     }
 }
 
-impl<L: Log> std::io::Write for AitiaWriter<L> {
+impl<L: Log> std::io::Write for LogWriter<L> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let mut g = self.0.lock().unwrap();
+        let mut g = self.0.lock();
         let line = String::from_utf8_lossy(buf);
         let step = L::parse(&line).unwrap();
         g.apply(step);
@@ -97,11 +110,13 @@ impl<L: Log> std::io::Write for AitiaWriter<L> {
 
 #[cfg(test)]
 mod tests {
-    use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, Registry};
+    use tracing_subscriber::{
+        prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Registry,
+    };
 
-    use crate::Fact;
+    use crate::{logging::LogWriter, Fact};
 
-    use super::{layer, FactLogJson};
+    use super::{tracing_layer, FactLogJson};
 
     #[derive(
         Debug,
@@ -132,10 +147,38 @@ mod tests {
 
     impl FactLogJson for TestFact {}
 
+    #[derive(Default)]
+    struct Log(Vec<TestFact>);
+
+    impl super::Log for Log {
+        type Fact = TestFact;
+
+        fn apply(&mut self, fact: Self::Fact) {
+            self.0.push(fact)
+        }
+    }
+
     #[test]
     fn sample_log() {
-        tracing::subscriber::set_global_default(Registry::default().with(layer::<_>())).unwrap();
+        let log = LogWriter::<Log>::default();
+        let log2 = log.clone();
+        Registry::default()
+            .with(tracing_layer(move || log2.clone()))
+            .init();
 
-        crate::trace!(&TestFact::A("hello".to_string()));
+        let facts = vec![
+            TestFact::A("hello".to_string()),
+            TestFact::B(24),
+            TestFact::A("bye!".to_string()),
+        ];
+
+        for fact in facts.iter() {
+            crate::trace!(fact);
+        }
+
+        {
+            let ctx = log.lock();
+            assert_eq!(ctx.0, facts);
+        }
     }
 }
