@@ -54,12 +54,8 @@ use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
-use holochain_types::prelude::*;
 use metrics::create_cascade_duration_metric;
 use metrics::CascadeDurationMetric;
-use mutations::insert_action;
-use mutations::insert_entry;
-use mutations::insert_op_lite;
 use tracing::*;
 
 #[cfg(feature = "test_utils")]

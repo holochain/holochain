@@ -105,6 +105,10 @@
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
 #[cfg(feature = "influxive")]
 const DASH_TX5: &[u8] = include_bytes!("dashboards/tx5.json");
+#[cfg(feature = "influxive")]
+const DASH_DATABASE: &[u8] = include_bytes!("dashboards/database.json");
+#[cfg(feature = "influxive")]
+const DASH_CONDUCTOR: &[u8] = include_bytes!("dashboards/conductor.json");
 
 /// Configuration for holochain metrics.
 pub enum HolochainMetricsConfig {
@@ -273,10 +277,16 @@ impl HolochainMetricsConfig {
                     // only initialize dashboards if the db is new
                     if cur.contains("\"dashboards\": []") {
                         if let Err(err) = influxive.apply(DASH_NETWORK_STATS).await {
-                            tracing::warn!(?err, "failed to initialize dashboard");
+                            tracing::warn!(?err, "failed to initialize network stats dashboard");
                         }
                         if let Err(err) = influxive.apply(DASH_TX5).await {
-                            tracing::warn!(?err, "failed to initialize dashboard");
+                            tracing::warn!(?err, "failed to initialize tx5 dashboard");
+                        }
+                        if let Err(err) = influxive.apply(DASH_DATABASE).await {
+                            tracing::warn!(?err, "failed to initialize database dashboard");
+                        }
+                        if let Err(err) = influxive.apply(DASH_CONDUCTOR).await {
+                            tracing::warn!(?err, "failed to initialize conductor dashboard");
                         }
                     }
                 }
