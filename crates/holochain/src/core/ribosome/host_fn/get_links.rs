@@ -156,9 +156,9 @@ pub mod slow_tests {
             .await;
 
         let expect = Path::from(vec![
-            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
-            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
-            hdk::hash_path::path::Component::from("bar".as_bytes().to_vec()),
+            hdk::prelude::Component::new(hdi::hash_path::anchor::ROOT.to_vec()),
+            hdk::prelude::Component::from("foo".as_bytes().to_vec()),
+            hdk::prelude::Component::from("bar".as_bytes().to_vec()),
         ]);
         assert_eq!(
             anchor_address_one,
@@ -175,9 +175,9 @@ pub mod slow_tests {
             .await;
 
         let expect = Path::from(vec![
-            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
-            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
-            hdk::hash_path::path::Component::from("baz".as_bytes().to_vec()),
+            hdk::prelude::Component::new(hdi::hash_path::anchor::ROOT.to_vec()),
+            hdk::prelude::Component::from("foo".as_bytes().to_vec()),
+            hdk::prelude::Component::from("baz".as_bytes().to_vec()),
         ]);
         assert_eq!(
             anchor_address_two,
@@ -189,8 +189,8 @@ pub mod slow_tests {
             .await;
 
         let expect = Path::from(vec![
-            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
-            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+            hdk::prelude::Component::new(hdi::hash_path::anchor::ROOT.to_vec()),
+            hdk::prelude::Component::from("foo".as_bytes().to_vec()),
         ]);
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1);
