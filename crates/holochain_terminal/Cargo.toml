@@ -2,7 +2,7 @@
 name = "hcterm"
 version = "0.2.0"
 description = "A terminal for Holochain"
-license-file = "LICENSE_CAL-1.0"
+license = "MIT"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_terminal"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
