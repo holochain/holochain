@@ -251,6 +251,7 @@ mod tests {
                             op.hash,
                             Outcome::AwaitingOpDep(fixt!(AnyDhtHash)),
                             Dependency::Null,
+                        ))
                     } else if op.hash == missing_dep_op.hash {
                         Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null))
                         unreachable!("Unexpected op")
