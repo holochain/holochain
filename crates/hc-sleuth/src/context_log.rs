@@ -27,8 +27,8 @@ pub struct Context {
     facts: HashSet<Step>,
     node_ids: HashSet<String>,
     entry_actions: HashMap<EntryHash, ActionHash>,
-    sysval_dep: HashMap<OpAction, Option<OpAction>>,
-    appval_deps: HashMap<OpAction, HashSet<OpAction>>,
+    // sysval_dep: HashMap<OpAction, Option<OpAction>>,
+    // appval_deps: HashMap<OpAction, HashSet<OpAction>>,
 }
 
 impl Context {
@@ -48,12 +48,14 @@ impl Context {
         self.facts.contains(fact)
     }
 
-    pub fn sysval_dep(&self, op: &OpAction) -> Option<&OpAction> {
-        self.sysval_dep.get(op)?.as_ref()
+    pub fn sysval_op_dep(&self, op: &OpLite) -> Option<&OpLite> {
+        todo!()
+        // self.sysval_dep.get(op)?.as_ref()
     }
 
-    pub fn appval_deps(&self, op: &OpAction) -> Option<&HashSet<OpAction>> {
-        self.appval_deps.get(op)
+    pub fn appval_op_deps(&self, op: &OpLite) -> Option<&HashSet<OpLite>> {
+        todo!()
+        // self.appval_deps.get(op)
     }
 
     pub fn node_ids(&self) -> &HashSet<String> {
