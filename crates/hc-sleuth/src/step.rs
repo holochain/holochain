@@ -6,52 +6,61 @@ use aitia::logging::FactLogTraits;
 use aitia::{Cause, FactTraits};
 use holochain_state::{prelude::*, validation_db::ValidationStage};
 
+// #[derive(Debug, Clone, derive_more::From)]
+// pub enum OpRef {
+//     OpLite(OpLite),
+//     Action(ActionHash, DhtOpType),
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
+pub struct OpAction(pub ActionHash, pub DhtOpType);
+
 pub type OpLite = DhtOpLite;
 pub type NodeId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Step {
+pub enum Step<Op = OpLite> {
     Authored {
         by: NodeId,
         action: ActionHash,
     },
     Published {
         by: NodeId,
-        op: OpLite,
+        op: Op,
     },
     Integrated {
         by: NodeId,
-        op: OpLite,
+        op: Op,
     },
     AppValidated {
         by: NodeId,
-        op: OpLite,
+        op: Op,
     },
     SysValidated {
         by: NodeId,
-        op: OpLite,
+        op: Op,
     },
     PendingSysValidation {
         by: NodeId,
-        op: OpLite,
+        op: Op,
         dep: Option<AnyDhtHash>,
     },
     PendingAppValidation {
         by: NodeId,
-        op: OpLite,
+        op: Op,
         deps: Vec<AnyDhtHash>,
     },
     Fetched {
         by: NodeId,
-        op: OpLite,
+        op: Op,
     },
     // GossipReceived {},
     // PublishReceived {},
 }
 
-impl aitia::logging::FactLogJson for Step {}
+impl aitia::logging::FactLogJson for Step<OpLite> {}
 
-impl std::fmt::Display for Step {
+impl<Op: Debug> std::fmt::Display for Step<Op> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Step::Authored { by, action } => {
@@ -80,7 +89,7 @@ impl std::fmt::Display for Step {
     }
 }
 
-impl aitia::Fact for Step {
+impl aitia::Fact for Step<OpLite> {
     type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {

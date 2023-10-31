@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use hc_sleuth::OpAction;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -579,7 +580,13 @@ async fn three_way_gossip(
             holochain_types::prelude::DhtOpType::StoreRecord,
         ),
     };
-    aitia::trace!(&step);
+
+    {
+        let ctx = aw.lock();
+        let step = ctx.expand(step.clone());
+        drop(ctx);
+        aitia::trace!(&step);
+    }
 
     // let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
 

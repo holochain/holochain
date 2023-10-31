@@ -29,7 +29,8 @@ pub struct Context {
     entry_actions: HashMap<EntryHash, ActionHash>,
     sysval_dep: HashMap<OpLite, Option<AnyDhtHash>>,
     appval_deps: HashMap<OpLite, HashSet<AnyDhtHash>>,
-    ops: HashMap<AnyDhtHash, OpLite>,
+    ops_by_fetch_hash: HashMap<AnyDhtHash, OpLite>,
+    ops_by_action: HashMap<OpAction, OpLite>,
 }
 
 impl Context {
@@ -50,12 +51,15 @@ impl Context {
     }
 
     pub fn sysval_op_dep(&self, op: &OpLite) -> Option<&OpLite> {
-        self.ops.get(self.sysval_dep.get(op)?.as_ref()?)
+        self.ops_by_fetch_hash
+            .get(self.sysval_dep.get(op)?.as_ref()?)
     }
 
     pub fn appval_op_deps(&self, op: &OpLite) -> HashSet<&OpLite> {
         if let Some(deps) = self.appval_deps.get(op) {
-            deps.into_iter().map(|h| self.ops.get(h).unwrap()).collect()
+            deps.into_iter()
+                .map(|h| self.ops_by_fetch_hash.get(h).unwrap())
+                .collect()
         } else {
             HashSet::new()
         }
@@ -64,10 +68,46 @@ impl Context {
     pub fn node_ids(&self) -> &HashSet<String> {
         &self.node_ids
     }
+
+    pub fn expand(&self, step: Step<OpAction>) -> Step<OpLite> {
+        match step {
+            Step::Authored { by, action } => Step::Authored { by, action },
+            Step::Published { by, op } => Step::Published {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+            },
+            Step::Integrated { by, op } => Step::Integrated {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+            },
+            Step::AppValidated { by, op } => Step::AppValidated {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+            },
+            Step::SysValidated { by, op } => Step::SysValidated {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+            },
+            Step::PendingSysValidation { by, op, dep } => Step::PendingSysValidation {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+                dep,
+            },
+            Step::PendingAppValidation { by, op, deps } => Step::PendingAppValidation {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+                deps,
+            },
+            Step::Fetched { by, op } => Step::Fetched {
+                by,
+                op: self.ops_by_action.get(&op).unwrap().clone(),
+            },
+        }
+    }
 }
 
 impl aitia::logging::Log for Context {
-    type Fact = Step;
+    type Fact = Step<OpLite>;
 
     fn apply(&mut self, fact: Step) {
         match fact.clone() {
@@ -77,6 +117,13 @@ impl aitia::logging::Log for Context {
             Step::AppValidated { by, op } => {}
             Step::SysValidated { by, op } => {}
             Step::PendingSysValidation { by, op, dep } => {
+                self.ops_by_fetch_hash
+                    .insert(op.fetch_dependency_hash(), op.clone());
+                self.ops_by_action.insert(
+                    OpAction(op.action_hash().clone(), op.get_type()),
+                    op.clone(),
+                );
+
                 self.sysval_dep.insert(op, dep);
             }
             Step::PendingAppValidation { by, op, deps } => {
