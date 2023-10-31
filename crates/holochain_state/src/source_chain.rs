@@ -919,7 +919,7 @@ fn build_ops_from_actions(
         // &ActionHash, &Action, EntryHash are needed to produce the ops.
         let entry_hash = shh.action().entry_hash().cloned();
         let item = (shh.as_hash(), shh.action(), entry_hash);
-        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter())?;
+        let ops_inner = produce_op_lites_from_iter(vec![item].into_iter())?;
 
         // Break apart the SignedActionHashed.
         let (action, sig) = shh.into_inner();
@@ -990,7 +990,7 @@ pub async fn genesis(
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
     let dna_record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_records(vec![&dna_record])?;
+    let dna_ops = produce_op_lites_from_records(vec![&dna_record])?;
     let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
@@ -1006,7 +1006,7 @@ pub async fn genesis(
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
     let agent_validation_record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_records(vec![&agent_validation_record])?;
+    let avh_ops = produce_op_lites_from_records(vec![&agent_validation_record])?;
     let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
@@ -1023,7 +1023,7 @@ pub async fn genesis(
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
     let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lights_from_records(vec![&agent_record])?;
+    let agent_ops = produce_op_lites_from_records(vec![&agent_record])?;
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
@@ -1185,7 +1185,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
-    let ops = produce_op_lights_from_records(vec![&record])?;
+    let ops = produce_op_lites_from_records(vec![&record])?;
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();

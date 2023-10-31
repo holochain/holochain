@@ -260,7 +260,7 @@ impl DhtOp {
     }
 
     /// Convert a [DhtOp] to a [DhtOpLite] and basis
-    pub fn to_light(
+    pub fn to_lite(
         // Hoping one day we can work out how to go from `&Create`
         // to `&Action::Create(Create)` so punting on a reference
         &self,
@@ -687,7 +687,7 @@ impl<'a> UniqueForm<'a> {
 
 /// Produce all DhtOps for a Record
 pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
-    let op_lights = produce_op_lights_from_records(vec![record])?;
+    let op_lites = produce_op_lites_from_records(vec![record])?;
     let (shh, entry) = record.clone().into_inner();
     let SignedActionHashed {
         hashed: ActionHashed {
@@ -696,9 +696,9 @@ pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
         signature,
     } = shh;
 
-    let mut ops = Vec::with_capacity(op_lights.len());
+    let mut ops = Vec::with_capacity(op_lites.len());
 
-    for op_light in op_lights {
+    for op_light in op_lites {
         let signature = signature.clone();
         let action = action.clone();
         let op = match op_light {
@@ -747,8 +747,8 @@ pub fn produce_ops_from_record(record: &Record) -> DhtOpResult<Vec<DhtOp>> {
     Ok(ops)
 }
 
-/// Produce all the op lights for tese records
-pub fn produce_op_lights_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<DhtOpLite>> {
+/// Produce all the op lites for these records
+pub fn produce_op_lites_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<DhtOpLite>> {
     let actions_and_hashes = actions.into_iter().map(|e| {
         (
             e.action_address(),
@@ -756,36 +756,36 @@ pub fn produce_op_lights_from_records(actions: Vec<&Record>) -> DhtOpResult<Vec<
             e.action().entry_data().map(|(h, _)| h.clone()),
         )
     });
-    produce_op_lights_from_iter(actions_and_hashes)
+    produce_op_lites_from_iter(actions_and_hashes)
 }
 
-/// Produce all the op lights from this record group
+/// Produce all the op lites from this record group
 /// with a shared entry
-pub fn produce_op_lights_from_record_group(
+pub fn produce_op_lites_from_record_group(
     records: &RecordGroup<'_>,
 ) -> DhtOpResult<Vec<DhtOpLite>> {
     let actions_and_hashes = records.actions_and_hashes();
     let maybe_entry_hash = Some(records.entry_hash());
-    produce_op_lights_from_parts(actions_and_hashes, maybe_entry_hash)
+    produce_op_lites_from_parts(actions_and_hashes, maybe_entry_hash)
 }
 
 /// Data minimal clone (no cloning entries) cheap &Record to DhtOpLite conversion
-fn produce_op_lights_from_parts<'a>(
+fn produce_op_lites_from_parts<'a>(
     actions_and_hashes: impl Iterator<Item = (&'a ActionHash, &'a Action)>,
     maybe_entry_hash: Option<&EntryHash>,
 ) -> DhtOpResult<Vec<DhtOpLite>> {
     let iter = actions_and_hashes.map(|(head, hash)| (head, hash, maybe_entry_hash.cloned()));
-    produce_op_lights_from_iter(iter)
+    produce_op_lites_from_iter(iter)
 }
 
-/// Produce op lights from iter of (action hash, action, maybe entry).
-pub fn produce_op_lights_from_iter<'a>(
+/// Produce op lites from iter of (action hash, action, maybe entry).
+pub fn produce_op_lites_from_iter<'a>(
     iter: impl Iterator<Item = (&'a ActionHash, &'a Action, Option<EntryHash>)>,
 ) -> DhtOpResult<Vec<DhtOpLite>> {
     let mut ops = Vec::new();
 
     for (action_hash, action, maybe_entry_hash) in iter {
-        let op_lights = action_to_op_types(action)
+        let op_lites = action_to_op_types(action)
             .into_iter()
             .filter_map(|op_type| {
                 let op_light = match (op_type, action) {
@@ -857,7 +857,7 @@ pub fn produce_op_lights_from_iter<'a>(
                 };
                 Some(op_light)
             });
-        ops.extend(op_lights);
+        ops.extend(op_lites);
     }
     Ok(ops)
 }

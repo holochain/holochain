@@ -217,7 +217,7 @@ async fn insert_op_equivalence() {
     .unwrap();
     insert_op_lite(
         &mut txn1,
-        &op.to_light(),
+        &op.to_lite(),
         op.as_hash(),
         &op_order,
         &create_action.timestamp,
