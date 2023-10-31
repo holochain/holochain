@@ -254,7 +254,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    fn assert_type<T: HashType>(_: &str, h: HoloHash<T>) {
+    fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc().as_u32());
         assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(
