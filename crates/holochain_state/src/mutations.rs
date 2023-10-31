@@ -99,7 +99,7 @@ pub fn insert_op_scratch(
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
-    let op_light = op.to_light();
+    let op_light = op.to_lite();
     let action = op.action();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry().into_option() {
@@ -134,7 +134,7 @@ pub fn insert_record_scratch(
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
-    let op_light = op.to_light();
+    let op_light = op.to_lite();
     let action = op.action();
     let timestamp = action.timestamp();
     let signature = op.signature().clone();
