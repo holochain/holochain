@@ -126,7 +126,7 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::sync::Arc;
 
     use super::*;
@@ -138,19 +138,13 @@ pub mod tests {
     use crate::sweettest::*;
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
-    use fixt::Unpredictable;
+    use holochain_keystore::test_keystore;
     use holochain_p2p::HolochainP2pDnaFixturator;
-    use holochain_state::prelude::test_authored_db;
-    use holochain_state::prelude::test_cache_db;
-    use holochain_state::prelude::test_dht_db;
-    use holochain_state::prelude::SourceChain;
+    use holochain_state::prelude::*;
     use holochain_state::test_utils::test_db_dir;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::inline_zome::InlineZomeSet;
-    use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fake_agent_pubkey_1;
-    use holochain_zome_types::Action;
     use matches::assert_matches;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {

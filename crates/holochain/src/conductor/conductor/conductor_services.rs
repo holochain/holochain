@@ -13,7 +13,7 @@ mod app_store_service;
 pub use app_store_service::*;
 
 use super::ConductorHandle;
-use holochain_zome_types::CellId;
+use holochain_zome_types::prelude::CellId;
 
 /// The set of all Conductor Services available to the conductor
 #[derive(Clone)]

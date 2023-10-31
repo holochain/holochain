@@ -92,6 +92,7 @@ test_utils = [
   "fixturators",
   "fuzzing",
   "isotest",
+  "holochain_keystore/test_utils",
   "holochain_zome_types/test_utils",
 ]
 

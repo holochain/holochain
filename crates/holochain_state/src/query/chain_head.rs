@@ -1,6 +1,6 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::*;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
 
 use crate::prelude::HeadInfo;
