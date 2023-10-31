@@ -54,7 +54,7 @@ pub fn count_links<'a>(
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
-pub mod tests {
+mod tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

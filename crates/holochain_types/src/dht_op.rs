@@ -9,8 +9,6 @@ use std::str::FromStr;
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::record::RecordGroup;
-use error::DhtOpError;
-use error::DhtOpResult;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
@@ -21,14 +19,11 @@ use kitsune_p2p_dht::Loc;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[allow(missing_docs)]
-pub mod error;
+mod error;
+pub use error::*;
 
 #[cfg(test)]
-pub mod tests;
-
-#[cfg(feature = "fuzzing")]
-pub mod facts;
+mod tests;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.

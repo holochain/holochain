@@ -7,8 +7,6 @@ use holo_hash::DhtOpHash;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::prelude::*;
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
 use tracing::instrument;

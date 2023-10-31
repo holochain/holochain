@@ -2,7 +2,7 @@
 
 //! Defines the hApp Manifest YAML format, including validation.
 
-use holochain_zome_types::NetworkSeed;
+use holochain_zome_types::prelude::*;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
@@ -109,7 +109,7 @@ impl AppManifest {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use mr_bundle::Manifest;
 

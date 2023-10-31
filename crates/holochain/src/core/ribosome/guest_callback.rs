@@ -11,7 +11,6 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
-use holochain_zome_types::ExternIO;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     host_context: HostContext,

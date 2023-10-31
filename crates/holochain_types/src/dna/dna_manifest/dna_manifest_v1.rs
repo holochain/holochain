@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::prelude::*;
 use holo_hash::*;
-use holochain_zome_types::ZomeName;
+// use holochain_zome_types::prelude::*;
 use serde_with::serde_as;
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".

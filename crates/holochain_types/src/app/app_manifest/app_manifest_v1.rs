@@ -9,7 +9,7 @@ use super::{
 };
 use crate::prelude::{RoleName, YamlProperties};
 use holo_hash::DnaHashB64;
-use holochain_zome_types::{DnaModifiersOpt, NetworkSeed};
+use holochain_zome_types::prelude::*;
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema

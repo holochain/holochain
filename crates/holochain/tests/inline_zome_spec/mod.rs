@@ -12,7 +12,7 @@ use holochain::{
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
-    core::workflow::error::WorkflowError,
+    core::workflow::WorkflowError,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};

@@ -3,19 +3,8 @@ use std::sync::Arc;
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::prelude::*;
+use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
-use holochain_types::action::WireUpdateRelationship;
-use holochain_types::dht_op::DhtOpType;
-use holochain_types::prelude::EntryData;
-use holochain_types::prelude::HasValidationStatus;
-use holochain_types::prelude::WireEntryOps;
-use holochain_zome_types::EntryType;
-use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::Judged;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::TryFrom;
-use holochain_zome_types::TryInto;
 
 #[derive(Debug, Clone)]
 pub struct GetEntryOpsQuery(EntryHash);

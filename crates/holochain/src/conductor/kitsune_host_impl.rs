@@ -21,7 +21,7 @@ use holochain_types::{
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };
-use holochain_zome_types::Timestamp;
+use holochain_zome_types::prelude::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,

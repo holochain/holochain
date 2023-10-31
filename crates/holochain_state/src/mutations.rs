@@ -23,7 +23,7 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::str::FromStr;
 
 pub use error::*;
@@ -450,7 +450,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_zome_types::Timestamp::now();
+    let now = holochain_zome_types::prelude::Timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp

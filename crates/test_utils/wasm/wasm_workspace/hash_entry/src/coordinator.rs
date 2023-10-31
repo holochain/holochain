@@ -33,8 +33,8 @@ fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
 }
 
 #[cfg(all(test, feature = "mock"))]
-pub mod tests {
-    use fixt::prelude::*;
+mod tests {
+    use ::fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]
