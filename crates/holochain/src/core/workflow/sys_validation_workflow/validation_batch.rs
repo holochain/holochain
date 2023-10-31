@@ -37,7 +37,7 @@ pub(super) async fn validate_ops_batch(
     let mut round_time = started_at.is_some().then(std::time::Instant::now);
     // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
-        let num_ops: usize = chunk.iter().count();
+        let num_ops: usize = chunk.len();
         tracing::debug!("Committing {} ops", num_ops);
         let summary = commit_outcome_batch_fn(chunk).await?;
 
