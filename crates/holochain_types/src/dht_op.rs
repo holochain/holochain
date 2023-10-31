@@ -583,6 +583,18 @@ impl DhtOpLite {
         };
         Ok(op)
     }
+
+    /// Get the AnyDhtHash which would be used in a `must_get_*` context.
+    ///
+    /// For instance, `must_get_entry` will use an EntryHash, and requires a
+    /// StoreEntry record to be integrated to succeed. All other must_gets take
+    /// an ActionHash.
+    pub fn fetch_dependency_hash(&self) -> AnyDhtHash {
+        match self {
+            DhtOpLite::StoreEntry(_, entry_hash, _) => entry_hash.clone().into(),
+            other => other.action_hash().clone().into(),
+        }
+    }
 }
 
 #[allow(missing_docs)]

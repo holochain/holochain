@@ -27,8 +27,9 @@ pub struct Context {
     facts: HashSet<Step>,
     node_ids: HashSet<String>,
     entry_actions: HashMap<EntryHash, ActionHash>,
-    // sysval_dep: HashMap<OpAction, Option<OpAction>>,
-    // appval_deps: HashMap<OpAction, HashSet<OpAction>>,
+    sysval_dep: HashMap<OpLite, Option<AnyDhtHash>>,
+    appval_deps: HashMap<OpLite, HashSet<AnyDhtHash>>,
+    ops: HashMap<AnyDhtHash, OpLite>,
 }
 
 impl Context {
@@ -49,13 +50,15 @@ impl Context {
     }
 
     pub fn sysval_op_dep(&self, op: &OpLite) -> Option<&OpLite> {
-        todo!()
-        // self.sysval_dep.get(op)?.as_ref()
+        self.ops.get(self.sysval_dep.get(op)?.as_ref()?)
     }
 
-    pub fn appval_op_deps(&self, op: &OpLite) -> Option<&HashSet<OpLite>> {
-        todo!()
-        // self.appval_deps.get(op)
+    pub fn appval_op_deps(&self, op: &OpLite) -> HashSet<&OpLite> {
+        if let Some(deps) = self.appval_deps.get(op) {
+            deps.into_iter().map(|h| self.ops.get(h).unwrap()).collect()
+        } else {
+            HashSet::new()
+        }
     }
 
     pub fn node_ids(&self) -> &HashSet<String> {
@@ -67,6 +70,23 @@ impl aitia::logging::Log for Context {
     type Fact = Step;
 
     fn apply(&mut self, fact: Step) {
+        match fact.clone() {
+            Step::Authored { by, action } => {}
+            Step::Published { by, op } => {}
+            Step::Integrated { by, op } => {}
+            Step::AppValidated { by, op } => {}
+            Step::SysValidated { by, op } => {}
+            Step::PendingSysValidation { by, op, dep } => {
+                self.sysval_dep.insert(op, dep);
+            }
+            Step::PendingAppValidation { by, op, deps } => {
+                self.appval_deps
+                    .entry(op)
+                    .or_default()
+                    .extend(deps.into_iter());
+            }
+            Step::Fetched { by, op } => {}
+        }
         self.facts.insert(fact);
     }
 }

@@ -87,7 +87,7 @@ async fn sys_validation_workflow_inner(
             let cascade = cascade.clone();
             async move {
                 let (op, op_hash) = so.into_inner();
-                let op_action = hc_sleuth::OpAction::from(op.clone());
+                let op_action = DhtOpLite::from(op.clone());
                 let op_type = op.get_type();
                 let action = op.action();
 
@@ -143,6 +143,7 @@ async fn sys_validation_workflow_inner(
                 let mut awaiting = 0;
                 let mut missing = 0;
                 let mut rejected = 0;
+                let sleuth_id = todo!();
                 for outcome in chunk.into_iter().flatten() {
                     let (op_hash, outcome, dependency, op_action) = outcome?;
                     match outcome {
@@ -150,7 +151,6 @@ async fn sys_validation_workflow_inner(
                             total += 1;
                             put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
 
-                            let sleuth_id = todo!();
                             aitia::trace!(&hc_sleuth::Step::SysValidated {
                                 by: sleuth_id,
                                 op: op_action
@@ -169,6 +169,12 @@ async fn sys_validation_workflow_inner(
                             // RegisterAgentActivity or RegisterAddLink.
                             let status = ValidationStage::AwaitingSysDeps(missing_dep);
                             put_validation_limbo(txn, &op_hash, status)?;
+
+                            aitia::trace!(&hc_sleuth::Step::PendingSysValidation {
+                                by: sleuth_id,
+                                op: op_action,
+                                dep: Some(missing_dep),
+                            });
                         }
                         Outcome::MissingDhtDep => {
                             missing += 1;

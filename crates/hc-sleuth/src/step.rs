@@ -110,16 +110,18 @@ impl aitia::Fact for Step {
                 let mut causes = vec![received];
 
                 let dep = ctx.sysval_op_dep(&op).cloned();
-                let dep_integrated = dep.clone().map(|op| Cause::from(Integrated { by, op }));
                 let pending = PendingSysValidation {
-                    by,
-                    op,
-                    dep: dep.clone().map(|d| d),
+                    by: by.clone(),
+                    op: op.clone(),
+                    dep: dep.clone().map(|d| d.fetch_dependency_hash()),
                 }
                 .into();
-                causes.extend(dep_integrated);
 
-                Some(Cause::Every(vec![pending, dep_integrated]))
+                if let Some(dep_integrated) = dep.map(|op| Cause::from(Integrated { by, op })) {
+                    Some(Cause::Every(vec![pending, dep_integrated]))
+                } else {
+                    Some(pending)
+                }
             }
             PendingSysValidation { by, op, dep: _ } => {
                 let authored = Authored {
