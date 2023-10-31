@@ -242,7 +242,7 @@ mod tests {
             to_app_validate.push(op);
         }
 
-        // We **don't** expect any of these too appear in either sys validation or app validation
+        // We **don't** expect any of these to appear in either sys validation or app validation
         let facts = Facts {
             pending: false,
             awaiting_sys_deps: false,
