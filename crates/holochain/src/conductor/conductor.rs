@@ -201,7 +201,7 @@ pub struct Conductor {
     running_cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
-    pub config: ConductorConfig,
+    pub config: Arc<ConductorConfig>,
 
     /// The map of dna hash spaces.
     pub(crate) spaces: Spaces,
@@ -275,7 +275,7 @@ mod startup_shutdown_impls {
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
-                config,
+                config: Arc::new(config),
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
                 task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),

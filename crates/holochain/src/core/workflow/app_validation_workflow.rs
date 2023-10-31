@@ -179,7 +179,7 @@ async fn app_validation_workflow_inner(
                 let mut rejected = 0;
                 let mut agent_activity = Vec::new();
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, dependency, op_lites, outcome, activity) = outcome;
+                    let (op_hash, dependency, op_lite, outcome, activity) = outcome;
                     // Get the outcome or return the error
                     let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
@@ -207,7 +207,7 @@ async fn app_validation_workflow_inner(
                             }
                             aitia::trace!(&hc_sleuth::Step::AppValidated {
                                 by: sleuth_id.clone(),
-                                op: op_light.into()
+                                op: op_lite.into()
                             });
                         }
                         Outcome::AwaitingDeps(deps) => {
@@ -219,7 +219,7 @@ async fn app_validation_workflow_inner(
                             rejected += 1;
                             tracing::info!(
                                 "Received invalid op. The op author will be blocked.\nOp: {:?}",
-                                op_lites
+                                op_lite
                             );
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
