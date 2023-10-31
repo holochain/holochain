@@ -97,15 +97,10 @@ pub fn get_pending_validation_receipts(
 mod tests {
     use super::*;
     use crate::mutations::set_when_integrated;
-    use crate::prelude::{set_require_receipt, set_validation_status};
-    use fixt::prelude::*;
+    use crate::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::{HasHash, HoloHashOf};
-    use holochain_keystore::MetaLairClient;
-    use holochain_types::dht_op::DhtOp;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::prelude::Timestamp;
-    use holochain_zome_types::fixt::*;
-    use holochain_zome_types::ValidationStatus;
+    use holochain_keystore::{test_keystore, MetaLairClient};
     use std::collections::HashSet;
 
     async fn fake_vr(
@@ -128,7 +123,7 @@ mod tests {
 
         let test_db = crate::test_utils::test_authored_db();
         let env = test_db.to_db();
-        let keystore = crate::test_utils::test_keystore();
+        let keystore = test_keystore();
 
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),

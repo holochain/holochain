@@ -4,8 +4,8 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_nonce::fresh_nonce;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -224,8 +224,8 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
     use holo_hash::ActionHash;
+    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
     use rusqlite::named_params;
 

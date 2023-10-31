@@ -1,5 +1,4 @@
-use holochain_zome_types::ZomeIndex;
-use holochain_zome_types::ZomeName;
+use holochain_zome_types::prelude::*;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

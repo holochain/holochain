@@ -2,8 +2,11 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::chain_lock::is_chain_locked;
+use crate::chain_lock::is_lock_expired;
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
+use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -20,61 +23,15 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
-use holochain_state_types::{SourceChainJsonDump, SourceChainJsonRecord};
-use holochain_types::chc::ChcError;
-use holochain_types::db::DbRead;
-use holochain_types::db::DbWrite;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::dht_op::produce_op_lights_from_iter;
-use holochain_types::dht_op::produce_op_lights_from_records;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::dht_op::OpOrder;
-use holochain_types::dht_op::UniqueForm;
-use holochain_types::prelude::AddRecordPayload;
-use holochain_types::record::SignedActionHashedExt;
+use holochain_state_types::SourceChainJsonRecord;
 use holochain_types::sql::AsSql;
-use holochain_zome_types::action;
-use holochain_zome_types::query::ChainQueryFilterRange;
-use holochain_zome_types::Action;
-use holochain_zome_types::ActionBuilder;
-use holochain_zome_types::ActionBuilderCommon;
-use holochain_zome_types::ActionExt;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ActionType;
-use holochain_zome_types::ActionUnweighed;
-use holochain_zome_types::CapAccess;
-use holochain_zome_types::CapGrant;
-use holochain_zome_types::CapSecret;
-use holochain_zome_types::CellId;
-use holochain_zome_types::ChainQueryFilter;
-use holochain_zome_types::ChainTopOrdering;
-use holochain_zome_types::CounterSigningAgentState;
-use holochain_zome_types::CounterSigningSessionData;
-use holochain_zome_types::Entry;
-use holochain_zome_types::EntryRateWeight;
-use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::GrantedFunction;
-use holochain_zome_types::MembraneProof;
-use holochain_zome_types::PreflightRequest;
-use holochain_zome_types::QueryFilter;
-use holochain_zome_types::Record;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
-use holochain_zome_types::Timestamp;
 
-use crate::chain_lock::is_chain_locked;
-use crate::chain_lock::is_lock_expired;
 use crate::prelude::*;
-use crate::query::chain_head::ChainHeadQuery;
-use crate::scratch::Scratch;
-use crate::scratch::SyncScratch;
+use crate::source_chain;
 use holo_hash::EntryHash;
-use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
 use holochain_sqlite::rusqlite;
-use holochain_zome_types::EntryType;
 
 mod error;
 
@@ -1024,7 +981,7 @@ pub async fn genesis(
     membrane_proof: Option<MembraneProof>,
     chc: Option<ChcImpl>,
 ) -> SourceChainResult<()> {
-    let dna_action = Action::Dna(action::Dna {
+    let dna_action = Action::Dna(Dna {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         hash: dna_hash,
@@ -1037,7 +994,7 @@ pub async fn genesis(
     let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
-    let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
+    let agent_validation_action = Action::AgentValidationPkg(AgentValidationPkg {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         action_seq: 1,
@@ -1053,12 +1010,12 @@ pub async fn genesis(
     let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
-    let agent_action = Action::Create(action::Create {
+    let agent_action = Action::Create(Create {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         action_seq: 2,
         prev_action: avh_addr,
-        entry_type: action::EntryType::AgentPubKey,
+        entry_type: EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
         // AgentPubKey is weightless
         weight: Default::default(),
@@ -1198,7 +1155,7 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
+async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
@@ -1341,14 +1298,14 @@ impl From<SourceChain> for SourceChainRead {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holochain_keystore::test_keystore;
     use holochain_p2p::MockHolochainP2pDnaT;
-    use holochain_zome_types::prelude::*;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;

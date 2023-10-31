@@ -73,7 +73,9 @@ impl ConductorBuilder {
                 }
             };
             match &self.config.keystore {
-                KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                KeystoreConfig::DangerTestKeystore => {
+                    holochain_keystore::spawn_test_keystore().await?
+                }
                 KeystoreConfig::LairServer { connection_url } => {
                     warn_no_encryption();
                     let passphrase = get_passphrase()?;
@@ -298,7 +300,7 @@ impl ConductorBuilder {
     ) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
-            .unwrap_or_else(holochain_types::prelude::test_keystore);
+            .unwrap_or_else(holochain_keystore::test_keystore);
         self.config.environment_path = env_path.to_path_buf().into();
 
         let spaces = Spaces::new(&self.config)?;

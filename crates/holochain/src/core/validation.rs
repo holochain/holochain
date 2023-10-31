@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use holo_hash::DhtOpHash;
 use holochain_types::dht_op::DhtOp;
 
-use super::workflow::error::WorkflowResult;
+use super::workflow::WorkflowResult;
 use super::SourceChainError;
 use super::SysValidationError;
 use super::ValidationOutcome;

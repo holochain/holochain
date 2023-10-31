@@ -1,15 +1,9 @@
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::query::prelude::*;
-use holochain_types::db::DbRead;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::dht_op::DhtOpType;
-use holochain_zome_types::Entry;
-use holochain_zome_types::SignedAction;
+use holochain_state::prelude::*;
 
 pub use crate::core::validation::DhtOpOrder;
-use crate::core::workflow::error::WorkflowResult;
+use crate::core::workflow::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
@@ -103,21 +97,14 @@ async fn get_ops_to_validate(
 
 #[cfg(test)]
 mod tests {
+    use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
-    use fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HashableContentExtSync;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
     use holochain_state::validation_db::ValidationLimboStatus;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::dht_op::OpOrder;
-    use holochain_zome_types::fixt::*;
-    use holochain_zome_types::Action;
-    use holochain_zome_types::Signature;
-    use holochain_zome_types::ValidationStatus;
-    use holochain_zome_types::NOISE;
 
     use super::*;
 
