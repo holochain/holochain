@@ -88,7 +88,6 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
-use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
@@ -99,12 +98,8 @@ use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
-use holochain_state::prelude::from_blob;
-use holochain_state::prelude::StateMutationResult;
-use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{wasm, *};
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
@@ -276,13 +271,14 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
+            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
-                task_manager: TaskManagerClient::new(outcome_sender),
+                task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
                 // Must be initialized later, since it requires an Arc<Conductor>
                 outcomes_task: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),
@@ -1183,7 +1179,7 @@ mod network_impls {
                 | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
-                | ValidationReceiptReceived { .. } => {
+                | ValidationReceiptsReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                     let cell = self.cell_by_id(&cell_id, true).await?;
@@ -1291,7 +1287,8 @@ mod network_impls {
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
-            let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(now)?;
+            let (nonce, expires_at) =
+                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),
@@ -1349,13 +1346,18 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
+            #[cfg(feature = "chc")]
+            let ignore_genesis_failure = payload.ignore_genesis_failure;
+            #[cfg(not(feature = "chc"))]
+            let ignore_genesis_failure = false;
+
             let InstallAppPayload {
                 source,
                 agent_key,
                 installed_app_id,
                 membrane_proofs,
                 network_seed,
-                ignore_genesis_failure,
+                ..
             } = payload;
 
             let bundle = {
@@ -1761,6 +1763,7 @@ mod clone_cell_impls {
 /// Methods related to management of app and cell status
 mod app_status_impls {
     use super::*;
+    use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
@@ -2065,7 +2068,7 @@ mod app_status_impls {
         {
             for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                    if let Some(cell) = cells.get_mut(cell_id.borrow()) {
                         cell.status = status;
                     }
                 });
@@ -2075,9 +2078,9 @@ mod app_status_impls {
         fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
             match e {
                 // TODO this is brittle because some other network access could fail first if Kitune changes.
-                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Reqwest(e)) => {
-                    e.is_connect()
-                }
+                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Bootstrap(
+                    BootstrapClientError::Reqwest(e),
+                )) => e.is_connect(),
                 _ => false,
             }
         }
@@ -2180,7 +2183,7 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use holochain_zome_types::builder;
+    use holochain_zome_types::action::builder;
 
     use super::*;
 
@@ -2619,7 +2622,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_enabled_cells().into_iter().cloned().collect()
+                    app.all_enabled_cells().cloned().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2687,7 +2690,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to stop app(s)", ?errors);
                     }
-
                     (NoChange, errors)
                 }
                 SpinUp | Both => {
@@ -2704,7 +2706,6 @@ impl Conductor {
                     if !errors.is_empty() {
                         error!(msg = "Errors when trying to start app(s)", ?errors);
                     }
-
                     (delta, errors)
                 }
             };

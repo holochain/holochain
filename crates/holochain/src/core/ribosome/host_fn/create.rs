@@ -119,6 +119,14 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasmPair;
     use holochain_trace;
     use std::sync::Arc;
+    use crate::sweettest::sweet_topos::network::NetworkTopology;
+    use crate::sweettest::fact::size::SizedNetworkFact;
+    use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
+    use crate::sweettest::fact::density::DenseNetworkFact;
+    use crate::sweettest::fact::rng_from_generator;
+    use contrafact::Generator;
+    use contrafact::facts;
+    use contrafact::Fact;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
@@ -191,6 +199,54 @@ pub mod wasm_test {
         assert_eq!(vec![163, 102, 111, 111], bytes);
 
         assert_eq!(round_twice, vec![round.clone(), round],);
+    }
+
+    #[test]
+    fn ribosome_create_entry_network_test() {
+        crate::big_stack_test!(async move {
+                holochain_trace::test_run().ok();
+
+                let mut network_topology = NetworkTopology::default();
+
+                let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+                network_topology.add_dnas(vec![dna_file.clone()]);
+
+                let size_fact = SizedNetworkFact { nodes: 7, agents: 1..=3 };
+                let partition_fact = StrictlyPartitionedNetworkFact {
+                    partitions: 1,
+                    efficiency: 1.0,
+                };
+                let density_fact = DenseNetworkFact { density: 0.8 };
+
+                let mut facts = facts![size_fact, partition_fact, density_fact];
+
+                let mut g: Generator = unstructured_noise().into();
+                let mut rng = rng_from_generator(&mut g);
+                network_topology = facts.mutate(&mut g, network_topology).unwrap();
+
+                network_topology.apply().await.unwrap();
+
+                let alice_node = network_topology.random_node(&mut rng).unwrap();
+                let alice_cell = alice_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+                let alice = alice_node.conductor().lock().await.read().await.get_sweet_cell(alice_cell).unwrap();
+
+                let bob_node = network_topology.random_node(&mut rng).unwrap();
+                let bob_cell = bob_node.cells().into_iter().filter(|cell| cell.dna_hash() == dna_file.dna_hash()).choose(&mut rng).unwrap();
+                let bob = bob_node.conductor().lock().await.read().await.get_sweet_cell(bob_cell).unwrap();
+
+                let action_hash: ActionHash = alice_node.conductor().lock().await.write().await.call(&alice.zome(TestWasm::Create), "create_entry", ()).await;
+
+                crate::wait_for_10s!(
+                    bob_node.conductor().lock().await.write().await.call::<_, Option<Record>, _>(&bob.zome(TestWasm::Create), "get_entry", ()).await,
+                    |x: &Option<Record>| x.is_some(),
+                    |_| true
+                );
+
+                let record: Option<Record> = bob_node.conductor().lock().await.write().await.call(&bob.zome(TestWasm::Create), "get_entry", ()).await;
+
+                assert_eq!(record.unwrap().action_address(), &action_hash);
+            }, 4_000_000);
     }
 
     #[tokio::test(flavor = "multi_thread")]

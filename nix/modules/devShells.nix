@@ -1,16 +1,24 @@
 { self, lib, ... }: {
   perSystem = { config, self', inputs', pkgs, ... }:
     let
-      holonixPackages = with self'.packages; [ holochain lair-keystore hc-launch hc-scaffold ];
+      holonixPackages = { holochainOverrides ? { } }:
+        with self'.packages; [
+          (holochain.override holochainOverrides)
+          lair-keystore
+          hc-launch
+          hc-scaffold
+        ];
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
             (package: ''
               echo ${package.pname} \($(${package}/bin/${package.pname} -V)\): ${package.src.rev or "na"}'')
-            holonixPackages
+            (holonixPackages { })
         );
       hn-introspect =
         pkgs.writeShellScriptBin "hn-introspect" versionsFileText;
+
+      mkRustShell = args: pkgs.mkShell.override ({ stdenv = config.rustHelper.defaultStdenv pkgs; }) args;
     in
     {
       packages = {
@@ -19,14 +27,18 @@
 
       devShells = {
         default = self'.devShells.holonix;
-        holonix = pkgs.mkShell {
-          inputsFrom = [ self'.devShells.rustDev ];
-          packages = holonixPackages ++ [ hn-introspect ];
-          shellHook = ''
-            echo Holochain development shell spawned. Type 'exit' to leave.
-            export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
-          '';
-        };
+        holonix = pkgs.lib.makeOverridable
+          ({ holochainOverrides }: mkRustShell {
+            inputsFrom = [ self'.devShells.rustDev ];
+            packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
+            shellHook = ''
+              echo Holochain development shell spawned. Type 'exit' to leave.
+              export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
+            '';
+          })
+          {
+            holochainOverrides = { };
+          };
 
         holochainBinaries = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
@@ -92,7 +104,7 @@
                 );
 
           in
-          pkgs.mkShell {
+          mkRustShell {
             inputsFrom = [ self'.devShells.rustDev ] ++ (
               # filter out the holochain binary crates from the shell because it's at best unnecessary in local development
               # it's currently a nativeBuildInput because one of the unit tests requires `holochain` and `hc-sandbox` in PATH
@@ -131,15 +143,15 @@
               '')
 
               (pkgs.writeShellScriptBin "scripts-cargo-update" ''
-                 set -xeu -o pipefail
+                set -xeu -o pipefail
 
-                 # Update the Holochain project Cargo.lock
-                 cargo update --manifest-path Cargo.toml
-                 # Update the release-automation crate's Cargo.lock
-                 cargo update --manifest-path crates/release-automation/Cargo.toml
-                 # Update the WASM workspace Cargo.lock
-                 cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
-               '')
+                # Update the Holochain project Cargo.lock
+                cargo update --manifest-path Cargo.toml
+                # Update the release-automation crate's Cargo.lock
+                cargo update --manifest-path crates/release-automation/Cargo.toml
+                # Update the WASM workspace Cargo.lock
+                cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
+              '')
             ]
 
             # generate one script for each of the "holochain-tests-" prefixed derivations by reusing their checkPhase
@@ -161,7 +173,7 @@
           };
 
         rustDev =
-          pkgs.mkShell
+          mkRustShell
             {
               inputsFrom = [
                 self'.packages.holochain
@@ -174,6 +186,8 @@
                 export CARGO_CACHE_RUSTC_INFO=1
                 export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
                 export NIX_PATH="nixpkgs=${pkgs.path}"
+                export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+                echo Rust development shell spawned. Type 'exit' to leave.
               '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
                 export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
               '');

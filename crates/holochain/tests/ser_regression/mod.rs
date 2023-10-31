@@ -6,7 +6,7 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app_in_new_conductor;
-use holochain_state::nonce::fresh_nonce;
+use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;

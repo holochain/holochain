@@ -36,7 +36,6 @@ use derive_more::Display;
 use futures::future::Either;
 use futures::{Future, Stream, StreamExt};
 use holochain_types::prelude::*;
-use holochain_zome_types::CellId;
 use tokio::sync::broadcast;
 
 // MAYBE: move these to workflow mod
@@ -65,8 +64,8 @@ use countersigning_consumer::*;
 mod tests;
 
 use super::workflow::app_validation_workflow::AppValidationWorkspace;
-use super::workflow::error::{WorkflowError, WorkflowResult};
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
+use super::workflow::{WorkflowError, WorkflowResult};
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
@@ -560,6 +559,11 @@ impl TriggerReceiver {
             }
         }
         Ok(())
+    }
+
+    /// Check whether the backoff loop is paused. Will always return false if there is no backoff for this receiver.
+    pub fn is_paused(&self) -> bool {
+        self.back_off.as_ref().map_or(false, |b| b.is_paused())
     }
 }
 

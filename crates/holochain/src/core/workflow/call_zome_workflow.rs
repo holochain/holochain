@@ -13,7 +13,7 @@ use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -163,6 +163,9 @@ where
 
     let validation_result =
         inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
+
+    // If the validation failed remove any active chain lock that matches the
+    // entry that failed validation.
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(

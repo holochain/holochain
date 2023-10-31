@@ -26,7 +26,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
-use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
 

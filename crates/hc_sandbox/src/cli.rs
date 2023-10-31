@@ -30,7 +30,9 @@ pub struct HcSandbox {
     #[arg(long, default_value_t = Output::Log)]
     structured: Output,
 
-    /// Force the admin port(s) that hc uses to talk to Holochain to a specific value.
+    /// Force the admin port(s) that Holochain will use to a specific value.
+    /// This option updates the conductor config file before starting Holochain
+    /// and is only available with the `generate` and `run` commands.
     /// For example `hc sandbox -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
     #[arg(short, long, value_delimiter = ',')]
@@ -75,6 +77,10 @@ pub enum HcSandboxSubcommand {
 
         /// A hApp bundle to install.
         happ: Option<PathBuf>,
+
+        /// Network seed to use when installing the provided hApp.
+        #[arg(long, short = 's')]
+        network_seed: Option<String>,
     },
 
     /// Run conductor(s) from existing sandbox(es).
@@ -123,12 +129,14 @@ impl HcSandbox {
                 create,
                 run,
                 happ,
+                network_seed,
             } => {
                 let paths = generate(
                     &self.holochain_path,
                     happ,
                     create,
                     app_id,
+                    network_seed,
                     self.structured.clone(),
                 )
                 .await?;
@@ -144,40 +152,30 @@ impl HcSandbox {
                     let holochain_path = self.holochain_path.clone();
                     let force_admin_ports = self.force_admin_ports.clone();
                     let structured = self.structured.clone();
-                    tokio::task::spawn(async move {
-                        if let Err(e) =
-                            run_n(&holochain_path, paths, ports, force_admin_ports, structured)
-                                .await
-                        {
-                            tracing::error!(failed_to_run = ?e);
-                        }
-                    });
-                    tokio::signal::ctrl_c().await?;
+
+                    let result = tokio::select! {
+                        result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                        result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
+                    };
                     crate::save::release_ports(std::env::current_dir()?).await?;
+                    return result;
                 }
             }
             HcSandboxSubcommand::Run(Run { ports, existing }) => {
                 let paths = existing.load()?;
                 if paths.is_empty() {
+                    tracing::warn!("no paths available, exiting.");
                     return Ok(());
                 }
                 let holochain_path = self.holochain_path.clone();
                 let force_admin_ports = self.force_admin_ports.clone();
-                tokio::task::spawn(async move {
-                    if let Err(e) = run_n(
-                        &holochain_path,
-                        paths,
-                        ports,
-                        force_admin_ports,
-                        self.structured,
-                    )
-                    .await
-                    {
-                        tracing::error!(failed_to_run = ?e);
-                    }
-                });
-                tokio::signal::ctrl_c().await?;
+
+                let result = tokio::select! {
+                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                    result = run_n(&holochain_path, paths, ports, force_admin_ports, self.structured) => result,
+                };
                 crate::save::release_ports(std::env::current_dir()?).await?;
+                return result;
             }
             HcSandboxSubcommand::Call(call) => {
                 crate::calls::call(&self.holochain_path, call, self.structured).await?
@@ -289,10 +287,19 @@ pub async fn generate(
     happ: Option<PathBuf>,
     create: Create,
     app_id: InstalledAppId,
+    network_seed: Option<String>,
     structured: Output,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let happ = crate::bundles::parse_happ(happ)?;
-    let paths = crate::sandbox::default_n(holochain_path, create, happ, app_id, structured).await?;
+    let paths = crate::sandbox::default_n(
+        holochain_path,
+        create,
+        happ,
+        app_id,
+        network_seed,
+        structured,
+    )
+    .await?;
     crate::save::save(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
 }

@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use holo_hash::AgentPubKey;
-use holochain_zome_types::{CellId, Timestamp};
+use holochain_zome_types::prelude::*;
 
 use crate::conductor::ConductorHandle;
 
 /// Interface for the DPKI service
 #[async_trait::async_trait]
+// #[cfg_attr(feature = "test_utils", mockall::automock)]
 #[mockall::automock]
 #[allow(clippy::needless_lifetimes)]
 pub trait DpkiService: Send + Sync {

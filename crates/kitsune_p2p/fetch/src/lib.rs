@@ -4,7 +4,7 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash, KSpace};
+use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
 
 mod pool;
 mod respond;
@@ -21,11 +21,12 @@ pub use rough_sized::*;
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(tag = "type", content = "key", rename_all = "camelCase")]
 pub enum FetchKey {
-    /// Fetch via region.
-    Region(RegionCoords),
-
     /// Fetch via op hash.
     Op(KOpHash),
 }
@@ -68,5 +69,9 @@ pub struct FetchPoolPush {
     serde::Deserialize,
     derive_more::Deref,
     derive_more::From,
+)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct FetchContext(pub u32);

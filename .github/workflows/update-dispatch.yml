@@ -57,7 +57,7 @@ jobs:
         run: echo
       - name: Checkout repository
         if: ${{ steps.skip.outcome != 'skipped' }}
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v4
       - name: Call the update action
         if: ${{ steps.skip.outcome != 'skipped' }}
         uses: ./.github/actions/update

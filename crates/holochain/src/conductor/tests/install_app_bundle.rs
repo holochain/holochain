@@ -1,15 +1,10 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{conductor::error::ConductorError, sweettest::*};
-use fixt::prelude::strum_macros;
+use ::fixt::prelude::strum_macros;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_types::prelude::{
-    mapvec, AppBundle, AppBundleError, AppBundleSource, AppManifestCurrentBuilder,
-    AppManifestError, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
-    CreateCloneCellPayload, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
-};
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
 
@@ -53,6 +48,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         }
     }
@@ -161,6 +157,7 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -177,6 +174,7 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: alice.clone(),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: None,
         })
@@ -200,6 +198,7 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: alice.clone(),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: None,
         })
@@ -220,6 +219,7 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: alice.clone(),
             installed_app_id: Some("app_2".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
             network_seed: Some("network".into()),
         })
@@ -271,6 +271,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -314,6 +315,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -378,6 +380,7 @@ async fn network_seed_regression() {
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -391,6 +394,7 @@ async fn network_seed_regression() {
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
             membrane_proofs: HashMap::new(),
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         })
         .await
@@ -641,6 +645,7 @@ impl TestCase {
                 installed_app_id: Some(case_str.clone()),
                 network_seed,
                 membrane_proofs: HashMap::new(),
+                #[cfg(feature = "chc")]
                 ignore_genesis_failure: false,
             })
             .await

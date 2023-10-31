@@ -24,6 +24,14 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Standin until std::io::Error::other is stablized.
+pub fn err_other<E>(error: E) -> std::io::Error
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    std::io::Error::new(std::io::ErrorKind::Other, error.into())
+}
+
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
 
@@ -37,6 +45,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
+    id: [u8; 32],
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
@@ -46,6 +55,16 @@ pub struct SweetConductor {
     signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
+
+/// ID based equality is good for SweetConductors so we can track them
+/// independently no matter what kind of mutations/state might eventuate.
+impl PartialEq for SweetConductor {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for SweetConductor {}
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> SweetConductorConfig {
@@ -76,6 +95,11 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 }
 
 impl SweetConductor {
+    /// Get the ID of this conductor for manual equality checks.
+    pub fn id(&self) -> [u8; 32] {
+        self.id
+    }
+
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
@@ -109,7 +133,10 @@ impl SweetConductor {
 
         let keystore = handle.keystore().clone();
 
+        let mut rng = rand::thread_rng();
+
         Self {
+            id: rng.gen(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
@@ -187,9 +214,13 @@ impl SweetConductor {
 
         tracing::info!(?config);
 
-        let handle =
-            Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
-                .await;
+        let handle = Self::handle_from_existing(
+            &dir,
+            keystore.unwrap_or_else(holochain_keystore::test_keystore),
+            &config,
+            &[],
+        )
+        .await;
         Self::new(handle, dir, config, rendezvous).await
     }
 
@@ -484,8 +515,21 @@ impl SweetConductor {
     ///
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
+        self.try_shutdown().await.unwrap();
+    }
+
+    /// Shutdown this conductor.
+    /// This will wait for the conductor to shutdown but
+    /// keep the inner state to restart it.
+    ///
+    /// Attempting to use this conductor without starting it up again will cause a panic.
+    pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown().await.unwrap().unwrap();
+            handle
+                .shutdown()
+                .await
+                .map_err(err_other)?
+                .map_err(err_other)
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }

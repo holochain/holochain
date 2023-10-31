@@ -29,6 +29,7 @@
 //!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST=[my influxdb url]`
 //!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET=[my influxdb bucket name]`
 //!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN=[my influxdb auth token]`
+//!   - The influxdb auth token must have permission to write to all buckets
 //!   - Metrics will be set up to report to this already running InfluxDB.
 //!
 //! ## Metric Naming Conventions

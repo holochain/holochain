@@ -24,7 +24,7 @@ pub use pool_reader::*;
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
 
-/// A FetchPool tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
+/// A FetchPool tracks a set of [`FetchKey`]s (op hashes) to be fetched,
 /// each of which can have multiple sources associated with it.
 ///
 /// When adding the same key twice, the sources are merged by appending the newest
@@ -253,7 +253,6 @@ impl State {
                         let h = hash.to_string();
                         format!("{}..{}", &h[0..4], &h[h.len() - 4..])
                     }
-                    FetchKey::Region(_) => "[region]".to_string(),
                 };
 
                 let size = v.size.unwrap_or_default().get();
@@ -877,7 +876,7 @@ mod tests {
 
         // We created an item that will always fail, so should have at least one left
         assert!(
-            fetch_pool.get_items_to_fetch().len() >= 1,
+            !fetch_pool.get_items_to_fetch().is_empty(),
             "Pool should have had at least one item but got \n {}",
             fetch_pool.state.share_ref(|s| format!(
                 "{}\n{}",

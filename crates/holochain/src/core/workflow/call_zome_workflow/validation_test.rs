@@ -1,7 +1,7 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::CellError;
 use crate::conductor::ConductorHandle;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use crate::core::SourceChainError;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_names;

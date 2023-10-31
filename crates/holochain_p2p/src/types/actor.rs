@@ -4,6 +4,7 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
@@ -242,6 +243,8 @@ impl Default for GetActivityOptions {
     }
 }
 
+type MaybeDnaHash = Option<DnaHash>;
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
@@ -345,7 +348,7 @@ ghost_actor::ghost_chan! {
         ) -> Vec<MustGetAgentActivityResponse>;
 
         /// Send a validation receipt to a remote node.
-        fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
+        fn send_validation_receipts(dna_hash: DnaHash, to_agent: AgentPubKey, receipts: ValidationReceiptBundle) -> ();
 
         /// New data has been integrated and is ready for gossiping.
         fn new_integrated_data(dna_hash: DnaHash) -> ();
@@ -362,7 +365,7 @@ ghost_actor::ghost_chan! {
 
         /// Dump network metrics.
         fn dump_network_metrics(
-            dna_hash: Option<DnaHash>,
+            dna_hash: MaybeDnaHash,
         ) -> String;
 
         /// Dump network stats.

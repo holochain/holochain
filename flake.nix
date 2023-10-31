@@ -49,9 +49,13 @@
     versions.url = "github:holochain/holochain?dir=versions/0_1";
 
     holochain.follows = "empty";
+    holochain.flake = false;
     lair.follows = "empty";
+    lair.flake = false;
     launcher.follows = "empty";
+    launcher.flake = false;
     scaffolding.follows = "empty";
+    scaffolding.flake = false;
 
     cargo-chef = {
       url = "github:LukeMathWalker/cargo-chef/main";

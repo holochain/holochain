@@ -1,3 +1,5 @@
+use crate::UnitEnum;
+
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -13,7 +15,7 @@ enum LinkZomes {
 
 fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
     ScopedZomeTypes(
-        ids.into_iter()
+        ids.iter()
             .map(|(zome_index, len)| ((*zome_index).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )
@@ -21,7 +23,7 @@ fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
 
 fn make_entry_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<EntryDefIndex> {
     ScopedZomeTypes(
-        ids.into_iter()
+        ids.iter()
             .map(|(zome_index, len)| ((*zome_index).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )
@@ -259,7 +261,7 @@ enum EntryZomes {
     B(EntryTypes),
 }
 
-impl crate::UnitEnum for EntryTypes {
+impl UnitEnum for EntryTypes {
     type Unit = UnitEntry;
 
     fn to_unit(&self) -> Self::Unit {
@@ -333,7 +335,7 @@ impl From<(ZomeEntryTypesKey, Entry)> for EntryZomes {
                     zome_index: 0.into(),
                     type_index,
                 };
-                let unit: <EntryTypes as crate::UnitEnum>::Unit = k.into();
+                let unit: <EntryTypes as UnitEnum>::Unit = k.into();
                 let r = match unit {
                     UnitEntry::A => EntryTypes::A(entry.into()),
                     UnitEntry::B => EntryTypes::B(entry.into()),
@@ -348,7 +350,7 @@ impl From<(ZomeEntryTypesKey, Entry)> for EntryZomes {
                     zome_index: 0.into(),
                     type_index,
                 };
-                let unit: <EntryTypes as crate::UnitEnum>::Unit = k.into();
+                let unit: <EntryTypes as UnitEnum>::Unit = k.into();
                 let r = match unit {
                     UnitEntry::A => EntryTypes::A(entry.into()),
                     UnitEntry::B => EntryTypes::B(entry.into()),

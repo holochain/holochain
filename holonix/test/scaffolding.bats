@@ -15,3 +15,8 @@ teardown() {
   echo $result
   [[ "$result" == "holochain_scaffolding_cli"* ]]
 }
+
+@test "expected scaffold an example to succeed" {
+  set -e
+  hc scaffold example forum -t vue
+}

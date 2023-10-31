@@ -9,8 +9,6 @@ use std::str::FromStr;
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::record::RecordGroup;
-use error::DhtOpError;
-use error::DhtOpResult;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
@@ -21,21 +19,21 @@ use kitsune_p2p_dht::Loc;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[allow(missing_docs)]
-pub mod error;
+mod error;
+pub use error::*;
 
 #[cfg(test)]
-pub mod tests;
-
-#[cfg(feature = "test_utils")]
-pub mod facts;
+mod tests;
 
 /// A unit of DHT gossip. Used to notify an authority of new (meta)data to hold
 /// as well as changes to the status of already held data.
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum DhtOp {
     #[display(fmt = "StoreRecord")]
     /// Used to notify the authority for an action that it has been created.
@@ -428,6 +426,21 @@ impl DhtOp {
             }
         } else {
             None
+        }
+    }
+
+    /// Access to the Timestamp
+    pub fn timestamp(&self) -> Timestamp {
+        match self {
+            DhtOp::StoreRecord(_, h, _) => h.timestamp(),
+            DhtOp::StoreEntry(_, h, _) => h.timestamp(),
+            DhtOp::RegisterAgentActivity(_, h) => h.timestamp(),
+            DhtOp::RegisterUpdatedContent(_, h, _) => h.timestamp,
+            DhtOp::RegisterUpdatedRecord(_, h, _) => h.timestamp,
+            DhtOp::RegisterDeletedBy(_, h) => h.timestamp,
+            DhtOp::RegisterDeletedEntryAction(_, h) => h.timestamp,
+            DhtOp::RegisterAddLink(_, h) => h.timestamp,
+            DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
         }
     }
 }

@@ -2,7 +2,7 @@
 
 //! Defines the hApp Manifest YAML format, including validation.
 
-use holochain_zome_types::NetworkSeed;
+use holochain_zome_types::prelude::*;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
@@ -22,7 +22,7 @@ use super::InstalledCell;
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum AppManifest {
@@ -109,7 +109,7 @@ impl AppManifest {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use mr_bundle::Manifest;
 

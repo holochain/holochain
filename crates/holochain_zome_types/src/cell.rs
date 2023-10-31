@@ -1,7 +1,7 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
-use crate::RoleName;
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
@@ -22,6 +22,7 @@ use std::fmt;
     Ord,
     PartialOrd,
 )]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct CellId(DnaHash, AgentPubKey);
 
 /// Delimiter in a clone id that separates the base cell's role name from the
