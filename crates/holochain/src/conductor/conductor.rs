@@ -3082,8 +3082,10 @@ async fn p2p_event_task(
             let max_time = max_time.clone();
             let duration_metric = duration_metric.clone();
             async move {
+                // Track whether the concurrency limit has been reached and keep the start time for reporting if so.
                 let start = Instant::now();
-                let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+
                 let evt_dna_hash = evt.dna_hash().clone();
 
                 // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
@@ -3100,7 +3102,7 @@ async fn p2p_event_task(
                     }
                 }
 
-                if current_num_tasks + 1 >= NUM_PARALLEL_EVTS {
+                if current_num_tasks >= NUM_PARALLEL_EVTS {
                     let el = start.elapsed();
                     let us = el.as_micros() as u64;
                     let max_us = max_time
