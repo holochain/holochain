@@ -7,11 +7,9 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
+use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_trace;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::Entry;
-use holochain_zome_types::ValidationStatus;
 
 #[derive(Clone)]
 struct TestData {

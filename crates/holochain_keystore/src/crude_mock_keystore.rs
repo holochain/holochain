@@ -10,7 +10,7 @@ use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::client_trai
 use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
 
-use crate::test_keystore::spawn_test_keystore;
+use crate::spawn_test_keystore;
 use crate::MetaLairClient;
 
 /// Spawn a test keystore which always returns the same LairError for every call.

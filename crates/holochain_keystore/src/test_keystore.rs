@@ -75,3 +75,13 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     let (s, _) = tokio::sync::mpsc::unbounded_channel();
     Ok(MetaLairClient(Arc::new(parking_lot::Mutex::new(client)), s))
 }
+
+/// Generate a test keystore pre-populated with a couple test keypairs.
+#[cfg(feature = "test_utils")]
+pub fn test_keystore() -> MetaLairClient {
+    holochain_util::tokio_helper::block_on(
+        async move { spawn_test_keystore().await.unwrap() },
+        std::time::Duration::from_secs(1),
+    )
+    .expect("timeout elapsed")
+}

@@ -4,9 +4,8 @@
 use futures::StreamExt;
 use hdk::prelude::ExternIO;
 use holochain::sweettest::{SweetCell, SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
-use holochain_types::signal::Signal;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::RemoteSignal;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

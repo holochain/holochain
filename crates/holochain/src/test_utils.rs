@@ -36,6 +36,8 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_types::test_utils::fake_dna_file;
+use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;

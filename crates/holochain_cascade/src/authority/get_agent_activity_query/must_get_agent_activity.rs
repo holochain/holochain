@@ -7,18 +7,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::*;
-use holochain_state::prelude::from_blob;
-use holochain_state::prelude::StateQueryResult;
-use holochain_state::scratch::Scratch;
-use holochain_types::chain::MustGetAgentActivityResponse;
-use holochain_types::chain::Sequences;
-use holochain_types::dht_op::DhtOpType;
-use holochain_types::prelude::BoundedMustGetAgentActivityResponse;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ChainFilter;
-use holochain_zome_types::RegisterAgentActivity;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
+use holochain_state::prelude::*;
 
 #[cfg(test)]
 mod test;
