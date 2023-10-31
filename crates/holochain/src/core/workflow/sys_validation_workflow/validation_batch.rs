@@ -65,11 +65,10 @@ pub(super) async fn validate_ops_batch(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::Duration;
     use super::validate_ops_batch;
-    use crate::core::workflow::sys_validation_workflow::OutcomeSummary;
+    use crate::core::workflow::error::WorkflowError;
     use crate::core::workflow::sys_validation_workflow::validation_batch::NUM_CONCURRENT_OPS;
+    use crate::core::workflow::sys_validation_workflow::OutcomeSummary;
     use crate::core::workflow::{error::WorkflowResult, sys_validation_workflow::types::Outcome};
     use assert_cmd::assert;
     use fixt::prelude::*;
@@ -77,12 +76,13 @@ mod tests {
     use hdk::prelude::Action;
     use hdk::prelude::CreateFixturator;
     use hdk::prelude::SignatureFixturator;
+    use holo_hash::fixt::AnyDhtHashFixturator;
     use holochain::prelude::DhtOp;
     use holochain_state::prelude::Dependency;
     use holochain_types::prelude::DhtOpHashed;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use crate::core::workflow::error::WorkflowError;
-    use holo_hash::fixt::AnyDhtHashFixturator;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn no_ops_to_process() {
@@ -191,14 +191,16 @@ mod tests {
         let summaries = validate_ops_batch(
             std::iter::repeat_with(test_op).take(30).collect(),
             None,
-            |op| async move {
-                if rand::random::<bool>() {
-                    Err(WorkflowError::other("test error"))
-                } else {
-                    Ok((op.hash, Outcome::Accepted, Dependency::Null))
+            |op| {
+                async move {
+                    if rand::random::<bool>() {
+                        Err(WorkflowError::other("test error"))
+                    } else {
+                        Ok((op.hash, Outcome::Accepted, Dependency::Null))
+                    }
                 }
-            }
-            .boxed(),
+                .boxed()
+            },
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
@@ -215,7 +217,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(1, summaries.len());
-        assert!(summaries[0].total < 30, "Expected fewer than 30 ops to have been processed successfully but got {}", summaries[0].total);
+        assert!(
+            summaries[0].total < 30,
+            "Expected fewer than 30 ops to have been processed successfully but got {}",
+            summaries[0].total
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -226,19 +232,28 @@ mod tests {
         let rejected_op = test_op();
 
         let summaries = validate_ops_batch(
-            vec![success_op.clone(), awaiting_dep_op.clone(), missing_dep_op.clone(), rejected_op.clone()],
+            vec![
+                success_op.clone(),
+                awaiting_dep_op.clone(),
+                missing_dep_op.clone(),
+                rejected_op.clone(),
+            ],
             None,
             move |op| {
                 let success_op = success_op.clone();
                 let awaiting_dep_op = awaiting_dep_op.clone();
                 let missing_dep_op = missing_dep_op.clone();
                 let rejected_op = rejected_op.clone();
-                
+
                 async move {
                     if op.hash == success_op.hash {
                         Ok((op.hash, Outcome::Accepted, Dependency::Null))
                     } else if op.hash == awaiting_dep_op.hash {
-                        Ok((op.hash, Outcome::AwaitingOpDep(fixt!(AnyDhtHash)), Dependency::Null))
+                        Ok((
+                            op.hash,
+                            Outcome::AwaitingOpDep(fixt!(AnyDhtHash)),
+                            Dependency::Null,
+                        ))
                     } else if op.hash == missing_dep_op.hash {
                         Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null))
                     } else if op.hash == rejected_op.hash {
@@ -247,24 +262,33 @@ mod tests {
                         unreachable!("Unexpected op")
                     }
                 }
-                .boxed()  
+                .boxed()
             },
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
                         total: batch.iter().count(),
-                        awaiting: batch.iter().filter(|r| match r {
-                            Ok((_, Outcome::AwaitingOpDep(_), _)) => true,
-                            _ => false,
-                        }).count(),
-                        missing: batch.iter().filter(|r| match r {
-                            Ok((_, Outcome::MissingDhtDep, _)) => true,
-                            _ => false,
-                        }).count(),
-                        rejected: batch.iter().filter(|r| match r {
-                            Ok((_, Outcome::Rejected, _)) => true,
-                            _ => false,
-                        }).count(),
+                        awaiting: batch
+                            .iter()
+                            .filter(|r| match r {
+                                Ok((_, Outcome::AwaitingOpDep(_), _)) => true,
+                                _ => false,
+                            })
+                            .count(),
+                        missing: batch
+                            .iter()
+                            .filter(|r| match r {
+                                Ok((_, Outcome::MissingDhtDep, _)) => true,
+                                _ => false,
+                            })
+                            .count(),
+                        rejected: batch
+                            .iter()
+                            .filter(|r| match r {
+                                Ok((_, Outcome::Rejected, _)) => true,
+                                _ => false,
+                            })
+                            .count(),
                     })
                 }
                 .boxed()
