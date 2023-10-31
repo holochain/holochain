@@ -6,21 +6,20 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
+use std::path::PathBuf;
+
 pub use holochain_integrity_types::zome::*;
 
 use holochain_serialized_bytes::prelude::*;
 
-pub mod error;
+mod error;
+pub use error::*;
+
 #[cfg(feature = "full-dna-def")]
 pub mod inline_zome;
 
-use error::ZomeResult;
-
 #[cfg(feature = "full-dna-def")]
-use crate::InlineIntegrityZome;
-#[cfg(feature = "full-dna-def")]
-use error::ZomeError;
-use std::path::PathBuf;
+use inline_zome::InlineIntegrityZome;
 #[cfg(feature = "full-dna-def")]
 use std::sync::Arc;
 
@@ -251,8 +250,8 @@ impl From<InlineIntegrityZome> for IntegrityZomeDef {
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<crate::InlineCoordinatorZome> for ZomeDef {
-    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+impl From<crate::prelude::InlineCoordinatorZome> for ZomeDef {
+    fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
         Self::Inline {
             inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
             dependencies: Default::default(),
@@ -261,8 +260,8 @@ impl From<crate::InlineCoordinatorZome> for ZomeDef {
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<crate::InlineCoordinatorZome> for CoordinatorZomeDef {
-    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+impl From<crate::prelude::InlineCoordinatorZome> for CoordinatorZomeDef {
+    fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
         Self(ZomeDef::Inline {
             inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
             dependencies: Default::default(),

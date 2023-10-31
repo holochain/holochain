@@ -4,7 +4,7 @@ use crate::prelude::AgentPubKeyFixturator;
 use crate::prelude::CreateFixturator;
 use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
-use fixt::fixt;
+use ::fixt::fixt;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use hdk::prelude::Action;
@@ -14,15 +14,7 @@ use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindDht, DbWrite};
-use holochain_state::prelude::set_require_receipt;
-use holochain_state::prelude::set_validation_status;
-use holochain_state::prelude::set_when_integrated;
-use holochain_state::prelude::StateMutationResult;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::prelude::Timestamp;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::prelude::ValidationStatus;
-use holochain_zome_types::{Block, BlockTarget, CellBlockReason};
+use holochain_state::prelude::*;
 use parking_lot::RwLock;
 use rusqlite::named_params;
 use std::sync::Arc;
@@ -33,7 +25,7 @@ async fn no_running_cells() {
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
@@ -58,7 +50,7 @@ async fn do_not_block_or_send_to_self() {
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     let dna_hash = fixt!(DnaHash);
     let author = fixt!(AgentPubKey);
@@ -107,7 +99,7 @@ async fn block_invalid_op_author() {
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     // Any op created by somebody else, which has been rejected by validation.
     let (author, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Rejected)
@@ -167,7 +159,7 @@ async fn continues_if_receipt_cannot_be_signed() {
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     // Any op created by somebody else, which is valid
     let (_, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
@@ -205,7 +197,7 @@ async fn send_validation_receipt() {
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     // Any op created by somebody else, which is valid
     let (_, op_hash) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
@@ -246,7 +238,7 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     let test_db = holochain_state::test_utils::test_dht_db();
     let vault = test_db.to_db();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     let (author1, op_hash1) = create_op_with_status(vault.clone(), None, ValidationStatus::Valid)
         .await

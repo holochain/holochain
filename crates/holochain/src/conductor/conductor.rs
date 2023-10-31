@@ -88,7 +88,6 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
-use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
@@ -99,12 +98,8 @@ use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
-use holochain_state::prelude::from_blob;
-use holochain_state::prelude::StateMutationResult;
-use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{wasm, *};
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
@@ -2188,7 +2183,7 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use holochain_zome_types::builder;
+    use holochain_zome_types::action::builder;
 
     use super::*;
 

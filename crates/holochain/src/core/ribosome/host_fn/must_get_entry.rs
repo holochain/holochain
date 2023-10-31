@@ -98,7 +98,6 @@ pub mod test {
     use crate::test_entry_impl;
     use hdk::prelude::*;
     use holochain_state::prelude::*;
-    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use unwrap_to::unwrap_to;
 

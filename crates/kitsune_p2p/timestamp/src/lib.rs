@@ -21,6 +21,9 @@ pub(crate) use chrono_ext::*;
 #[cfg(feature = "chrono")]
 mod chrono_ext;
 
+#[cfg(feature = "fuzzing")]
+pub mod noise;
+
 /// One million
 pub const MM: i64 = 1_000_000;
 

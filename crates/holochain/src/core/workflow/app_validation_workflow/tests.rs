@@ -28,8 +28,6 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasmPair;
 use holochain_wasm_test_utils::TestZomes;
-use holochain_zome_types::Entry;
-use holochain_zome_types::ValidationStatus;
 use matches::assert_matches;
 use rusqlite::named_params;
 use rusqlite::Transaction;

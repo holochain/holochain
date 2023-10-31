@@ -7,12 +7,6 @@ use thiserror::Error;
 pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
 pub use holochain_integrity_types::action::*;
 
-#[cfg(feature = "fuzzing")]
-pub use facts::*;
-
-#[cfg(feature = "fuzzing")]
-pub mod facts;
-
 #[derive(Error, Debug)]
 pub enum ActionError {
     #[error("Tried to create a NewEntryAction with a type that isn't a Create or Update")]

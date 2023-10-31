@@ -15,8 +15,6 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
 use holochain_trace;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::Entry;
 use tracing::*;
 
 use super::OpBasis;

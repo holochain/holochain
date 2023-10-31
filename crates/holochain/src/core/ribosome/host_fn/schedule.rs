@@ -45,7 +45,7 @@ pub fn schedule(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_state::prelude::schedule_fn;

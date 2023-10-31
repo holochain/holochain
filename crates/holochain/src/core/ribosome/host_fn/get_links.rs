@@ -277,10 +277,6 @@ pub mod slow_tests {
         let hash_path_b: holo_hash::AnyLinkableHash =
             conductor.call(&alice, "get_path_hash", "b").await;
 
-        const LINK_TYPE: ScopedLinkType = ScopedLinkType {
-            zome_index: ZomeIndex(0),
-            zome_type: LinkType(0),
-        };
         let forward_link_0 = forward_links.get(0).unwrap();
         assert_eq!(forward_link_0.base, hash_path_a);
         assert_eq!(forward_link_0.target, hash_path_b);

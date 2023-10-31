@@ -4,7 +4,7 @@
 #![allow(missing_docs)]
 
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_zome_types::TimestampError;
+use holochain_zome_types::prelude::*;
 use std::path::PathBuf;
 use thiserror::Error;
 

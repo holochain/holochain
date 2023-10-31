@@ -75,7 +75,7 @@ impl WebAppManifest {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use crate::web_app::{
         web_app_manifest::WebAppManifestV1, AppManifestLocation, WebAppManifest, WebUI,

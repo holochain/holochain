@@ -2,11 +2,7 @@
 use std::collections::HashMap;
 
 pub use error::*;
-use holochain_zome_types::EntryDefIndex;
-use holochain_zome_types::LinkType;
-use holochain_zome_types::ScopedZomeTypes;
-use holochain_zome_types::ScopedZomeTypesSet;
-use holochain_zome_types::ZomeIndex;
+use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
