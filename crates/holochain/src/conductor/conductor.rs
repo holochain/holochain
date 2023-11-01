@@ -2247,7 +2247,7 @@ mod misc_impls {
             let out = JsonDump {
                 peer_dump,
                 source_chain_dump,
-                integration_dump: integration_dump(&dht_db.clone().into()).await?,
+                integration_dump: integration_dump(dht_db).await?,
             };
             // Add summary
             let summary = out.to_string();
@@ -2961,8 +2961,8 @@ pub(crate) async fn genesis_cells(
 }
 
 /// Dump the integration json state.
-pub async fn integration_dump(
-    vault: &DbRead<DbKindDht>,
+pub async fn integration_dump<Db: ReadAccess<DbKindDht>>(
+    vault: &Db,
 ) -> ConductorApiResult<IntegrationStateDump> {
     vault
         .read_async(move |txn| {

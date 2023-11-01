@@ -46,11 +46,16 @@ async fn conductors_call_remote(num_conductors: usize) {
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
+
     conductors.exchange_peer_info().await;
+
+    // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
+    // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
+    consistency_60s(cells.iter()).await;
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
-    let iter = cells.into_iter().zip(conductors.into_inner().into_iter());
+    let iter = cells.clone().into_iter().zip(conductors.into_inner().into_iter());
     let keep = std::sync::Mutex::new(Vec::new());
     let keep = &keep;
     futures::stream::iter(iter)
@@ -73,6 +78,9 @@ async fn conductors_call_remote(num_conductors: usize) {
             }
         })
         .await;
+
+    // Ensure that all the create requests were received and published.
+    consistency_60s(cells.iter()).await;
 }
 
 // TODO - rewrite all these tests to use local sweettest
