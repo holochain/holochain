@@ -20,8 +20,11 @@ impl<T: Display> Default for TruthTree<T> {
     }
 }
 
-#[derive(Debug)]
-pub struct CauseError<F: Display>(pub F);
+#[derive(Debug, derive_more::Constructor)]
+pub struct CauseError<F: Fact> {
+    pub info: String,
+    pub fact: F,
+}
 
 #[derive(Debug)]
 pub struct CheckError<F: Fact>(pub Check<F>);

@@ -339,11 +339,11 @@ impl SourceChain {
                     insert_entry(txn, entry.as_hash(), entry.as_content())?;
                 }
                 for shh in actions.iter() {
+                    insert_action(txn, shh)?;
                     aitia::trace!(&hc_sleuth::Step::Authored {
                         by: (*author).clone(),
                         action: shh.action_address().clone(),
                     });
-                    insert_action(txn, shh)?;
                 }
                 for (op, op_hash, op_order, timestamp, _) in &ops {
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
@@ -352,6 +352,9 @@ impl SourceChain {
                     if is_countersigning_session {
                         set_withhold_publish(txn, op_hash)?;
                     }
+                    aitia::trace!(&hc_sleuth::Step::Seen {
+                        op: OpLiteHashed::new(op.clone(), op_hash.clone()),
+                    });
                 }
                 SourceChainResult::Ok(actions)
             })

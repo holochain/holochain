@@ -13,8 +13,8 @@ use super::*;
 
 pub type ContextWriter = aitia::logging::LogWriter<Context>;
 
-#[derive(Debug)]
-pub struct CtxError;
+// #[derive(Debug, derive_more::From)]
+pub type CtxError = &'static str;
 pub type ContextResult<T> = Result<T, CtxError>;
 
 pub fn init_subscriber() -> ContextWriter {
@@ -29,7 +29,10 @@ pub fn init_subscriber() -> ContextWriter {
 
 #[derive(Default, Debug)]
 pub struct Context {
+    /// All steps recorded
     facts: HashSet<Step>,
+
+    ///
     pub(crate) node_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
     entry_actions: HashMap<EntryHash, ActionHash>,
     map_op_to_sysval_dep_hash: HashMap<OpRef, Option<AnyDhtHash>>,
@@ -56,31 +59,33 @@ impl Context {
         self.facts.contains(fact)
     }
 
+    /// Get the sys validation dependency of this op hash if applicable
     pub fn sysval_op_dep(&self, op: &OpRef) -> ContextResult<Option<&OpInfo>> {
         self.map_op_to_sysval_dep_hash
             .get(op)
-            .ok_or(CtxError)?
+            .ok_or("map_op_to_sysval_dep_hash")?
             .as_ref()
-            .map(|o| self.map_dep_hash_to_op.get(o).ok_or(CtxError))
+            .map(|h| self.map_dep_hash_to_op.get(h).ok_or("map_dep_hash_to_op"))
             .transpose()?
-            .map(|o| self.op_info.get(o).ok_or(CtxError))
+            .map(|d| self.op_info(d))
             .transpose()
     }
 
+    /// Get the app validation dependencies of this op hash
     pub fn appval_op_deps(&self, op: &OpRef) -> ContextResult<HashSet<&OpInfo>> {
         self.map_op_to_appval_dep_hash
             .get(op)
-            .ok_or(CtxError)?
+            .ok_or("map_op_to_appval_dep_hash")?
             .iter()
-            .map(|o| self.map_dep_hash_to_op.get(o).ok_or(CtxError))
+            .map(|h| self.map_dep_hash_to_op.get(h).ok_or("map_dep_hash_to_op"))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
-            .map(|o| self.op_info.get(o).ok_or(CtxError))
+            .map(|d| self.op_info(d))
             .collect()
     }
 
     pub fn op_info(&self, op: &OpRef) -> ContextResult<&OpInfo> {
-        self.op_info.get(op).ok_or(CtxError)
+        self.op_info.get(op).ok_or("op_info")
     }
 
     pub fn op_to_action(&self, op: &OpRef) -> ContextResult<OpAction> {
@@ -91,7 +96,7 @@ impl Context {
         self.map_action_to_op
             .get(&OpAction(action, op_type))
             .cloned()
-            .ok_or(CtxError)
+            .ok_or("map_action_to_op")
     }
 }
 
@@ -116,11 +121,17 @@ impl aitia::logging::Log for Context {
             }
             Step::Fetched { by, op } => {}
             Step::Seen { op } => {
+                let op_hash = op.as_hash();
+                let a = OpAction::from((*op).clone());
                 self.map_dep_hash_to_op
-                    .insert(op.fetch_dependency_hash(), op.as_hash().clone());
-                self.op_info.insert(op.as_hash().clone(), op);
+                    .insert(op.fetch_dependency_hash(), op_hash.clone());
+                self.map_action_to_op.insert(a, op_hash.clone());
+                self.op_info.insert(op_hash.clone(), op);
             }
         }
-        self.facts.insert(fact);
+        let exists = self.facts.insert(fact.clone());
+        if exists {
+            tracing::warn!("Duplicate fact {:?}", fact);
+        }
     }
 }

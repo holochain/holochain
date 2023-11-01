@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
+use crate::context_log::CtxError;
 use crate::*;
 use aitia::cause::CauseResult;
 use aitia::graph::CauseError;
@@ -134,6 +135,11 @@ impl aitia::Fact for Step {
     fn cause(&self, ctx: &Self::Context) -> CauseResult<Self> {
         use Step::*;
 
+        let mapper = |e: CtxError| CauseError {
+            info: e.into(),
+            fact: self.clone(),
+        };
+
         Ok(match self.clone() {
             Authored { by, action } => None,
             Published { by, op } => Some(Integrated { by, op }.into()),
@@ -141,9 +147,7 @@ impl aitia::Fact for Step {
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
             PendingAppValidation { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
             SysValidated { by, op } => {
-                let dep = ctx
-                    .sysval_op_dep(&op)
-                    .map_err(|_| CauseError(self.clone()))?;
+                let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
                 let pending = PendingSysValidation {
                     by: by.clone(),
                     op: op.clone(),
@@ -159,11 +163,11 @@ impl aitia::Fact for Step {
                 }
             }
             PendingSysValidation { by, op, dep: _ } => {
-                let op_info = ctx.op_info(&op).map_err(|_| CauseError(self.clone()))?;
+                let op_info = ctx.op_info(&op).map_err(mapper)?;
                 let causes: Vec<_> = ctx
                     .node_agents
                     .get(&by)
-                    .ok_or_else(|| CauseError(self.clone()))?
+                    .ok_or_else(|| CauseError::new("node_agents".into(), self.clone()))?
                     .into_iter()
                     .cloned()
                     .map(|agent| Authored {

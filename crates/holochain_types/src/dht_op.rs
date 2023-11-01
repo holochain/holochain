@@ -163,7 +163,16 @@ pub enum DhtOpLite {
 
 /// A DhtOpLite along with its corresponding DhtOpHash
 #[derive(
-    Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, derive_more::Deref, derive_more::Into,
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Constructor,
+    derive_more::Deref,
+    derive_more::Into,
 )]
 pub struct OpLiteHashed {
     #[deref]

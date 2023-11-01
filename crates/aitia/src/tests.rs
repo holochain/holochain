@@ -372,12 +372,12 @@ fn holochain_like() {
     holochain_trace::test_run().ok().unwrap();
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
-    struct Step {
+    struct F {
         which: bool,
         stage: Stage,
     }
 
-    impl std::fmt::Display for Step {
+    impl std::fmt::Display for F {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let who = match self.which {
                 false => "Fatma",
@@ -398,7 +398,7 @@ fn holochain_like() {
         SendB,
     }
 
-    impl Fact for Step {
+    impl Fact for F {
         type Context = Checks<Self>;
 
         fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
@@ -423,7 +423,7 @@ fn holochain_like() {
         }
     }
 
-    impl Step {
+    impl F {
         pub fn mine(&self, stage: Stage) -> Cause<Self> {
             Cause::Fact(Self {
                 which: self.which,
@@ -439,12 +439,12 @@ fn holochain_like() {
         }
     }
 
-    let fatma_store = Cause::Fact(Step {
+    let fatma_store = Cause::Fact(F {
         which: false,
         stage: Stage::Store,
     });
 
-    let checks: Checks<Step> = Box::new(|step: &Step| match (step.which, step.stage) {
+    let checks: Checks<F> = Box::new(|step: &F| match (step.which, step.stage) {
         (true, Stage::Create) => true,
         // (false, Stage::Create) => true,
 
