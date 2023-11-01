@@ -162,6 +162,3 @@ macro_rules! holochain_externs {
         );
     };
 }
-
-#[cfg(not(feature = "mock"))]
-holochain_externs!();
