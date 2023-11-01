@@ -35,7 +35,7 @@ pub struct Context {
     ///
     pub(crate) node_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
     entry_actions: HashMap<EntryHash, ActionHash>,
-    map_op_to_sysval_dep_hash: HashMap<OpRef, Option<AnyDhtHash>>,
+    map_op_to_sysval_dep_hash: HashMap<OpRef, Option<ActionHash>>,
     map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
     map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
     map_action_to_op: HashMap<OpAction, OpRef>,
@@ -65,7 +65,11 @@ impl Context {
             .get(op)
             .ok_or("map_op_to_sysval_dep_hash")?
             .as_ref()
-            .map(|h| self.map_dep_hash_to_op.get(h).ok_or("map_dep_hash_to_op"))
+            .map(|h| {
+                self.map_dep_hash_to_op
+                    .get(&h.clone().into())
+                    .ok_or("map_dep_hash_to_op")
+            })
             .transpose()?
             .map(|d| self.op_info(d))
             .transpose()
@@ -105,14 +109,10 @@ impl aitia::logging::Log for Context {
 
     fn apply(&mut self, fact: Step) {
         match fact.clone() {
-            Step::Authored { by, action } => {}
             Step::Published { by, op } => {}
             Step::Integrated { by, op } => {}
             Step::AppValidated { by, op } => {}
             Step::SysValidated { by, op } => {}
-            Step::PendingSysValidation { by, op, dep } => {
-                self.map_op_to_sysval_dep_hash.insert(op, dep);
-            }
             Step::PendingAppValidation { by, op, deps } => {
                 self.map_op_to_appval_dep_hash
                     .entry(op)
@@ -120,12 +120,15 @@ impl aitia::logging::Log for Context {
                     .extend(deps.into_iter());
             }
             Step::Fetched { by, op } => {}
-            Step::Seen { op } => {
+            Step::Authored { by: _, op } => {
+                // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
                 let a = OpAction::from((*op).clone());
                 self.map_dep_hash_to_op
                     .insert(op.fetch_dependency_hash(), op_hash.clone());
                 self.map_action_to_op.insert(a, op_hash.clone());
+                self.map_op_to_sysval_dep_hash
+                    .insert(op_hash.clone(), op.dep.clone());
                 self.op_info.insert(op_hash.clone(), op);
             }
         }

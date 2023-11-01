@@ -93,10 +93,7 @@ async fn sys_validation_workflow_inner(
             async move {
                 let (op, op_hash) = so.into_inner();
                 let op_lite = op.clone().to_lite();
-                let op_type = op.get_type();
-                let action = op.action();
-
-                let dependency = get_dependency(op_type, &action);
+                let dependency = op.sys_validation_dependency();
                 let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
                 let r = validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
@@ -175,12 +172,6 @@ async fn sys_validation_workflow_inner(
                             // RegisterAgentActivity or RegisterAddLink.
                             let status = ValidationStage::AwaitingSysDeps(missing_dep.clone());
                             put_validation_limbo(txn, &op_hash, status)?;
-
-                            aitia::trace!(&hc_sleuth::Step::PendingSysValidation {
-                                by: sleuth_id.clone(),
-                                op: op_hash,
-                                dep: Some(missing_dep),
-                            });
                         }
                         Outcome::MissingDhtDep => {
                             missing += 1;
@@ -189,7 +180,7 @@ async fn sys_validation_workflow_inner(
                         }
                         Outcome::Rejected => {
                             rejected += 1;
-                            if let Dependency::Null = dependency {
+                            if dependency.is_none() {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;

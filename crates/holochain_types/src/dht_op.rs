@@ -161,32 +161,6 @@ pub enum DhtOpLite {
     RegisterRemoveLink(ActionHash, OpBasis),
 }
 
-/// A DhtOpLite along with its corresponding DhtOpHash
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    Hash,
-    derive_more::Constructor,
-    derive_more::Deref,
-    derive_more::Into,
-)]
-pub struct OpLiteHashed {
-    #[deref]
-    op: DhtOpLite,
-    hash: DhtOpHash,
-}
-
-impl OpLiteHashed {
-    /// Accessor
-    pub fn as_hash(&self) -> &DhtOpHash {
-        &self.hash
-    }
-}
-
 impl PartialEq for DhtOpLite {
     fn eq(&self, other: &Self) -> bool {
         // The ops are the same if they are the same type on the same action hash.
@@ -238,6 +212,35 @@ pub enum DhtOpType {
     RegisterAddLink,
     #[display(fmt = "RegisterRemoveLink")]
     RegisterRemoveLink,
+}
+
+/// A sys validation dependency
+pub type SysValDep = Option<ActionHash>;
+
+impl DhtOpType {
+    /// Calculate the op's sys validation dependency action hash
+    pub fn sys_validation_dependency(&self, action: &Action) -> SysValDep {
+        match self {
+            DhtOpType::StoreRecord | DhtOpType::StoreEntry => None,
+            DhtOpType::RegisterAgentActivity => action
+                .prev_action()
+                .map(|p| Some(p.clone()))
+                .unwrap_or_else(|| None),
+            DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedRecord => match action {
+                Action::Update(update) => Some(update.original_action_address.clone()),
+                _ => None,
+            },
+            DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryAction => match action {
+                Action::Delete(delete) => Some(delete.deletes_address.clone()),
+                _ => None,
+            },
+            DhtOpType::RegisterAddLink => None,
+            DhtOpType::RegisterRemoveLink => match action {
+                Action::DeleteLink(delete_link) => Some(delete_link.link_add_address.clone()),
+                _ => None,
+            },
+        }
+    }
 }
 
 impl ToSql for DhtOpType {
@@ -475,6 +478,11 @@ impl DhtOp {
             DhtOp::RegisterAddLink(_, h) => h.timestamp,
             DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
         }
+    }
+
+    /// Calculate the op's sys validation dependency action hash
+    pub fn sys_validation_dependency(&self) -> SysValDep {
+        self.get_type().sys_validation_dependency(&self.action())
     }
 }
 

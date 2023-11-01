@@ -9,13 +9,32 @@ use aitia::logging::FactLogTraits;
 use aitia::{Cause, FactTraits};
 use holochain_types::prelude::*;
 
-// #[derive(Debug, Clone, derive_more::From)]
-// pub enum OpRef {
-//     OpLite(OpLite),
-//     Action(ActionHash, DhtOpType),
-// }
+/// A DhtOpLite along with its corresponding DhtOpHash
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Constructor,
+    derive_more::Deref,
+    derive_more::Into,
+)]
+pub struct OpInfo {
+    #[deref]
+    pub(crate) op: DhtOpLite,
+    pub(crate) hash: DhtOpHash,
+    pub(crate) dep: SysValDep,
+}
 
-pub type OpInfo = OpLiteHashed;
+impl OpInfo {
+    /// Accessor
+    pub fn as_hash(&self) -> &DhtOpHash {
+        &self.hash
+    }
+}
 
 pub type OpRef = DhtOpHash;
 
@@ -52,10 +71,6 @@ pub type SleuthId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Step {
-    Authored {
-        by: AgentPubKey,
-        action: ActionHash,
-    },
     Published {
         by: SleuthId,
         op: OpRef,
@@ -72,11 +87,7 @@ pub enum Step {
         by: SleuthId,
         op: OpRef,
     },
-    PendingSysValidation {
-        by: SleuthId,
-        op: OpRef,
-        dep: Option<AnyDhtHash>,
-    },
+
     PendingAppValidation {
         by: SleuthId,
         op: OpRef,
@@ -86,7 +97,8 @@ pub enum Step {
         by: SleuthId,
         op: OpRef,
     },
-    Seen {
+    Authored {
+        by: AgentPubKey,
         op: OpInfo,
     },
     // GossipReceived {},
@@ -98,9 +110,6 @@ impl aitia::logging::FactLogJson for Step {}
 impl std::fmt::Display for Step {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Step::Authored { by, action } => {
-                f.write_fmt(format_args!("[{}] Authored: {}", by, action))
-            }
             Step::Published { by, op } => f.write_fmt(format_args!("[{}] Published: {:?}", by, op)),
             Step::Integrated { by, op } => {
                 f.write_fmt(format_args!("[{}] Integrated: {:?}", by, op))
@@ -111,16 +120,13 @@ impl std::fmt::Display for Step {
             Step::SysValidated { by, op } => {
                 f.write_fmt(format_args!("[{}] SysValidated: {:?}", by, op))
             }
-            Step::PendingSysValidation { by, op, dep } => f.write_fmt(format_args!(
-                "[{}] PendingSysValidation: {:?} dep: {:?}",
-                by, op, dep
-            )),
+
             Step::PendingAppValidation { by, op, deps } => f.write_fmt(format_args!(
                 "[{}] PendingAppValidation: {:?} deps: {:#?}",
                 by, op, deps
             )),
             Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
-            Step::Seen { op } => f.write_fmt(format_args!("Op Seen: {:?}", op)),
+            Step::Authored { by, op } => f.write_fmt(format_args!("[{}] Authored: {:?}", by, op)),
         }
     }
 }
@@ -141,51 +147,39 @@ impl aitia::Fact for Step {
         };
 
         Ok(match self.clone() {
-            Authored { by, action } => None,
             Published { by, op } => Some(Integrated { by, op }.into()),
             Integrated { by, op } => Some(AppValidated { by, op }.into()),
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
             PendingAppValidation { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
             SysValidated { by, op } => {
+                let op_info = ctx.op_info(&op).map_err(mapper)?;
                 let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
-                let pending = PendingSysValidation {
-                    by: by.clone(),
-                    op: op.clone(),
-                    dep: dep.clone().map(|d| d.fetch_dependency_hash()),
-                }
-                .into();
+
+                let any = Cause::Any(
+                    ctx.node_agents
+                        .get(&by)
+                        .ok_or_else(|| CauseError::new("node_agents".into(), self.clone()))?
+                        .into_iter()
+                        .cloned()
+                        .map(|agent| Authored {
+                            by: agent,
+                            op: op_info.clone(),
+                        })
+                        .chain([Fetched {
+                            by: by.clone(),
+                            op: op.clone(),
+                        }])
+                        .map(Cause::from)
+                        .collect(),
+                );
 
                 if let Some(dep) = dep {
                     let integrated = Cause::from(Integrated { by, op });
-                    Some(Cause::Every(vec![pending, integrated]))
+                    Some(Cause::Every(vec![any, integrated]))
                 } else {
-                    Some(pending)
+                    Some(any)
                 }
             }
-            PendingSysValidation { by, op, dep: _ } => {
-                let op_info = ctx.op_info(&op).map_err(mapper)?;
-                let causes: Vec<_> = ctx
-                    .node_agents
-                    .get(&by)
-                    .ok_or_else(|| CauseError::new("node_agents".into(), self.clone()))?
-                    .into_iter()
-                    .cloned()
-                    .map(|agent| Authored {
-                        by: agent,
-                        action: op_info.action_hash().clone(),
-                    })
-                    .chain([Fetched { by: by.clone(), op }])
-                    .map(Cause::from)
-                    .collect();
-
-                Some(Cause::Any(causes))
-            }
-
-            // "Seen" is a necessary event for the context to populate itself with full op info,
-            // to make cause construction and other queries possible. It's kept outside of the
-            // causal graph because it's more about building up context state than anything to
-            // do with Holochain.
-            Seen { .. } => None,
             Fetched { by, op } => {
                 let mut others: Vec<_> = ctx
                     .node_agents
@@ -204,6 +198,7 @@ impl aitia::Fact for Step {
                     .collect();
                 Some(Cause::Any(others))
             }
+            Authored { by, op } => None,
         })
     }
 

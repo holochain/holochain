@@ -108,7 +108,7 @@ async fn app_validation_workflow_inner(
                 let (op, op_hash) = so.into_inner();
                 let op_type = op.get_type();
                 let action = op.action();
-                let dependency = get_dependency(op_type, &action);
+                let dependency = op.sys_validation_dependency();
                 let op_lite = op.to_lite();
 
                 // If this is agent activity, track it for the cache.
@@ -116,7 +116,7 @@ async fn app_validation_workflow_inner(
                     (
                         action.author().clone(),
                         action.action_seq(),
-                        matches!(dependency, Dependency::Null),
+                        matches!(dependency, None),
                     )
                 });
 
@@ -200,7 +200,7 @@ async fn app_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
-                            if let Dependency::Null = dependency {
+                            if dependency.is_none() {
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
@@ -221,7 +221,7 @@ async fn app_validation_workflow_inner(
                                 "Received invalid op. The op author will be blocked.\nOp: {:?}",
                                 op_lite
                             );
-                            if let Dependency::Null = dependency {
+                            if dependency.is_none() {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
