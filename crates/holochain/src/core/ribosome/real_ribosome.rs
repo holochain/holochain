@@ -96,7 +96,6 @@ use wasmer::Type;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
 use crate::core::ribosome::host_fn::count_links::count_links;
-use holochain_types::wasmer_types::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::module::InstanceWithStore;
@@ -107,7 +106,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use wasmer::StoreMut;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
