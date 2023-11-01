@@ -159,7 +159,7 @@ async fn sys_validation_workflow_inner(
 
                             aitia::trace!(&hc_sleuth::Step::SysValidated {
                                 by: sleuth_id.clone(),
-                                op: op_lite
+                                op: op_lite.into()
                             });
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
@@ -178,7 +178,7 @@ async fn sys_validation_workflow_inner(
 
                             aitia::trace!(&hc_sleuth::Step::PendingSysValidation {
                                 by: sleuth_id.clone(),
-                                op: op_lite,
+                                op: op_lite.into(),
                                 dep: Some(missing_dep),
                             });
                         }

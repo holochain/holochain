@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 use crate::*;
+use aitia::cause::CauseResult;
+use aitia::graph::CauseError;
 use aitia::logging::FactLogTraits;
 use aitia::{Cause, FactTraits};
 use holochain_state::{prelude::*, validation_db::ValidationStage};
@@ -12,55 +14,85 @@ use holochain_state::{prelude::*, validation_db::ValidationStage};
 //     Action(ActionHash, DhtOpType),
 // }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, derive_more::From)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::From,
+    derive_more::Into,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct OpAction(pub ActionHash, pub DhtOpType);
+
+impl From<OpLite> for OpAction {
+    fn from(op: OpLite) -> Self {
+        Self(op.action_hash().clone(), op.get_type())
+    }
+}
+
+impl OpAction {
+    pub fn action_hash(&self) -> &ActionHash {
+        &self.0
+    }
+
+    pub fn op_type(&self) -> &DhtOpType {
+        &self.1
+    }
+}
 
 pub type OpLite = DhtOpLite;
 pub type NodeId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Step<Op = OpLite> {
+pub enum Step {
     Authored {
         by: NodeId,
         action: ActionHash,
     },
     Published {
         by: NodeId,
-        op: Op,
+        op: OpAction,
     },
     Integrated {
         by: NodeId,
-        op: Op,
+        op: OpAction,
     },
     AppValidated {
         by: NodeId,
-        op: Op,
+        op: OpAction,
     },
     SysValidated {
         by: NodeId,
-        op: Op,
+        op: OpAction,
     },
     PendingSysValidation {
         by: NodeId,
-        op: Op,
+        op: OpAction,
         dep: Option<AnyDhtHash>,
     },
     PendingAppValidation {
         by: NodeId,
-        op: Op,
+        op: OpAction,
         deps: Vec<AnyDhtHash>,
     },
     Fetched {
         by: NodeId,
-        op: Op,
+        op: OpAction,
+    },
+    Seen {
+        by: NodeId,
+        op_lite: OpLite,
     },
     // GossipReceived {},
     // PublishReceived {},
 }
 
-impl aitia::logging::FactLogJson for Step<OpLite> {}
+impl aitia::logging::FactLogJson for Step {}
 
-impl<Op: Debug> std::fmt::Display for Step<Op> {
+impl std::fmt::Display for Step {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Step::Authored { by, action } => {
@@ -85,40 +117,33 @@ impl<Op: Debug> std::fmt::Display for Step<Op> {
                 by, op, deps
             )),
             Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
+            Step::Seen { by, op_lite } => {
+                f.write_fmt(format_args!("[{}] Op Seen: {:?}", by, op_lite))
+            }
         }
     }
 }
 
-impl aitia::Fact for Step<OpLite> {
+impl aitia::Fact for Step {
     type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {
         self.to_string()
     }
 
-    fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>> {
+    fn cause(&self, ctx: &Self::Context) -> CauseResult<Self> {
         use Step::*;
-        match self.clone() {
+
+        Ok(match self.clone() {
             Authored { by, action } => None,
             Published { by, op } => Some(Integrated { by, op }.into()),
             Integrated { by, op } => Some(AppValidated { by, op }.into()),
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
             PendingAppValidation { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
             SysValidated { by, op } => {
-                let authored = Authored {
-                    by: by.clone(),
-                    action: op.action_hash().clone(),
-                };
-
-                let fetched = Fetched {
-                    by: by.clone(),
-                    op: op.clone(),
-                };
-
-                let received = Cause::Any(vec![authored.into(), fetched.into()]);
-                let mut causes = vec![received];
-
-                let dep = ctx.sysval_op_dep(&op).cloned();
+                let dep = ctx
+                    .sysval_op_dep(&op)
+                    .map_err(|_| CauseError(self.clone()))?;
                 let pending = PendingSysValidation {
                     by: by.clone(),
                     op: op.clone(),
@@ -126,21 +151,31 @@ impl aitia::Fact for Step<OpLite> {
                 }
                 .into();
 
-                if let Some(dep_integrated) = dep.map(|op| Cause::from(Integrated { by, op })) {
-                    Some(Cause::Every(vec![pending, dep_integrated]))
+                if let Some(dep) = dep {
+                    let integrated = Cause::from(Integrated { by, op });
+                    Some(Cause::Every(vec![pending, integrated]))
                 } else {
                     Some(pending)
                 }
             }
-            PendingSysValidation { by, op, dep: _ } => {
+            PendingSysValidation { by, op, dep: _ } => Some(
+                Seen {
+                    by,
+                    op_lite: ctx
+                        .action_to_op(&op)
+                        .map_err(|_| CauseError(self.clone()))?,
+                }
+                .into(),
+            ),
+            Seen { by, op_lite } => {
                 let authored = Authored {
                     by: by.clone(),
-                    action: op.action_hash().clone(),
+                    action: op_lite.action_hash().clone(),
                 };
 
                 let fetched = Fetched {
                     by: by.clone(),
-                    op: op.clone(),
+                    op: op_lite.into(),
                 };
 
                 Some(Cause::Any(vec![authored.into(), fetched.into()]))
@@ -163,7 +198,7 @@ impl aitia::Fact for Step<OpLite> {
                     .collect();
                 Some(Cause::Any(others))
             }
-        }
+        })
     }
 
     fn check(&self, ctx: &Self::Context) -> bool {

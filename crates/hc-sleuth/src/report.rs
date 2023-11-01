@@ -5,8 +5,7 @@ use aitia::{
 
 use super::*;
 
-pub fn report(step: Step<OpAction>, ctx: &Context) {
-    let step = ctx.expand(step);
+pub fn report(step: Step, ctx: &Context) {
     match aitia::Cause::from(step).traverse(ctx) {
         Traversal::Pass => println!("PASS"),
         Traversal::Groundless => println!("GROUNDLESS"),
@@ -22,5 +21,6 @@ pub fn report(step: Step<OpAction>, ctx: &Context) {
             }
             println!("Passing checks: {:#?}", passes);
         }
+        Traversal::TraversalError(err) => println!("Traversal error: {:?}", err),
     }
 }

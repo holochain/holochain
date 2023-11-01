@@ -6,11 +6,15 @@ use aitia::{
     Fact,
 };
 use holochain_p2p::DnaHashExt;
+use holochain_state::prelude::hash_type::AnyDht;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 
 use super::*;
 
 pub type ContextWriter = aitia::logging::LogWriter<Context>;
+
+pub type ContextError = ();
+pub type ContextResult<T> = Result<T, ContextError>;
 
 pub fn init_subscriber() -> ContextWriter {
     let w = ContextWriter::default();
@@ -27,10 +31,10 @@ pub struct Context {
     facts: HashSet<Step>,
     node_ids: HashSet<String>,
     entry_actions: HashMap<EntryHash, ActionHash>,
-    sysval_dep: HashMap<OpLite, Option<AnyDhtHash>>,
-    appval_deps: HashMap<OpLite, HashSet<AnyDhtHash>>,
-    ops_by_fetch_hash: HashMap<AnyDhtHash, OpLite>,
-    ops_by_action: HashMap<OpAction, OpLite>,
+    map_action_to_sysval_fetch_hash: HashMap<OpAction, Option<AnyDhtHash>>,
+    map_action_to_appval_fetch_hash: HashMap<OpAction, HashSet<AnyDhtHash>>,
+    map_fetch_hash_to_op: HashMap<AnyDhtHash, OpLite>,
+    map_action_to_op: HashMap<OpAction, OpLite>,
 }
 
 impl Context {
@@ -50,64 +54,35 @@ impl Context {
         self.facts.contains(fact)
     }
 
-    pub fn sysval_op_dep(&self, op: &OpLite) -> Option<&OpLite> {
-        self.ops_by_fetch_hash
-            .get(self.sysval_dep.get(op)?.as_ref()?)
+    pub fn sysval_op_dep(&self, op: &OpAction) -> ContextResult<Option<OpLite>> {
+        self.map_action_to_sysval_fetch_hash
+            .get(op)
+            .ok_or(())?
+            .as_ref()
+            .map(|o| self.map_fetch_hash_to_op.get(o).cloned().ok_or(()))
+            .transpose()
     }
 
-    pub fn appval_op_deps(&self, op: &OpLite) -> HashSet<&OpLite> {
-        if let Some(deps) = self.appval_deps.get(op) {
-            deps.into_iter()
-                .map(|h| self.ops_by_fetch_hash.get(h).unwrap())
-                .collect()
-        } else {
-            HashSet::new()
-        }
+    pub fn appval_op_deps(&self, op: &OpAction) -> ContextResult<HashSet<OpLite>> {
+        self.map_action_to_appval_fetch_hash
+            .get(op)
+            .ok_or(())?
+            .iter()
+            .map(|o| self.map_fetch_hash_to_op.get(o).cloned().ok_or(()))
+            .collect::<Result<HashSet<OpLite>, _>>()
+    }
+
+    pub fn action_to_op(&self, op: &OpAction) -> ContextResult<OpLite> {
+        self.map_action_to_op.get(op).cloned().ok_or(())
     }
 
     pub fn node_ids(&self) -> &HashSet<String> {
         &self.node_ids
     }
-
-    pub fn expand(&self, step: Step<OpAction>) -> Step<OpLite> {
-        match step {
-            Step::Authored { by, action } => Step::Authored { by, action },
-            Step::Published { by, op } => Step::Published {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-            },
-            Step::Integrated { by, op } => Step::Integrated {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-            },
-            Step::AppValidated { by, op } => Step::AppValidated {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-            },
-            Step::SysValidated { by, op } => Step::SysValidated {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-            },
-            Step::PendingSysValidation { by, op, dep } => Step::PendingSysValidation {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-                dep,
-            },
-            Step::PendingAppValidation { by, op, deps } => Step::PendingAppValidation {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-                deps,
-            },
-            Step::Fetched { by, op } => Step::Fetched {
-                by,
-                op: self.ops_by_action.get(&op).unwrap().clone(),
-            },
-        }
-    }
 }
 
 impl aitia::logging::Log for Context {
-    type Fact = Step<OpLite>;
+    type Fact = Step;
 
     fn apply(&mut self, fact: Step) {
         match fact.clone() {
@@ -117,22 +92,21 @@ impl aitia::logging::Log for Context {
             Step::AppValidated { by, op } => {}
             Step::SysValidated { by, op } => {}
             Step::PendingSysValidation { by, op, dep } => {
-                self.ops_by_fetch_hash
-                    .insert(op.fetch_dependency_hash(), op.clone());
-                self.ops_by_action.insert(
-                    OpAction(op.action_hash().clone(), op.get_type()),
-                    op.clone(),
-                );
-
-                self.sysval_dep.insert(op, dep);
+                self.map_action_to_sysval_fetch_hash.insert(op, dep);
             }
             Step::PendingAppValidation { by, op, deps } => {
-                self.appval_deps
+                self.map_action_to_appval_fetch_hash
                     .entry(op)
                     .or_default()
                     .extend(deps.into_iter());
             }
             Step::Fetched { by, op } => {}
+            Step::Seen { by, op_lite } => {
+                self.map_fetch_hash_to_op
+                    .insert(op_lite.fetch_dependency_hash(), op_lite.clone());
+                self.map_action_to_op
+                    .insert(OpAction::from(op_lite.clone()), op_lite);
+            }
         }
         self.facts.insert(fact);
     }

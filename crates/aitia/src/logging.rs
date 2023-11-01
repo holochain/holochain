@@ -113,7 +113,7 @@ mod tests {
         prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Registry,
     };
 
-    use crate::{logging::LogWriter, Fact};
+    use crate::{cause::CauseResult, logging::LogWriter, Fact};
 
     use super::{tracing_layer, FactLogJson};
 
@@ -135,7 +135,7 @@ mod tests {
     impl Fact for TestFact {
         type Context = ();
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<crate::Cause<Self>> {
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
             todo!()
         }
 

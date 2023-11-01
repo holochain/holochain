@@ -20,6 +20,18 @@ impl<T: Display> Default for TruthTree<T> {
     }
 }
 
+#[derive(Debug)]
+pub struct CauseError<F: Display>(pub F);
+
+#[derive(Debug)]
+pub struct CheckError<F: Fact>(pub Check<F>);
+
+#[derive(Debug, derive_more::From)]
+pub enum TraversalError<F: Fact> {
+    Cause(CauseError<F>),
+    Check(CheckError<F>),
+}
+
 #[derive(Debug, derive_more::From)]
 // #[cfg_attr(test, derive(PartialEq))]
 pub enum Traversal<T: Fact> {
@@ -33,6 +45,8 @@ pub enum Traversal<T: Fact> {
         tree: TruthTree<T>,
         passes: Vec<Cause<T>>,
     },
+    /// A cause or check call returned an error during traversal
+    TraversalError(CauseError<T>),
 }
 
 impl<T: Fact> Traversal<T> {
@@ -60,7 +74,7 @@ pub type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
 pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
     let mut table = TraversalMap::default();
     match traverse_inner(cause, ctx, &mut table) {
-        Some(check) => {
+        Ok(Some(check)) => {
             if check.is_pass() {
                 Traversal::Pass
             } else {
@@ -68,7 +82,8 @@ pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
                 Traversal::Fail { tree, passes }
             }
         }
-        None => Traversal::Groundless,
+        Ok(None) => Traversal::Groundless,
+        Err(err) => Traversal::TraversalError(err),
     }
 }
 
@@ -76,7 +91,7 @@ fn traverse_inner<F: Fact>(
     cause: &Cause<F>,
     ctx: &F::Context,
     table: &mut TraversalMap<F>,
-) -> Option<Check<F>> {
+) -> Result<Option<Check<F>>, CauseError<F>> {
     tracing::trace!("enter {:?}", cause);
     match table.get(cause) {
         None => {
@@ -89,13 +104,24 @@ fn traverse_inner<F: Fact>(
             // We're currently processing a traversal that started from this cause.
             // Not even sure if this is even valid, but in any case
             // we certainly can't say anything about this traversal.
-            return None;
+            return Ok(None);
         }
         Some(Some(check)) => {
             tracing::trace!("return cached: {:?}", check);
-            return Some(check.clone());
+            return Ok(Some(check.clone()));
         }
     }
+
+    let mut recursive_checks =
+        |cs: &[Cause<F>]| -> Result<Vec<(Cause<F>, Check<F>)>, CauseError<F>> {
+            let mut checks = vec![];
+            for c in cs {
+                if let Some(check) = traverse_inner(c, ctx, table)? {
+                    checks.push((c.clone(), check));
+                }
+            }
+            Ok(checks)
+        };
 
     let check = match cause {
         Cause::Fact(f) => {
@@ -103,7 +129,7 @@ fn traverse_inner<F: Fact>(
                 tracing::trace!("fact pass");
                 Check::Pass
             } else {
-                if let Some(cause) = f.cause(ctx) {
+                if let Some(cause) = f.cause(ctx)? {
                     tracing::trace!("fact fail with cause, traversing");
                     let check = traverse_inner(&cause, ctx, table)?;
                     tracing::trace!("traversal done, check: {:?}", check);
@@ -115,15 +141,12 @@ fn traverse_inner<F: Fact>(
             }
         }
         Cause::Any(cs) => {
-            let checks: Vec<_> = cs
-                .iter()
-                .filter_map(|c| Some((c.clone(), traverse_inner(c, ctx, table)?)))
-                .collect();
+            let checks = recursive_checks(cs)?;
             tracing::trace!("Any. checks: {:?}", checks);
             if checks.is_empty() {
                 // All loops
                 tracing::debug!("All loops");
-                return None;
+                return Ok(None);
             }
             let num_checks = checks.len();
             let fails: Vec<_> = checks
@@ -138,15 +161,13 @@ fn traverse_inner<F: Fact>(
             }
         }
         Cause::Every(cs) => {
-            let checks: Vec<_> = cs
-                .iter()
-                .filter_map(|c| Some((c.clone(), traverse_inner(c, ctx, table)?)))
-                .collect();
+            let checks = recursive_checks(cs)?;
+
             tracing::trace!("Every. checks: {:?}", checks);
             if checks.is_empty() {
                 // All loops
                 tracing::debug!("All loops");
-                return None;
+                return Ok(None);
             }
             let fails = checks.iter().filter(|(_, check)| !check.is_pass()).count();
             let causes: Vec<_> = checks.into_iter().map(|(cause, _)| cause).collect();
@@ -160,7 +181,7 @@ fn traverse_inner<F: Fact>(
     };
     table.insert(cause.clone(), Some(check.clone()));
     tracing::trace!("exit. check: {:?}", check);
-    Some(check)
+    Ok(Some(check))
 }
 
 /// Prune away any extraneous nodes or edges from a Traversal.

@@ -25,6 +25,7 @@ fn report<T: Fact>(traversal: &Traversal<T>) {
 
             println!("Passing checks: {:#?}", passes);
         }
+        Traversal::TraversalError(err) => println!("Traversal error: {:?}", err),
     }
 }
 
@@ -46,8 +47,8 @@ fn singleton() {
     impl Fact for Singleton {
         type Context = (bool, bool);
 
-        fn cause(&self, (self_ref, _): &Self::Context) -> Option<Cause<Self>> {
-            self_ref.then_some(Self.into())
+        fn cause(&self, (self_ref, _): &Self::Context) -> CauseResult<Self> {
+            Ok(self_ref.then_some(Self.into()))
         }
 
         fn check(&self, (_, check): &Self::Context) -> bool {
@@ -92,14 +93,14 @@ fn single_path() {
     impl Fact for Countdown {
         type Context = Checks<Self>;
 
-        fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
-            match self.0 {
+        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+            Ok(match self.0 {
                 3 => Some(Self(2).into()),
                 2 => Some(Self(1).into()),
                 1 => Some(Self(0).into()),
                 0 => None,
                 _ => unreachable!(),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -175,14 +176,14 @@ fn loopy() {
     impl Fact for Countdown {
         type Context = Checks<Self>;
 
-        fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
-            match self.0 {
+        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+            Ok(match self.0 {
                 3 => Some(Self(2).into()),
                 2 => Some(Self(1).into()),
                 1 => Some(Self(3).into()),
                 0 => None,
                 _ => unreachable!(),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -229,9 +230,9 @@ fn branching_any() {
     impl Fact for Branching {
         type Context = HashSet<u8>;
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
-            (self.0 <= 64)
-                .then(|| Cause::Any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()]))
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+            Ok((self.0 <= 64)
+                .then(|| Cause::Any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()])))
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -282,9 +283,9 @@ fn simple_every() {
     impl Fact for Recipe {
         type Context = HashSet<Recipe>;
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
             use Recipe::*;
-            match self {
+            Ok(match self {
                 Eggs => None,
                 Vinegar => None,
                 Mayo => Some(Cause::Every(vec![Eggs.into(), Vinegar.into()])),
@@ -298,7 +299,7 @@ fn simple_every() {
                     Bread.into(),
                 ])),
                 GrilledCheese => Some(Cause::Every(vec![Cheese.into(), Bread.into()])),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -400,9 +401,9 @@ fn holochain_like() {
     impl Fact for Step {
         type Context = Checks<Self>;
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
             use Stage::*;
-            match self.stage {
+            Ok(match self.stage {
                 Create => None,
                 Fetch => Some(Cause::Any(vec![self.mine(ReceiveA), self.mine(ReceiveB)])),
                 ReceiveA => Some(self.theirs(SendA)),
@@ -410,7 +411,7 @@ fn holochain_like() {
                 Store => Some(Cause::Any(vec![self.mine(Create), self.mine(Fetch)])),
                 SendA => Some(self.mine(Store)),
                 SendB => Some(self.mine(Store)),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {

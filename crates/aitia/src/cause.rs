@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::graph::{traverse, Traversal};
+use crate::graph::{traverse, CauseError, Traversal};
 
 pub trait FactTraits: Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {}
 impl<T> FactTraits for T where T: Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {}
@@ -11,9 +11,11 @@ pub trait Fact: FactTraits {
     fn explain(&self, _ctx: &Self::Context) -> String {
         self.to_string()
     }
-    fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>>;
+    fn cause(&self, ctx: &Self::Context) -> CauseResult<Self>;
     fn check(&self, ctx: &Self::Context) -> bool;
 }
+
+pub type CauseResult<F> = Result<Option<Cause<F>>, CauseError<F>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Check<T: Fact> {
