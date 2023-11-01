@@ -1,7 +1,9 @@
 use crate::integrity::*;
-use hdi::prelude::__hc__dna_info_1;
 use hdk::prelude::*;
 use serde_yaml::Value;
+
+#[cfg(not(feature = "mock"))]
+use hdi::prelude::__hc__dna_info_1;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
@@ -67,6 +69,7 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
     }
 }
 
+#[cfg(not(feature = "mock"))]
 #[hdk_extern]
 fn dna_info_1(_: ()) -> ExternResult<DnaInfoV1> {
     host_call::<(), DnaInfoV1>(__hc__dna_info_1, ())
