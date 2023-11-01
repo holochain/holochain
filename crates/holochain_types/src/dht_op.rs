@@ -161,6 +161,21 @@ pub enum DhtOpLite {
     RegisterRemoveLink(ActionHash, OpBasis),
 }
 
+/// A DhtOpLite along with its corresponding DhtOpHash
+#[derive(Clone, Debug, Serialize, Deserialize, derive_more::Deref)]
+pub struct OpLiteHashed {
+    #[deref]
+    op: DhtOpLite,
+    hash: DhtOpHash,
+}
+
+impl OpLiteHashed {
+    /// Accessor
+    pub fn dht_op_hash(&self) -> &DhtOpHash {
+        &self.hash
+    }
+}
+
 impl PartialEq for DhtOpLite {
     fn eq(&self, other: &Self) -> bool {
         // The ops are the same if they are the same type on the same action hash.

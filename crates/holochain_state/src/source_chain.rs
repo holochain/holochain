@@ -339,6 +339,10 @@ impl SourceChain {
                     insert_entry(txn, entry.as_hash(), entry.as_content())?;
                 }
                 for shh in actions.iter() {
+                    aitia::trace!(&hc_sleuth::Step::Authored {
+                        by: (*author).clone(),
+                        action: shh.action_address().clone(),
+                    });
                     insert_action(txn, shh)?;
                 }
                 for (op, op_hash, op_order, timestamp, _) in &ops {

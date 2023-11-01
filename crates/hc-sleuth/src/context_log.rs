@@ -6,7 +6,7 @@ use aitia::{
     Fact,
 };
 use holochain_p2p::DnaHashExt;
-use holochain_state::prelude::hash_type::AnyDht;
+use holochain_types::prelude::*;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 
 use super::*;
@@ -29,7 +29,7 @@ pub fn init_subscriber() -> ContextWriter {
 #[derive(Default, Debug)]
 pub struct Context {
     facts: HashSet<Step>,
-    node_ids: HashSet<String>,
+    pub(crate) node_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
     entry_actions: HashMap<EntryHash, ActionHash>,
     map_action_to_sysval_fetch_hash: HashMap<OpAction, Option<AnyDhtHash>>,
     map_action_to_appval_fetch_hash: HashMap<OpAction, HashSet<AnyDhtHash>>,
@@ -74,10 +74,6 @@ impl Context {
 
     pub fn action_to_op(&self, op: &OpAction) -> ContextResult<OpLite> {
         self.map_action_to_op.get(op).cloned().ok_or(())
-    }
-
-    pub fn node_ids(&self) -> &HashSet<String> {
-        &self.node_ids
     }
 }
 

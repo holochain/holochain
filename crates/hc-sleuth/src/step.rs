@@ -6,7 +6,7 @@ use aitia::cause::CauseResult;
 use aitia::graph::CauseError;
 use aitia::logging::FactLogTraits;
 use aitia::{Cause, FactTraits};
-use holochain_state::{prelude::*, validation_db::ValidationStage};
+use holochain_types::prelude::*;
 
 // #[derive(Debug, Clone, derive_more::From)]
 // pub enum OpRef {
@@ -43,47 +43,46 @@ impl OpAction {
     }
 }
 
-pub type OpLite = DhtOpLite;
-pub type NodeId = String;
+pub type SleuthId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Step {
     Authored {
-        by: NodeId,
+        by: AgentPubKey,
         action: ActionHash,
     },
     Published {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
     },
     Integrated {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
     },
     AppValidated {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
     },
     SysValidated {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
     },
     PendingSysValidation {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
         dep: Option<AnyDhtHash>,
     },
     PendingAppValidation {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
         deps: Vec<AnyDhtHash>,
     },
     Fetched {
-        by: NodeId,
+        by: SleuthId,
         op: OpAction,
     },
     Seen {
-        by: NodeId,
+        by: SleuthId,
         op_lite: OpLite,
     },
     // GossipReceived {},
@@ -167,23 +166,31 @@ impl aitia::Fact for Step {
                 }
                 .into(),
             ),
+            // TODO: add this to authoring and fetch workflows?
             Seen { by, op_lite } => {
-                let authored = Authored {
-                    by: by.clone(),
-                    action: op_lite.action_hash().clone(),
-                };
+                let causes: Vec<_> = ctx
+                    .node_agents
+                    .get(&by)
+                    .ok_or_else(|| CauseError(self.clone()))?
+                    .into_iter()
+                    .cloned()
+                    .map(|agent| Authored {
+                        by: agent,
+                        action: op_lite.action_hash().clone(),
+                    })
+                    .chain([Fetched {
+                        by: by.clone(),
+                        op: op_lite.clone().into(),
+                    }])
+                    .map(Cause::from)
+                    .collect();
 
-                let fetched = Fetched {
-                    by: by.clone(),
-                    op: op_lite.into(),
-                };
-
-                Some(Cause::Any(vec![authored.into(), fetched.into()]))
+                Some(Cause::Any(causes))
             }
             Fetched { by, op } => {
                 let mut others: Vec<_> = ctx
-                    .node_ids()
-                    .iter()
+                    .node_agents
+                    .keys()
                     .filter(|i| **i != by)
                     .cloned()
                     .map(|i| {

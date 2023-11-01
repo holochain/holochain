@@ -2508,8 +2508,9 @@ dependencies = [
  "derive_more",
  "hc-sleuth",
  "holochain_p2p",
- "holochain_state",
+ "holochain_state_types",
  "holochain_trace 0.3.0-beta-dev.1",
+ "holochain_types",
  "kitsune_p2p",
  "once_cell",
  "parking_lot 0.10.2",
@@ -3217,6 +3218,7 @@ dependencies = [
 name = "holochain_state"
 version = "0.3.0-beta-dev.21"
 dependencies = [
+ "aitia",
  "anyhow",
  "arbitrary",
  "async-recursion",
@@ -3231,6 +3233,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
+ "hc-sleuth",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",

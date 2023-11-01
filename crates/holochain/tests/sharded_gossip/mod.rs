@@ -581,13 +581,6 @@ async fn three_way_gossip(
         ),
     };
 
-    {
-        let ctx = aw.lock();
-        let step = ctx.expand(step.clone());
-        drop(ctx);
-        aitia::trace!(&step);
-    }
-
     // let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
 
     {
