@@ -2,7 +2,7 @@
 
 # "retries" defines the number of times a test should be retried. If set to a
 # non-zero value, tests that succeed on a subsequent attempt will be marked as
-# non-flaky. Can be overridden through the `--retries` option.
+# flaky. Can be overridden through the `--retries` option.
 retries = 5
 
 # this will display all of fail, retry, slow
