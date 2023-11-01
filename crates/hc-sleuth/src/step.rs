@@ -101,8 +101,10 @@ pub enum Step {
         by: AgentPubKey,
         op: OpInfo,
     },
-    // GossipReceived {},
-    // PublishReceived {},
+    AgentJoined {
+        node: SleuthId,
+        agent: AgentPubKey,
+    },
 }
 
 impl aitia::logging::FactLogJson for Step {}
@@ -127,6 +129,9 @@ impl std::fmt::Display for Step {
             )),
             Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
             Step::Authored { by, op } => f.write_fmt(format_args!("[{}] Authored: {:?}", by, op)),
+            Step::AgentJoined { node, agent } => {
+                f.write_fmt(format_args!("[{}] AgentJoined: {:?}", node, agent))
+            }
         }
     }
 }
@@ -156,9 +161,8 @@ impl aitia::Fact for Step {
                 let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
 
                 let any = Cause::Any(
-                    ctx.node_agents
-                        .get(&by)
-                        .ok_or_else(|| CauseError::new("node_agents".into(), self.clone()))?
+                    ctx.node_agents(&by)
+                        .map_err(mapper)?
                         .into_iter()
                         .cloned()
                         .map(|agent| Authored {
@@ -182,7 +186,7 @@ impl aitia::Fact for Step {
             }
             Fetched { by, op } => {
                 let mut others: Vec<_> = ctx
-                    .node_agents
+                    .map_node_to_agents
                     .keys()
                     .filter(|i| **i != by)
                     .cloned()
@@ -198,7 +202,11 @@ impl aitia::Fact for Step {
                     .collect();
                 Some(Cause::Any(others))
             }
-            Authored { by, op } => None,
+            Authored { by, op } => {
+                let node = ctx.agent_node(&by).map_err(mapper)?.clone();
+                Some(Cause::from(AgentJoined { node, agent: by }))
+            }
+            AgentJoined { node, agent } => None,
         })
     }
 

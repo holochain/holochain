@@ -33,8 +33,9 @@ pub struct Context {
     facts: HashSet<Step>,
 
     ///
-    pub(crate) node_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
     entry_actions: HashMap<EntryHash, ActionHash>,
+    pub(crate) map_node_to_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
+    map_agent_to_node: HashMap<AgentPubKey, SleuthId>,
     map_op_to_sysval_dep_hash: HashMap<OpRef, Option<ActionHash>>,
     map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
     map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
@@ -57,6 +58,14 @@ impl Context {
 
     pub fn check(&self, fact: &Step) -> bool {
         self.facts.contains(fact)
+    }
+
+    pub fn node_agents(&self, id: &SleuthId) -> ContextResult<&HashSet<AgentPubKey>> {
+        self.map_node_to_agents.get(id).ok_or("node_agents")
+    }
+
+    pub fn agent_node(&self, agent: &AgentPubKey) -> ContextResult<&SleuthId> {
+        self.map_agent_to_node.get(agent).ok_or("agent_node")
     }
 
     /// Get the sys validation dependency of this op hash if applicable
@@ -130,6 +139,12 @@ impl aitia::logging::Log for Context {
                 self.map_op_to_sysval_dep_hash
                     .insert(op_hash.clone(), op.dep.clone());
                 self.op_info.insert(op_hash.clone(), op);
+            }
+            Step::AgentJoined { node, agent } => {
+                self.map_node_to_agents
+                    .entry(node)
+                    .or_default()
+                    .insert(agent);
             }
         }
         let exists = self.facts.insert(fact.clone());
