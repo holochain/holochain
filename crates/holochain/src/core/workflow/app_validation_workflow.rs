@@ -207,7 +207,7 @@ async fn app_validation_workflow_inner(
                             }
                             aitia::trace!(&hc_sleuth::Step::AppValidated {
                                 by: sleuth_id.clone(),
-                                op: op_lite.into()
+                                op: op_hash
                             });
                         }
                         Outcome::AwaitingDeps(deps) => {

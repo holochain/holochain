@@ -14,6 +14,10 @@ use holochain_types::prelude::*;
 //     Action(ActionHash, DhtOpType),
 // }
 
+pub type OpInfo = OpLiteHashed;
+
+pub type OpRef = DhtOpHash;
+
 #[derive(
     Debug,
     Clone,
@@ -53,37 +57,36 @@ pub enum Step {
     },
     Published {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
     },
     Integrated {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
     },
     AppValidated {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
     },
     SysValidated {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
     },
     PendingSysValidation {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
         dep: Option<AnyDhtHash>,
     },
     PendingAppValidation {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
         deps: Vec<AnyDhtHash>,
     },
     Fetched {
         by: SleuthId,
-        op: OpAction,
+        op: OpRef,
     },
     Seen {
-        by: SleuthId,
-        op_lite: OpLite,
+        op: OpInfo,
     },
     // GossipReceived {},
     // PublishReceived {},
@@ -116,9 +119,7 @@ impl std::fmt::Display for Step {
                 by, op, deps
             )),
             Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
-            Step::Seen { by, op_lite } => {
-                f.write_fmt(format_args!("[{}] Op Seen: {:?}", by, op_lite))
-            }
+            Step::Seen { op } => f.write_fmt(format_args!("Op Seen: {:?}", op)),
         }
     }
 }
@@ -157,17 +158,8 @@ impl aitia::Fact for Step {
                     Some(pending)
                 }
             }
-            PendingSysValidation { by, op, dep: _ } => Some(
-                Seen {
-                    by,
-                    op_lite: ctx
-                        .action_to_op(&op)
-                        .map_err(|_| CauseError(self.clone()))?,
-                }
-                .into(),
-            ),
-            // TODO: add this to authoring and fetch workflows?
-            Seen { by, op_lite } => {
+            PendingSysValidation { by, op, dep: _ } => {
+                let op_info = ctx.op_info(&op).map_err(|_| CauseError(self.clone()))?;
                 let causes: Vec<_> = ctx
                     .node_agents
                     .get(&by)
@@ -176,17 +168,20 @@ impl aitia::Fact for Step {
                     .cloned()
                     .map(|agent| Authored {
                         by: agent,
-                        action: op_lite.action_hash().clone(),
+                        action: op_info.action_hash().clone(),
                     })
-                    .chain([Fetched {
-                        by: by.clone(),
-                        op: op_lite.clone().into(),
-                    }])
+                    .chain([Fetched { by: by.clone(), op }])
                     .map(Cause::from)
                     .collect();
 
                 Some(Cause::Any(causes))
             }
+
+            // "Seen" is a necessary event for the context to populate itself with full op info,
+            // to make cause construction and other queries possible. It's kept outside of the
+            // causal graph because it's more about building up context state than anything to
+            // do with Holochain.
+            Seen { .. } => None,
             Fetched { by, op } => {
                 let mut others: Vec<_> = ctx
                     .node_agents

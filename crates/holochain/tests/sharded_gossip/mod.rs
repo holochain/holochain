@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use hc_sleuth::OpAction;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
@@ -573,19 +572,22 @@ async fn three_way_gossip(
     //     &[cell.agent_pubkey().clone()],
     // );
 
-    let step = hc_sleuth::Step::Integrated {
-        by: conductors[2].id(),
-        op: OpAction(
-            hashes[0].clone(),
-            holochain_types::prelude::DhtOpType::StoreRecord,
-        ),
-    };
-
     // let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
 
     {
         let ctx = aw.lock();
         dbg!(&ctx);
+
+        let step = hc_sleuth::Step::Integrated {
+            by: conductors[2].id(),
+            op: ctx
+                .op_from_action(
+                    hashes[0].clone(),
+                    holochain_types::prelude::DhtOpType::StoreRecord,
+                )
+                .unwrap(),
+        };
+
         hc_sleuth::report(step, &ctx);
     }
 
@@ -593,16 +595,17 @@ async fn three_way_gossip(
         .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
         .await;
 
-    let step = hc_sleuth::Step::Integrated {
-        by: conductors[2].id(),
-        op: OpAction(
-            hashes[0].clone(),
-            holochain_types::prelude::DhtOpType::StoreRecord,
-        ),
-    };
-
     {
         let ctx = aw.lock();
+        let step = hc_sleuth::Step::Integrated {
+            by: conductors[2].id(),
+            op: ctx
+                .op_from_action(
+                    hashes[0].clone(),
+                    holochain_types::prelude::DhtOpType::StoreRecord,
+                )
+                .unwrap(),
+        };
         hc_sleuth::report(step, &ctx);
     }
 

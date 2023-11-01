@@ -162,7 +162,9 @@ pub enum DhtOpLite {
 }
 
 /// A DhtOpLite along with its corresponding DhtOpHash
-#[derive(Clone, Debug, Serialize, Deserialize, derive_more::Deref)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, derive_more::Deref, derive_more::Into,
+)]
 pub struct OpLiteHashed {
     #[deref]
     op: DhtOpLite,
@@ -171,7 +173,7 @@ pub struct OpLiteHashed {
 
 impl OpLiteHashed {
     /// Accessor
-    pub fn dht_op_hash(&self) -> &DhtOpHash {
+    pub fn as_hash(&self) -> &DhtOpHash {
         &self.hash
     }
 }

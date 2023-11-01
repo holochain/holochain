@@ -13,8 +13,9 @@ use super::*;
 
 pub type ContextWriter = aitia::logging::LogWriter<Context>;
 
-pub type ContextError = ();
-pub type ContextResult<T> = Result<T, ContextError>;
+#[derive(Debug)]
+pub struct CtxError;
+pub type ContextResult<T> = Result<T, CtxError>;
 
 pub fn init_subscriber() -> ContextWriter {
     let w = ContextWriter::default();
@@ -31,10 +32,11 @@ pub struct Context {
     facts: HashSet<Step>,
     pub(crate) node_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
     entry_actions: HashMap<EntryHash, ActionHash>,
-    map_action_to_sysval_fetch_hash: HashMap<OpAction, Option<AnyDhtHash>>,
-    map_action_to_appval_fetch_hash: HashMap<OpAction, HashSet<AnyDhtHash>>,
-    map_fetch_hash_to_op: HashMap<AnyDhtHash, OpLite>,
-    map_action_to_op: HashMap<OpAction, OpLite>,
+    map_op_to_sysval_dep_hash: HashMap<OpRef, Option<AnyDhtHash>>,
+    map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
+    map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
+    map_action_to_op: HashMap<OpAction, OpRef>,
+    op_info: HashMap<OpRef, OpInfo>,
 }
 
 impl Context {
@@ -54,26 +56,42 @@ impl Context {
         self.facts.contains(fact)
     }
 
-    pub fn sysval_op_dep(&self, op: &OpAction) -> ContextResult<Option<OpLite>> {
-        self.map_action_to_sysval_fetch_hash
+    pub fn sysval_op_dep(&self, op: &OpRef) -> ContextResult<Option<&OpInfo>> {
+        self.map_op_to_sysval_dep_hash
             .get(op)
-            .ok_or(())?
+            .ok_or(CtxError)?
             .as_ref()
-            .map(|o| self.map_fetch_hash_to_op.get(o).cloned().ok_or(()))
+            .map(|o| self.map_dep_hash_to_op.get(o).ok_or(CtxError))
+            .transpose()?
+            .map(|o| self.op_info.get(o).ok_or(CtxError))
             .transpose()
     }
 
-    pub fn appval_op_deps(&self, op: &OpAction) -> ContextResult<HashSet<OpLite>> {
-        self.map_action_to_appval_fetch_hash
+    pub fn appval_op_deps(&self, op: &OpRef) -> ContextResult<HashSet<&OpInfo>> {
+        self.map_op_to_appval_dep_hash
             .get(op)
-            .ok_or(())?
+            .ok_or(CtxError)?
             .iter()
-            .map(|o| self.map_fetch_hash_to_op.get(o).cloned().ok_or(()))
-            .collect::<Result<HashSet<OpLite>, _>>()
+            .map(|o| self.map_dep_hash_to_op.get(o).ok_or(CtxError))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .map(|o| self.op_info.get(o).ok_or(CtxError))
+            .collect()
     }
 
-    pub fn action_to_op(&self, op: &OpAction) -> ContextResult<OpLite> {
-        self.map_action_to_op.get(op).cloned().ok_or(())
+    pub fn op_info(&self, op: &OpRef) -> ContextResult<&OpInfo> {
+        self.op_info.get(op).ok_or(CtxError)
+    }
+
+    pub fn op_to_action(&self, op: &OpRef) -> ContextResult<OpAction> {
+        Ok(OpAction::from((**self.op_info(op)?).clone())).into()
+    }
+
+    pub fn op_from_action(&self, action: ActionHash, op_type: DhtOpType) -> ContextResult<OpRef> {
+        self.map_action_to_op
+            .get(&OpAction(action, op_type))
+            .cloned()
+            .ok_or(CtxError)
     }
 }
 
@@ -88,20 +106,19 @@ impl aitia::logging::Log for Context {
             Step::AppValidated { by, op } => {}
             Step::SysValidated { by, op } => {}
             Step::PendingSysValidation { by, op, dep } => {
-                self.map_action_to_sysval_fetch_hash.insert(op, dep);
+                self.map_op_to_sysval_dep_hash.insert(op, dep);
             }
             Step::PendingAppValidation { by, op, deps } => {
-                self.map_action_to_appval_fetch_hash
+                self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
                     .extend(deps.into_iter());
             }
             Step::Fetched { by, op } => {}
-            Step::Seen { by, op_lite } => {
-                self.map_fetch_hash_to_op
-                    .insert(op_lite.fetch_dependency_hash(), op_lite.clone());
-                self.map_action_to_op
-                    .insert(OpAction::from(op_lite.clone()), op_lite);
+            Step::Seen { op } => {
+                self.map_dep_hash_to_op
+                    .insert(op.fetch_dependency_hash(), op.as_hash().clone());
+                self.op_info.insert(op.as_hash().clone(), op);
             }
         }
         self.facts.insert(fact);

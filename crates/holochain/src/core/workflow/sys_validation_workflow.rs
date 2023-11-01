@@ -151,7 +151,7 @@ async fn sys_validation_workflow_inner(
                 let mut missing = 0;
                 let mut rejected = 0;
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, outcome, dependency, op_lite) = outcome?;
+                    let (op_hash, outcome, dependency, _op_lite) = outcome?;
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
@@ -159,7 +159,7 @@ async fn sys_validation_workflow_inner(
 
                             aitia::trace!(&hc_sleuth::Step::SysValidated {
                                 by: sleuth_id.clone(),
-                                op: op_lite.into()
+                                op: op_hash
                             });
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
@@ -178,7 +178,7 @@ async fn sys_validation_workflow_inner(
 
                             aitia::trace!(&hc_sleuth::Step::PendingSysValidation {
                                 by: sleuth_id.clone(),
-                                op: op_lite.into(),
+                                op: op_hash,
                                 dep: Some(missing_dep),
                             });
                         }
