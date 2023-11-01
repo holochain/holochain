@@ -3084,9 +3084,9 @@ name = "holochain_metrics"
 version = "0.3.0-beta-dev.4"
 dependencies = [
  "influxive",
+ "opentelemetry_api",
  "reqwest",
  "tracing",
- "ts_opentelemetry_api",
 ]
 
 [[package]]
@@ -8205,22 +8205,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "termcolor",
-]
-
-[[package]]
-name = "ts_opentelemetry_api"
-version = "0.20.0-beta.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d186495330f646b5881aeb3b83bac75b8a462d7ef32fda06a2a68f3869d5ba82"
-dependencies = [
- "futures-channel",
- "futures-util",
- "indexmap 1.9.3",
- "js-sys",
- "once_cell",
- "pin-project-lite",
- "thiserror",
- "urlencoding",
 ]
 
 [[package]]
