@@ -14,7 +14,7 @@ use super::*;
 pub type ContextWriter = aitia::logging::LogWriter<Context>;
 
 // #[derive(Debug, derive_more::From)]
-pub type CtxError = &'static str;
+pub type CtxError = String;
 pub type ContextResult<T> = Result<T, CtxError>;
 
 pub fn init_subscriber() -> ContextWriter {
@@ -61,23 +61,27 @@ impl Context {
     }
 
     pub fn node_agents(&self, id: &SleuthId) -> ContextResult<&HashSet<AgentPubKey>> {
-        self.map_node_to_agents.get(id).ok_or("node_agents")
+        self.map_node_to_agents
+            .get(id)
+            .ok_or(format!("node_agents({id})"))
     }
 
     pub fn agent_node(&self, agent: &AgentPubKey) -> ContextResult<&SleuthId> {
-        self.map_agent_to_node.get(agent).ok_or("agent_node")
+        self.map_agent_to_node
+            .get(agent)
+            .ok_or(format!("agent_node({agent})"))
     }
 
     /// Get the sys validation dependency of this op hash if applicable
     pub fn sysval_op_dep(&self, op: &OpRef) -> ContextResult<Option<&OpInfo>> {
         self.map_op_to_sysval_dep_hash
             .get(op)
-            .ok_or("map_op_to_sysval_dep_hash")?
+            .ok_or(format!("map_op_to_sysval_dep_hash({op})"))?
             .as_ref()
             .map(|h| {
                 self.map_dep_hash_to_op
                     .get(&h.clone().into())
-                    .ok_or("map_dep_hash_to_op")
+                    .ok_or(format!("map_dep_hash_to_op({h})"))
             })
             .transpose()?
             .map(|d| self.op_info(d))
@@ -88,9 +92,13 @@ impl Context {
     pub fn appval_op_deps(&self, op: &OpRef) -> ContextResult<HashSet<&OpInfo>> {
         self.map_op_to_appval_dep_hash
             .get(op)
-            .ok_or("map_op_to_appval_dep_hash")?
+            .ok_or(format!("map_op_to_appval_dep_hash({op})"))?
             .iter()
-            .map(|h| self.map_dep_hash_to_op.get(h).ok_or("map_dep_hash_to_op"))
+            .map(|h| {
+                self.map_dep_hash_to_op
+                    .get(h)
+                    .ok_or(format!("map_dep_hash_to_op({h})"))
+            })
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .map(|d| self.op_info(d))
@@ -98,7 +106,7 @@ impl Context {
     }
 
     pub fn op_info(&self, op: &OpRef) -> ContextResult<&OpInfo> {
-        self.op_info.get(op).ok_or("op_info")
+        self.op_info.get(op).ok_or(format!("op_info({op})"))
     }
 
     pub fn op_to_action(&self, op: &OpRef) -> ContextResult<OpAction> {
@@ -106,10 +114,11 @@ impl Context {
     }
 
     pub fn op_from_action(&self, action: ActionHash, op_type: DhtOpType) -> ContextResult<OpRef> {
+        let oa = OpAction(action, op_type);
         self.map_action_to_op
-            .get(&OpAction(action, op_type))
+            .get(&oa)
             .cloned()
-            .ok_or("map_action_to_op")
+            .ok_or(format!("map_action_to_op({oa:?})"))
     }
 }
 
@@ -141,6 +150,7 @@ impl aitia::logging::Log for Context {
                 self.op_info.insert(op_hash.clone(), op);
             }
             Step::AgentJoined { node, agent } => {
+                self.map_agent_to_node.insert(agent.clone(), node.clone());
                 self.map_node_to_agents
                     .entry(node)
                     .or_default()
