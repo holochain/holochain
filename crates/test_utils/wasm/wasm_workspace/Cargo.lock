@@ -597,12 +597,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "difference"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
-
-[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -617,12 +611,6 @@ dependencies = [
  "block-buffer",
  "crypto-common",
 ]
-
-[[package]]
-name = "downcast"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 
 [[package]]
 name = "downcast"
@@ -752,15 +740,6 @@ dependencies = [
  "serde",
  "strum",
  "strum_macros 0.18.0",
-]
-
-[[package]]
-name = "float-cmp"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1267f4ac4f343772758f7b1bdcbe767c218bbab93bb432acbf5162bbf85a6c4"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -967,7 +946,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_wasmer_guest",
- "mockall 0.10.2",
+ "mockall",
  "paste",
  "serde",
  "serde_bytes",
@@ -985,7 +964,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "mockall 0.11.2",
+ "mockall",
  "paste",
  "serde",
  "serde_bytes",
@@ -1078,7 +1057,7 @@ name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
  "hdi",
- "mockall 0.11.2",
+ "mockall",
 ]
 
 [[package]]
@@ -1529,11 +1508,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
 dependencies = [
  "cfg-if 1.0.0",
- "downcast 0.11.0",
+ "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive 0.11.2",
- "predicates 2.1.1",
+ "mockall_derive",
+ "predicates",
  "predicates-tree",
 ]
 
