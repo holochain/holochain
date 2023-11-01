@@ -511,7 +511,7 @@ fn check_prev_action_chain<A: ChainItem>(
 pub async fn check_and_hold_register_add_link<F>(
     hash: &ActionHash,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -540,7 +540,7 @@ where
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &ActionHash,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -569,7 +569,7 @@ where
 pub async fn check_and_hold_store_entry<F>(
     hash: &ActionHash,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -628,7 +628,7 @@ where
 pub async fn check_and_hold_store_record<F>(
     hash: &ActionHash,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -644,6 +644,29 @@ where
     Ok(())
 }
 
+/// Allows DhtOps to be sent to some receiver
+#[async_trait::async_trait]
+#[cfg_attr(test, mockall::automock)]
+pub trait DhtOpSender {
+    /// Sends an op
+    async fn send_op(
+        &self,
+        op: DhtOp,
+    ) -> SysValidationResult<()>;
+
+    /// Send a StoreRecord DhtOp
+    async fn send_store_record(&self, record: Record) -> SysValidationResult<()>;
+
+    /// Send a StoreEntry DhtOp
+    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()>;
+
+    /// Send a RegisterAddLink DhtOp
+    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()>;
+
+    /// Send a RegisterAgentActivity DhtOp
+    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()>;
+}
+
 /// Allows you to send an op to the
 /// incoming_dht_ops_workflow if you
 /// found it on the network and were supposed
@@ -654,48 +677,50 @@ pub struct IncomingDhtOpSender {
     sys_validation_trigger: TriggerSender,
 }
 
-impl IncomingDhtOpSender {
-    /// Sends the op to the incoming workflow
+#[async_trait::async_trait]
+impl DhtOpSender for IncomingDhtOpSender {
     async fn send_op(
-        self,
-        record: Record,
-        make_op: fn(Record) -> Option<DhtOp>,
+        &self,
+        op: DhtOp,
     ) -> SysValidationResult<()> {
-        if let Some(op) = make_op(record) {
-            let ops = vec![op];
-            incoming_dht_ops_workflow(
-                self.space.as_ref().clone(),
-                self.sys_validation_trigger,
-                ops,
-                false,
-            )
-            .await
-            .map_err(Box::new)?;
-        }
-        Ok(())
+        let ops = vec![op];
+        Ok(incoming_dht_ops_workflow(
+            self.space.as_ref().clone(),
+            self.sys_validation_trigger.clone(),
+            ops,
+            false,
+        )
+        .await
+        .map_err(Box::new)?)
     }
 
-    async fn send_store_record(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_store_record).await
+    async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
+        self.send_op(make_store_record(record)).await
     }
 
-    async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
         // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
         if is_public_entry {
-            self.send_op(record, make_store_entry).await?;
+            if let Some(op) = make_store_entry(record) {
+                self.send_op(op).await?;
+            }
         }
         Ok(())
     }
 
-    async fn send_register_add_link(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_register_add_link).await
+    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
+        if let Some(op) = make_register_add_link(record) {
+            self.send_op(op).await?;
+        }
+
+        Ok(())
     }
 
-    async fn send_register_agent_activity(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_register_agent_activity).await
+    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
+        self.send_op(make_register_agent_activity(record)).await
     }
 }
 
@@ -742,15 +767,14 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> Option<DhtOp> {
+fn make_store_record(record: Record) -> DhtOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
     // Create the op
-    let op = DhtOp::StoreRecord(signature, action, record_entry);
-    Some(op)
+    DhtOp::StoreRecord(signature, action, record_entry)
 }
 
 /// Make a StoreEntry DhtOp from a Record.
@@ -800,17 +824,17 @@ fn make_register_add_link(record: Record) -> Option<DhtOp> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> Option<DhtOp> {
+fn make_register_agent_activity(record: Record) -> DhtOp {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
 
+    // TODO something seems to have changed here, should this not be able to fail?
     // If the action is the wrong type exit early
     let action = action.into_content();
 
     // Create the op
-    let op = DhtOp::RegisterAgentActivity(signature, action);
-    Some(op)
+    DhtOp::RegisterAgentActivity(signature, action)
 }
 
 #[cfg(test)]
@@ -823,6 +847,7 @@ pub mod test {
     use fixt::Predictable;
     use hdk::prelude::AgentPubKeyFixturator;
     use holochain_keystore::AgentPubKeyExt;
+    use holochain_zome_types::Action;
     use holochain_zome_types::countersigning::PreflightResponse;
     use matches::assert_matches;
 

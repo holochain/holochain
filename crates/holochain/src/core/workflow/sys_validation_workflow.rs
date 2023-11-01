@@ -38,6 +38,8 @@ mod chain_test;
 mod test_ideas;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod validate_op_tests;
 
 #[instrument(skip(
     workspace,
@@ -103,7 +105,7 @@ async fn sys_validation_workflow_inner(
                     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
                     let r =
-                        validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
+                        validate_op(&op, &dna_def, &cascade, Some(&incoming_dht_ops_sender)).await;
                     r.map(|o| (op_hash, o, dependency))
                 }
                 .boxed()
@@ -186,7 +188,7 @@ pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(op, cascade, dna_def, incoming_dht_ops_sender).await {
         Ok(_) => Ok(Outcome::Accepted),
@@ -248,7 +250,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     cascade: &impl Cascade,
     dna_def: &DnaDefHashed,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     match op {
@@ -392,7 +394,7 @@ async fn sys_validate_record_inner(
         maybe_entry: Option<&Entry>,
         cascade: &impl Cascade,
     ) -> SysValidationResult<()> {
-        let incoming_dht_ops_sender = None;
+        let incoming_dht_ops_sender: Option<&IncomingDhtOpSender> = None;
         store_record(action, cascade).await?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
@@ -451,7 +453,7 @@ async fn register_agent_activity(
     action: &Action,
     cascade: &impl Cascade,
     dna_def: &DnaDefHashed,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
@@ -529,7 +531,7 @@ async fn store_entry(
 async fn register_updated_content(
     entry_update: &Update,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
@@ -549,7 +551,7 @@ async fn register_updated_content(
 async fn register_updated_record(
     entry_update: &Update,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
@@ -570,7 +572,7 @@ async fn register_updated_record(
 async fn register_deleted_by(
     record_delete: &Delete,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
@@ -592,7 +594,7 @@ async fn register_deleted_by(
 async fn register_deleted_entry_action(
     record_delete: &Delete,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
@@ -614,7 +616,7 @@ async fn register_deleted_entry_action(
 async fn register_add_link(
     link_add: &CreateLink,
     _cascade: &impl Cascade,
-    _incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    _incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     check_tag_size(&link_add.tag)?;
     Ok(())
@@ -623,7 +625,7 @@ async fn register_add_link(
 async fn register_delete_link(
     link_remove: &DeleteLink,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
