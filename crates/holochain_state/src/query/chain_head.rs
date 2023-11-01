@@ -99,7 +99,7 @@ mod tests {
     use crate::mutations::{insert_action, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::schema::SCHEMA_CELL;
-    use holochain_types::dht_op::DhtOpLight;
+    use holochain_types::dht_op::DhtOpLite;
     use holochain_types::dht_op::OpOrder;
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
 
         for shh in &shhs[..6] {
             let hash = shh.action_address();
-            let op = DhtOpLight::StoreRecord(hash.clone(), None, hash.clone().into());
+            let op = DhtOpLite::StoreRecord(hash.clone(), None, hash.clone().into());
             let op_order = OpOrder::new(op.get_type(), shh.action().timestamp());
             insert_action(&mut txn, shh).unwrap();
             insert_op_lite(
