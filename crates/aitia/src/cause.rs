@@ -45,8 +45,8 @@ impl<T: Fact> Check<T> {
 pub enum Cause<T> {
     #[from]
     Fact(T),
-    Any(Vec<Cause<T>>),
-    Every(Vec<Cause<T>>),
+    Any(String, Vec<Cause<T>>),
+    Every(String, Vec<Cause<T>>),
 }
 
 impl<T: Fact> Cause<T> {
@@ -57,13 +57,13 @@ impl<T: Fact> Cause<T> {
     pub fn explain(&self, ctx: &T::Context) -> String {
         match &self {
             Cause::Fact(fact) => fact.explain(ctx),
-            Cause::Any(cs) => {
+            Cause::Any(name, cs) => {
                 let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
-                format!("ANY({cs:#?})")
+                format!("ANY({:#?})", (name, cs))
             }
-            Cause::Every(cs) => {
+            Cause::Every(name, cs) => {
                 let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
-                format!("EVERY({cs:#?})")
+                format!("EVERY({:#?})", (name, cs))
             }
         }
     }
@@ -73,11 +73,11 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Cause<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Cause::Fact(fact) => f.write_fmt(format_args!("{:?}", fact))?,
-            Cause::Any(cs) => {
-                f.write_fmt(format_args!("ANY({cs:#?})"))?;
+            Cause::Any(name, cs) => {
+                f.write_fmt(format_args!("ANY({:#?})", (name, cs)))?;
             }
-            Cause::Every(cs) => {
-                f.write_fmt(format_args!("EVERY({cs:#?})"))?;
+            Cause::Every(name, cs) => {
+                f.write_fmt(format_args!("EVERY({:#?})", (name, cs)))?;
             }
         }
         Ok(())

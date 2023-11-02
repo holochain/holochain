@@ -186,7 +186,8 @@ impl aitia::Fact for Step {
 
                 if let Some(dep) = dep {
                     let integrated = Cause::from(Integrated { by, op });
-                    Some(Cause::Every(vec![fetched, integrated]))
+                    // TODO: eventually we don't want to just use anything we fetched, right?
+                    Some(Cause::Every("Exists".into(), vec![fetched, integrated]))
                 } else {
                     Some(fetched)
                 }
@@ -207,7 +208,7 @@ impl aitia::Fact for Step {
                         .into()
                     })
                     .collect();
-                Some(Cause::Any(others))
+                Some(Cause::Any("Peer authorities".into(), others))
             }
             Authored { by, op } => {
                 let node = ctx.agent_node(&by).map_err(mapper)?.clone();
@@ -256,6 +257,6 @@ impl Step {
             .map(Cause::from);
 
         any.extend(authors);
-        Ok(Cause::Any(any))
+        Ok(Cause::Any("Authority".into(), any))
     }
 }

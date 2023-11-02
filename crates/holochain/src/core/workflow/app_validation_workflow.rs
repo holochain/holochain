@@ -200,15 +200,21 @@ async fn app_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
+                            aitia::trace!(&hc_sleuth::Step::AppValidated {
+                                by: sleuth_id.clone(),
+                                op: op_hash.clone()
+                            });
+
                             if dependency.is_none() {
+                                aitia::trace!(&hc_sleuth::Step::Integrated {
+                                    by: sleuth_id.clone(),
+                                    op: op_hash.clone()
+                                });
+
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
                             }
-                            aitia::trace!(&hc_sleuth::Step::AppValidated {
-                                by: sleuth_id.clone(),
-                                op: op_hash
-                            });
                         }
                         Outcome::AwaitingDeps(deps) => {
                             awaiting += 1;

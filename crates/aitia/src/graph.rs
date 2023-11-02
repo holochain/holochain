@@ -203,7 +203,7 @@ fn traverse_inner<F: Fact>(
                 }
             }
         }
-        Cause::Any(cs) => {
+        Cause::Any(_, cs) => {
             let checks = recursive_checks(cs).map_err(|err| {
                 // Continue constructing the tree while we bubble up errors
                 tracing::error!("traversal ending due to error: {err:?}");
@@ -228,7 +228,7 @@ fn traverse_inner<F: Fact>(
                 Check::Fail(fails)
             }
         }
-        Cause::Every(cs) => {
+        Cause::Every(_, cs) => {
             let checks = recursive_checks(cs).map_err(|err| {
                 // Continue constructing the tree while we bubble up errors
                 tracing::error!("traversal ending due to error: {err:?}");

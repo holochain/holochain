@@ -1,19 +1,26 @@
 ## todo
 
+### short term
+
 * [ ] Need to make the graph make more sense during a normal failure:
     - If there are any failures, make the graph show only the paths which lead to true facts
     - Render the true facts differently from the false ones, even if only by showing a little check mark
     - There's probably no point in showing the graph if there are no truths
 * [ ] When the graph terminates in an Any or Every, it would be classy to show the underlying Facts which satisfied it
 
+### mid term
+
+* [ ] Add a "passing" mode where we expect the fact to pass, and we validate the entire tree, and add this to a bunch of unit tests
+
+### future
+
+* [ ] Consider making earlier causes declare their implications rather than the other way around
+
 ## limitations
 
 - Must only use one dna hash at a time
 - aitia::trace can only handle one type of fact (per serde)
 
-## future
-
-* [ ] Consider making earlier causes declare their implications rather than the other way around
 
 Seems like earlier causes have the info necessary to construct later ones, so this could make more sense. Either way we can construct the entire tree. However if there are multiple starting points then all starting points need to be declared.
 
