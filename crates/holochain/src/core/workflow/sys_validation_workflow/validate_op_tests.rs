@@ -6,6 +6,8 @@ use fixt::prelude::*;
 use holochain_state::prelude::CreateFixturator;
 use holochain_state::prelude::SignatureFixturator;
 use holochain_cascade::MockCascade;
+use crate::core::workflow::sys_validation_workflow::validate_op;
+use crate::core::MockDhtOpSender;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_op() {
@@ -16,11 +18,11 @@ async fn validate_valid_op() {
 
     let cascade = MockCascade::new();
 
-    
+    validate_op(&op, &dna_def, &cascade, None::<&MockDhtOpSender>).await.unwrap();
 }
 
 fn test_op() -> DhtOp {
-    let mut create_action = fixt!(Create);
+    let create_action = fixt!(Create);
     let action = Action::Create(create_action);
 
     DhtOp::RegisterAgentActivity(fixt!(Signature), action)

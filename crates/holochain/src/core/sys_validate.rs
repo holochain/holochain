@@ -847,7 +847,6 @@ pub mod test {
     use fixt::Predictable;
     use hdk::prelude::AgentPubKeyFixturator;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_zome_types::Action;
     use holochain_zome_types::countersigning::PreflightResponse;
     use matches::assert_matches;
 
