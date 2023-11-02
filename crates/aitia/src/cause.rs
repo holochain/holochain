@@ -59,11 +59,11 @@ impl<T: Fact> Cause<T> {
             Cause::Fact(fact) => fact.explain(ctx),
             Cause::Any(cs) => {
                 let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
-                format!("Any({cs:#?})")
+                format!("ANY({cs:#?})")
             }
             Cause::Every(cs) => {
                 let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
-                format!("Every({cs:#?})")
+                format!("EVERY({cs:#?})")
             }
         }
     }
@@ -74,10 +74,10 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Cause<T> {
         match self {
             Cause::Fact(fact) => f.write_fmt(format_args!("{:?}", fact))?,
             Cause::Any(cs) => {
-                f.write_fmt(format_args!("Any({cs:#?})"))?;
+                f.write_fmt(format_args!("ANY({cs:#?})"))?;
             }
             Cause::Every(cs) => {
-                f.write_fmt(format_args!("Every({cs:#?})"))?;
+                f.write_fmt(format_args!("EVERY({cs:#?})"))?;
             }
         }
         Ok(())

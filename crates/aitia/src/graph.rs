@@ -71,7 +71,7 @@ impl<'c, T: Fact> Default for CauseTree<'c, T> {
 #[derive(Debug, derive_more::Constructor)]
 pub struct CauseError<F: Fact> {
     pub info: String,
-    pub fact: F,
+    pub fact: Option<F>,
 }
 
 #[derive(Debug)]

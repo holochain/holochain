@@ -160,35 +160,18 @@ impl aitia::Fact for Step {
 
         let mapper = |e: CtxError| CauseError {
             info: e.into(),
-            fact: self.clone(),
+            fact: Some(self.clone()),
         };
 
         Ok(match self.clone() {
-            Published { by, op } => Some(Integrated { by, op }.into()),
-            Integrated { by, op } => {
-                let op_info = ctx.op_info(&op).map_err(mapper)?;
-
-                let app_validated = AppValidated {
+            Published { by, op } => Some(Self::authority(ctx, by, op)?),
+            Integrated { by, op } => Some(
+                AppValidated {
                     by: by.clone(),
                     op: op.clone(),
                 }
-                .into();
-                let mut any = vec![app_validated];
-
-                let authors = ctx
-                    .node_agents(&by)
-                    .map_err(mapper)?
-                    .into_iter()
-                    .cloned()
-                    .map(|agent| Authored {
-                        by: agent,
-                        op: op_info.clone(),
-                    })
-                    .map(Cause::from);
-
-                any.extend(authors);
-                Some(Cause::Any(any))
-            }
+                .into(),
+            ),
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
             MissingAppValDep { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
             SysValidated { by, op } => {
@@ -237,5 +220,42 @@ impl aitia::Fact for Step {
 
     fn check(&self, ctx: &Self::Context) -> bool {
         ctx.check(self)
+    }
+}
+
+impl Step {
+    /// The cause which is satisfied by either Integrating this op,
+    /// or having authored this op by any of the local agents
+    pub fn authority(
+        ctx: &Context,
+        by: SleuthId,
+        op: OpRef,
+    ) -> Result<Cause<Self>, CauseError<Self>> {
+        let integrated = Self::Integrated {
+            by: by.clone(),
+            op: op.clone(),
+        }
+        .into();
+        let mut any = vec![integrated];
+
+        let mapper = |e: CtxError| CauseError {
+            info: e.into(),
+            fact: None,
+        };
+
+        let op_info = ctx.op_info(&op).map_err(mapper)?;
+        let authors = ctx
+            .node_agents(&by)
+            .map_err(mapper)?
+            .into_iter()
+            .cloned()
+            .map(|agent| Self::Authored {
+                by: agent,
+                op: op_info.clone(),
+            })
+            .map(Cause::from);
+
+        any.extend(authors);
+        Ok(Cause::Any(any))
     }
 }
