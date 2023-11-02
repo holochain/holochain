@@ -62,14 +62,16 @@ impl<T: Display> std::fmt::Debug for Cause<T> {
         match self {
             Cause::Fact(fact) => f.write_str(&fact.to_string())?,
             Cause::Any(cs) => {
-                f.write_str("Any(")?;
-                f.debug_list().entries(cs.iter()).finish()?;
-                f.write_str(")")?;
+                f.write_fmt(format_args!("Any({cs:#?})"))?;
+                // f.write_str("Any(")?;
+                // f.debug_list().entries(cs.iter()).finish()?;
+                // f.write_str(")")?;
             }
             Cause::Every(cs) => {
-                f.write_str("Every(")?;
-                f.debug_list().entries(cs.iter()).finish()?;
-                f.write_str(")")?;
+                f.write_fmt(format_args!("Every({cs:#?})"))?;
+                // f.write_str("Every(")?;
+                // f.debug_list().entries(cs.iter()).finish()?;
+                // f.write_str(")")?;
             }
         }
         Ok(())

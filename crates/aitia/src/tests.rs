@@ -2,34 +2,13 @@ use std::collections::HashSet;
 
 use maplit::hashset;
 
+use super::simple_report as report;
 use crate::cause::*;
 use crate::graph::*;
 
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
-fn report<T: Fact>(traversal: &Traversal<T>) {
-    match traversal {
-        Traversal::Pass => println!("PASS"),
-        Traversal::Groundless => println!("GROUNDLESS"),
-        Traversal::Fail { tree, passes } => {
-            let dot = format!(
-                "{:?}",
-                petgraph::dot::Dot::with_config(&**tree, &[petgraph::dot::Config::EdgeNoLabel],)
-            );
-
-            if let Ok(graph) = graph_easy(&dot) {
-                println!("`graph-easy` output:\n{}", graph);
-            } else {
-                println!("`graph-easy` not installed. Original dot output: {}", dot);
-            }
-
-            println!("Passing checks: {:#?}", passes);
-        }
-        Traversal::TraversalError(err) => println!("Traversal error: {:?}", err),
-    }
-}
-
-fn path_lengths<T: Fact>(graph: &TruthTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
+fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
     let start_ix = graph.node_indices().find(|i| graph[*i] == start).unwrap();
     let end_ix = graph.node_indices().find(|i| graph[*i] == end).unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)

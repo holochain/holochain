@@ -6,15 +6,37 @@ use std::io::{Read, Write};
 use crate::cause::*;
 
 #[derive(Debug, derive_more::From, derive_more::Deref, derive_more::DerefMut)]
-pub struct TruthTree<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
+pub struct CauseTree<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
 
-impl<T: Display + Clone + Eq + Hash> TruthTree<T> {
+impl<T: Display + Clone + Eq + Hash> CauseTree<T> {
     pub fn nodes(&self) -> HashSet<Cause<T>> {
         self.node_weights().cloned().collect::<HashSet<_>>()
     }
+
+    pub fn print(&self) {
+        let dot = format!(
+            "{:?}",
+            petgraph::dot::Dot::with_attr_getters(
+                &**self,
+                &[petgraph::dot::Config::EdgeNoLabel],
+                &|g, e| "".to_string(),
+                &|g, n| {
+                    // n.1
+                    "nojustify=true".to_string()
+                },
+            )
+        );
+
+        if let Ok(graph) = graph_easy(&dot) {
+            println!("Original dot output: {}", dot);
+            println!("`graph-easy` output:\n{}", graph);
+        } else {
+            println!("`graph-easy` not installed. Original dot output: {}", dot);
+        }
+    }
 }
 
-impl<T: Display> Default for TruthTree<T> {
+impl<T: Display> Default for CauseTree<T> {
     fn default() -> Self {
         Self(Default::default())
     }
@@ -45,15 +67,18 @@ pub enum Traversal<T: Fact> {
     /// The target fact is false, and all paths which lead to true facts
     /// are present in this graph
     Fail {
-        tree: TruthTree<T>,
+        tree: CauseTree<T>,
         passes: Vec<Cause<T>>,
     },
     /// A cause or check call returned an error during traversal
-    TraversalError(CauseError<T>),
+    TraversalError {
+        error: CauseError<T>,
+        tree: CauseTree<T>,
+    },
 }
 
 impl<T: Fact> Traversal<T> {
-    pub fn fail(self) -> Option<(TruthTree<T>, Vec<Cause<T>>)> {
+    pub fn fail(self) -> Option<(CauseTree<T>, Vec<Cause<T>>)> {
         match self {
             Traversal::Fail { tree, passes } => Some((tree, passes)),
             _ => None,
@@ -86,7 +111,10 @@ pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
             }
         }
         Ok(None) => Traversal::Groundless,
-        Err(err) => Traversal::TraversalError(err),
+        Err(error) => {
+            let (tree, _) = produce_graph(&table, cause);
+            Traversal::TraversalError { tree, error }
+        }
     }
 }
 
@@ -132,11 +160,16 @@ fn traverse_inner<F: Fact>(
                 tracing::trace!("fact pass");
                 Check::Pass
             } else {
-                if let Some(cause) = f.cause(ctx)? {
+                if let Some(sub_cause) = f.cause(ctx)? {
                     tracing::trace!("fact fail with cause, traversing");
-                    let check = traverse_inner(&cause, ctx, table)?;
+                    let check = traverse_inner(&sub_cause, ctx, table).map_err(|err| {
+                        // Continue constructing the tree while we bubble up errors
+                        tracing::error!("traversal ending due to error: {err:?}");
+                        table.insert(cause.clone(), Some(Check::Fail(vec![sub_cause.clone()])));
+                        err
+                    })?;
                     tracing::trace!("traversal done, check: {:?}", check);
-                    Check::Fail(vec![cause])
+                    Check::Fail(vec![sub_cause])
                 } else {
                     tracing::trace!("fact fail with no cause, terminating");
                     Check::Fail(vec![])
@@ -144,7 +177,12 @@ fn traverse_inner<F: Fact>(
             }
         }
         Cause::Any(cs) => {
-            let checks = recursive_checks(cs)?;
+            let checks = recursive_checks(cs).map_err(|err| {
+                // Continue constructing the tree while we bubble up errors
+                tracing::error!("traversal ending due to error: {err:?}");
+                table.insert(cause.clone(), Some(Check::Fail(cs.clone())));
+                err
+            })?;
             tracing::trace!("Any. checks: {:?}", checks);
             if checks.is_empty() {
                 // All loops
@@ -164,7 +202,12 @@ fn traverse_inner<F: Fact>(
             }
         }
         Cause::Every(cs) => {
-            let checks = recursive_checks(cs)?;
+            let checks = recursive_checks(cs).map_err(|err| {
+                // Continue constructing the tree while we bubble up errors
+                tracing::error!("traversal ending due to error: {err:?}");
+                table.insert(cause.clone(), Some(Check::Fail(cs.clone())));
+                err
+            })?;
 
             tracing::trace!("Every. checks: {:?}", checks);
             if checks.is_empty() {
@@ -217,8 +260,8 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
 pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> (TruthTree<T>, Vec<Cause<T>>) {
-    let mut g = TruthTree::default();
+) -> (CauseTree<T>, Vec<Cause<T>>) {
+    let mut g = CauseTree::default();
 
     let (sub, passes) = prune_traversal(table, start);
 

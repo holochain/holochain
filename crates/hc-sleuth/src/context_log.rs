@@ -30,17 +30,17 @@ pub fn init_subscriber() -> ContextWriter {
 #[derive(Default, Debug)]
 pub struct Context {
     /// All steps recorded
-    facts: HashSet<Step>,
+    pub facts: HashSet<Step>,
 
     ///
-    entry_actions: HashMap<EntryHash, ActionHash>,
-    pub(crate) map_node_to_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
-    map_agent_to_node: HashMap<AgentPubKey, SleuthId>,
-    map_op_to_sysval_dep_hash: HashMap<OpRef, Option<ActionHash>>,
-    map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
-    map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
-    map_action_to_op: HashMap<OpAction, OpRef>,
-    op_info: HashMap<OpRef, OpInfo>,
+    pub entry_actions: HashMap<EntryHash, ActionHash>,
+    pub map_node_to_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
+    pub map_agent_to_node: HashMap<AgentPubKey, SleuthId>,
+    pub map_op_to_sysval_dep_hash: HashMap<OpRef, Option<ActionHash>>,
+    pub map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
+    pub map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
+    pub map_action_to_op: HashMap<OpAction, OpRef>,
+    pub op_info: HashMap<OpRef, OpInfo>,
 }
 
 impl Context {

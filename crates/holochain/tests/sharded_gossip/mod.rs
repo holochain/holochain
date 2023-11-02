@@ -576,7 +576,7 @@ async fn three_way_gossip(
 
     {
         let ctx = aw.lock();
-        dbg!(&ctx);
+        dbg!(&ctx.map_agent_to_node);
 
         let step = hc_sleuth::Step::Integrated {
             by: conductors[2].id(),

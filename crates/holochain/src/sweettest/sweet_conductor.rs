@@ -109,7 +109,7 @@ impl SweetConductor {
     pub async fn new(
         handle: ConductorHandle,
         env_dir: TestDir,
-        mut config: ConductorConfig,
+        config: ConductorConfig,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -134,10 +134,6 @@ impl SweetConductor {
         .unwrap();
 
         let keystore = handle.keystore().clone();
-
-        if config.tracing_scope().is_none() {
-            config.network.tracing_scope = Some(nanoid!(8));
-        }
 
         Self {
             handle: Some(SweetConductorHandle(handle)),
@@ -209,11 +205,15 @@ impl SweetConductor {
                 .await;
         }
 
-        let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
+        let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.into().into_conductor_config(&*r).await
         } else {
             config.into().into()
         };
+
+        if config.tracing_scope().is_none() {
+            config.network.tracing_scope = Some(nanoid!(8));
+        }
 
         tracing::info!(?config);
 
