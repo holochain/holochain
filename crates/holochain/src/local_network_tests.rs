@@ -55,7 +55,10 @@ async fn conductors_call_remote(num_conductors: usize) {
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
-    let iter = cells.clone().into_iter().zip(conductors.into_inner().into_iter());
+    let iter = cells
+        .clone()
+        .into_iter()
+        .zip(conductors.into_inner().into_iter());
     let keep = std::sync::Mutex::new(Vec::new());
     let keep = &keep;
     futures::stream::iter(iter)
