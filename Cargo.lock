@@ -2507,7 +2507,6 @@ dependencies = [
  "arbitrary",
  "derive_more",
  "hc-sleuth",
- "holochain_p2p",
  "holochain_state_types",
  "holochain_trace 0.3.0-beta-dev.1",
  "holochain_types",
@@ -3105,11 +3104,13 @@ dependencies = [
 name = "holochain_p2p"
 version = "0.3.0-beta-dev.21"
 dependencies = [
+ "aitia",
  "async-trait",
  "derive_more",
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.6",
+ "hc-sleuth",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",

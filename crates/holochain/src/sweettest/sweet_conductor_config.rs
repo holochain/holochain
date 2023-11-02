@@ -1,14 +1,8 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::{atomic::AtomicUsize, Arc};
 
 use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
-use kitsune_p2p_types::{
-    config::{KitsuneP2pConfig, TransportConfig},
-    dependencies::lair_keystore_api::dependencies::nanoid::nanoid,
-};
+use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 

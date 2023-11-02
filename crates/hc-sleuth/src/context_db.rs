@@ -5,7 +5,6 @@ use aitia::{
     logging::{Log, LogLine},
     Fact,
 };
-use holochain_p2p::DnaHashExt;
 use holochain_types::prelude::*;
 
 use super::*;
