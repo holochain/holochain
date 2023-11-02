@@ -85,13 +85,17 @@ default = ["fixturators", "test_utils"]
 
 fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
-  "arbitrary",
-  "contrafact",
-  "holochain_zome_types/arbitrary",
+  "fuzzing",
   "holo_hash/arbitrary",
   "isotest",
   "mr_bundle/arbitrary",
   "holochain_zome_types/test_utils",
+]
+
+fuzzing = [
+  "arbitrary",
+  "contrafact",
+  "holochain_zome_types/fuzzing",
 ]
 
 sqlite-encrypted = [
