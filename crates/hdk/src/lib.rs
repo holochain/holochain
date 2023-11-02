@@ -487,7 +487,7 @@ pub mod map_extern;
 pub mod prelude;
 
 #[cfg(not(feature = "mock"))]
-prelude::holochain_externs!();
+crate::holochain_externs!();
 
 /// Encryption and decryption using the (secret)box algorithms popularised by Libsodium.
 ///
