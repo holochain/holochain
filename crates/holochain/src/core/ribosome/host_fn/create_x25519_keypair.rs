@@ -6,6 +6,7 @@ use holochain_types::prelude::*;
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn create_x25519_keypair(
     _ribosome: Arc<impl RibosomeT>,
