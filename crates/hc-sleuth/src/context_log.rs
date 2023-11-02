@@ -131,7 +131,7 @@ impl aitia::logging::Log for Context {
             Step::Integrated { by, op } => {}
             Step::AppValidated { by, op } => {}
             Step::SysValidated { by, op } => {}
-            Step::PendingAppValidation { by, op, deps } => {
+            Step::MissingAppValDep { by, op, deps } => {
                 self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
@@ -155,6 +155,13 @@ impl aitia::logging::Log for Context {
                     .entry(node)
                     .or_default()
                     .insert(agent);
+            }
+            Step::SweetConductorShutdown { node } => {
+                if let Some(agents) = self.map_node_to_agents.remove(&node) {
+                    for a in agents {
+                        self.map_agent_to_node.remove(&a);
+                    }
+                }
             }
         }
         let duplicate = self.facts.insert(fact.clone());

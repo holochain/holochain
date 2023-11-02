@@ -273,7 +273,8 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
         match table[&next].as_ref() {
             Some(Check::Fail(causes)) => {
                 to_add.extend(causes.iter());
-                sub.insert(next, causes.as_slice());
+                let old = sub.insert(next, causes.as_slice());
+                assert!(old.is_none())
             }
             Some(Check::Pass) => {
                 passes.push(next);

@@ -71,70 +71,56 @@ pub type SleuthId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Step {
+    /// The node has published this at least once, to somebody
     Published {
         by: SleuthId,
         op: OpRef,
     },
+    /// The node has integrated an op authored by someone else
     Integrated {
         by: SleuthId,
         op: OpRef,
     },
+    /// The node has app validated an op authored by someone else
     AppValidated {
         by: SleuthId,
         op: OpRef,
     },
+    /// The node has sys validated an op authored by someone else
     SysValidated {
         by: SleuthId,
         op: OpRef,
     },
 
-    PendingAppValidation {
+    /// TODO: handle a missing app validation dep
+    MissingAppValDep {
         by: SleuthId,
         op: OpRef,
         deps: Vec<AnyDhtHash>,
     },
+    /// The node has fetched an op after hearing about the hash via publish or gossip
     Fetched {
         by: SleuthId,
         op: OpRef,
     },
+    /// The node has authored this op, including validation and integration
     Authored {
         by: AgentPubKey,
         op: OpInfo,
     },
+    /// An agent has joined the network
     AgentJoined {
         node: SleuthId,
         agent: AgentPubKey,
     },
+    // XXX: this is a replacement for a proper AgentLeave. This just lets us act as if every
+    // agent in the SweetConductor has left
+    SweetConductorShutdown {
+        node: SleuthId,
+    },
 }
 
 impl aitia::logging::FactLogJson for Step {}
-
-// impl std::fmt::Display for Step {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Step::Published { by, op } => f.write_fmt(format_args!("[{}] Published: {:?}", by, op)),
-//             Step::Integrated { by, op } => {
-//                 f.write_fmt(format_args!("[{}] Integrated: {:?}", by, op))
-//             }
-//             Step::AppValidated { by, op } => {
-//                 f.write_fmt(format_args!("[{}] AppValidated: {:?}", by, op))
-//             }
-//             Step::SysValidated { by, op } => {
-//                 f.write_fmt(format_args!("[{}] SysValidated: {:?}", by, op))
-//             }
-
-//             Step::PendingAppValidation { by, op, deps } => f.write_fmt(format_args!(
-//                 "[{}] PendingAppValidation: {:?} deps: {:#?}",
-//                 by, op, deps
-//             )),
-//             Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
-//             Step::Authored { by, op } => f.write_fmt(format_args!("[{}] Authored: {:?}", by, op)),
-//             Step::AgentJoined { node, agent } => {
-//                 f.write_fmt(format_args!("[{}] AgentJoined: {:?}", node, agent))
-//             }
-//         }
-//     }
-// }
 
 impl aitia::Fact for Step {
     type Context = Context;
@@ -151,8 +137,7 @@ impl aitia::Fact for Step {
             Step::SysValidated { by, op } => {
                 format!("[{}] SysValidated: {:?}", by, op)
             }
-
-            Step::PendingAppValidation { by, op, deps } => {
+            Step::MissingAppValDep { by, op, deps } => {
                 format!("[{}] PendingAppValidation: {:?} deps: {:#?}", by, op, deps)
             }
             Step::Fetched { by, op } => format!("[{}] Fetched: {:?}", by, op),
@@ -163,6 +148,9 @@ impl aitia::Fact for Step {
             }
             Step::AgentJoined { node, agent } => {
                 format!("[{}] AgentJoined: {:?}", node, agent)
+            }
+            Step::SweetConductorShutdown { node } => {
+                format!("[{}] SweetConductorShutdown", node)
             }
         }
     }
@@ -177,35 +165,47 @@ impl aitia::Fact for Step {
 
         Ok(match self.clone() {
             Published { by, op } => Some(Integrated { by, op }.into()),
-            Integrated { by, op } => Some(AppValidated { by, op }.into()),
+            Integrated { by, op } => {
+                let op_info = ctx.op_info(&op).map_err(mapper)?;
+
+                let app_validated = AppValidated {
+                    by: by.clone(),
+                    op: op.clone(),
+                }
+                .into();
+                let mut any = vec![app_validated];
+
+                let authors = ctx
+                    .node_agents(&by)
+                    .map_err(mapper)?
+                    .into_iter()
+                    .cloned()
+                    .map(|agent| Authored {
+                        by: agent,
+                        op: op_info.clone(),
+                    })
+                    .map(Cause::from);
+
+                any.extend(authors);
+                Some(Cause::Any(any))
+            }
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
-            PendingAppValidation { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
+            MissingAppValDep { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
             SysValidated { by, op } => {
                 let op_info = ctx.op_info(&op).map_err(mapper)?;
                 let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
 
-                let any = Cause::Any(
-                    ctx.node_agents(&by)
-                        .map_err(mapper)?
-                        .into_iter()
-                        .cloned()
-                        .map(|agent| Authored {
-                            by: agent,
-                            op: op_info.clone(),
-                        })
-                        .chain([Fetched {
-                            by: by.clone(),
-                            op: op.clone(),
-                        }])
-                        .map(Cause::from)
-                        .collect(),
-                );
+                let fetched = Fetched {
+                    by: by.clone(),
+                    op: op.clone(),
+                }
+                .into();
 
                 if let Some(dep) = dep {
                     let integrated = Cause::from(Integrated { by, op });
-                    Some(Cause::Every(vec![any, integrated]))
+                    Some(Cause::Every(vec![fetched, integrated]))
                 } else {
-                    Some(any)
+                    Some(fetched)
                 }
             }
             Fetched { by, op } => {
@@ -231,6 +231,7 @@ impl aitia::Fact for Step {
                 Some(Cause::from(AgentJoined { node, agent: by }))
             }
             AgentJoined { node, agent } => None,
+            SweetConductorShutdown { node } => None,
         })
     }
 

@@ -1,8 +1,17 @@
+## todo
+
 * [ ] Need to make the graph make more sense during a normal failure:
     - If there are any failures, make the graph show only the paths which lead to true facts
     - Render the true facts differently from the false ones, even if only by showing a little check mark
     - There's probably no point in showing the graph if there are no truths
 * [ ] When the graph terminates in an Any or Every, it would be classy to show the underlying Facts which satisfied it
+
+## limitations
+
+- Must only use one dna hash at a time
+- aitia::trace can only handle one type of fact (per serde)
+
+## future
 
 * [ ] Consider making earlier causes declare their implications rather than the other way around
 
