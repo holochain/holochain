@@ -1,16 +1,33 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::io::{Read, Write};
 
 use crate::cause::*;
 
 #[derive(Debug, derive_more::From, derive_more::Deref, derive_more::DerefMut)]
-pub struct CauseTree<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
+pub struct CauseTree<'c, T: Fact>(petgraph::graph::DiGraph<TreeNode<'c, T>, ()>);
 
-impl<T: Display + Clone + Eq + Hash> CauseTree<T> {
-    pub fn nodes(&self) -> HashSet<Cause<T>> {
-        self.node_weights().cloned().collect::<HashSet<_>>()
+#[derive(PartialEq, Eq, Hash)]
+pub struct TreeNode<'c, T: Fact> {
+    pub cause: Cause<T>,
+    pub ctx: &'c T::Context,
+}
+
+impl<'c, T: Fact> Clone for TreeNode<'c, T> {
+    fn clone(&self) -> Self {
+        Self {
+            cause: self.cause.clone(),
+            ctx: self.ctx,
+        }
+    }
+}
+
+impl<'c, T: Fact> CauseTree<'c, T> {
+    pub fn causes(&self) -> HashSet<Cause<T>> {
+        self.node_weights()
+            .map(|n| n.cause.clone())
+            .collect::<HashSet<_>>()
     }
 
     pub fn print(&self) {
@@ -28,15 +45,24 @@ impl<T: Display + Clone + Eq + Hash> CauseTree<T> {
         );
 
         if let Ok(graph) = graph_easy(&dot) {
-            println!("Original dot output: {}", dot);
+            println!("Original dot output:\n\n{}", dot);
             println!("`graph-easy` output:\n{}", graph);
         } else {
-            println!("`graph-easy` not installed. Original dot output: {}", dot);
+            println!(
+                "`graph-easy` not installed. Original dot output:\n\n{}",
+                dot
+            );
         }
     }
 }
 
-impl<T: Display> Default for CauseTree<T> {
+impl<'c, T: Fact> Debug for TreeNode<'c, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.cause.explain(self.ctx))
+    }
+}
+
+impl<'c, T: Fact> Default for CauseTree<'c, T> {
     fn default() -> Self {
         Self(Default::default())
     }
@@ -59,7 +85,7 @@ pub enum TraversalError<F: Fact> {
 
 #[derive(Debug, derive_more::From)]
 // #[cfg_attr(test, derive(PartialEq))]
-pub enum Traversal<T: Fact> {
+pub enum Traversal<'c, T: Fact> {
     /// The target fact is true; nothing more needs to be said
     Pass,
     /// The target is false and there is no path to any true fact
@@ -67,20 +93,21 @@ pub enum Traversal<T: Fact> {
     /// The target fact is false, and all paths which lead to true facts
     /// are present in this graph
     Fail {
-        tree: CauseTree<T>,
+        tree: CauseTree<'c, T>,
         passes: Vec<Cause<T>>,
+        ctx: &'c T::Context,
     },
     /// A cause or check call returned an error during traversal
     TraversalError {
         error: CauseError<T>,
-        tree: CauseTree<T>,
+        tree: CauseTree<'c, T>,
     },
 }
 
-impl<T: Fact> Traversal<T> {
-    pub fn fail(self) -> Option<(CauseTree<T>, Vec<Cause<T>>)> {
+impl<'c, T: Fact> Traversal<'c, T> {
+    pub fn fail(self) -> Option<(CauseTree<'c, T>, Vec<Cause<T>>)> {
         match self {
-            Traversal::Fail { tree, passes } => Some((tree, passes)),
+            Traversal::Fail { tree, passes, .. } => Some((tree, passes)),
             _ => None,
         }
     }
@@ -99,20 +126,20 @@ pub type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
 /// If a path ends in a failing check, or if it forms a loop without encountering
 /// a passing check, we don't add that path to the graph.
 #[tracing::instrument(skip(ctx))]
-pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
+pub fn traverse<'c, F: Fact>(cause: &Cause<F>, ctx: &'c F::Context) -> Traversal<'c, F> {
     let mut table = TraversalMap::default();
     match traverse_inner(cause, ctx, &mut table) {
         Ok(Some(check)) => {
             if check.is_pass() {
                 Traversal::Pass
             } else {
-                let (tree, passes) = produce_graph(&table, cause);
-                Traversal::Fail { tree, passes }
+                let (tree, passes) = produce_graph(&table, cause, ctx);
+                Traversal::Fail { tree, passes, ctx }
             }
         }
         Ok(None) => Traversal::Groundless,
         Err(error) => {
-            let (tree, _) = produce_graph(&table, cause);
+            let (tree, _) = produce_graph(&table, cause, ctx);
             Traversal::TraversalError { tree, error }
         }
     }
@@ -257,10 +284,11 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     (sub, passes)
 }
 
-pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
+pub fn produce_graph<'a, 'b: 'a, 'c, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> (CauseTree<T>, Vec<Cause<T>>) {
+    ctx: &'c T::Context,
+) -> (CauseTree<'c, T>, Vec<Cause<T>>) {
     let mut g = CauseTree::default();
 
     let (sub, passes) = prune_traversal(table, start);
@@ -268,7 +296,10 @@ pub fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
     let rows: Vec<_> = sub.into_iter().collect();
     let mut nodemap = HashMap::new();
     for (i, (k, _)) in rows.iter().enumerate() {
-        let id = g.add_node((*k).to_owned());
+        let id = g.add_node(TreeNode {
+            cause: (*k).to_owned(),
+            ctx,
+        });
         nodemap.insert(k, id);
         assert_eq!(id.index(), i);
     }

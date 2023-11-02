@@ -9,8 +9,14 @@ use crate::graph::*;
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
 fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
-    let start_ix = graph.node_indices().find(|i| graph[*i] == start).unwrap();
-    let end_ix = graph.node_indices().find(|i| graph[*i] == end).unwrap();
+    let start_ix = graph
+        .node_indices()
+        .find(|i| graph[*i].cause == start)
+        .unwrap();
+    let end_ix = graph
+        .node_indices()
+        .find(|i| graph[*i].cause == end)
+        .unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
         .map(|c| c.len())
         .collect()
@@ -40,7 +46,7 @@ fn singleton() {
         .traverse(&(false, false))
         .fail()
         .unwrap();
-    assert_eq!(graph.nodes(), maplit::hashset! {Singleton.into()});
+    assert_eq!(graph.causes(), maplit::hashset! {Singleton.into()});
     assert_eq!(graph.edge_count(), 0);
 
     // Loop ending in falsity
@@ -97,7 +103,7 @@ fn single_path() {
             .fail()
             .unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![
                 Cause::from(Countdown(0)),
                 Cause::from(Countdown(1)),
@@ -110,7 +116,7 @@ fn single_path() {
     {
         let (graph, _passes) = Cause::from(Countdown(2)).traverse(&true_3).fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![
                 Cause::from(Countdown(0)),
                 Cause::from(Countdown(1)),
@@ -122,7 +128,7 @@ fn single_path() {
     {
         let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![
                 Cause::from(Countdown(1)),
                 Cause::from(Countdown(2)),
@@ -134,10 +140,9 @@ fn single_path() {
     }
     {
         let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_1).fail().unwrap();
-        let nodes = graph.node_weights().cloned().collect::<HashSet<_>>();
 
         assert_eq!(
-            nodes,
+            graph.causes(),
             maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(3))]
         );
 
@@ -183,7 +188,7 @@ fn loopy() {
         let tr = Cause::from(Countdown(3)).traverse(&true_1);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![Cause::from(Countdown(3)), Cause::from(Countdown(2))]
         );
         assert_eq!(graph.edge_count(), 1);
@@ -192,7 +197,7 @@ fn loopy() {
         let tr = Cause::from(Countdown(2)).traverse(&true_3);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(1))]
         );
         assert_eq!(graph.edge_count(), 1);
@@ -220,7 +225,8 @@ fn branching_any() {
     }
 
     {
-        let tr = Cause::from(Branching(2)).traverse(&maplit::hashset![40, 64]);
+        let ctx = maplit::hashset![40, 64];
+        let tr = Cause::from(Branching(2)).traverse(&ctx);
         report(&tr);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
@@ -233,7 +239,8 @@ fn branching_any() {
         );
     }
     {
-        let tr = Cause::from(Branching(2)).traverse(&(32..128).collect());
+        let ctx = (32..128).collect();
+        let tr = Cause::from(Branching(2)).traverse(&ctx);
         report(&tr);
         let _ = tr.fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case.
@@ -291,37 +298,41 @@ fn simple_every() {
         // - loops with Every might take some more thought.
 
         {
-            let tr = Cause::from(GrilledCheese).traverse(&maplit::hashset![Cheese, Bread]);
+            let ctx = maplit::hashset![Cheese, Bread];
+            let tr = Cause::from(GrilledCheese).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
-            assert_eq!(g.nodes(), maplit::hashset!(Cause::from(GrilledCheese)));
+            assert_eq!(g.causes(), maplit::hashset!(Cause::from(GrilledCheese)));
         }
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread]);
+            let ctx = maplit::hashset![Cheese, Bread];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
             assert_eq!(
-                g.nodes()
+                g.causes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
                     .count(),
                 3
             );
         }
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, TunaSalad]);
+            let ctx = maplit::hashset![Cheese, Bread, TunaSalad];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
-            assert_eq!(g.nodes(), maplit::hashset!(Cause::from(TunaMelt)));
+            assert_eq!(g.causes(), maplit::hashset!(Cause::from(TunaMelt)));
         }
 
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Eggs, Tuna]);
+            let ctx = maplit::hashset![Cheese, Bread, Eggs, Tuna];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
 
             // Only the Vinegar base ingredient is included
             assert_eq!(
-                g.nodes()
+                g.causes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
                     .cloned()
                     .collect::<HashSet<_>>(),
@@ -330,13 +341,14 @@ fn simple_every() {
         }
 
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Mayo]);
+            let ctx = maplit::hashset![Cheese, Bread, Mayo];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
 
             // Only the Tuna base ingredient is included
             assert_eq!(
-                g.nodes()
+                g.causes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
                     .cloned()
                     .collect::<HashSet<_>>(),

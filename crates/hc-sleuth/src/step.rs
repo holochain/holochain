@@ -109,38 +109,62 @@ pub enum Step {
 
 impl aitia::logging::FactLogJson for Step {}
 
-impl std::fmt::Display for Step {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Step::Published { by, op } => f.write_fmt(format_args!("[{}] Published: {:?}", by, op)),
-            Step::Integrated { by, op } => {
-                f.write_fmt(format_args!("[{}] Integrated: {:?}", by, op))
-            }
-            Step::AppValidated { by, op } => {
-                f.write_fmt(format_args!("[{}] AppValidated: {:?}", by, op))
-            }
-            Step::SysValidated { by, op } => {
-                f.write_fmt(format_args!("[{}] SysValidated: {:?}", by, op))
-            }
+// impl std::fmt::Display for Step {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Step::Published { by, op } => f.write_fmt(format_args!("[{}] Published: {:?}", by, op)),
+//             Step::Integrated { by, op } => {
+//                 f.write_fmt(format_args!("[{}] Integrated: {:?}", by, op))
+//             }
+//             Step::AppValidated { by, op } => {
+//                 f.write_fmt(format_args!("[{}] AppValidated: {:?}", by, op))
+//             }
+//             Step::SysValidated { by, op } => {
+//                 f.write_fmt(format_args!("[{}] SysValidated: {:?}", by, op))
+//             }
 
-            Step::PendingAppValidation { by, op, deps } => f.write_fmt(format_args!(
-                "[{}] PendingAppValidation: {:?} deps: {:#?}",
-                by, op, deps
-            )),
-            Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
-            Step::Authored { by, op } => f.write_fmt(format_args!("[{}] Authored: {:?}", by, op)),
-            Step::AgentJoined { node, agent } => {
-                f.write_fmt(format_args!("[{}] AgentJoined: {:?}", node, agent))
-            }
-        }
-    }
-}
+//             Step::PendingAppValidation { by, op, deps } => f.write_fmt(format_args!(
+//                 "[{}] PendingAppValidation: {:?} deps: {:#?}",
+//                 by, op, deps
+//             )),
+//             Step::Fetched { by, op } => f.write_fmt(format_args!("[{}] Fetched: {:?}", by, op)),
+//             Step::Authored { by, op } => f.write_fmt(format_args!("[{}] Authored: {:?}", by, op)),
+//             Step::AgentJoined { node, agent } => {
+//                 f.write_fmt(format_args!("[{}] AgentJoined: {:?}", node, agent))
+//             }
+//         }
+//     }
+// }
 
 impl aitia::Fact for Step {
     type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {
-        self.to_string()
+        match self {
+            Step::Published { by, op } => format!("[{}] Published: {:?}", by, op),
+            Step::Integrated { by, op } => {
+                format!("[{}] Integrated: {:?}", by, op)
+            }
+            Step::AppValidated { by, op } => {
+                format!("[{}] AppValidated: {:?}", by, op)
+            }
+            Step::SysValidated { by, op } => {
+                format!("[{}] SysValidated: {:?}", by, op)
+            }
+
+            Step::PendingAppValidation { by, op, deps } => {
+                format!("[{}] PendingAppValidation: {:?} deps: {:#?}", by, op, deps)
+            }
+            Step::Fetched { by, op } => format!("[{}] Fetched: {:?}", by, op),
+            Step::Authored { by, op } => {
+                let node = ctx.agent_node(&by).expect("I got lazy");
+                let op_hash = op.as_hash();
+                format!("[{}] Authored: {:?}", node, op_hash)
+            }
+            Step::AgentJoined { node, agent } => {
+                format!("[{}] AgentJoined: {:?}", node, agent)
+            }
+        }
     }
 
     fn cause(&self, ctx: &Self::Context) -> CauseResult<Self> {

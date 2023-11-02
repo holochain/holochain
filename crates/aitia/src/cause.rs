@@ -1,15 +1,13 @@
-use std::fmt::Display;
-
 use crate::graph::{traverse, CauseError, Traversal};
 
-pub trait FactTraits: Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {}
-impl<T> FactTraits for T where T: Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {}
+pub trait FactTraits: Clone + Eq + std::fmt::Debug + std::hash::Hash {}
+impl<T> FactTraits for T where T: Clone + Eq + std::fmt::Debug + std::hash::Hash {}
 
 pub trait Fact: FactTraits {
     type Context;
 
     fn explain(&self, _ctx: &Self::Context) -> String {
-        self.to_string()
+        format!("{:?}", self)
     }
     fn cause(&self, ctx: &Self::Context) -> CauseResult<Self>;
     fn check(&self, ctx: &Self::Context) -> bool;
@@ -52,26 +50,34 @@ pub enum Cause<T> {
 }
 
 impl<T: Fact> Cause<T> {
-    pub fn traverse(&self, ctx: &T::Context) -> Traversal<T> {
+    pub fn traverse<'c>(&self, ctx: &'c T::Context) -> Traversal<'c, T> {
         traverse(self, ctx)
+    }
+
+    pub fn explain(&self, ctx: &T::Context) -> String {
+        match &self {
+            Cause::Fact(fact) => fact.explain(ctx),
+            Cause::Any(cs) => {
+                let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
+                format!("Any({cs:#?})")
+            }
+            Cause::Every(cs) => {
+                let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
+                format!("Every({cs:#?})")
+            }
+        }
     }
 }
 
-impl<T: Display> std::fmt::Debug for Cause<T> {
+impl<T: std::fmt::Debug> std::fmt::Debug for Cause<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Cause::Fact(fact) => f.write_str(&fact.to_string())?,
+            Cause::Fact(fact) => f.write_fmt(format_args!("{:?}", fact))?,
             Cause::Any(cs) => {
                 f.write_fmt(format_args!("Any({cs:#?})"))?;
-                // f.write_str("Any(")?;
-                // f.debug_list().entries(cs.iter()).finish()?;
-                // f.write_str(")")?;
             }
             Cause::Every(cs) => {
                 f.write_fmt(format_args!("Every({cs:#?})"))?;
-                // f.write_str("Every(")?;
-                // f.debug_list().entries(cs.iter()).finish()?;
-                // f.write_str(")")?;
             }
         }
         Ok(())

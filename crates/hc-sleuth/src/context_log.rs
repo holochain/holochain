@@ -157,8 +157,8 @@ impl aitia::logging::Log for Context {
                     .insert(agent);
             }
         }
-        let exists = self.facts.insert(fact.clone());
-        if exists {
+        let duplicate = self.facts.insert(fact.clone());
+        if duplicate {
             tracing::warn!("Duplicate fact {:?}", fact);
         }
     }

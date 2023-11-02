@@ -18,11 +18,16 @@ impl<T> FactLogTraits for T where T: FactTraits + serde::Serialize + serde::de::
 #[macro_export]
 macro_rules! trace {
     ($fact:expr) => {
-        // The tracing level doesn't matter
+        // Note the tracing level doesn't matter when using the AitiaWriter, but it
+        // of course affects whether this will be present in the normal logs
+
+        // XXX: because the JSON representation is wonky,
+        let fact = $fact;
         tracing::info!(
             aitia = "json",
+            ?fact,
             "<AITIA>{}</AITIA>",
-            $crate::logging::LogLine::encode($fact)
+            $crate::logging::LogLine::encode(fact)
         );
     };
 }
