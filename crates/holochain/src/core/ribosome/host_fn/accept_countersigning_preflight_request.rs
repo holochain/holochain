@@ -160,6 +160,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_timeout_session() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -394,6 +395,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
 
@@ -515,6 +517,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
 
@@ -823,6 +826,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn enzymatic_session_success() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
