@@ -23,7 +23,6 @@ webpki = "=0.22.2" # pinned until other libraries upgrade to ring 0.17
 rustls = { version = "0.20.4", features = [ "dangerous_configuration" ] }
 serde = { version = ">= 1.0, <= 1.0.166", features = [ "derive" ] }
 tokio = { version = "1.27", features = [ "full" ] }
-webpki = "0.22.0"
 
 [features]
 sqlite-encrypted = [
