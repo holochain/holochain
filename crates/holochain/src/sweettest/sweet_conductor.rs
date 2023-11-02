@@ -3,7 +3,7 @@
 
 use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
-    SweetConductorHandle,
+    SweetConductorHandle, NUM_CREATED,
 };
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
@@ -22,6 +22,7 @@ use holochain_websocket::*;
 use nanoid::nanoid;
 use rand::Rng;
 use std::path::Path;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -212,7 +213,11 @@ impl SweetConductor {
         };
 
         if config.tracing_scope().is_none() {
-            config.network.tracing_scope = Some(nanoid!(8));
+            config.network.tracing_scope = Some(format!(
+                "{}.{}",
+                NUM_CREATED.load(Ordering::SeqCst),
+                nanoid!(5)
+            ));
         }
 
         tracing::info!(?config);
@@ -242,6 +247,8 @@ impl SweetConductor {
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
+        NUM_CREATED.fetch_add(1, Ordering::SeqCst);
+
         Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)

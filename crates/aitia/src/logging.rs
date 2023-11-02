@@ -21,7 +21,8 @@ macro_rules! trace {
         // Note the tracing level doesn't matter when using the AitiaWriter, but it
         // of course affects whether this will be present in the normal logs
 
-        // XXX: because the JSON representation is wonky,
+        // XXX: because the JSON representation is wonky, especially for hashes,
+        //      we also redundantly print a normal debug for better log readability
         let fact = $fact;
         tracing::info!(
             aitia = "json",
