@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath
+- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## 0.4.0-beta-dev.14
 
 ## 0.4.0-beta-dev.13
 
