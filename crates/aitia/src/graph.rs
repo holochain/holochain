@@ -88,8 +88,6 @@ pub enum TraversalError<F: Fact> {
 pub enum Traversal<'c, T: Fact> {
     /// The target fact is true; nothing more needs to be said
     Pass,
-    /// The target is false and there is no path to any true fact
-    Groundless,
     /// The target fact is false, and all paths which lead to true facts
     /// are present in this graph
     Fail {
@@ -129,15 +127,14 @@ pub type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
 pub fn traverse<'c, F: Fact>(cause: &Cause<F>, ctx: &'c F::Context) -> Traversal<'c, F> {
     let mut table = TraversalMap::default();
     match traverse_inner(cause, ctx, &mut table) {
-        Ok(Some(check)) => {
-            if check.is_pass() {
+        Ok(maybe_check) => {
+            if let Some(Check::Pass) = maybe_check {
                 Traversal::Pass
             } else {
                 let (tree, passes) = produce_graph(&table, cause, ctx);
                 Traversal::Fail { tree, passes, ctx }
             }
         }
-        Ok(None) => Traversal::Groundless,
         Err(error) => {
             let (tree, _) = produce_graph(&table, cause, ctx);
             Traversal::TraversalError { tree, error }
@@ -272,9 +269,15 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     while let Some(next) = to_add.pop() {
         match table[&next].as_ref() {
             Some(Check::Fail(causes)) => {
-                to_add.extend(causes.iter());
                 let old = sub.insert(next, causes.as_slice());
-                assert!(old.is_none())
+                if let Some(old) = old {
+                    assert_eq!(
+                        old, causes,
+                        "Looped back to same node, but with different children?"
+                    );
+                } else {
+                    to_add.extend(causes.iter());
+                }
             }
             Some(Check::Pass) => {
                 passes.push(next);

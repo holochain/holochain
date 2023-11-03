@@ -15,7 +15,6 @@ use graph::Traversal;
 pub fn simple_report<T: Fact>(traversal: &Traversal<T>) {
     match traversal {
         Traversal::Pass => println!("PASS"),
-        Traversal::Groundless => println!("GROUNDLESS"),
         Traversal::Fail { tree, passes, ctx } => {
             tree.print();
             let passes: Vec<_> = passes.into_iter().map(|p| p.explain(ctx)).collect();

@@ -50,10 +50,12 @@ fn singleton() {
     assert_eq!(graph.edge_count(), 0);
 
     // Loop ending in falsity
-    assert!(matches!(
-        Cause::from(Singleton).traverse(&(true, false)),
-        Traversal::Groundless
-    ));
+    let (graph, _passes) = Cause::from(Singleton)
+        .traverse(&(false, false))
+        .fail()
+        .unwrap();
+    assert_eq!(graph.causes(), maplit::hashset! {Singleton.into()});
+    assert_eq!(graph.edge_count(), 0);
 
     // Self is true
     assert!(matches!(
@@ -178,11 +180,21 @@ fn loopy() {
     let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
     let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
     let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
-
-    assert!(matches!(
-        Cause::from(Countdown(3)).traverse(&true_0),
-        Traversal::Groundless
-    ));
+    {
+        let tr = Cause::from(Countdown(3)).traverse(&true_0);
+        report(&tr);
+        let (graph, _passes) = tr.fail().unwrap();
+        assert_eq!(
+            graph.causes(),
+            maplit::hashset![
+                Cause::from(Countdown(3)),
+                Cause::from(Countdown(2)),
+                Cause::from(Countdown(1)),
+            ]
+        );
+        // The graph should show the loop
+        assert_eq!(graph.edge_count(), 3);
+    }
 
     {
         let tr = Cause::from(Countdown(3)).traverse(&true_1);
@@ -227,7 +239,7 @@ fn branching_any() {
     {
         let ctx = maplit::hashset![40, 64];
         let tr = Cause::from(Branching(2)).traverse(&ctx);
-        report(&tr);
+        // report(&tr);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
             path_lengths(&graph, Branching(2).into(), Branching(20).into()),
@@ -241,7 +253,7 @@ fn branching_any() {
     {
         let ctx = (32..128).collect();
         let tr = Cause::from(Branching(2)).traverse(&ctx);
-        report(&tr);
+        // report(&tr);
         let _ = tr.fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case.
     }
