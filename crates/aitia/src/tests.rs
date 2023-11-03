@@ -215,12 +215,8 @@ fn branching_any() {
         type Context = HashSet<u8>;
 
         fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
-            Ok((self.0 <= 64).then(|| {
-                Cause::Any(
-                    "Branch".into(),
-                    vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()],
-                )
-            }))
+            Ok((self.0 <= 64)
+                .then(|| Cause::any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()])))
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -278,16 +274,17 @@ fn simple_every() {
             Ok(match self {
                 Eggs => None,
                 Vinegar => None,
-                Mayo => Some(Cause::Every("".into(), vec![Eggs.into(), Vinegar.into()])),
+                Mayo => Some(Cause::every(vec![Eggs.into(), Vinegar.into()])),
                 Tuna => None,
                 Cheese => None,
                 Bread => None,
-                TunaSalad => Some(Cause::Every("".into(), vec![Tuna.into(), Mayo.into()])),
-                TunaMelt => Some(Cause::Every(
-                    "".into(),
-                    vec![TunaSalad.into(), Cheese.into(), Bread.into()],
-                )),
-                GrilledCheese => Some(Cause::Every("".into(), vec![Cheese.into(), Bread.into()])),
+                TunaSalad => Some(Cause::every(vec![Tuna.into(), Mayo.into()])),
+                TunaMelt => Some(Cause::every(vec![
+                    TunaSalad.into(),
+                    Cheese.into(),
+                    Bread.into(),
+                ])),
+                GrilledCheese => Some(Cause::every(vec![Cheese.into(), Bread.into()])),
             })
         }
 
@@ -399,14 +396,14 @@ fn holochain_like() {
             use Stage::*;
             Ok(match self.stage {
                 Create => None,
-                Fetch => Some(Cause::Any(
-                    "Receive either".into(),
+                Fetch => Some(Cause::any_named(
+                    "Receive either",
                     vec![self.mine(ReceiveA), self.mine(ReceiveB)],
                 )),
                 ReceiveA => Some(self.theirs(SendA)),
                 ReceiveB => Some(self.theirs(SendB)),
-                Store => Some(Cause::Any(
-                    "Hold".into(),
+                Store => Some(Cause::any_named(
+                    "Hold",
                     vec![self.mine(Create), self.mine(Fetch)],
                 )),
                 SendA => Some(self.mine(Store)),

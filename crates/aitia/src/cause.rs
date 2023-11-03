@@ -45,11 +45,27 @@ impl<T: Fact> Check<T> {
 pub enum Cause<T> {
     #[from]
     Fact(T),
-    Any(String, Vec<Cause<T>>),
-    Every(String, Vec<Cause<T>>),
+    Any(Option<String>, Vec<Cause<T>>),
+    Every(Option<String>, Vec<Cause<T>>),
 }
 
 impl<T: Fact> Cause<T> {
+    pub fn any(causes: Vec<Cause<T>>) -> Self {
+        Self::Any(None, causes)
+    }
+
+    pub fn any_named(name: impl ToString, causes: Vec<Cause<T>>) -> Self {
+        Self::Any(Some(name.to_string()), causes)
+    }
+
+    pub fn every(causes: Vec<Cause<T>>) -> Self {
+        Self::Every(None, causes)
+    }
+
+    pub fn every_named(name: impl ToString, causes: Vec<Cause<T>>) -> Self {
+        Self::Every(Some(name.to_string()), causes)
+    }
+
     pub fn traverse<'c>(&self, ctx: &'c T::Context) -> Traversal<'c, T> {
         traverse(self, ctx)
     }
@@ -59,11 +75,19 @@ impl<T: Fact> Cause<T> {
             Cause::Fact(fact) => fact.explain(ctx),
             Cause::Any(name, cs) => {
                 let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
-                format!("ANY({:#?})", (name, cs))
+                if let Some(name) = name {
+                    format!("ANY({:#?})", (name, cs))
+                } else {
+                    format!("ANY({:#?})", cs)
+                }
             }
             Cause::Every(name, cs) => {
                 let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
-                format!("EVERY({:#?})", (name, cs))
+                if let Some(name) = name {
+                    format!("EVERY({:#?})", (name, cs))
+                } else {
+                    format!("EVERY({:#?})", cs)
+                }
             }
         }
     }
