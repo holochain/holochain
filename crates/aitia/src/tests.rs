@@ -2,38 +2,21 @@ use std::collections::HashSet;
 
 use maplit::hashset;
 
+use super::simple_report as report;
 use crate::cause::*;
 use crate::graph::*;
 
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
-fn report<T: Fact>(traversal: &Traversal<T>) {
-    match traversal {
-        Traversal::Pass => println!("PASS"),
-        Traversal::Groundless => println!("GROUNDLESS"),
-        Traversal::Fail {
-            graph: tree,
-            passes,
-        } => {
-            let dot = format!(
-                "{:?}",
-                petgraph::dot::Dot::with_config(&**tree, &[petgraph::dot::Config::EdgeNoLabel],)
-            );
-
-            if let Ok(graph) = graph_easy(&dot) {
-                println!("`graph-easy` output:\n{}", graph);
-            } else {
-                println!("`graph-easy` not installed. Original dot output: {}", dot);
-            }
-
-            println!("Passing checks: {:#?}", passes);
-        }
-    }
-}
-
-fn path_lengths<T: Fact>(graph: &CausalGraph<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
-    let start_ix = graph.node_indices().find(|i| graph[*i] == start).unwrap();
-    let end_ix = graph.node_indices().find(|i| graph[*i] == end).unwrap();
+fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
+    let start_ix = graph
+        .node_indices()
+        .find(|i| graph[*i].cause == start)
+        .unwrap();
+    let end_ix = graph
+        .node_indices()
+        .find(|i| graph[*i].cause == end)
+        .unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
         .map(|c| c.len())
         .collect()
@@ -49,8 +32,8 @@ fn singleton() {
     impl Fact for Singleton {
         type Context = (bool, bool);
 
-        fn cause(&self, (self_ref, _): &Self::Context) -> Option<Cause<Self>> {
-            self_ref.then_some(Self.into())
+        fn cause(&self, (self_ref, _): &Self::Context) -> CauseResult<Self> {
+            Ok(self_ref.then_some(Self.into()))
         }
 
         fn check(&self, (_, check): &Self::Context) -> bool {
@@ -63,14 +46,16 @@ fn singleton() {
         .traverse(&(false, false))
         .fail()
         .unwrap();
-    assert_eq!(graph.nodes(), maplit::hashset! {Singleton.into()});
+    assert_eq!(graph.causes(), maplit::hashset! {Singleton.into()});
     assert_eq!(graph.edge_count(), 0);
 
     // Loop ending in falsity
-    assert!(matches!(
-        Cause::from(Singleton).traverse(&(true, false)),
-        Traversal::Groundless
-    ));
+    let (graph, _passes) = Cause::from(Singleton)
+        .traverse(&(false, false))
+        .fail()
+        .unwrap();
+    assert_eq!(graph.causes(), maplit::hashset! {Singleton.into()});
+    assert_eq!(graph.edge_count(), 0);
 
     // Self is true
     assert!(matches!(
@@ -95,14 +80,14 @@ fn single_path() {
     impl Fact for Countdown {
         type Context = Checks<Self>;
 
-        fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
-            match self.0 {
+        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+            Ok(match self.0 {
                 3 => Some(Self(2).into()),
                 2 => Some(Self(1).into()),
                 1 => Some(Self(0).into()),
                 0 => None,
                 _ => unreachable!(),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -120,7 +105,7 @@ fn single_path() {
             .fail()
             .unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![
                 Cause::from(Countdown(0)),
                 Cause::from(Countdown(1)),
@@ -133,7 +118,7 @@ fn single_path() {
     {
         let (graph, _passes) = Cause::from(Countdown(2)).traverse(&true_3).fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![
                 Cause::from(Countdown(0)),
                 Cause::from(Countdown(1)),
@@ -145,7 +130,7 @@ fn single_path() {
     {
         let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![
                 Cause::from(Countdown(1)),
                 Cause::from(Countdown(2)),
@@ -157,10 +142,9 @@ fn single_path() {
     }
     {
         let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_1).fail().unwrap();
-        let nodes = graph.node_weights().cloned().collect::<HashSet<_>>();
 
         assert_eq!(
-            nodes,
+            graph.causes(),
             maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(3))]
         );
 
@@ -178,14 +162,14 @@ fn loopy() {
     impl Fact for Countdown {
         type Context = Checks<Self>;
 
-        fn cause(&self, _: &Self::Context) -> Option<Cause<Self>> {
-            match self.0 {
+        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+            Ok(match self.0 {
                 3 => Some(Self(2).into()),
                 2 => Some(Self(1).into()),
                 1 => Some(Self(3).into()),
                 0 => None,
                 _ => unreachable!(),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -196,17 +180,27 @@ fn loopy() {
     let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
     let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
     let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
-
-    assert!(matches!(
-        Cause::from(Countdown(3)).traverse(&true_0),
-        Traversal::Groundless
-    ));
+    {
+        let tr = Cause::from(Countdown(3)).traverse(&true_0);
+        report(&tr);
+        let (graph, _passes) = tr.fail().unwrap();
+        assert_eq!(
+            graph.causes(),
+            maplit::hashset![
+                Cause::from(Countdown(3)),
+                Cause::from(Countdown(2)),
+                Cause::from(Countdown(1)),
+            ]
+        );
+        // The graph should show the loop
+        assert_eq!(graph.edge_count(), 3);
+    }
 
     {
         let tr = Cause::from(Countdown(3)).traverse(&true_1);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![Cause::from(Countdown(3)), Cause::from(Countdown(2))]
         );
         assert_eq!(graph.edge_count(), 1);
@@ -215,7 +209,7 @@ fn loopy() {
         let tr = Cause::from(Countdown(2)).traverse(&true_3);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
-            graph.nodes(),
+            graph.causes(),
             maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(1))]
         );
         assert_eq!(graph.edge_count(), 1);
@@ -232,9 +226,9 @@ fn branching_any() {
     impl Fact for Branching {
         type Context = HashSet<u8>;
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
-            (self.0 <= 64)
-                .then(|| Cause::Any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()]))
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+            Ok((self.0 <= 64)
+                .then(|| Cause::any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()])))
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -243,8 +237,9 @@ fn branching_any() {
     }
 
     {
-        let tr = Cause::from(Branching(2)).traverse(&maplit::hashset![40, 64]);
-        report(&tr);
+        let ctx = maplit::hashset![40, 64];
+        let tr = Cause::from(Branching(2)).traverse(&ctx);
+        // report(&tr);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
             path_lengths(&graph, Branching(2).into(), Branching(20).into()),
@@ -256,8 +251,9 @@ fn branching_any() {
         );
     }
     {
-        let tr = Cause::from(Branching(2)).traverse(&(32..128).collect());
-        report(&tr);
+        let ctx = (32..128).collect();
+        let tr = Cause::from(Branching(2)).traverse(&ctx);
+        // report(&tr);
         let _ = tr.fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case.
     }
@@ -285,23 +281,23 @@ fn simple_every() {
     impl Fact for Recipe {
         type Context = HashSet<Recipe>;
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
             use Recipe::*;
-            match self {
+            Ok(match self {
                 Eggs => None,
                 Vinegar => None,
-                Mayo => Some(Cause::Every(vec![Eggs.into(), Vinegar.into()])),
+                Mayo => Some(Cause::every(vec![Eggs.into(), Vinegar.into()])),
                 Tuna => None,
                 Cheese => None,
                 Bread => None,
-                TunaSalad => Some(Cause::Every(vec![Tuna.into(), Mayo.into()])),
-                TunaMelt => Some(Cause::Every(vec![
+                TunaSalad => Some(Cause::every(vec![Tuna.into(), Mayo.into()])),
+                TunaMelt => Some(Cause::every(vec![
                     TunaSalad.into(),
                     Cheese.into(),
                     Bread.into(),
                 ])),
-                GrilledCheese => Some(Cause::Every(vec![Cheese.into(), Bread.into()])),
-            }
+                GrilledCheese => Some(Cause::every(vec![Cheese.into(), Bread.into()])),
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -314,37 +310,41 @@ fn simple_every() {
         // - loops with Every might take some more thought.
 
         {
-            let tr = Cause::from(GrilledCheese).traverse(&maplit::hashset![Cheese, Bread]);
+            let ctx = maplit::hashset![Cheese, Bread];
+            let tr = Cause::from(GrilledCheese).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
-            assert_eq!(g.nodes(), maplit::hashset!(Cause::from(GrilledCheese)));
+            assert_eq!(g.causes(), maplit::hashset!(Cause::from(GrilledCheese)));
         }
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread]);
+            let ctx = maplit::hashset![Cheese, Bread];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
             assert_eq!(
-                g.nodes()
+                g.causes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
                     .count(),
                 3
             );
         }
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, TunaSalad]);
+            let ctx = maplit::hashset![Cheese, Bread, TunaSalad];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
-            assert_eq!(g.nodes(), maplit::hashset!(Cause::from(TunaMelt)));
+            assert_eq!(g.causes(), maplit::hashset!(Cause::from(TunaMelt)));
         }
 
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Eggs, Tuna]);
+            let ctx = maplit::hashset![Cheese, Bread, Eggs, Tuna];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
 
             // Only the Vinegar base ingredient is included
             assert_eq!(
-                g.nodes()
+                g.causes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
                     .cloned()
                     .collect::<HashSet<_>>(),
@@ -353,13 +353,14 @@ fn simple_every() {
         }
 
         {
-            let tr = Cause::from(TunaMelt).traverse(&maplit::hashset![Cheese, Bread, Mayo]);
+            let ctx = maplit::hashset![Cheese, Bread, Mayo];
+            let tr = Cause::from(TunaMelt).traverse(&ctx);
             report(&tr);
             let (g, _) = tr.fail().unwrap();
 
             // Only the Tuna base ingredient is included
             assert_eq!(
-                g.nodes()
+                g.causes()
                     .intersection(&hashset! {Tuna.into(), Vinegar.into(), Eggs.into()})
                     .cloned()
                     .collect::<HashSet<_>>(),
@@ -374,12 +375,12 @@ fn holochain_like() {
     holochain_trace::test_run().ok().unwrap();
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
-    struct Step {
+    struct F {
         which: bool,
         stage: Stage,
     }
 
-    impl std::fmt::Display for Step {
+    impl std::fmt::Display for F {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let who = match self.which {
                 false => "Fatma",
@@ -400,20 +401,26 @@ fn holochain_like() {
         SendB,
     }
 
-    impl Fact for Step {
+    impl Fact for F {
         type Context = Checks<Self>;
 
-        fn cause(&self, _ctx: &Self::Context) -> Option<Cause<Self>> {
+        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
             use Stage::*;
-            match self.stage {
+            Ok(match self.stage {
                 Create => None,
-                Fetch => Some(Cause::Any(vec![self.mine(ReceiveA), self.mine(ReceiveB)])),
+                Fetch => Some(Cause::any_named(
+                    "Receive either",
+                    vec![self.mine(ReceiveA), self.mine(ReceiveB)],
+                )),
                 ReceiveA => Some(self.theirs(SendA)),
                 ReceiveB => Some(self.theirs(SendB)),
-                Store => Some(Cause::Any(vec![self.mine(Create), self.mine(Fetch)])),
+                Store => Some(Cause::any_named(
+                    "Hold",
+                    vec![self.mine(Create), self.mine(Fetch)],
+                )),
                 SendA => Some(self.mine(Store)),
                 SendB => Some(self.mine(Store)),
-            }
+            })
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -425,7 +432,7 @@ fn holochain_like() {
         }
     }
 
-    impl Step {
+    impl F {
         pub fn mine(&self, stage: Stage) -> Cause<Self> {
             Cause::Fact(Self {
                 which: self.which,
@@ -441,12 +448,12 @@ fn holochain_like() {
         }
     }
 
-    let fatma_store = Cause::Fact(Step {
+    let fatma_store = Cause::Fact(F {
         which: false,
         stage: Stage::Store,
     });
 
-    let checks: Checks<Step> = Box::new(|step: &Step| match (step.which, step.stage) {
+    let checks: Checks<F> = Box::new(|step: &F| match (step.which, step.stage) {
         (true, Stage::Create) => true,
         // (false, Stage::Create) => true,
 

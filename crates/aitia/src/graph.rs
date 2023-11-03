@@ -1,60 +1,117 @@
-//! Functions for constructing causal graphs
-
 use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::io::{Read, Write};
 
 use crate::cause::*;
 
-/// A DAG of Facts linked by their causal relationships
 #[derive(Debug, derive_more::From, derive_more::Deref, derive_more::DerefMut)]
-pub struct CausalGraph<T: Display>(petgraph::graph::DiGraph<Cause<T>, ()>);
+pub struct CauseTree<'c, T: Fact>(petgraph::graph::DiGraph<TreeNode<'c, T>, ()>);
 
-impl<T: Display + Clone + Eq + Hash> CausalGraph<T> {
-    /// Just return the nodes.
-    pub fn nodes(&self) -> HashSet<Cause<T>> {
-        self.node_weights().cloned().collect::<HashSet<_>>()
+#[derive(PartialEq, Eq, Hash)]
+pub struct TreeNode<'c, T: Fact> {
+    pub cause: Cause<T>,
+    pub ctx: &'c T::Context,
+}
+
+impl<'c, T: Fact> Clone for TreeNode<'c, T> {
+    fn clone(&self) -> Self {
+        Self {
+            cause: self.cause.clone(),
+            ctx: self.ctx,
+        }
     }
 }
 
-impl<T: Display> Default for CausalGraph<T> {
+impl<'c, T: Fact> CauseTree<'c, T> {
+    pub fn causes(&self) -> HashSet<Cause<T>> {
+        self.node_weights()
+            .map(|n| n.cause.clone())
+            .collect::<HashSet<_>>()
+    }
+
+    pub fn print(&self) {
+        let dot = format!(
+            "{:?}",
+            petgraph::dot::Dot::with_attr_getters(
+                &**self,
+                &[petgraph::dot::Config::EdgeNoLabel],
+                &|g, e| "".to_string(),
+                &|g, n| {
+                    // n.1
+                    "nojustify=true".to_string()
+                },
+            )
+        );
+
+        if let Ok(graph) = graph_easy(&dot) {
+            println!("Original dot output:\n\n{}", dot);
+            println!("`graph-easy` output:\n{}", graph);
+        } else {
+            println!(
+                "`graph-easy` not installed. Original dot output:\n\n{}",
+                dot
+            );
+        }
+    }
+}
+
+impl<'c, T: Fact> Debug for TreeNode<'c, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.cause.explain(self.ctx))
+    }
+}
+
+impl<'c, T: Fact> Default for CauseTree<'c, T> {
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
-/// A traversal of the causal graph, potentially resulting in a DAG of failing facts.
+#[derive(Debug, derive_more::Constructor)]
+pub struct CauseError<F: Fact> {
+    pub info: String,
+    pub fact: Option<F>,
+}
+
+#[derive(Debug)]
+pub struct CheckError<F: Fact>(pub Check<F>);
+
 #[derive(Debug, derive_more::From)]
-pub enum Traversal<T: Fact> {
+pub enum TraversalError<F: Fact> {
+    Cause(CauseError<F>),
+    Check(CheckError<F>),
+}
+
+#[derive(Debug, derive_more::From)]
+// #[cfg_attr(test, derive(PartialEq))]
+pub enum Traversal<'c, T: Fact> {
     /// The target fact is true; nothing more needs to be said
     Pass,
-    /// The target is false and there is no path to any true fact
-    Groundless,
     /// The target fact is false, and all paths which lead to true facts
     /// are present in this graph
     Fail {
-        /// The DAG of failing facts
-        graph: CausalGraph<T>,
-        /// The facts which did pass (the leaves of the DAG point to these)
+        tree: CauseTree<'c, T>,
         passes: Vec<Cause<T>>,
+        ctx: &'c T::Context,
+    },
+    /// A cause or check call returned an error during traversal
+    TraversalError {
+        error: CauseError<T>,
+        tree: CauseTree<'c, T>,
     },
 }
 
-impl<T: Fact> Traversal<T> {
-    /// If failure, just return the contents
-    pub fn fail(self) -> Option<(CausalGraph<T>, Vec<Cause<T>>)> {
+impl<'c, T: Fact> Traversal<'c, T> {
+    pub fn fail(self) -> Option<(CauseTree<'c, T>, Vec<Cause<T>>)> {
         match self {
-            Traversal::Fail {
-                graph: tree,
-                passes,
-            } => Some((tree, passes)),
+            Traversal::Fail { tree, passes, .. } => Some((tree, passes)),
             _ => None,
         }
     }
 }
 
-type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
+pub type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
 
 /// Traverse the causal graph implied by the specified Cause.
 ///
@@ -67,18 +124,21 @@ type TraversalMap<T> = HashMap<Cause<T>, Option<Check<T>>>;
 /// If a path ends in a failing check, or if it forms a loop without encountering
 /// a passing check, we don't add that path to the graph.
 #[tracing::instrument(skip(ctx))]
-pub fn traverse<F: Fact>(cause: &Cause<F>, ctx: &F::Context) -> Traversal<F> {
+pub fn traverse<'c, F: Fact>(cause: &Cause<F>, ctx: &'c F::Context) -> Traversal<'c, F> {
     let mut table = TraversalMap::default();
     match traverse_inner(cause, ctx, &mut table) {
-        Some(check) => {
-            if check.is_pass() {
+        Ok(maybe_check) => {
+            if let Some(Check::Pass) = maybe_check {
                 Traversal::Pass
             } else {
-                let (graph, passes) = produce_graph(&table, cause);
-                Traversal::Fail { graph, passes }
+                let (tree, passes) = produce_graph(&table, cause, ctx);
+                Traversal::Fail { tree, passes, ctx }
             }
         }
-        None => Traversal::Groundless,
+        Err(error) => {
+            let (tree, _) = produce_graph(&table, cause, ctx);
+            Traversal::TraversalError { tree, error }
+        }
     }
 }
 
@@ -86,7 +146,7 @@ fn traverse_inner<F: Fact>(
     cause: &Cause<F>,
     ctx: &F::Context,
     table: &mut TraversalMap<F>,
-) -> Option<Check<F>> {
+) -> Result<Option<Check<F>>, CauseError<F>> {
     tracing::trace!("enter {:?}", cause);
     match table.get(cause) {
         None => {
@@ -99,13 +159,24 @@ fn traverse_inner<F: Fact>(
             // We're currently processing a traversal that started from this cause.
             // Not even sure if this is even valid, but in any case
             // we certainly can't say anything about this traversal.
-            return None;
+            return Ok(None);
         }
         Some(Some(check)) => {
             tracing::trace!("return cached: {:?}", check);
-            return Some(check.clone());
+            return Ok(Some(check.clone()));
         }
     }
+
+    let mut recursive_checks =
+        |cs: &[Cause<F>]| -> Result<Vec<(Cause<F>, Check<F>)>, CauseError<F>> {
+            let mut checks = vec![];
+            for c in cs {
+                if let Some(check) = traverse_inner(c, ctx, table)? {
+                    checks.push((c.clone(), check));
+                }
+            }
+            Ok(checks)
+        };
 
     let check = match cause {
         Cause::Fact(f) => {
@@ -113,27 +184,34 @@ fn traverse_inner<F: Fact>(
                 tracing::trace!("fact pass");
                 Check::Pass
             } else {
-                if let Some(cause) = f.cause(ctx) {
+                if let Some(sub_cause) = f.cause(ctx)? {
                     tracing::trace!("fact fail with cause, traversing");
-                    let check = traverse_inner(&cause, ctx, table)?;
+                    let check = traverse_inner(&sub_cause, ctx, table).map_err(|err| {
+                        // Continue constructing the tree while we bubble up errors
+                        tracing::error!("traversal ending due to error: {err:?}");
+                        table.insert(cause.clone(), Some(Check::Fail(vec![sub_cause.clone()])));
+                        err
+                    })?;
                     tracing::trace!("traversal done, check: {:?}", check);
-                    Check::Fail(vec![cause])
+                    Check::Fail(vec![sub_cause])
                 } else {
                     tracing::trace!("fact fail with no cause, terminating");
                     Check::Fail(vec![])
                 }
             }
         }
-        Cause::Any(cs) => {
-            let checks: Vec<_> = cs
-                .iter()
-                .filter_map(|c| Some((c.clone(), traverse_inner(c, ctx, table)?)))
-                .collect();
+        Cause::Any(_, cs) => {
+            let checks = recursive_checks(cs).map_err(|err| {
+                // Continue constructing the tree while we bubble up errors
+                tracing::error!("traversal ending due to error: {err:?}");
+                table.insert(cause.clone(), Some(Check::Fail(cs.clone())));
+                err
+            })?;
             tracing::trace!("Any. checks: {:?}", checks);
             if checks.is_empty() {
                 // All loops
                 tracing::debug!("All loops");
-                return None;
+                return Ok(None);
             }
             let num_checks = checks.len();
             let fails: Vec<_> = checks
@@ -147,16 +225,19 @@ fn traverse_inner<F: Fact>(
                 Check::Fail(fails)
             }
         }
-        Cause::Every(cs) => {
-            let checks: Vec<_> = cs
-                .iter()
-                .filter_map(|c| Some((c.clone(), traverse_inner(c, ctx, table)?)))
-                .collect();
+        Cause::Every(_, cs) => {
+            let checks = recursive_checks(cs).map_err(|err| {
+                // Continue constructing the tree while we bubble up errors
+                tracing::error!("traversal ending due to error: {err:?}");
+                table.insert(cause.clone(), Some(Check::Fail(cs.clone())));
+                err
+            })?;
+
             tracing::trace!("Every. checks: {:?}", checks);
             if checks.is_empty() {
                 // All loops
                 tracing::debug!("All loops");
-                return None;
+                return Ok(None);
             }
             let fails = checks.iter().filter(|(_, check)| !check.is_pass()).count();
             let causes: Vec<_> = checks.into_iter().map(|(cause, _)| cause).collect();
@@ -170,14 +251,14 @@ fn traverse_inner<F: Fact>(
     };
     table.insert(cause.clone(), Some(check.clone()));
     tracing::trace!("exit. check: {:?}", check);
-    Some(check)
+    Ok(Some(check))
 }
 
 /// Prune away any extraneous nodes or edges from a Traversal.
 /// After pruning, the graph contains all edges starting with the specified cause
 /// and ending with a true cause.
 /// Passing facts are returned separately.
-fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
+pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
 ) -> (HashMap<&'a Cause<T>, &'a [Cause<T>]>, Vec<&'a Cause<T>>) {
@@ -188,8 +269,15 @@ fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     while let Some(next) = to_add.pop() {
         match table[&next].as_ref() {
             Some(Check::Fail(causes)) => {
-                to_add.extend(causes.iter());
-                sub.insert(next, causes.as_slice());
+                let old = sub.insert(next, causes.as_slice());
+                if let Some(old) = old {
+                    assert_eq!(
+                        old, causes,
+                        "Looped back to same node, but with different children?"
+                    );
+                } else {
+                    to_add.extend(causes.iter());
+                }
             }
             Some(Check::Pass) => {
                 passes.push(next);
@@ -200,18 +288,22 @@ fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     (sub, passes)
 }
 
-fn produce_graph<'a, 'b: 'a, T: Fact + Eq + Hash>(
+pub fn produce_graph<'a, 'b: 'a, 'c, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Cause<T>,
-) -> (CausalGraph<T>, Vec<Cause<T>>) {
-    let mut g = CausalGraph::default();
+    ctx: &'c T::Context,
+) -> (CauseTree<'c, T>, Vec<Cause<T>>) {
+    let mut g = CauseTree::default();
 
     let (sub, passes) = prune_traversal(table, start);
 
     let rows: Vec<_> = sub.into_iter().collect();
     let mut nodemap = HashMap::new();
     for (i, (k, _)) in rows.iter().enumerate() {
-        let id = g.add_node((*k).to_owned());
+        let id = g.add_node(TreeNode {
+            cause: (*k).to_owned(),
+            ctx,
+        });
         nodemap.insert(k, id);
         assert_eq!(id.index(), i);
     }
