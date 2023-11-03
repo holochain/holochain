@@ -6,6 +6,7 @@ use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[cfg(not(feature = "mock"))]
 use holochain_zome_types::info::DnaInfoV1;

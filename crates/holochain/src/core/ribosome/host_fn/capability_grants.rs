@@ -1,7 +1,7 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 /// list all the grants stored locally in the chain filtered by tag
 /// this is only the current grants as per local CRUD
