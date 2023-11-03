@@ -67,9 +67,9 @@ pub(super) async fn validate_ops_batch(
 mod tests {
     use super::validate_ops_batch;
     use crate::core::workflow::error::WorkflowError;
+    use crate::core::workflow::sys_validation_workflow::types::Outcome;
     use crate::core::workflow::sys_validation_workflow::validation_batch::NUM_CONCURRENT_OPS;
     use crate::core::workflow::sys_validation_workflow::OutcomeSummary;
-    use crate::core::workflow::sys_validation_workflow::types::Outcome;
     use fixt::prelude::*;
     use futures::FutureExt;
     use hdk::prelude::Action;

@@ -649,10 +649,7 @@ where
 #[cfg_attr(test, mockall::automock)]
 pub trait DhtOpSender {
     /// Sends an op
-    async fn send_op(
-        &self,
-        op: DhtOp,
-    ) -> SysValidationResult<()>;
+    async fn send_op(&self, op: DhtOp) -> SysValidationResult<()>;
 
     /// Send a StoreRecord DhtOp
     async fn send_store_record(&self, record: Record) -> SysValidationResult<()>;
@@ -679,10 +676,7 @@ pub struct IncomingDhtOpSender {
 
 #[async_trait::async_trait]
 impl DhtOpSender for IncomingDhtOpSender {
-    async fn send_op(
-        &self,
-        op: DhtOp,
-    ) -> SysValidationResult<()> {
+    async fn send_op(&self, op: DhtOp) -> SysValidationResult<()> {
         let ops = vec![op];
         Ok(incoming_dht_ops_workflow(
             self.space.as_ref().clone(),
