@@ -36,11 +36,8 @@ impl<'c, T: Fact> CauseTree<'c, T> {
             petgraph::dot::Dot::with_attr_getters(
                 &**self,
                 &[petgraph::dot::Config::EdgeNoLabel],
-                &|g, e| "".to_string(),
-                &|g, n| {
-                    // n.1
-                    "nojustify=true".to_string()
-                },
+                &|_g, _e| "".to_string(),
+                &|_g, _n| { "nojustify=true".to_string() },
             )
         );
 
