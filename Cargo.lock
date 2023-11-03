@@ -98,6 +98,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "test-case 2.2.2",
  "tracing",
  "tracing-core",
  "tracing-serde",

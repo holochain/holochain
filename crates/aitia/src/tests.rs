@@ -1,12 +1,11 @@
 use std::collections::HashSet;
+use test_case::test_case;
 
 use maplit::hashset;
 
 use super::simple_report as report;
 use crate::cause::*;
 use crate::graph::*;
-
-type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
 fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
     let start_ix = graph
@@ -22,78 +21,59 @@ fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -
         .collect()
 }
 
-#[test]
-fn singleton() {
-    holochain_trace::test_run().ok().unwrap();
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct Singleton(bool, bool);
 
-    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-    struct Singleton;
+impl Fact for Singleton {
+    type Context = ();
 
-    impl Fact for Singleton {
-        type Context = (bool, bool);
-
-        fn cause(&self, (self_ref, _): &Self::Context) -> CauseResult<Self> {
-            Ok(self_ref.then_some(Self.into()))
-        }
-
-        fn check(&self, (_, check): &Self::Context) -> bool {
-            *check
-        }
+    fn check(&self, (): &Self::Context) -> bool {
+        self.0
     }
 
-    // No basis in truth
-    let (graph, _passes) = Cause::from(Singleton)
-        .traverse(&(false, false))
+    fn cause(&self, (): &Self::Context) -> CauseResult<Self> {
+        Ok(self.1.then_some(self.clone().into()))
+    }
+}
+
+#[test_case( Singleton(false, false) => Some(hashset! { Singleton(false, false).into() }) ; "failing single isolated fact produces only self")]
+#[test_case( Singleton(false, true)  => Some(hashset! { Singleton(false, true).into() }) ; "failing single self-referencing fact produces only self")]
+#[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
+#[test_case( Singleton(true, true) => None  ; "passing single self-referencing fact produces Pass")]
+fn singleton_causes(fact: Singleton) -> Option<HashSet<Cause<Singleton>>> {
+    holochain_trace::test_run().ok().unwrap();
+    Cause::from(fact.clone())
+        .traverse(&())
         .fail()
-        .unwrap();
-    assert_eq!(graph.causes(), maplit::hashset! {Singleton.into()});
-    assert_eq!(graph.edge_count(), 0);
+        .map(|(graph, _)| graph.causes())
+}
 
-    // Loop ending in falsity
-    let (graph, _passes) = Cause::from(Singleton)
-        .traverse(&(false, false))
-        .fail()
-        .unwrap();
-    assert_eq!(graph.causes(), maplit::hashset! {Singleton.into()});
-    assert_eq!(graph.edge_count(), 0);
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+struct Countdown(u8);
 
-    // Self is true
-    assert!(matches!(
-        Cause::from(Singleton).traverse(&(false, true)),
-        Traversal::Pass
-    ));
+type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
-    // Self is true and loopy
-    assert!(matches!(
-        Cause::from(Singleton).traverse(&(true, true)),
-        Traversal::Pass
-    ));
+impl Fact for Countdown {
+    type Context = Checks<Self>;
+
+    fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+        Ok(match self.0 {
+            3 => Some(Self(2).into()),
+            2 => Some(Self(1).into()),
+            1 => Some(Self(0).into()),
+            0 => None,
+            _ => unreachable!(),
+        })
+    }
+
+    fn check(&self, ctx: &Self::Context) -> bool {
+        (ctx)(self)
+    }
 }
 
 #[test]
 fn single_path() {
     holochain_trace::test_run().ok().unwrap();
-
-    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-    struct Countdown(u8);
-
-    impl Fact for Countdown {
-        type Context = Checks<Self>;
-
-        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
-            Ok(match self.0 {
-                3 => Some(Self(2).into()),
-                2 => Some(Self(1).into()),
-                1 => Some(Self(0).into()),
-                0 => None,
-                _ => unreachable!(),
-            })
-        }
-
-        fn check(&self, ctx: &Self::Context) -> bool {
-            (ctx)(self)
-        }
-    }
 
     let all_false: Checks<Countdown> = Box::new(|_| false);
     let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);

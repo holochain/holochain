@@ -81,7 +81,6 @@ pub enum TraversalError<F: Fact> {
 }
 
 #[derive(Debug, derive_more::From)]
-// #[cfg_attr(test, derive(PartialEq))]
 pub enum Traversal<'c, T: Fact> {
     /// The target fact is true; nothing more needs to be said
     Pass,
