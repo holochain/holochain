@@ -33,10 +33,13 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        environment_path: db_dir.path().to_path_buf().into(),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            environment_path: db_dir.path().to_path_buf().into(),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -84,10 +87,13 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        environment_path: db_dir.path().to_path_buf().into(),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            environment_path: db_dir.path().to_path_buf().into(),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -367,7 +373,7 @@ async fn test_signing_error_during_genesis() {
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
         db_dir.into(),
-        config,
+        config.into(),
         None,
     )
     .await;

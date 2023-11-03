@@ -517,6 +517,10 @@ impl SpaceInternalHandler for Space {
                         context: Some(context),
                     });
 
+                    ro_inner
+                        .host_api
+                        .handle_op_hash_received(space.clone(), op_hash.clone());
+
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.
                     if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {

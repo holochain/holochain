@@ -51,7 +51,7 @@ pub struct SweetConductor {
     db_dir: TestDir,
     keystore: MetaLairClient,
     pub(crate) spaces: Spaces,
-    config: ConductorConfig,
+    config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
@@ -110,7 +110,7 @@ impl SweetConductor {
     pub async fn new(
         handle: ConductorHandle,
         env_dir: TestDir,
-        config: ConductorConfig,
+        config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -128,11 +128,7 @@ impl SweetConductor {
         // to actually access those databases.
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
-        let spaces = Spaces::new(&ConductorConfig {
-            environment_path: env_dir.to_path_buf().into(),
-            ..Default::default()
-        })
-        .unwrap();
+        let spaces = Spaces::new(config.clone()).unwrap();
 
         let keystore = handle.keystore().clone();
 
@@ -229,7 +225,7 @@ impl SweetConductor {
             &[],
         )
         .await;
-        Self::new(handle, dir, config, rendezvous).await
+        Self::new(handle, dir, Arc::new(config), rendezvous).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -237,7 +233,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
         let handle = builder.test(&db_dir, &[]).await.unwrap();
-        Self::new(handle, db_dir, config, None).await
+        Self::new(handle, db_dir, Arc::new(config), None).await
     }
 
     /// Create a handle from an existing environment and config

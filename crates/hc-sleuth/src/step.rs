@@ -76,6 +76,11 @@ pub enum Step {
         by: SleuthId,
         op: OpRef,
     },
+    /// The node has gossiped this at least once, to somebody
+    Gossiped {
+        by: SleuthId,
+        op: OpRef,
+    },
     /// The node has integrated an op authored by someone else
     Integrated {
         by: SleuthId,
@@ -100,6 +105,11 @@ pub enum Step {
     },
     /// The node has fetched an op after hearing about the hash via publish or gossip
     Fetched {
+        by: SleuthId,
+        op: OpRef,
+    },
+    /// The node has received an op hash via publish or gossip
+    ReceivedHash {
         by: SleuthId,
         op: OpRef,
     },
@@ -128,6 +138,7 @@ impl aitia::Fact for Step {
     fn explain(&self, ctx: &Self::Context) -> String {
         match self {
             Step::Published { by, op } => format!("[{}] Published: {:?}", by, op),
+            Step::Gossiped { by, op } => format!("[{}] Gossiped: {:?}", by, op),
             Step::Integrated { by, op } => {
                 format!("[{}] Integrated: {:?}", by, op)
             }
@@ -141,6 +152,7 @@ impl aitia::Fact for Step {
                 format!("[{}] PendingAppValidation: {:?} deps: {:#?}", by, op, deps)
             }
             Step::Fetched { by, op } => format!("[{}] Fetched: {:?}", by, op),
+            Step::ReceivedHash { by, op } => format!("[{}] ReceivedHash: {:?}", by, op),
             Step::Authored { by, op } => {
                 let node = ctx.agent_node(&by).expect("I got lazy");
                 let op_hash = op.as_hash();
@@ -165,6 +177,7 @@ impl aitia::Fact for Step {
 
         Ok(match self.clone() {
             Published { by, op } => Some(Self::authority(ctx, by, op)?),
+            Gossiped { by, op } => Some(Self::authority(ctx, by, op)?),
             Integrated { by, op } => Some(
                 AppValidated {
                     by: by.clone(),
@@ -192,7 +205,8 @@ impl aitia::Fact for Step {
                     Some(fetched)
                 }
             }
-            Fetched { by, op } => {
+            Fetched { by, op } => Some(ReceivedHash { by, op }.into()),
+            ReceivedHash { by, op } => {
                 let mut others: Vec<_> = ctx
                     .map_node_to_agents
                     .keys()

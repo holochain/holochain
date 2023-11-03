@@ -263,7 +263,7 @@ mod startup_shutdown_impls {
     impl Conductor {
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
-            config: ConductorConfig,
+            config: Arc<ConductorConfig>,
             ribosome_store: RwShare<RibosomeStore>,
             keystore: MetaLairClient,
             holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -275,7 +275,7 @@ mod startup_shutdown_impls {
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
-                config: Arc::new(config),
+                config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
                 task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),

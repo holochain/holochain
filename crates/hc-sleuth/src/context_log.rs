@@ -127,6 +127,7 @@ impl aitia::logging::Log for Context {
     fn apply(&mut self, fact: Step) {
         match fact.clone() {
             Step::Published { by, op } => {}
+            Step::Gossiped { by, op } => {}
             Step::Integrated { by, op } => {}
             Step::AppValidated { by, op } => {}
             Step::SysValidated { by, op } => {}
@@ -137,6 +138,7 @@ impl aitia::logging::Log for Context {
                     .extend(deps.into_iter());
             }
             Step::Fetched { by, op } => {}
+            Step::ReceivedHash { by, op } => {}
             Step::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
