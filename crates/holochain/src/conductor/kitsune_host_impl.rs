@@ -26,7 +26,7 @@ use holochain_types::{
 use holochain_zome_types::prelude::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
-    dependencies::kitsune_p2p_fetch::{OpHashSized, RoughSized},
+    dependencies::kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod},
     event::GetAgentInfoSignedEvt,
     KitsuneHost, KitsuneHostResult,
 };
@@ -291,11 +291,31 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
-    fn handle_op_hash_received(&self, _space: Arc<KitsuneSpace>, op_hash: RoughSized<KOpHash>) {
+    fn handle_op_hash_received(
+        &self,
+        _space: &KitsuneSpace,
+        op_hash: &RoughSized<KOpHash>,
+        transfer_method: TransferMethod,
+    ) {
         let hash = DhtOpHash::from_kitsune(&op_hash.data());
         aitia::trace!(&hc_sleuth::Step::ReceivedHash {
             by: self.config.sleuth_id(),
-            op: hash
+            op: hash,
+            method: transfer_method,
+        });
+    }
+
+    fn handle_op_hash_transmitted(
+        &self,
+        _space: &KitsuneSpace,
+        op_hash: &RoughSized<KOpHash>,
+        transfer_method: TransferMethod,
+    ) {
+        let hash = DhtOpHash::from_kitsune(&op_hash.data());
+        aitia::trace!(&hc_sleuth::Step::SentHash {
+            by: self.config.sleuth_id(),
+            op: hash,
+            method: transfer_method,
         });
     }
 

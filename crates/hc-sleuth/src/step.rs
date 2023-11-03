@@ -8,6 +8,7 @@ use aitia::graph::CauseError;
 use aitia::logging::FactLogTraits;
 use aitia::{Cause, FactTraits};
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
 /// A DhtOpLite along with its corresponding DhtOpHash
 #[derive(
@@ -71,16 +72,6 @@ pub type SleuthId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Step {
-    /// The node has published this at least once, to somebody
-    Published {
-        by: SleuthId,
-        op: OpRef,
-    },
-    /// The node has gossiped this at least once, to somebody
-    Gossiped {
-        by: SleuthId,
-        op: OpRef,
-    },
     /// The node has integrated an op authored by someone else
     Integrated {
         by: SleuthId,
@@ -108,10 +99,17 @@ pub enum Step {
         by: SleuthId,
         op: OpRef,
     },
+    /// The node has published or gossiped this at least once, to somebody
+    SentHash {
+        by: SleuthId,
+        op: OpRef,
+        method: TransferMethod,
+    },
     /// The node has received an op hash via publish or gossip
     ReceivedHash {
         by: SleuthId,
         op: OpRef,
+        method: TransferMethod,
     },
     /// The node has authored this op, including validation and integration
     Authored {
@@ -137,8 +135,6 @@ impl aitia::Fact for Step {
 
     fn explain(&self, ctx: &Self::Context) -> String {
         match self {
-            Step::Published { by, op } => format!("[{}] Published: {:?}", by, op),
-            Step::Gossiped { by, op } => format!("[{}] Gossiped: {:?}", by, op),
             Step::Integrated { by, op } => {
                 format!("[{}] Integrated: {:?}", by, op)
             }
@@ -152,7 +148,10 @@ impl aitia::Fact for Step {
                 format!("[{}] PendingAppValidation: {:?} deps: {:#?}", by, op, deps)
             }
             Step::Fetched { by, op } => format!("[{}] Fetched: {:?}", by, op),
-            Step::ReceivedHash { by, op } => format!("[{}] ReceivedHash: {:?}", by, op),
+            Step::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
+            Step::ReceivedHash { by, op, method } => {
+                format!("[{by}] ReceivedHash({method}): {op:?}")
+            }
             Step::Authored { by, op } => {
                 let node = ctx.agent_node(&by).expect("I got lazy");
                 let op_hash = op.as_hash();
@@ -176,8 +175,11 @@ impl aitia::Fact for Step {
         };
 
         Ok(match self.clone() {
-            Published { by, op } => Some(Self::authority(ctx, by, op)?),
-            Gossiped { by, op } => Some(Self::authority(ctx, by, op)?),
+            // Op hashes only get gossiped and published by a node after being fully integrated by that node
+            // TODO: could add more antecedents
+            SentHash { by, op, method: _ } => Some(Self::authority(ctx, by, op)?),
+
+            // Ops get integrated directly after being app validated
             Integrated { by, op } => Some(
                 AppValidated {
                     by: by.clone(),
@@ -185,8 +187,15 @@ impl aitia::Fact for Step {
                 }
                 .into(),
             ),
+
+            // Ops get app validated directly after being sys validated
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
-            MissingAppValDep { by, op, deps: _ } => Some(Cause::from(SysValidated { by, op })),
+
+            // TODO
+            MissingAppValDep { by, op, deps: _ } => todo!(),
+
+            // Ops can only be sys validated after being fetched from an authority, and after
+            // its dependency has been integrated
             SysValidated { by, op } => {
                 let op_info = ctx.op_info(&op).map_err(mapper)?;
                 let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
@@ -205,30 +214,54 @@ impl aitia::Fact for Step {
                     Some(fetched)
                 }
             }
-            Fetched { by, op } => Some(ReceivedHash { by, op }.into()),
-            ReceivedHash { by, op } => {
+
+            // An op can be fetched only if its hash is in the fetch pool, which happens
+            // whenever the op is received by any method
+            Fetched { by, op } => Some(Cause::Any(
+                "ReceivedHash".into(),
+                [TransferMethod::Publish, TransferMethod::Gossip]
+                    .into_iter()
+                    .map(|method| {
+                        ReceivedHash {
+                            by: by.clone(),
+                            op: op.clone(),
+                            method,
+                        }
+                        .into()
+                    })
+                    .collect(),
+            )),
+
+            // We can only receive a hash via a given method if some other node has sent it
+            // via that method
+            ReceivedHash { by, op, method } => {
                 let mut others: Vec<_> = ctx
                     .map_node_to_agents
                     .keys()
                     .filter(|i| **i != by)
                     .cloned()
                     .map(|i| {
-                        // TODO: this should be Published | Gossiped, but we
-                        // don't have a good rule for Gossiped yet
-                        Integrated {
+                        SentHash {
                             by: i,
                             op: op.clone(),
+                            method,
                         }
                         .into()
                     })
                     .collect();
                 Some(Cause::Any("Peer authorities".into(), others))
             }
+
+            // An agent can author an op at any time, but must have joined the network first
             Authored { by, op } => {
                 let node = ctx.agent_node(&by).map_err(mapper)?.clone();
                 Some(Cause::from(AgentJoined { node, agent: by }))
             }
+
+            // An agent can join at any time
             AgentJoined { node, agent } => None,
+
+            // "Special" cause
             SweetConductorShutdown { node } => None,
         })
     }
