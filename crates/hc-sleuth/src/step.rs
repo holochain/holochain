@@ -136,18 +136,18 @@ impl aitia::Fact for Step {
     fn explain(&self, ctx: &Self::Context) -> String {
         match self {
             Step::Integrated { by, op } => {
-                format!("[{}] Integrated: {:?}", by, op)
+                format!("[{by}] Integrated: {op}")
             }
             Step::AppValidated { by, op } => {
-                format!("[{}] AppValidated: {:?}", by, op)
+                format!("[{by}] AppValidated: {op}")
             }
             Step::SysValidated { by, op } => {
-                format!("[{}] SysValidated: {:?}", by, op)
+                format!("[{by}] SysValidated: {op}")
             }
             Step::MissingAppValDep { by, op, deps } => {
-                format!("[{}] PendingAppValidation: {:?} deps: {:#?}", by, op, deps)
+                format!("[{by}] PendingAppValidation: {op} deps: {deps:#?}")
             }
-            Step::Fetched { by, op } => format!("[{}] Fetched: {:?}", by, op),
+            Step::Fetched { by, op } => format!("[{by}] Fetched: {op}"),
             Step::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
             Step::ReceivedHash { by, op, method } => {
                 format!("[{by}] ReceivedHash({method}): {op:?}")
@@ -155,13 +155,13 @@ impl aitia::Fact for Step {
             Step::Authored { by, op } => {
                 let node = ctx.agent_node(&by).expect("I got lazy");
                 let op_hash = op.as_hash();
-                format!("[{}] Authored: {:?}", node, op_hash)
+                format!("[{node}] Authored: {op_hash}")
             }
             Step::AgentJoined { node, agent } => {
-                format!("[{}] AgentJoined: {:?}", node, agent)
+                format!("[{node}] AgentJoined: {agent}")
             }
             Step::SweetConductorShutdown { node } => {
-                format!("[{}] SweetConductorShutdown", node)
+                format!("[{node}] SweetConductorShutdown")
             }
         }
     }
@@ -249,7 +249,7 @@ impl aitia::Fact for Step {
                         .into()
                     })
                     .collect();
-                Some(Cause::any_named("Peer authorities", others))
+                Some(Cause::any_named("Received hash from authority", others))
             }
 
             // An agent can author an op at any time, but must have joined the network first
