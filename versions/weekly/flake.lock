@@ -71,7 +71,7 @@
       },
       "original": {
         "owner": "holochain",
-        "ref": "holochain-0.2",
+        "ref": "holochain-v0.2",
         "repo": "scaffolding",
         "type": "github"
       }

@@ -19,7 +19,7 @@
 
       # holochain_scaffolding_cli
       scaffolding = {
-        url = "github:holochain/scaffolding/holochain-0.1";
+        url = "github:holochain/scaffolding/holochain-v0.1";
         flake = false;
       };
     };
