@@ -248,8 +248,6 @@ impl ShardedGossip {
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
-        enum Followup {};
-
         let (cert, how, gossip) = outgoing;
         match self.gossip.gossip_type {
             GossipType::Recent => {

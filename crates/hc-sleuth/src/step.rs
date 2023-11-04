@@ -3,10 +3,10 @@ use std::hash::Hash;
 
 use crate::context_log::CtxError;
 use crate::*;
-use aitia::cause::CauseResult;
-use aitia::graph::CauseError;
 use aitia::logging::FactLogTraits;
-use aitia::{Cause, FactTraits};
+use aitia::DepError;
+use aitia::DepResult;
+use aitia::{Dep, FactTraits};
 use holochain_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
@@ -166,10 +166,10 @@ impl aitia::Fact for Step {
         }
     }
 
-    fn cause(&self, ctx: &Self::Context) -> CauseResult<Self> {
+    fn dep(&self, ctx: &Self::Context) -> DepResult<Self> {
         use Step::*;
 
-        let mapper = |e: CtxError| CauseError {
+        let mapper = |e: CtxError| DepError {
             info: e.into(),
             fact: Some(self.clone()),
         };
@@ -207,9 +207,9 @@ impl aitia::Fact for Step {
                 .into();
 
                 if let Some(dep) = dep {
-                    let integrated = Cause::from(Integrated { by, op });
+                    let integrated = Dep::from(Integrated { by, op });
                     // TODO: eventually we don't want to just use anything we fetched, right?
-                    Some(Cause::every_named("Exists", vec![fetched, integrated]))
+                    Some(Dep::every_named("Exists", vec![fetched, integrated]))
                 } else {
                     Some(fetched)
                 }
@@ -217,7 +217,7 @@ impl aitia::Fact for Step {
 
             // An op can be fetched only if its hash is in the fetch pool, which happens
             // whenever the op is received by any method
-            Fetched { by, op } => Some(Cause::any_named(
+            Fetched { by, op } => Some(Dep::any_named(
                 "ReceivedHash",
                 [TransferMethod::Publish, TransferMethod::Gossip]
                     .into_iter()
@@ -249,13 +249,13 @@ impl aitia::Fact for Step {
                         .into()
                     })
                     .collect();
-                Some(Cause::any_named("Received hash from authority", others))
+                Some(Dep::any_named("Received hash from authority", others))
             }
 
             // An agent can author an op at any time, but must have joined the network first
             Authored { by, op } => {
                 let node = ctx.agent_node(&by).map_err(mapper)?.clone();
-                Some(Cause::from(AgentJoined { node, agent: by }))
+                Some(Dep::from(AgentJoined { node, agent: by }))
             }
 
             // An agent can join at any time
@@ -274,11 +274,7 @@ impl aitia::Fact for Step {
 impl Step {
     /// The cause which is satisfied by either Integrating this op,
     /// or having authored this op by any of the local agents
-    pub fn authority(
-        ctx: &Context,
-        by: SleuthId,
-        op: OpRef,
-    ) -> Result<Cause<Self>, CauseError<Self>> {
+    pub fn authority(ctx: &Context, by: SleuthId, op: OpRef) -> Result<Dep<Self>, DepError<Self>> {
         let integrated = Self::Integrated {
             by: by.clone(),
             op: op.clone(),
@@ -286,7 +282,7 @@ impl Step {
         .into();
         let mut any = vec![integrated];
 
-        let mapper = |e: CtxError| CauseError {
+        let mapper = |e: CtxError| DepError {
             info: e.into(),
             fact: None,
         };
@@ -301,9 +297,9 @@ impl Step {
                 by: agent,
                 op: op_info.clone(),
             })
-            .map(Cause::from);
+            .map(Dep::from);
 
         any.extend(authors);
-        Ok(Cause::any_named("Authority", any))
+        Ok(Dep::any_named("Authority", any))
     }
 }

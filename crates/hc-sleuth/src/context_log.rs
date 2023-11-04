@@ -1,9 +1,8 @@
 use std::{collections::HashSet, hash::Hash, io::BufRead, sync::Arc};
 
 use aitia::{
-    cause::FactTraits,
     logging::{Log, LogLine},
-    Fact,
+    Fact, FactTraits,
 };
 use holochain_types::prelude::*;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};

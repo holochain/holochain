@@ -21,7 +21,7 @@ macro_rules! trace {
         // Note the tracing level doesn't matter when using the AitiaWriter, but it
         // of course affects whether this will be present in the normal logs
 
-        // XXX: because the JSON representation is wonky, especially for hashes,
+        // XXX: bedep the JSON representation is wonky, especially for hashes,
         //      we also redundantly print a normal debug for better log readability
         let fact = $fact;
         tracing::info!(
@@ -119,7 +119,7 @@ mod tests {
         prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Registry,
     };
 
-    use crate::{cause::CauseResult, logging::LogWriter, Fact};
+    use crate::{dep::DepResult, logging::LogWriter, Fact};
 
     use super::{tracing_layer, FactLogJson};
 
@@ -141,7 +141,7 @@ mod tests {
     impl Fact for TestFact {
         type Context = ();
 
-        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, _ctx: &Self::Context) -> DepResult<Self> {
             todo!()
         }
 
