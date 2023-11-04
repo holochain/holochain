@@ -92,9 +92,17 @@ dependencies = [
  "derive_more",
  "holochain_trace 0.3.0-beta-dev.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "maplit",
+ "parking_lot 0.10.2",
  "petgraph",
- "pretty_assertions 0.6.1",
+ "pretty_assertions",
+ "regex",
+ "serde",
+ "serde_json",
+ "test-case 2.2.2",
  "tracing",
+ "tracing-core",
+ "tracing-serde",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -129,15 +137,6 @@ name = "anes"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
-
-[[package]]
-name = "ansi_term"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
-dependencies = [
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "ansi_term"
@@ -929,7 +928,7 @@ version = "2.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0610544180c38b88101fecf2dd634b174a62eef6946f84dfc6a7127512b381c"
 dependencies = [
- "ansi_term 0.12.1",
+ "ansi_term",
  "atty",
  "bitflags 1.3.2",
  "strsim 0.8.0",
@@ -1418,16 +1417,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5efa2b3d7902f4b634a20cae3c9c4e6209dc4779feb6863329607560143efa70"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "ctor"
-version = "0.1.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d2301688392eb071b0bf1a37be05c469d3cc4dbbd95df672fe28ab021e6a096"
-dependencies = [
- "quote 1.0.33",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -2827,7 +2816,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "petgraph",
  "predicates 1.0.8",
- "pretty_assertions 0.6.1",
+ "pretty_assertions",
  "rand 0.7.3",
  "rand 0.8.5",
  "rand-utf8",
@@ -2898,7 +2887,7 @@ dependencies = [
  "kitsune_p2p",
  "matches",
  "mockall",
- "pretty_assertions 0.7.2",
+ "pretty_assertions",
  "serde",
  "serde_derive",
  "test-case 2.2.2",
@@ -2969,7 +2958,7 @@ dependencies = [
 name = "holochain_cli_sandbox"
 version = "0.3.0-beta-dev.23"
 dependencies = [
- "ansi_term 0.12.1",
+ "ansi_term",
  "anyhow",
  "assert_cmd 1.0.8",
  "chrono",
@@ -3216,7 +3205,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "parking_lot 0.10.2",
- "pretty_assertions 0.7.2",
+ "pretty_assertions",
  "r2d2",
  "r2d2_sqlite_neonphog",
  "rand 0.8.5",
@@ -3271,7 +3260,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -3382,7 +3371,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.8.5",
@@ -4125,7 +4114,7 @@ dependencies = [
  "once_cell",
  "opentelemetry_api",
  "parking_lot 0.12.1",
- "pretty_assertions 1.4.0",
+ "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.7.3",
@@ -4229,7 +4218,7 @@ dependencies = [
  "must_future",
  "num-traits",
  "once_cell",
- "pretty_assertions 1.4.0",
+ "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.8.5",
@@ -4252,7 +4241,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "maplit",
  "num-traits",
- "pretty_assertions 1.4.0",
+ "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.8.5",
@@ -4275,7 +4264,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "linked-hash-map",
- "pretty_assertions 1.4.0",
+ "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.8.5",
@@ -4400,7 +4389,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "843c7dbcbc8d75eef0b30397a7eb0d04549aabeff4ea69ebd272aea991555746"
 dependencies = [
  "lair_keystore_api",
- "pretty_assertions 1.4.0",
+ "pretty_assertions",
  "rpassword 7.2.0",
  "rusqlite",
  "sqlformat 0.2.2",
@@ -5345,15 +5334,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "output_vt100"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "628223faebab4e3e40667ee0b2336d34a5b960ff60ea743ddfdbcf7770bcfb66"
-dependencies = [
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5742,30 +5722,6 @@ checksum = "368ba315fb8c5052ab692e68a0eefec6ec57b23a36959c14496f0b0df2c0cecf"
 dependencies = [
  "predicates-core",
  "termtree",
-]
-
-[[package]]
-name = "pretty_assertions"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f81e1644e1b54f5a68959a29aa86cde704219254669da328ecfdf6a1f09d427"
-dependencies = [
- "ansi_term 0.11.0",
- "ctor",
- "difference",
- "output_vt100",
-]
-
-[[package]]
-name = "pretty_assertions"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cab0e7c02cf376875e9335e0ba1da535775beb5450d21e1dffca068818ed98b"
-dependencies = [
- "ansi_term 0.12.1",
- "ctor",
- "diff",
- "output_vt100",
 ]
 
 [[package]]
