@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use test_case::test_case;
 
 use maplit::hashset;
 
@@ -21,120 +20,124 @@ fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct Singleton(bool, bool);
-
-impl Fact for Singleton {
-    type Context = ();
-
-    fn check(&self, (): &Self::Context) -> bool {
-        self.0
-    }
-
-    fn cause(&self, (): &Self::Context) -> CauseResult<Self> {
-        Ok(self.1.then_some(self.clone().into()))
-    }
-}
-
-#[test_case( Singleton(false, false) => Some(hashset! { Singleton(false, false).into() }) ; "failing single isolated fact produces only self")]
-#[test_case( Singleton(false, true)  => Some(hashset! { Singleton(false, true).into() }) ; "failing single self-referencing fact produces only self")]
-#[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
-#[test_case( Singleton(true, true) => None  ; "passing single self-referencing fact produces Pass")]
-fn singleton_causes(fact: Singleton) -> Option<HashSet<Cause<Singleton>>> {
-    holochain_trace::test_run().ok().unwrap();
-    Cause::from(fact.clone())
-        .traverse(&())
-        .fail()
-        .map(|(graph, _)| graph.causes())
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-struct Countdown(u8);
-
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
-impl Fact for Countdown {
-    type Context = Checks<Self>;
+mod singleton {
+    use super::*;
+    use test_case::test_case;
 
-    fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
-        Ok(match self.0 {
-            3 => Some(Self(2).into()),
-            2 => Some(Self(1).into()),
-            1 => Some(Self(0).into()),
-            0 => None,
-            _ => unreachable!(),
-        })
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    struct Singleton(bool, bool);
+    
+    impl Fact for Singleton {
+        type Context = ();
+    
+        fn check(&self, (): &Self::Context) -> bool {
+            self.0
+        }
+    
+        fn cause(&self, (): &Self::Context) -> CauseResult<Self> {
+            Ok(self.1.then_some(self.clone().into()))
+        }
     }
-
-    fn check(&self, ctx: &Self::Context) -> bool {
-        (ctx)(self)
+    
+    #[test_case( Singleton(false, false) => Some(hashset! { Singleton(false, false).into() }) ; "failing single isolated fact produces only self")]
+    #[test_case( Singleton(false, true)  => Some(hashset! { Singleton(false, true).into() }) ; "failing single self-referencing fact produces only self")]
+    #[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
+    #[test_case( Singleton(true, true) => None  ; "passing single self-referencing fact produces Pass")]
+    fn singleton_causes(fact: Singleton) -> Option<HashSet<Cause<Singleton>>> {
+        holochain_trace::test_run().ok().unwrap();
+        Cause::from(fact.clone())
+            .traverse(&())
+            .fail()
+            .map(|(graph, _)| graph.causes())
     }
 }
 
-#[test]
-fn single_path() {
-    holochain_trace::test_run().ok().unwrap();
+mod acyclic_single_path {
+    use super::*;
+    use test_case::test_case;
 
-    let all_false: Checks<Countdown> = Box::new(|_| false);
-    let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
-    let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
-    let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
-    {
-        let (graph, _passes) = Cause::from(Countdown(3))
-            .traverse(&all_false)
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+    struct Countdown(u8);
+    
+    
+    impl Fact for Countdown {
+        type Context = Checks<Self>;
+    
+        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+            Ok(match self.0 {
+                3 => Some(Self(2).into()),
+                2 => Some(Self(1).into()),
+                1 => Some(Self(0).into()),
+                0 => None,
+                _ => unreachable!(),
+            })
+        }
+    
+        fn check(&self, ctx: &Self::Context) -> bool {
+            (ctx)(self)
+        }
+    }
+    
+    #[test_case( 
+        Countdown(3), 
+        None
+        => vec![0, 1, 2, 3]
+        ; "Countdown from 3 with all false returns path from 3 to 0"
+    )]
+    #[test_case( 
+        Countdown(2), 
+        Some(3) 
+        => vec![0, 1, 2]
+        ; "Countdown from 2 with 3 being true returns path from 2 to 0"
+    )]
+    #[test_case( 
+        Countdown(3), 
+        Some(0) 
+        => vec![1, 2, 3]
+        ; "Countdown from 3 with 0 being true returns path from 3 to 1"
+    )]
+    #[test_case( 
+        Countdown(3), 
+        Some(1) 
+        => vec![2, 3]
+        ; "Countdown from 3 with 1 being true returns path from 3 to 2"
+    )]
+    #[test_case( 
+        Countdown(1), 
+        Some(2) 
+        => vec![0, 1]
+        ; "Countdown from 1 with 3 being true returns path from 1 to 0"
+    )]
+    fn single_path(countdown: Countdown, true_one: Option<u8>) -> Vec<u8> {
+        holochain_trace::test_run().ok().unwrap();
+    
+        let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
+        let tr = Cause::from(countdown).traverse(&checker);
+        report(&tr);
+        let (graph, _passes) = tr
             .fail()
             .unwrap();
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![
-                Cause::from(Countdown(0)),
-                Cause::from(Countdown(1)),
-                Cause::from(Countdown(2)),
-                Cause::from(Countdown(3)),
-            ]
-        );
-        assert_eq!(graph.edge_count(), 3);
-    }
-    {
-        let (graph, _passes) = Cause::from(Countdown(2)).traverse(&true_3).fail().unwrap();
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![
-                Cause::from(Countdown(0)),
-                Cause::from(Countdown(1)),
-                Cause::from(Countdown(2)),
-            ]
-        );
-        assert_eq!(graph.edge_count(), 2);
-    }
-    {
-        let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_0).fail().unwrap();
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![
-                Cause::from(Countdown(1)),
-                Cause::from(Countdown(2)),
-                Cause::from(Countdown(3))
-            ]
-        );
-
-        assert_eq!(graph.edge_count(), 2);
-    }
-    {
-        let (graph, _passes) = Cause::from(Countdown(3)).traverse(&true_1).fail().unwrap();
-
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(3))]
-        );
-
-        assert_eq!(graph.edge_count(), 1);
+    
+        let mut nodes: Vec<_> = graph.causes().into_iter().map(|c| match c {
+            Cause::Fact(f) => f.0,
+            _ => unreachable!(),
+        }).collect();
+        nodes.sort();
+        
+        let edges = graph.edge_count();
+    
+        // If the number of edges is one less than the number of nodes, that implies a straight noncyclic path
+        // (this doesn't test that something weird and ridiculous happens like a branch with a disconnected node)
+        assert_eq!(nodes.len(), edges + 1);
+        nodes
     }
 }
 
-#[test]
-fn loopy() {
-    holochain_trace::test_run().ok().unwrap();
+mod single_loop {
+    use super::*;
+    use test_case::test_case;
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     struct Countdown(u8);
@@ -157,43 +160,50 @@ fn loopy() {
         }
     }
 
-    let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
-    let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
-    let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
-    {
-        let tr = Cause::from(Countdown(3)).traverse(&true_0);
-        report(&tr);
-        let (graph, _passes) = tr.fail().unwrap();
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![
-                Cause::from(Countdown(3)),
-                Cause::from(Countdown(2)),
-                Cause::from(Countdown(1)),
-            ]
-        );
-        // The graph should show the loop
-        assert_eq!(graph.edge_count(), 3);
+    #[test]
+    fn loopy() {
+        holochain_trace::test_run().ok().unwrap();
+    
+    
+        let true_0: Checks<Countdown> = Box::new(|i| i.0 == 0);
+        let true_1: Checks<Countdown> = Box::new(|i| i.0 == 1);
+        let true_3: Checks<Countdown> = Box::new(|i| i.0 == 3);
+        {
+            let tr = Cause::from(Countdown(3)).traverse(&true_0);
+            report(&tr);
+            let (graph, _passes) = tr.fail().unwrap();
+            assert_eq!(
+                graph.causes(),
+                maplit::hashset![
+                    Cause::from(Countdown(3)),
+                    Cause::from(Countdown(2)),
+                    Cause::from(Countdown(1)),
+                ]
+            );
+            // The graph should show the loop
+            assert_eq!(graph.edge_count(), 3);
+        }
+    
+        {
+            let tr = Cause::from(Countdown(3)).traverse(&true_1);
+            let (graph, _passes) = tr.fail().unwrap();
+            assert_eq!(
+                graph.causes(),
+                maplit::hashset![Cause::from(Countdown(3)), Cause::from(Countdown(2))]
+            );
+            assert_eq!(graph.edge_count(), 1);
+        }
+        {
+            let tr = Cause::from(Countdown(2)).traverse(&true_3);
+            let (graph, _passes) = tr.fail().unwrap();
+            assert_eq!(
+                graph.causes(),
+                maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(1))]
+            );
+            assert_eq!(graph.edge_count(), 1);
+        }
     }
-
-    {
-        let tr = Cause::from(Countdown(3)).traverse(&true_1);
-        let (graph, _passes) = tr.fail().unwrap();
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![Cause::from(Countdown(3)), Cause::from(Countdown(2))]
-        );
-        assert_eq!(graph.edge_count(), 1);
-    }
-    {
-        let tr = Cause::from(Countdown(2)).traverse(&true_3);
-        let (graph, _passes) = tr.fail().unwrap();
-        assert_eq!(
-            graph.causes(),
-            maplit::hashset![Cause::from(Countdown(2)), Cause::from(Countdown(1))]
-        );
-        assert_eq!(graph.edge_count(), 1);
-    }
+    
 }
 
 #[test]
