@@ -70,6 +70,20 @@ impl<T: Fact> Cause<T> {
         traverse(self, ctx)
     }
 
+    pub fn fact(&self) -> Option<&T> {
+        match self {
+            Cause::Fact(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn into_fact(self) -> Option<T> {
+        match self {
+            Cause::Fact(f) => Some(f),
+            _ => None,
+        }
+    }
+
     pub fn explain(&self, ctx: &T::Context) -> String {
         match &self {
             Cause::Fact(fact) => fact.explain(ctx),

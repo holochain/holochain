@@ -30,6 +30,18 @@ impl<'c, T: Fact> CauseTree<'c, T> {
             .collect::<HashSet<_>>()
     }
 
+    pub fn leaves(&self) -> HashSet<&Cause<T>> {
+        self.node_indices()
+            .filter(|i| {
+                self.edges_directed(*i, petgraph::Direction::Outgoing)
+                    .count()
+                    == 0
+            })
+            .filter_map(|i| self.node_weight(i))
+            .map(|n| &n.cause)
+            .collect()
+    }
+
     pub fn print(&self) {
         let dot = format!(
             "{:?}",
