@@ -3,17 +3,17 @@ use std::collections::HashSet;
 use maplit::hashset;
 
 use super::simple_report as report;
-use crate::cause::*;
+use crate::dep::*;
 use crate::graph::*;
 
-fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -> Vec<usize> {
+fn path_lengths<T: Fact>(graph: &DepTree<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
     let start_ix = graph
         .node_indices()
-        .find(|i| graph[*i].cause == start)
+        .find(|i| graph[*i].dep == start)
         .unwrap();
     let end_ix = graph
         .node_indices()
-        .find(|i| graph[*i].cause == end)
+        .find(|i| graph[*i].dep == end)
         .unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
         .map(|c| c.len())
@@ -38,7 +38,7 @@ mod singleton {
             self.0
         }
     
-        fn cause(&self, (): &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, (): &Self::Context) -> DepResult<Self> {
             Ok(self.1.then_some(self.clone().into()))
         }
     }
@@ -47,12 +47,12 @@ mod singleton {
     #[test_case( Singleton(false, true)  => Some(hashset! { Singleton(false, true).into() }) ; "failing single self-referencing fact produces only self")]
     #[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
     #[test_case( Singleton(true, true) => None  ; "passing single self-referencing fact produces Pass")]
-    fn singleton_causes(fact: Singleton) -> Option<HashSet<Cause<Singleton>>> {
+    fn singleton_deps(fact: Singleton) -> Option<HashSet<Dep<Singleton>>> {
         holochain_trace::test_run().ok().unwrap();
-        Cause::from(fact.clone())
+        Dep::from(fact.clone())
             .traverse(&())
             .fail()
-            .map(|(graph, _)| graph.causes())
+            .map(|(graph, _)| graph.deps())
     }
 }
 
@@ -68,7 +68,7 @@ mod acyclic_single_path {
     impl Fact for Countdown {
         type Context = Checks<Self>;
     
-        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, _: &Self::Context) -> DepResult<Self> {
             Ok(match self.0 {
                 3 => Some(Self(2).into()),
                 2 => Some(Self(1).into()),
@@ -117,14 +117,14 @@ mod acyclic_single_path {
         holochain_trace::test_run().ok().unwrap();
     
         let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
-        let tr = Cause::from(countdown).traverse(&checker);
+        let tr = Dep::from(countdown).traverse(&checker);
         report(&tr);
         let (graph, _passes) = tr
             .fail()
             .unwrap();
     
-        let nodes: HashSet<_> = graph.causes().into_iter().map(|c| match c {
-            Cause::Fact(f) => f.0,
+        let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
+            Dep::Fact(f) => f.0,
             _ => unreachable!(),
         }).collect();
         
@@ -148,7 +148,7 @@ mod single_loop {
     impl Fact for Countdown {
         type Context = Checks<Self>;
 
-        fn cause(&self, _: &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, _: &Self::Context) -> DepResult<Self> {
             Ok(match self.0 {
                 3 => Some(Self(2).into()),
                 2 => Some(Self(1).into()),
@@ -191,14 +191,14 @@ mod single_loop {
         holochain_trace::test_run().ok().unwrap();
     
         let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
-        let tr = Cause::from(countdown).traverse(&checker);
+        let tr = Dep::from(countdown).traverse(&checker);
         report(&tr);
         let (graph, _passes) = tr
             .fail()
             .unwrap();
     
-        let nodes: HashSet<_> = graph.causes().into_iter().map(|c| match c {
-            Cause::Fact(f) => f.0,
+        let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
+            Dep::Fact(f) => f.0,
             _ => unreachable!(),
         }).collect();
         
@@ -221,11 +221,11 @@ fn branching_any() {
     impl Fact for Branching {
         type Context = HashSet<u8>;
 
-        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, _ctx: &Self::Context) -> DepResult<Self> {
             // If greater than 64, then the node is a leaf of the tree
             // Otherwise, each node `n` branches off to the other numbers `i` where `floor(i / 2) = n`
             Ok((self.0 <= 64)
-                .then(|| Cause::any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()])))
+                .then(|| Dep::any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()])))
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
@@ -235,7 +235,7 @@ fn branching_any() {
 
     {
         let ctx = maplit::hashset![40, 64];
-        let tr = Cause::from(Branching(2)).traverse(&ctx);
+        let tr = Dep::from(Branching(2)).traverse(&ctx);
         // report(&tr);
         let (graph, _passes) = tr.fail().unwrap();
         assert_eq!(
@@ -249,7 +249,7 @@ fn branching_any() {
     }
     {
         let ctx = (32..128).collect();
-        let tr = Cause::from(Branching(2)).traverse(&ctx);
+        let tr = Dep::from(Branching(2)).traverse(&ctx);
         // report(&tr);
         let _ = tr.fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case, check the graph output
@@ -281,22 +281,22 @@ mod recipes {
     impl Fact for Recipe {
         type Context = HashSet<Recipe>;
 
-        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, _ctx: &Self::Context) -> DepResult<Self> {
             use Recipe::*;
             Ok(match self {
                 Eggs => None,
                 Vinegar => None,
-                Mayo => Some(Cause::every(vec![Eggs.into(), Vinegar.into()])),
+                Mayo => Some(Dep::every(vec![Eggs.into(), Vinegar.into()])),
                 Tuna => None,
                 Cheese => None,
                 Bread => None,
-                TunaSalad => Some(Cause::every(vec![Tuna.into(), Mayo.into()])),
-                TunaMelt => Some(Cause::every(vec![
+                TunaSalad => Some(Dep::every(vec![Tuna.into(), Mayo.into()])),
+                TunaMelt => Some(Dep::every(vec![
                     TunaSalad.into(),
                     Cheese.into(),
                     Bread.into(),
                 ])),
-                GrilledCheese => Some(Cause::every(vec![Cheese.into(), Bread.into()])),
+                GrilledCheese => Some(Dep::every(vec![Cheese.into(), Bread.into()])),
             })
         }
 
@@ -335,13 +335,13 @@ mod recipes {
         => hashset![Tuna]
         ; "TunaMelt only requires tuna"
     )]
-    fn every_cause_simple(item: Recipe, truths: HashSet<Recipe>) -> HashSet<Recipe> {
+    fn every_dep_simple(item: Recipe, truths: HashSet<Recipe>) -> HashSet<Recipe> {
         holochain_trace::test_run().ok().unwrap();
 
         // TODO:
         // - loops with Every might take some more thought.
 
-        let tr = Cause::from(item).traverse(&truths);
+        let tr = Dep::from(item).traverse(&truths);
         report(&tr);
         let (g, _) = tr.fail().unwrap();
         g.leaves().into_iter().map(|c| c.clone().into_fact().unwrap()).collect()
@@ -387,17 +387,17 @@ fn holochain_like() {
     impl Fact for F {
         type Context = Checks<Self>;
 
-        fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+        fn dep(&self, _ctx: &Self::Context) -> DepResult<Self> {
             use Stage::*;
             Ok(match self.stage {
                 Create => None,
-                Fetch => Some(Cause::any_named(
+                Fetch => Some(Dep::any_named(
                     "Receive either",
                     vec![self.mine(ReceiveA), self.mine(ReceiveB)],
                 )),
                 ReceiveA => Some(self.theirs(SendA)),
                 ReceiveB => Some(self.theirs(SendB)),
-                Store => Some(Cause::any_named(
+                Store => Some(Dep::any_named(
                     "Hold",
                     vec![self.mine(Create), self.mine(Fetch)],
                 )),
@@ -416,22 +416,22 @@ fn holochain_like() {
     }
 
     impl F {
-        pub fn mine(&self, stage: Stage) -> Cause<Self> {
-            Cause::Fact(Self {
+        pub fn mine(&self, stage: Stage) -> Dep<Self> {
+            Dep::Fact(Self {
                 which: self.which,
                 stage,
             })
         }
 
-        pub fn theirs(&self, stage: Stage) -> Cause<Self> {
-            Cause::Fact(Self {
+        pub fn theirs(&self, stage: Stage) -> Dep<Self> {
+            Dep::Fact(Self {
                 which: !self.which,
                 stage,
             })
         }
     }
 
-    let fatma_store = Cause::Fact(F {
+    let fatma_store = Dep::Fact(F {
         which: false,
         stage: Stage::Store,
     });

@@ -14,7 +14,7 @@
 
 ### future
 
-* [ ] Consider making earlier causes declare their implications rather than the other way around
+* [ ] Consider making earlier deps declare their implications rather than the other way around
 
 ## limitations
 
@@ -22,7 +22,7 @@
 - aitia::trace can only handle one type of fact (per serde)
 
 
-Seems like earlier causes have the info necessary to construct later ones, so this could make more sense. Either way we can construct the entire tree. However if there are multiple starting points then all starting points need to be declared.
+Seems like earlier deps have the info necessary to construct later ones, so this could make more sense. Either way we can construct the entire tree. However if there are multiple starting points then all starting points need to be declared.
 
 There is a theme where each fact is "about" something. Maybe instead of explicitly passing that something around, or transforming it, we can have the "subjects" be outside of the facts. For instance in Holochain, most facts are about an Op and a Node. Ops get introduced by authoring, and Nodes get introduced by initializing.
 
