@@ -1,5 +1,5 @@
 use crate::{
-    graph::{traverse, Traversal},
+    traversal::{traverse, Traversal},
     Fact,
 };
 
@@ -83,3 +83,11 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Dep<T> {
         Ok(())
     }
 }
+
+#[derive(Debug, derive_more::Constructor)]
+pub struct DepError<F: Fact> {
+    pub info: String,
+    pub fact: Option<F>,
+}
+
+pub type DepResult<F> = Result<Option<Dep<F>>, DepError<F>>;

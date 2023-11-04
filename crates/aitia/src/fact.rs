@@ -1,4 +1,4 @@
-use crate::{graph::DepError, Dep};
+use crate::{dep::DepResult, Dep};
 
 pub trait FactTraits: Clone + Eq + std::fmt::Debug + std::hash::Hash {}
 impl<T> FactTraits for T where T: Clone + Eq + std::fmt::Debug + std::hash::Hash {}
@@ -14,8 +14,6 @@ pub trait Fact: FactTraits {
         format!("{:?}", self)
     }
 }
-
-pub type DepResult<F> = Result<Option<Dep<F>>, DepError<F>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Check<T: Fact> {
@@ -42,3 +40,6 @@ impl<T: Fact> Check<T> {
         matches!(self, Check::Pass)
     }
 }
+
+#[derive(Debug)]
+pub struct CheckError<F: Fact>(pub Check<F>);

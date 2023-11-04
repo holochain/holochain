@@ -39,7 +39,8 @@
 
 mod dep;
 mod fact;
-pub mod graph;
+mod graph;
+pub(crate) mod traversal;
 
 #[macro_use]
 #[cfg(feature = "tracing")]
@@ -51,7 +52,7 @@ pub use fact::{Fact, FactTraits};
 #[cfg(test)]
 mod tests;
 
-use graph::Traversal;
+use traversal::Traversal;
 
 /// Helpful function for printing a report from a given Traversal
 ///

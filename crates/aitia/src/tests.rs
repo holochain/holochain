@@ -3,10 +3,11 @@ use std::collections::HashSet;
 use maplit::hashset;
 
 use super::simple_report as report;
+use crate::Fact;
 use crate::dep::*;
 use crate::graph::*;
 
-fn path_lengths<T: Fact>(graph: &DepTree<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
+fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
     let start_ix = graph
         .node_indices()
         .find(|i| graph[*i].dep == start)
@@ -25,6 +26,7 @@ type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
 /// Tests exploring all the possible graphs involving a single node
 mod singleton {
+
     use super::*;
     use test_case::test_case;
 
@@ -58,6 +60,7 @@ mod singleton {
 
 /// Tests exploring a single, acyclic path with various starting and ending points
 mod acyclic_single_path {
+
     use super::*;
     use test_case::test_case;
 
