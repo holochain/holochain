@@ -22,6 +22,8 @@ fn path_lengths<T: Fact>(graph: &CauseTree<T>, start: Cause<T>, end: Cause<T>) -
 
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
+
+/// Tests exploring all the possible graphs involving a single node
 mod singleton {
     use super::*;
     use test_case::test_case;
@@ -54,6 +56,7 @@ mod singleton {
     }
 }
 
+/// Tests exploring a single, acyclic path with various starting and ending points
 mod acyclic_single_path {
     use super::*;
     use test_case::test_case;
@@ -134,6 +137,7 @@ mod acyclic_single_path {
     }
 }
 
+/// Tests exploring a single loop with various starting and ending points
 mod single_loop {
     use super::*;
     use test_case::test_case;
@@ -206,6 +210,7 @@ mod single_loop {
     
 }
 
+/// Contrived test case involving graphs mostly consisting of ANY nodes
 #[test]
 fn branching_any() {
     holochain_trace::test_run().ok().unwrap();
@@ -217,6 +222,8 @@ fn branching_any() {
         type Context = HashSet<u8>;
 
         fn cause(&self, _ctx: &Self::Context) -> CauseResult<Self> {
+            // If greater than 64, then the node is a leaf of the tree
+            // Otherwise, each node `n` branches off to the other numbers `i` where `floor(i / 2) = n`
             Ok((self.0 <= 64)
                 .then(|| Cause::any(vec![Self(self.0 * 2).into(), Self(self.0 * 2 + 1).into()])))
         }
@@ -245,11 +252,12 @@ fn branching_any() {
         let tr = Cause::from(Branching(2)).traverse(&ctx);
         // report(&tr);
         let _ = tr.fail().unwrap();
-        // no assertion here, just a smoke test. It's a neat case.
+        // no assertion here, just a smoke test. It's a neat case, check the graph output
     }
 }
 
 
+/// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
 
     use super::*;
@@ -343,7 +351,9 @@ mod recipes {
 }
 
 
+/// A test similar to what Holochain uses, since that's what this lib was written for
 #[test]
+#[ignore = "should be run manually"]
 fn holochain_like() {
     holochain_trace::test_run().ok().unwrap();
 
