@@ -433,7 +433,7 @@ async fn test_gossip_startup() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mk_conductor = || async {
         let cfg = config();
-        assert!(cfg.network.as_ref().unwrap().is_tx5());
+        assert!(cfg.network.is_tx5());
         let mut conductor =
             SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
         // let mut conductor = SweetConductor::from_config(config()).await;
@@ -466,25 +466,28 @@ async fn test_gossip_startup() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    holochain_trace::test_run().ok();
+    let aw = hc_sleuth::init_subscriber();
     let config = make_config(false, true, false, None);
-    three_way_gossip(config).await;
+    three_way_gossip(config, aw).await;
 }
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    holochain_trace::test_run().ok();
+    let aw = hc_sleuth::init_subscriber();
     let config = make_config(false, false, true, Some(0));
-    three_way_gossip(config).await;
+    three_way_gossip(config, aw).await;
 }
 
 /// Test that:
 /// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
+async fn three_way_gossip(
+    config: holochain::sweettest::SweetConductorConfig,
+    aw: hc_sleuth::ContextWriter,
+) {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 
@@ -497,15 +500,17 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     }))
     .await;
 
-    let mut sleuth_ctx = hc_sleuth::Context::default();
-    sleuth_ctx.nodes.add(
-        conductors[0].sleuth_env(dna_hash),
-        &[cells[0].agent_pubkey().clone()],
-    );
-    sleuth_ctx.nodes.add(
-        conductors[1].sleuth_env(dna_hash),
-        &[cells[1].agent_pubkey().clone()],
-    );
+    // let mut sleuth_ctx = hc_sleuth::Context::default();
+    // sleuth_ctx.nodes.add(
+    //     conductors[0].id(),
+    //     conductors[0].sleuth_env(dna_hash),
+    //     &[cells[0].agent_pubkey().clone()],
+    // );
+    // sleuth_ctx.nodes.add(
+    //     conductors[1].id(),
+    //     conductors[1].sleuth_env(dna_hash),
+    //     &[cells[1].agent_pubkey().clone()],
+    // );
 
     let zomes: Vec<_> = cells
         .iter()
@@ -561,32 +566,48 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
-    sleuth_ctx.nodes.add(
-        conductors[2].sleuth_env(dna_hash),
-        &[cell.agent_pubkey().clone()],
-    );
+    // sleuth_ctx.nodes.add(
+    //     conductors[2].id(),
+    //     conductors[2].sleuth_env(dna_hash),
+    //     &[cell.agent_pubkey().clone()],
+    // );
 
-    let step = hc_sleuth::Step::Integrated {
-        by: 2,
-        op: (
-            hashes[0].clone(),
-            holochain_types::prelude::DhtOpType::StoreRecord,
-        ),
-    };
-    hc_sleuth::report(step, &sleuth_ctx);
+    // let ctx = LogAccumulator::from_file(BufReader::new(std::fs::File::open("out.log").unwrap()));
+
+    {
+        let ctx = aw.lock();
+        dbg!(&ctx.map_agent_to_node);
+
+        let step = hc_sleuth::Step::Integrated {
+            by: conductors[2].id(),
+            op: ctx
+                .op_from_action(
+                    hashes[0].clone(),
+                    holochain_types::prelude::DhtOpType::StoreRecord,
+                )
+                .unwrap(),
+        };
+
+        hc_sleuth::report(step, &ctx);
+    }
 
     conductors[2]
         .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(10))
         .await;
 
-    let step = hc_sleuth::Step::Integrated {
-        by: 2,
-        op: (
-            hashes[0].clone(),
-            holochain_types::prelude::DhtOpType::StoreRecord,
-        ),
-    };
-    hc_sleuth::report(step, &sleuth_ctx);
+    {
+        let ctx = aw.lock();
+        let step = hc_sleuth::Step::Integrated {
+            by: conductors[2].id(),
+            op: ctx
+                .op_from_action(
+                    hashes[0].clone(),
+                    holochain_types::prelude::DhtOpType::StoreRecord,
+                )
+                .unwrap(),
+        };
+        hc_sleuth::report(step, &ctx);
+    }
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
@@ -1084,7 +1105,7 @@ async fn mock_network_sharded_gossip() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
@@ -1593,7 +1614,7 @@ async fn mock_network_sharding() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);

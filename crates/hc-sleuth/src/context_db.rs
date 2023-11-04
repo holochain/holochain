@@ -1,4 +1,11 @@
-use holochain_p2p::DnaHashExt;
+use std::{collections::HashSet, hash::Hash, io::BufRead, sync::Arc};
+
+use aitia::{
+    cause::FactTraits,
+    logging::{Log, LogLine},
+    Fact,
+};
+use holochain_types::prelude::*;
 
 use super::*;
 
@@ -10,21 +17,20 @@ pub struct Context {
 #[derive(Default, derive_more::Deref)]
 pub struct NodeGroup {
     #[deref]
-    pub envs: Vec<NodeEnv>,
+    pub envs: HashMap<NodeId, NodeEnv>,
     pub agent_map: HashMap<AgentPubKey, NodeId>,
 }
 
 impl NodeGroup {
-    pub fn add(&mut self, node: NodeEnv, agents: &[AgentPubKey]) {
-        let id = self.envs.len();
-        self.envs.push(node);
+    pub fn add(&mut self, id: NodeId, node: NodeEnv, agents: &[AgentPubKey]) {
+        self.envs.insert(id.clone(), node);
         self.agent_map
-            .extend(agents.iter().map(|a| (a.clone(), id)));
+            .extend(agents.iter().map(move |a| (a.clone(), id.clone())));
     }
 
     pub fn node(&self, agent: &AgentPubKey) -> Option<&NodeEnv> {
         let id = self.agent_map.get(agent)?;
-        self.envs.get(*id)
+        self.envs.get(id)
     }
 }
 
@@ -35,8 +41,6 @@ pub struct NodeEnv {
     pub peers: DbWrite<DbKindP2pAgents>,
     pub metrics: DbWrite<DbKindP2pMetrics>,
 }
-
-pub type NodeId = usize;
 
 impl NodeEnv {
     pub fn integrated<R: Send + 'static>(

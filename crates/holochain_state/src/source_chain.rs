@@ -341,13 +341,17 @@ impl SourceChain {
                 for shh in actions.iter() {
                     insert_action(txn, shh)?;
                 }
-                for (op, op_hash, op_order, timestamp, _) in &ops {
+                for (op, op_hash, op_order, timestamp, dep) in &ops {
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
                         set_withhold_publish(txn, op_hash)?;
                     }
+                    aitia::trace!(&hc_sleuth::Step::Authored {
+                        by: (*author).clone(),
+                        op: hc_sleuth::OpInfo::new(op.clone(), op_hash.clone(), dep.clone()),
+                    });
                 }
                 SourceChainResult::Ok(actions)
             })
@@ -907,7 +911,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLight, DhtOpHash, OpOrder, Timestamp, Dependency)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDep)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -919,7 +923,7 @@ fn build_ops_from_actions(
         // &ActionHash, &Action, EntryHash are needed to produce the ops.
         let entry_hash = shh.action().entry_hash().cloned();
         let item = (shh.as_hash(), shh.action(), entry_hash);
-        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter())?;
+        let ops_inner = produce_op_lites_from_iter(vec![item].into_iter())?;
 
         // Break apart the SignedActionHashed.
         let (action, sig) = shh.into_inner();
@@ -934,9 +938,9 @@ fn build_ops_from_actions(
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = get_dependency(op_type, &action);
+            let dependency = op.get_type().sys_validation_dependency(&action);
             h = Some(action);
-            // Collect the DhtOpLight, DhtOpHash and OpOrder.
+            // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
         }
 
@@ -990,7 +994,7 @@ pub async fn genesis(
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
     let dna_record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_records(vec![&dna_record])?;
+    let dna_ops = produce_op_lites_from_records(vec![&dna_record])?;
     let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
@@ -1006,7 +1010,7 @@ pub async fn genesis(
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
     let agent_validation_record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_records(vec![&agent_validation_record])?;
+    let avh_ops = produce_op_lites_from_records(vec![&agent_validation_record])?;
     let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
@@ -1023,7 +1027,7 @@ pub async fn genesis(
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
     let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lights_from_records(vec![&agent_record])?;
+    let agent_ops = produce_op_lites_from_records(vec![&agent_record])?;
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
@@ -1071,7 +1075,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLight>,
+    ops: Vec<DhtOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();
@@ -1185,7 +1189,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
-    let ops = produce_op_lights_from_records(vec![&record])?;
+    let ops = produce_op_lites_from_records(vec![&record])?;
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();

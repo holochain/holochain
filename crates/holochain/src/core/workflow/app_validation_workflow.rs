@@ -93,6 +93,7 @@ async fn app_validation_workflow_inner(
     tracing::debug!("validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
+    let sleuth_id = conductor.config.sleuth_id();
 
     // Validate all the ops
     let iter = sorted_ops.into_iter().map({
@@ -107,15 +108,15 @@ async fn app_validation_workflow_inner(
                 let (op, op_hash) = so.into_inner();
                 let op_type = op.get_type();
                 let action = op.action();
-                let dependency = get_dependency(op_type, &action);
-                let op_light = op.to_light();
+                let dependency = op.sys_validation_dependency();
+                let op_lite = op.to_lite();
 
                 // If this is agent activity, track it for the cache.
                 let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
                     (
                         action.author().clone(),
                         action.action_seq(),
-                        matches!(dependency, Dependency::Null),
+                        matches!(dependency, None),
                     )
                 });
 
@@ -127,7 +128,7 @@ async fn app_validation_workflow_inner(
                     }
                     Err(e) => Err(e),
                 };
-                (op_hash, dependency, op_light, r, activity)
+                (op_hash, dependency, op_lite, r, activity)
             }
         }
     });
@@ -169,6 +170,7 @@ async fn app_validation_workflow_inner(
             "Committing {} ops",
             chunk.iter().map(|c| c.len()).sum::<usize>()
         );
+        let sleuth_id = sleuth_id.clone();
         let (t, a, r, activity) = workspace
             .dht_db
             .write_async(move |txn| {
@@ -177,7 +179,7 @@ async fn app_validation_workflow_inner(
                 let mut rejected = 0;
                 let mut agent_activity = Vec::new();
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, dependency, op_light, outcome, activity) = outcome;
+                    let (op_hash, dependency, op_lite, outcome, activity) = outcome;
                     // Get the outcome or return the error
                     let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
@@ -198,7 +200,17 @@ async fn app_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
-                            if let Dependency::Null = dependency {
+                            aitia::trace!(&hc_sleuth::Step::AppValidated {
+                                by: sleuth_id.clone(),
+                                op: op_hash.clone()
+                            });
+
+                            if dependency.is_none() {
+                                aitia::trace!(&hc_sleuth::Step::Integrated {
+                                    by: sleuth_id.clone(),
+                                    op: op_hash.clone()
+                                });
+
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
@@ -213,9 +225,9 @@ async fn app_validation_workflow_inner(
                             rejected += 1;
                             tracing::info!(
                                 "Received invalid op. The op author will be blocked.\nOp: {:?}",
-                                op_light
+                                op_lite
                             );
-                            if let Dependency::Null = dependency {
+                            if dependency.is_none() {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;

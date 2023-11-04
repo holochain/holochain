@@ -3,7 +3,7 @@
 
 use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
-    SweetConductorHandle,
+    SweetConductorHandle, NUM_CREATED,
 };
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
@@ -19,8 +19,10 @@ use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
+use nanoid::nanoid;
 use rand::Rng;
 use std::path::Path;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -45,12 +47,11 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
-    id: [u8; 32],
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
     pub(crate) spaces: Spaces,
-    config: ConductorConfig,
+    config: Arc<ConductorConfig>,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
@@ -60,7 +61,7 @@ pub struct SweetConductor {
 /// independently no matter what kind of mutations/state might eventuate.
 impl PartialEq for SweetConductor {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.id() == other.id()
     }
 }
 
@@ -96,8 +97,10 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 
 impl SweetConductor {
     /// Get the ID of this conductor for manual equality checks.
-    pub fn id(&self) -> [u8; 32] {
-        self.id
+    pub fn id(&self) -> String {
+        self.config
+            .tracing_scope()
+            .expect("SweetConductor must have a tracing scope set")
     }
 
     /// Create a SweetConductor from an already-built ConductorHandle and environments
@@ -107,7 +110,7 @@ impl SweetConductor {
     pub async fn new(
         handle: ConductorHandle,
         env_dir: TestDir,
-        config: ConductorConfig,
+        config: Arc<ConductorConfig>,
         rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -125,18 +128,11 @@ impl SweetConductor {
         // to actually access those databases.
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
-        let spaces = Spaces::new(&ConductorConfig {
-            environment_path: env_dir.to_path_buf().into(),
-            ..Default::default()
-        })
-        .unwrap();
+        let spaces = Spaces::new(config.clone()).unwrap();
 
         let keystore = handle.keystore().clone();
 
-        let mut rng = rand::thread_rng();
-
         Self {
-            id: rng.gen(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
@@ -206,11 +202,19 @@ impl SweetConductor {
                 .await;
         }
 
-        let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
+        let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.into().into_conductor_config(&*r).await
         } else {
             config.into().into()
         };
+
+        if config.tracing_scope().is_none() {
+            config.network.tracing_scope = Some(format!(
+                "{}.{}",
+                NUM_CREATED.load(Ordering::SeqCst),
+                nanoid!(5)
+            ));
+        }
 
         tracing::info!(?config);
 
@@ -221,7 +225,7 @@ impl SweetConductor {
             &[],
         )
         .await;
-        Self::new(handle, dir, config, rendezvous).await
+        Self::new(handle, dir, Arc::new(config), rendezvous).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -229,7 +233,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
         let handle = builder.test(&db_dir, &[]).await.unwrap();
-        Self::new(handle, db_dir, config, None).await
+        Self::new(handle, db_dir, Arc::new(config), None).await
     }
 
     /// Create a handle from an existing environment and config
@@ -239,6 +243,8 @@ impl SweetConductor {
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
+        NUM_CREATED.fetch_add(1, Ordering::SeqCst);
+
         Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)
@@ -525,6 +531,9 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
+            aitia::trace!(&hc_sleuth::Step::SweetConductorShutdown {
+                node: handle.config.sleuth_id()
+            });
             handle
                 .shutdown()
                 .await
@@ -681,16 +690,16 @@ impl SweetConductor {
         }
     }
 
-    /// Get the databases needed to use hc-sleuth
-    pub fn sleuth_env(&self, dna_hash: &DnaHash) -> hc_sleuth::NodeEnv {
-        hc_sleuth::NodeEnv {
-            authored: self.spaces.authored_db(dna_hash).unwrap(),
-            cache: self.spaces.cache(dna_hash).unwrap(),
-            dht: self.spaces.dht_db(dna_hash).unwrap(),
-            peers: self.spaces.p2p_agents_db(dna_hash).unwrap(),
-            metrics: self.spaces.p2p_metrics_db(dna_hash).unwrap(),
-        }
-    }
+    // /// Get the databases needed to use hc-sleuth
+    // pub fn sleuth_db_context(&self, dna_hash: &DnaHash) -> hc_sleuth::context_db::NodeEnv {
+    //     hc_sleuth::context_db::NodeEnv {
+    //         authored: self.spaces.authored_db(dna_hash).unwrap(),
+    //         cache: self.spaces.cache(dna_hash).unwrap(),
+    //         dht: self.spaces.dht_db(dna_hash).unwrap(),
+    //         peers: self.spaces.p2p_agents_db(dna_hash).unwrap(),
+    //         metrics: self.spaces.p2p_metrics_db(dna_hash).unwrap(),
+    //     }
+    // }
 }
 
 /// Get a websocket client on localhost at the specified port

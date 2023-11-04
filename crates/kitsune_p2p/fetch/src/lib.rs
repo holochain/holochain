@@ -43,10 +43,14 @@ pub struct FetchPoolPush {
     /// The source to fetch the op from
     pub source: FetchSource,
 
+    /// The means by which this hash arrived, either via Publish or Gossip.
+    pub transfer_method: TransferMethod,
+
     /// The approximate size of the item
     pub size: Option<RoughInt>,
 
     /// If specified, the author of the op.
+    ///
     /// NOTE: author is additive-only. That is, an op without an author
     /// is the same as one *with* an author, but should be updated to
     /// include the author. It is UB to have two FetchKeys with the
@@ -55,6 +59,25 @@ pub struct FetchPoolPush {
 
     /// Opaque "context" to be provided and interpreted by the host.
     pub context: Option<FetchContext>,
+}
+
+/// The possible methods of transferring op hashes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum TransferMethod {
+    /// Transfer by publishing
+    Publish,
+    /// Transfer by gossiping
+    Gossip,
 }
 
 /// Usage agnostic context data.

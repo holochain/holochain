@@ -553,7 +553,7 @@ pub fn commit_chain<Kind: DbKindT>(
     db.test_write(move |txn| {
         for data in &data {
             for op in data {
-                let op_light = DhtOpLight::RegisterAgentActivity(
+                let op_light = DhtOpLite::RegisterAgentActivity(
                     op.action.action_address().clone(),
                     op.action
                         .hashed

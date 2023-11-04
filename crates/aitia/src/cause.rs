@@ -1,16 +1,19 @@
-use std::fmt::Display;
+use crate::graph::{traverse, CauseError, Traversal};
 
-use crate::graph::{traverse, Traversal};
+pub trait FactTraits: Clone + Eq + std::fmt::Debug + std::hash::Hash {}
+impl<T> FactTraits for T where T: Clone + Eq + std::fmt::Debug + std::hash::Hash {}
 
-pub trait Fact: Sized + Clone + Eq + std::fmt::Display + std::fmt::Debug + std::hash::Hash {
+pub trait Fact: FactTraits {
     type Context;
 
     fn explain(&self, _ctx: &Self::Context) -> String {
-        self.to_string()
+        format!("{:?}", self)
     }
-    fn cause(&self, ctx: &Self::Context) -> Option<Cause<Self>>;
+    fn cause(&self, ctx: &Self::Context) -> CauseResult<Self>;
     fn check(&self, ctx: &Self::Context) -> bool;
 }
+
+pub type CauseResult<F> = Result<Option<Cause<F>>, CauseError<F>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Check<T: Fact> {
@@ -42,29 +45,63 @@ impl<T: Fact> Check<T> {
 pub enum Cause<T> {
     #[from]
     Fact(T),
-    Any(Vec<Cause<T>>),
-    Every(Vec<Cause<T>>),
+    Any(Option<String>, Vec<Cause<T>>),
+    Every(Option<String>, Vec<Cause<T>>),
 }
 
 impl<T: Fact> Cause<T> {
-    pub fn traverse(&self, ctx: &T::Context) -> Traversal<T> {
+    pub fn any(causes: Vec<Cause<T>>) -> Self {
+        Self::Any(None, causes)
+    }
+
+    pub fn any_named(name: impl ToString, causes: Vec<Cause<T>>) -> Self {
+        Self::Any(Some(name.to_string()), causes)
+    }
+
+    pub fn every(causes: Vec<Cause<T>>) -> Self {
+        Self::Every(None, causes)
+    }
+
+    pub fn every_named(name: impl ToString, causes: Vec<Cause<T>>) -> Self {
+        Self::Every(Some(name.to_string()), causes)
+    }
+
+    pub fn traverse<'c>(&self, ctx: &'c T::Context) -> Traversal<'c, T> {
         traverse(self, ctx)
+    }
+
+    pub fn explain(&self, ctx: &T::Context) -> String {
+        match &self {
+            Cause::Fact(fact) => fact.explain(ctx),
+            Cause::Any(name, cs) => {
+                let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
+                if let Some(name) = name {
+                    format!("ANY({:#?})", (name, cs))
+                } else {
+                    format!("ANY({:#?})", cs)
+                }
+            }
+            Cause::Every(name, cs) => {
+                let cs = cs.iter().map(|c| c.explain(ctx)).collect::<Vec<_>>();
+                if let Some(name) = name {
+                    format!("EVERY({:#?})", (name, cs))
+                } else {
+                    format!("EVERY({:#?})", cs)
+                }
+            }
+        }
     }
 }
 
-impl<T: Display> std::fmt::Debug for Cause<T> {
+impl<T: std::fmt::Debug> std::fmt::Debug for Cause<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Cause::Fact(fact) => f.write_str(&fact.to_string())?,
-            Cause::Any(cs) => {
-                f.write_str("Any(")?;
-                f.debug_list().entries(cs.iter()).finish()?;
-                f.write_str(")")?;
+            Cause::Fact(fact) => f.write_fmt(format_args!("{:?}", fact))?,
+            Cause::Any(name, cs) => {
+                f.write_fmt(format_args!("ANY({:#?})", (name, cs)))?;
             }
-            Cause::Every(cs) => {
-                f.write_str("Every(")?;
-                f.debug_list().entries(cs.iter()).finish()?;
-                f.write_str(")")?;
+            Cause::Every(name, cs) => {
+                f.write_fmt(format_args!("EVERY({:#?})", (name, cs)))?;
             }
         }
         Ok(())

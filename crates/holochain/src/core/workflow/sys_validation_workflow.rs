@@ -10,6 +10,7 @@ use crate::core::validation::*;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
@@ -40,7 +41,8 @@ mod tests;
     space,
     trigger_app_validation,
     sys_validation_trigger,
-    network
+    network,
+    config
 ))]
 pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
@@ -48,9 +50,11 @@ pub async fn sys_validation_workflow(
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     network: HolochainP2pDna,
+    config: Arc<ConductorConfig>,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
-        sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger).await?;
+        sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger, &config)
+            .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -65,6 +69,7 @@ async fn sys_validation_workflow_inner(
     space: Arc<Space>,
     network: HolochainP2pDna,
     sys_validation_trigger: TriggerSender,
+    config: &ConductorConfig,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -87,14 +92,12 @@ async fn sys_validation_workflow_inner(
             let cascade = cascade.clone();
             async move {
                 let (op, op_hash) = so.into_inner();
-                let op_type = op.get_type();
-                let action = op.action();
-
-                let dependency = get_dependency(op_type, &action);
+                let op_lite = op.clone().to_lite();
+                let dependency = op.sys_validation_dependency();
                 let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
                 let r = validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
-                r.map(|o| (op_hash, o, dependency))
+                r.map(|o| (op_hash, o, dependency, op_lite))
             }
         }
     });
@@ -131,9 +134,11 @@ async fn sys_validation_workflow_inner(
 
     let mut total = 0;
     let mut round_time = start.is_some().then(std::time::Instant::now);
+    let sleuth_id = config.sleuth_id();
     // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
         let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
+        let sleuth_id = sleuth_id.clone();
         tracing::debug!("Committing {} ops", num_ops);
         let (t, a, m, r) = space
             .dht_db
@@ -143,11 +148,16 @@ async fn sys_validation_workflow_inner(
                 let mut missing = 0;
                 let mut rejected = 0;
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, outcome, dependency) = outcome?;
+                    let (op_hash, outcome, dependency, _op_lite) = outcome?;
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
                             put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
+
+                            aitia::trace!(&hc_sleuth::Step::SysValidated {
+                                by: sleuth_id.clone(),
+                                op: op_hash
+                            });
                         }
                         Outcome::AwaitingOpDep(missing_dep) => {
                             awaiting += 1;
@@ -160,7 +170,7 @@ async fn sys_validation_workflow_inner(
                             // We need to be holding the dependency because
                             // we were meant to get a StoreRecord or StoreEntry or
                             // RegisterAgentActivity or RegisterAddLink.
-                            let status = ValidationStage::AwaitingSysDeps(missing_dep);
+                            let status = ValidationStage::AwaitingSysDeps(missing_dep.clone());
                             put_validation_limbo(txn, &op_hash, status)?;
                         }
                         Outcome::MissingDhtDep => {
@@ -170,7 +180,7 @@ async fn sys_validation_workflow_inner(
                         }
                         Outcome::Rejected => {
                             rejected += 1;
-                            if let Dependency::Null = dependency {
+                            if dependency.is_none() {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;

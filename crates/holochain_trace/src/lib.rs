@@ -76,9 +76,10 @@
 use tracing::Subscriber;
 use tracing_subscriber::{
     filter::EnvFilter,
-    fmt::{format::FmtSpan, time::UtcTime},
+    fmt::{format::FmtSpan, time::UtcTime, SubscriberBuilder},
+    layer::SubscriberExt,
     registry::LookupSpan,
-    FmtSubscriber,
+    Layer,
 };
 
 use derive_more::Display;
@@ -263,15 +264,12 @@ pub fn test_run_timed_ice_console(
     }))
 }
 
-/// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
-/// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
-pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
-    init_fmt_with_opts(output, std::io::stderr)
-}
-
-fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError>
+/// Return a subscriber builder directly, for times when you need more control over the
+/// produced subscriber
+pub fn standard_layer<W, S>(writer: W) -> Result<impl Layer<S>, errors::TracingError>
 where
-    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
 {
     let mut filter = match std::env::var("RUST_LOG") {
         Ok(_) => EnvFilter::from_default_env(),
@@ -286,56 +284,80 @@ where
             .ok();
     }
 
-    let subscriber = FmtSubscriber::builder()
+    // let standard = tracing_subscriber::fmt::Layer::<_, _, _, _>::default()
+    Ok(tracing_subscriber::fmt::Layer::default()
         .with_test_writer()
         .with_writer(writer)
         .with_file(true)
         .with_line_number(true)
-        .with_target(true);
+        .with_target(true)
+        .with_filter(filter))
+
+    // Ok(Registry::default().with(layer).with(standard))
+
+    /*
+
+    impl<L, S> Subscriber for Layered<L, S>
+    where
+        L: Layer<S>,
+        S: Subscriber,
+         */
+}
+
+/// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
+/// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
+pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
+    init_fmt_with_opts(output, std::io::stderr)
+}
+
+fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError>
+where
+    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
+{
+    let subscriber = SubscriberBuilder::default();
 
     match output {
-        Output::Json => {
-            let subscriber = subscriber
-                .with_env_filter(filter)
+        Output::Json => finish(
+            subscriber
                 .with_timer(UtcTime::rfc_3339())
                 .json()
-                .event_format(FormatEvent);
-            finish(subscriber.finish())
-        }
-        Output::JsonTimed => {
-            let subscriber = subscriber
+                .event_format(FormatEvent)
+                .finish()
+                .with(standard_layer(writer)?),
+        ),
+        Output::JsonTimed => finish(
+            subscriber
                 .with_span_events(FmtSpan::CLOSE)
-                .with_env_filter(filter)
                 .with_timer(UtcTime::rfc_3339())
                 .json()
-                .event_format(FormatEvent);
-            finish(subscriber.finish())
-        }
-        Output::Log => finish(subscriber.with_env_filter(filter).finish()),
-        Output::LogTimed => {
-            let subscriber = subscriber.with_span_events(FmtSpan::CLOSE);
-            finish(subscriber.with_env_filter(filter).finish())
-        }
-        Output::FlameTimed => {
-            let subscriber = subscriber
+                .event_format(FormatEvent)
+                .finish()
+                .with(standard_layer(writer)?),
+        ),
+        Output::Log => Ok(()),
+        Output::LogTimed => finish(
+            subscriber
                 .with_span_events(FmtSpan::CLOSE)
-                .with_env_filter(filter)
-                .with_timer(UtcTime::rfc_3339())
-                .event_format(FormatEventFlame);
-            finish(subscriber.finish())
-        }
-        Output::IceTimed => {
-            let subscriber = subscriber
+                .finish()
+                .with(standard_layer(writer)?),
+        ),
+        Output::FlameTimed => finish(
+            subscriber
                 .with_span_events(FmtSpan::CLOSE)
-                .with_env_filter(filter)
                 .with_timer(UtcTime::rfc_3339())
-                .event_format(FormatEventIce);
-            finish(subscriber.finish())
-        }
-        Output::Compact => {
-            let subscriber = subscriber.compact();
-            finish(subscriber.with_env_filter(filter).finish())
-        }
+                .event_format(FormatEventFlame)
+                .finish()
+                .with(standard_layer(writer)?),
+        ),
+        Output::IceTimed => finish(
+            subscriber
+                .with_span_events(FmtSpan::CLOSE)
+                .with_timer(UtcTime::rfc_3339())
+                .event_format(FormatEventIce)
+                .finish()
+                .with(standard_layer(writer)?),
+        ),
+        Output::Compact => finish(subscriber.compact().finish().with(standard_layer(writer)?)),
         // Output::OpenTel => {
         //     #[cfg(feature = "opentelemetry-on")]
         //     {

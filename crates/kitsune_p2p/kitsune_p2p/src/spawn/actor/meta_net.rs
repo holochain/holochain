@@ -248,9 +248,7 @@ impl MetricSendGuard {
 
 impl Drop for MetricSendGuard {
     fn drop(&mut self) {
-        let cx = opentelemetry_api::Context::new();
         crate::metrics::METRIC_MSG_OUT_BYTE.record(
-            &cx,
             self.byte_count,
             &[
                 opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
@@ -258,7 +256,6 @@ impl Drop for MetricSendGuard {
             ],
         );
         crate::metrics::METRIC_MSG_OUT_TIME.record(
-            &cx,
             self.start_time.elapsed().as_secs_f64(),
             &[
                 opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),

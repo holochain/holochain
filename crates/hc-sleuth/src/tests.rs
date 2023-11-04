@@ -1,7 +1,7 @@
 use arbitrary::Arbitrary;
 use holochain_state::mutations;
 
-use crate::{query::*, *};
+use crate::{context_db::NodeEnv, query::*, *};
 
 #[test]
 fn all_integrated() {
