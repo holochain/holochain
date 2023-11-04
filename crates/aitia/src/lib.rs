@@ -1,4 +1,6 @@
-//! aitia, a crate for examining causal trees
+//! aitia, a crate for gaining insights from causal graphs
+//!
+//! ("aitia" is the root of "etiology", the study of causes, and also an easy-to-type palindrome)
 //!
 //! In complex systems, when something is going wrong, it can be difficult to
 //! narrow down the dep to some subsystem without doing lots of forensic
@@ -6,9 +8,9 @@
 //! of narrowing down the possible scope of a problem.
 //!
 //! You define a collection of [`Fact`]s about your system, each of which specifies
-//! one or more [`Dep`]s. The causal relationships imply a graph, with each Fact
-//! connected to others. When testing your system, you can check whether a particular
-//! Fact is true or not. If it's not true, `aitia` recursively follows the causal
+//! one or more [`Dep`]s (dependencies). The causal relationships between Depsimply a graph,
+//! with each Fact connected to others. When testing your system, you can check whether a
+//! particular Fact is true or not. If it's not true, `aitia` recursively follows the causal
 //! relationships specified, building up a graph of deps, each of which is checked for
 //! truth. The traversal stops only when either:
 //! 1. a true fact is encountered, or
