@@ -486,9 +486,6 @@ pub mod map_extern;
 /// Exports common types and functions according to the Rust prelude pattern.
 pub mod prelude;
 
-#[cfg(not(feature = "mock"))]
-crate::holochain_externs!();
-
 /// Encryption and decryption using the (secret)box algorithms popularised by Libsodium.
 ///
 /// Libsodium defines and implements two encryption functions `secretbox` and `box`.
