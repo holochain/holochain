@@ -46,7 +46,6 @@ impl DerefMut for PConnGuard {
 impl Drop for PConnGuard {
     fn drop(&mut self) {
         self.use_time_metric.record(
-            &opentelemetry_api::Context::new(),
             self.created.elapsed().as_secs_f64(),
             &[],
         );
