@@ -4,9 +4,8 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpHashed, DhtOpType},
-    prelude::DhtOpResult,
+    prelude::*,
 };
-use holochain_zome_types::{EntryVisibility, SignedAction};
 
 use crate::{prelude::*, query::get_public_op_from_db};
 
@@ -49,7 +48,7 @@ pub async fn authored_ops_to_dht_db_without_check(
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
     let ops = authored_db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             for hash in hashes {
                 // This function filters out any private entries from ops
                 // or store entry ops with private entries.
@@ -62,7 +61,7 @@ pub async fn authored_ops_to_dht_db_without_check(
         .await?;
     let mut activity = Vec::new();
     let activity = dht_db
-        .async_commit(|txn| {
+        .write_async(|txn| {
             for op in ops {
                 if let Some(op) = insert_locally_validated_op(txn, op)? {
                     activity.push(op);
@@ -105,7 +104,7 @@ fn insert_locally_validated_op(
     // Insert the op.
     insert_op(txn, &op)?;
     // Set the status to valid because we authored it.
-    set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
+    set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
     // Set the stage to awaiting integration.
@@ -113,7 +112,7 @@ fn insert_locally_validated_op(
         // This set the validation stage to pending which is correct when
         // it's integrated.
         set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
-        set_when_integrated(txn, hash, holochain_zome_types::Timestamp::now())?;
+        set_when_integrated(txn, hash, holochain_zome_types::prelude::Timestamp::now())?;
     } else {
         set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
     }
@@ -129,12 +128,12 @@ fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
         matches!(et.visibility(), EntryVisibility::Private)
     });
 
-    if is_private_entry && op.entry().is_some() {
+    if is_private_entry && op.entry().into_option().is_some() {
         let (op, hash) = op.into_inner();
         let op_type = op.get_type();
-        let (signature, action, _) = op.into_inner();
+        let (signature, action) = (op.signature(), op.action());
         Ok(DhtOpHashed::with_pre_hashed(
-            DhtOp::from_type(op_type, SignedAction(action, signature), None)?,
+            DhtOp::from_type(op_type, SignedAction(action, signature.clone()), None)?,
             hash,
         ))
     } else {

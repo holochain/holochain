@@ -7,7 +7,7 @@ pub enum AgentSpaceBlockReason {
     BadCrypto,
 }
 
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
 pub enum NodeBlockReason {
     /// The node did some bad cryptography.
     BadCrypto,
@@ -15,45 +15,47 @@ pub enum NodeBlockReason {
     DOS,
 }
 
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
+pub enum NodeSpaceBlockReason {
+    BadWire,
+}
+
+#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
 pub enum IpBlockReason {
     /// Classic DOS.
     DOS,
 }
 
-pub type NodeId = Arc<[u8; 32]>;
+pub type NodeId = kitsune_p2p_bin_data::NodeCert;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum BlockTarget {
-    AgentSpace(
-        Arc<kitsune_p2p_bin_data::KitsuneAgent>,
-        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-        AgentSpaceBlockReason,
-    ),
     Node(NodeId, NodeBlockReason),
+    NodeSpace(
+        NodeId,
+        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
+        NodeSpaceBlockReason,
+    ),
     Ip(std::net::Ipv4Addr, IpBlockReason),
 }
 
 pub enum BlockTargetId {
-    AgentSpace(
-        Arc<kitsune_p2p_bin_data::KitsuneAgent>,
-        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-    ),
     Node(NodeId),
+    NodeSpace(NodeId, Arc<kitsune_p2p_bin_data::KitsuneSpace>),
     Ip(std::net::Ipv4Addr),
 }
 
 impl From<BlockTarget> for BlockTargetId {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {
-            BlockTarget::AgentSpace(agent, space, _) => Self::AgentSpace(agent, space),
+            BlockTarget::NodeSpace(node_id, space, _) => Self::NodeSpace(node_id, space),
             BlockTarget::Node(node_id, _) => Self::Node(node_id),
             BlockTarget::Ip(ip_addr, _) => Self::Ip(ip_addr),
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Block {
     target: BlockTarget,
     interval: InclusiveTimestampInterval,

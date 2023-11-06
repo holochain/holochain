@@ -10,12 +10,32 @@ use tokio::time::Instant;
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;
-use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use num_traits::*;
+
+use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
+use once_cell::sync::Lazy;
+
+pub(crate) static METRIC_MSG_OUT_BYTE: Lazy<opentelemetry_api::metrics::Histogram<u64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .u64_histogram("kitsune.peer.send.byte.count")
+            .with_description("Outgoing p2p network messages byte count")
+            .with_unit(opentelemetry_api::metrics::Unit::new("By"))
+            .init()
+    });
+
+pub(crate) static METRIC_MSG_OUT_TIME: Lazy<opentelemetry_api::metrics::Histogram<f64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .f64_histogram("kitsune.peer.send.duration")
+            .with_description("Outgoing p2p network messages seconds")
+            .with_unit(opentelemetry_api::metrics::Unit::new("s"))
+            .init()
+    });
 
 /// how long historical metric records should be kept
 /// (currently set to 1 week)
@@ -109,7 +129,7 @@ const MAX_HISTORY: usize = 10;
 /// The history of gossip with an agent on a remote node.
 /// We record metrics per agent,
 pub struct PeerAgentHistory {
-    /// Sucessful and unsuccessful messages from the remote
+    /// Successful and unsuccessful messages from the remote
     /// can be combined to estimate a "reachability quotient"
     /// between 1 (or 0 if empty) and 100. Errors are weighted
     /// heavier because we retry less frequently.
@@ -119,7 +139,7 @@ pub struct PeerAgentHistory {
     pub latency_micros: RunAvg,
     /// Times we recorded successful initiates to this node (they accepted).
     pub initiates: VecDeque<RoundMetric>,
-    /// Times we recorded initates from this node (we accepted).
+    /// Times we recorded initiates from this node (we accepted).
     pub accepts: VecDeque<RoundMetric>,
     /// Times we recorded complete rounds for this node.
     pub successes: VecDeque<RoundMetric>,

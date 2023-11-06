@@ -1,9 +1,9 @@
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
-use crate::{AppInfo, FullStateDump};
+use crate::{AppInfo, FullStateDump, StorageInfo};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -147,9 +147,13 @@ pub enum AdminRequest {
         installed_app_id: InstalledAppId,
     },
 
-    /// Open up a new websocket for processing [`AppRequest`]s.
+    /// Open up a new websocket for processing [`AppRequest`]s. Any active app will be
+    /// callable via the attached app interface.
     ///
-    /// Any active app will be callable via the attached app interface.
+    /// **NB:** App interfaces are persisted when shutting down the conductor and are
+    /// restored when restarting the conductor. Unused app interfaces are _not_ cleaned
+    /// up. It is therefore recommended to reuse existing interfaces. They can be queried
+    /// with the call [`AdminRequest::ListAppInterfaces`].
     ///
     /// # Returns
     ///
@@ -159,7 +163,6 @@ pub enum AdminRequest {
     ///
     /// Optionally a `port` parameter can be passed to this request. If it is `None`,
     /// a free port is chosen by the conductor.
-    /// The response will contain the port chosen by the conductor if `None` was passed.
     ///
     /// [`AppRequest`]: super::AppRequest
     AttachAppInterface {
@@ -221,6 +224,9 @@ pub enum AdminRequest {
         /// If set, limits the metrics dumped to a single DNA hash space.
         dna_hash: Option<DnaHash>,
     },
+
+    /// Dump raw json network statistics from the backend networking lib.
+    DumpNetworkStats,
 
     /// Add a list of agents to this conductor's peer store.
     ///
@@ -320,6 +326,9 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::CloneCellDeleted`]
     DeleteCloneCell(Box<DeleteCloneCellPayload>),
+
+    /// Info about storage used by apps
+    StorageInfo,
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -386,9 +395,7 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::AttachAppInterface`].
     ///
-    /// `AppInterfaceApi` successfully attached.
-    /// If no port was specified in the request, contains the port number that was
-    /// selected by the conductor for running this app interface.
+    /// Contains the port number of the attached app interface.
     AppInterfaceAttached {
         /// Networking port of the new `AppInterfaceApi`
         port: u16,
@@ -431,6 +438,12 @@ pub enum AdminResponse {
     /// The string is a JSON blob of the metrics results.
     NetworkMetricsDumped(String),
 
+    /// The successful result of a call to [`AdminRequest::DumpNetworkStats`].
+    ///
+    /// The string is a raw JSON blob returned directly from the backend
+    /// networking library.
+    NetworkStatsDumped(String),
+
     /// The successful response to an [`AdminRequest::AddAgentInfo`].
     ///
     /// This means the agent info was successfully added to the peer store.
@@ -449,6 +462,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,
+
+    /// The successful response to an [`AdminRequest::StorageInfo`].
+    StorageInfo(StorageInfo),
 }
 
 /// Error type that goes over the websocket wire.

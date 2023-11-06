@@ -17,6 +17,7 @@ use crate::types::AgentPubKeyExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 
+use holochain_trace::tracing::warn;
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -199,6 +200,18 @@ impl WrapEvtSender {
         )
     }
 
+    fn count_links(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        query: WireLinkQuery,
+    ) -> impl Future<Output = HolochainP2pResult<CountLinksResponse>> + 'static + Send {
+        timing_trace!(
+            { self.0.count_links(dna_hash, to_agent, query) },
+            "(hp2p:handle) count_links"
+        )
+    }
+
     fn get_agent_activity(
         &self,
         dna_hash: DnaHash,
@@ -234,16 +247,16 @@ impl WrapEvtSender {
         )
     }
 
-    fn validation_receipt_received(
+    fn validation_receipts_received(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> impl Future<Output = HolochainP2pResult<()>> + 'static + Send {
         timing_trace!(
             {
                 self.0
-                    .validation_receipt_received(dna_hash, to_agent, receipt)
+                    .validation_receipts_received(dna_hash, to_agent, receipts)
             },
             "(hp2p:handle) validation_receipt_received",
         )
@@ -338,8 +351,8 @@ impl ghost_actor::GhostControlHandler for HolochainP2pActor {
 impl HolochainP2pActor {
     /// constructor
     pub async fn new(
-        config: kitsune_p2p::KitsuneP2pConfig,
-        tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
+        config: kitsune_p2p_types::config::KitsuneP2pConfig,
+        tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
         host: kitsune_p2p::HostApi,
@@ -459,6 +472,23 @@ impl HolochainP2pActor {
         .into())
     }
 
+    fn handle_incoming_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        query: WireLinkQuery,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let res = evt_sender.count_links(dna_hash, to_agent, query).await;
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
+                .map_err(kitsune_p2p::KitsuneP2pError::from)
+                .map(|res| UnsafeBytes::from(res).into())
+        }
+        .boxed()
+        .into())
+    }
+
     /// receiving an incoming get_links request from a remote node
     fn handle_incoming_get_agent_activity(
         &mut self,
@@ -531,18 +561,16 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
-        receipt: Vec<u8>,
-    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
-        let receipt: SerializedBytes = UnsafeBytes::from(receipt).into();
+        receipts: ValidationReceiptBundle,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             evt_sender
-                .validation_receipt_received(dna_hash, agent_pub_key, receipt)
+                .validation_receipts_received(dna_hash, agent_pub_key, receipts)
                 .await?;
 
             // validation receipts don't need a response
-            // send back an empty vec for now
-            Ok(Vec::with_capacity(0))
+            Ok(())
         }
         .boxed()
         .into())
@@ -724,6 +752,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::GetLinks { link_key, options } => {
                 self.handle_incoming_get_links(space, to_agent, link_key, options)
             }
+            WireMessage::CountLinks { query } => {
+                self.handle_incoming_count_links(space, to_agent, query)
+            }
             crate::wire::WireMessage::GetAgentActivity {
                 agent,
                 query,
@@ -732,8 +763,11 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::MustGetAgentActivity { agent, filter } => {
                 self.handle_incoming_must_get_agent_activity(space, to_agent, agent, filter)
             }
-            crate::wire::WireMessage::ValidationReceipt { receipt } => {
-                self.handle_incoming_validation_receipt(space, to_agent, receipt)
+            crate::wire::WireMessage::ValidationReceipts { .. } => {
+                Err(HolochainP2pError::invalid_p2p_message(
+                    "invalid: validation receipts are now notifications rather than requests, please upgrade".to_string(),
+                )
+                    .into())
             }
             // holochain_p2p only broadcasts this message.
             crate::wire::WireMessage::CountersigningSessionNegotiation { .. }
@@ -765,9 +799,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::Get { .. }
             | crate::wire::WireMessage::GetMeta { .. }
             | crate::wire::WireMessage::GetLinks { .. }
+            | crate::wire::WireMessage::CountLinks { .. }
             | crate::wire::WireMessage::GetAgentActivity { .. }
-            | crate::wire::WireMessage::MustGetAgentActivity { .. }
-            | crate::wire::WireMessage::ValidationReceipt { .. } => {
+            | crate::wire::WireMessage::MustGetAgentActivity { .. } => {
                 Err(HolochainP2pError::invalid_p2p_message(
                     "invalid call type message in a notify".to_string(),
                 )
@@ -823,6 +857,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     }
                     None => Err(HolochainP2pError::RoutingAgentError(to_agent).into()),
                 }
+            }
+            WireMessage::ValidationReceipts { receipts } => {
+                self.handle_incoming_validation_receipt(space, to_agent, receipts)
             }
             crate::wire::WireMessage::CountersigningSessionNegotiation { message } => {
                 self.handle_incoming_countersigning_session_negotiation(space, to_agent, message)
@@ -946,17 +983,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let agent = agent_pub_key.into_kitsune();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(
-            async move { Ok(kitsune_p2p.join(space, agent, initial_arc).await?) }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            Ok(kitsune_p2p
+                .join(space, agent, maybe_agent_info, initial_arc)
+                .await?)
+        }
+        .boxed()
+        .into())
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
@@ -1252,6 +1292,37 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    fn handle_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        query: WireLinkQuery,
+    ) -> HolochainP2pHandlerResult<CountLinksResponse> {
+        let space = dna_hash.into_kitsune();
+        let basis = query.base.to_kitsune();
+
+        let payload = WireMessage::count_links(query).encode()?;
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        let tuning_params = self.tuning_params.clone();
+        Ok(async move {
+            let mut input =
+                kitsune_p2p::actor::RpcMulti::new(&tuning_params, space, basis, payload);
+            input.max_remote_agent_count = 1;
+            let result = kitsune_p2p.rpc_multi(input).await?;
+
+            if let Some(result) = result.into_iter().next() {
+                let kitsune_p2p::actor::RpcMultiResponse { response, .. } = result;
+                Ok(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?)
+            } else {
+                Err(HolochainP2pError::from(
+                    "Failed to fetch link count from a peer",
+                ))
+            }
+        }
+        .boxed()
+        .into())
+    }
+
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_get_agent_activity(
         &mut self,
@@ -1332,20 +1403,24 @@ impl HolochainP2pHandler for HolochainP2pActor {
     }
 
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_send_validation_receipt(
+    fn handle_send_validation_receipts(
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
         let to_agent = to_agent.into_kitsune();
 
-        let req = crate::wire::WireMessage::validation_receipt(receipt).encode()?;
+        let req = crate::wire::WireMessage::validation_receipts(receipts).encode()?;
+
+        let timeout = self.tuning_params.implicit_timeout();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            kitsune_p2p.rpc_single(space, to_agent, req, None).await?;
+            kitsune_p2p
+                .targeted_broadcast(space, vec![to_agent], timeout, req, false)
+                .await?;
             Ok(())
         }
         .boxed()
@@ -1415,6 +1490,16 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             serde_json::to_string_pretty(&kitsune_p2p.dump_network_metrics(space).await?)
+                .map_err(HolochainP2pError::other)
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_dump_network_stats(&mut self) -> HolochainP2pHandlerResult<String> {
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            serde_json::to_string_pretty(&kitsune_p2p.dump_network_stats().await?)
                 .map_err(HolochainP2pError::other)
         }
         .boxed()

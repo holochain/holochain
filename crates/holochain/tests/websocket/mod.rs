@@ -2,10 +2,11 @@ use ::fixt::prelude::*;
 use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
-use holochain::sweettest::SweetAgents;
+use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
         api::{AdminRequest, AdminResponse},
@@ -14,7 +15,7 @@ use holochain::{
     },
     fixt::*,
 };
-use holochain_trace;
+
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -189,7 +190,7 @@ async fn call_zome() {
         &mut app_tx,
         cell_id.clone(),
         &signing_keypair,
-        cap_secret.clone(),
+        cap_secret,
         zome_name.clone(),
         fn_name.clone(),
         &(),
@@ -235,7 +236,7 @@ async fn call_zome() {
         &mut app_tx,
         cell_id.clone(),
         &signing_keypair,
-        cap_secret.clone(),
+        cap_secret,
         zome_name.clone(),
         fn_name.clone(),
         &(),
@@ -245,6 +246,7 @@ async fn call_zome() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
     holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
@@ -279,10 +281,9 @@ async fn remote_signals() -> anyhow::Result<()> {
     let cells = apps.cells_flattened();
 
     let mut rxs = Vec::new();
-    for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().subscribe_separately())
+    for h in conductors.iter() {
+        rxs.extend(h.signal_broadcaster().subscribe_separately())
     }
-    let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
     let signal = fixt!(ExternIo);
 
@@ -297,14 +298,16 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-
-    let signal = AppSignal::new(signal);
-    for mut rx in rxs {
-        let r = rx.try_recv();
-        // Each handle should recv a signal
-        assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
-    }
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        let signal = AppSignal::new(signal);
+        for mut rx in rxs {
+            let r = rx.recv().await;
+            // Each handle should recv a signal
+            assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
+        }
+    })
+    .await
+    .unwrap();
 
     Ok(())
 }
@@ -415,7 +418,7 @@ async fn emit_signals() {
         Signal::App {
             cell_id,
             zome_name,
-            signal: AppSignal::new(ExternIO::encode(()).unwrap())
+            signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
         Signal::try_from(sig1.clone()).unwrap(),
     );
@@ -433,10 +436,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
-    let dna = fake_dna_zomes(
-        "".into(),
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-    );
+    let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
         modifiers: DnaModifiersOpt::none(),
@@ -478,7 +478,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // There should be no app interfaces listed
-    assert_matches!(response, Ok(Ok(AdminResponse::AppInterfacesListed(interfaces))) if interfaces.len() == 0);
+    assert_matches!(response, Ok(Ok(AdminResponse::AppInterfacesListed(interfaces))) if interfaces.is_empty());
 
     Ok(())
 }
@@ -525,10 +525,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     info!("About to make failing request");
 
-    let dna = fake_dna_zomes(
-        "".into(),
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-    );
+    let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
         modifiers: DnaModifiersOpt::none(),
@@ -550,27 +547,56 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn too_many_open() {
+#[cfg(feature = "slow_tests")]
+async fn connection_limit_is_respected() {
     holochain_trace::test_run().ok();
 
-    info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
-    info!("building conductor");
-    for _i in 0..1000 {
-        holochain_websocket::connect(
-            url2!("ws://127.0.0.1:{}", port),
-            Arc::new(WebsocketConfig {
-                default_request_timeout_s: 1,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+
+    let url = url2!("ws://127.0.0.1:{}", port);
+    let cfg = Arc::new(WebsocketConfig::default());
+
+    // Retain handles so that the test can control when to disconnect clients
+    let mut handles = Vec::new();
+
+    // The first `MAX_CONNECTIONS` connections should succeed
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
     }
+
+    // Try lots of failed connections to make sure the limit is respected
+    for _ in 0..2 * MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+
+        // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
+        sender
+            .request::<AdminRequest, AdminResponse>(AdminRequest::ListDnas)
+            .await
+            .expect_err("Should be no available connection slots");
+    }
+
+    // Disconnect all the clients
+    handles.clear();
+
+    // Should now be possible to connect new clients
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
+    }
+
     conductor_handle.shutdown();
 }
 
@@ -603,14 +629,18 @@ async fn concurrent_install_dna() {
 
     //let before = std::time::Instant::now();
 
-    let install_tasks_stream = futures::stream::iter((0..NUM_DNA).into_iter().map(|i| {
+    let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
         tokio::spawn(async move {
             let name = format!("fake_dna_{}", i);
 
             // Install Dna
-            let dna = fake_dna_zomes_named(&uuid::Uuid::new_v4().to_string(), &name, zomes.clone());
+            let dna = holochain_types::test_utils::fake_dna_zomes_named(
+                &uuid::Uuid::new_v4().to_string(),
+                &name,
+                zomes.clone(),
+            );
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
@@ -647,6 +677,40 @@ async fn concurrent_install_dna() {
     //    NUM_CONCURRENT_INSTALLS,
     //    before.elapsed()
     //);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore)]
+async fn network_stats() {
+    holochain_trace::test_run().ok();
+
+    let mut batch =
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous()).await;
+
+    let dna_file = SweetDnaFile::unique_empty().await;
+
+    let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
+    batch.exchange_peer_info().await;
+
+    let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
+
+    #[cfg(not(feature = "tx5"))]
+    const EXPECT: &str = "tx2-quic";
+    #[cfg(feature = "tx5")]
+    const EXPECT: &str = "go-pion";
+
+    let req = AdminRequest::DumpNetworkStats;
+    let res: AdminResponse = client.request(req).await.unwrap();
+    match res {
+        AdminResponse::NetworkStatsDumped(json) => {
+            println!("{json}");
+
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            let backend = parsed.as_object().unwrap().get("backend").unwrap();
+            assert_eq!(EXPECT, backend);
+        }
+        _ => panic!("unexpected"),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

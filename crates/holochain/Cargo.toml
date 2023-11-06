@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.2.0-beta-rc.0"
+version = "0.3.0-beta-dev.23"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,82 +19,100 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
-fixt = { version = "^0.2.0-beta-rc.0", path = "../fixt" }
+fixt = { version = "^0.3.0-beta-dev.0", path = "../fixt" }
 futures = "0.3.1"
 getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
-ghost_actor = "0.3.0-alpha.5"
-holo_hash = { version = "^0.2.0-beta-rc.0", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "^0.2.0-beta-rc.0", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.2.0-beta-rc.0", path = "../holochain_conductor_api" }
-holochain_keystore = { version = "^0.2.0-beta-rc.0", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.2.0-beta-rc.0", path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.2.0-beta-rc.0", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "^0.2.0-beta-rc.0", path = "../holochain_state" }
-holochain_types = { version = "^0.2.0-beta-rc.0", path = "../holochain_types" }
-holochain_util = { version = "^0.2.0-beta-rc.0", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.83"
-holochain_websocket = { version = "^0.2.0-beta-rc.0", path = "../holochain_websocket" }
-holochain_zome_types = { version = "^0.2.0-beta-rc.0", path = "../holochain_zome_types", features = ["full"] }
+ghost_actor = "0.3.0-alpha.6"
+holo_hash = { version = "^0.3.0-beta-dev.11", path = "../holo_hash", features = ["full"] }
+holochain_cascade = { version = "^0.3.0-beta-dev.23", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.23", path = "../holochain_conductor_api" }
+holochain_keystore = { version = "^0.3.0-beta-dev.16", path = "../holochain_keystore", default-features = false }
+holochain_p2p = { version = "^0.3.0-beta-dev.22", path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.3.0-beta-dev.20", path = "../holochain_sqlite" }
+holochain_serialized_bytes = "=0.0.53"
+holochain_state = { version = "^0.3.0-beta-dev.22", path = "../holochain_state" }
+holochain_types = { version = "^0.3.0-beta-dev.20", path = "../holochain_types" }
+holochain_util = { version = "^0.3.0-beta-dev.2", path = "../holochain_util", features = [ "pw" ] }
+holochain_wasmer_host = "=0.0.86"
+holochain_websocket = { version = "^0.3.0-beta-dev.4", path = "../holochain_websocket" }
+holochain_zome_types = { version = "^0.3.0-beta-dev.15", path = "../holochain_zome_types", features = ["full"] }
+holochain_nonce = { version = "^0.3.0-beta-dev.21", path = "../holochain_nonce" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.20", path = "../holochain_secure_primitive" }
 human-panic = "1.0.3"
-kitsune_p2p = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
-kitsune_p2p_types = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/types" }
-kitsune_p2p_block = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/block" }
+itertools = { version = "0.10" }
+kitsune_p2p = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/bootstrap_client" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.9", path = "../kitsune_p2p/bin_data" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.12", path = "../kitsune_p2p/types" }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/block" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
-mr_bundle = { version = "^0.2.0-beta-rc.0", path = "../mr_bundle" }
+mr_bundle = { version = "^0.3.0-beta-dev.2", path = "../mr_bundle" }
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
-holochain_trace = { version = "^0.2.0-beta-rc.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
+holochain_metrics = { version = "^0.3.0-beta-dev.5", path = "../holochain_metrics", default_features = false }
 once_cell = "1.4.1"
+async-once-cell = "0.5"
 one_err = "0.0.8"
 parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.8.5"
+rand_chacha = "0.3.1"
 rand-utf8 = "0.0.1"
 rpassword = "5.0.1"
-rusqlite = { version = "0.28" }
+rusqlite = { version = "0.29" }
 serde = { version = "1.0", features = [ "derive" ] }
+serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
-sodoken = "=0.0.7"
+sodoken = "=0.0.9"
 structopt = "0.3.11"
 strum = "0.18.0"
 subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.11", features = [ "full"] }
+tokio = { version = "1.27", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
-task-motel = "0.1.0-rc.1"
+task-motel = "0.1.0"
 toml = "0.5.6"
 tracing = "0.1.37"
 tracing-futures = "0.2.5"
 tracing-subscriber = "0.3.16"
-url = "1.7.2"
+url = "2.4"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-holochain_wasm_test_utils = { version = "^0.2.0-beta-rc.0", path = "../test_utils/wasm" }
+holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.21", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
-wasmer-middlewares = "2"
+wasmer = "=4.2.2"
+wasmer-middlewares = "=4.2.2"
 
-# Dependencies for test_utils: keep in sync with below
-hdk = { version = "^0.2.0-beta-rc.0", path = "../hdk", optional = true }
+# Dependencies for test_utils
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+contrafact = {version = "0.2.0-rc.1", optional = true }
+diff = {version = "0.1", optional = true }
+hdk = { version = "^0.3.0-beta-dev.18", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
-holochain_test_wasm_common = { version = "^0.2.0-beta-rc.0", path = "../test_utils/wasm_common", optional = true  }
-kitsune_p2p_bootstrap = { version = "0.0.12-dev.0", path = "../kitsune_p2p/bootstrap", optional = true }
+holochain_test_wasm_common = { version = "^0.3.0-beta-dev.18", path = "../test_utils/wasm_common", optional = true  }
+kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.12", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-itertools = { version = "0.10", optional = false }
-tx5-go-pion-turn = { version = "0.0.1-alpha.4", optional = true }
-tx5-signal-srv = { version = "0.0.1-alpha.5", optional = true }
+tx5-go-pion-turn = { version = "=0.0.4-alpha", optional = true }
+tx5-signal-srv = { version = "=0.0.4-alpha", optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
-reqwest = { version = "0.11.2", optional = true }
+reqwest = { version = "0.11.2", features = ["json"], optional = true }
+
+# fact deps
+petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
+
+# debugging
+backtrace = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 sd-notify = "0.3.0"
@@ -105,27 +123,23 @@ holochain = { path = ".", features = ["test_utils"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-contrafact = "0.1.0-dev.1"
+clap = "4.0"
+contrafact = "0.2.0-rc.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
+indoc = "1.0"
 isotest = "0"
 maplit = "1"
 pretty_assertions = "0.6.1"
 rand_dalek = {package = "rand", version = "0.7"}
+regex = "1.5"
 reqwest = "0.11.2"
 serial_test = "0.4.0"
 test-case = "1.2.1"
-
-# Dependencies for test_utils: keep in sync with above
-hdk = { version = "^0.2.0-beta-rc.0", path = "../hdk", optional = false }
-matches = {version = "0.1.8", optional = false }
-holochain_test_wasm_common = { version = "^0.2.0-beta-rc.0", path = "../test_utils/wasm_common", optional = false  }
-kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap", optional = false }
-unwrap_to = { version = "0.1.0", optional = false }
-arbitrary = { version = "1.0", features = ["derive"] }
+tokio-tungstenite = "0.13"
 
 [build-dependencies]
-hdk = { version = "^0.2.0-beta-rc.0", path = "../hdk"}
+hdk = { version = "^0.3.0-beta-dev.18", path = "../hdk"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51" }
 toml = "0.5.6"
@@ -149,14 +163,20 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2", "tx5"]
+default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5", "metrics_influxive"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
 
+# Use the "Influxive" opentelemetry metrics binding to write metrics
+# to an InfluxDB time series database.
+metrics_influxive = [ "holochain_metrics/influxive" ]
+
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
+  "contrafact",
+  "diff",
   "ghost_actor/test_utils",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
@@ -164,12 +184,17 @@ test_utils = [
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
+  "holochain_cascade/test_utils",
   "kitsune_p2p/test_utils",
   "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",
+  "kitsune_p2p_bin_data/fixt",
+  "kitsune_p2p_types/fixt",
+  "arbitrary",
   "matches",
   "holochain_test_wasm_common",
-  "unwrap_to"
+  "unwrap_to",
+  "contrafact",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
@@ -183,12 +208,44 @@ build_wasms = ['holochain_wasm_test_utils/build']
 only_check_wasms = ['holochain_wasm_test_utils/only_check']
 
 # Enables at-rest encryption of the SQLite database.
-# Incompatible with "no-deps".
-db-encryption = [ "holochain_keystore/db-encryption", "holochain_sqlite/db-encryption" ]
+# Incompatible with "sqlite".
+sqlite-encrypted = [
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "holochain_keystore/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_cascade/sqlite-encrypted",
+  "holochain_conductor_api/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
+  "holochain_p2p/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_state/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
+  "kitsune_p2p_types/sqlite-encrypted",
+  "kitsune_p2p_block/sqlite-encrypted",
+  "kitsune_p2p_bootstrap/sqlite-encrypted",
+]
 
 # Compile SQLite from source rather than depending on a library.
-# Incompatible with "db-encryption"
-no-deps = [ "holochain_keystore/no-deps", "holochain_sqlite/no-deps" ]
+# Incompatible with "sqlite-encrypted"
+sqlite = [
+  "rusqlite/bundled",
+  "holochain_keystore/sqlite",
+  "holo_hash/sqlite",
+  "holochain_cascade/sqlite",
+  "holochain_conductor_api/sqlite",
+  "holochain_keystore/sqlite",
+  "holochain_p2p/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_state/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
+  "kitsune_p2p_types/sqlite",
+  "kitsune_p2p_block/sqlite",
+  "kitsune_p2p_bootstrap/sqlite",
+]
 
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
@@ -196,5 +253,15 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 # Enable chain head coordination
 chc = [
   "bytes",
-  "reqwest"
+  "reqwest",
+  "holochain_conductor_api/chc",
+  "holochain_types/chc",
+]
+
+# Transitional feature flag for code that is only ready when DPKI integration lands.
+dpki = []
+
+sweetest = [
+  "test_utils",
+  "sqlite",
 ]

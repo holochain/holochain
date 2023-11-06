@@ -2,28 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use holo_hash::hash_type::AnyDht;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_keystore::KeystoreError;
-use holochain_types::prelude::*;
-use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::ChainTopOrdering;
-use holochain_zome_types::Entry;
-use holochain_zome_types::Record;
-use holochain_zome_types::SignedActionHashed;
-use holochain_zome_types::TimestampError;
 use thiserror::Error;
 
-use crate::prelude::HeadInfo;
-use crate::prelude::Query;
-use crate::prelude::Stores;
-use crate::prelude::StoresIter;
-use crate::query::StateQueryResult;
+use crate::prelude::*;
 use crate::query::StmtIter;
-use crate::query::Store;
-use holochain_zome_types::ScheduledFn;
 
 /// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.
@@ -148,10 +134,7 @@ impl Scratch {
         self.actions.len()
     }
 
-    fn get_exact_record(
-        &self,
-        hash: &ActionHash,
-    ) -> StateQueryResult<Option<holochain_zome_types::Record>> {
+    fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
         Ok(self.get_action(hash)?.map(|shh| {
             let entry = shh
                 .action()
@@ -161,10 +144,7 @@ impl Scratch {
         }))
     }
 
-    fn get_any_record(
-        &self,
-        hash: &EntryHash,
-    ) -> StateQueryResult<Option<holochain_zome_types::Record>> {
+    fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
         let r = self.get_entry(hash)?.and_then(|entry| {
             let shh = self
                 .actions()
@@ -242,9 +222,9 @@ impl Store for Scratch {
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
-        match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
+        match hash.clone().into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
+            AnyDhtHashPrimitive::Action(hash) => self.get_exact_record(&hash),
         }
     }
 

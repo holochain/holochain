@@ -3,14 +3,11 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::action::ActionType;
-use crate::action::EntryType;
-use crate::warrant::Warrant;
-use crate::ActionHashed;
-use crate::Record;
-use holo_hash::ActionHash;
+use crate::prelude::*;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
+use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Defines several ways that queries can be restricted to a range.
@@ -72,18 +69,40 @@ pub struct ChainQueryFilter {
     /// Filter by EntryType
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
-    pub entry_type: Option<EntryType>,
+    pub entry_type: Option<Vec<EntryType>>,
     /// Filter by a list of `EntryHash`.
     pub entry_hashes: Option<HashSet<EntryHash>>,
     /// Filter by ActionType
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
-    pub action_type: Option<ActionType>,
+    pub action_type: Option<Vec<ActionType>>,
     /// Include the entries in the records
     pub include_entries: bool,
     /// The query should be ordered in descending order (default is ascending),
     /// when run as a database query. There is no provisioning for in-memory ordering.
     pub order_descending: bool,
+}
+
+/// A query for links to be used with host functions that support filtering links
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+pub struct LinkQuery {
+    /// The base to find links from.
+    pub base: AnyLinkableHash,
+
+    /// Filter by the link type.
+    pub link_type: LinkTypeFilter,
+
+    /// Filter by tag prefix.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -135,8 +154,10 @@ pub struct HighestObserved {
 // TODO: In the future we will most likely be replaced
 // by warrants instead of Forked / Invalid so we can provide
 // evidence of why the chain has a status.
+#[derive(Default)]
 pub enum ChainStatus {
     /// This authority has no information on the chain.
+    #[default]
     Empty,
     /// The chain is valid as at this action sequence and action hash.
     Valid(ChainHead),
@@ -144,12 +165,6 @@ pub enum ChainStatus {
     Forked(ChainFork),
     /// Chain is invalid because of this action.
     Invalid(ChainHead),
-}
-
-impl Default for ChainStatus {
-    fn default() -> Self {
-        ChainStatus::Empty
-    }
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -189,9 +204,18 @@ impl ChainQueryFilter {
         self
     }
 
-    /// Filter on entry type.
+    /// Filter on entry type. This function can be called multiple times
+    /// to create an OR query on all provided entry types.
     pub fn entry_type(mut self, entry_type: EntryType) -> Self {
-        self.entry_type = Some(entry_type);
+        match self.entry_type {
+            Some(ref mut types) => {
+                types.push(entry_type);
+            }
+            None => {
+                self.entry_type = Some(vec![entry_type]);
+            }
+        }
+
         self
     }
 
@@ -201,9 +225,18 @@ impl ChainQueryFilter {
         self
     }
 
-    /// Filter on action type.
+    /// Filter on action type. This function can be called multiple times
+    /// to create an OR query on all provided action types.
     pub fn action_type(mut self, action_type: ActionType) -> Self {
-        self.action_type = Some(action_type);
+        match self.action_type {
+            Some(ref mut types) => {
+                types.push(action_type);
+            }
+            None => {
+                self.action_type = Some(vec![action_type]);
+            }
+        }
+
         self
     }
 
@@ -289,12 +322,17 @@ impl ChainQueryFilter {
             .filter(|action| {
                 self.action_type
                     .as_ref()
-                    .map(|action_type| action.action_type() == *action_type)
+                    .map(|action_types| action_types.contains(&action.as_ref().action_type()))
                     .unwrap_or(true)
                     && self
                         .entry_type
                         .as_ref()
-                        .map(|entry_type| action.entry_type() == Some(entry_type))
+                        .map(|entry_types| {
+                            action
+                                .entry_type()
+                                .map(|entry_type| entry_types.contains(entry_type))
+                                .unwrap_or(false)
+                        })
                         .unwrap_or(true)
                     && self
                         .entry_hashes
@@ -327,15 +365,51 @@ impl ChainQueryFilter {
     }
 }
 
+impl LinkQuery {
+    /// Create a new link query for a base and link type
+    pub fn new(base: impl Into<AnyLinkableHash>, link_type: LinkTypeFilter) -> Self {
+        LinkQuery {
+            base: base.into(),
+            link_type,
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+        }
+    }
+
+    /// Filter by tag prefix.
+    pub fn tag_prefix(mut self, tag_prefix: LinkTag) -> Self {
+        self.tag_prefix = Some(tag_prefix);
+        self
+    }
+
+    /// Filter for links created before `before`.
+    pub fn before(mut self, before: Timestamp) -> Self {
+        self.before = Some(before);
+        self
+    }
+
+    /// Filter for links create after `after`.
+    pub fn after(mut self, after: Timestamp) -> Self {
+        self.after = Some(after);
+        self
+    }
+
+    /// Filter for links created by this author.
+    pub fn author(mut self, author: AgentPubKey) -> Self {
+        self.author = Some(author);
+        self
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
     use super::ChainQueryFilter;
     use crate::action::EntryType;
     use crate::fixt::AppEntryDefFixturator;
-    use crate::fixt::*;
-    use crate::ActionHashed;
-    use crate::ChainQueryFilterRange;
+    use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
 
@@ -390,8 +464,7 @@ mod tests {
         h5.prev_action = hh4.as_hash().clone();
         let hh5 = ActionHashed::from_content_sync(h5.into());
 
-        let actions = [hh0, hh1, hh2, hh3, hh3a, hh4, hh5];
-        actions
+        [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }
 
     fn map_query(query: &ChainQueryFilter, actions: &[ActionHashed]) -> Vec<bool> {
@@ -574,6 +647,56 @@ mod tests {
                 &ChainQueryFilter::new()
                     .entry_type(actions[0].entry_type().unwrap().clone())
                     .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 999)),
+                &actions
+            ),
+            [true, false, false, false, true, true, false].to_vec()
+        );
+    }
+
+    #[test]
+    fn filter_by_multiple_action_types() {
+        let actions = fixtures();
+
+        // Filter for create and update actions
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new()
+                    .action_type(actions[0].action_type())
+                    .action_type(actions[1].action_type()),
+                &actions
+            ),
+            [true, true, false, true, true, true, false].to_vec()
+        );
+
+        // Filter for create actions only
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new().action_type(actions[0].action_type()),
+                &actions
+            ),
+            [true, false, false, true, true, false, false].to_vec()
+        );
+    }
+
+    #[test]
+    fn filter_by_multiple_entry_types() {
+        let actions = fixtures();
+
+        // Filter for app entries and agent public keys
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new()
+                    .entry_type(actions[0].entry_type().unwrap().clone())
+                    .entry_type(actions[1].entry_type().unwrap().clone()),
+                &actions
+            ),
+            [true, true, false, true, true, true, false].to_vec()
+        );
+
+        // Filter for app entries only
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new().entry_type(actions[0].entry_type().unwrap().clone()),
                 &actions
             ),
             [true, false, false, false, true, true, false].to_vec()

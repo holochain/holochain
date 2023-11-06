@@ -9,7 +9,9 @@ use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
+use crate::AppEntryDef;
 use crate::EntryDefIndex;
+use crate::EntryType;
 use crate::ZomeIndex;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
@@ -82,8 +84,11 @@ impl From<EntryHashed> for Entry {
 }
 
 /// Structure holding the entry portion of a chain record.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, SerializedBytes)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
@@ -138,6 +143,20 @@ impl Entry {
     ) -> Result<Self, EntryError> {
         Ok(Entry::App(AppEntryBytes::try_from(sb.try_into()?)?))
     }
+
+    /// Get an EntryType based on the type of this Entry.
+    /// If the entry type is Entry, and no entry def is specified, return None
+    pub fn entry_type(&self, entry_def: Option<AppEntryDef>) -> Option<EntryType> {
+        match (self, entry_def) {
+            (Entry::Agent(_), _) => Some(EntryType::AgentPubKey),
+            (Entry::CapClaim(_), _) => Some(EntryType::CapClaim),
+            (Entry::CapGrant(_), _) => Some(EntryType::CapGrant),
+            (Entry::App(_), Some(aed)) | (Entry::CounterSign(_, _), Some(aed)) => {
+                Some(EntryType::App(aed))
+            }
+            _ => None,
+        }
+    }
 }
 
 impl HashableContent for Entry {
@@ -153,10 +172,7 @@ impl HashableContent for Entry {
                 // We must retype this AgentPubKey as an EntryHash so that the
                 // prefix bytes match the Entry prefix
                 HashableContentBytes::Prehashed39(
-                    agent_pubkey
-                        .clone()
-                        .retype(holo_hash::hash_type::Entry)
-                        .into_inner(),
+                    EntryHash::from(agent_pubkey.clone()).into_inner(),
                 )
             }
             entry => HashableContentBytes::Content(

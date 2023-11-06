@@ -25,6 +25,9 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod forest;
+pub use forest::flatten_forest;
+
 pub mod aliases {
     pub use cargo::core::dependency::DepKind as CargoDepKind;
     pub use cargo::core::package::Package as CargoPackage;
@@ -51,6 +54,15 @@ pub struct Crate<'a> {
     dependencies_in_workspace: OnceCell<DependenciesT>,
     #[debug(skip)]
     dependants_in_workspace: OnceCell<Vec<&'a Crate<'a>>>,
+}
+
+#[cfg(test)]
+impl PartialEq for Crate<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.package == other.package
+            && self.dependencies_in_workspace == other.dependencies_in_workspace
+            && self.dependants_in_workspace == other.dependants_in_workspace
+    }
 }
 
 impl<'a> Crate<'a> {
@@ -327,48 +339,61 @@ impl<'a> Crate<'a> {
         })
     }
 
+    fn direct_workspace_dependencies(
+        &'a self,
+        workspace_packages: &HashSet<String>,
+    ) -> Vec<cargo::core::Dependency> {
+        self.package()
+            .dependencies()
+            .iter()
+            .filter_map(|dep| {
+                let dep_name = dep.package_name().to_string();
+                if self.name() == dep_name {
+                    None // Ignore self
+                } else if !workspace_packages.contains(&dep_name) {
+                    None // Ignore deps that aren't part of the workspace
+                } else if !dep.specified_req() || dep.version_req().to_string() == "*" {
+                    None // Ignore deps without a version or with a "*" version
+                } else {
+                    Some(dep.clone())
+                }
+            })
+            .collect()
+    }
+
     /// Returns a reference to all workspace crates that depend on this crate.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.dependants_in_workspace_filtered(|_| true)
+        self.dependants_in_workspace
+            .get_or_try_init(|| -> Fallible<_> { self.dependants_in_workspace_filtered(|_| true) })
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
     /// Features filtering by applying a filter function to the dependant's dependencies.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace_filtered<F>(
         &'a self,
         filter_fn: F,
-    ) -> Fallible<&'a Vec<&'a Crate<'a>>>
+    ) -> Fallible<Vec<&'a Crate<'a>>>
     where
         F: Fn(&(&String, &Vec<Dependency>)) -> bool,
         F: Copy,
     {
-        self.dependants_in_workspace.get_or_try_init(|| {
-            let members_dependants = self.workspace.members()?.iter().try_fold(
-                LinkedHashMap::<String, &'a Crate<'a>>::new(),
-                |mut acc, member| -> Fallible<_> {
-                    if member
-                        .dependencies_in_workspace()?
-                        .iter()
-                        // FIXME: applying the filter here is incorrect, because
-                        // it persists the return value for the first call and
-                        // returns that for every subsequent call, regardless of
-                        // the filter function that's passed
-                        .filter(filter_fn)
-                        .map(|(dep_name, _)| dep_name)
-                        .collect::<LinkedHashSet<_>>()
-                        .contains(&self.name())
-                    {
-                        acc.insert(member.name(), *member);
-                    };
+        let members_dependants = self.workspace.members()?.iter().try_fold(
+            LinkedHashMap::<String, &'a Crate<'a>>::new(),
+            |mut acc, member| -> Fallible<_> {
+                if member
+                    .dependencies_in_workspace()?
+                    .iter()
+                    .filter(filter_fn)
+                    .any(|(dep_name, _)| dep_name == &self.name())
+                {
+                    acc.insert(member.name(), *member);
+                };
 
-                    Ok(acc)
-                },
-            )?;
+                Ok(acc)
+            },
+        )?;
 
-            Ok(members_dependants.values().cloned().collect())
-        })
+        Ok(members_dependants.values().cloned().collect())
     }
 
     pub fn root(&self) -> &Path {
@@ -1077,70 +1102,8 @@ impl<'a> ReleaseWorkspace<'a> {
     /// Returns all non-excluded workspace members.
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            let mut members = self
-                .members_unsorted()?
-                .iter()
-                .enumerate()
-                .collect::<Vec<_>>();
-
-            let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
-                LinkedHashMap::<String, LinkedHashSet<String>>::new(),
-                |mut acc, elem| -> Fallible<_> {
-                    acc.insert(
-                        elem.name(),
-                        elem.dependencies_in_workspace()?
-                            .into_iter()
-                            .filter_map(|(dep_name, deps)| {
-                                deps.into_iter()
-                                    .find(|dep| {
-                                        dep.specified_req() && dep.version_req().to_string() != "*"
-                                    })
-                                    .map(|_| dep_name.clone())
-                            })
-                            .collect(),
-                    );
-
-                    Ok(acc)
-                },
-            )?;
-
-            // ensure members are ordered respecting their dependency tree
-            members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
-                use std::cmp::Ordering::{Equal, Greater, Less};
-
-                let a_deps = workspace_dependencies
-                    .get(&a.name())
-                    .unwrap_or_else(|| panic!("dependencies for {} not found", a.name()));
-                let b_deps = workspace_dependencies
-                    .get(&b.name())
-                    .unwrap_or_else(|| panic!("dependencies for {} not found", b.name()));
-
-                // understand whether one is a direct dependency of the other
-                let comparison = (a_deps.contains(&b.name()), b_deps.contains(&a.name()));
-                let result = match comparison {
-                    (true, true) => {
-                        panic!("cyclic dependency between {} and {}", a.name(), b.name())
-                    }
-                    (true, false) => Greater,
-                    (false, true) => Less,
-                    (false, false) => a_i.cmp(b_i),
-                };
-
-                trace!(
-                    "comparing \n{} ({:?}) with \n{} ({:?})\n{:?} => {:?}",
-                    a.name(),
-                    a_deps,
-                    b.name(),
-                    b_deps,
-                    comparison,
-                    result
-                );
-                result
-            });
-
-            Ok(members.into_iter().map(|(_, member)| member).collect())
-        })
+        self.members_sorted
+            .get_or_try_init(|| -> Fallible<_> { flatten_forest(self.members_unsorted()?) })
     }
 
     /// Return the root path of the workspace.
@@ -1447,4 +1410,4 @@ pub fn ensure_release_order_consistency<'a>(
 }
 
 #[cfg(test)]
-pub mod tests;
+mod tests;

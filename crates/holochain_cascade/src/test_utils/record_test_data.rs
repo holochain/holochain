@@ -2,26 +2,10 @@ use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::UnsafeBytes;
-use holochain_types::action::WireDelete;
-use holochain_types::action::WireUpdateRelationship;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_zome_types::fixt::*;
-use holochain_zome_types::Action;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::AppEntryBytes;
-use holochain_zome_types::Create;
-use holochain_zome_types::Entry;
-use holochain_zome_types::EntryType;
-use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::Judged;
-use holochain_zome_types::Record;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
-use holochain_zome_types::Update;
+use holochain_state::prelude::*;
 use std::convert::TryInto;
 
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 
 /// A collection of fixtures for use in Cascade tests
 #[derive(Debug)]
@@ -94,7 +78,7 @@ impl RecordTestData {
         let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
             create_action.clone(),
-            Some(Box::new(entry.clone())),
+            entry.clone().into(),
         ));
 
         let wire_create = Judged::valid(SignedAction(create_action, signature));
@@ -109,7 +93,7 @@ impl RecordTestData {
         let update_record_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedRecord(
             signature.clone(),
             update,
-            Some(Box::new(update_entry)),
+            update_entry.into(),
         ));
         let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
 
@@ -134,7 +118,7 @@ impl RecordTestData {
                     *entry_type = entry_type_fixt.next().unwrap();
                     *eh = EntryHash::with_data_sync(&entry);
                     any_entry_hash = Some(eh.clone());
-                    any_entry = Some(Box::new(entry));
+                    any_entry = Some(entry);
                 }
                 _ => unreachable!(),
             }
@@ -146,7 +130,7 @@ impl RecordTestData {
         let any_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
             any_action.clone(),
-            any_entry.clone(),
+            RecordEntry::new(any_action.entry_visibility(), any_entry.clone()),
         ));
 
         let any_record = Record::new(
@@ -154,7 +138,7 @@ impl RecordTestData {
                 ActionHashed::from_content_sync(any_action.clone()),
                 signature.clone(),
             ),
-            any_entry.clone().map(|i| *i),
+            any_entry.clone(),
         );
 
         let any_action = Judged::valid(SignedAction(any_action, signature));
@@ -174,7 +158,7 @@ impl RecordTestData {
             any_store_record_op,
             any_action,
             any_action_hash,
-            any_entry: any_entry.map(|e| *e),
+            any_entry,
             any_entry_hash,
             any_record,
         }

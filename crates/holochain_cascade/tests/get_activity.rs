@@ -3,19 +3,12 @@ use std::sync::Arc;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::prelude::test_cache_db;
-use holochain_state::prelude::test_dht_db;
-use holochain_state::scratch::Scratch;
-use holochain_types::activity::*;
-use holochain_types::chain::MustGetAgentActivityResponse;
+use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::ChainFilter;
-use holochain_zome_types::ChainQueryFilter;
-use holochain_zome_types::ChainStatus;
 use test_case::test_case;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -30,13 +23,13 @@ async fn get_activity() {
     let td = ActivityTestData::valid_chain_scenario();
 
     for hash_op in td.hash_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op);
+        fill_db(&authority.to_db(), hash_op).await;
     }
     for hash_op in td.noise_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op);
+        fill_db(&authority.to_db(), hash_op).await;
     }
     for hash_op in td.store_ops.iter().cloned() {
-        fill_db(&cache.to_db(), hash_op);
+        fill_db(&cache.to_db(), hash_op).await;
     }
 
     let options = holochain_p2p::actor::GetActivityOptions {
@@ -50,7 +43,7 @@ async fn get_activity() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     let r = cascade
         .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
@@ -128,7 +121,7 @@ async fn test_must_get_agent_activity(
         None => None,
     };
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.into()]);
-    let mut cascade = Cascade::empty()
+    let mut cascade = CascadeImpl::empty()
         .with_authored(authored.into())
         .with_network(network, cache);
     if let Some(sync_scratch) = sync_scratch {

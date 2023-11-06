@@ -13,7 +13,7 @@ use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
@@ -163,6 +163,9 @@ where
 
     let validation_result =
         inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
+
+    // If the validation failed remove any active chain lock that matches the
+    // entry that failed validation.
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(
@@ -233,13 +236,16 @@ pub async fn inline_validation<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    let cascade =
+        holochain_cascade::CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+
     let to_app_validate = {
         // collect all the records we need to validate in wasm
         let scratch_records = workspace.source_chain().scratch_records()?;
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            sys_validate_record(&record, &workspace, network.clone(), &conductor_handle)
+            sys_validate_record(&record, &cascade)
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
@@ -251,12 +257,9 @@ where
         to_app_validate
     };
 
-    let mut cascade =
-        holochain_cascade::Cascade::from_workspace_and_network(&workspace, network.clone());
     for mut chain_record in to_app_validate {
         for op_type in action_to_op_types(chain_record.action()) {
-            let op =
-                app_validation_workflow::record_to_op(chain_record, op_type, &mut cascade).await;
+            let op = app_validation_workflow::record_to_op(chain_record, op_type, &cascade).await;
 
             let (op, omitted_entry) = match op {
                 Ok(op) => op,
@@ -268,6 +271,7 @@ where
                 workspace.clone().into(),
                 &network,
                 &ribosome,
+                &conductor_handle,
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
@@ -295,7 +299,11 @@ fn map_outcome(
         // from the network where unmet dependencies would need to be
         // rescheduled to attempt later due to partitions etc.
         app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-            return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+            return Err(SourceChainError::InvalidCommit(format!(
+                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
+                hashes
+            ))
+            .into());
         }
     }
     Ok(())

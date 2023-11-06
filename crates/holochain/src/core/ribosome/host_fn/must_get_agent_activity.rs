@@ -3,10 +3,11 @@ use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn must_get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
@@ -26,11 +27,11 @@ pub fn must_get_agent_activity(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = match call_context.host_context {
+                let cascade = match call_context.host_context {
                     HostContext::Validate(_) => {
-                        Cascade::from_workspace_stores(workspace.stores(), None)
+                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
                     }
-                    _ => Cascade::from_workspace_and_network(
+                    _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
@@ -111,6 +112,52 @@ pub mod test {
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
+
+    /// Test that validation can get the currently-being-validated agent's
+    /// activity.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_must_get_agent_activity_self() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
+
+        // This test is a repro of some issue where the init being inline with
+        // the commit being validated may or may not be important. For that
+        // reason this test should not be merged with other tests/assertions.
+        let _: () = conductor
+            .call(
+                &alice,
+                "commit_require_self_agents_chain",
+                (),
+            )
+            .await;
+    }
+
+    /// Test that validation can get the currently-being-validated agent's
+    /// previous action bounded activity.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_must_get_agent_activity_self_prev() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
+
+        // This test is a repro of some issue where the init being inline with
+        // the commit being validated may or may not be important. For that
+        // reason this test should not be merged with other tests/assertions.
+        let _: () = conductor
+            .call(
+                &alice,
+                "commit_require_self_prev_agents_chain",
+                (),
+            )
+            .await;
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity() {

@@ -26,7 +26,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
-use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
 use unwrap_to::unwrap_to;
 
@@ -384,9 +383,12 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, type_query, link_tag);
+        let mut input = GetLinksInputBuilder::try_new(base, type_query).unwrap();
+        if let Some(link_tag) = link_tag {
+            input = input.tag_prefix(link_tag);
+        }
         let output = {
-            host_fn::get_links::get_links(ribosome, call_context, vec![input])
+            host_fn::get_links::get_links(ribosome, call_context, vec![input.build()])
                 .unwrap()
                 .into_iter()
                 .next()
@@ -407,7 +409,10 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, type_query, Some(tag));
+        let input = GetLinksInputBuilder::try_new(base, type_query)
+            .unwrap()
+            .tag_prefix(tag)
+            .build();
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()

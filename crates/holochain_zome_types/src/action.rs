@@ -1,19 +1,11 @@
 use crate::timestamp::Timestamp;
-pub use builder::ActionBuilder;
-pub use builder::ActionBuilderCommon;
 use conversions::WrongActionError;
 use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
 use thiserror::Error;
 
+pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
 pub use holochain_integrity_types::action::*;
-
-#[cfg(any(test, feature = "test_utils"))]
-pub use facts::*;
-
-pub mod builder;
-#[cfg(any(test, feature = "test_utils"))]
-pub mod facts;
 
 #[derive(Error, Debug)]
 pub enum ActionError {

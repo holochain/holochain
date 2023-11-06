@@ -3,7 +3,7 @@
 
 use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
-    SweetConductorHandle, SweetLocalRendezvous,
+    SweetConductorHandle,
 };
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
@@ -22,6 +22,15 @@ use holochain_websocket::*;
 use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+/// Standin until std::io::Error::other is stablized.
+pub fn err_other<E>(error: E) -> std::io::Error
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    std::io::Error::new(std::io::ErrorKind::Other, error.into())
+}
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -30,10 +39,13 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// as easy installation of apps across multiple Conductors and Agents.
 ///
 /// This is intentionally NOT `Clone`, because the drop handle triggers a shutdown of
-/// the conductor handle, which would render all other cloned instances useless.
+/// the conductor handle, which would render all other cloned instances useless,
+/// as well as the fact that the SweetConductor has some extra state which would not
+/// be tracked by cloned instances.
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
+    id: [u8; 32],
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
@@ -41,15 +53,26 @@ pub struct SweetConductor {
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
-    _rendezvous: Option<DynSweetRendezvous>,
+    rendezvous: Option<DynSweetRendezvous>,
 }
 
+/// ID based equality is good for SweetConductors so we can track them
+/// independently no matter what kind of mutations/state might eventuate.
+impl PartialEq for SweetConductor {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for SweetConductor {}
+
 /// Standard config for SweetConductors
-pub fn standard_config() -> ConductorConfig {
-    SweetConductorConfig::standard().into()
+pub fn standard_config() -> SweetConductorConfig {
+    SweetConductorConfig::standard()
 }
 
 /// A DnaFile with a role name assigned
+#[derive(Clone)]
 pub struct DnaWithRole {
     role: RoleName,
     dna: DnaFile,
@@ -72,6 +95,11 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 }
 
 impl SweetConductor {
+    /// Get the ID of this conductor for manual equality checks.
+    pub fn id(&self) -> [u8; 32] {
+        self.id
+    }
+
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
@@ -80,7 +108,7 @@ impl SweetConductor {
         handle: ConductorHandle,
         env_dir: TestDir,
         config: ConductorConfig,
-        _rendezvous: Option<DynSweetRendezvous>,
+        rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
@@ -105,7 +133,10 @@ impl SweetConductor {
 
         let keystore = handle.keystore().clone();
 
+        let mut rng = rand::thread_rng();
+
         Self {
+            id: rng.gen(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
@@ -113,7 +144,7 @@ impl SweetConductor {
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
-            _rendezvous,
+            rendezvous,
         }
     }
 
@@ -122,21 +153,75 @@ impl SweetConductor {
     where
         C: Into<SweetConductorConfig>,
     {
-        let rendezvous = SweetLocalRendezvous::new().await;
-        Self::from_config_rendezvous(config, rendezvous).await
+        Self::create_with_defaults(config, None, None::<DynSweetRendezvous>).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
-        R: Into<DynSweetRendezvous>,
+        R: Into<DynSweetRendezvous> + Clone,
     {
-        let rendezvous = rendezvous.into();
-        let config = config.into().into_conductor_config(&*rendezvous).await;
+        Self::create_with_defaults(config, None, Some(rendezvous)).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    pub async fn create_with_defaults<C, R>(
+        config: C,
+        keystore: Option<MetaLairClient>,
+        rendezvous: Option<R>,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous> + Clone,
+    {
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    /// and a metrics initialization.
+    pub async fn create_with_defaults_and_metrics<C, R>(
+        config: C,
+        keystore: Option<MetaLairClient>,
+        rendezvous: Option<R>,
+        with_metrics: bool,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous> + Clone,
+    {
+        let rendezvous = rendezvous.map(|r| r.into());
         let dir = TestDir::new(test_db_dir());
-        let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
-        Self::new(handle, dir, config, Some(rendezvous)).await
+
+        assert!(
+            dir.read_dir().unwrap().next().is_none(),
+            "Test dir not empty - {:?}",
+            dir.to_path_buf()
+        );
+
+        if with_metrics {
+            #[cfg(feature = "metrics_influxive")]
+            holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
+                .init()
+                .await;
+        }
+
+        let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
+            config.into().into_conductor_config(&*r).await
+        } else {
+            config.into().into()
+        };
+
+        tracing::info!(?config);
+
+        let handle = Self::handle_from_existing(
+            &dir,
+            keystore.unwrap_or_else(holochain_keystore::test_keystore),
+            &config,
+            &[],
+        )
+        .await;
+        Self::new(handle, dir, config, rendezvous).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -166,6 +251,11 @@ impl SweetConductor {
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_standard_config() -> SweetConductor {
         Self::from_config(standard_config()).await
+    }
+
+    /// Get the rendezvous config that this conductor is using, if any
+    pub fn get_rendezvous_config(&self) -> Option<DynSweetRendezvous> {
+        self.rendezvous.clone()
     }
 
     /// Access the database path for this conductor
@@ -245,7 +335,7 @@ impl SweetConductor {
             })
             .collect();
         self.raw_handle()
-            .install_app(installed_app_id.clone(), installed_cells)
+            .install_app_legacy(installed_app_id.clone(), installed_cells)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
@@ -425,8 +515,21 @@ impl SweetConductor {
     ///
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
+        self.try_shutdown().await.unwrap();
+    }
+
+    /// Shutdown this conductor.
+    /// This will wait for the conductor to shutdown but
+    /// keep the inner state to restart it.
+    ///
+    /// Attempting to use this conductor without starting it up again will cause a panic.
+    pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown().await.unwrap().unwrap();
+            handle
+                .shutdown()
+                .await
+                .map_err(err_other)?
+                .map_err(err_other)
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -523,6 +626,59 @@ impl SweetConductor {
         }
         let connectivity = covering(rng, all.len(), s);
         crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
+    }
+
+    /// Wait for at least one gossip round to have completed for the given cell
+    ///
+    /// Note that this is really a crutch. If gossip starts fast enough then this is unnecessary
+    /// but that doesn't necessarily happen. Waiting for gossip to have started before, for example,
+    /// waiting for something else like consistency is useful to ensure that communication has
+    /// actually started.
+    pub async fn require_initial_gossip_activity_for_cell(
+        &self,
+        cell: &SweetCell,
+        min_peers: u32,
+        timeout: Duration,
+    ) {
+        let handle = self.raw_handle();
+
+        let wait_start = Instant::now();
+        loop {
+            let (number_of_peers, completed_rounds) = handle
+                .network_info(&NetworkInfoRequestPayload {
+                    agent_pub_key: cell.agent_pubkey().clone(),
+                    dnas: vec![cell.cell_id.dna_hash().clone()],
+                    last_time_queried: None, // Just care about seeing the first data
+                })
+                .await
+                .expect("Could not get network info")
+                .first()
+                .map_or((0, 0), |info| {
+                    (
+                        info.current_number_of_peers,
+                        info.completed_rounds_since_last_time_queried,
+                    )
+                });
+
+            if number_of_peers >= min_peers && completed_rounds > 0 {
+                tracing::info!(
+                    "Took {}s for cell {} to complete {} gossip rounds",
+                    wait_start.elapsed().as_secs(),
+                    cell.cell_id(),
+                    completed_rounds
+                );
+                return;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+            if wait_start.elapsed() > timeout {
+                panic!(
+                    "Timed out waiting for gossip to start for cell {}",
+                    cell.cell_id()
+                );
+            }
+        }
     }
 }
 

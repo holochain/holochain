@@ -5,8 +5,6 @@ use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
 use crate::prelude::*;
-use error::RecordGroupError;
-use error::RecordGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
@@ -15,7 +13,8 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 #[allow(missing_docs)]
-pub mod error;
+mod error;
+pub use error::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 /// A condensed version of get record request.
@@ -365,10 +364,13 @@ impl SignedActionHashedExt for SignedActionHashed {
         let (action, signature) = signed_action.into();
         Self::with_presigned(action.into_hashed(), signature)
     }
-    /// SignedAction constructor
-    async fn sign(keystore: &MetaLairClient, action: ActionHashed) -> LairResult<Self> {
-        let signature = action.author().sign(keystore, &*action).await?;
-        Ok(Self::with_presigned(action, signature))
+    /// Construct by signing the Action (NOT including the hash)
+    async fn sign(keystore: &MetaLairClient, action_hashed: ActionHashed) -> LairResult<Self> {
+        let signature = action_hashed
+            .author()
+            .sign(keystore, action_hashed.as_content())
+            .await?;
+        Ok(Self::with_presigned(action_hashed, signature))
     }
 
     /// Validates a signed action
@@ -377,7 +379,7 @@ impl SignedActionHashedExt for SignedActionHashed {
             .action()
             .author()
             .verify_signature(self.signature(), self.action())
-            .await
+            .await?
         {
             return Err(KeystoreError::InvalidSignature(
                 self.signature().clone(),

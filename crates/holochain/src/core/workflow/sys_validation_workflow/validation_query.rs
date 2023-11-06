@@ -1,15 +1,9 @@
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::query::prelude::*;
-use holochain_types::db::DbRead;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::dht_op::DhtOpType;
-use holochain_zome_types::Entry;
-use holochain_zome_types::SignedAction;
+use holochain_state::prelude::*;
 
 pub use crate::core::validation::DhtOpOrder;
-use crate::core::workflow::error::WorkflowResult;
+use crate::core::workflow::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
@@ -79,7 +73,7 @@ async fn get_ops_to_validate(
         LIMIT 10000
         ",
     );
-    db.async_reader(move |txn| {
+    db.read_async(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
@@ -103,22 +97,14 @@ async fn get_ops_to_validate(
 
 #[cfg(test)]
 mod tests {
+    use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
-    use fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HashableContentExtSync;
-    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
     use holochain_state::validation_db::ValidationLimboStatus;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::dht_op::OpOrder;
-    use holochain_zome_types::fixt::*;
-    use holochain_zome_types::Action;
-    use holochain_zome_types::Signature;
-    use holochain_zome_types::ValidationStatus;
-    use holochain_zome_types::NOISE;
 
     use super::*;
 
@@ -137,7 +123,7 @@ mod tests {
     async fn sys_validation_query() {
         holochain_trace::test_run().ok();
         let db = test_dht_db();
-        let expected = test_data(&db.to_db().into());
+        let expected = test_data(&db.to_db().into()).await;
         let r = get_ops_to_validate(&db.to_db().into(), true).await.unwrap();
         let mut r_sorted = r.clone();
         // Sorted by OpOrder
@@ -152,17 +138,18 @@ mod tests {
         }
     }
 
-    fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
+    async fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                let hash = state.as_hash().clone();
-                insert_op(txn, &state).unwrap();
+        db.write_async({
+            let query_state = state.clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let hash = query_state.as_hash().clone();
+                insert_op(txn, &query_state).unwrap();
                 if facts.has_validation_status {
                     set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 }
@@ -177,13 +164,15 @@ mod tests {
                     .unwrap();
                 }
                 txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
-                DatabaseResult::Ok(())
-            })
-            .unwrap();
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
         state
     }
 
-    fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
+    async fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
         let mut results = Vec::new();
         // We **do** expect any of these in the results:
         let facts = Facts {
@@ -192,7 +181,7 @@ mod tests {
             has_validation_status: false,
         };
         for _ in 0..20 {
-            let op = create_and_insert_op(db, facts);
+            let op = create_and_insert_op(db, facts).await;
             results.push(op);
         }
 
@@ -202,7 +191,7 @@ mod tests {
             has_validation_status: false,
         };
         for _ in 0..20 {
-            let op = create_and_insert_op(db, facts);
+            let op = create_and_insert_op(db, facts).await;
             results.push(op);
         }
 
@@ -213,7 +202,7 @@ mod tests {
             has_validation_status: true,
         };
         for _ in 0..20 {
-            create_and_insert_op(db, facts);
+            create_and_insert_op(db, facts).await;
         }
 
         Expected { results }
@@ -232,7 +221,7 @@ mod tests {
             Action::arbitrary(&mut u).unwrap(),
         ));
 
-        db.async_commit(move |txn| {
+        db.write_async(move |txn| {
             insert_op(txn, &op)?;
             StateMutationResult::Ok(())
         })

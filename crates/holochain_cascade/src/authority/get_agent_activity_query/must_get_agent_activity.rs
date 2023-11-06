@@ -2,24 +2,12 @@ use std::ops::RangeInclusive;
 
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::DbRead;
+use holochain_sqlite::prelude::{DbKindDht, DbRead};
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::*;
-use holochain_state::prelude::from_blob;
-use holochain_state::prelude::StateQueryResult;
-use holochain_state::scratch::Scratch;
-use holochain_types::chain::ChainFilterRange;
-use holochain_types::chain::MustGetAgentActivityResponse;
-use holochain_types::chain::Sequences;
-use holochain_types::dht_op::DhtOpType;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ChainFilter;
-use holochain_zome_types::RegisterAgentActivity;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
+use holochain_state::prelude::*;
 
 #[cfg(test)]
 mod test;
@@ -34,9 +22,9 @@ pub async fn must_get_agent_activity(
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
     let result = env
-        .async_reader(move |mut txn| get_bounded_activity(&mut txn, None, &author, filter))
+        .read_async(move |mut txn| get_bounded_activity(&mut txn, None, &author, filter))
         .await?;
-    filter_then_check(result)
+    Ok(filter_then_check(result))
 }
 
 pub fn get_bounded_activity(
@@ -44,38 +32,41 @@ pub fn get_bounded_activity(
     scratch: Option<&Scratch>,
     author: &AgentPubKey,
     filter: ChainFilter,
-) -> StateQueryResult<(MustGetAgentActivityResponse, Option<ChainFilterRange>)> {
+) -> StateQueryResult<BoundedMustGetAgentActivityResponse> {
     // Find the bounds of the range specified in the filter.
     match find_bounds(txn, scratch, author, filter)? {
         Sequences::Found(filter_range) => {
             // Get the full range of actions from the database.
-            get_activity(txn, scratch, author, filter_range.range()).map(|a| {
-                (
-                    MustGetAgentActivityResponse::Activity(a),
-                    Some(filter_range),
-                )
-            })
+            get_activity(txn, scratch, author, filter_range.range())
+                .map(|a| BoundedMustGetAgentActivityResponse::Activity(a, filter_range))
         }
         // One of the actions specified in the filter does not exist in the database.
         Sequences::ChainTopNotFound(a) => {
-            Ok((MustGetAgentActivityResponse::ChainTopNotFound(a), None))
+            Ok(BoundedMustGetAgentActivityResponse::ChainTopNotFound(a))
         }
         // The filter specifies a range that is empty.
-        Sequences::EmptyRange => Ok((MustGetAgentActivityResponse::EmptyRange, None)),
+        Sequences::EmptyRange => Ok(BoundedMustGetAgentActivityResponse::EmptyRange),
     }
 }
 
+/// Consume the chain filter (if present) from a bounded response to produce an
+/// unbounded response.
 pub fn filter_then_check(
-    response: (MustGetAgentActivityResponse, Option<ChainFilterRange>),
-) -> StateQueryResult<MustGetAgentActivityResponse> {
+    response: BoundedMustGetAgentActivityResponse,
+) -> MustGetAgentActivityResponse {
     match response {
-        (MustGetAgentActivityResponse::Activity(activity), Some(filter_range)) => {
+        BoundedMustGetAgentActivityResponse::Activity(activity, filter_range) => {
             // Filter the activity from the database and check the invariants of the
             // filter still hold.
-            Ok(filter_range.filter_then_check(activity))
+            filter_range.filter_then_check(activity)
         }
-        (MustGetAgentActivityResponse::Activity(_), None) => unreachable!(),
-        (r, _) => Ok(r),
+        BoundedMustGetAgentActivityResponse::IncompleteChain => {
+            MustGetAgentActivityResponse::IncompleteChain
+        }
+        BoundedMustGetAgentActivityResponse::ChainTopNotFound(a) => {
+            MustGetAgentActivityResponse::ChainTopNotFound(a)
+        }
+        BoundedMustGetAgentActivityResponse::EmptyRange => MustGetAgentActivityResponse::EmptyRange,
     }
 }
 

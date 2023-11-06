@@ -15,7 +15,7 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
-use holochain_state::prelude::test_keystore;
+use holochain_keystore::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
@@ -231,8 +231,7 @@ async fn common_genesis_test_app(
     // no other app could be possibly referencing it, but just in case we have some kind of complex
     // behavior like installing two apps which reference each others' Cells at the same time,
     // we need to be aware of this distinction.
-    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
-    );
+    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution();
 
     // Create one DNA which always works, and another from a zome that gets passed in
     let (dna_hardcoded, _, _) = mk_dna(("hardcoded", hardcoded_zome)).await;
@@ -271,11 +270,11 @@ async fn test_uninstall_app() {
         .await;
 
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .call::<_, Option<Record>, _>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_some());
 
@@ -297,11 +296,11 @@ async fn test_uninstall_app() {
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_some());
 
@@ -325,11 +324,11 @@ async fn test_uninstall_app() {
     //   of the cells was destroyed, all data was destroyed as well.
     let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_none());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_none());
 }
@@ -514,7 +513,7 @@ async fn test_signing_error_during_genesis() {
 // }
 
 pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     InlineIntegrityZome::new_unique(vec![unit_entry_def.clone()], 0)
         .function("create", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
@@ -807,7 +806,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     holochain_trace::test_run().ok();
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .function("integrity", "validate", |_api, op: Op| match op {
@@ -866,7 +865,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 #[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
     holochain_trace::test_run().ok();
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             // We need a different validation callback that doesn't happen inline
@@ -1012,14 +1011,26 @@ async fn test_cell_and_app_status_reconciliation() {
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
             conductor.running_cell_ids(Some(Joined)).len(),
-            conductor.running_cell_ids(Some(PendingJoin)).len(),
+            conductor
+                .running_cell_ids(Some(PendingJoin(PendingJoinReason::Initial)))
+                .len()
+                + conductor
+                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Retry)))
+                    .len()
+                + conductor
+                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Failed)))
+                    .len(),
         )
     };
 
     assert_eq!(check().await, (Running, 3, 0));
 
     // - Simulate a cell failing to join the network
-    conductor.update_cell_status(cell1, PendingJoin);
+    conductor.update_cell_status(
+        cell1
+            .iter()
+            .map(|c| (c, PendingJoin(PendingJoinReason::Failed))),
+    );
     assert_eq!(check().await, (Running, 2, 1));
 
     // - Reconciled app state is Paused due to one unjoined Cell

@@ -16,7 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     tokio::task::spawn(async move {
-        let keystore = test_keystore::spawn_test_keystore().await.unwrap();
+        let keystore = holochain_keystore::spawn_test_keystore().await.unwrap();
         let agent_pubkey = AgentPubKey::new_random(&keystore).await.unwrap();
 
         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -26,7 +26,7 @@ async fn main() {
 
         let signature = agent_pubkey.sign(&keystore, &my_data_1).await.unwrap();
 
-        assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await);
+        assert!(agent_pubkey.verify_signature(&signature, &my_data_1).await.unwrap());
     }).await.unwrap();
 }
 ```

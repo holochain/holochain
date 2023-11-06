@@ -8,7 +8,7 @@ use crate::metrics::*;
 /// Note that a node can contain many agents.
 pub(crate) struct Node {
     pub(crate) agent_info_list: Vec<AgentInfoSigned>,
-    pub(crate) cert: Arc<[u8; 32]>,
+    pub(crate) cert: NodeCert,
     pub(crate) url: TxUrl,
 }
 
@@ -18,12 +18,13 @@ impl ShardedGossipLocal {
         &self,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
+        all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Node>> {
-        let mut remote_nodes: HashMap<Arc<[u8; 32]>, Node> = HashMap::new();
+        let mut remote_nodes: HashMap<NodeCert, Node> = HashMap::new();
 
         // Get all the remote nodes in this arc set.
         let remote_agents_within_arc_set: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
+            store::agents_within_arcset(&self.host_api, &self.space, arc_set.clone())
                 .await?
                 .into_iter()
                 .filter(|(a, _)| !local_agents.contains(a))
@@ -31,9 +32,8 @@ impl ShardedGossipLocal {
                 .collect();
 
         // Get all the agent info for these remote nodes.
-        for info in store::all_agent_info(&self.evt_sender, &self.space)
-            .await?
-            .into_iter()
+        for info in all_agents
+            .iter()
             .filter(|a| {
                 std::time::Duration::from_millis(a.expires_at_ms)
                     > std::time::UNIX_EPOCH
@@ -51,14 +51,14 @@ impl ShardedGossipLocal {
                     kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
                         .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                         .ok()
-                        .map(|purl| (info.clone(), purl.digest().0, url.to_string()))
+                        .map(|purl| (info.clone(), purl.digest().0.into(), url.to_string()))
                 })
                 .next();
 
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
             if let Some((info, cert, url)) = info {
-                match remote_nodes.get_mut::<Arc<[u8; 32]>>(&cert) {
+                match remote_nodes.get_mut::<NodeCert>(&cert) {
                     // Add the agent to the node.
                     Some(node) => node.agent_info_list.push(info),
                     None => {
@@ -146,7 +146,7 @@ fn next_remote_node(
 
 #[cfg(test)]
 mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
 
@@ -213,7 +213,7 @@ mod tests {
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],
-                    cert: purl.digest().0,
+                    cert: NodeCert::from(purl.digest().0),
                     url,
                 }
             })

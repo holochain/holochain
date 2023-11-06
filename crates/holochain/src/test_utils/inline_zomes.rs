@@ -35,8 +35,8 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
     #[derive(Copy, Clone, Debug, Serialize, Deserialize, SerializedBytes)]
     struct RandNum(u64);
 
-    impl RandNum {
-        pub fn new() -> Self {
+    impl Default for RandNum {
+        fn default() -> Self {
             Self(rand::thread_rng().gen())
         }
     }
@@ -47,7 +47,7 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
                 api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
                     EntryVisibility::Public,
-                    Entry::app(RandNum::new().try_into().unwrap()).unwrap(),
+                    Entry::app(RandNum::default().try_into().unwrap()).unwrap(),
                     ChainTopOrdering::default(),
                 ))
                 .unwrap()
@@ -89,9 +89,9 @@ impl AppString {
 
 /// An InlineZome with simple Create and Read operations
 pub fn simple_crud_zome() -> InlineZomeSet {
-    let string_entry_def = EntryDef::from_id("string");
-    let unit_entry_def = EntryDef::from_id("unit");
-    let bytes_entry_def = EntryDef::from_id("bytes");
+    let string_entry_def = EntryDef::default_from_id("string");
+    let unit_entry_def = EntryDef::default_from_id("unit");
+    let bytes_entry_def = EntryDef::default_from_id("bytes");
 
     SweetInlineZomes::new(vec![string_entry_def, unit_entry_def, bytes_entry_def], 0)
         .function("create_string", move |api, s: AppString| {

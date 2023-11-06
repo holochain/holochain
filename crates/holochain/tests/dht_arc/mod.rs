@@ -37,19 +37,17 @@ async fn test_arc_redundancy() {
         for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
-                let mut arc = peers.get_mut(i).unwrap();
+                let arc = peers.get_mut(i).unwrap();
                 let view =
                     PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
-                view.update_arc(&mut arc);
+                view.update_arc(arc);
             }
 
             let r = check_redundancy(peers.clone());
             if mature {
                 assert!(r >= DEFAULT_MIN_REDUNDANCY);
-            } else {
-                if r >= DEFAULT_MIN_REDUNDANCY {
-                    mature = true;
-                }
+            } else if r >= DEFAULT_MIN_REDUNDANCY {
+                mature = true;
             }
         }
         assert!(mature);
@@ -88,13 +86,10 @@ async fn test_join_leave() {
     let converge = |peers: &mut Vec<DhtArc>| {
         for i in 0..peers.len() {
             let p = peers.clone();
-            let mut arc = peers.get_mut(i).unwrap();
-            let view = PeerStrat::default().view(
-                Topology::standard_epoch_full(),
-                arc.clone(),
-                p.as_slice(),
-            );
-            view.update_arc(&mut arc);
+            let arc = peers.get_mut(i).unwrap();
+            let view =
+                PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
+            view.update_arc(arc);
         }
     };
     let mut peers = get_peers(num_peers, &coverages, keystore.clone()).await;
@@ -110,10 +105,8 @@ async fn test_join_leave() {
 
         if mature {
             assert!(r >= DEFAULT_MIN_REDUNDANCY);
-        } else {
-            if r >= DEFAULT_MIN_REDUNDANCY {
-                mature = true;
-            }
+        } else if r >= DEFAULT_MIN_REDUNDANCY {
+            mature = true;
         }
     }
     assert!(mature);

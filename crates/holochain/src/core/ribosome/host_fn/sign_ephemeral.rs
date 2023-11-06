@@ -5,6 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn sign_ephemeral(
     _ribosome: Arc<impl RibosomeT>,
@@ -26,11 +27,7 @@ pub fn sign_ephemeral(
 
             let sig = sodoken::BufWriteSized::new_no_lock();
             for data in input.into_inner().into_iter() {
-                sodoken::sign::detached(
-                    sig.clone(),
-                    data.to_vec(),
-                    sk.clone(),
-                ).await?;
+                sodoken::sign::detached(sig.clone(), data.to_vec(), sk.clone()).await?;
                 signatures.push((*sig.read_lock_sized()).into());
             }
 
@@ -76,52 +73,48 @@ pub mod wasm_test {
         #[derive(Serialize, Deserialize, Debug)]
         struct Two([u8; 2]);
 
-        assert!(
-            output[0]
-                .key
-                .verify_signature_raw(
-                    &output[0].signatures[0],
-                    holochain_serialized_bytes::encode(&One([1, 2]))
-                        .unwrap()
-                        .into()
-                )
-                .await
-        );
+        assert!(output[0]
+            .key
+            .verify_signature_raw(
+                &output[0].signatures[0],
+                holochain_serialized_bytes::encode(&One([1, 2]))
+                    .unwrap()
+                    .into()
+            )
+            .await
+            .unwrap());
 
-        assert!(
-            output[0]
-                .key
-                .verify_signature_raw(
-                    &output[0].signatures[1],
-                    holochain_serialized_bytes::encode(&One([3, 4]))
-                        .unwrap()
-                        .into()
-                )
-                .await
-        );
+        assert!(output[0]
+            .key
+            .verify_signature_raw(
+                &output[0].signatures[1],
+                holochain_serialized_bytes::encode(&One([3, 4]))
+                    .unwrap()
+                    .into()
+            )
+            .await
+            .unwrap());
 
-        assert!(
-            output[1]
-                .key
-                .verify_signature_raw(
-                    &output[1].signatures[0],
-                    holochain_serialized_bytes::encode(&One([1, 2]))
-                        .unwrap()
-                        .into()
-                )
-                .await
-        );
+        assert!(output[1]
+            .key
+            .verify_signature_raw(
+                &output[1].signatures[0],
+                holochain_serialized_bytes::encode(&One([1, 2]))
+                    .unwrap()
+                    .into()
+            )
+            .await
+            .unwrap());
 
-        assert!(
-            output[1]
-                .key
-                .verify_signature_raw(
-                    &output[1].signatures[1],
-                    holochain_serialized_bytes::encode(&Two([2, 3]))
-                        .unwrap()
-                        .into()
-                )
-                .await
-        );
+        assert!(output[1]
+            .key
+            .verify_signature_raw(
+                &output[1].signatures[1],
+                holochain_serialized_bytes::encode(&Two([2, 3]))
+                    .unwrap()
+                    .into()
+            )
+            .await
+            .unwrap());
     }
 }

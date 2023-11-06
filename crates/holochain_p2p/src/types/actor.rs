@@ -4,9 +4,11 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 /// Holochain-specific FetchContext extension trait.
 pub trait FetchContextExt {
@@ -241,12 +243,14 @@ impl Default for GetActivityOptions {
     }
 }
 
+type MaybeDnaHash = Option<DnaHash>;
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
     pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
+        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, maybe_agent_info: Option<AgentInfoSigned>, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
 
         /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
@@ -322,6 +326,12 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> Vec<WireLinkOps>;
 
+        /// Get a count of links from the DHT.
+        fn count_links(
+            dna_hash: DnaHash,
+            query: WireLinkQuery,
+        ) -> CountLinksResponse;
+
         /// Get agent activity from the DHT.
         fn get_agent_activity(
             dna_hash: DnaHash,
@@ -338,7 +348,7 @@ ghost_actor::ghost_chan! {
         ) -> Vec<MustGetAgentActivityResponse>;
 
         /// Send a validation receipt to a remote node.
-        fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
+        fn send_validation_receipts(dna_hash: DnaHash, to_agent: AgentPubKey, receipts: ValidationReceiptBundle) -> ();
 
         /// New data has been integrated and is ready for gossiping.
         fn new_integrated_data(dna_hash: DnaHash) -> ();
@@ -355,8 +365,11 @@ ghost_actor::ghost_chan! {
 
         /// Dump network metrics.
         fn dump_network_metrics(
-            dna_hash: Option<DnaHash>,
+            dna_hash: MaybeDnaHash,
         ) -> String;
+
+        /// Dump network stats.
+        fn dump_network_stats() -> String;
 
         /// Get struct for diagnostic data
         fn get_diagnostics(dna_hash: DnaHash) -> KitsuneDiagnostics;

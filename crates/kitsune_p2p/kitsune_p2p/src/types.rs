@@ -28,21 +28,9 @@ pub enum KitsuneP2pError {
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
 
-    /// Reqwest crate.
-    #[error(transparent)]
-    Reqwest(#[from] reqwest::Error),
-
     /// Bootstrap call failed.
-    #[error("Bootstrap Error: {0}")]
-    Bootstrap(Box<str>),
-
-    /// SystemTime call failed.
     #[error(transparent)]
-    SystemTime(#[from] std::time::SystemTimeError),
-
-    /// Integer casting failed.
-    #[error(transparent)]
-    TryFromInt(#[from] std::num::TryFromIntError),
+    Bootstrap(#[from] BootstrapClientError),
 
     /// Other
     #[error("Other: {0}")]
@@ -83,6 +71,7 @@ impl From<&str> for KitsuneP2pError {
     }
 }
 
+use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 pub use kitsune_p2p_types::bin_types::*;
 
 /// Data structures to be stored in the agent/peer database.

@@ -11,15 +11,15 @@ use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
-use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
-use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
 use rand::Rng;
@@ -355,7 +355,7 @@ async fn create_test_data(
     let rng = rand::thread_rng();
     let mut rand_entry = rng.sample_iter(&Standard);
     let rand_entry = rand_entry.by_ref();
-    let start = std::time::Instant::now();
+
     loop {
         let d: Vec<u8> = rand_entry.take(10).collect();
         let d = UnsafeBytes::from(d);
@@ -375,8 +375,6 @@ async fn create_test_data(
             break;
         }
     }
-    dbg!(bucket_counts);
-    dbg!(start.elapsed());
 
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -391,7 +389,7 @@ async fn create_test_data(
     };
     let mut conductor = SweetConductor::from_config(config).await;
     let mut agents = Vec::new();
-    dbg!("generating agents");
+
     for i in 0..num_agents {
         eprintln!("generating agent {}", i);
         let agent = conductor
@@ -402,8 +400,6 @@ async fn create_test_data(
             .unwrap();
         agents.push(agent);
     }
-
-    dbg!("Installing apps");
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file.clone()])
@@ -425,16 +421,22 @@ async fn create_test_data(
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Extracting data {}", i);
         let db = cell.authored_db().clone();
-        let data = fresh_reader_test(db, |mut txn| {
-            get_authored_ops(&mut txn, cell.agent_pubkey())
-        });
+        let data = db
+            .read_async({
+                let agent_pk = cell.agent_pubkey().clone();
+                move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, DhtOpHashed>> {
+                    Ok(get_authored_ops(&txn, &agent_pk))
+                }
+            })
+            .await
+            .unwrap();
         let hashes = data.keys().cloned().collect::<Vec<_>>();
         authored.insert(Arc::new(cell.agent_pubkey().clone()), hashes);
         ops.extend(data);
     }
-    dbg!("Getting agent info");
+
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
-    dbg!("Done");
+
     GeneratedData {
         integrity_uuid,
         coordinator_uuid,
@@ -503,7 +505,7 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
 }
 
 fn get_authored_ops(
-    txn: &mut Transaction<'_>,
+    txn: &Transaction<'_>,
     author: &AgentPubKey,
 ) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     txn.prepare(

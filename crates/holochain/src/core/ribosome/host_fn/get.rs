@@ -3,10 +3,11 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::StreamExt;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 #[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
@@ -29,7 +30,7 @@ pub fn get<'a>(
                             any_dht_hash,
                             get_options,
                         } = input;
-                        Cascade::from_workspace_and_network(
+                        CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().clone(),
                         )

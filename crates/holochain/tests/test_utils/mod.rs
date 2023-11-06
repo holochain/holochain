@@ -58,7 +58,7 @@ impl Drop for SupervisedChild {
             self.1
                 .kill()
                 .await
-                .expect(&format!("Failed to kill {}", self.0));
+                .unwrap_or_else(|_| panic!("Failed to kill {}", self.0));
         });
     }
 }
@@ -127,7 +127,7 @@ pub async fn call_zome_fn<S>(
 ) where
     S: Serialize + std::fmt::Debug,
 {
-    let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(Timestamp::now()).unwrap();
+    let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
     let zome_call_unsigned = ZomeCallUnsigned {
         cap_secret: Some(cap_secret),
@@ -136,7 +136,7 @@ pub async fn call_zome_fn<S>(
         fn_name: fn_name.clone(),
         provenance: signing_key,
         payload: ExternIO::encode(input).unwrap(),
-        nonce: Nonce256Bits::from(nonce),
+        nonce,
         expires_at,
     };
     let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
@@ -243,14 +243,12 @@ pub async fn register_and_install_dna_named(
         .await
         .unwrap();
 
-    let version = DnaVersionSpec::from(vec![dna_hash.clone().into()]).into();
-
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(dna_path.clone())),
             modifiers: mods,
-            version: Some(version),
+            installed_hash: Some(dna_hash.clone().into()),
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -265,13 +263,9 @@ pub async fn register_and_install_dna_named(
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
 
-    let bundle = AppBundle::new(
-        manifest.clone().into(),
-        resources,
-        PathBuf::from(dna_path.clone()),
-    )
-    .await
-    .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
+        .await
+        .unwrap();
 
     let payload = InstallAppPayload {
         agent_key,
@@ -279,6 +273,8 @@ pub async fn register_and_install_dna_named(
         installed_app_id: Some(name),
         network_seed: None,
         membrane_proofs: std::collections::HashMap::new(),
+        #[cfg(feature = "chc")]
+        ignore_genesis_failure: false,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
@@ -391,10 +387,8 @@ pub async fn dump_full_state(
     let response = client.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let full_state = match response {
+    match response {
         AdminResponse::FullStateDumped(state) => state,
         _ => panic!("DumpFullState failed: {:?}", response),
-    };
-
-    full_state
+    }
 }

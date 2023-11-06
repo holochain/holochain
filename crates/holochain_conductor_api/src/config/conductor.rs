@@ -2,6 +2,7 @@
 //! This module is used to configure the conductor
 
 use holochain_types::db::DbSyncStrategy;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -48,13 +49,14 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+    pub network: Option<KitsuneP2pConfig>,
 
-    /// **PLACEHOLDER**: Optional specification of the Cloudflare namespace to use in Chain Head Coordination
-    /// service URLs. This is a placeholder for future work and may even go away.
-    /// Setting this to anything other than `None` will surely lead to no good.
+    /// Optional specification of Chain Head Coordination service URL.
+    /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
+    /// If you don't know what this means, leave this setting alone (as `None`)
     #[serde(default)]
-    pub chc_namespace: Option<String>,
+    #[cfg(feature = "chc")]
+    pub chc_url: Option<url2::Url2>,
 
     /// Override the default database synchronous strategy.
     ///
@@ -66,11 +68,14 @@ pub struct ConductorConfig {
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
-    //
-    //
-    // Which signals to emit
-    // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
-    // pub signals: SignalConfig,
+
+    /// All logs from all managed tasks will be instrumented to contain this string,
+    /// so that logs from multiple conductors in the same process can be disambiguated.
+    /// NOTE: Kitsune config has a similar option for its own tasks, because it has its
+    /// own task management system (or lack thereof). You probably want to ensure
+    /// that this value matches the one in KitsuneP2pConfig!
+    #[serde(default)]
+    pub tracing_scope: Option<String>,
 }
 
 /// Helper function to load a config from a YAML string.
@@ -92,11 +97,20 @@ impl ConductorConfig {
         })?;
         config_from_yaml(&config_yaml)
     }
+
+    /// Get tuning params for this config (default if not set)
+    pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
+        self.network
+            .as_ref()
+            .map(|c| c.tuning_params.clone())
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
+    use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
@@ -138,7 +152,9 @@ pub mod tests {
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
-                chc_namespace: None,
+                tracing_scope: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
@@ -168,14 +184,8 @@ pub mod tests {
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
-        - type: proxy
-          sub_transport:
-            type: quic
-            bind_to: kitsune-quic://0.0.0.0:0
-          proxy_config:
-            type: remote_proxy_client_from_bootstrap
-            bootstrap_url: https://bootstrap.holo.host
-            fallback_proxy_url: ~
+        - type: webrtc
+          signal_url: wss://signal.holotest.net
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -185,27 +195,20 @@ pub mod tests {
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
+        tx5_min_ephemeral_udp_port: 40000
+        tx5_max_ephemeral_udp_port: 40255
       network_type: quic_bootstrap
 
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.push(TransportConfig::Proxy {
-            sub_transport: Box::new(TransportConfig::Quic {
-                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-                override_host: None,
-                override_port: None,
-            }),
-            proxy_config: ProxyConfig::RemoteProxyClientFromBootstrap {
-                bootstrap_url: url2::url2!("https://bootstrap.holo.host"),
-                fallback_proxy_url: None,
-            },
+        network_config.transport_pool.push(TransportConfig::WebRTC {
+            signal_url: "wss://signal.holotest.net".into(),
         });
         let mut tuning_params =
-            kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
@@ -214,6 +217,8 @@ pub mod tests {
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
         tuning_params.proxy_to_expire_ms = 42;
+        tuning_params.tx5_min_ephemeral_udp_port = 40000;
+        tuning_params.tx5_max_ephemeral_udp_port = 40255;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
         assert_eq!(
             result.unwrap(),
@@ -230,7 +235,9 @@ pub mod tests {
                 }]),
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
-                chc_namespace: None,
+                tracing_scope: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }
@@ -254,11 +261,13 @@ pub mod tests {
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
-                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
+                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                chc_namespace: None,
+                tracing_scope: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
             }
         );
     }

@@ -7,8 +7,10 @@ use kitsune_p2p::{agent_store::AgentInfoSigned, dht::region::RegionBounds, event
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
+#[derive(Default)]
 pub enum GetRequest {
     /// Get all the integrated data.
+    #[default]
     All,
     /// Get only the integrated content.
     Content,
@@ -39,12 +41,6 @@ impl From<&actor::GetOptions> for GetOptions {
             all_live_actions_with_metadata: a.all_live_actions_with_metadata,
             request_type: a.request_type.clone(),
         }
-    }
-}
-
-impl Default for GetRequest {
-    fn default() -> Self {
-        GetRequest::All
     }
 }
 
@@ -219,6 +215,13 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> WireLinkOps;
 
+        /// A remote node is requesting a link count from us.
+        fn count_links(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            query: WireLinkQuery,
+        ) -> CountLinksResponse;
+
         /// A remote node is requesting agent activity from us.
         fn get_agent_activity(
             dna_hash: DnaHash,
@@ -237,10 +240,10 @@ ghost_actor::ghost_chan! {
         ) -> MustGetAgentActivityResponse;
 
         /// A remote node has sent us a validation receipt.
-        fn validation_receipt_received(
+        fn validation_receipts_received(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            receipt: SerializedBytes,
+            receipts: ValidationReceiptBundle,
         ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
@@ -288,9 +291,10 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
-            HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
+            HolochainP2pEvent::ValidationReceiptsReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }
             $($t2)*

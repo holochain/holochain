@@ -1,5 +1,6 @@
 //! Signature for authenticity of data
 use holo_hash::AgentPubKey;
+use holochain_secure_primitive::secure_primitive;
 use holochain_serialized_bytes::prelude::*;
 
 /// Ed25519 signatures are always the same length, 64 bytes.
@@ -7,13 +8,14 @@ pub const SIGNATURE_BYTES: usize = 64;
 
 /// The raw bytes of a signature.
 #[derive(Clone, PartialOrd, Hash, Ord)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 // The equality is not different, it's just constant time, so we can derive a hash.
 // For an actually secure thing we wouldn't want to just assume a safe default hashing
 // But that is not what clippy is complaining about here.
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 pub struct Signature(pub [u8; SIGNATURE_BYTES]);
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Signature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; SIGNATURE_BYTES];
@@ -26,7 +28,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Signature {
 // about things like constant time equality.
 // Signature verification should always defer to the host.
 // What's nice about this is that we can easily handle fixed size signatures.
-crate::secure_primitive!(Signature, SIGNATURE_BYTES);
+secure_primitive!(Signature, SIGNATURE_BYTES);
 
 /// The output of ephemeral signing.
 /// The private key for this public key has been discarded by this point.
@@ -109,4 +111,11 @@ impl VerifySignature {
             data,
         }
     }
+}
+
+#[test]
+fn signature_roundtrip() {
+    let bytes = Signature::from([1u8; 64]);
+    let json = serde_json::to_string(&bytes).unwrap();
+    let _: Signature = serde_json::from_str(&json).unwrap();
 }

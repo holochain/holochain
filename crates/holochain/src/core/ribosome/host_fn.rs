@@ -72,13 +72,14 @@ host_fn_api_impls! {
     // Block some agent on the same DNA.
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
-    // @todo
-    fn dna_info (()) -> zt::info::DnaInfo;
+    // Info about the current DNA.
+    fn dna_info_1 (()) -> zt::info::DnaInfoV1;
+    fn dna_info_2 (()) -> zt::info::DnaInfoV2;
 
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::prelude::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -151,6 +152,8 @@ host_fn_api_impls! {
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
+
+    fn count_links(zt::query::LinkQuery) -> usize;
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;

@@ -4,10 +4,10 @@
 
 use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
-use crate::meta_net::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
-use crate::{types::*, HostApi};
+use crate::types::*;
+use crate::{meta_net::*, HostApiLegacy};
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
@@ -40,12 +40,9 @@ pub use bandwidth::BandwidthThrottles;
 
 /// How quickly to run a gossip iteration which attempts to initiate
 /// with a new target.
-///
-/// TODO: Currently our gossip loop does a database query for remote nodes
-/// on every iteration. We should add a longer interval for refreshing this
-/// list (perhaps once per second), and use a cached value for other iterations,
-/// so as not to do hundreds of DB queries per second.
-const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(10);
+const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(100);
+
+const AGENT_LIST_FETCH_INTERVAL: Duration = Duration::from_secs(1);
 
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
@@ -66,9 +63,7 @@ mod next_target;
 // code path due to test_utils, the helper functions defined in this module
 // are not used due to the tests themselves not being compiled, so it's easier
 // to do this than to annotate each function as `#[cfg(test)]`
-#[cfg(any(test, feature = "test_utils"))]
-#[allow(dead_code)]
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) mod tests;
 
 /// max send buffer size (keep it under 16384 with a little room for overhead)
@@ -79,11 +74,7 @@ pub(crate) mod tests;
 ///    16384 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
-/// The timeout for a gossip round if there is no contact. One minute.
-const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
 type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
-type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
 #[derive(Debug)]
 struct TimedBloomFilter {
@@ -166,11 +157,10 @@ impl ShardedGossip {
     /// Constructor
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: EventSender,
-        host_api: HostApi,
+        host_api: HostApiLegacy,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
@@ -187,13 +177,14 @@ impl ShardedGossip {
         #[cfg(not(feature = "test"))]
         let state = Default::default();
 
+        let tuning_params = config.tuning_params.clone();
+
         let this = Arc::new(Self {
             ep_hnd,
             state: Share::new(state),
             gossip: ShardedGossipLocal {
                 tuning_params,
                 space,
-                evt_sender,
                 host_api,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
@@ -202,7 +193,12 @@ impl ShardedGossip {
             },
             bandwidth,
         });
-        metric_task({
+
+        let mut agent_list_by_local_agents = vec![];
+        let mut all_agents = vec![];
+        let mut refresh_agent_list_timer = std::time::Instant::now();
+
+        metric_task_instrumented(config.tracing_scope.clone(), {
             let this = this.clone();
 
             async move {
@@ -213,8 +209,37 @@ impl ShardedGossip {
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
-                    this.run_one_iteration().await;
+                    this.run_one_iteration(
+                        agent_list_by_local_agents.clone(),
+                        all_agents.as_slice(),
+                    )
+                    .await;
                     this.stats(&mut stats);
+
+                    if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
+                        agent_list_by_local_agents =
+                            match this.gossip.query_agents_by_local_agents().await {
+                                Ok(a) => a,
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Failed to query for agents by local agents - {:?}",
+                                        e
+                                    );
+                                    vec![]
+                                }
+                            };
+                        all_agents =
+                            match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
+                                .await
+                            {
+                                Ok(a) => a,
+                                Err(e) => {
+                                    tracing::error!("Failed to query for all agents - {:?}", e);
+                                    vec![]
+                                }
+                            };
+                        refresh_agent_list_timer = std::time::Instant::now();
+                    }
                 }
                 KitsuneResult::Ok(())
             }
@@ -355,8 +380,16 @@ impl ShardedGossip {
         Ok(())
     }
 
-    async fn run_one_iteration(&self) {
-        match self.gossip.try_initiate().await {
+    async fn run_one_iteration(
+        &self,
+        agent_list_by_local_agents: Vec<AgentInfoSigned>,
+        all_agents: &[AgentInfoSigned],
+    ) {
+        match self
+            .gossip
+            .try_initiate(agent_list_by_local_agents, all_agents)
+            .await
+        {
             Ok(Some(outgoing)) => {
                 if let Err(err) = self.state.share_mut(|i, _| {
                     i.push_outgoing([outgoing]);
@@ -404,7 +437,7 @@ impl ShardedGossip {
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!(
-                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", 
+                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}",
                         i.metrics,
                         stats.avg_processing_time,
                         stats.count,
@@ -427,28 +460,25 @@ pub struct ShardedGossipLocal {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
-    evt_sender: EventSender,
-    host_api: HostApi,
+    host_api: HostApiLegacy,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
     fetch_pool: FetchPool,
 }
 
-type StateKey = Arc<[u8; 32]>;
-
 /// Incoming gossip.
 type Incoming = (MetaNetCon, String, ShardedGossipWire, usize);
 /// Outgoing gossip.
-type Outgoing = (StateKey, HowToConnect, ShardedGossipWire);
+type Outgoing = (NodeCert, HowToConnect, ShardedGossipWire);
 
 /// A peer (from the perspective of any other node) is uniquely identified by its Cert
-pub type NodeId = StateKey;
+pub type NodeId = NodeCert;
 
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
 pub(crate) struct ShardedGossipTarget {
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
-    pub(crate) cert: StateKey,
+    pub(crate) cert: NodeCert,
     pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
     #[allow(dead_code)]
@@ -478,7 +508,7 @@ impl ShardedGossipLocalState {
 
     fn remove_state(
         &mut self,
-        state_key: &StateKey,
+        state_key: &NodeCert,
         gossip_type: GossipType,
         error: bool,
     ) -> Option<RoundState> {
@@ -510,7 +540,7 @@ impl ShardedGossipLocalState {
         r
     }
 
-    fn check_tgt_expired(&mut self, gossip_type: GossipType) {
+    fn check_tgt_expired(&mut self, gossip_type: GossipType, round_timeout: Duration) {
         if let Some((remote_agent_list, cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
@@ -520,7 +550,7 @@ impl ShardedGossipLocalState {
             let no_current_round_exist = !self.round_map.round_exists(&cert);
             match when_initiated {
                 Some(when_initiated)
-                    if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
+                    if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
                     tracing::error!("Tgt expired {:?}", cert);
                     {
@@ -732,26 +762,27 @@ impl ShardedGossipLocal {
         remote_agent_list: Vec<AgentInfoSigned>,
         common_arc_set: Arc<DhtArcSet>,
         region_set_sent: Option<RegionSetLtcs>,
+        round_timeout: Duration,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState::new(
             remote_agent_list,
             common_arc_set,
             region_set_sent.map(Arc::new),
-            ROUND_TIMEOUT,
+            round_timeout,
         ))
     }
 
-    fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn get_state(&self, id: &NodeCert) -> KitsuneResult<Option<RoundState>> {
         self.inner
             .share_mut(|i, _| Ok(i.round_map.get(id).cloned()))
     }
 
-    fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
+    fn remove_state(&self, id: &NodeCert, error: bool) -> KitsuneResult<Option<RoundState>> {
         self.inner
             .share_mut(|i, _| Ok(i.remove_state(id, self.gossip_type, error)))
     }
 
-    fn remove_target(&self, id: &StateKey, error: bool) -> KitsuneResult<()> {
+    fn remove_target(&self, id: &NodeCert, error: bool) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
@@ -770,7 +801,7 @@ impl ShardedGossipLocal {
     }
 
     /// If the round is still active then update the state.
-    fn update_state_if_active(&self, key: StateKey, state: RoundState) -> KitsuneResult<()> {
+    fn update_state_if_active(&self, key: NodeCert, state: RoundState) -> KitsuneResult<()> {
         self.inner.share_mut(|i, _| {
             if i.round_map.round_exists(&key) {
                 if state.is_finished() {
@@ -785,7 +816,7 @@ impl ShardedGossipLocal {
 
     fn incoming_op_blooms_finished(
         &self,
-        state_id: &StateKey,
+        state_id: &NodeCert,
     ) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let finished = i
@@ -804,7 +835,7 @@ impl ShardedGossipLocal {
         })
     }
 
-    fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
+    fn decrement_op_blooms(&self, state_id: &NodeCert) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
             let remove_state = |state: &mut RoundState| {
                 let num_op_blooms = state.num_expected_op_blooms.saturating_sub(1);
@@ -827,7 +858,7 @@ impl ShardedGossipLocal {
 
     async fn process_incoming(
         &self,
-        peer_cert: StateKey,
+        peer_cert: NodeCert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
@@ -1109,8 +1140,12 @@ fn time_range(start: Duration, end: Duration) -> TimeWindow {
     start..end
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 /// An encoded timed bloom filter of missing op hashes.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum EncodedTimedBloomFilter {
     /// I have no overlap with your agents
     /// Please don't send any ops.
@@ -1341,19 +1376,17 @@ impl ShardedRecentGossipFactory {
 impl AsGossipModuleFactory for ShardedRecentGossipFactory {
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
-            tuning_params,
+            config,
             space,
             ep_hnd,
-            evt_sender,
             host,
             GossipType::Recent,
             self.bandwidth.clone(),
@@ -1376,19 +1409,17 @@ impl ShardedHistoricalGossipFactory {
 impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
-        evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
-        host: HostApi,
+        host: HostApiLegacy,
         metrics: MetricsSync,
         fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
-            tuning_params,
+            config,
             space,
             ep_hnd,
-            evt_sender,
             host,
             GossipType::Historical,
             self.bandwidth.clone(),

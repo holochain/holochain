@@ -15,7 +15,7 @@ use kitsune_p2p_types::{
     KOpData, KOpHash,
 };
 
-use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
+use crate::event::GetAgentInfoSignedEvt;
 
 /// A boxed future result with dynamic error type
 pub type KitsuneHostResult<'a, T> =
@@ -23,7 +23,7 @@ pub type KitsuneHostResult<'a, T> =
 
 /// The interface to be implemented by the host, which handles various requests
 /// for data
-pub trait KitsuneHost: 'static + Send + Sync {
+pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     /// We are requesting a block.
     fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
 
@@ -120,6 +120,18 @@ pub trait KitsuneHost: 'static + Send + Sync {
 /// Trait object for the host interface
 pub type HostApi = std::sync::Arc<dyn KitsuneHost>;
 
+/// A HostApi paired with a ghost_actor sender (legacy)
+/// When all legacy functions have been moved to the API,
+/// this type can be replaced by `HostApi`.
+#[derive(Clone, Debug, derive_more::Constructor, derive_more::Deref, derive_more::Into)]
+pub struct HostApiLegacy {
+    /// The new API
+    #[deref]
+    pub api: HostApi,
+    /// The old ghost_actor sender based API
+    pub legacy: futures::channel::mpsc::Sender<crate::event::KitsuneP2pEvent>,
+}
+
 // Test-only stub which mostly panics
 #[cfg(any(test, feature = "test_utils"))]
 mod host_stub;
@@ -130,3 +142,4 @@ pub use host_stub::*;
 mod host_default_error;
 #[cfg(any(test, feature = "test_utils"))]
 pub use host_default_error::*;
+use kitsune_p2p_types::metrics::MetricRecord;

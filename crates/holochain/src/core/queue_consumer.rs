@@ -36,7 +36,6 @@ use derive_more::Display;
 use futures::future::Either;
 use futures::{Future, Stream, StreamExt};
 use holochain_types::prelude::*;
-use holochain_zome_types::CellId;
 use tokio::sync::broadcast;
 
 // MAYBE: move these to workflow mod
@@ -65,8 +64,8 @@ use countersigning_consumer::*;
 mod tests;
 
 use super::workflow::app_validation_workflow::AppValidationWorkspace;
-use super::workflow::error::{WorkflowError, WorkflowResult};
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
+use super::workflow::{WorkflowError, WorkflowResult};
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
@@ -561,6 +560,11 @@ impl TriggerReceiver {
         }
         Ok(())
     }
+
+    /// Check whether the backoff loop is paused. Will always return false if there is no backoff for this receiver.
+    pub fn is_paused(&self) -> bool {
+        self.back_off.as_ref().map_or(false, |b| b.is_paused())
+    }
 }
 
 /// Create a future that will be ok with either a recv or a lagged.
@@ -660,7 +664,7 @@ async fn queue_consumer_main_task_impl<
                     tracing::debug!("Work incomplete, retriggering workflow");
                     tx.trigger(&"retrigger")
                 }
-                Err(err) => handle_workflow_error(err)?,
+                Err(err) => handle_workflow_error(&name, err)?,
                 _ => (),
             }
         } else {
@@ -702,11 +706,11 @@ fn queue_consumer_cell_bound<
 /// Does nothing.
 /// Does extra nothing and logs about it if the error shouldn't bail the
 /// workflow.
-fn handle_workflow_error(err: WorkflowError) -> ManagedTaskResult {
+fn handle_workflow_error(workflow_name: &String, err: WorkflowError) -> ManagedTaskResult {
     if err.workflow_should_bail() {
         Err(Box::new(ConductorError::from(err)).into())
     } else {
-        tracing::error!(?err);
+        tracing::error!(?workflow_name, ?err);
         Ok(())
     }
 }

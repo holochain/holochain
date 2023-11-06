@@ -3,19 +3,9 @@ use std::sync::Arc;
 use holo_hash::AnyLinkableHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::prelude::*;
+use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
-use holochain_types::dht_op::DhtOpType;
-use holochain_types::link::WireCreateLink;
-use holochain_types::link::WireDeleteLink;
-use holochain_types::link::WireLinkOps;
 use holochain_types::sql::ToSqlStatement;
-use holochain_zome_types::Action;
-use holochain_zome_types::HasValidationStatus;
-use holochain_zome_types::Judged;
-use holochain_zome_types::LinkTag;
-use holochain_zome_types::LinkTypeFilter;
-use holochain_zome_types::SignedAction;
 
 use super::WireLinkKey;
 
@@ -35,12 +25,7 @@ impl GetLinksOpsQuery {
         }
     }
     pub fn tag_to_hex(tag: &LinkTag) -> String {
-        use std::fmt::Write;
-        let mut s = String::with_capacity(tag.0.len());
-        for b in &tag.0 {
-            write!(&mut s, "{:02X}", b).ok();
-        }
-        s
+        holochain_util::hex::bytes_to_hex(&tag.0, true)
     }
 }
 

@@ -2,6 +2,16 @@
 
 use kitsune_p2p_dht_arc::DhtLocation;
 
+#[cfg(feature = "fixt")]
+pub mod fixt;
+
+pub mod dependencies {
+    #[cfg(feature = "fuzzing")]
+    pub use proptest;
+    #[cfg(feature = "fuzzing")]
+    pub use proptest_derive;
+}
+
 /// Kitsune hashes are expected to be 36 bytes.
 /// The first 32 bytes are the proper hash.
 /// The final 4 bytes are a hash-of-the-hash that can be treated like a u32 "location".
@@ -52,11 +62,16 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
+            #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
             #[shrinkwrap(mutable)]
-            pub struct $name(#[serde(with = "serde_bytes")] pub Vec<u8>);
+            pub struct $name(
+                #[serde(with = "serde_bytes")]
+                #[cfg_attr(feature = "fuzzing", proptest(strategy = "proptest::collection::vec(0u8..128, 36)"))]
+                pub Vec<u8>);
 
             impl KitsuneBinType for $name {
 
+                // TODO This actually allows mixups, for example a KitsuneAgent can be constructed with a 36 byte vector
                 fn new(mut bytes: Vec<u8>) -> Self {
                     if bytes.len() != 36 {
                         // If location bytes are not included, append them now.
@@ -83,12 +98,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl std::fmt::Debug for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.write_fmt(format_args!("{}(0x", stringify!($name)))?;
-                    for byte in &self.0 {
-                        f.write_fmt(format_args!("{:02x}", byte))?;
-                    }
-                    f.write_fmt(format_args!(")"))?;
-                    Ok(())
+                    f.write_fmt(format_args!("{}(0x{})", stringify!($name), &holochain_util::hex::bytes_to_hex(&self.0, false)))
                 }
             }
 
@@ -104,7 +114,7 @@ macro_rules! make_kitsune_bin_type {
                 }
             }
 
-            #[cfg(feature = "arbitrary")]
+            #[cfg(feature = "fuzzing")]
             impl<'a> arbitrary::Arbitrary<'a> for $name {
                 fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
                     // FIXME: there is no way to calculate location bytes right now,
@@ -123,6 +133,19 @@ macro_rules! make_kitsune_bin_type {
     };
 }
 
+// #[derive(Debug)]
+// pub struct BT(Vec<u8>);
+
+// #[cfg(feature = "fuzzing")]
+// impl proptest::arbitrary::Arbitrary for BT {
+//     type Parameters = ();
+//     type Strategy = proptest::collection::VecStrategy<proptest::num::u8::Any>;
+
+//     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+//         todo!()
+//     }
+// }
+
 make_kitsune_bin_type! {
     "Distinguish multiple categories of communication within the same network module.",
     KitsuneSpace,
@@ -140,6 +163,10 @@ These metadata "Operations" each also have unique OpHashes."#,
 
 /// The op data with its location
 #[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct KitsuneOpData(
@@ -166,49 +193,12 @@ impl From<Vec<u8>> for KitsuneOpData {
     }
 }
 
-/// Helpful pattern for debug formatting many bytes.
-/// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
-pub fn fmt_many_bytes(
-    name: &str,
-    f: &mut std::fmt::Formatter<'_>,
-    bytes: &[u8],
-) -> std::fmt::Result {
-    if bytes.len() <= 32 {
-        let mut t = f.debug_tuple(name);
-        t.field(&bytes).finish()
-    } else {
-        let mut t = f.debug_struct(name);
-        let l = bytes.len();
-        t.field("length", &l);
-        t.field(
-            "bytes",
-            &format!(
-                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
-                bytes[0],
-                bytes[1],
-                bytes[2],
-                bytes[3],
-                bytes[4],
-                bytes[5],
-                bytes[6],
-                bytes[7],
-                bytes[l - 1],
-                bytes[l - 2],
-                bytes[l - 3],
-                bytes[l - 4],
-                bytes[l - 5],
-                bytes[l - 6],
-                bytes[l - 7],
-                bytes[l - 8],
-            ),
-        )
-        .finish()
-    }
-}
-
 impl std::fmt::Debug for KitsuneOpData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt_many_bytes("KitsuneOpData", f, self.0.as_slice())
+        f.write_fmt(format_args!(
+            "KitsuneOpData({})",
+            &holochain_util::hex::many_bytes_string(self.0.as_slice())
+        ))
     }
 }
 
@@ -229,7 +219,10 @@ pub type KOp = std::sync::Arc<KitsuneOpData>;
     serde::Deserialize,
     serde::Serialize,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -241,5 +234,26 @@ impl std::fmt::Debug for KitsuneSignature {
         }
         f.write_fmt(format_args!(")"))?;
         Ok(())
+    }
+}
+
+/// A 32 byte cert identifying a peer
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Deref,
+    derive_more::From,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct NodeCert(std::sync::Arc<[u8; 32]>);
+
+impl std::fmt::Debug for NodeCert {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("NodeCert")
+            .field(&holochain_util::hex::many_bytes_string(self.0.as_slice()))
+            .finish()
     }
 }

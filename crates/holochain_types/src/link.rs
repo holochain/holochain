@@ -3,24 +3,15 @@
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
-use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use regex::Regex;
 
-use crate::dht_op::error::DhtOpError;
-use crate::dht_op::error::DhtOpResult;
+use crate::dht_op::DhtOpError;
+use crate::dht_op::DhtOpResult;
 use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
-
-/// Links interrelate entries in a source chain.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, SerializedBytes)]
-pub struct Link {
-    base: EntryHash,
-    target: EntryHash,
-    tag: LinkTag,
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Link key for sending across the wire for get links requests.
@@ -31,6 +22,12 @@ pub struct WireLinkKey {
     pub type_query: LinkTypeFilter,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
+    /// Specify a minimum action timestamp to filter results.
+    pub after: Option<Timestamp>,
+    /// Specify a maximum action timestamp to filter results.
+    pub before: Option<Timestamp>,
+    /// Only get links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]
@@ -208,32 +205,6 @@ pub struct GetLinksResponse {
     pub link_removes: Vec<(DeleteLink, Signature)>,
 }
 
-impl Link {
-    /// Construct a new link.
-    pub fn new(base: &EntryHash, target: &EntryHash, tag: &LinkTag) -> Self {
-        Link {
-            base: base.to_owned(),
-            target: target.to_owned(),
-            tag: tag.to_owned(),
-        }
-    }
-
-    /// Get the base address of this link.
-    pub fn base(&self) -> &EntryHash {
-        &self.base
-    }
-
-    /// Get the target address of this link.
-    pub fn target(&self) -> &EntryHash {
-        &self.target
-    }
-
-    /// Get the tag of this link.
-    pub fn tag(&self) -> &LinkTag {
-        &self.tag
-    }
-}
-
 /// How do we match this link in queries?
 pub enum LinkMatch<S: Into<String>> {
     /// Match all/any links.
@@ -260,5 +231,43 @@ impl<S: Into<String>> LinkMatch<S> {
             Ok(_) => Ok(re_string),
             Err(_) => Err("Invalid regex passed to get_links".into()),
         }
+    }
+}
+
+/// Query for links to be sent over the network.
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+pub struct WireLinkQuery {
+    /// The base to find links from.
+    pub base: AnyLinkableHash,
+
+    /// Filter by the link type.
+    pub link_type: LinkTypeFilter,
+
+    /// Filter by tag prefix.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
+}
+
+/// Response type for a `WireLinkQuery`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct CountLinksResponse(Vec<ActionHash>);
+
+impl CountLinksResponse {
+    /// Create a new response from the action hashes of the matched links
+    pub fn new(create_link_actions: Vec<ActionHash>) -> Self {
+        CountLinksResponse(create_link_actions)
+    }
+
+    /// Get the action hashes of the matched links
+    pub fn create_link_actions(&self) -> Vec<ActionHash> {
+        self.0.clone()
     }
 }

@@ -3,7 +3,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
+use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -69,7 +69,18 @@ pub enum AppRequest {
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Info about networking processes
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::NetworkInfo`]
     NetworkInfo(Box<NetworkInfoRequestPayload>),
+
+    /// List all host functions available to wasm on this conductor.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::ListWasmHostFunctions`]
+    ListWasmHostFunctions,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -112,6 +123,9 @@ pub enum AppResponse {
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
+
+    /// All the wasm host functions supported by this conductor.
+    ListWasmHostFunctions(Vec<String>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -296,6 +310,9 @@ pub struct AppInfo {
     pub status: AppInfoStatus,
     /// The app's agent pub key.
     pub agent_pub_key: AgentPubKey,
+    /// The original AppManifest used to install the app, which can also be used to
+    /// install the app again under a new agent.
+    pub manifest: AppManifest,
 }
 
 impl AppInfo {
@@ -306,6 +323,7 @@ impl AppInfo {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
         let agent_pub_key = app.agent_key().to_owned();
+        let mut manifest = app.manifest().clone();
 
         let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
@@ -322,6 +340,17 @@ impl AppInfo {
                         dna_def.name.to_owned(),
                     );
                     cell_info_for_role.push(cell_info);
+
+                    // Update the manifest with the installed hash
+                    match &mut manifest {
+                        AppManifest::V1(manifest) => {
+                            if let Some(role) =
+                                manifest.roles.iter_mut().find(|r| r.name == *role_name)
+                            {
+                                role.dna.installed_hash = Some(dna_def.hash.clone().into());
+                            }
+                        }
+                    }
                 } else {
                     tracing::error!("no DNA definition found for cell id {}", provisioned_cell);
                 }
@@ -377,6 +406,7 @@ impl AppInfo {
             cell_info,
             status,
             agent_pub_key,
+            manifest,
         }
     }
 }
@@ -410,14 +440,19 @@ impl From<AppInfoStatus> for AppStatus {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
     pub fetch_pool_info: FetchPoolInfo,
+    pub current_number_of_peers: u32,
+    pub arc_size: f64,
+    pub total_network_peers: u32,
+    pub bytes_since_last_time_queried: u64,
+    pub completed_rounds_since_last_time_queried: u32,
 }
 
 #[test]
 fn status_serialization() {
-    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
+    use serde_json;
 
     let status: AppInfoStatus =
         AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();

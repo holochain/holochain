@@ -6,27 +6,27 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
+use std::path::PathBuf;
+
 pub use holochain_integrity_types::zome::*;
 
 use holochain_serialized_bytes::prelude::*;
 
-pub mod error;
+mod error;
+pub use error::*;
+
 #[cfg(feature = "full-dna-def")]
 pub mod inline_zome;
 
-use error::ZomeResult;
-
 #[cfg(feature = "full-dna-def")]
-use crate::InlineIntegrityZome;
-#[cfg(feature = "full-dna-def")]
-use error::ZomeError;
+use inline_zome::InlineIntegrityZome;
 #[cfg(feature = "full-dna-def")]
 use std::sync::Arc;
 
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Zome<T = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -132,6 +132,24 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
     }
 }
 
+/// A zome defined by Wasm bytecode
+// TODO: move to `holochain_types`
+
+#[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+pub struct WasmZome {
+    /// The WasmHash representing the WASM byte code for this zome.
+    pub wasm_hash: holo_hash::WasmHash,
+
+    /// The zome dependencies
+    pub dependencies: Vec<ZomeName>,
+
+    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
+    /// Useful for iOS and other targets.
+    #[serde(default)]
+    pub preserialized_path: Option<PathBuf>,
+}
+
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
@@ -143,6 +161,7 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 /// again.
 ///
 /// In particular, a real-world DnaFile should only ever contain Wasm zomes!
+// TODO: move to `holochain_types`
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 // This can be untagged, since the only valid serialization target is WasmZome
 #[serde(untagged, into = "ZomeDefSerialized")]
@@ -203,6 +222,7 @@ impl CoordinatorZomeDef {
     pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
         match &mut self.0 {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),
+
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
         }
@@ -230,8 +250,8 @@ impl From<InlineIntegrityZome> for IntegrityZomeDef {
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<crate::InlineCoordinatorZome> for ZomeDef {
-    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+impl From<crate::prelude::InlineCoordinatorZome> for ZomeDef {
+    fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
         Self::Inline {
             inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
             dependencies: Default::default(),
@@ -240,8 +260,8 @@ impl From<crate::InlineCoordinatorZome> for ZomeDef {
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<crate::InlineCoordinatorZome> for CoordinatorZomeDef {
-    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+impl From<crate::prelude::InlineCoordinatorZome> for CoordinatorZomeDef {
+    fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
         Self(ZomeDef::Inline {
             inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
             dependencies: Default::default(),
@@ -258,6 +278,7 @@ impl ZomeDef {
     pub fn wasm_hash(&self, _zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
         match self {
             ZomeDef::Wasm(WasmZome { wasm_hash, .. }) => Ok(wasm_hash.clone()),
+
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { .. } => Err(ZomeError::NonWasmZome(_zome_name.clone())),
         }
@@ -267,6 +288,7 @@ impl ZomeDef {
     pub fn dependencies(&self) -> &[ZomeName] {
         match self {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => &dependencies[..],
+
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { dependencies, .. } => &dependencies[..],
         }
@@ -297,37 +319,25 @@ impl From<ZomeDef> for CoordinatorZomeDef {
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::Wasm(WasmZome::arbitrary(u)?))
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for IntegrityZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
     }
-}
-
-/// A zome defined by Wasm bytecode
-#[derive(
-    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes,
-)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
-pub struct WasmZome {
-    /// The WasmHash representing the WASM byte code for this zome.
-    pub wasm_hash: holo_hash::WasmHash,
-    /// Integrity zomes this zome depends on.
-    pub dependencies: Vec<ZomeName>,
 }
 
 impl WasmZome {
@@ -336,6 +346,7 @@ impl WasmZome {
         Self {
             wasm_hash,
             dependencies: Default::default(),
+            preserialized_path: None,
         }
     }
 }
@@ -346,6 +357,7 @@ impl ZomeDef {
         Self::Wasm(WasmZome {
             wasm_hash,
             dependencies: Default::default(),
+            preserialized_path: None,
         })
     }
 }

@@ -9,14 +9,14 @@
 
 mod app_bundle;
 mod app_manifest;
-mod dna_gamut;
-pub mod error;
-use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
+mod error;
+
+use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use derive_more::{Display, Into};
-pub use dna_gamut::*;
+pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
@@ -24,8 +24,6 @@ use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
-
-use self::error::{AppError, AppResult};
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
@@ -66,8 +64,13 @@ pub struct RegisterDnaPayload {
 /// The instructions on how to request NetworkInfo
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NetworkInfoRequestPayload {
+    /// The calling agent
+    pub agent_pub_key: AgentPubKey,
     /// Get gossip info for these DNAs
     pub dnas: Vec<DnaHash>,
+    /// Timestamp in ms since which received amount of bytes from peers will
+    /// be returned. Defaults to UNIX_EPOCH.
+    pub last_time_queried: Option<Timestamp>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -144,6 +147,13 @@ pub struct InstallAppPayload {
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     pub network_seed: Option<NetworkSeed>,
+
+    /// Optional: If app installation fails due to genesis failure, normally the app will be
+    /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
+    /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
+    #[cfg(feature = "chc")]
+    #[serde(default)]
+    pub ignore_genesis_failure: bool,
 }
 
 /// The possible locations of an AppBundle
@@ -404,6 +414,8 @@ pub struct InstalledAppCommon {
     agent_key: AgentPubKey,
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<RoleName, AppRoleAssignment>,
+    /// The manifest used to install the app.
+    manifest: AppManifest,
 }
 
 impl InstalledAppCommon {
@@ -412,6 +424,7 @@ impl InstalledAppCommon {
         installed_app_id: S,
         agent_key: AgentPubKey,
         role_assignments: I,
+        manifest: AppManifest,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role name contains a clone id delimiter
@@ -425,6 +438,7 @@ impl InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             agent_key,
             role_assignments,
+            manifest,
         })
     }
 
@@ -540,11 +554,13 @@ impl InstalledAppCommon {
     /// Add a clone cell.
     pub fn add_clone(&mut self, role_name: &RoleName, cell_id: &CellId) -> AppResult<CloneId> {
         let app_role_assignment = self.role_mut(role_name)?;
+
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
             "A clone cell must use the same agent key as the role it is added to"
         );
+
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
@@ -748,7 +764,9 @@ impl InstalledAppCommon {
             return Err(AppError::DuplicateRoleNames(installed_app_id, duplicates));
         }
 
-        let roles = installed_cells
+        let manifest = AppManifest::from_legacy(installed_cells.clone().into_iter());
+
+        let role_assignments = installed_cells
             .into_iter()
             .map(|InstalledCell { role_name, cell_id }| {
                 let role = AppRoleAssignment {
@@ -762,11 +780,23 @@ impl InstalledAppCommon {
                 (role_name, role)
             })
             .collect();
+
         Ok(Self {
             installed_app_id,
             agent_key: _agent_key,
-            role_assignments: roles,
+            role_assignments,
+            manifest,
         })
+    }
+
+    /// Return the manifest if available
+    pub fn manifest(&self) -> &AppManifest {
+        &self.manifest
+    }
+
+    /// Return the list of role assignments
+    pub fn role_assignments(&self) -> &HashMap<RoleName, AppRoleAssignment> {
+        &self.role_assignments
     }
 }
 
@@ -1062,10 +1092,12 @@ mod tests {
     use super::{AppRoleAssignment, RunningApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use arbitrary::Arbitrary;
     use std::collections::HashSet;
 
     #[test]
     fn illegal_role_name_is_rejected() {
+        let mut u = unstructured_noise();
         let result = InstalledAppCommon::new(
             "test_app",
             fixt!(AgentPubKey),
@@ -1073,6 +1105,7 @@ mod tests {
                 CLONE_ID_DELIMITER.into(),
                 AppRoleAssignment::new(fixt!(CellId), false, 0),
             )],
+            AppManifest::arbitrary(&mut u).unwrap(),
         );
         assert!(result.is_err())
     }
@@ -1086,10 +1119,15 @@ mod tests {
         let role1 = AppRoleAssignment::new(base_cell_id, false, clone_limit);
         let agent = fixt!(AgentPubKey);
         let role_name: RoleName = "role_name".into();
-        let mut app: RunningApp =
-            InstalledAppCommon::new("app", agent.clone(), vec![(role_name.clone(), role1)])
-                .unwrap()
-                .into();
+        let manifest = AppManifest::arbitrary(&mut unstructured_noise()).unwrap();
+        let mut app: RunningApp = InstalledAppCommon::new(
+            "app",
+            agent.clone(),
+            vec![(role_name.clone(), role1)],
+            manifest,
+        )
+        .unwrap()
+        .into();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];

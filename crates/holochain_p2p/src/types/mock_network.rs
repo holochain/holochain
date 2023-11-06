@@ -1,7 +1,7 @@
 //! Tools for simulating a network around real holochain nodes.
 //! This is a very early prototype and subject to change.
 
-use fixt::prelude::Distribution;
+use ::fixt::prelude::Distribution;
 use futures::stream::Stream;
 use kitsune_p2p::actor::BroadcastData;
 use std::collections::HashMap;
@@ -106,6 +106,8 @@ pub enum HolochainP2pMockMsg {
     PeerQuery(kitsune_p2p::wire::PeerQuery),
     /// A response to peer query.
     PeerQueryResp(kitsune_p2p::wire::PeerQueryResp),
+    /// Unsolicited peer info.
+    PeerUnsolicited(kitsune_p2p::wire::PeerUnsolicited),
     /// A gossip protocol message.
     /// These messages are all notifies and not request.
     Gossip {
@@ -340,10 +342,11 @@ impl HolochainP2pMockMsg {
             HolochainP2pMockMsg::Wire { msg, .. } => match &msg {
                 crate::wire::WireMessage::CallRemote { .. }
                 | crate::wire::WireMessage::CallRemoteMulti { .. }
-                | crate::wire::WireMessage::ValidationReceipt { .. }
+                | crate::wire::WireMessage::ValidationReceipts { .. }
                 | crate::wire::WireMessage::Get { .. }
                 | crate::wire::WireMessage::GetMeta { .. }
                 | crate::wire::WireMessage::GetLinks { .. }
+                | crate::wire::WireMessage::CountLinks { .. }
                 | crate::wire::WireMessage::GetAgentActivity { .. }
                 | crate::wire::WireMessage::PublishCountersign { .. }
                 | crate::wire::WireMessage::MustGetAgentActivity { .. } => next_msg_id().as_req(),
@@ -369,10 +372,11 @@ impl HolochainP2pMockMsg {
                 let call = match &msg {
                     crate::wire::WireMessage::CallRemote { .. }
                     | crate::wire::WireMessage::CallRemoteMulti { .. }
-                    | crate::wire::WireMessage::ValidationReceipt { .. }
+                    | crate::wire::WireMessage::ValidationReceipts { .. }
                     | crate::wire::WireMessage::Get { .. }
                     | crate::wire::WireMessage::GetMeta { .. }
                     | crate::wire::WireMessage::GetLinks { .. }
+                    | crate::wire::WireMessage::CountLinks { .. }
                     | crate::wire::WireMessage::GetAgentActivity { .. }
                     | crate::wire::WireMessage::MustGetAgentActivity { .. } => true,
                     crate::wire::WireMessage::PublishCountersign { .. }
@@ -400,6 +404,7 @@ impl HolochainP2pMockMsg {
             HolochainP2pMockMsg::PeerGetResp(data) => kwire::Wire::PeerGetResp(data),
             HolochainP2pMockMsg::PeerQuery(data) => kwire::Wire::PeerQuery(data),
             HolochainP2pMockMsg::PeerQueryResp(data) => kwire::Wire::PeerQueryResp(data),
+            HolochainP2pMockMsg::PeerUnsolicited(data) => kwire::Wire::PeerUnsolicited(data),
             HolochainP2pMockMsg::Gossip {
                 dna,
                 module,
@@ -501,6 +506,7 @@ impl HolochainP2pMockMsg {
             kwire::Wire::PeerGetResp(msg) => HolochainP2pMockMsg::PeerGetResp(msg),
             kwire::Wire::PeerQuery(msg) => HolochainP2pMockMsg::PeerQuery(msg),
             kwire::Wire::PeerQueryResp(msg) => HolochainP2pMockMsg::PeerQueryResp(msg),
+            kwire::Wire::PeerUnsolicited(msg) => HolochainP2pMockMsg::PeerUnsolicited(msg),
             kwire::Wire::CallResp(msg) => HolochainP2pMockMsg::CallResp(msg.data),
             kwire::Wire::Failure(msg) => HolochainP2pMockMsg::Failure(msg.reason),
             kwire::Wire::FetchOp(_) => todo!(),

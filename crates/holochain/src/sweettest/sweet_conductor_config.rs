@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::{
+    config::{KitsuneP2pConfig, TransportConfig},
+    dependencies::lair_keystore_api::dependencies::nanoid::nanoid,
+};
 
 /// Wrapper around ConductorConfig with some helpful builder methods
 #[derive(
@@ -38,15 +41,15 @@ impl SweetConductorConfig {
             if n.bootstrap_service.is_some()
                 && n.bootstrap_service.as_ref().unwrap().to_string() == "rendezvous:"
             {
-                n.bootstrap_service = Some(url2::url2!("http://{}", rendezvous.bootstrap_addr()));
+                n.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
             }
 
             #[cfg(feature = "tx5")]
             {
                 for t in n.transport_pool.iter_mut() {
-                    if let kitsune_p2p::TransportConfig::WebRTC { signal_url } = t {
+                    if let TransportConfig::WebRTC { signal_url } = t {
                         if signal_url == "rendezvous:" {
-                            *signal_url = format!("ws://{}", rendezvous.sig_addr());
+                            *signal_url = rendezvous.sig_addr().to_string();
                         }
                     }
                 }
@@ -60,6 +63,13 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
+        let mut config: Self = KitsuneP2pConfig::default().into();
+        config.random_scope();
+        config
+    }
+
+    /// Rendezvous config for SweetConductors
+    pub fn rendezvous() -> Self {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
@@ -67,18 +77,18 @@ impl SweetConductorConfig {
         let mut network = KitsuneP2pConfig::default();
         network.bootstrap_service = Some(url2::url2!("rendezvous:"));
 
-        #[cfg(not(feature = "tx5"))]
+        /*#[cfg(not(feature = "tx5"))]
         {
-            network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+            network.transport_pool = vec![TransportConfig::Quic {
                 bind_to: None,
                 override_host: None,
                 override_port: None,
             }];
-        }
+        }*/
 
         #[cfg(feature = "tx5")]
         {
-            network.transport_pool = vec![kitsune_p2p::TransportConfig::WebRTC {
+            network.transport_pool = vec![TransportConfig::WebRTC {
                 signal_url: "rendezvous:".into(),
             }];
         }
@@ -90,14 +100,39 @@ impl SweetConductorConfig {
     /// Set network tuning params.
     pub fn tune(
         mut self,
-        tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
+        f: impl FnOnce(&mut kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams),
+    ) -> Self {
+        let r = &mut self
+            .0
+            .network
+            .as_mut()
+            .expect("failed to tune network")
+            .tuning_params;
+        let mut tuning = (**r).clone();
+        f(&mut tuning);
+        *r = Arc::new(tuning);
+        self
+    }
+
+    /// Set network tuning params.
+    pub fn set_tuning_params(
+        mut self,
+        tuning_params: kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams,
     ) -> Self {
         self.0
             .network
             .as_mut()
             .expect("failed to tune network")
-            .tuning_params = tuning_params;
+            .tuning_params = Arc::new(tuning_params);
         self
+    }
+
+    /// Set the tracing scope to a new random value
+    pub fn random_scope(&mut self) {
+        let scope = nanoid!();
+        let network = self.network.get_or_insert_with(Default::default);
+        network.tracing_scope = Some(scope.clone());
+        self.tracing_scope = Some(scope);
     }
 
     /// Completely disable networking

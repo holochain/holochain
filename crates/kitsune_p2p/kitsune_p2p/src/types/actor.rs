@@ -65,6 +65,10 @@ pub struct RpcMultiResponse {
 /// Data to broadcast to the remote.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum BroadcastData {
     /// User broadcast.
     User(#[serde(with = "serde_bytes")] Vec<u8>),
@@ -101,7 +105,7 @@ ghost_actor::ghost_chan! {
         fn list_transport_bindings() -> Vec<Url2>;
 
         /// Announce a space/agent pair on this network.
-        fn join(space: KSpace, agent: KAgent, initial_arc: OptArc) -> ();
+        fn join(space: KSpace, agent: KAgent, maybe_agent_info: Option<kitsune_p2p_types::agent_info::AgentInfoSigned>, initial_arc: OptArc) -> ();
 
         /// Withdraw this space/agent pair from this network.
         fn leave(space: KSpace, agent: KAgent) -> ();
@@ -159,6 +163,9 @@ ghost_actor::ghost_chan! {
         fn dump_network_metrics(
             space: KSpaceOpt,
         ) -> serde_json::Value;
+
+        /// dump network stats
+        fn dump_network_stats() -> serde_json::Value;
 
         /// Get data for diagnostics
         fn get_diagnostics(space: KSpace) -> KitsuneDiagnostics;

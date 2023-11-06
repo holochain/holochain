@@ -8,7 +8,7 @@ use crate::event::{
     PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow, TimeWindowInclusive,
 };
 use crate::types::event::KitsuneP2pEventSender;
-use crate::HostApi;
+use crate::{HostApi, HostApiLegacy};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::{
@@ -18,14 +18,15 @@ use kitsune_p2p_types::{
     KitsuneError, KitsuneResult,
 };
 
-use super::{EventSender, ShardedGossipLocal};
+use super::ShardedGossipLocal;
 
 /// Get all agent info signed for a space.
 pub(super) async fn all_agent_info(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    evt_sender
+    host_api
+        .legacy
         .query_agents(QueryAgentsEvt::new(space.clone()))
         .await
         .map_err(KitsuneError::other)
@@ -33,12 +34,13 @@ pub(super) async fn all_agent_info(
 
 /// Get all `AgentInfoSigned` for agents in a space.
 pub(super) async fn query_agent_info(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
-    evt_sender
+    host_api
+        .legacy
         .query_agents(query)
         .await
         .map_err(KitsuneError::other)
@@ -46,11 +48,11 @@ pub(super) async fn query_agent_info(
 
 /// Get the arc intervals for specified agent, paired with their respective agent.
 pub(super) async fn local_agent_arcs(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
-    Ok(query_agent_info(evt_sender, space, local_agents)
+    Ok(query_agent_info(host_api, space, local_agents)
         .await?
         .into_iter()
         .map(|info| (info.agent.clone(), info.storage_arc))
@@ -59,11 +61,11 @@ pub(super) async fn local_agent_arcs(
 
 /// Get just the arc intervals for specified agents.
 pub(super) async fn local_arcs(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<DhtArc>> {
-    Ok(local_agent_arcs(evt_sender, space, local_agents)
+    Ok(local_agent_arcs(host_api, space, local_agents)
         .await?
         .into_iter()
         .map(|(_, arc)| arc)
@@ -72,16 +74,16 @@ pub(super) async fn local_arcs(
 
 /// Get `AgentInfoSigned` for all agents within a `DhtArcSet`.
 pub(super) async fn agent_info_within_arc_set(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    let set: HashSet<_> = agents_within_arcset(evt_sender, space, arc_set)
+    let set: HashSet<_> = agents_within_arcset(host_api, space, arc_set)
         .await?
         .into_iter()
         .map(|(a, _)| a)
         .collect();
-    Ok(all_agent_info(evt_sender, space)
+    Ok(all_agent_info(host_api, space)
         .await?
         .into_iter()
         .filter(move |info| set.contains(info.agent.as_ref())))
@@ -89,11 +91,12 @@ pub(super) async fn agent_info_within_arc_set(
 
 /// Get agents and their intervals within a `DhtArcSet`.
 pub(super) async fn agents_within_arcset(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
-    Ok(evt_sender
+    Ok(host_api
+        .legacy
         .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
         .await
         .map_err(KitsuneError::other)?
@@ -104,14 +107,15 @@ pub(super) async fn agents_within_arcset(
 
 /// Get all ops for all agents that fall within the specified arcset.
 pub(super) async fn all_op_hashes_within_arcset(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     common_arc_set: DhtArcSet,
     window: TimeWindow,
     max_ops: usize,
     include_limbo: bool,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
-    evt_sender
+    host_api
+        .legacy
         .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
             arc_set: common_arc_set,
@@ -163,7 +167,7 @@ pub struct TimeChunk {
 /// where the cursor can be saved an a new hash query can be started in the future
 /// where the search time window starts from the previous queries cursor.
 pub(super) fn hash_chunks_query(
-    evt_sender: EventSender,
+    host_api: HostApiLegacy,
     space: Arc<KitsuneSpace>,
     common_arc_set: DhtArcSet,
     search_time_window: TimeWindow,
@@ -173,7 +177,7 @@ pub(super) fn hash_chunks_query(
         // The stream starts with the full time window and control flow is set to continue.
         (search_time_window, ControlFlow::Continue(())),
         move |(mut search_time_window, control_flow)| {
-            let evt_sender = evt_sender.clone();
+            let host_api = host_api.clone();
             let space = space.clone();
             let common_arc_set = common_arc_set.clone();
             async move {
@@ -184,7 +188,7 @@ pub(super) fn hash_chunks_query(
 
                 // Run the hash query for the current search time window up to the hashes limit.
                 let result = all_op_hashes_within_arcset(
-                    &evt_sender,
+                    &host_api,
                     &space,
                     common_arc_set.clone(),
                     search_time_window.clone(),
@@ -273,12 +277,13 @@ pub(super) async fn query_region_set<'a>(
 
 /// Add new agent info to the p2p store.
 pub(super) async fn put_agent_info(
-    evt_sender: &EventSender,
+    host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     agents: &[Arc<AgentInfoSigned>],
 ) -> KitsuneResult<()> {
     let peer_data: Vec<_> = agents.iter().map(|i| (**i).clone()).collect();
-    evt_sender
+    host_api
+        .legacy
         .put_agent_info_signed(PutAgentInfoSignedEvt {
             space: space.clone(),
             peer_data,

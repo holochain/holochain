@@ -1,11 +1,11 @@
 [package]
 name = "holochain_cli"
-version = "0.2.0-beta-rc.0"
+version = "0.3.0-beta-dev.23"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo" ]
-categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
+categories = ["command-line-utilities", "development-tools::build-utils", "filesystem"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Provides the `hc` binary, a helpful CLI tool for working with Holochain."
@@ -20,9 +20,17 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
+clap = { version = "4.0", features = [ "derive", "cargo" ] }
 futures = "0.3"
-holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0-beta-rc.0"}
-holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.2.0-beta-rc.0"}
-holochain_trace = { version = "^0.2.0-beta-rc.0", path = "../holochain_trace" }
-structopt = "0.3"
-tokio = { version = "1.11", features = [ "full" ] }
+lazy_static = "1.4"
+holochain_cli_bundle = { path = "../hc_bundle", version = "^0.3.0-beta-dev.21"}
+holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.3.0-beta-dev.23"}
+holochain_cli_run_local_services = { path = "../hc_run_local_services", version = "^0.3.0-beta-dev.13"}
+holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../holochain_trace" }
+tokio = { version = "1.27", features = ["full"] }
+
+[features]
+
+chc = [
+    "holochain_cli_sandbox/chc"
+]

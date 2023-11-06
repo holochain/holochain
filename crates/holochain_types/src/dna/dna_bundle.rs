@@ -40,7 +40,10 @@ impl DnaBundle {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
 
-        Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
+        Ok((
+            DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
+            original_hash,
+        ))
     }
 
     /// Construct from raw bytes
@@ -72,34 +75,30 @@ impl DnaBundle {
 
         let integrity_zomes = data[0]
             .iter()
-            .map(|(zome_name, hash, _, dependencies)| {
-                (
-                    zome_name.clone(),
-                    ZomeDef::Wasm(WasmZome {
-                        wasm_hash: hash.clone(),
-                        dependencies: dependencies.clone(),
-                    })
-                    .into(),
-                )
+            .map(|(zome_name, hash, _, dependencies, dylib_path)| {
+                let zome_def = ZomeDef::Wasm(WasmZome {
+                    wasm_hash: hash.clone(),
+                    dependencies: dependencies.clone(),
+                    preserialized_path: dylib_path.clone(),
+                });
+                (zome_name.clone(), zome_def.into())
             })
             .collect();
         let coordinator_zomes = data[1]
             .iter()
-            .map(|(zome_name, hash, _, dependencies)| {
-                (
-                    zome_name.clone(),
-                    ZomeDef::Wasm(WasmZome {
-                        wasm_hash: hash.clone(),
-                        dependencies: dependencies.clone(),
-                    })
-                    .into(),
-                )
+            .map(|(zome_name, hash, _, dependencies, dylib_path)| {
+                let zome_def = ZomeDef::Wasm(WasmZome {
+                    wasm_hash: hash.clone(),
+                    dependencies: dependencies.clone(),
+                    preserialized_path: dylib_path.clone(),
+                });
+                (zome_name.clone(), zome_def.into())
             })
             .collect();
         let code: BTreeMap<_, _> = data
             .into_iter()
             .flatten()
-            .map(|(_, hash, wasm, _)| (hash, wasm))
+            .map(|(_, hash, wasm, _, _)| (hash, wasm))
             .collect();
 
         let wasms = WasmMap::from(code);
@@ -139,7 +138,7 @@ impl DnaBundle {
 
     /// Build a bundle from a DnaFile. Useful for tests.
     #[cfg(feature = "test_utils")]
-    pub async fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
+    pub fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
         let DnaFile { dna, code, .. } = dna_file;
         let manifest = Self::manifest_from_dna_def(dna.into_content())?;
         let resources = code
@@ -169,6 +168,7 @@ impl DnaBundle {
                         name,
                         hash: Some(hash),
                         location: Location::Bundled(PathBuf::from(filename)),
+                        dylib: None,
                         dependencies: Some(dependencies),
                     }
                 })
@@ -192,6 +192,7 @@ impl DnaBundle {
                         name,
                         hash: Some(hash),
                         location: Location::Bundled(PathBuf::from(filename)),
+                        dylib: None,
                         dependencies: Some(dependencies),
                     }
                 })
@@ -219,7 +220,7 @@ impl DnaBundle {
 pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<Location, ResourceBytes>,
-) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
+) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>, Option<PathBuf>)>> {
     let iter = zomes.map(|z| {
         let bytes = resources
             .remove(&z.location)
@@ -230,6 +231,7 @@ pub(super) async fn hash_bytes(
         let dependencies = z.dependencies.map_or(Vec::with_capacity(0), |deps| {
             deps.into_iter().map(|d| d.name).collect()
         });
+        let dylib_path = z.dylib;
         async move {
             let hash = wasm.to_hash().await;
             if let Some(expected) = expected_hash {
@@ -237,7 +239,7 @@ pub(super) async fn hash_bytes(
                     return Err(DnaError::WasmHashMismatch(expected, hash));
                 }
             }
-            DnaResult::Ok((zome_name, hash, wasm, dependencies))
+            DnaResult::Ok((zome_name, hash, wasm, dependencies, dylib_path))
         }
     });
     futures::stream::iter(iter)
@@ -273,6 +275,7 @@ mod tests {
                         name: "zome1".into(),
                         hash: None,
                         location: mr_bundle::Location::Bundled(path1.clone()),
+                        dylib: None,
                         dependencies: Default::default(),
                     },
                     ZomeManifest {
@@ -280,6 +283,7 @@ mod tests {
                         // Intentional wrong hash
                         hash: Some(hash1.clone().into()),
                         location: mr_bundle::Location::Bundled(path2.clone()),
+                        dylib: None,
                         dependencies: Default::default(),
                     },
                 ],

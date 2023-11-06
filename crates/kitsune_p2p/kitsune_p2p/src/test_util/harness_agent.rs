@@ -1,4 +1,5 @@
 use super::*;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 type KAgent = Arc<KitsuneAgent>;
 type KAgentMap = HashMap<KAgent, Arc<AgentInfoSigned>>;
@@ -23,6 +24,7 @@ ghost_actor::ghost_chan! {
     }
 }
 
+#[derive(Debug)]
 pub struct HarnessHost;
 
 impl HarnessHost {
@@ -102,7 +104,7 @@ use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
 use kitsune_p2p_types::dht::spacetime::Topology;
-use kitsune_p2p_types::dht::PeerStrat;
+use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 
 struct AgentHarness {
@@ -112,6 +114,7 @@ struct AgentHarness {
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
     topology: Topology,
+    strat: ArqStrat,
 }
 
 impl AgentHarness {
@@ -134,6 +137,7 @@ impl AgentHarness {
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
             topology,
+            strat: ArqStrat::default(),
         })
     }
 }
@@ -236,7 +240,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         _space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
-        let strat = PeerStrat::default();
+        let strat = PeerStrat::from(self.strat.clone());
         let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
 
         // contains is already checked in the iterator

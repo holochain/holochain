@@ -28,6 +28,7 @@ use std::{
 };
 use structopt::StructOpt;
 
+use crate::crate_selection::flatten_forest;
 use crate::{
     changelog::{Changelog, WorkspaceCrateReleaseHeading},
     common::{increment_semver, SemverIncrementMode},
@@ -228,7 +229,7 @@ fn bump_release_versions<'a>(
                     crt.set_version(cmd_args.dry_run, &incremented_version)?;
                     incremented_version.clone()
                 } else {
-                    bail!("neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", &current_version, &incremented_version, previous_release_version);
+                    bail!("[{}] neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", crt.name(), &current_version, &incremented_version, previous_release_version);
                 }
             }
 
@@ -648,7 +649,7 @@ impl PublishError {
 
 /// Try to publish the given crates to crates.io.
 ///
-/// If dry-run is given, the following error conditoins are tolerated:
+/// If dry-run is given, the following error conditions are tolerated:
 /// - a dependency is not found but is part of the release
 /// - a version of a dependency is not found bu the dependency is part of the release
 ///

@@ -17,18 +17,21 @@ pub use types::*;
 mod spawn;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 pub use spawn::*;
+#[cfg(feature = "test_utils")]
 pub use test::stub_network;
+#[cfg(feature = "test_utils")]
 pub use test::HolochainP2pDnaFixturator;
 
 pub use kitsune_p2p;
 
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
-pub trait HolochainP2pDnaT {
+pub trait HolochainP2pDnaT: Send + Sync {
     /// owned getter
     fn dna_hash(&self) -> DnaHash;
 
@@ -36,6 +39,7 @@ pub trait HolochainP2pDnaT {
     async fn join(
         &self,
         agent: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -115,6 +119,12 @@ pub trait HolochainP2pDnaT {
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>>;
 
+    /// Get a count of links from the DHT.
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> actor::HolochainP2pResult<CountLinksResponse>;
+
     /// Get agent activity from the DHT.
     async fn get_agent_activity(
         &self,
@@ -131,10 +141,10 @@ pub trait HolochainP2pDnaT {
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Check if an agent is an authority for a hash.
@@ -167,7 +177,7 @@ pub struct HolochainP2pDna {
 }
 
 /// A CHC implementation
-pub type ChcImpl = Arc<dyn Send + Sync + ChainHeadCoordinator<Item = SignedActionHashed>>;
+pub type ChcImpl = Arc<dyn 'static + Send + Sync + ChainHeadCoordinatorExt>;
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {
@@ -180,10 +190,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn join(
         &self,
         agent: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .join((*self.dna_hash).clone(), agent, initial_arc)
+            .join(
+                (*self.dna_hash).clone(),
+                agent,
+                maybe_agent_info,
+                initial_arc,
+            )
             .await
     }
 
@@ -322,6 +338,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
+    /// Get a count of links from the DHT.
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> actor::HolochainP2pResult<CountLinksResponse> {
+        self.sender
+            .count_links((*self.dna_hash).clone(), query)
+            .await
+    }
+
     /// Get agent activity from the DHT.
     async fn get_agent_activity(
         &self,
@@ -345,13 +371,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// Send a validation receipt to a remote node.
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .send_validation_receipt((*self.dna_hash).clone(), to_agent, receipt)
+            .send_validation_receipts((*self.dna_hash).clone(), to_agent, receipts)
             .await
     }
 
@@ -389,4 +415,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
 pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
+#[allow(unused)]
+#[cfg(any(test, feature = "test_utils"))]
 mod test;

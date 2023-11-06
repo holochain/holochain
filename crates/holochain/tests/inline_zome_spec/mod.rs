@@ -1,18 +1,18 @@
 #![cfg(feature = "test_utils")]
 
 use hdk::prelude::*;
-use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
+use holochain::core::ribosome::guest_callback::validate::ValidateResult;
+use holochain::test_utils::{
+    consistency_10s,
+    inline_zomes::{simple_crud_zome, AppString},
+};
 use holochain::{
     conductor::api::error::ConductorApiResult,
     sweettest::{SweetAgents, SweetConductor, SweetDnaFile, SweetInlineZomes},
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
-    core::workflow::error::WorkflowError,
-    test_utils::WaitOps,
-};
-use holochain::{
-    core::ribosome::guest_callback::validate::ValidateResult, test_utils::wait_for_integration_1m,
+    core::workflow::WorkflowError,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
@@ -51,12 +51,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
         )
         .await;
 
-    // Wait long enough for Bob to receive gossip
-    wait_for_integration_1m(
-        bobbo.dht_db(),
-        WaitOps::start() + WaitOps::cold_start() + WaitOps::ENTRY,
-    )
-    .await;
+    consistency_10s([&alice, &bobbo]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let records: Option<Record> = conductor
@@ -91,7 +86,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
+    let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (carol_foo, carol_bar)) =
         apps.into_tuples();
 
     assert_eq!(alice_foo.agent_pubkey(), alice_bar.agent_pubkey());
@@ -120,13 +115,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     assert_ne!(hash_foo, hash_bar);
 
     // Wait long enough for others to receive gossip
-    for env in [bobbo_foo.dht_db(), carol_bar.dht_db()].iter() {
-        wait_for_integration_1m(
-            *env,
-            WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
-        )
-        .await;
-    }
+    consistency_10s([&alice_foo, &bobbo_foo, &carol_foo]).await;
+    consistency_10s([&alice_bar, &bobbo_bar, &carol_bar]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     // on the "foo" DNA
@@ -215,7 +205,6 @@ async fn get_deleted() -> anyhow::Result<()> {
         .into_iter()
         .next()
         .unwrap();
-    // let ((alice,), (bobbo,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductor
@@ -225,9 +214,8 @@ async fn get_deleted() -> anyhow::Result<()> {
             (),
         )
         .await;
-    let mut expected_count = WaitOps::start() + WaitOps::ENTRY;
 
-    wait_for_integration_1m(alice.dht_db(), expected_count).await;
+    consistency_10s([&alice]).await;
 
     let records: Option<Record> = conductor
         .call(
@@ -253,8 +241,7 @@ async fn get_deleted() -> anyhow::Result<()> {
         )
         .await;
 
-    expected_count += WaitOps::DELETE;
-    wait_for_integration_1m(alice.dht_db(), expected_count).await;
+    consistency_10s([&alice]).await;
 
     let records: Vec<Option<Record>> = conductor
         .call(
@@ -293,7 +280,7 @@ async fn signal_subscription() {
 
 /// Simple zome which contains a validation rule which can fail
 fn simple_validation_zome() -> InlineZomeSet {
-    let entry_def = EntryDef::from_id("string");
+    let entry_def = EntryDef::default_from_id("string");
 
     SweetInlineZomes::new(vec![entry_def.clone()], 0)
         .function("create", move |api, s: AppString| {
@@ -318,7 +305,7 @@ fn simple_validation_zome() -> InlineZomeSet {
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
-            if &s.0 == "" {
+            if s.0.is_empty() {
                 Ok(ValidateResult::Invalid("No empty strings allowed".into()))
             } else {
                 Ok(ValidateResult::Valid)

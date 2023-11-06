@@ -14,6 +14,11 @@ pub mod dependencies {
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;
+
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest;
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest_derive;
 }
 
 /// Typedef for result of `proc_count_now()`.
@@ -88,13 +93,13 @@ impl CertDigestExt for CertDigest {
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
-impl From<Tx2Cert> for Arc<[u8; 32]> {
+impl From<Tx2Cert> for bin_types::NodeCert {
     fn from(f: Tx2Cert) -> Self {
-        f.0 .0 .0.clone()
+        f.0 .0 .0.clone().into()
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::from(u.bytes(32)?.to_vec()))
@@ -198,7 +203,7 @@ impl From<Arc<Vec<u8>>> for Tx2Cert {
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(*c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(*c);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -226,6 +231,7 @@ impl From<&Tx2Cert> for CertDigest {
     }
 }
 
+use base64::Engine;
 use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
@@ -244,6 +250,10 @@ pub enum KitsuneErrorKind {
     /// This object is closed, calls on it are invalid.
     #[error("This object is closed, calls on it are invalid.")]
     Closed,
+
+    /// The operation is unauthorized by the host.
+    #[error("Unauthorized")]
+    Unauthorized,
 
     /// Unspecified error.
     #[error(transparent)]
@@ -329,18 +339,18 @@ pub use timeout::*;
 
 pub mod agent_info;
 pub mod async_lazy;
-mod auto_stream_select;
-pub use auto_stream_select::*;
 pub mod bootstrap;
 pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
+pub mod fetch_pool;
 pub mod metrics;
-pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+#[cfg(feature = "fixt")]
+pub mod fixt;
 
 #[cfg(feature = "tx2")]
 pub mod tx2;
@@ -366,6 +376,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "tx2")]
     async fn test_tx2_digest() {
         let d: Tx2Cert = vec![0xdb; 32].into();
         println!("raw_debug: {:?}", d);

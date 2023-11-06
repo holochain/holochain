@@ -6,10 +6,14 @@ use super::*;
 impl ShardedGossipLocal {
     /// Try to initiate gossip if we don't currently
     /// have an outgoing gossip.
-    pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
+    pub(super) async fn try_initiate(
+        &self,
+        agent_list: Vec<AgentInfoSigned>,
+        all_agents: &[AgentInfoSigned],
+    ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
-            i.check_tgt_expired(self.gossip_type);
+            i.check_tgt_expired(self.gossip_type, self.tuning_params.gossip_round_timeout());
             let has_target = i.initiate_tgt.is_some();
             // Clear any expired rounds.
             i.round_map.current_rounds();
@@ -27,7 +31,7 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals: Vec<_> = store::local_arcs(&self.evt_sender, &self.space, &local_agents)
+        let intervals: Vec<_> = store::local_arcs(&self.host_api, &self.space, &local_agents)
             .await?
             .into_iter()
             .map(DhtArcRange::from)
@@ -35,7 +39,11 @@ impl ShardedGossipLocal {
 
         // Choose a remote agent to gossip with.
         let remote_agent = self
-            .find_remote_agent_within_arcset(Arc::new(intervals.clone().into()), &local_agents)
+            .find_remote_agent_within_arcset(
+                Arc::new(intervals.clone().into()),
+                &local_agents,
+                all_agents,
+            )
             .await?;
 
         let maybe_gossip = if let Some(next_target::Node {
@@ -45,14 +53,6 @@ impl ShardedGossipLocal {
         }) = remote_agent
         {
             let id = rand::thread_rng().gen();
-
-            let agent_list = self
-                .evt_sender
-                .query_agents(
-                    QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
-                )
-                .await
-                .map_err(KitsuneError::other)?;
 
             let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
 
@@ -80,7 +80,7 @@ impl ShardedGossipLocal {
     /// - Only send the agent bloom if this is a recent gossip type.
     pub(super) async fn incoming_initiate(
         &self,
-        peer_cert: Arc<[u8; 32]>,
+        peer_cert: NodeCert,
         remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
@@ -129,14 +129,15 @@ impl ShardedGossipLocal {
 
         // Get the local intervals.
         let local_agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+            store::local_agent_arcs(&self.host_api, &self.space, &local_agents).await?;
         let local_arcs: Vec<DhtArcRange> = local_agent_arcs
             .into_iter()
             .map(|(_, arc)| arc.into())
             .collect();
 
         let agent_list = self
-            .evt_sender
+            .host_api
+            .legacy
             .query_agents(
                 QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
             )
@@ -186,6 +187,17 @@ impl ShardedGossipLocal {
         Ok(gossip)
     }
 
+    /// Fetch a current list of agents to initiate gossip with.
+    pub(super) async fn query_agents_by_local_agents(&self) -> KitsuneResult<Vec<AgentInfoSigned>> {
+        let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
+
+        self.host_api
+            .legacy
+            .query_agents(QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents))
+            .await
+            .map_err(KitsuneError::other)
+    }
+
     /// Generate the bloom filters and generate a new state.
     /// - Agent bloom is only generated if this is a `Recent` gossip type.
     /// - Empty blooms are not created.
@@ -204,7 +216,7 @@ impl ShardedGossipLocal {
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let region_set = store::query_region_set(
-                self.host_api.clone(),
+                self.host_api.clone().api,
                 self.space.clone(),
                 common_arc_set.clone(),
             )
@@ -216,7 +228,12 @@ impl ShardedGossipLocal {
         };
 
         // Generate the new state.
-        let mut state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
+        let mut state = self.new_state(
+            remote_agent_list,
+            common_arc_set,
+            region_set,
+            self.tuning_params.gossip_round_timeout(),
+        )?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {

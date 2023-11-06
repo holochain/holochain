@@ -1,5 +1,4 @@
 use crate::entry_def::EntryDefStoreKey;
-use crate::prelude::SignedValidationReceipt;
 use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
@@ -7,24 +6,24 @@ use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
+use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
-use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
+use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
 use holochain_types::sql::AsSql;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::zome_io::Nonce256Bits;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::str::FromStr;
 
 pub use error::*;
@@ -34,7 +33,6 @@ mod error;
 #[derive(Debug)]
 pub enum Dependency {
     Action(ActionHash),
-    Entry(AnyDhtHash),
     Null,
 }
 
@@ -101,10 +99,10 @@ pub fn insert_op_scratch(
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
-    let op_light = op.to_light();
+    let op_light = op.to_lite();
     let action = op.action();
     let signature = op.signature().clone();
-    if let Some(entry) = op.entry() {
+    if let Some(entry) = op.entry().into_option() {
         let entry_hashed = EntryHashed::with_pre_hashed(
             entry.clone(),
             action
@@ -136,11 +134,11 @@ pub fn insert_record_scratch(
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
-    let op_light = op.to_light();
+    let op_light = op.to_lite();
     let action = op.action();
     let timestamp = action.timestamp();
     let signature = op.signature().clone();
-    if let Some(entry) = op.entry() {
+    if let Some(entry) = op.entry().into_option() {
         let entry_hash = action
             .entry_hash()
             .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
@@ -157,7 +155,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     Ok(())
 }
 
-/// Insert a [`DhtOpLight`] into an authored database.
+/// Insert a [`DhtOpLite`] into an authored database.
 /// This sets the sql fields so the authored database
 /// can be used in queries with other databases.
 /// Because we are sharing queries across databases
@@ -165,7 +163,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 #[tracing::instrument(skip(txn))]
 pub fn insert_op_lite_into_authored(
     txn: &mut Transaction,
-    op_lite: &DhtOpLight,
+    op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
@@ -176,10 +174,10 @@ pub fn insert_op_lite_into_authored(
     Ok(())
 }
 
-/// Insert a [`DhtOpLight`] into the database.
+/// Insert a [`DhtOpLite`] into the database.
 pub fn insert_op_lite(
     txn: &mut Transaction,
-    op_lite: &DhtOpLight,
+    op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
@@ -422,11 +420,6 @@ pub fn set_dependency(
                 "dependency": dep,
             })?;
         }
-        Dependency::Entry(dep) => {
-            dht_op_update!(txn, hash, {
-                "dependency": dep,
-            })?;
-        }
         Dependency::Null => (),
     }
     Ok(())
@@ -457,7 +450,7 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
-    let now = holochain_zome_types::Timestamp::now();
+    let now = holochain_zome_types::prelude::Timestamp::now();
     txn.execute(
         "
         UPDATE DhtOp

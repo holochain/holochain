@@ -72,6 +72,10 @@ impl RangeBounds<u32> for ArcRange {
 /// Contrast to [`DhtArcRange`], which is used for cases where the arc is not
 /// associated with any particular Agent, and so the agent's Location cannot be known.
 #[derive(Copy, Clone, Debug, derive_more::Deref, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct DhtArc(#[deref] DhtArcRange, Option<DhtLocation>);
 
 impl DhtArc {
@@ -181,6 +185,10 @@ impl From<&DhtArc> for DhtArcRange {
 /// This type exists to make sure we don't accidentally intepret the starting
 /// point of such a "derived" arc as a legitimate agent location.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum DhtArcRange<T = DhtLocation> {
     Empty,
     Full,
@@ -300,6 +308,32 @@ impl DhtArcRange<DhtLocation> {
         matches!(self, Self::Bounded(_, _))
     }
 
+    /// Get the min distance to a location.
+    /// Zero if Full, u32::MAX if Empty.
+    pub fn dist(&self, tgt: u32) -> u32 {
+        match self {
+            DhtArcRange::Empty => u32::MAX,
+            DhtArcRange::Full => 0,
+            DhtArcRange::Bounded(start, end) => {
+                let start = u32::from(*start);
+                let end = u32::from(*end);
+                if start < end {
+                    if tgt >= start && tgt <= end {
+                        0
+                    } else if tgt < start {
+                        std::cmp::min(start - tgt, (u32::MAX - end) + tgt + 1)
+                    } else {
+                        std::cmp::min(tgt - end, (u32::MAX - tgt) + start + 1)
+                    }
+                } else if tgt <= end || tgt >= start {
+                    0
+                } else {
+                    std::cmp::min(tgt - end, start - tgt)
+                }
+            }
+        }
+    }
+
     /// Check if arcs overlap
     pub fn overlaps(&self, other: &Self) -> bool {
         let a = DhtArcSet::from(self);
@@ -417,6 +451,15 @@ impl DhtArcRange<DhtLocation> {
             }
         }
         s
+    }
+
+    pub fn print(&self, len: usize) {
+        println!(
+            "     |{}| {} {:?}",
+            self.to_ascii(len),
+            self.length(),
+            self.to_bounds_grouped(),
+        );
     }
 
     pub fn canonical(self) -> DhtArcRange {

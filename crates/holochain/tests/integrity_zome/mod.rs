@@ -7,24 +7,10 @@ use holochain::conductor::api::RealAdminInterfaceApi;
 use holochain::sweettest::*;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
-use holochain_types::dna::CoordinatorBundle;
-use holochain_types::dna::CoordinatorManifest;
-use holochain_types::dna::ZomeDependency;
-use holochain_types::dna::ZomeLocation;
-use holochain_types::dna::ZomeManifest;
-use holochain_types::prelude::DnaWasm;
-use holochain_types::prelude::UpdateCoordinatorsPayload;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestCoordinatorWasm;
 use holochain_wasm_test_utils::TestIntegrityWasm;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::CoordinatorZome;
-use holochain_zome_types::CoordinatorZomeDef;
-use holochain_zome_types::IntegrityZome;
-use holochain_zome_types::Record;
-use holochain_zome_types::Timestamp;
-use holochain_zome_types::WasmZome;
-use holochain_zome_types::Zome;
-use holochain_zome_types::ZomeDef;
 use mr_bundle::Bundle;
 use serde::Serialize;
 
@@ -104,6 +90,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
         ZomeDef::Wasm(WasmZome {
             wasm_hash,
             mut dependencies,
+            preserialized_path,
         }) => {
             dependencies.clear();
             dependencies.push("2".into());
@@ -113,6 +100,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash,
                     dependencies,
+                    preserialized_path,
                 })
                 .into(),
             )
@@ -194,6 +182,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
     let new_coordinator: CoordinatorZomeDef = ZomeDef::Wasm(WasmZome {
         wasm_hash,
         dependencies: vec!["2".into()],
+        preserialized_path: None,
     })
     .into();
 
@@ -245,6 +234,7 @@ async fn test_update_admin_interface() {
         zomes: vec![ZomeManifest {
             name: TestCoordinatorWasm::CoordinatorZomeUpdate.into(),
             hash: None,
+            dylib: None,
             location: ZomeLocation::Bundled(TestCoordinatorWasm::CoordinatorZomeUpdate.into()),
             dependencies: Some(vec![ZomeDependency {
                 name: TestIntegrityWasm::IntegrityZome.into(),

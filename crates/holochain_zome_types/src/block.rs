@@ -1,8 +1,9 @@
-use crate::CellId;
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
+use kitsune_p2p_block::NodeSpaceBlockReason;
 use kitsune_p2p_timestamp::InclusiveTimestampInterval;
 #[cfg(feature = "rusqlite")]
 use rusqlite::types::ToSqlOutput;
@@ -21,7 +22,7 @@ pub struct BlockAgentInput {
 }
 
 /// Reason why we might want to block a cell.
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
 pub enum CellBlockReason {
     /// We don't know the reason but the happ does.
     #[serde(with = "serde_bytes")]
@@ -73,6 +74,7 @@ type IpV4 = std::net::Ipv4Addr;
 pub enum BlockTarget {
     /// Some cell did bad at the happ level.
     Cell(CellId, CellBlockReason),
+    NodeDna(kitsune_p2p_block::NodeId, DnaHash, NodeSpaceBlockReason),
     /// Some node is playing silly buggers.
     Node(kitsune_p2p_block::NodeId, NodeBlockReason),
     /// An entire college campus has it out for us.
@@ -82,13 +84,9 @@ pub enum BlockTarget {
 impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
     fn from(kblock_target: kitsune_p2p_block::BlockTarget) -> Self {
         match kblock_target {
-            kitsune_p2p_block::BlockTarget::AgentSpace(agent, space, reason) => Self::Cell(
-                CellId::new(
-                    DnaHash::from_raw_36(space.0.clone()),
-                    AgentPubKey::from_raw_36(agent.0.clone()),
-                ),
-                reason.into(),
-            ),
+            kitsune_p2p_block::BlockTarget::NodeSpace(node_id, space, reason) => {
+                Self::NodeDna(node_id, DnaHash::from_raw_36(space.0.clone()), reason)
+            }
             kitsune_p2p_block::BlockTarget::Node(node_id, reason) => {
                 Self::Node(node_id, reason.into())
             }
@@ -100,6 +98,7 @@ impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
 #[derive(Debug, serde::Serialize, Clone)]
 pub enum BlockTargetId {
     Cell(CellId),
+    NodeDna(kitsune_p2p_block::NodeId, DnaHash),
     Node(kitsune_p2p_block::NodeId),
     Ip(IpV4),
 }
@@ -107,10 +106,9 @@ pub enum BlockTargetId {
 impl From<kitsune_p2p_block::BlockTargetId> for BlockTargetId {
     fn from(kblock_target_id: kitsune_p2p_block::BlockTargetId) -> Self {
         match kblock_target_id {
-            kitsune_p2p_block::BlockTargetId::AgentSpace(agent, space) => Self::Cell(CellId::new(
-                DnaHash::from_raw_36(space.0.clone()),
-                AgentPubKey::from_raw_36(agent.0.clone()),
-            )),
+            kitsune_p2p_block::BlockTargetId::NodeSpace(node_id, space) => {
+                Self::NodeDna(node_id, DnaHash::from_raw_36(space.0.clone()))
+            }
             kitsune_p2p_block::BlockTargetId::Node(node_id) => Self::Node(node_id),
             kitsune_p2p_block::BlockTargetId::Ip(ip_addr) => Self::Ip(ip_addr),
         }
@@ -121,6 +119,7 @@ impl From<BlockTarget> for BlockTargetId {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {
             BlockTarget::Cell(id, _) => Self::Cell(id),
+            BlockTarget::NodeDna(node_id, dna, _) => Self::NodeDna(node_id, dna),
             BlockTarget::Node(id, _) => Self::Node(id),
             BlockTarget::Ip(id, _) => Self::Ip(id),
         }
@@ -141,6 +140,7 @@ impl ToSql for BlockTargetId {
 #[derive(Debug, serde::Serialize, Clone)]
 pub enum BlockTargetReason {
     Cell(CellBlockReason),
+    NodeDna(NodeSpaceBlockReason),
     Node(NodeBlockReason),
     Ip(IpBlockReason),
 }
@@ -160,6 +160,7 @@ impl From<BlockTarget> for BlockTargetReason {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {
             BlockTarget::Cell(_, reason) => BlockTargetReason::Cell(reason),
+            BlockTarget::NodeDna(_, _, reason) => BlockTargetReason::NodeDna(reason),
             BlockTarget::Node(_, reason) => BlockTargetReason::Node(reason),
             BlockTarget::Ip(_, reason) => BlockTargetReason::Ip(reason),
         }

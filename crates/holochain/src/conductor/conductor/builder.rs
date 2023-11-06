@@ -1,5 +1,3 @@
-use holochain_p2p::dht::ArqStrat;
-
 use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
@@ -58,7 +56,7 @@ impl ConductorBuilder {
             keystore
         } else {
             pub(crate) fn warn_no_encryption() {
-                #[cfg(not(feature = "db-encryption"))]
+                #[cfg(not(feature = "sqlite-encrypted"))]
                 {
                     const MSG: &str = "WARNING: running without local db encryption";
                     eprintln!("{}", MSG);
@@ -75,7 +73,9 @@ impl ConductorBuilder {
                 }
             };
             match &self.config.keystore {
-                KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                KeystoreConfig::DangerTestKeystore => {
+                    holochain_keystore::spawn_test_keystore().await?
+                }
                 KeystoreConfig::LairServer { connection_url } => {
                     warn_no_encryption();
                     let passphrase = get_passphrase()?;
@@ -122,7 +122,7 @@ impl ConductorBuilder {
                 cert_priv_key,
                 cert_digest,
             };
-        let strat = ArqStrat::from_params(network_config.tuning_params.gossip_redundancy_target);
+        let strat = network_config.tuning_params.to_arq_strat();
 
         let host = KitsuneHostImpl::new(
             spaces.clone(),
@@ -298,7 +298,9 @@ impl ConductorBuilder {
         env_path: &std::path::Path,
         extra_dnas: &[DnaFile],
     ) -> ConductorResult<ConductorHandle> {
-        let keystore = self.keystore.unwrap_or_else(test_keystore);
+        let keystore = self
+            .keystore
+            .unwrap_or_else(holochain_keystore::test_keystore);
         self.config.environment_path = env_path.to_path_buf().into();
 
         let spaces = Spaces::new(&self.config)?;
@@ -312,7 +314,7 @@ impl ConductorBuilder {
 
         let network_config = self.config.network.clone().unwrap_or_default();
         let tuning_params = network_config.tuning_params.clone();
-        let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
+        let strat = tuning_params.to_arq_strat();
 
         let ribosome_store = RwShare::new(self.ribosome_store);
         let host = KitsuneHostImpl::new(

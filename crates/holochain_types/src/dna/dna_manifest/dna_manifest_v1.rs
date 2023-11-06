@@ -1,6 +1,8 @@
+use std::path::PathBuf;
+
 use crate::prelude::*;
 use holo_hash::*;
-use holochain_zome_types::ZomeName;
+// use holochain_zome_types::prelude::*;
 use serde_with::serde_as;
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".
@@ -153,6 +155,11 @@ pub struct ZomeManifest {
     /// The order of these must match the order the types
     /// are used in the zome.
     pub dependencies: Option<Vec<ZomeDependency>>,
+
+    /// The location of the wasm dylib for this zome
+    /// Useful for iOS.
+    #[serde(default)]
+    pub dylib: Option<PathBuf>,
 }
 
 /// Manifest for integrity zomes that another zome
