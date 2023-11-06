@@ -3,7 +3,10 @@ name = "hc-sleuth"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "hc-sleuth"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
@@ -21,6 +24,8 @@ regex = "1"
 serde = { version = "1.0", features = ["derive"]}
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+structopt = "0.3"
 
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }

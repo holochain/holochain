@@ -2547,6 +2547,7 @@ dependencies = [
  "pretty_assertions",
  "regex",
  "serde",
+ "structopt",
  "tracing",
  "tracing-subscriber",
 ]
