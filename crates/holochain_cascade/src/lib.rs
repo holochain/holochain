@@ -622,7 +622,6 @@ where
         .await??;
 
         self.duration_metric.record(
-            &opentelemetry_api::Context::new(),
             start.elapsed().as_secs_f64(),
             &[],
         );

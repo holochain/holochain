@@ -225,7 +225,6 @@ impl ConductorBuilder {
                     }
 
                     duration_metric.record(
-                        &opentelemetry_api::Context::new(),
                         start.elapsed().as_secs_f64(),
                         &[
                             opentelemetry_api::KeyValue::new(

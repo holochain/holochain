@@ -675,7 +675,6 @@ async fn queue_consumer_main_task_impl<
             }
 
             duration_metric.record(
-                &opentelemetry_api::Context::new(),
                 start.elapsed().as_secs_f64(),
                 &[],
             );

@@ -3115,7 +3115,7 @@ async fn p2p_event_task(
                     max_time.store(0, std::sync::atomic::Ordering::Relaxed);
                 }
 
-                duration_metric.record(&opentelemetry_api::Context::new(), start.elapsed().as_secs_f64(), &[
+                duration_metric.record(start.elapsed().as_secs_f64(), &[
                     opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", evt_dna_hash)),
                 ]);
 
