@@ -6,6 +6,7 @@ use super::simple_report as report;
 use crate::Fact;
 use crate::dep::*;
 use crate::graph::*;
+use crate::traversal::Traversal;
 
 fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
     let start_ix = graph
@@ -20,6 +21,18 @@ fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec
         .map(|c| c.len())
         .collect()
 }
+
+
+impl<'c, T: Fact> Traversal<'c, T> {
+    pub fn fail(self) -> Option<(DepGraph<'c, T>, Vec<Dep<T>>)> {
+        if self.graph.node_count() == 0 {
+            None
+        } else {
+            Some((self.graph, self.terminal_passes))
+        }
+    }
+}
+
 
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
 
@@ -53,6 +66,7 @@ mod singleton {
         holochain_trace::test_run().ok().unwrap();
         Dep::from(fact.clone())
             .traverse(&())
+            .unwrap()
             .fail()
             .map(|(graph, _)| graph.deps())
     }
@@ -123,7 +137,7 @@ mod acyclic_single_path {
         let tr = Dep::from(countdown).traverse(&checker);
         report(&tr);
         let (graph, _passes) = tr
-            .fail()
+            .unwrap().fail()
             .unwrap();
     
         let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
@@ -197,7 +211,7 @@ mod single_loop {
         let tr = Dep::from(countdown).traverse(&checker);
         report(&tr);
         let (graph, _passes) = tr
-            .fail()
+            .unwrap().fail()
             .unwrap();
     
         let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
@@ -240,7 +254,7 @@ fn branching_any() {
         let ctx = maplit::hashset![40, 64];
         let tr = Dep::from(Branching(2)).traverse(&ctx);
         // report(&tr);
-        let (graph, _passes) = tr.fail().unwrap();
+        let (graph, _passes) = tr.unwrap().fail().unwrap();
         assert_eq!(
             path_lengths(&graph, Branching(2).into(), Branching(20).into()),
             vec![7]
@@ -254,7 +268,7 @@ fn branching_any() {
         let ctx = (32..128).collect();
         let tr = Dep::from(Branching(2)).traverse(&ctx);
         // report(&tr);
-        let _ = tr.fail().unwrap();
+        let _ = tr.unwrap().fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case, check the graph output
     }
 }
@@ -262,6 +276,8 @@ fn branching_any() {
 
 /// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
+
+    use crate::traversal::TraversalMode;
 
     use super::*;
     use test_case::test_case;
@@ -346,11 +362,28 @@ mod recipes {
 
         let tr = Dep::from(item).traverse(&truths);
         report(&tr);
-        let (g, _) = tr.fail().unwrap();
+        let (g, _) = tr.unwrap().fail().unwrap();
         g.leaves().into_iter().map(|c| c.clone().into_fact().unwrap()).collect()
     }
 
+    #[test]
+    fn happy_path() {
+        use Recipe::*;
+        let truths = hashset! {
+            Eggs,
+            Vinegar,
+            Mayo,
+            Tuna,
+            Cheese,
+            TunaSalad,
+            Bread,
+            TunaMelt,
+            GrilledCheese,
+        };
 
+        let tr = Dep::from(TunaMelt).traverse_with_mode(&truths, TraversalMode::ExpectPass);
+        report(&tr);
+    }
 }
 
 

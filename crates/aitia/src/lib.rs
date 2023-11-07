@@ -54,26 +54,35 @@ pub use fact::{Fact, FactTraits};
 #[cfg(test)]
 mod tests;
 
-use traversal::Traversal;
+use traversal::{Traversal, TraversalError, TraversalResult};
 
 /// Helpful function for printing a report from a given Traversal
 ///
 /// You're encouraged to write your own reports as best serve you, but this
 /// is a good starting point.
-pub fn simple_report<T: Fact>(traversal: &Traversal<T>) {
-    match traversal {
-        Traversal::Pass => println!("PASS"),
-        Traversal::Fail { tree, passes, ctx } => {
-            tree.print();
+pub fn simple_report<T: Fact>(tr: &TraversalResult<T>) {
+    match tr {
+        Ok(Traversal {
+            pass,
+            graph,
+            terminal_passes: passes,
+            ctx,
+        }) => {
+            if *pass {
+                println!("The targed fact PASSED");
+            } else {
+                println!("The targed fact FAILED");
+            }
+            graph.print();
             let passes: Vec<_> = passes.into_iter().map(|p| p.explain(ctx)).collect();
             println!("Passing checks");
             for pass in passes {
                 println!("{pass}");
             }
         }
-        Traversal::TraversalError { error, tree } => {
-            tree.print();
-            println!("Traversal error: {:?}", error)
+        Err(TraversalError { inner, graph }) => {
+            graph.print();
+            println!("Traversal error: {inner:?}")
         }
     }
 }

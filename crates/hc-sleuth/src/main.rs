@@ -9,7 +9,6 @@ fn main() {
 
     match opt {
         HcSleuth::ShowGraph => {
-            unimplemented!("showing graph not yet implemented");
             report(
                 Step::Integrated {
                     by: "".into(),
