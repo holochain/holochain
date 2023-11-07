@@ -16,12 +16,14 @@ pub trait Fact: FactTraits {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Check<T: Fact> {
-    Pass,
-    Fail(Vec<Dep<T>>),
+pub enum TraversalStep<T: Fact> {
+    /// This node terminates the traversal due to its check() status.
+    Terminate,
+    /// The traversal should continue with the following nodes.
+    Continue(Vec<Dep<T>>),
 }
 
-impl<T: Fact> Check<T> {
+impl<T: Fact> TraversalStep<T> {
     // pub fn deps(&self) -> &[Dep<T>] {
     //     match self {
     //         Check::Pass => &[],
@@ -37,9 +39,9 @@ impl<T: Fact> Check<T> {
     // }
 
     pub fn is_pass(&self) -> bool {
-        matches!(self, Check::Pass)
+        matches!(self, TraversalStep::Terminate)
     }
 }
 
 #[derive(Debug)]
-pub struct CheckError<F: Fact>(pub Check<F>);
+pub struct CheckError<F: Fact>(pub TraversalStep<F>);

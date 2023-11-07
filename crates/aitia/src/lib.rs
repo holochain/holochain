@@ -65,7 +65,7 @@ pub fn simple_report<T: Fact>(tr: &TraversalResult<T>) {
         Ok(Traversal {
             pass,
             graph,
-            terminal_passes: passes,
+            terminals,
             ctx,
         }) => {
             if *pass {
@@ -74,9 +74,9 @@ pub fn simple_report<T: Fact>(tr: &TraversalResult<T>) {
                 println!("The targed fact FAILED");
             }
             graph.print();
-            let passes: Vec<_> = passes.into_iter().map(|p| p.explain(ctx)).collect();
+            let terminals: Vec<_> = terminals.into_iter().map(|p| p.explain(ctx)).collect();
             println!("Passing checks");
-            for pass in passes {
+            for pass in terminals {
                 println!("{pass}");
             }
         }

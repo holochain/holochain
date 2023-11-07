@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::fact::{Check, CheckError};
+use crate::fact::{CheckError, TraversalStep};
 use crate::graph::{DepGraph, GraphNode};
 use crate::{dep::*, Fact};
 
@@ -22,7 +22,7 @@ pub enum TraversalInnerError<F: Fact> {
 pub struct Traversal<'c, T: Fact> {
     pub(crate) pass: bool,
     pub(crate) graph: DepGraph<'c, T>,
-    pub(crate) terminal_passes: Vec<Dep<T>>,
+    pub(crate) terminals: Vec<Dep<T>>,
     pub(crate) ctx: &'c T::Context,
 }
 
@@ -46,7 +46,17 @@ impl Default for TraversalMode {
     }
 }
 
-pub type TraversalMap<T> = HashMap<Dep<T>, Option<Check<T>>>;
+impl TraversalMode {
+    /// When traversing in this mode, when a Check comes back with this value, terminate that branch.
+    pub fn terminal_check_value(&self) -> bool {
+        match self {
+            TraversalMode::ExpectFail => true,
+            TraversalMode::ExpectPass => false,
+        }
+    }
+}
+
+pub type TraversalMap<T> = HashMap<Dep<T>, Option<TraversalStep<T>>>;
 
 impl<T: Fact> Dep<T> {
     /// Traverse the causal graph implied by the specified Dep.
@@ -67,13 +77,13 @@ impl<T: Fact> Dep<T> {
     ) -> TraversalResult<'c, T> {
         let mut table = TraversalMap::default();
         let res = traverse_inner(self, ctx, &mut table, mode);
-        let pass = matches!(res, Ok(Some(Check::Pass)));
-        let (graph, terminal_passes) = produce_graph(&table, self, ctx);
+        let pass = matches!(res, Ok(Some(TraversalStep::Terminate)));
+        let (graph, terminals) = produce_graph(&table, self, ctx);
         match res {
             Ok(_) => Ok(Traversal {
                 pass,
                 graph,
-                terminal_passes,
+                terminals,
                 ctx,
             }),
             Err(inner) => Err(TraversalError { graph, inner }),
@@ -90,7 +100,7 @@ fn traverse_inner<F: Fact>(
     ctx: &F::Context,
     table: &mut TraversalMap<F>,
     mode: TraversalMode,
-) -> Result<Option<Check<F>>, TraversalInnerError<F>> {
+) -> Result<Option<TraversalStep<F>>, TraversalInnerError<F>> {
     tracing::trace!("enter {:?}", dep);
     match table.get(dep) {
         None => {
@@ -112,7 +122,7 @@ fn traverse_inner<F: Fact>(
     }
 
     let mut recursive_checks =
-        |cs: &[Dep<F>]| -> Result<Vec<(Dep<F>, Check<F>)>, TraversalInnerError<F>> {
+        |cs: &[Dep<F>]| -> Result<Vec<(Dep<F>, TraversalStep<F>)>, TraversalInnerError<F>> {
             let mut checks = vec![];
             for c in cs {
                 if let Some(check) = traverse_inner(c, ctx, table, mode)? {
@@ -124,23 +134,26 @@ fn traverse_inner<F: Fact>(
 
     let check = match dep {
         Dep::Fact(f) => {
-            if f.check(ctx) {
+            if f.check(ctx) == mode.terminal_check_value() {
                 tracing::trace!("fact pass");
-                Check::Pass
+                TraversalStep::Terminate
             } else {
                 if let Some(sub_dep) = f.dep(ctx)? {
                     tracing::trace!("fact fail with dep, traversing");
                     let check = traverse_inner(&sub_dep, ctx, table, mode).map_err(|err| {
                         // Continue constructing the graph while we bubble up errors
                         tracing::error!("traversal ending due to error: {err:?}");
-                        table.insert(dep.clone(), Some(Check::Fail(vec![sub_dep.clone()])));
+                        table.insert(
+                            dep.clone(),
+                            Some(TraversalStep::Continue(vec![sub_dep.clone()])),
+                        );
                         err
                     })?;
                     tracing::trace!("traversal done, check: {:?}", check);
-                    Check::Fail(vec![sub_dep])
+                    TraversalStep::Continue(vec![sub_dep])
                 } else {
                     tracing::trace!("fact fail with no dep, terminating");
-                    Check::Fail(vec![])
+                    TraversalStep::Continue(vec![])
                 }
             }
         }
@@ -148,7 +161,7 @@ fn traverse_inner<F: Fact>(
             let checks = recursive_checks(cs).map_err(|err| {
                 // Continue constructing the graph while we bubble up errors
                 tracing::error!("traversal ending due to error: {err:?}");
-                table.insert(dep.clone(), Some(Check::Fail(cs.clone())));
+                table.insert(dep.clone(), Some(TraversalStep::Continue(cs.clone())));
                 err
             })?;
             tracing::trace!("Any. checks: {:?}", checks);
@@ -164,16 +177,16 @@ fn traverse_inner<F: Fact>(
                 .collect();
             tracing::trace!("Any. fails: {:?}", fails);
             if fails.len() < num_checks {
-                Check::Pass
+                TraversalStep::Terminate
             } else {
-                Check::Fail(fails)
+                TraversalStep::Continue(fails)
             }
         }
         Dep::Every(_, cs) => {
             let checks = recursive_checks(cs).map_err(|err| {
                 // Continue constructing the graph while we bubble up errors
                 tracing::error!("traversal ending due to error: {err:?}");
-                table.insert(dep.clone(), Some(Check::Fail(cs.clone())));
+                table.insert(dep.clone(), Some(TraversalStep::Continue(cs.clone())));
                 err
             })?;
 
@@ -187,9 +200,9 @@ fn traverse_inner<F: Fact>(
             let deps: Vec<_> = checks.into_iter().map(|(dep, _)| dep).collect();
             tracing::trace!("Every. num fails: {}", fails);
             if fails == 0 {
-                Check::Pass
+                TraversalStep::Terminate
             } else {
-                Check::Fail(deps)
+                TraversalStep::Continue(deps)
             }
         }
     };
@@ -207,12 +220,12 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     start: &'b Dep<T>,
 ) -> (HashMap<&'a Dep<T>, &'a [Dep<T>]>, Vec<&'a Dep<T>>) {
     let mut sub = HashMap::<&Dep<T>, &[Dep<T>]>::new();
-    let mut passes = vec![];
+    let mut terminals = vec![];
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
         match table[&next].as_ref() {
-            Some(Check::Fail(deps)) => {
+            Some(TraversalStep::Continue(deps)) => {
                 let old = sub.insert(next, deps.as_slice());
                 if let Some(old) = old {
                     assert_eq!(
@@ -223,13 +236,13 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
                     to_add.extend(deps.iter());
                 }
             }
-            Some(Check::Pass) => {
-                passes.push(next);
+            Some(TraversalStep::Terminate) => {
+                terminals.push(next);
             }
             None => {}
         }
     }
-    (sub, passes)
+    (sub, terminals)
 }
 
 pub fn produce_graph<'a, 'b: 'a, 'c, T: Fact + Eq + Hash>(

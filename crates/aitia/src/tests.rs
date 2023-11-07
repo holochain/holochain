@@ -28,7 +28,7 @@ impl<'c, T: Fact> Traversal<'c, T> {
         if self.graph.node_count() == 0 {
             None
         } else {
-            Some((self.graph, self.terminal_passes))
+            Some((self.graph, self.terminals))
         }
     }
 }
@@ -383,6 +383,8 @@ mod recipes {
 
         let tr = Dep::from(TunaMelt).traverse_with_mode(&truths, TraversalMode::ExpectPass);
         report(&tr);
+        let t = tr.unwrap();
+        assert_eq!(t.terminals, vec![]);
     }
 }
 
