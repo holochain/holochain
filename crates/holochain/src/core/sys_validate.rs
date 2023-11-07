@@ -168,6 +168,8 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
         if is_dna && !has_prev {
             Ok(())
         } else {
+            // Note that the implementation of the action types and `prev_action` should prevent this being hit
+            // but this is a useful as a defensive check.
             Err(PrevActionErrorKind::InvalidRoot)
         }
     } else {
