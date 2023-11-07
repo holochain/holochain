@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -22,7 +22,7 @@ pub enum TraversalInnerError<F: Fact> {
 pub struct Traversal<'c, T: Fact> {
     pub(crate) pass: bool,
     pub(crate) graph: DepGraph<'c, T>,
-    pub(crate) terminals: Vec<Dep<T>>,
+    pub(crate) terminals: HashSet<Dep<T>>,
     pub(crate) ctx: &'c T::Context,
 }
 
@@ -249,12 +249,12 @@ pub fn produce_graph<'a, 'b: 'a, 'c, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Dep<T>,
     ctx: &'c T::Context,
-) -> (DepGraph<'c, T>, Vec<Dep<T>>) {
+) -> (DepGraph<'c, T>, HashSet<Dep<T>>) {
     let mut g = DepGraph::default();
 
     let (sub, passes) = prune_traversal(table, start);
 
-    let rows: Vec<_> = sub.into_iter().collect();
+    let rows: HashSet<_> = sub.into_iter().collect();
     let mut nodemap = HashMap::new();
     for (i, (k, _)) in rows.iter().enumerate() {
         let id = g.add_node(GraphNode {

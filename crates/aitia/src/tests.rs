@@ -24,7 +24,7 @@ fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec
 
 
 impl<'c, T: Fact> Traversal<'c, T> {
-    pub fn fail(self) -> Option<(DepGraph<'c, T>, Vec<Dep<T>>)> {
+    pub fn fail(self) -> Option<(DepGraph<'c, T>, HashSet<Dep<T>>)> {
         if self.graph.node_count() == 0 {
             None
         } else {
@@ -384,7 +384,7 @@ mod recipes {
         let tr = Dep::from(TunaMelt).traverse_with_mode(&truths, TraversalMode::ExpectPass);
         report(&tr);
         let t = tr.unwrap();
-        assert_eq!(t.terminals, vec![]);
+        assert_eq!(t.terminals, hashset![]);
     }
 }
 
