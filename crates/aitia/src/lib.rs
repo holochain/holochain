@@ -56,6 +56,20 @@ mod tests;
 
 use traversal::{Traversal, TraversalError, TraversalResult};
 
+#[macro_export]
+macro_rules! assert_dep {
+    ($ctx: expr, $dep: expr) => {
+        let ctx = $ctx;
+        let dep: $crate::Dep<_> = $dep;
+        let tr = dep.traverse_with_mode(ctx, TraversalMode::TraverseFails);
+        let ok = matches!(&tr, Ok(t) if t.root_check_passed);
+        if !ok {
+            $crate::simple_report(&tr);
+            panic!("aitia dependency not met given the context: {dep:?}");
+        }
+    };
+}
+
 /// Helpful function for printing a report from a given Traversal
 ///
 /// You're encouraged to write your own reports as best serve you, but this
@@ -63,21 +77,22 @@ use traversal::{Traversal, TraversalError, TraversalResult};
 pub fn simple_report<T: Fact>(tr: &TraversalResult<T>) {
     match tr {
         Ok(Traversal {
-            pass,
+            root_check_passed,
             graph,
             terminals,
             ctx,
         }) => {
-            if *pass {
+            if *root_check_passed {
                 println!("The targed fact PASSED");
             } else {
                 println!("The targed fact FAILED");
             }
             graph.print();
             let terminals: Vec<_> = terminals.into_iter().map(|p| p.explain(ctx)).collect();
-            println!("Passing checks");
-            for pass in terminals {
-                println!("{pass}");
+
+            println!("Terminal nodes:");
+            for term in terminals {
+                println!("{term}");
             }
         }
         Err(TraversalError { inner, graph }) => {

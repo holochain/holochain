@@ -20,7 +20,7 @@ pub enum TraversalInnerError<F: Fact> {
 
 #[derive(Debug, derive_more::From)]
 pub struct Traversal<'c, T: Fact> {
-    pub(crate) pass: bool,
+    pub(crate) root_check_passed: bool,
     pub(crate) graph: DepGraph<'c, T>,
     pub(crate) terminals: HashSet<Dep<T>>,
     pub(crate) ctx: &'c T::Context,
@@ -34,15 +34,15 @@ pub type TraversalResult<'c, F> = Result<Traversal<'c, F>, TraversalError<'c, F>
 #[derive(Debug, Clone, Copy)]
 pub enum TraversalMode {
     /// The default mode, which terminates traversal along a branch whenever a true fact is encountered.
-    ExpectFail,
+    TraverseFails,
     /// Traverses the entire graph, expecting the entire traversal to consist of true facts.
     /// Useful for self-checking your model by running it against scenarios which are known to succeed.
-    ExpectPass,
+    TraversePasses,
 }
 
 impl Default for TraversalMode {
     fn default() -> Self {
-        Self::ExpectFail
+        Self::TraverseFails
     }
 }
 
@@ -50,8 +50,8 @@ impl TraversalMode {
     /// When traversing in this mode, when a Check comes back with this value, terminate that branch.
     pub fn terminal_check_value(&self) -> bool {
         match self {
-            TraversalMode::ExpectFail => true,
-            TraversalMode::ExpectPass => false,
+            TraversalMode::TraverseFails => true,
+            TraversalMode::TraversePasses => false,
         }
     }
 }
@@ -77,11 +77,11 @@ impl<T: Fact> Dep<T> {
     ) -> TraversalResult<'c, T> {
         let mut table = TraversalMap::default();
         let res = traverse_inner(self, ctx, &mut table, mode);
-        let pass = matches!(res, Ok(Some(TraversalStep::Terminate)));
+        let root_check_passed = matches!(res, Ok(Some(TraversalStep::Terminate)));
         let (graph, terminals) = produce_graph(&table, self, ctx);
         match res {
             Ok(_) => Ok(Traversal {
-                pass,
+                root_check_passed,
                 graph,
                 terminals,
                 ctx,

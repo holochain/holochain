@@ -381,7 +381,11 @@ mod recipes {
             GrilledCheese,
         };
 
-        let tr = Dep::from(TunaMelt).traverse_with_mode(&truths, TraversalMode::ExpectPass);
+        for dep in truths.iter() {
+            crate::assert_dep!(&truths, dep.clone().into());
+        }
+
+        let tr = Dep::from(TunaMelt).traverse_with_mode(&truths, TraversalMode::TraversePasses);
         report(&tr);
         let t = tr.unwrap();
         assert_eq!(t.terminals, hashset![]);
