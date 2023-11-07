@@ -209,6 +209,7 @@ impl aitia::Fact for Step {
                 if let Some(dep) = dep {
                     let integrated = Dep::from(Integrated { by, op });
                     // TODO: eventually we don't want to just use anything we fetched, right?
+                    // TODO: currently we don't actually need to integrate the dep, it can just exist in the cache
                     Some(Dep::every_named("Exists", vec![fetched, integrated]))
                 } else {
                     Some(fetched)
