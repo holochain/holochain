@@ -59,16 +59,32 @@ use traversal::{Traversal, TraversalError, TraversalResult};
 #[macro_export]
 macro_rules! assert_fact {
     ($ctx: expr, $fact: expr) => {{
-        use $crate::Fact;
-        let ctx = $ctx;
-        let fact = $fact;
-        let tr = fact.clone().traverse(ctx);
-        let ok = matches!(&tr, Ok(t) if t.root_check_passed);
-        if !ok {
-            $crate::simple_report(&tr);
-            panic!("aitia dependency not met given the context: {fact:?}");
+        if let Some(problem) = $crate::fact_problem($ctx, $fact) {
+            panic!("{}", problem)
         }
     }};
+}
+
+#[allow(unused)]
+fn fact_problem<F: Fact>(ctx: &F::Context, fact: &F) -> Option<String> {
+    let tr = fact.clone().traverse(ctx);
+    match &tr {
+        Ok(Traversal { root_check_passed, terminals, ..}) => {
+            if *root_check_passed {
+                if terminals.is_empty() {
+                    // All is well
+                    None
+                } else {
+                    Some(format!("Target fact was true, but some dependency checks failed. Your model may be incorrect. Failed checks: {terminals:?}"))
+                }
+            } else {
+                Some(format!("aitia dependency not met given the context: {fact:?}"))
+            }
+        },
+        Err(err) => {
+            Some(format!("aitia fact could not be traversed due to user error. Check your fact's `check()` and `dep()` implementations for errors. Error: {err:?}"))
+        }
+    }
 }
 
 /// Helpful function for printing a report from a given Traversal

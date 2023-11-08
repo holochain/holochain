@@ -99,6 +99,12 @@ mod acyclic_single_path {
     
     #[test_case( 
         Countdown(3), 
+        hashset![3, 2, 1, 0]
+        => hashset![3, 2, 1, 0]
+        ; "Countdown from 3 with all true returns path from 3 to 0"
+    )]
+    #[test_case( 
+        Countdown(3), 
         hashset![]
         => hashset![3, 2, 1, 0]
         ; "Countdown from 3 with all false returns path from 3 to 0"
@@ -132,9 +138,7 @@ mod acyclic_single_path {
     
         let tr = countdown.traverse(&truths);
         report(&tr);
-        let (graph, _passes) = tr
-            .unwrap().fail()
-            .unwrap();
+        let graph = tr.unwrap().graph;
     
         let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
             Dep::Fact(f) => f.0,
@@ -178,6 +182,12 @@ mod single_loop {
 
     #[test_case( 
         Countdown(3), 
+        hashset![3, 2, 1]
+        => (hashset![3, 2, 1], 3)
+        ; "Countdown from 3 with all in loop true returns entire loop"
+    )]
+    #[test_case( 
+        Countdown(3), 
         hashset!(0)
         => (hashset![3, 2, 1], 3)
         ; "Countdown from 3 with all in loop false returns entire loop"
@@ -205,9 +215,8 @@ mod single_loop {
     
         let tr = countdown.traverse(&truths);
         report(&tr);
-        let (graph, _passes) = tr
-            .unwrap().fail()
-            .unwrap();
+        let t = tr.unwrap();
+        let graph = t.graph;
     
         let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
             Dep::Fact(f) => f.0,
@@ -272,6 +281,8 @@ fn branching_any() {
 /// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
 
+
+    use crate::fact_problem;
 
     use super::*;
     use test_case::test_case;
@@ -377,14 +388,35 @@ mod recipes {
         };
 
         for dep in truths.iter() {
-            crate::assert_fact!(&truths, dep.clone());
+            crate::assert_fact!(&truths, dep);
         }
 
-        let tr = TunaMelt.traverse(&truths);
-        report(&tr);
-        assert_eq!(tr.unwrap().terminals, hashset![]);
+        {
+            let tr = TunaMelt.traverse(&truths);
+            report(&tr);
+            assert_eq!(tr.unwrap().terminals, hashset![]);
+        }
 
-        // truths.remove()
+        truths.remove(&Cheese);
+
+        {
+            let tr = TunaMelt.traverse(&truths);
+            report(&tr);
+            assert_eq!(tr.unwrap().terminals, hashset![Cheese.into()]);
+            assert!(fact_problem(&truths, &TunaMelt).is_some());
+        }
+        
+
+        truths.remove(&Mayo);
+        
+        {
+            let tr = TunaMelt.traverse(&truths);
+            report(&tr);
+            assert_eq!(tr.unwrap().terminals, hashset![Cheese.into(), Mayo.into()]);
+            assert!(fact_problem(&truths, &TunaMelt).is_some());
+        }
+
+
     }
 }
 

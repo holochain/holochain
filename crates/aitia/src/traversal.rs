@@ -99,7 +99,6 @@ pub fn traverse<'c, F: Fact>(fact: F, ctx: &'c F::Context) -> TraversalResult<'c
         Ok(check) => {
             table.insert(dep.clone(), Some(check.clone()));
             let (graph, terminals) = produce_graph(&table, &dep, ctx);
-            dbg!(&table);
 
             Ok(Traversal {
                 root_check_passed,
