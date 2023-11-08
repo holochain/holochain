@@ -24,7 +24,7 @@ failure = "0.1.6"
 fixt = { version = "^0.2.4", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash", version = "^0.2.4"}
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.2.4", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { version = "^0.2.4", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "^0.2.4", path = "../kitsune_p2p/kitsune_p2p" }

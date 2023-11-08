@@ -7,6 +7,7 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
