@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Add additional configuration options to network_tuning for setting the allowed ephemeral port range for tx5 connections: tx5_min_ephemeral_udp_port and tx5_max_ephemeral_udp_port
-- Adjust bootstrap max\_delay from 60 minutes -> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
+## 0.2.3-rc.0
+
+- Add additional configuration options to network\_tuning for setting the allowed ephemeral port range for tx5 connections: tx5\_min\_ephemeral\_udp\_port and tx5\_max\_ephemeral\_udp\_port
+- Adjust bootstrap max\_delay from 60 minutes -\> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
 
 ## 0.2.3-beta-rc.0
 
