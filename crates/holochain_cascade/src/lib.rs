@@ -621,10 +621,8 @@ where
         })
         .await??;
 
-        self.duration_metric.record(
-            start.elapsed().as_secs_f64(),
-            &[],
-        );
+        self.duration_metric
+            .record(start.elapsed().as_secs_f64(), &[]);
 
         Ok(results)
     }

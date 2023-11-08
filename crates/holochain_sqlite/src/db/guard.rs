@@ -45,10 +45,8 @@ impl DerefMut for PConnGuard {
 
 impl Drop for PConnGuard {
     fn drop(&mut self) {
-        self.use_time_metric.record(
-            self.created.elapsed().as_secs_f64(),
-            &[],
-        );
+        self.use_time_metric
+            .record(self.created.elapsed().as_secs_f64(), &[]);
     }
 }
 

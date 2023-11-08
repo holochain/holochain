@@ -674,10 +674,7 @@ async fn queue_consumer_main_task_impl<
                 _ => (),
             }
 
-            duration_metric.record(
-                start.elapsed().as_secs_f64(),
-                &[],
-            );
+            duration_metric.record(start.elapsed().as_secs_f64(), &[]);
         } else {
             tracing::info!("Cell is shutting down: stopping queue consumer '{}'", name);
             break;
