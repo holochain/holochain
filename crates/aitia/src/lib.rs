@@ -57,17 +57,18 @@ mod tests;
 use traversal::{Traversal, TraversalError, TraversalResult};
 
 #[macro_export]
-macro_rules! assert_dep {
-    ($ctx: expr, $dep: expr) => {
+macro_rules! assert_fact {
+    ($ctx: expr, $fact: expr) => {{
+        use $crate::Fact;
         let ctx = $ctx;
-        let dep: $crate::Dep<_> = $dep;
-        let tr = dep.traverse_with_mode(ctx, TraversalMode::TraverseFails);
+        let fact = $fact;
+        let tr = fact.clone().traverse(ctx);
         let ok = matches!(&tr, Ok(t) if t.root_check_passed);
         if !ok {
             $crate::simple_report(&tr);
-            panic!("aitia dependency not met given the context: {dep:?}");
+            panic!("aitia dependency not met given the context: {fact:?}");
         }
-    };
+    }};
 }
 
 /// Helpful function for printing a report from a given Traversal

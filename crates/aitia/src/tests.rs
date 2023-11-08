@@ -25,7 +25,7 @@ fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec
 
 impl<'c, T: Fact> Traversal<'c, T> {
     pub fn fail(self) -> Option<(DepGraph<'c, T>, HashSet<Dep<T>>)> {
-        if self.graph.node_count() == 0 {
+        if self.root_check_passed {
             None
         } else {
             Some((self.graph, self.terminals))
@@ -64,7 +64,7 @@ mod singleton {
     #[test_case( Singleton(true, true) => None  ; "passing single self-referencing fact produces Pass")]
     fn singleton_deps(fact: Singleton) -> Option<HashSet<Dep<Singleton>>> {
         holochain_trace::test_run().ok().unwrap();
-        Dep::from(fact.clone())
+        fact.clone()
             .traverse(&())
             .unwrap()
             .fail()
@@ -134,7 +134,7 @@ mod acyclic_single_path {
         holochain_trace::test_run().ok().unwrap();
     
         let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
-        let tr = Dep::from(countdown).traverse(&checker);
+        let tr = countdown.traverse(&checker);
         report(&tr);
         let (graph, _passes) = tr
             .unwrap().fail()
@@ -208,7 +208,7 @@ mod single_loop {
         holochain_trace::test_run().ok().unwrap();
     
         let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
-        let tr = Dep::from(countdown).traverse(&checker);
+        let tr = countdown.traverse(&checker);
         report(&tr);
         let (graph, _passes) = tr
             .unwrap().fail()
@@ -252,7 +252,7 @@ fn branching_any() {
 
     {
         let ctx = maplit::hashset![40, 64];
-        let tr = Dep::from(Branching(2)).traverse(&ctx);
+        let tr = Branching(2).traverse(&ctx);
         // report(&tr);
         let (graph, _passes) = tr.unwrap().fail().unwrap();
         assert_eq!(
@@ -266,7 +266,7 @@ fn branching_any() {
     }
     {
         let ctx = (32..128).collect();
-        let tr = Dep::from(Branching(2)).traverse(&ctx);
+        let tr = Branching(2).traverse(&ctx);
         // report(&tr);
         let _ = tr.unwrap().fail().unwrap();
         // no assertion here, just a smoke test. It's a neat case, check the graph output
@@ -277,7 +277,6 @@ fn branching_any() {
 /// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
 
-    use crate::traversal::TraversalMode;
 
     use super::*;
     use test_case::test_case;
@@ -360,7 +359,7 @@ mod recipes {
         // TODO:
         // - loops with Every might take some more thought.
 
-        let tr = Dep::from(item).traverse(&truths);
+        let tr = item.traverse(&truths);
         report(&tr);
         let (g, _) = tr.unwrap().fail().unwrap();
         g.leaves().into_iter().map(|c| c.clone().into_fact().unwrap()).collect()
@@ -368,8 +367,9 @@ mod recipes {
 
     #[test]
     fn happy_path() {
+        holochain_trace::test_run().ok().unwrap();
         use Recipe::*;
-        let truths = hashset! {
+        let mut truths = hashset! {
             Eggs,
             Vinegar,
             Mayo,
@@ -382,13 +382,14 @@ mod recipes {
         };
 
         for dep in truths.iter() {
-            crate::assert_dep!(&truths, dep.clone().into());
+            crate::assert_fact!(&truths, dep.clone());
         }
 
-        let tr = Dep::from(TunaMelt).traverse_with_mode(&truths, TraversalMode::TraversePasses);
+        let tr = TunaMelt.traverse(&truths);
         report(&tr);
-        let t = tr.unwrap();
-        assert_eq!(t.terminals, hashset![]);
+        assert_eq!(tr.unwrap().terminals, hashset![]);
+
+        // truths.remove()
     }
 }
 
@@ -473,10 +474,10 @@ fn holochain_like() {
         }
     }
 
-    let fatma_store = Dep::Fact(F {
+    let fatma_store = F {
         which: false,
         stage: Stage::Store,
-    });
+    };
 
     let checks: Checks<F> = Box::new(|step: &F| match (step.which, step.stage) {
         (true, Stage::Create) => true,

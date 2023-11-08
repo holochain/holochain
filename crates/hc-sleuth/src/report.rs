@@ -1,7 +1,7 @@
-use aitia::simple_report;
+use aitia::{simple_report, Fact};
 
 use super::*;
 
 pub fn report(step: Step, ctx: &Context) {
-    simple_report(&aitia::Dep::from(step).traverse(ctx))
+    simple_report(&step.traverse(ctx))
 }
