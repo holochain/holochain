@@ -200,13 +200,13 @@ async fn app_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
-                            aitia::trace!(&hc_sleuth::Step::AppValidated {
+                            aitia::trace!(&hc_sleuth::Event::AppValidated {
                                 by: sleuth_id.clone(),
                                 op: op_hash.clone()
                             });
 
                             if dependency.is_none() {
-                                aitia::trace!(&hc_sleuth::Step::Integrated {
+                                aitia::trace!(&hc_sleuth::Event::Integrated {
                                     by: sleuth_id.clone(),
                                     op: op_hash.clone()
                                 });

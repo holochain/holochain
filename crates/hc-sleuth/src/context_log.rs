@@ -28,7 +28,7 @@ pub fn init_subscriber() -> ContextWriter {
 #[derive(Default, Debug)]
 pub struct Context {
     /// All steps recorded
-    pub facts: HashSet<Step>,
+    pub facts: HashSet<Event>,
 
     ///
     pub entry_actions: HashMap<EntryHash, ActionHash>,
@@ -54,7 +54,7 @@ impl Context {
         la
     }
 
-    pub fn check(&self, fact: &Step) -> bool {
+    pub fn check(&self, fact: &Event) -> bool {
         self.facts.contains(fact)
     }
 
@@ -118,26 +118,32 @@ impl Context {
             .cloned()
             .ok_or(format!("map_action_to_op({oa:?})"))
     }
+
+    pub fn as_if(&mut self) {
+        todo!()
+    }
+
+    pub fn all_events_for_topic() {}
 }
 
 impl aitia::logging::Log for Context {
-    type Fact = Step;
+    type Fact = Event;
 
-    fn apply(&mut self, fact: Step) {
+    fn apply(&mut self, fact: Event) {
         match fact.clone() {
-            Step::Integrated { .. } => {}
-            Step::AppValidated { .. } => {}
-            Step::SysValidated { .. } => {}
-            Step::MissingAppValDep { by, op, deps } => {
+            Event::Integrated { .. } => {}
+            Event::AppValidated { .. } => {}
+            Event::SysValidated { .. } => {}
+            Event::MissingAppValDep { by, op, deps } => {
                 self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
                     .extend(deps.into_iter());
             }
-            Step::Fetched { .. } => {}
-            Step::ReceivedHash { .. } => {}
-            Step::SentHash { .. } => {}
-            Step::Authored { by: _, op } => {
+            Event::Fetched { .. } => {}
+            Event::ReceivedHash { .. } => {}
+            Event::SentHash { .. } => {}
+            Event::Authored { by: _, op } => {
                 // TODO: add check that the same op is not authored twice?
                 let op_hash = op.as_hash();
                 let a = OpAction::from((*op).clone());
@@ -148,14 +154,14 @@ impl aitia::logging::Log for Context {
                     .insert(op_hash.clone(), op.dep.clone());
                 self.op_info.insert(op_hash.clone(), op);
             }
-            Step::AgentJoined { node, agent } => {
+            Event::AgentJoined { node, agent } => {
                 self.map_agent_to_node.insert(agent.clone(), node.clone());
                 self.map_node_to_agents
                     .entry(node)
                     .or_default()
                     .insert(agent);
             }
-            Step::SweetConductorShutdown { node } => {
+            Event::SweetConductorShutdown { node } => {
                 if let Some(agents) = self.map_node_to_agents.remove(&node) {
                     for a in agents {
                         self.map_agent_to_node.remove(&a);

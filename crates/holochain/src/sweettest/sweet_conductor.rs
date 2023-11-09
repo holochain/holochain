@@ -531,7 +531,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
-            aitia::trace!(&hc_sleuth::Step::SweetConductorShutdown {
+            aitia::trace!(&hc_sleuth::Event::SweetConductorShutdown {
                 node: handle.config.sleuth_id()
             });
             handle

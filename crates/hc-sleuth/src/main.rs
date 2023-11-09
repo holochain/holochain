@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr};
 
-use hc_sleuth::{report, Step};
+use hc_sleuth::{report, Event};
 use holochain_types::prelude::*;
 use structopt::StructOpt;
 
@@ -10,7 +10,7 @@ fn main() {
     match opt {
         HcSleuth::ShowGraph => {
             report(
-                Step::Integrated {
+                Event::Integrated {
                     by: "".into(),
                     op: DhtOpHash::from_raw_32(vec![0; 32]),
                 },

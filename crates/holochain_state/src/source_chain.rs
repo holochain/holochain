@@ -348,7 +348,7 @@ impl SourceChain {
                     if is_countersigning_session {
                         set_withhold_publish(txn, op_hash)?;
                     }
-                    aitia::trace!(&hc_sleuth::Step::Authored {
+                    aitia::trace!(&hc_sleuth::Event::Authored {
                         by: (*author).clone(),
                         op: hc_sleuth::OpInfo::new(op.clone(), op_hash.clone(), dep.clone()),
                     });

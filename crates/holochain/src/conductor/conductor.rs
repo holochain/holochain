@@ -1933,7 +1933,7 @@ mod app_status_impls {
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let network = cell.holochain_p2p_dna().clone();
                     
-                    aitia::trace!(&hc_sleuth::Step::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
+                    aitia::trace!(&hc_sleuth::Event::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
                     
                     match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                         Ok(Err(e)) => {

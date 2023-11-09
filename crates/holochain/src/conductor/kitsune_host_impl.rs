@@ -298,7 +298,7 @@ impl KitsuneHost for KitsuneHostImpl {
         transfer_method: TransferMethod,
     ) {
         let hash = DhtOpHash::from_kitsune(&op_hash.data());
-        aitia::trace!(&hc_sleuth::Step::ReceivedHash {
+        aitia::trace!(&hc_sleuth::Event::ReceivedHash {
             by: self.config.sleuth_id(),
             op: hash,
             method: transfer_method,
@@ -312,7 +312,7 @@ impl KitsuneHost for KitsuneHostImpl {
         transfer_method: TransferMethod,
     ) {
         let hash = DhtOpHash::from_kitsune(&op_hash.data());
-        aitia::trace!(&hc_sleuth::Step::SentHash {
+        aitia::trace!(&hc_sleuth::Event::SentHash {
             by: self.config.sleuth_id(),
             op: hash,
             method: transfer_method,

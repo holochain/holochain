@@ -71,7 +71,7 @@ impl OpAction {
 pub type SleuthId = String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Step {
+pub enum Event {
     /// The node has integrated an op authored by someone else
     Integrated {
         by: SleuthId,
@@ -128,46 +128,46 @@ pub enum Step {
     },
 }
 
-impl aitia::logging::FactLogJson for Step {}
+impl aitia::logging::FactLogJson for Event {}
 
-impl aitia::Fact for Step {
+impl aitia::Fact for Event {
     type Context = Context;
 
     fn explain(&self, ctx: &Self::Context) -> String {
         match self {
-            Step::Integrated { by, op } => {
+            Event::Integrated { by, op } => {
                 format!("[{by}] Integrated: {op}")
             }
-            Step::AppValidated { by, op } => {
+            Event::AppValidated { by, op } => {
                 format!("[{by}] AppValidated: {op}")
             }
-            Step::SysValidated { by, op } => {
+            Event::SysValidated { by, op } => {
                 format!("[{by}] SysValidated: {op}")
             }
-            Step::MissingAppValDep { by, op, deps } => {
+            Event::MissingAppValDep { by, op, deps } => {
                 format!("[{by}] PendingAppValidation: {op} deps: {deps:#?}")
             }
-            Step::Fetched { by, op } => format!("[{by}] Fetched: {op}"),
-            Step::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
-            Step::ReceivedHash { by, op, method } => {
+            Event::Fetched { by, op } => format!("[{by}] Fetched: {op}"),
+            Event::SentHash { by, op, method } => format!("[{by}] SentHash({method}): {op:?}"),
+            Event::ReceivedHash { by, op, method } => {
                 format!("[{by}] ReceivedHash({method}): {op:?}")
             }
-            Step::Authored { by, op } => {
+            Event::Authored { by, op } => {
                 let node = ctx.agent_node(&by).expect("I got lazy");
                 let op_hash = op.as_hash();
                 format!("[{node}] Authored: {op_hash}")
             }
-            Step::AgentJoined { node, agent } => {
+            Event::AgentJoined { node, agent } => {
                 format!("[{node}] AgentJoined: {agent}")
             }
-            Step::SweetConductorShutdown { node } => {
+            Event::SweetConductorShutdown { node } => {
                 format!("[{node}] SweetConductorShutdown")
             }
         }
     }
 
     fn dep(&self, ctx: &Self::Context) -> DepResult<Self> {
-        use Step::*;
+        use Event::*;
 
         let mapper = |e: CtxError| DepError {
             info: e.into(),
@@ -272,7 +272,7 @@ impl aitia::Fact for Step {
     }
 }
 
-impl Step {
+impl Event {
     /// The cause which is satisfied by either Integrating this op,
     /// or having authored this op by any of the local agents
     pub fn authority(ctx: &Context, by: SleuthId, op: OpRef) -> Result<Dep<Self>, DepError<Self>> {

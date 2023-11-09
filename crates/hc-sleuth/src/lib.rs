@@ -15,8 +15,8 @@ pub use context_log::{init_subscriber, Context, ContextWriter};
 
 pub use report::*;
 
-mod step;
-pub use step::*;
+mod event;
+pub use event::*;
 
 // #[cfg(test)]
 // mod tests;

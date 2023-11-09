@@ -12,6 +12,7 @@
 ### mid term
 
 * [X] ~~*Add a "passing" mode where we expect the fact to pass, and we validate the entire tree, and add this to a bunch of unit tests*~~ [2023-11-08]
+* [ ] Maybe see entire chains of real events related to a fact. For instance if an op is integrated, see all the times validation was attempted, not just the first.
 
 ### future
 

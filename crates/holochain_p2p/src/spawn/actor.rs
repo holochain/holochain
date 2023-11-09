@@ -890,7 +890,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     .map_err(HolochainP2pError::from)?
                     .op_data;
 
-                aitia::trace!(&hc_sleuth::Step::Fetched {
+                aitia::trace!(&hc_sleuth::Event::Fetched {
                     by: by.clone(),
                     op: op.to_hash()
                 });

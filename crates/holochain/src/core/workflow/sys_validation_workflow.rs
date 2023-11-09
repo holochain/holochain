@@ -154,7 +154,7 @@ async fn sys_validation_workflow_inner(
                             total += 1;
                             put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
 
-                            aitia::trace!(&hc_sleuth::Step::SysValidated {
+                            aitia::trace!(&hc_sleuth::Event::SysValidated {
                                 by: sleuth_id.clone(),
                                 op: op_hash
                             });
