@@ -98,14 +98,10 @@ async fn get_ops_to_validate(
 #[cfg(test)]
 mod tests {
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
-    use arbitrary::Unstructured;
     use holo_hash::HasHash;
-    use holo_hash::HashableContentExtSync;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
     use holochain_state::validation_db::ValidationLimboStatus;
-    use itertools::Itertools;
     use std::collections::HashSet;
 
     use super::*;
@@ -133,8 +129,8 @@ mod tests {
         let expected = create_test_data(&db.to_db().into()).await;
         let ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
 
-        assert_sorted_by_op_order(&ops);
-        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops);
+        assert_sorted_by_op_order(&ops).await;
+        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops).await;
 
         // Check all the expected ops were returned
         for op in ops {
@@ -149,8 +145,8 @@ mod tests {
         let expected = create_test_data(&db.to_db().into()).await;
         let ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
 
-        assert_sorted_by_op_order(&ops);
-        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops);
+        assert_sorted_by_op_order(&ops).await;
+        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops).await;
 
         // Check all the expected ops were returned
         for op in ops {
