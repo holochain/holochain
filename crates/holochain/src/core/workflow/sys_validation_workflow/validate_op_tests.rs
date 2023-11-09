@@ -21,13 +21,20 @@ use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_state::prelude::CreateFixturator;
 use holochain_state::prelude::SignatureFixturator;
+use holochain_types::EntryHashed;
 use holochain_types::prelude::SignedActionHashedExt;
 use holochain_zome_types::prelude::AgentValidationPkg;
+use holochain_zome_types::prelude::AppEntry;
+use holochain_zome_types::prelude::Create;
+use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedHashed;
 use crate::prelude::EntryType;
 use crate::prelude::CreateLinkFixturator;
 use crate::prelude::ActionHashFixturator;
+use holo_hash::HasHash;
+use crate::prelude::AppEntryDef;
+use crate::prelude::AppEntryBytesFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -929,6 +936,184 @@ async fn validate_avp_op_not_followed_by_create() {
         validation_outcome
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_store_entry_with_no_entry() {
+    holochain_trace::test_run().unwrap();
+
+    let keystore = holochain_keystore::test_keystore();
+
+    let agent = keystore.new_sign_keypair_random().await.unwrap();
+
+    // This is the previous
+    let mut action = fixt!(Create);
+    action.author = agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let action = Action::Create(action);
+    let action_hashed = ActionHashed::from_content_sync(action);
+    let signed_action = SignedActionHashed::sign(&keystore, action_hashed)
+        .await
+        .unwrap();
+
+    // and current which needs values from previous
+    let mut create_action = fixt!(Create);
+    create_action.author = signed_action.action().author().clone();
+    create_action.action_seq = signed_action.action().action_seq() + 1;
+    create_action.prev_action = signed_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::CapClaim;
+    let action = Action::Create(create_action);
+
+    let op = DhtOp::StoreRecord(fixt!(Signature), action, holochain_zome_types::record::RecordEntry::NotStored);
+
+    let dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
+
+    let mut cascade = MockCascade::new();
+
+    cascade.expect_retrieve_action().times(1).returning({
+        let signed_action = signed_action.clone();
+        move |_, _| {
+            let signed_action = signed_action.clone();
+            async move { Ok(Some((signed_action, CascadeSource::Local))) }.boxed()
+        }
+    });
+
+    let validation_outcome = validate_op(&op, &dna_def, &cascade, None::<&MockDhtOpSender>)
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(validation_outcome, Outcome::Accepted),
+        "Expected Accepted but actual outcome was {:?}",
+        validation_outcome
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_with_entry_with_wrong_entry_type() {
+    holochain_trace::test_run().unwrap();
+
+    let keystore = holochain_keystore::test_keystore();
+
+    let agent = keystore.new_sign_keypair_random().await.unwrap();
+
+    // This is the previous
+    let mut action = fixt!(Create);
+    action.author = agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let action = Action::Create(action);
+    let action_hashed = ActionHashed::from_content_sync(action);
+    let signed_action = SignedActionHashed::sign(&keystore, action_hashed)
+        .await
+        .unwrap();
+
+    let agent_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(agent_entry.clone());
+
+    // and current which needs values from previous
+    let mut create_action = fixt!(Create);
+    create_action.author = signed_action.action().author().clone();
+    create_action.action_seq = signed_action.action().action_seq() + 1;
+    create_action.prev_action = signed_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
+    create_action.entry_hash = entry_hash.as_hash().clone();
+    let action = Action::Create(create_action);
+
+    let op = DhtOp::StoreRecord(fixt!(Signature), action, holochain_zome_types::record::RecordEntry::Present(agent_entry));
+
+    let dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
+
+    let mut cascade = MockCascade::new();
+
+    cascade.expect_retrieve_action().times(1).returning({
+        let signed_action = signed_action.clone();
+        move |_, _| {
+            let signed_action = signed_action.clone();
+            async move { Ok(Some((signed_action, CascadeSource::Local))) }.boxed()
+        }
+    });
+
+    let validation_outcome = validate_op(&op, &dna_def, &cascade, None::<&MockDhtOpSender>)
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(validation_outcome, Outcome::Rejected),
+        "Expected Accepted but actual outcome was {:?}",
+        validation_outcome
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_with_entry_with_wrong_entry_hash() {
+    holochain_trace::test_run().unwrap();
+
+    let keystore = holochain_keystore::test_keystore();
+
+    let agent = keystore.new_sign_keypair_random().await.unwrap();
+
+    // This is the previous
+    let mut action = fixt!(Create);
+    action.author = agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let action = Action::Create(action);
+    let action_hashed = ActionHashed::from_content_sync(action);
+    let signed_action = SignedActionHashed::sign(&keystore, action_hashed)
+        .await
+        .unwrap();
+
+    let agent_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(agent_entry.clone());
+
+    // Create some new data which will have a different hash
+    let agent_entry = Entry::App(fixt!(AppEntryBytes));
+
+    // and current which needs values from previous
+    let mut create_action = fixt!(Create);
+    create_action.author = signed_action.action().author().clone();
+    create_action.action_seq = signed_action.action().action_seq() + 1;
+    create_action.prev_action = signed_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public));
+    create_action.entry_hash = entry_hash.as_hash().clone();
+    let action = Action::Create(create_action);
+
+    let op = DhtOp::StoreRecord(fixt!(Signature), action, holochain_zome_types::record::RecordEntry::Present(agent_entry));
+
+    let dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
+    let dna_def = DnaDefHashed::from_content_sync(dna_def);
+
+    let mut cascade = MockCascade::new();
+
+    cascade.expect_retrieve_action().times(1).returning({
+        let signed_action = signed_action.clone();
+        move |_, _| {
+            let signed_action = signed_action.clone();
+            async move { Ok(Some((signed_action, CascadeSource::Local))) }.boxed()
+        }
+    });
+
+    let validation_outcome = validate_op(&op, &dna_def, &cascade, None::<&MockDhtOpSender>)
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(validation_outcome, Outcome::Rejected),
+        "Expected Accepted but actual outcome was {:?}",
+        validation_outcome
+    );
+}
+
+// TODO add a test which validates an op that isn't a create or an update
 
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
 #[tokio::test(flavor = "multi_thread")]
