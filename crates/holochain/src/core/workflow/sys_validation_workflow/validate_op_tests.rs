@@ -1142,7 +1142,7 @@ async fn validate_store_entry_with_large_entry() {
         .await
         .unwrap();
 
-    let agent_entry = Entry::App(AppEntryBytes(TestLargeEntry { data: vec![0; 100_000_000] }.try_into().unwrap()));
+    let agent_entry = Entry::App(AppEntryBytes(TestLargeEntry { data: vec![0; 5_000_000] }.try_into().unwrap()));
     let entry_hash = EntryHashed::from_content_sync(agent_entry.clone());
 
     // and current which needs values from previous
