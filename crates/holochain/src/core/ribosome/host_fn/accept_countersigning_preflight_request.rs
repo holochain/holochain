@@ -118,7 +118,7 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
     use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
+    use crate::sweettest::SweetConductorBatch;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
