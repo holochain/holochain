@@ -26,6 +26,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Instant;
 
 use error::CascadeResult;
 use holo_hash::ActionHash;
@@ -52,6 +53,11 @@ use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
+use metrics::create_cascade_duration_metric;
+use metrics::CascadeDurationMetric;
+use tracing::*;
+
+#[cfg(feature = "test_utils")]
 use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
 use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 use mutations::insert_action;
@@ -63,6 +69,7 @@ pub mod authority;
 pub mod error;
 
 mod agent_activity;
+mod metrics;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
@@ -103,6 +110,7 @@ pub struct CascadeImpl<Network: Send + Sync = HolochainP2pDna> {
     scratch: Option<SyncScratch>,
     network: Option<Network>,
     private_data: Option<Arc<AgentPubKey>>,
+    duration_metric: &'static CascadeDurationMetric,
 }
 
 impl<Network> CascadeImpl<Network>
@@ -162,6 +170,7 @@ where
             private_data: self.private_data,
             cache: Some(cache_db),
             network: Some(network),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 }
@@ -176,6 +185,7 @@ impl CascadeImpl<HolochainP2pDna> {
             cache: None,
             scratch: None,
             private_data: None,
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 
@@ -203,6 +213,7 @@ impl CascadeImpl<HolochainP2pDna> {
             private_data,
             scratch,
             network: Some(network),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 
@@ -221,6 +232,7 @@ impl CascadeImpl<HolochainP2pDna> {
             scratch,
             network: None,
             private_data: author,
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 }
@@ -585,6 +597,7 @@ where
         Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
         <Q as Query>::Output: Send + 'static,
     {
+        let start = Instant::now();
         let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
         // TODO We may already be on a blocking thread here because this is accessible from a zome call. Ideally we'd have
@@ -607,6 +620,10 @@ where
             CascadeResult::Ok(results)
         })
         .await??;
+
+        self.duration_metric
+            .record(start.elapsed().as_secs_f64(), &[]);
+
         Ok(results)
     }
 
