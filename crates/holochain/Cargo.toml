@@ -91,6 +91,7 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
 wasmer = "=4.2.2"
 wasmer-middlewares = "=4.2.2"
+opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
