@@ -1996,6 +1996,7 @@ async fn validate_valid_store_entry_update() {
     to_update_action.action_seq = 5;
     to_update_action.prev_action = fixt!(ActionHash);
     to_update_action.entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public));
+    to_update_action.entry_hash = fixt!(EntryHash);
 
     let to_update_action = Action::Create(to_update_action);
     let to_update_action_hashed = ActionHashed::from_content_sync(to_update_action);
@@ -2027,7 +2028,7 @@ async fn validate_valid_store_entry_update() {
     update_action.timestamp = Timestamp::now().into();
     update_action.entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public));
     update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = fixt!(EntryHash); // entry_hash.as_hash().clone(); // TODO not checked?
+    update_action.original_entry_address = to_update_signed_action.action().entry_hash().unwrap().clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
     let action = Action::Update(update_action);
 
@@ -2106,7 +2107,6 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     update_action.timestamp = Timestamp::now().into();
     update_action.entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public));
     update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = fixt!(EntryHash); // entry_hash.as_hash().clone(); // TODO not checked?
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
     let action = Action::Update(update_action);
 
@@ -2159,6 +2159,7 @@ async fn validate_store_entry_update_changes_entry_type() {
     to_update_action.action_seq = 5;
     to_update_action.prev_action = fixt!(ActionHash);
     to_update_action.entry_type = EntryType::App(AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public));
+    to_update_action.entry_hash = fixt!(EntryHash);
 
     let to_update_action = Action::Create(to_update_action);
     let to_update_action_hashed = ActionHashed::from_content_sync(to_update_action);
@@ -2191,7 +2192,7 @@ async fn validate_store_entry_update_changes_entry_type() {
     // Different entry type defined here
     update_action.entry_type = EntryType::App(AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public));
     update_action.entry_hash = entry_hash.as_hash().clone();
-    update_action.original_entry_address = fixt!(EntryHash); // entry_hash.as_hash().clone(); // TODO not checked?
+    update_action.original_entry_address = to_update_signed_action.action().entry_hash().unwrap().clone();
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
     let action = Action::Update(update_action);
 
