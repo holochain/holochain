@@ -642,7 +642,7 @@ fn update_check(entry_update: &Update, original_action: &Action) -> SysValidatio
     check_new_entry_action(original_action)?;
     let original_action: NewEntryActionRef = original_action
         .try_into()
-        .expect("This can't fail due to the above check_new_entry_action");
+        .expect("This can't fail due to the above check_new_entry_action"); // TODO yes it can if the code changes
     check_update_reference(entry_update, &original_action)?;
     Ok(())
 }
