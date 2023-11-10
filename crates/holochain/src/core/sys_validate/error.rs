@@ -147,6 +147,8 @@ pub enum ValidationOutcome {
     WrongDna(DnaHash, DnaHash),
     #[error("Update original EntryType: {0:?} doesn't match new EntryType {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
+    #[error("Update original {0:?} doesn't match the {1:?} in the update")]
+    UpdateHashMismatch(EntryHash, EntryHash),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
     VerifySignature(Signature, Action),
     #[error("The app entry def {0:?} zome index was out of range")]

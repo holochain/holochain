@@ -423,18 +423,26 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 /// Check a Update's entry type is the same for
 /// original and new entry.
 pub fn check_update_reference(
-    eu: &Update,
+    update: &Update,
     original_entry_action: &NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
-    if eu.entry_type == *original_entry_action.entry_type() {
-        Ok(())
-    } else {
-        Err(ValidationOutcome::UpdateTypeMismatch(
+    if update.entry_type != *original_entry_action.entry_type() {
+        return Err(ValidationOutcome::UpdateTypeMismatch(
             original_entry_action.entry_type().clone(),
-            eu.entry_type.clone(),
+            update.entry_type.clone(),
         )
-        .into())
+        .into());
     }
+
+    if update.original_entry_address != *original_entry_action.entry_hash() {
+        return Err(ValidationOutcome::UpdateHashMismatch(
+            original_entry_action.entry_hash().clone(),
+            update.original_entry_address.clone(),
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 /// Validate a chain of actions with an optional starting point.

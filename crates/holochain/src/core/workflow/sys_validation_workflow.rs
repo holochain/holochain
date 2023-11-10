@@ -239,6 +239,7 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
+        ValidationOutcome::UpdateHashMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
         ValidationOutcome::WrongDna(_, _) => Rejected,
         ValidationOutcome::ZomeIndex(_) => Rejected,
@@ -640,9 +641,10 @@ async fn register_delete_link(
 
 fn update_check(entry_update: &Update, original_action: &Action) -> SysValidationResult<()> {
     check_new_entry_action(original_action)?;
+    // This shouldn't fail due to the above `check_new_entry_action` check
     let original_action: NewEntryActionRef = original_action
         .try_into()
-        .expect("This can't fail due to the above check_new_entry_action"); // TODO yes it can if the code changes
+        .map_err(|_| ValidationOutcome::NotNewEntry(original_action.clone()))?;
     check_update_reference(entry_update, &original_action)?;
     Ok(())
 }
