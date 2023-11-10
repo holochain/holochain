@@ -7,8 +7,6 @@ use std::sync::Arc;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use holochain_types::prelude::*;
-use holochain_zome_types::TryInto;
 use tracing::*;
 
 use super::error::WorkflowResult;

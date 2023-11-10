@@ -1,7 +1,5 @@
 use super::ToSqlStatement;
-use holochain_zome_types::LinkType;
-use holochain_zome_types::LinkTypeFilter;
-use holochain_zome_types::ZomeIndex;
+use crate::prelude::*;
 use test_case::test_case;
 
 fn make_multi(types: &[(u8, &[u8])]) -> LinkTypeFilter {

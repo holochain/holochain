@@ -3,15 +3,8 @@ use arbitrary::Unstructured;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_state::validation_db::ValidationLimboStatus;
-use holochain_state::{mutations, prelude::test_in_mem_db};
-use holochain_types::db_cache::*;
-use holochain_types::dht_op::{DhtOpLight, DhtOpType, OpOrder};
-use holochain_zome_types::Create;
-use holochain_zome_types::ValidationStatus;
-use holochain_zome_types::{
-    Action, ActionHashed, Dna, Signature, SignedActionHashed, Timestamp, NOISE,
-};
+use holochain_state::mutations;
+use holochain_state::prelude::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,7 +22,7 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
     mutations::insert_action(txn, &action).unwrap();
     mutations::insert_op_lite(
         txn,
-        &DhtOpLight::RegisterAgentActivity(hash, basis_hash.clone()),
+        &DhtOpLite::RegisterAgentActivity(hash, basis_hash.clone()),
         &op_hash,
         &op_order,
         &timestamp,

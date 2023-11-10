@@ -9,13 +9,14 @@
 
 mod app_bundle;
 mod app_manifest;
+mod error;
 
-pub mod error;
-use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
+use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use derive_more::{Display, Into};
+pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
@@ -23,8 +24,6 @@ use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
-
-use self::error::{AppError, AppResult};
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;

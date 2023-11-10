@@ -11,9 +11,7 @@ use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
-use holochain_state::prelude::StateMutationResult;
-use holochain_state::prelude::StateQueryResult;
-use holochain_zome_types::CellId;
+use holochain_state::prelude::*;
 use std::sync::Arc;
 use thiserror::Error;
 

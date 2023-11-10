@@ -1,7 +1,7 @@
 //! Tools for simulating a network around real holochain nodes.
 //! This is a very early prototype and subject to change.
 
-use fixt::prelude::Distribution;
+use ::fixt::prelude::Distribution;
 use futures::stream::Stream;
 use kitsune_p2p::actor::BroadcastData;
 use std::collections::HashMap;

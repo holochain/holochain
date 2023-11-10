@@ -1,5 +1,4 @@
-use crate::record::SignedActionHashed;
-use crate::ChainTopOrdering;
+use crate::prelude::*;
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
@@ -27,7 +26,7 @@ pub struct Link {
     /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked to
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
-    pub timestamp: crate::Timestamp,
+    pub timestamp: Timestamp,
     /// The [`ZomeIndex`] for where this link is defined.
     pub zome_index: ZomeIndex,
     /// The [`LinkType`] for this link.
