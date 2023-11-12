@@ -93,19 +93,37 @@ use wasmer::Store;
 use wasmer::Type;
 // This is here because there were errors about different crate versions
 // without it.
-use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::RwLock;
 
+use crate::conductor::paths::CompiledWasmsRootPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
+use holochain_wasmer_host::module::InstanceCache;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleWithStore;
+use holochain_wasmer_host::module::PlruKeyMap;
+use holochain_wasmer_host::plru::MicroCache;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+
+pub static SERIALIZED_MODULE_CACHE: Lazy<RwLock<SerializedModuleCache>> = Lazy::new(|| {
+    RwLock::new(SerializedModuleCache {
+        cranelift,
+        maybe_fs_dir: Some(CompiledWasmsRootPath::default().into()),
+        plru: MicroCache::default(),
+        key_map: PlruKeyMap::default(),
+        cache: BTreeMap::default(),
+    })
+});
+pub static INSTANCE_CACHE: Lazy<RwLock<InstanceCache>> =
+    Lazy::new(|| RwLock::new(InstanceCache::default()));
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -353,22 +371,10 @@ impl RealRibosome {
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<ModuleWithStore>> {
-        match holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.get() {
-            Some(cache) => Ok(cache.write().get(
-                self.wasm_cache_key(zome_name)?,
-                &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-            )?),
-            None => {
-                // This can stampede but we don't really care. Just ignore any errors
-                // as the initialization is always the same.
-                let _ = holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.set(RwLock::new(
-                    SerializedModuleCache::default_with_cranelift(cranelift),
-                ));
-                // This will recurse at most once because the only condition of recursion
-                // is if the cache is empty, which we just set above.
-                self.runtime_compiled_module(zome_name)
-            }
-        }
+        Ok(SERIALIZED_MODULE_CACHE.write().get(
+            self.wasm_cache_key(zome_name)?,
+            &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+        )?)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
@@ -403,9 +409,7 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             context_key,
         );
-        holochain_wasmer_host::module::INSTANCE_CACHE
-            .write()
-            .put_item(key, instance_with_store);
+        INSTANCE_CACHE.write().put_item(key, instance_with_store);
 
         Ok(())
     }
@@ -520,7 +524,7 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );
-        let mut lock = holochain_wasmer_host::module::INSTANCE_CACHE.write();
+        let mut lock = INSTANCE_CACHE.write();
         // Get the first available key.
         let key = lock
             .cache()

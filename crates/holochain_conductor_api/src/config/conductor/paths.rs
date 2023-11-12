@@ -13,6 +13,7 @@ const ORGANIZATION: &str = "holochain";
 const APPLICATION: &str = "holochain";
 const KEYS_DIRECTORY: &str = "keys";
 const DATABASES_DIRECTORY: &str = "databases";
+const WASM_CACHE_DIRECTORY: &str = "compiled-wasms";
 const CONFIG_FILENAME: &str = "conductor-config.yml";
 
 /// Newtype for the database path. Has a Default.
@@ -37,6 +38,33 @@ impl Default for DatabaseRootPath {
 }
 
 impl<'a> From<&'a Path> for DatabaseRootPath {
+    fn from(p: &'a Path) -> Self {
+        p.to_owned().into()
+    }
+}
+
+/// Newtype for the compiled wasms path. Has a Default.
+#[derive(
+    Clone,
+    From,
+    Into,
+    Debug,
+    PartialEq,
+    AsRef,
+    FromStr,
+    Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[display(fmt = "{}", "_0.display()")]
+pub struct CompiledWasmsRootPath(PathBuf);
+impl Default for CompiledWasmsRootPath {
+    fn default() -> Self {
+        Self(data_root().join(PathBuf::from(WASM_CACHE_DIRECTORY)))
+    }
+}
+
+impl<'a> From<&'a Path> for CompiledWasmsRootPath {
     fn from(p: &'a Path) -> Self {
         p.to_owned().into()
     }
