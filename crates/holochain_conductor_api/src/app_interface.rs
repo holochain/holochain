@@ -4,6 +4,8 @@ use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
+use rmp_serde::config::SerializerConfig;
+use rmp_serde::config::StructMapConfig;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -448,6 +450,36 @@ pub struct NetworkInfo {
     pub total_network_peers: u32,
     pub bytes_since_last_time_queried: u64,
     pub completed_rounds_since_last_time_queried: u32,
+}
+
+#[test]
+fn app_request_serialization() {
+    use rmp_serde::Deserializer;
+
+    // make sure requests are serialized as expected
+    let request = AppRequest::AppInfo {
+        installed_app_id: "some_id".to_string(),
+    };
+    let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
+
+    let json_expected = r#"{"type":{"app_info":null},"data":{"installed_app_id":"some_id"}}"#;
+    let mut deserializer = Deserializer::new(&*serialized_request);
+    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+    let json_actual = serde_json::to_string(&json_value).unwrap();
+
+    assert_eq!(json_actual, json_expected);
+
+    // make sure responses are serialized as expected
+    let response =
+        AppResponse::ListWasmHostFunctions(vec!["host_fn_1".to_string(), "host_fn_2".to_string()]);
+    let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
+
+    let json_expected = r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
+    let mut deserializer = Deserializer::new(&*serialized_response);
+    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+    let json_actual = serde_json::to_string(&json_value).unwrap();
+
+    assert_eq!(json_actual, json_expected);
 }
 
 #[test]
