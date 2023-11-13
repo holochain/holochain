@@ -196,6 +196,11 @@ impl SweetConductorBatch {
     }
 
     /// Let each conductor know about each others' agents so they can do networking
+    pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
+        SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
         SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
     }
