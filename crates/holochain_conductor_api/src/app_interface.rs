@@ -4,8 +4,6 @@ use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
-use rmp_serde::config::SerializerConfig;
-use rmp_serde::config::StructMapConfig;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -474,7 +472,8 @@ fn app_request_serialization() {
         AppResponse::ListWasmHostFunctions(vec!["host_fn_1".to_string(), "host_fn_2".to_string()]);
     let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
 
-    let json_expected = r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
+    let json_expected =
+        r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
     let mut deserializer = Deserializer::new(&*serialized_response);
     let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
     let json_actual = serde_json::to_string(&json_value).unwrap();
