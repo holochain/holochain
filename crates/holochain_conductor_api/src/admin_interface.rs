@@ -510,3 +510,35 @@ pub enum AppStatusFilter {
     Stopped,
     Paused,
 }
+
+#[test]
+fn admin_request_serialization() {
+    use rmp_serde::Deserializer;
+
+    // make sure requests are serialized as expected
+    let request = AdminRequest::DisableApp {
+        installed_app_id: "some_id".to_string(),
+    };
+    let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
+
+    let json_expected = r#"{"type":{"disable_app":null},"data":{"installed_app_id":"some_id"}}"#;
+    let mut deserializer = Deserializer::new(&*serialized_request);
+    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+    let json_actual = serde_json::to_string(&json_value).unwrap();
+
+    assert_eq!(json_actual, json_expected);
+
+    // make sure responses are serialized as expected
+    let response = AdminResponse::Error(ExternalApiWireError::RibosomeError(
+        "error_text".to_string(),
+    ));
+    let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
+
+    let json_expected =
+        r#"{"type":{"error":null},"data":{"type":{"ribosome_error":null},"data":"error_text"}}"#;
+    let mut deserializer = Deserializer::new(&*serialized_response);
+    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+    let json_actual = serde_json::to_string(&json_value).unwrap();
+
+    assert_eq!(json_actual, json_expected);
+}
