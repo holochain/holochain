@@ -173,10 +173,10 @@ async fn app_validation_workflow_inner(
             "Committing {} ops",
             chunk.iter().map(|c| c.len()).sum::<usize>()
         );
-        let (t, a, r, activity) = workspace
+        let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
             .dht_db
             .write_async(move |txn| {
-                let mut total = 0;
+                let mut accepted = 0;
                 let mut awaiting = 0;
                 let mut rejected = 0;
                 let mut agent_activity = Vec::new();
@@ -201,7 +201,7 @@ async fn app_validation_workflow_inner(
                     }
                     match outcome {
                         Outcome::Accepted => {
-                            total += 1;
+                            accepted += 1;
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
@@ -227,7 +227,7 @@ async fn app_validation_workflow_inner(
                         }
                     }
                 }
-                WorkflowResult::Ok((total, awaiting, rejected, agent_activity))
+                WorkflowResult::Ok((accepted, awaiting, rejected, agent_activity))
             })
             .await?;
 
@@ -246,13 +246,13 @@ async fn app_validation_workflow_inner(
                     .await?;
             }
         }
-        ops_validated += t;
+        ops_validated += accepted_ops;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();
             *round_time = std::time::Instant::now();
             let avg_ops_ps =
                 ops_validated as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            let ops_ps = accepted_ops as f64 / round_el.as_micros() as f64 * 1_000_000.0;
             tracing::warn!(
                 "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
                 (num_ops_to_validate - ops_validated) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
@@ -260,17 +260,12 @@ async fn app_validation_workflow_inner(
                 ops_ps
             );
         }
-        tracing::debug!(
-            "{} committed, {} awaiting sys dep, {} rejected. {} committed this round",
-            t,
-            a,
-            r,
-            ops_validated
-        );
+        tracing::debug!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
     }
     jh.await?;
     Ok(if saturated || ops_validated < num_ops_to_validate {
-        WorkComplete::Incomplete(Some(2500))
+        // trigger app validation workflow again in 10 seconds
+        WorkComplete::Incomplete(Some(10000))
     } else {
         WorkComplete::Complete
     })
