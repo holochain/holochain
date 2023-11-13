@@ -1,6 +1,4 @@
-use crate::core::workflow::error::WorkflowResult;
-use holo_hash::DhtOpHash;
-use holochain_types::dht_op::DhtOp;
+use crate::core::workflow::WorkflowResult;
 use holochain_types::prelude::DhtOpHashed;
 use holochain_types::share::RwShare;
 

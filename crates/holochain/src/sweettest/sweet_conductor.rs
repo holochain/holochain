@@ -214,9 +214,13 @@ impl SweetConductor {
 
         tracing::info!(?config);
 
-        let handle =
-            Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
-                .await;
+        let handle = Self::handle_from_existing(
+            &dir,
+            keystore.unwrap_or_else(holochain_keystore::test_keystore),
+            &config,
+            &[],
+        )
+        .await;
         Self::new(handle, dir, config, rendezvous).await
     }
 

@@ -1,13 +1,7 @@
-use crate::prelude::StateMutationResult;
-use crate::query::from_blob;
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::{named_params, Transaction};
-use holochain_zome_types::FunctionName;
-use holochain_zome_types::Schedule;
-use holochain_zome_types::ScheduledFn;
-use holochain_zome_types::Timestamp;
-use holochain_zome_types::ZomeName;
 
 pub fn fn_is_scheduled(
     txn: &Transaction,

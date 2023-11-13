@@ -5,8 +5,8 @@ use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::GetOptions;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn must_get_valid_record<'a>(

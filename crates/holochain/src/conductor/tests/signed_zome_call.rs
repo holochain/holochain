@@ -1,9 +1,7 @@
 use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{
-    CapSecret, GrantZomeCallCapabilityPayload, GrantedFunction, GrantedFunctions, RoleName,
-};
+use holochain_zome_types::prelude::*;
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
@@ -16,9 +14,6 @@ use arbitrary::Arbitrary;
 async fn signed_zome_call() {
     use holochain_conductor_api::ZomeCall;
     use holochain_nonce::fresh_nonce;
-    use holochain_zome_types::{
-        CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
-    };
     use matches::assert_matches;
 
     let zome = TestWasm::Create;
@@ -123,10 +118,7 @@ async fn signed_zome_call() {
         .await
         .unwrap()
         .unwrap();
-    assert_matches!(
-        response,
-        holochain_zome_types::ZomeCallResponse::Unauthorized(..)
-    );
+    assert_matches!(response, ZomeCallResponse::Unauthorized(..));
 
     // a zome call with the cap secret of the authorized signing key should succeed
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
@@ -151,7 +143,7 @@ async fn signed_zome_call() {
         .await
         .unwrap()
         .unwrap();
-    assert_matches!(response, holochain_zome_types::ZomeCallResponse::Ok(_));
+    assert_matches!(response, ZomeCallResponse::Ok(_));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -159,9 +151,7 @@ async fn signed_zome_call() {
 async fn signed_zome_call_wildcard() {
     use holochain_conductor_api::ZomeCall;
     use holochain_nonce::fresh_nonce;
-    use holochain_zome_types::{
-        CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
-    };
+    use holochain_zome_types::prelude::*;
     use matches::assert_matches;
 
     let zome = TestWasm::Create;
@@ -266,5 +256,5 @@ async fn signed_zome_call_wildcard() {
         .await
         .unwrap()
         .unwrap();
-    assert_matches!(response, holochain_zome_types::ZomeCallResponse::Ok(_));
+    assert_matches!(response, ZomeCallResponse::Ok(_));
 }

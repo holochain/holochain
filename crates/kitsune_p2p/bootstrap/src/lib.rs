@@ -20,6 +20,8 @@ mod put;
 mod random;
 mod store;
 
+pub mod error;
+
 /// No reason to accept a peer data bigger then 1KB.
 // TODO: Maybe even that's too high?
 const SIZE_LIMIT: u64 = 1024;

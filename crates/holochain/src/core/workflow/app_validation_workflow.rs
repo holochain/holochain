@@ -31,10 +31,6 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
-use holochain_zome_types::op::EntryCreationAction;
-use holochain_zome_types::op::Op;
 use rusqlite::Transaction;
 use std::collections::HashSet;
 use tracing::*;
@@ -112,7 +108,7 @@ async fn app_validation_workflow_inner(
                 let op_type = op.get_type();
                 let action = op.action();
                 let dependency = get_dependency(op_type, &action);
-                let op_light = op.to_light();
+                let op_lite = op.to_lite();
 
                 // If this is agent activity, track it for the cache.
                 let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
@@ -131,7 +127,7 @@ async fn app_validation_workflow_inner(
                     }
                     Err(e) => Err(e),
                 };
-                (op_hash, dependency, op_light, r, activity)
+                (op_hash, dependency, op_lite, r, activity)
             }
         }
     });
@@ -181,7 +177,7 @@ async fn app_validation_workflow_inner(
                 let mut rejected = 0;
                 let mut agent_activity = Vec::new();
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, dependency, op_light, outcome, activity) = outcome;
+                    let (op_hash, dependency, op_lites, outcome, activity) = outcome;
                     // Get the outcome or return the error
                     let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
@@ -217,7 +213,7 @@ async fn app_validation_workflow_inner(
                             rejected += 1;
                             tracing::info!(
                                 "Received invalid op. The op author will be blocked.\nOp: {:?}",
-                                op_light
+                                op_lites
                             );
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;

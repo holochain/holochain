@@ -124,7 +124,6 @@ mod test {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use holochain_types::prelude::*;
-    use holochain_zome_types::ExternIO;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn post_commit_invocation_access() {

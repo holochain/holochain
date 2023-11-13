@@ -71,6 +71,7 @@ impl From<&str> for KitsuneP2pError {
     }
 }
 
+use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 pub use kitsune_p2p_types::bin_types::*;
 
 /// Data structures to be stored in the agent/peer database.
@@ -85,7 +86,6 @@ pub(crate) mod gossip;
 pub mod wire;
 
 pub use gossip::GossipModuleType;
-use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 pub use kitsune_p2p_types::dht;
 pub use kitsune_p2p_types::dht_arc;
 

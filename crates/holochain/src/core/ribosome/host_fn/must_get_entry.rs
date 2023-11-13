@@ -7,6 +7,7 @@ use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn must_get_entry<'a>(
@@ -97,7 +98,6 @@ pub mod test {
     use crate::test_entry_impl;
     use hdk::prelude::*;
     use holochain_state::prelude::*;
-    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use unwrap_to::unwrap_to;
 

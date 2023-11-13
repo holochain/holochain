@@ -20,7 +20,6 @@ use holochain_state::{
     prelude::*,
     query::{row_blob_and_hash_to_action, QueryData},
 };
-use holochain_types::prelude::*;
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, Clone)]

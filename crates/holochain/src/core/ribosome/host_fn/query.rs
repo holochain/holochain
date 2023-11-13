@@ -5,6 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
@@ -47,7 +48,6 @@ pub mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use query::ChainQueryFilter;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn query_smoke_test() {
