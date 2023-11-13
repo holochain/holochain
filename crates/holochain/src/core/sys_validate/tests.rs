@@ -156,6 +156,7 @@ async fn record_with_deps_fixup(
                     update.original_action_address = create.action_address().clone();
                     update.original_entry_address =
                         create.entry().as_option().unwrap().to_hash().clone();
+                    *create.as_action_mut().entry_data_mut().unwrap().0 = create.entry().as_option().unwrap().to_hash().clone();
                     *create.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
                     deps.push(create);
                 }
@@ -211,7 +212,7 @@ async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Reco
 #[allow(dead_code)]
 async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
     let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
+    let cascade: MockCascade = MockCascade::with_records(deps.clone());
     sys_validate_record(&record, &cascade).await
 }
 
