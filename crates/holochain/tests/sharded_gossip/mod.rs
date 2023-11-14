@@ -528,6 +528,7 @@ async fn three_way_gossip_recent() {
         publish: false,
         recent: true,
         historical: false,
+        // NOTE: disable bootstrap so we can selectively ignore the shut-down conductor
         bootstrap: false,
         recent_threshold: None,
     };
@@ -543,6 +544,7 @@ async fn three_way_gossip_historical() {
         publish: false,
         recent: false,
         historical: true,
+        // NOTE: disable bootstrap so we can selectively ignore the shut-down conductor
         bootstrap: false,
         recent_threshold: Some(0),
     };
@@ -615,10 +617,11 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
     assert_eq!(records_0, records_1);
 
+    // Forget the first node's peer info before it gets gossiped to the third node.
+    // NOTE: this simulates "leave network", which we haven't yet implemented. The test will work without this,
+    // but there is a high chance of a 60 second timeout which flakily slows down this test beyond any acceptable duration.
     conductors.forget_peer_info([cells[0].agent_pubkey()]).await;
     conductors[0].shutdown().await;
-    // tokio::time::sleep(Duration::from_secs(5)).await;
-    // tokio::time::sleep(Duration::from_secs(5)).await;
 
     let new_config = config.random_scope();
     let new_scope = new_config.tracing_scope.clone().unwrap();
