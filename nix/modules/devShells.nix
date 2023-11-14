@@ -177,6 +177,7 @@
 
           packages = (lib.lists.optionals pkgs.stdenv.isLinux [
             pkgs.mold
+            pkgs.pkgsStatic.openssl
           ]);
 
           shellHook = ''
@@ -194,7 +195,6 @@
           '')
           + (lib.strings.optionalString pkgs.stdenv.isLinux ''
             export RUSTFLAGS="$RUSTFLAGS -Clink-arg=-fuse-ld=mold"
-            export LD_LIBRARY_PATH=${lib.makeLibraryPath [ pkgs.openssl ]}
           '')
           ;
         };
