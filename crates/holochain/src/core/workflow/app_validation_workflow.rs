@@ -2,6 +2,7 @@
 
 use std::convert::TryInto;
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
@@ -262,7 +263,7 @@ async fn app_validation_workflow_inner(
     jh.await?;
     Ok(if saturated || ops_validated < num_ops_to_validate {
         // trigger app validation workflow again in 10 seconds
-        WorkComplete::Incomplete(Some(10000))
+        WorkComplete::Incomplete(Some(Duration::from_secs(10)))
     } else {
         WorkComplete::Complete
     })

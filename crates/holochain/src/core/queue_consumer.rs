@@ -633,7 +633,7 @@ pub enum WorkComplete {
     /// The queue has been exhausted
     Complete,
     /// Items still remain on the queue. Optionally a delay in ms before retriggering.
-    Incomplete(Option<u64>),
+    Incomplete(Option<Duration>),
 }
 
 /// The only error possible when attempting to trigger: the channel is closed
@@ -669,10 +669,8 @@ async fn queue_consumer_main_task_impl<
                 Ok(WorkComplete::Incomplete(delay)) => {
                     tracing::info!("Work incomplete, re-triggering workflow.");
                     if let Some(dly) = delay {
-                        tracing::info!(
-                            "Sleeping for {dly} ms before re-triggering."
-                        );
-                        tokio::time::sleep(Duration::from_millis(dly)).await;
+                        tracing::info!("Sleeping for {} ms before re-triggering.", dly.as_millis());
+                        tokio::time::sleep(dly).await;
                     }
                     tx.trigger(&"retrigger")
                 }
