@@ -308,7 +308,7 @@ impl LocalBehavior1 {
 }
 
 async fn loc_test_conductor(network_seed: String, rendezvous: DynSweetRendezvous) -> HcStressTest {
-    let config = SweetConductorConfig::rendezvous();
+    let config = SweetConductorConfig::rendezvous(true);
     let conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
     let dna = HcStressTest::test_dna(network_seed).await;
     HcStressTest::new(conductor, &[dna]).await

@@ -170,6 +170,7 @@ impl KitsuneP2pActor {
 
         // Start a loop to handle our fetch queue fetch items.
         FetchTask::spawn(
+            config.clone(),
             fetch_pool.clone(),
             host_api.clone(),
             internal_sender.clone(),
