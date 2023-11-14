@@ -667,11 +667,13 @@ async fn queue_consumer_main_task_impl<
             let start = Instant::now();
             match fut().await {
                 Ok(WorkComplete::Incomplete(delay)) => {
-                    let delay = delay.unwrap_or(0);
-                    tracing::error!(
-                        "Work incomplete, retriggering workflow after a delay of {delay} ms."
-                    );
-                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                    tracing::info!("Work incomplete, re-triggering workflow.");
+                    if let Some(dly) = delay {
+                        tracing::info!(
+                            "Sleeping for {dly} ms before re-triggering."
+                        );
+                        tokio::time::sleep(Duration::from_millis(dly)).await;
+                    }
                     tx.trigger(&"retrigger")
                 }
                 Err(err) => handle_workflow_error(&name, err)?,
