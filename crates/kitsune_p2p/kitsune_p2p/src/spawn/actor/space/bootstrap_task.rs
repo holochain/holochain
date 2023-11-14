@@ -84,8 +84,7 @@ impl BootstrapTask {
     ) -> Arc<RwLock<Self>> {
         let task_this = this.clone();
         tokio::spawn(async move {
-            let backoff_multiplier = if !cfg!(test) && bootstrap_check_delay_backoff_multiplier < 2
-            {
+            let backoff_multiplier = if bootstrap_check_delay_backoff_multiplier < 2 {
                 tracing::warn!(
                     "Using default bootstrap backoff multiplier 2 because configured value is too low - {}",
                     bootstrap_check_delay_backoff_multiplier
