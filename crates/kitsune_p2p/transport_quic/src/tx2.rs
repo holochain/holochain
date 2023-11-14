@@ -481,14 +481,14 @@ mod tests {
         let config = QuicConfig::default();
         let factory = QuicBackendAdapt::new(config).await.unwrap();
         let (ep1, _con_recv1) = factory
-            .bind("kitsune-quic://0.0.0.0:0".into(), t)
+            .bind("kitsune-quic://0.0.0.0:0".try_into().unwrap(), t)
             .await
             .unwrap();
 
         let config = QuicConfig::default();
         let factory = QuicBackendAdapt::new(config).await.unwrap();
         let (ep2, mut con_recv2) = factory
-            .bind("kitsune-quic://0.0.0.0:0".into(), t)
+            .bind("kitsune-quic://0.0.0.0:0".try_into().unwrap(), t)
             .await
             .unwrap();
 
