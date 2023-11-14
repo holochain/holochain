@@ -605,8 +605,8 @@ async fn check_update_reference_test() {
     .build(&mut g);
 
     let net = new_entry_type.clone();
-    let entry = contrafact::brute("matching entry", move |e: &Entry| {
-        entry_type_matches(&net, e)
+    let entry = contrafact::brute("matching entry, not countersigning", move |e: &Entry| {
+        !matches!(e, Entry::CounterSign(_, _)) && entry_type_matches(&net, e)
     })
     .build(&mut g);
 
