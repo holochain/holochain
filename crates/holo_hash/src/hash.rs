@@ -87,6 +87,32 @@ impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
     }
 }
 
+#[cfg(feature = "fuzzing")]
+impl<T: HashType + proptest::arbitrary::Arbitrary> proptest::arbitrary::Arbitrary for HoloHash<T>
+where
+    T::Strategy: 'static,
+{
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHash<T>>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        let strat = T::arbitrary().prop_flat_map(move |hash_type| {
+            let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
+            gen_strat.prop_map(move |mut buf| {
+                assert_eq!(buf.len(), 39);
+                buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
+                HoloHash {
+                    hash: buf.to_vec(),
+                    hash_type,
+                }
+            })
+        });
+        strat.boxed()
+    }
+}
+
 impl<T: HashType> HoloHash<T> {
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type

@@ -21,7 +21,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use std::sync::Arc;
 
     use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
-    use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
 
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
@@ -77,9 +77,9 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous(true);
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -112,7 +112,11 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // See if we can fetch metric data from bobbo
     let metrics = conductors[1].dump_network_metrics(None).await?;
-    println!("@!@! - metrics: {}", metrics);
+    tracing::info!(target: "TEST", "@!@! - metrics: {metrics}");
+
+    // See if we can fetch network stats from bobbo
+    let stats = conductors[1].dump_network_stats().await?;
+    tracing::info!(target: "TEST", "@!@! - stats: {stats}");
 
     Ok(())
 }
@@ -313,7 +317,7 @@ async fn check_all_gets_for_private_entry(
             .into_iter()
             .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
     );
-    let records = records.into_iter().filter_map(|a| a).collect();
+    let records = records.into_iter().flatten().collect();
     check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))

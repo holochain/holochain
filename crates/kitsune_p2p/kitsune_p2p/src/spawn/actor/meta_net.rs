@@ -19,6 +19,10 @@ use kitsune_p2p_proxy::tx2::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_transport_quic::tx2::*;
 #[cfg(feature = "tx2")]
+use kitsune_p2p_types::config::KitsuneP2pTx2Backend;
+#[cfg(feature = "tx2")]
+use kitsune_p2p_types::config::KitsuneP2pTx2ProxyConfig;
+#[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::tx2_api::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -36,6 +40,7 @@ use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::Codec;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
 use opentelemetry_api::metrics::Histogram;
@@ -128,6 +133,35 @@ pub enum MetaNetEvt {
     },
 }
 
+impl std::fmt::Debug for MetaNetEvt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connected { remote_url, .. } => f
+                .debug_struct("Connected")
+                .field("remote_url", remote_url)
+                .finish(),
+            Self::Disconnected { remote_url, .. } => f
+                .debug_struct("Disconnected")
+                .field("remote_url", remote_url)
+                .finish(),
+            Self::Request {
+                remote_url, data, ..
+            } => f
+                .debug_struct("Request")
+                .field("remote_url", remote_url)
+                .field("data", data)
+                .finish(),
+            Self::Notify {
+                remote_url, data, ..
+            } => f
+                .debug_struct("Notify")
+                .field("remote_url", remote_url)
+                .field("data", data)
+                .finish(),
+        }
+    }
+}
+
 impl MetaNetEvt {
     pub fn con(&self) -> &MetaNetCon {
         match self {
@@ -154,7 +188,7 @@ pub enum MetaNetAuth {
     UnauthorizedDisconnect,
 }
 
-async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, now: Timestamp) -> MetaNetAuth {
+async fn node_is_authorized(host: &HostApi, node_id: NodeCert, now: Timestamp) -> MetaNetAuth {
     match host.is_blocked(BlockTargetId::Node(node_id), now).await {
         Ok(true) => MetaNetAuth::UnauthorizedDisconnect,
         Ok(false) => MetaNetAuth::Authorized,
@@ -164,7 +198,7 @@ async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, now: Timesta
 
 pub async fn nodespace_is_authorized(
     host: &HostApi,
-    node_id: Arc<[u8; 32]>,
+    node_id: NodeCert,
     maybe_space: Option<Arc<KitsuneSpace>>,
     now: Timestamp,
 ) -> MetaNetAuth {
@@ -215,9 +249,7 @@ impl MetricSendGuard {
 
 impl Drop for MetricSendGuard {
     fn drop(&mut self) {
-        let cx = opentelemetry_api::Context::new();
         crate::metrics::METRIC_MSG_OUT_BYTE.record(
-            &cx,
             self.byte_count,
             &[
                 opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
@@ -225,7 +257,6 @@ impl Drop for MetricSendGuard {
             ],
         );
         crate::metrics::METRIC_MSG_OUT_TIME.record(
-            &cx,
             self.start_time.elapsed().as_secs_f64(),
             &[
                 opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
@@ -481,7 +512,7 @@ impl MetaNetCon {
         result
     }
 
-    pub fn peer_id(&self) -> Arc<[u8; 32]> {
+    pub fn peer_id(&self) -> NodeCert {
         #[cfg(test)]
         {
             if let MetaNetCon::Test { state } = self {
@@ -500,7 +531,7 @@ impl MetaNetCon {
         {
             if let MetaNetCon::Tx5 { rem_url, .. } = self {
                 let id = rem_url.id().unwrap();
-                return Arc::new(id.0);
+                return Arc::new(id.0).into();
             }
         }
 
@@ -511,7 +542,7 @@ impl MetaNetCon {
 #[cfg(test)]
 #[derive(Debug)]
 pub struct MetaNetConTest {
-    pub id: Arc<[u8; 32]>,
+    pub id: NodeCert,
     pub closed: bool,
 
     pub notify_succeed: bool,
@@ -522,7 +553,7 @@ pub struct MetaNetConTest {
 impl Default for MetaNetConTest {
     fn default() -> Self {
         Self {
-            id: Arc::new([0; 32]),
+            id: NodeCert::from(Arc::new([0; 32])),
             closed: false,
             notify_succeed: true,
             notify_call_count: 0,
@@ -534,12 +565,12 @@ impl Default for MetaNetConTest {
 impl MetaNetConTest {
     pub fn new_with_id(id: u8) -> Self {
         Self {
-            id: Arc::new(vec![id; 32].try_into().unwrap()),
+            id: NodeCert::from(Arc::new(vec![id; 32].try_into().unwrap())),
             ..Default::default()
         }
     }
 
-    pub fn id(&self) -> Arc<[u8; 32]> {
+    pub fn id(&self) -> NodeCert {
         self.id.clone()
     }
 }
@@ -638,9 +669,9 @@ impl MetaNet {
                     };
                     conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
                         Box::pin(async move {
-                            match crate::spawn::actor::bootstrap::proxy_list(
+                            match kitsune_p2p_bootstrap_client::proxy_list(
                                 bootstrap_url.into(),
-                                crate::spawn::actor::bootstrap::BootstrapNet::Tx2,
+                                kitsune_p2p_bootstrap_client::BootstrapNet::Tx2,
                             )
                             .await
                             {
@@ -663,8 +694,8 @@ impl MetaNet {
                     });
                 }
             }
-            let f = tx2_proxy(f, conf)?;
-            f
+
+            tx2_proxy(f, conf)?
         } else {
             f
         };
@@ -845,6 +876,14 @@ impl MetaNet {
             tx5_config.set_lair_tag(lair_tag);
         }
 
+        if let Err(err) = (tx5::deps::tx5_core::Tx5InitConfig {
+            ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
+            ephemeral_udp_port_max: tuning_params.tx5_max_ephemeral_udp_port,
+        })
+        .set_as_global_default()
+        {
+            tracing::warn!(?err, "Tx5InitConfig failed, you must be running multiple conductors in the same process. Be aware they will all share whichever Tx5InitConfig was first to be registered.");
+        }
         let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
 
         let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
@@ -1044,7 +1083,7 @@ impl MetaNet {
         panic!("invalid features");
     }
 
-    pub fn local_id(&self) -> Arc<[u8; 32]> {
+    pub fn local_id(&self) -> NodeCert {
         #[cfg(feature = "tx2")]
         {
             if let MetaNet::Tx2(ep, _) = self {
@@ -1056,7 +1095,7 @@ impl MetaNet {
         {
             if let MetaNet::Tx5 { url, .. } = self {
                 if let Some(id) = url.id() {
-                    return Arc::new(id.0);
+                    return Arc::new(id.0).into();
                 }
             }
         }
@@ -1073,8 +1112,10 @@ impl MetaNet {
 
         #[cfg(feature = "tx2")]
         {
-            tracing::debug!("broadcast on tx2");
-            return Ok(());
+            if matches!(self, MetaNet::Tx2 { .. }) {
+                tracing::debug!("broadcast on tx2");
+                return Ok(());
+            }
         }
 
         #[cfg(feature = "tx5")]
@@ -1165,3 +1206,6 @@ impl MetaNet {
         async move { Err("invalid features".into()) }.boxed()
     }
 }
+
+#[cfg(test)]
+mod tests;

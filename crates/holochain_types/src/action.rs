@@ -15,13 +15,13 @@ use holo_hash::EntryHash;
 use holochain_zome_types::op::EntryCreationAction;
 use holochain_zome_types::prelude::*;
 
-#[cfg(feature = "contrafact")]
-pub mod facts;
-
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 /// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
     /// A action which simply creates a new entry

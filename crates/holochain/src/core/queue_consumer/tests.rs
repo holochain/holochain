@@ -8,14 +8,17 @@ use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
 
 #[tokio::test]
-async fn test_trigger() {
+async fn test_trigger_receiver_waits_for_sender() {
     let (_tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move { rx.listen().await.unwrap() });
 
     // This should timeout because the trigger was not called.
     let r = tokio::time::timeout(Duration::from_millis(10), jh).await;
     assert!(r.is_err());
+}
 
+#[tokio::test]
+async fn test_trigger_send() {
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move { rx.listen().await.unwrap() });
     tx.trigger(&"");
@@ -23,6 +26,11 @@ async fn test_trigger() {
     // This should be joined because the trigger was called.
     let r = jh.await;
     assert!(r.is_ok());
+}
+
+#[tokio::test]
+async fn test_trigger_only_permits_single_trigger() {
+    holochain_trace::test_run().ok();
 
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move {

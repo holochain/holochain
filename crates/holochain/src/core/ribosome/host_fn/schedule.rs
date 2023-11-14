@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn schedule(
     _ribosome: Arc<impl RibosomeT>,
@@ -44,7 +45,7 @@ pub fn schedule(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_state::prelude::schedule_fn;

@@ -4,9 +4,8 @@
 use futures::StreamExt;
 use hdk::prelude::ExternIO;
 use holochain::sweettest::{SweetCell, SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
-use holochain_types::signal::Signal;
+use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::RemoteSignal;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -31,7 +30,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
     holochain_trace::test_run().ok();
 
     let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous()).await;
+        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(true))
+            .await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await

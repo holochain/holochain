@@ -8,7 +8,7 @@ use crate::metrics::*;
 /// Note that a node can contain many agents.
 pub(crate) struct Node {
     pub(crate) agent_info_list: Vec<AgentInfoSigned>,
-    pub(crate) cert: Arc<[u8; 32]>,
+    pub(crate) cert: NodeCert,
     pub(crate) url: TxUrl,
 }
 
@@ -20,7 +20,7 @@ impl ShardedGossipLocal {
         local_agents: &HashSet<Arc<KitsuneAgent>>,
         all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Node>> {
-        let mut remote_nodes: HashMap<Arc<[u8; 32]>, Node> = HashMap::new();
+        let mut remote_nodes: HashMap<NodeCert, Node> = HashMap::new();
 
         // Get all the remote nodes in this arc set.
         let remote_agents_within_arc_set: HashSet<_> =
@@ -51,14 +51,14 @@ impl ShardedGossipLocal {
                     kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
                         .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                         .ok()
-                        .map(|purl| (info.clone(), purl.digest().0, url.to_string()))
+                        .map(|purl| (info.clone(), purl.digest().0.into(), url.to_string()))
                 })
                 .next();
 
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
             if let Some((info, cert, url)) = info {
-                match remote_nodes.get_mut::<Arc<[u8; 32]>>(&cert) {
+                match remote_nodes.get_mut::<NodeCert>(&cert) {
                     // Add the agent to the node.
                     Some(node) => node.agent_info_list.push(info),
                     None => {
@@ -146,7 +146,7 @@ fn next_remote_node(
 
 #[cfg(test)]
 mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use rand::distributions::Alphanumeric;
     use test_case::test_case;
 
@@ -212,7 +212,7 @@ mod tests {
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],
-                    cert: purl.digest().0,
+                    cert: NodeCert::from(purl.digest().0),
                     url,
                 }
             })

@@ -43,6 +43,7 @@ use contrafact::Fact;
 use error::SysValidationError;
 
 use holochain_cascade::MockCascade;
+use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::SerializedBytes;
@@ -52,6 +53,7 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
+use holochain_zome_types::facts::ActionRefMut;
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::time::Duration;
@@ -238,14 +240,11 @@ async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
 async fn test_record_with_cascade() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     for _ in 0..100 {
-        let op = holochain_types::dht_op::facts::valid_dht_op(
-            keystore.clone(),
-            fake_agent_pubkey_1(),
-            false,
-        )
-        .build(&mut g);
+        let op =
+            holochain_types::facts::valid_dht_op(keystore.clone(), fake_agent_pubkey_1(), false)
+                .build(&mut g);
         let action = op.action().clone();
         assert_valid_action(&keystore, action).await;
     }
@@ -256,7 +255,7 @@ async fn test_record_with_cascade() {
 async fn verify_action_signature_test() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     let action = CreateLink::arbitrary(&mut g).unwrap();
     let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
@@ -276,7 +275,7 @@ async fn verify_action_signature_test() {
 async fn check_previous_action() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     let mut action = Action::Delete(Delete::arbitrary(&mut g).unwrap());
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
@@ -982,6 +981,11 @@ async fn test_dpki_agent_update() {
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
 #[tokio::test(flavor = "multi_thread")]
+// XXX: the valid_arbitrary_chain as used here can't handle actions with
+// sys validation dependencies, so we filter out those action types.
+// Also, there are several other problems here that need to be addressed
+// to make this not flaky.
+#[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();

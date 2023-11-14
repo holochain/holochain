@@ -152,8 +152,8 @@ impl LocalBehavior1 {
                 this.lock().unwrap().runner.as_ref().unwrap().add_node(
                     node,
                     SHUTDOWN_30_S,
-                    BehaviorPublish::None,
-                    BehaviorQuery::None,
+                    vec![(0, BehaviorPublish::None)],
+                    vec![(0, BehaviorQuery::None)],
                 );
 
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -163,8 +163,8 @@ impl LocalBehavior1 {
                 let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
                     node,
                     BehaviorLifetime::Forever,
-                    PUBLISH_LARGE_5_M,
-                    QUERY_FULL_15_S,
+                    vec![(0, PUBLISH_LARGE_5_M)],
+                    vec![(0, QUERY_FULL_15_S)],
                 );
                 this.lock()
                     .unwrap()
@@ -182,8 +182,8 @@ impl LocalBehavior1 {
                 let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
                     node,
                     BehaviorLifetime::Forever,
-                    PUBLISH_SMALL_1_M,
-                    QUERY_FULL_15_S,
+                    vec![(0, PUBLISH_SMALL_1_M)],
+                    vec![(0, QUERY_FULL_15_S)],
                 );
                 this.lock()
                     .unwrap()
@@ -203,8 +203,8 @@ impl LocalBehavior1 {
                 let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
                     node,
                     BehaviorLifetime::Forever,
-                    PUBLISH_SMALL_1_M,
-                    QUERY_SHALLOW_15_S,
+                    vec![(0, PUBLISH_SMALL_1_M)],
+                    vec![(0, QUERY_SHALLOW_15_S)],
                 );
                 this.lock()
                     .unwrap()
@@ -218,8 +218,8 @@ impl LocalBehavior1 {
                 this.lock().unwrap().runner.as_ref().unwrap().add_node(
                     node,
                     SHUTDOWN_3_M,
-                    PUBLISH_SMALL_SINGLE,
-                    BehaviorQuery::None,
+                    vec![(0, PUBLISH_SMALL_SINGLE)],
+                    vec![(0, BehaviorQuery::None)],
                 );
 
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -229,8 +229,8 @@ impl LocalBehavior1 {
                 this.lock().unwrap().runner.as_ref().unwrap().add_node(
                     node,
                     SHUTDOWN_3_M,
-                    PUBLISH_LARGE_SINGLE,
-                    BehaviorQuery::None,
+                    vec![(0, PUBLISH_LARGE_SINGLE)],
+                    vec![(0, BehaviorQuery::None)],
                 );
 
                 loop {
@@ -244,8 +244,8 @@ impl LocalBehavior1 {
                     let node_id = this.lock().unwrap().runner.as_ref().unwrap().add_node(
                         node,
                         SHUTDOWN_3_M,
-                        BehaviorPublish::None,
-                        QUERY_SHALLOW_15_S,
+                        vec![(0, BehaviorPublish::None)],
+                        vec![(0, QUERY_SHALLOW_15_S)],
                     );
                     this.lock()
                         .unwrap()
@@ -308,8 +308,8 @@ impl LocalBehavior1 {
 }
 
 async fn loc_test_conductor(network_seed: String, rendezvous: DynSweetRendezvous) -> HcStressTest {
-    let config = SweetConductorConfig::rendezvous();
+    let config = SweetConductorConfig::rendezvous(true);
     let conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
     let dna = HcStressTest::test_dna(network_seed).await;
-    HcStressTest::new(conductor, dna).await
+    HcStressTest::new(conductor, &[dna]).await
 }

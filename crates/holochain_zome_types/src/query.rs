@@ -3,12 +3,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::action::ActionType;
-use crate::action::EntryType;
-use crate::timestamp::Timestamp;
-use crate::warrant::Warrant;
-use crate::ActionHashed;
-use crate::Record;
+use crate::prelude::*;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
@@ -159,8 +154,10 @@ pub struct HighestObserved {
 // TODO: In the future we will most likely be replaced
 // by warrants instead of Forked / Invalid so we can provide
 // evidence of why the chain has a status.
+#[derive(Default)]
 pub enum ChainStatus {
     /// This authority has no information on the chain.
+    #[default]
     Empty,
     /// The chain is valid as at this action sequence and action hash.
     Valid(ChainHead),
@@ -168,12 +165,6 @@ pub enum ChainStatus {
     Forked(ChainFork),
     /// Chain is invalid because of this action.
     Invalid(ChainHead),
-}
-
-impl Default for ChainStatus {
-    fn default() -> Self {
-        ChainStatus::Empty
-    }
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -418,9 +409,7 @@ mod tests {
     use super::ChainQueryFilter;
     use crate::action::EntryType;
     use crate::fixt::AppEntryDefFixturator;
-    use crate::fixt::*;
-    use crate::ActionHashed;
-    use crate::ChainQueryFilterRange;
+    use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
 
@@ -475,8 +464,7 @@ mod tests {
         h5.prev_action = hh4.as_hash().clone();
         let hh5 = ActionHashed::from_content_sync(h5.into());
 
-        let actions = [hh0, hh1, hh2, hh3, hh3a, hh4, hh5];
-        actions
+        [hh0, hh1, hh2, hh3, hh3a, hh4, hh5]
     }
 
     fn map_query(query: &ChainQueryFilter, actions: &[ActionHashed]) -> Vec<bool> {

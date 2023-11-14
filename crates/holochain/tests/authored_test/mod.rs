@@ -2,18 +2,16 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::time::Duration;
 
+use rusqlite::named_params;
+
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holochain::test_utils::wait_for_integration;
-use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::Entry;
-
 use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain::test_utils::host_fn_caller::*;
+use holochain::test_utils::wait_for_integration;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_zome_types::EntryDefLocation;
-use holochain_zome_types::EntryVisibility;
-use rusqlite::named_params;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::prelude::*;
 
 /// - Alice commits an entry and it is in their authored store
 /// - Bob doesn't have the entry in their authored store
@@ -88,7 +86,7 @@ async fn authored_test() {
         &bob_call_data.dht_db,
         expected_count,
         num_attempts,
-        delay_per_attempt.clone(),
+        delay_per_attempt,
     )
     .await;
 

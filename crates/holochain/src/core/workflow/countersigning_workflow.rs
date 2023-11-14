@@ -6,13 +6,7 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
-use holochain_state::prelude::{
-    current_countersigning_session, SourceChainResult, StateMutationResult, Store,
-};
-use holochain_types::dht_op::DhtOp;
-use holochain_types::signal::{Signal, SystemSignal};
-use holochain_zome_types::Timestamp;
-use holochain_zome_types::{Entry, SignedAction, ZomeCallResponse};
+use holochain_state::prelude::*;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
 
@@ -85,7 +79,7 @@ pub(crate) fn incoming_countersigning(
                         .collect();
 
                     // Check if already timed out.
-                    if holochain_zome_types::Timestamp::now() < expires {
+                    if holochain_zome_types::prelude::Timestamp::now() < expires {
                         // Put this op in the pending map.
                         workspace.put(entry_hash, hash, op, required_actions, expires);
                         // We have new ops so we should trigger the workflow.
@@ -124,7 +118,7 @@ pub(crate) async fn countersigning_workflow(
             incoming_dht_ops_workflow(
                 space.clone(),
                 sys_validation_trigger.clone(),
-                non_enzymatic_ops,
+                non_enzymatic_ops.into_iter().map(|(_h, o)| o).collect(),
                 false,
             )
             .await?;
@@ -391,7 +385,7 @@ impl CountersigningWorkspace {
     }
 
     fn get_complete_sessions(&self) -> Vec<(AgentsToNotify, Ops, SignedActions)> {
-        let now = holochain_zome_types::Timestamp::now();
+        let now = holochain_zome_types::prelude::Timestamp::now();
         self.inner
             .share_mut(|i, _| {
                 // Remove any expired sessions.
@@ -466,7 +460,7 @@ mod tests {
     /// the expiry time is in the future and all required actions
     /// are present.
     fn gets_complete_sessions() {
-        let mut u = arbitrary::Unstructured::new(&holochain_zome_types::NOISE);
+        let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
         let workspace = CountersigningWorkspace::new();
 
         // - Create the ops.
@@ -518,7 +512,7 @@ mod tests {
     #[test]
     /// Test that expired sessions are removed.
     fn expired_sessions_removed() {
-        let mut u = arbitrary::Unstructured::new(&holochain_zome_types::NOISE);
+        let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
         let workspace = CountersigningWorkspace::new();
 
         // - Create an op for a session that has expired in the past.

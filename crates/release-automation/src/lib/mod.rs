@@ -20,7 +20,7 @@ pub mod crate_selection;
 pub mod release;
 
 #[cfg(test)]
-pub mod tests;
+mod tests;
 
 pub type Fallible<T> = anyhow::Result<T>;
 pub type CommandResult = Fallible<()>;

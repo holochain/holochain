@@ -5,7 +5,7 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.66.1";
+        version = "1.71.1";
       };
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
@@ -55,13 +55,15 @@
       });
 
       # derivation with the main crates
-      holochain = craneLib.buildPackage (commonArgs // {
+      holochain = lib.makeOverridable craneLib.buildPackage (commonArgs // {
         CARGO_PROFILE = "release";
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
         passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
       });
+
+      holochain_chc = holochain.override { cargoExtraArgs = " --features chc"; };
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
         pname = "holochain-tests-nextest";
@@ -215,6 +217,7 @@
         {
           inherit
             holochain
+            holochain_chc
 
             build-holochain-tests-unit
             build-holochain-tests-unit-wasm

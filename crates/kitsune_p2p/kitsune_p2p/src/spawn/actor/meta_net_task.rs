@@ -11,14 +11,16 @@ use crate::spawn::meta_net::{
     nodespace_is_authorized, MetaNetAuth, MetaNetCon, MetaNetEvt, MetaNetEvtRecv, Respond,
 };
 use crate::wire::WireData;
-use crate::{wire, HostApiLegacy, KitsuneAgent, KitsuneP2pConfig, KitsuneP2pError, KitsuneSpace};
+use crate::{wire, HostApiLegacy, KitsuneAgent, KitsuneP2pError, KitsuneSpace};
 use futures::StreamExt;
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool, FetchResponseQueue};
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tracing::Instrument;
 
 pub struct MetaNetTask {
     host: HostApiLegacy,
@@ -80,6 +82,9 @@ impl MetaNetTask {
 
         tokio::task::spawn({
             let tuning_params = self.config.tuning_params.clone();
+            let span =
+                tracing::error_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
+            let span_outer = span.clone();
             async move {
                 let ep_evt = self
                     .ep_evt
@@ -87,13 +92,14 @@ impl MetaNetTask {
                     .expect("There should always be an ep_evt");
 
                 let this = Arc::new(self);
+                let span = span.clone();
 
                 let ep_evt_run = ep_evt.for_each_concurrent(
                     tuning_params.concurrent_limit_per_thread,
                     move |event| {
                         let this = this.clone();
                         let shutdown_notify = shutdown_notify_send.clone();
-
+                        let span = span.clone();
                         async move {
                             if let Err(MetaNetTaskError::RequiredChannelClosed) = match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
@@ -117,6 +123,7 @@ impl MetaNetTask {
                                 shutdown_notify.notify_one();
                             }
                         }
+                        .instrument(span)
                     },
                 );
 
@@ -136,6 +143,7 @@ impl MetaNetTask {
                 );
                 is_finished.fetch_or(true, Ordering::SeqCst)
             }
+            .instrument(span_outer)
         });
     }
 
@@ -588,6 +596,7 @@ mod tests {
     use kitsune_p2p_fetch::test_utils::{test_key_op, test_req_op, test_source, test_space};
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
     use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
+    use kitsune_p2p_types::bin_types::NodeCert;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
@@ -2266,7 +2275,7 @@ mod tests {
     }
 
     fn test_node_id(i: u8) -> NodeId {
-        Arc::new(vec![i; 32].try_into().unwrap())
+        NodeCert::from(Arc::new(vec![i; 32].try_into().unwrap()))
     }
 
     fn test_agent(i: u8) -> Arc<KitsuneAgent> {

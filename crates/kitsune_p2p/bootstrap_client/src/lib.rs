@@ -1,11 +1,17 @@
-use crate::types::actor::KitsuneP2pResult;
-use crate::types::agent_store::AgentInfoSigned;
+use kitsune_p2p_bootstrap::error::BootstrapClientError;
+use kitsune_p2p_bootstrap::error::BootstrapClientResult;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use url2::Url2;
+
+pub mod prelude {
+    pub use super::{now, now_once, proxy_list, put, random, BootstrapNet};
+    pub use kitsune_p2p_bootstrap::error::*;
+}
 
 /// The "net" flag / bucket to use when talking to the bootstrap server.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -57,7 +63,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     op: &str,
     input: I,
     net: BootstrapNet,
-) -> crate::types::actor::KitsuneP2pResult<Option<O>> {
+) -> BootstrapClientResult<Option<O>> {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
     match url {
@@ -76,7 +82,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
                     &mut res.bytes().await?.as_ref(),
                 )?))
             } else {
-                Err(crate::KitsuneP2pError::Bootstrap(
+                Err(BootstrapClientError::Bootstrap(
                     res.text().await?.into_boxed_str(),
                 ))
             }
@@ -91,9 +97,9 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
 /// accept the data.
 pub async fn put(
     url: Option<Url2>,
-    agent_info_signed: crate::types::agent_store::AgentInfoSigned,
+    agent_info_signed: AgentInfoSigned,
     net: BootstrapNet,
-) -> crate::types::actor::KitsuneP2pResult<()> {
+) -> BootstrapClientResult<()> {
     match do_api(url, OP_PUT, agent_info_signed, net).await {
         Ok(Some(())) => Ok(()),
         Ok(None) => Ok(()),
@@ -102,7 +108,7 @@ pub async fn put(
 }
 
 /// Simple wrapper to get the local time as milliseconds, to be compared against the remote time.
-fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
+fn local_now() -> BootstrapClientResult<u64> {
     Ok(std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_millis()
@@ -113,10 +119,7 @@ fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
 ///
 /// There is no input to the `now` endpoint, just `()` to be encoded as nil in messagepack.
 #[allow(dead_code)]
-pub async fn now(
-    url: Option<Url2>,
-    net: BootstrapNet,
-) -> crate::types::actor::KitsuneP2pResult<u64> {
+pub async fn now(url: Option<Url2>, net: BootstrapNet) -> BootstrapClientResult<u64> {
     match do_api(url, OP_NOW, (), net).await {
         // If the server gives us something useful we use it.
         Ok(Some(v)) => Ok(v),
@@ -132,10 +135,7 @@ pub async fn now(
 ///
 /// Calculates the offset on the first call and caches it in the cell above.
 /// Only calls `now` once then keeps the offset for the static lifetime.
-pub async fn now_once(
-    url: Option<Url2>,
-    net: BootstrapNet,
-) -> crate::types::actor::KitsuneP2pResult<u64> {
+pub async fn now_once(url: Option<Url2>, net: BootstrapNet) -> BootstrapClientResult<u64> {
     match NOW_OFFSET_MILLIS.get() {
         Some(offset) => Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?),
         None => {
@@ -178,7 +178,7 @@ pub async fn random(
     url: Option<Url2>,
     query: RandomQuery,
     net: BootstrapNet,
-) -> crate::types::actor::KitsuneP2pResult<Vec<AgentInfoSigned>> {
+) -> BootstrapClientResult<Vec<AgentInfoSigned>> {
     let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url, OP_RANDOM, query, net).await {
         Ok(Some(v)) => v,
         Ok(None) => Vec::new(),
@@ -195,7 +195,7 @@ pub async fn random(
 ///
 /// Fetches the list of proxy servers currently stored in the bootstrap service.
 #[allow(dead_code)]
-pub async fn proxy_list(url: Url2, net: BootstrapNet) -> KitsuneP2pResult<Vec<Url2>> {
+pub async fn proxy_list(url: Url2, net: BootstrapNet) -> BootstrapClientResult<Vec<Url2>> {
     Ok(do_api::<_, Vec<String>>(Some(url), OP_PROXY_LIST, (), net)
         .await?
         .unwrap_or_default()
@@ -207,14 +207,15 @@ pub async fn proxy_list(url: Url2, net: BootstrapNet) -> KitsuneP2pResult<Vec<Ur
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fixt::*;
-    use crate::types::KitsuneAgent;
-    use crate::types::KitsuneBinType;
-    use crate::types::KitsuneSignature;
     use ::fixt::prelude::*;
     use ed25519_dalek::ed25519::signature::Signature;
     use ed25519_dalek::Keypair;
     use ed25519_dalek::Signer;
+    use kitsune_p2p_bin_data::fixt::*;
+    use kitsune_p2p_bin_data::KitsuneAgent;
+    use kitsune_p2p_bin_data::KitsuneBinType;
+    use kitsune_p2p_bin_data::KitsuneSignature;
+    use kitsune_p2p_types::fixt::*;
     use std::convert::TryInto;
     use std::net::SocketAddr;
     use std::sync::Arc;

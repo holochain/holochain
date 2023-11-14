@@ -17,8 +17,7 @@ pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::ActionHashed;
-pub use holochain_zome_types::Timestamp;
+pub use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
@@ -660,7 +659,7 @@ impl IncomingDhtOpSender {
     async fn send_op(
         self,
         record: Record,
-        make_op: fn(Record) -> Option<(DhtOpHash, DhtOp)>,
+        make_op: fn(Record) -> Option<DhtOp>,
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(record) {
             let ops = vec![op];
@@ -675,9 +674,11 @@ impl IncomingDhtOpSender {
         }
         Ok(())
     }
+
     async fn send_store_record(self, record: Record) -> SysValidationResult<()> {
         self.send_op(record, make_store_record).await
     }
+
     async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
         // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
@@ -688,9 +689,11 @@ impl IncomingDhtOpSender {
         }
         Ok(())
     }
+
     async fn send_register_add_link(self, record: Record) -> SysValidationResult<()> {
         self.send_op(record, make_register_add_link).await
     }
+
     async fn send_register_agent_activity(self, record: Record) -> SysValidationResult<()> {
         self.send_op(record, make_register_agent_activity).await
     }
@@ -739,16 +742,15 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_store_record(record: Record) -> Option<DhtOp> {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
-    // Create the hash and op
+    // Create the op
     let op = DhtOp::StoreRecord(signature, action, record_entry);
-    let hash = op.to_hash();
-    Some((hash, op))
+    Some(op)
 }
 
 /// Make a StoreEntry DhtOp from a Record.
@@ -758,7 +760,7 @@ fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_store_entry(record: Record) -> Option<DhtOp> {
     // Extract the data
     let (shh, record_entry) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -768,10 +770,9 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // If the action is the wrong type exit early
     let action = action.into_content().try_into().ok()?;
 
-    // Create the hash and op
+    // Create the op
     let op = DhtOp::StoreEntry(signature, action, entry_box);
-    let hash = op.to_hash();
-    Some((hash, op))
+    Some(op)
 }
 
 /// Make a RegisterAddLink DhtOp from a Record.
@@ -780,7 +781,7 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_register_add_link(record: Record) -> Option<DhtOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -788,10 +789,9 @@ fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // If the action is the wrong type exit early
     let action = action.into_content().try_into().ok()?;
 
-    // Create the hash and op
+    // Create the op
     let op = DhtOp::RegisterAddLink(signature, action);
-    let hash = op.to_hash();
-    Some((hash, op))
+    Some(op)
 }
 
 /// Make a RegisterAgentActivity DhtOp from a Record.
@@ -800,7 +800,7 @@ fn make_register_add_link(record: Record) -> Option<(DhtOpHash, DhtOp)> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> Option<(DhtOpHash, DhtOp)> {
+fn make_register_agent_activity(record: Record) -> Option<DhtOp> {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
@@ -808,10 +808,9 @@ fn make_register_agent_activity(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // If the action is the wrong type exit early
     let action = action.into_content();
 
-    // Create the hash and op
+    // Create the op
     let op = DhtOp::RegisterAgentActivity(signature, action);
-    let hash = op.to_hash();
-    Some((hash, op))
+    Some(op)
 }
 
 #[cfg(test)]
@@ -824,13 +823,12 @@ pub mod test {
     use fixt::Predictable;
     use hdk::prelude::AgentPubKeyFixturator;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_state::test_utils::test_keystore;
     use holochain_zome_types::countersigning::PreflightResponse;
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_check_countersigning_preflight_response_signature() {
-        let keystore = test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
         assert_matches!(
