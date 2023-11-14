@@ -243,6 +243,7 @@ async fn app_validation_workflow_inner(
             }
         }
         ops_validated += accepted_ops;
+        ops_validated += rejected_ops;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();
             *round_time = std::time::Instant::now();
