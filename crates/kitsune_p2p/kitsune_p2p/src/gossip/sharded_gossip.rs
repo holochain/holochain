@@ -553,7 +553,7 @@ impl ShardedGossipLocalState {
                     if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
                     tracing::error!(
-                        "Tgt expired. Cert: {:?}, Local agents: {:?}, Remote agents: {:?}",
+                        "Peer node timed out its gossip round. Cert: {:?}, Local agents: {:?}, Remote agents: {:?}",
                         cert,
                         self.local_agents,
                         remote_agent_list

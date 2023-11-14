@@ -138,7 +138,7 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     }
 }
 
-/// Share all current agent infos known to all provided peer dbs with each other.
+/// Drop the specified agent keys from each conductor's peer db.
 #[cfg(any(test, feature = "test_utils"))]
 pub async fn forget_peer_info(
     all_envs: Vec<DbWrite<DbKindP2pAgents>>,
