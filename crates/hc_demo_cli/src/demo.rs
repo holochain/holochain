@@ -255,7 +255,7 @@ async fn run(
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::rendezvous();
+    let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 

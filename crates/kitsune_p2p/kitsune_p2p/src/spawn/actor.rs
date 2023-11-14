@@ -172,7 +172,12 @@ impl KitsuneP2pActor {
         let fetch_pool = FetchPool::new_bitwise_or();
 
         // Start a loop to handle our fetch queue fetch items.
-        FetchTask::spawn(fetch_pool.clone(), host.clone(), internal_sender.clone());
+        FetchTask::spawn(
+            config.clone(),
+            fetch_pool.clone(),
+            host.clone(),
+            internal_sender.clone(),
+        );
 
         let i_s = internal_sender.clone();
 

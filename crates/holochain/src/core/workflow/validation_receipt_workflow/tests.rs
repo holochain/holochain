@@ -185,7 +185,7 @@ async fn test_block_invalid_receipt() {
         _ => Ok(ValidateResult::Valid),
     });
 
-    let config = SweetConductorConfig::rendezvous();
+    let config = SweetConductorConfig::rendezvous(true);
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let mut conductors = conductors.into_inner().into_iter();

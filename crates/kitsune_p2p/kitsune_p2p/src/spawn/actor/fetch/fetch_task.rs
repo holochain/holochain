@@ -1,9 +1,10 @@
 use crate::spawn::actor::{Internal, InternalSender};
-use crate::{HostApi, KitsuneP2pError};
+use crate::{HostApi, KitsuneP2pConfig, KitsuneP2pError};
 use ghost_actor::{GhostError, GhostSender};
 use kitsune_p2p_fetch::{FetchKey, FetchPool};
 use parking_lot::RwLock;
 use std::sync::Arc;
+use tracing::Instrument;
 
 pub struct FetchTask {
     is_finished: bool,
@@ -11,11 +12,14 @@ pub struct FetchTask {
 
 impl FetchTask {
     pub fn spawn(
+        config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
         host: HostApi,
         internal_sender: GhostSender<Internal>,
     ) -> Arc<RwLock<Self>> {
         let this = Arc::new(RwLock::new(FetchTask { is_finished: false }));
+
+        let span = tracing::error_span!("FetchTask::spawn", scope = config.tracing_scope);
 
         tokio::spawn({
             let this = this.clone();
@@ -53,7 +57,7 @@ impl FetchTask {
 
                 tracing::info!("Fetch task is finishing");
                 this.write().is_finished = true;
-            }
+            }.instrument(span)
         });
 
         this
@@ -216,7 +220,13 @@ mod tests {
                 async move { Ok(held_hashes) }.boxed().into()
             })
         });
-        let task = FetchTask::spawn(fetch_pool.clone(), host_stub, internal_sender);
+
+        let task = FetchTask::spawn(
+            Default::default(),
+            fetch_pool.clone(),
+            host_stub,
+            internal_sender,
+        );
 
         (
             task,

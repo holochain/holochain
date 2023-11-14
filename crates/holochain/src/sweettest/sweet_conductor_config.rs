@@ -61,19 +61,20 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        let mut config: Self = KitsuneP2pConfig::default().into();
-        config.random_scope();
-        config
+        let config: Self = KitsuneP2pConfig::default().into();
+        config.random_scope()
     }
 
     /// Rendezvous config for SweetConductors
-    pub fn rendezvous() -> Self {
+    pub fn rendezvous(bootstrap: bool) -> Self {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
 
         let mut network = KitsuneP2pConfig::default();
-        network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+        if bootstrap {
+            network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+        }
 
         /*#[cfg(not(feature = "tx5"))]
         {
@@ -126,11 +127,13 @@ impl SweetConductorConfig {
     }
 
     /// Set the tracing scope to a new random value
-    pub fn random_scope(&mut self) {
+    pub fn random_scope(&self) -> Self {
         let scope = nanoid!();
-        let network = self.network.get_or_insert_with(Default::default);
+        let mut this = self.clone();
+        let network = this.network.get_or_insert_with(Default::default);
         network.tracing_scope = Some(scope.clone());
-        self.tracing_scope = Some(scope);
+        this.tracing_scope = Some(scope);
+        this
     }
 
     /// Completely disable networking
