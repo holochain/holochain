@@ -74,7 +74,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
@@ -95,7 +95,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, true).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, true)
     }
 
     /// Create a source chain with a blank chain head.
@@ -119,10 +119,10 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
     }
 
-    async fn new_inner(
+    fn new_inner(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
