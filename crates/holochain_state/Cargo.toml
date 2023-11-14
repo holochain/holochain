@@ -1,7 +1,7 @@
 [package]
 name = "holochain_state"
 version = "0.3.0-beta-dev.23"
-description = "TODO minimize deps"
+description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_state"
