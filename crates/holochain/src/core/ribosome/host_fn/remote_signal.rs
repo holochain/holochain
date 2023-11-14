@@ -3,19 +3,20 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
+use holochain_nonce::fresh_nonce;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_state::nonce::fresh_nonce;
 use holochain_types::access::Permission;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::Signature;
 use holochain_wasmer_host::prelude::*;
+use holochain_zome_types::prelude::Timestamp;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome_io::ZomeCallUnsigned;
-use holochain_zome_types::Timestamp;
 use std::sync::Arc;
 use tracing::Instrument;
+use wasmer::RuntimeError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(

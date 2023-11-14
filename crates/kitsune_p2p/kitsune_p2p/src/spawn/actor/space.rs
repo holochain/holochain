@@ -1,13 +1,15 @@
 use super::*;
 use crate::metrics::*;
-use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModule;
 use base64::Engine;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
+use kitsune_p2p_types::config::NetworkType;
 use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -199,7 +201,7 @@ impl SpaceInternalHandler for Space {
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let internal_sender = self.i_s.clone();
         Ok(async move {
-            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
+            let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
             let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
@@ -247,7 +249,7 @@ impl SpaceInternalHandler for Space {
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
-            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
+            let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
@@ -682,7 +684,7 @@ async fn update_single_agent_info(
     // Update the agents arc through the internal sender.
     internal_sender.update_agent_arc(agent.clone(), arc).await?;
 
-    let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None, bootstrap_net).await?;
+    let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
     let expires_at_ms = signed_at_ms + expires_after;
 
     let agent_info_signed = AgentInfoSigned::sign(
@@ -742,7 +744,7 @@ async fn update_single_agent_info(
             }
         }
         NetworkType::QuicBootstrap => {
-            crate::spawn::actor::bootstrap::put(
+            kitsune_p2p_bootstrap_client::put(
                 bootstrap_service.clone(),
                 agent_info_signed.clone(),
                 bootstrap_net,
@@ -1422,7 +1424,7 @@ impl Space {
                     (
                         module,
                         factory.spawn_gossip_task(
-                            config.tuning_params.clone(),
+                            config.clone(),
                             space.clone(),
                             ep_hnd.clone(),
                             host_api.clone(),
@@ -1452,6 +1454,7 @@ impl Space {
                 config
                     .tuning_params
                     .bootstrap_check_delay_backoff_multiplier,
+                config.tuning_params.bootstrap_max_delay_s,
             );
         }
 
@@ -1505,8 +1508,7 @@ impl Space {
         let host = self.host_api.clone();
 
         Ok(async move {
-            let signed_at_ms =
-                crate::spawn::actor::bootstrap::now_once(None, bootstrap_net).await?;
+            let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
             let expires_at_ms = signed_at_ms + expires_after;
             let agent_info_signed = AgentInfoSigned::sign(
                 space.clone(),
@@ -1546,7 +1548,7 @@ impl Space {
             match network_type {
                 NetworkType::QuicMdns => tracing::warn!("NOT publishing leaves to mdns"),
                 NetworkType::QuicBootstrap => {
-                    crate::spawn::actor::bootstrap::put(
+                    kitsune_p2p_bootstrap_client::put(
                         bootstrap_service.clone(),
                         agent_info_signed,
                         bootstrap_net,

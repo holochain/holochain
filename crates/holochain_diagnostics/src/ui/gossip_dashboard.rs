@@ -5,14 +5,15 @@ use holochain::{
     prelude::{
         dht::region::Region,
         gossip::sharded_gossip::{KitsuneDiagnostics, NodeId, RegionDiffs},
-        kitsune_p2p::dependencies::{
-            kitsune_p2p_proxy,
-            kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
-        },
-        metrics::{CompletedRound, CurrentRound, PeerNodeHistory},
+        *,
     },
 };
 use human_repr::{HumanCount, HumanThroughput};
+use kitsune_p2p::dependencies::{
+    kitsune_p2p_proxy,
+    kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
+};
+use kitsune_p2p::metrics::{CompletedRound, CurrentRound, PeerNodeHistory};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -84,7 +85,7 @@ impl Node {
             })
             .collect();
         assert_eq!(ids.len(), 1);
-        let id = ids.pop().unwrap();
+        let id = ids.pop().unwrap().into();
 
         Self {
             conductor,

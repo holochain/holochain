@@ -1,11 +1,11 @@
 use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender, PutAgentInfoSignedEvt};
-use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalSender};
 use crate::{KitsuneP2pError, KitsuneP2pResult, KitsuneSpace};
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use ghost_actor::{GhostControlSender, GhostError, GhostSender};
+use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use parking_lot::RwLock;
@@ -33,7 +33,9 @@ struct DefaultBootstrapService {
 
 impl BootstrapService for DefaultBootstrapService {
     fn random(&self, query: RandomQuery) -> BoxFuture<KitsuneP2pResult<Vec<AgentInfoSigned>>> {
-        super::bootstrap::random(self.url.clone(), query, self.net).boxed()
+        async move {
+            Ok(kitsune_p2p_bootstrap_client::random(self.url.clone(), query, self.net).await?)
+        }.boxed()
     }
 }
 
@@ -45,12 +47,18 @@ impl BootstrapTask {
         bootstrap_service: Option<Url2>,
         bootstrap_net: BootstrapNet,
         bootstrap_check_delay_backoff_multiplier: u32,
+        mut bootstrap_max_delay_s: u32,
     ) -> Arc<RwLock<Self>> {
+        if bootstrap_max_delay_s < 60 {
+            bootstrap_max_delay_s = 60;
+        }
+
         let this = Arc::new(RwLock::new(BootstrapTask {
             is_finished: false,
             current_delay: Duration::from_secs(1),
-            max_delay: Duration::from_secs(60 * 60),
+            max_delay: Duration::from_secs(bootstrap_max_delay_s as u64),
         }));
+
         let bootstrap_query = DefaultBootstrapService {
             url: bootstrap_service,
             net: bootstrap_net,
@@ -165,8 +173,6 @@ impl BootstrapTask {
 #[cfg(test)]
 mod tests {
     use crate::event::PutAgentInfoSignedEvt;
-    use crate::fixt::AgentInfoSignedFixturator;
-    use crate::fixt::KitsuneSpaceFixturator;
     use crate::spawn::actor::space::bootstrap_task::{BootstrapService, BootstrapTask};
     use crate::spawn::actor::space::DhtArc;
     use crate::spawn::actor::space::{
@@ -179,15 +185,18 @@ mod tests {
     use crate::wire::Wire;
     use crate::KitsuneP2pResult;
     use crate::{GossipModuleType, KitsuneP2pError};
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use futures::channel::mpsc::channel;
     use futures::future::BoxFuture;
     use futures::{FutureExt, SinkExt, StreamExt};
     use ghost_actor::actor_builder::GhostActorBuilder;
     use ghost_actor::{GhostControlHandler, GhostControlSender, GhostHandler, GhostSender};
+    use kitsune_p2p_bin_data::fixt::*;
+    use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
     use kitsune_p2p_fetch::FetchContext;
     use kitsune_p2p_types::agent_info::AgentInfoSigned;
     use kitsune_p2p_types::bootstrap::RandomQuery;
+    use kitsune_p2p_types::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p_types::KOpHash;
     use parking_lot::RwLock;
     use std::collections::HashSet;
@@ -691,9 +700,9 @@ mod tests {
 
             if self.every_other_call_fails && calls % 2 == 1 {
                 return async move {
-                    Err(KitsuneP2pError::Bootstrap(
+                    Err(KitsuneP2pError::Bootstrap(BootstrapClientError::Bootstrap(
                         "test error".to_string().into_boxed_str(),
-                    ))
+                    )))
                 }
                 .boxed();
             }

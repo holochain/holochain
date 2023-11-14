@@ -2,8 +2,8 @@
 use crate::prelude::*;
 use crate::sql::sql_conductor;
 use holo_hash::AgentPubKey;
-use holochain_zome_types::zome_io::Nonce256Bits;
-use holochain_zome_types::Timestamp;
+use holochain_nonce::Nonce256Bits;
+use holochain_zome_types::prelude::Timestamp;
 use rusqlite::*;
 
 pub fn nonce_already_seen(

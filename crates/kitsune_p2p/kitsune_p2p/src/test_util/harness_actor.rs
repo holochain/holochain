@@ -1,4 +1,5 @@
 use super::*;
+use kitsune_p2p_types::config::TransportConfig;
 
 type KAgent = Arc<KitsuneAgent>;
 type KInfo = Arc<AgentInfoSigned>;

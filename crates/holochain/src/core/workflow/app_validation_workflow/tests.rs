@@ -28,8 +28,6 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasmPair;
 use holochain_wasm_test_utils::TestZomes;
-use holochain_zome_types::Entry;
-use holochain_zome_types::ValidationStatus;
 use matches::assert_matches;
 use rusqlite::named_params;
 use rusqlite::Transaction;
@@ -405,7 +403,7 @@ fn limbo_is_empty(txn: &Transaction) -> bool {
     !not_empty
 }
 
-fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
+fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(
         "
         SELECT DhtOp.type, Action.hash, Action.blob
@@ -420,10 +418,10 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
         let op_type: DhtOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
+        Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
     })
     .unwrap()
-    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .collect::<StateQueryResult<Vec<DhtOpLite>>>()
     .unwrap()
 }
 

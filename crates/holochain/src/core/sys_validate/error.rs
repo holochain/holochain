@@ -6,7 +6,7 @@ use super::MAX_ENTRY_SIZE;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use crate::from_sub_error;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;

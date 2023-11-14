@@ -133,7 +133,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "this test requires a remote service, so it should only be run manually"]
     async fn test_add_records_remote() {
-        let keystore = test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         let agent = fake_agent_pubkey_1();
         let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
         let chc = Arc::new(ChcRemote::new(

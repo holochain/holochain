@@ -1,14 +1,11 @@
-//! Fixturator definitions for kitsune_p2p.
+//! Fixturators for Kitsune P2p types
 
-use crate::agent_store::AgentInfoSigned;
-use crate::agent_store::UrlList;
-use crate::dependencies::url2;
-use crate::KitsuneAgent;
-use crate::KitsuneBinType;
-use crate::KitsuneOpHash;
-use crate::KitsuneSignature;
-use crate::KitsuneSpace;
+use crate::agent_info::AgentInfoSigned;
+use crate::agent_info::UrlList;
 use ::fixt::prelude::*;
+use kitsune_p2p_bin_data::fixt::KitsuneAgentFixturator;
+use kitsune_p2p_bin_data::fixt::KitsuneSignatureFixturator;
+use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;
 use std::sync::Arc;
 use url2::url2;
 
@@ -38,35 +35,6 @@ fixturator!(
         ret
     };
 );
-
-fixturator!(
-    KitsuneAgent;
-    constructor fn new(ThirtySixBytes);
-);
-
-fixturator!(
-    KitsuneSpace;
-    constructor fn new(ThirtySixBytes);
-);
-
-fixturator!(
-    KitsuneOpHash;
-    constructor fn new(ThirtySixBytes);
-);
-
-fixturator!(
-    KitsuneSignature;
-    from SixtyFourBytesVec;
-);
-
-/// make fixturators sync for now
-fn block_on<F>(f: F) -> F::Output
-where
-    F: 'static + std::future::Future + Send,
-    F::Output: 'static + Send,
-{
-    tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(f))
-}
 
 fixturator!(
     AgentInfoSigned;
@@ -116,3 +84,12 @@ fixturator!(
         })
     };
 );
+
+/// make fixturators sync for now
+fn block_on<F>(f: F) -> F::Output
+where
+    F: 'static + std::future::Future + Send,
+    F::Output: 'static + Send,
+{
+    tokio::task::block_in_place(move || tokio::runtime::Handle::current().block_on(f))
+}

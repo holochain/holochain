@@ -14,6 +14,11 @@ pub mod dependencies {
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;
+
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest;
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest_derive;
 }
 
 /// Typedef for result of `proc_count_now()`.
@@ -88,9 +93,9 @@ impl CertDigestExt for CertDigest {
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
-impl From<Tx2Cert> for Arc<[u8; 32]> {
+impl From<Tx2Cert> for bin_types::NodeCert {
     fn from(f: Tx2Cert) -> Self {
-        f.0 .0 .0.clone()
+        f.0 .0 .0.clone().into()
     }
 }
 
@@ -250,6 +255,11 @@ pub enum KitsuneErrorKind {
     #[error("Unauthorized")]
     Unauthorized,
 
+    /// Bad external input.
+    /// Can't proceed, but we don't have to shut everything down, either.
+    #[error("Bad external input. Error: {0}  Input: {1}")]
+    BadInput(Box<dyn std::error::Error + Send + Sync>, String),
+
     /// Unspecified error.
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -282,6 +292,11 @@ impl KitsuneError {
     /// the "kind" of this KitsuneError
     pub fn kind(&self) -> &KitsuneErrorKind {
         &self.0
+    }
+
+    /// Create a bad_input error
+    pub fn bad_input(e: impl Into<Box<dyn std::error::Error + Send + Sync>>, i: String) -> Self {
+        Self(Arc::new(KitsuneErrorKind::BadInput(e.into(), i)))
     }
 
     /// promote a custom error type to a KitsuneError
@@ -339,10 +354,13 @@ pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
+pub mod fetch_pool;
 pub mod metrics;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+#[cfg(feature = "fixt")]
+pub mod fixt;
 
 #[cfg(feature = "tx2")]
 pub mod tx2;

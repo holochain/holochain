@@ -6,6 +6,7 @@ use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 /// Count links
 #[allow(clippy::extra_unused_lifetimes)]
@@ -54,7 +55,7 @@ pub fn count_links<'a>(
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
-pub mod tests {
+mod tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

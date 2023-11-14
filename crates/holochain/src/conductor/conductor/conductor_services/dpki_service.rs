@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use holo_hash::AgentPubKey;
-use holochain_zome_types::{CellId, Timestamp};
+use holochain_zome_types::prelude::*;
 
 use crate::conductor::ConductorHandle;
 

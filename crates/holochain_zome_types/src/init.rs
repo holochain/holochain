@@ -4,10 +4,11 @@
 //! Init pass: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/init_pass/src/lib.rs>
 //! Init fail: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/init_fail/src/lib.rs>
 
-use crate::CallbackResult;
 use holochain_integrity_types::UnresolvedDependencies;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_common::*;
+use holochain_wasmer_common::{WasmError, WasmErrorInner};
+
+use crate::call::CallbackResult;
 
 /// The result of the DNA initialization callback.
 ///

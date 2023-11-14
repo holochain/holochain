@@ -4,7 +4,10 @@ use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppEntryBytes(pub SerializedBytes);
 
 impl std::fmt::Debug for AppEntryBytes {

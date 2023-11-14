@@ -1,3 +1,4 @@
+use holochain_secure_primitive::secure_primitive;
 use holochain_serialized_bytes::prelude::*;
 
 /// The number of bits we want for a comfy secret.
@@ -17,6 +18,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 // The PartialEq impl by subtle *should* be compatible with default Hash impl
 #[allow(clippy::derived_hash_with_manual_eq)]
 #[derive(Clone, Copy, Hash, SerializedBytes)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct CapSecret(CapSecretBytes);
 
 #[cfg(feature = "fuzzing")]
@@ -34,4 +36,4 @@ impl<'a> arbitrary::Arbitrary<'a> for CapSecret {
 // device if it is accepting incoming connections. Still secret but there are mitigating factors
 // such as the ability to revoke a secret, and to assign it to specific recipients ahead of time
 // if they are a known closed set.
-crate::secure_primitive!(CapSecret, CAP_SECRET_BYTES);
+secure_primitive!(CapSecret, CAP_SECRET_BYTES);
