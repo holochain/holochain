@@ -7,7 +7,7 @@
 use crate::CallbackResult;
 use holochain_integrity_types::UnresolvedDependencies;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_common::{WasmError, WasmErrorInner};
+use holochain_wasmer_common::*;
 
 /// The result of the DNA initialization callback.
 ///

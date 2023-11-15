@@ -6,7 +6,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use tracing::error;
-use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn accept_countersigning_preflight_request<'a>(
@@ -125,7 +124,6 @@ pub mod wasm_test {
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
-    use wasmer::RuntimeError;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(

@@ -4,7 +4,6 @@ use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
-use wasmer::RuntimeError;
 
 pub fn x_salsa20_poly1305_decrypt(
     _ribosome: Arc<impl RibosomeT>,
