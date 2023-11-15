@@ -243,6 +243,7 @@ mod tests {
                 let awaiting_dep_op = awaiting_dep_op.clone();
                 let missing_dep_op = missing_dep_op.clone();
                 let rejected_op = rejected_op.clone();
+
                 async move {
                     if op.hash == success_op.hash {
                         Ok((op.hash, Outcome::Accepted, Dependency::Null))
@@ -253,7 +254,10 @@ mod tests {
                             Dependency::Null,
                         ))
                     } else if op.hash == missing_dep_op.hash {
-                        Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null))
+                        Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null)) 
+                    } else if op.hash == rejected_op.hash {
+                        Ok((op.hash, Outcome::Rejected, Dependency::Null))
+                    } else {
                         unreachable!("Unexpected op")
                     }
                 }

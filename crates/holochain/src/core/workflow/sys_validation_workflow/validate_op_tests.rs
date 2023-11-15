@@ -1913,8 +1913,6 @@ async fn validate_store_entry_update_changes_entry_type() {
     );
 }
 
-// TODO add a test which validates an op that isn't a create or an update
-
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO fix this test"]
