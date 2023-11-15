@@ -34,7 +34,7 @@
             ${bats} ./test/rust.bats
             ${bats} ./test/hc-sandbox.bats
             
-            export CARGO_VENDOR_DIR=${moldOpensslDeps}/
+            env CARGO_VENDOR_DIR=${moldOpensslDeps}/ \
             ${bats} ./test/mold_openssl.bats
           '';
     in
