@@ -747,7 +747,7 @@ checksum = "6999dc1837253364c2ebb0704ba97994bd874e8f195d665c50b7548f6ea92764"
 
 [[package]]
 name = "fixt"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -958,7 +958,7 @@ checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
 
 [[package]]
 name = "hdi"
-version = "0.3.3-rc.0"
+version = "0.3.3-rc.1"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "getrandom",
  "hdi",
@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1033,7 +1033,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "arbitrary",
  "base64",
@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "arbitrary",
  "derive_builder",
@@ -1107,7 +1107,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "hdk",
  "serde",
@@ -1156,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "colored",
  "derivative",
@@ -1361,7 +1361,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.2.3-rc.0"
+version = "0.2.3-rc.1"
 dependencies = [
  "arbitrary",
  "chrono",
