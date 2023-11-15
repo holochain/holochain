@@ -115,7 +115,7 @@ mod tests {
 
         // Create 5 consecutive actions for the authoring agent,
         // as well as 5 other random actions, interspersed.
-        let mut shhs: Vec<_> = vec![
+        let mut actions: Vec<_> = vec![
             fixt!(ActionBuilderCommon),
             fixt!(ActionBuilderCommon),
             fixt!(ActionBuilderCommon),
@@ -142,21 +142,21 @@ mod tests {
         .collect();
 
         // Other actions have a different author, so the 9th action should be the head for our author's chain
-        let expected_head = shhs[8].clone();
+        let expected_head = actions[8].clone();
         // Shuffle so the head will sometimes be in scratch and sometimes be in the database and not always the last action by our author.
-        shhs.shuffle(&mut thread_rng());
+        actions.shuffle(&mut thread_rng());
 
-        for shh in &shhs[..6] {
-            let hash = shh.action_address();
+        for action in &actions[..6] {
+            let hash = action.action_address();
             let op = DhtOpLite::StoreRecord(hash.clone(), None, hash.clone().into());
-            let op_order = OpOrder::new(op.get_type(), shh.action().timestamp());
-            insert_action(&mut txn, shh).unwrap();
+            let op_order = OpOrder::new(op.get_type(), action.action().timestamp());
+            insert_action(&mut txn, action).unwrap();
             insert_op_lite(
                 &mut txn,
                 &op,
                 &fixt!(DhtOpHash),
                 &op_order,
-                &shh.action().timestamp(),
+                &action.action().timestamp(),
             )
             .unwrap();
         }
@@ -165,8 +165,8 @@ mod tests {
 
         // It's also totally invalid for a call_zome scratch to contain actions
         // from other authors, but it doesn't matter here
-        for shh in &shhs[6..] {
-            scratch.add_action(shh.clone(), ChainTopOrdering::default());
+        for action in &actions[6..] {
+            scratch.add_action(action.clone(), ChainTopOrdering::default());
         }
 
         let query = ChainHeadQuery::new(Arc::new(author));
