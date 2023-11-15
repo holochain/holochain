@@ -30,7 +30,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
     holochain_trace::test_run().ok();
 
     let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous()).await;
+        SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous(true))
+            .await;
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await

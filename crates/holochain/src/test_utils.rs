@@ -491,7 +491,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
 /// If the timeout is reached, print a report including a diff of all published ops
 /// which were not integrated.
-#[tracing::instrument(skip(db))]
+#[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     db: &Db,
     published: &[DhtOp],
