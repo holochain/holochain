@@ -10,7 +10,6 @@ use crate::core::workflow::error::WorkflowResult;
 use crate::core::workflow::sys_validation_workflow::validation_batch::{
     validate_ops_batch, NUM_CONCURRENT_OPS,
 };
-use futures::future::BoxFuture;
 use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
