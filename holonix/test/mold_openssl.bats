@@ -14,6 +14,6 @@ teardown() {
   rm -rf "${BATS_TMPDIR:?}"
 }
 
-@test "test binary runs successfully" {
-    cargo test --offline --locked
+@test "main binary runs successfully" {
+    cargo run --offline --locked
 }
