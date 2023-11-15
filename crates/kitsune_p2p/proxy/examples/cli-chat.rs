@@ -5,6 +5,7 @@ use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::*;
 use std::collections::HashSet;
 use std::io::Write;
@@ -104,7 +105,7 @@ async fn main() {
 
     let ep = f
         .bind(
-            "kitsune-quic://0.0.0.0:0",
+            TxUrl::from_str_panicking("kitsune-quic://0.0.0.0:0"),
             KitsuneTimeout::from_millis(5000),
         )
         .await
