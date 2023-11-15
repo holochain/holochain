@@ -17,8 +17,6 @@
         );
       hn-introspect =
         pkgs.writeShellScriptBin "hn-introspect" versionsFileText;
-
-      mkRustShell = args: pkgs.mkShell.override ({ stdenv = config.rustHelper.defaultStdenv pkgs; }) args;
     in
     {
       packages = {
@@ -28,7 +26,7 @@
       devShells = {
         default = self'.devShells.holonix;
         holonix = pkgs.lib.makeOverridable
-          ({ holochainOverrides }: mkRustShell {
+          ({ holochainOverrides }: pkgs.mkShell {
             inputsFrom = [ self'.devShells.rustDev ];
             packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
             shellHook = ''
@@ -104,7 +102,7 @@
                 );
 
           in
-          mkRustShell {
+          pkgs.mkShell {
             inputsFrom = [ self'.devShells.rustDev ] ++ (
               # filter out the holochain binary crates from the shell because it's at best unnecessary in local development
               # it's currently a nativeBuildInput because one of the unit tests requires `holochain` and `hc-sandbox` in PATH
@@ -172,26 +170,34 @@
             '';
           };
 
-        rustDev =
-          mkRustShell
-            {
-              inputsFrom = [
-                self'.packages.holochain
-              ];
+        rustDev = pkgs.mkShell {
+          inputsFrom = [
+            self'.packages.holochain
+          ];
 
-              shellHook = ''
-                export CARGO_HOME="$PWD/.cargo"
-                export CARGO_INSTALL_ROOT="$PWD/.cargo"
-                export CARGO_TARGET_DIR="$PWD/target"
-                export CARGO_CACHE_RUSTC_INFO=1
-                export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
-                export NIX_PATH="nixpkgs=${pkgs.path}"
-                export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
-                echo Rust development shell spawned. Type 'exit' to leave.
-              '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
-                export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
-              '');
-            };
+          packages = (lib.lists.optionals pkgs.stdenv.isLinux [
+            pkgs.mold
+            pkgs.pkgsStatic.openssl
+          ]);
+
+          shellHook = ''
+            export CARGO_HOME="$PWD/.cargo"
+            export CARGO_INSTALL_ROOT="$PWD/.cargo"
+            export CARGO_TARGET_DIR="$PWD/target"
+            export CARGO_CACHE_RUSTC_INFO=1
+            export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
+            export NIX_PATH="nixpkgs=${pkgs.path}"
+            export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+            echo Rust development shell spawned. Type 'exit' to leave.
+          ''
+          + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
+            export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+          '')
+          + (lib.strings.optionalString pkgs.stdenv.isLinux ''
+            export RUSTFLAGS="$RUSTFLAGS -Clink-arg=-fuse-ld=mold"
+          '')
+          ;
+        };
 
         nixDev =
           pkgs.mkShell
@@ -200,10 +206,6 @@
                 self'.devShells.rustDev
               ];
 
-              shellHook = self'.devShells.rustDev + ''
-                export RUSTFLAGS="-Clink-arg=-fuse-ld=lld"
-              '';
-
               packages = [
                 (pkgs.callPackage self.inputs.crate2nix.outPath { })
                 pkgs.llvmPackages.bintools
@@ -211,7 +213,4 @@
             };
       };
     };
-
 }
-
-
