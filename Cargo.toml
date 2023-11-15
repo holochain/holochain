@@ -54,10 +54,7 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-exclude = [
-  "crates/release-automation",
-  "holonix/test/mold_openssl"
-  ]
+exclude = ["crates/release-automation"]
 
 resolver = "2"
 
