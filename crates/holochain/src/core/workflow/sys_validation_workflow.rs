@@ -119,7 +119,7 @@ async fn sys_validation_workflow_inner(
                             let (op_hash, outcome, dependency) = outcome?;
                             match outcome {
                                 Outcome::Accepted => {
-                                    summary.total += 1;
+                                    summary.accepted += 1;
                                     put_validation_limbo(
                                         txn,
                                         &op_hash,
@@ -856,7 +856,7 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
 }
 
 struct OutcomeSummary {
-    total: usize,
+    accepted: usize,
     awaiting: usize,
     missing: usize,
     rejected: usize,
@@ -865,7 +865,7 @@ struct OutcomeSummary {
 impl OutcomeSummary {
     fn new() -> Self {
         OutcomeSummary {
-            total: 0,
+            accepted: 0,
             awaiting: 0,
             missing: 0,
             rejected: 0,

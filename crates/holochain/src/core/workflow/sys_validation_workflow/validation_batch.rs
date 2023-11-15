@@ -41,12 +41,12 @@ pub(super) async fn validate_ops_batch(
         tracing::debug!("Committing {} ops", num_ops);
         let summary = commit_outcome_batch_fn(chunk).await?;
 
-        total += summary.total;
+        total += summary.accepted;
         if let (Some(start), Some(round_time)) = (started_at, &mut round_time) {
             let round_el = round_time.elapsed();
             *round_time = std::time::Instant::now();
             let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-            let ops_ps = summary.total as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            let ops_ps = summary.accepted as f64 / round_el.as_micros() as f64 * 1_000_000.0;
             tracing::info!(
                 "Sys validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
                 (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
@@ -54,7 +54,7 @@ pub(super) async fn validate_ops_batch(
                 ops_ps
             );
         }
-        tracing::debug!("{} committed, {} awaiting sys dep, {} missing dht dep, {} rejected. {} committed this round", summary.total, summary.awaiting, summary.missing, summary.rejected, total);
+        tracing::debug!("{} committed, {} awaiting sys dep, {} missing dht dep, {} rejected. {} committed this round", summary.accepted, summary.awaiting, summary.missing, summary.rejected, total);
         summaries.push(summary);
     }
 
@@ -93,7 +93,7 @@ mod tests {
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
-                        total: batch.len(),
+                        accepted: batch.len(),
                         awaiting: 0,
                         missing: 0,
                         rejected: 0,
@@ -117,7 +117,7 @@ mod tests {
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
-                        total: batch.len(),
+                        accepted: batch.len(),
                         awaiting: 0,
                         missing: 0,
                         rejected: 0,
@@ -130,7 +130,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(1, summaries.len());
-        assert_eq!(1, summaries[0].total);
+        assert_eq!(1, summaries[0].accepted);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -166,7 +166,7 @@ mod tests {
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
-                        total: batch.len(),
+                        accepted: batch.len(),
                         awaiting: 0,
                         missing: 0,
                         rejected: 0,
@@ -183,7 +183,7 @@ mod tests {
 
         // NUM_CONCURRENT_OPS * 100 is the max chunk size, or 5_000 ops. So to process 20_505 we should need 5 chunks.
         assert!(summaries.len() >= 5);
-        assert!(summaries.iter().map(|s| s.total).max().unwrap() <= NUM_CONCURRENT_OPS * 100);
+        assert!(summaries.iter().map(|s| s.accepted).max().unwrap() <= NUM_CONCURRENT_OPS * 100);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -204,7 +204,7 @@ mod tests {
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
-                        total: batch.iter().filter(|r| r.is_ok()).count(),
+                        accepted: batch.iter().filter(|r| r.is_ok()).count(),
                         awaiting: 0,
                         missing: 0,
                         rejected: 0,
@@ -218,9 +218,9 @@ mod tests {
 
         assert_eq!(1, summaries.len());
         assert!(
-            summaries[0].total < 30,
+            summaries[0].accepted < 30,
             "Expected fewer than 30 ops to have been processed successfully but got {}",
-            summaries[0].total
+            summaries[0].accepted
         );
     }
 
@@ -267,7 +267,7 @@ mod tests {
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
-                        total: batch.iter().count(),
+                        accepted: batch.iter().count(),
                         awaiting: batch
                             .iter()
                             .filter(|r| match r {
@@ -298,7 +298,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(1, summaries.len());
-        assert_eq!(4, summaries[0].total);
+        assert_eq!(4, summaries[0].accepted);
         assert_eq!(1, summaries[0].awaiting);
         assert_eq!(1, summaries[0].missing);
         assert_eq!(1, summaries[0].rejected);
