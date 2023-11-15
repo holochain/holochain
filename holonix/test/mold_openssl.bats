@@ -15,6 +15,5 @@ teardown() {
 }
 
 @test "test binary runs successfully" {
-    cat $CARGO_CONFIG
     cargo test --offline --locked
 }
