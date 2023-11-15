@@ -30,11 +30,11 @@ holochain_conductor_api = { version = "^0.2.3-rc.0", path = "../holochain_conduc
 holochain_keystore = { version = "^0.2.3-rc.0", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.2.3-rc.0", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.2.3-rc.0", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = "=0.0.51"
 holochain_state = { version = "^0.2.3-rc.0", path = "../holochain_state" }
 holochain_types = { version = "^0.2.3-rc.0", path = "../holochain_types" }
 holochain_util = { version = "^0.2.3-rc.0", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.86"
+holochain_wasmer_host = "=0.0.84"
 holochain_websocket = { version = "^0.2.3-rc.0", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.2.3-rc.0", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
@@ -81,8 +81,7 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 holochain_wasm_test_utils = { version = "^0.2.3-rc.0", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
-wasmer = "=4.2.2"
-wasmer-middlewares = "=4.2.2"
+wasmer-middlewares = "2"
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }

@@ -9,7 +9,6 @@ use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use wasmer::RuntimeError;
 
 pub fn call(
     ribosome: Arc<impl RibosomeT>,
@@ -132,7 +131,7 @@ pub fn call(
                                             .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
-                                                    wasmer::RuntimeError::from(wasm_error!(
+                                                    RuntimeError::from(wasm_error!(
                                                         WasmErrorInner::Host(
                                                             "Role not found.".to_string()
                                                         )

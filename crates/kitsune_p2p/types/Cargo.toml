@@ -40,7 +40,6 @@ tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 url = "2"
 url2 = "0.0.6"
 webpki = "0.22.0"
-ureq = "=2.6.2" # pinned until other libraries upgrade to ring 0.17
 
 # arbitrary
 arbitrary = { version = "1.0", features = ["derive"], optional = true}

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_util::ffs;
-use wasmer::{CompileError, SerializeError};
+use holochain_wasmer_host::prelude::{CompileError, SerializeError};
 
 /// HcBundleError type.
 #[derive(Debug, thiserror::Error)]

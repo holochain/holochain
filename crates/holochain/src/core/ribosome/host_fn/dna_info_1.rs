@@ -7,7 +7,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::DnaInfoV1;
 use std::sync::Arc;
-use wasmer::RuntimeError;
 
 pub fn dna_info_1(
     ribosome: Arc<impl RibosomeT>,

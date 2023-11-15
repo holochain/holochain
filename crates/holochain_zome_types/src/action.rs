@@ -7,10 +7,10 @@ use thiserror::Error;
 pub use holochain_integrity_types::action::builder::{ActionBuilder, ActionBuilderCommon};
 pub use holochain_integrity_types::action::*;
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(any(test, feature = "test_utils"))]
 pub use facts::*;
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod facts;
 
 #[derive(Error, Debug)]

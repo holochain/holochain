@@ -5,7 +5,6 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::*;
-use wasmer::RuntimeError;
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
