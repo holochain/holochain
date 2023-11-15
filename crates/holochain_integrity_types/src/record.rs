@@ -36,7 +36,7 @@ impl<A> AsRef<A> for Record<A> {
 }
 
 /// Represents the different ways the entry_address reference within an action
-/// can be intepreted
+/// can be interpreted
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
