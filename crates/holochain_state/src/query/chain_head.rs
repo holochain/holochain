@@ -143,7 +143,7 @@ mod tests {
 
         // Other actions have a different author, so the 9th action should be the head for our author's chain
         let expected_head = shhs[8].clone();
-        // Shuffle so the head will sometimes be in scratch and sometimes be in the database and no always the last action by our author.
+        // Shuffle so the head will sometimes be in scratch and sometimes be in the database and not always the last action by our author.
         shhs.shuffle(&mut thread_rng());
 
         for shh in &shhs[..6] {
