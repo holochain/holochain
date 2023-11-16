@@ -5,7 +5,7 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::EntryDefBufferKey;
-use holochain_zome_types::EntryDef;
+use holochain_zome_types::prelude::*;
 
 use crate::mutations;
 use crate::prelude::from_blob;

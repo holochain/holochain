@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 
-use super::AppRoleAssignment;
 use crate::prelude::*;
 
 #[derive(Debug, thiserror::Error)]

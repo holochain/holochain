@@ -1,13 +1,16 @@
 //! The workflow and queue consumer for sys validation
 
-use super::*;
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_record;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
-use error::WorkflowResult;
+use crate::core::workflow::error::WorkflowResult;
+use crate::core::workflow::sys_validation_workflow::validation_batch::{
+    validate_ops_batch, NUM_CONCURRENT_OPS,
+};
+use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -17,11 +20,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
-use holochain_state::scratch::SyncScratch;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
-use holochain_zome_types::Entry;
-use holochain_zome_types::ValidationStatus;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -30,9 +28,8 @@ use types::Outcome;
 
 pub mod types;
 
+mod validation_batch;
 pub mod validation_query;
-
-const NUM_CONCURRENT_OPS: usize = 50;
 
 #[cfg(test)]
 mod chain_test;
@@ -76,139 +73,106 @@ async fn sys_validation_workflow_inner(
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     let start_len = sorted_ops.len();
     tracing::debug!("Validating {} ops", start_len);
+    // TODO questionable check for saturation. The query can return up to 10,000 results and this function
+    //      will process more than NUM_CONCURRENT_OPS ops, just not in parallel. Not necessarily true that
+    //      there will be more ops to process after this workflow run.
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
     let cascade = workspace.full_cascade(network);
 
-    // Process each op
-    let iter = sorted_ops.into_iter().map({
-        let space = space.clone();
-        move |so| {
-            // Create an incoming ops sender for any dependencies we find
-            // that we are meant to be holding but aren't.
-            // If we are not holding them they will be added to our incoming ops.
-            let incoming_dht_ops_sender =
-                IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
-            let workspace = workspace.clone();
-            let cascade = cascade.clone();
+    validate_ops_batch(
+        sorted_ops,
+        start,
+        {
+            let space = space.clone();
+            move |so| {
+                // Create an incoming ops sender for any dependencies we find
+                // that we are meant to be holding but aren't.
+                // If we are not holding them they will be added to our incoming ops.
+                let incoming_dht_ops_sender =
+                    IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
+                let workspace = workspace.clone();
+                let cascade = cascade.clone();
+                async move {
+                    let (op, op_hash) = so.into_inner();
+                    let op_type = op.get_type();
+                    let action = op.action();
+
+                    let dependency = get_dependency(op_type, &action);
+                    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
+
+                    let r =
+                        validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
+                    r.map(|o| (op_hash, o, dependency))
+                }
+                .boxed()
+            }
+        },
+        |batch| {
+            let space = space.clone();
             async move {
-                let (op, op_hash) = so.into_inner();
-                let op_type = op.get_type();
-                let action = op.action();
-
-                let dependency = get_dependency(op_type, &action);
-                let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
-
-                let r = validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
-                r.map(|o| (op_hash, o, dependency))
-            }
-        }
-    });
-
-    // Create a stream of concurrent validation futures.
-    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
-    // return up to NUM_CONCURRENT_OPS * 100 results.
-    use futures::stream::StreamExt;
-    let mut iter = futures::stream::iter(iter)
-        .buffer_unordered(NUM_CONCURRENT_OPS)
-        .ready_chunks(NUM_CONCURRENT_OPS * 100);
-
-    // Spawn a task to actually drive the stream.
-    // This allows the stream to make progress in the background while
-    // we are committing previous results to the database.
-    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
-    let jh = tokio::spawn(async move {
-        // Send the result to task that will commit to the database.
-        while let Some(op) = iter.next().await {
-            if tx
-                .send_timeout(op, std::time::Duration::from_secs(10))
-                .await
-                .is_err()
-            {
-                tracing::warn!("sys validation task has failed to send ops. This is not a problem if the conductor is shutting down");
-                break;
-            }
-        }
-    });
-
-    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
-    let mut iter =
-        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
-
-    let mut total = 0;
-    let mut round_time = start.is_some().then(std::time::Instant::now);
-    // Pull in a chunk of results.
-    while let Some(chunk) = iter.next().await {
-        let num_ops: usize = chunk.iter().map(|c| c.len()).sum();
-        tracing::debug!("Committing {} ops", num_ops);
-        let (t, a, m, r) = space
-            .dht_db
-            .write_async(move |txn| {
-                let mut total = 0;
-                let mut awaiting = 0;
-                let mut missing = 0;
-                let mut rejected = 0;
-                for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, outcome, dependency) = outcome?;
-                    match outcome {
-                        Outcome::Accepted => {
-                            total += 1;
-                            put_validation_limbo(
-                                txn,
-                                &op_hash,
-                                ValidationLimboStatus::SysValidated,
-                            )?;
-                        }
-                        Outcome::AwaitingOpDep(missing_dep) => {
-                            awaiting += 1;
-                            // TODO: Try and get this dependency to add to limbo
-                            //
-                            // I actually can't see how we can do this because there's no
-                            // way to get an DhtOpHash without either having the op or the full
-                            // action. We have neither that's why where here.
-                            //
-                            // We need to be holding the dependency because
-                            // we were meant to get a StoreRecord or StoreEntry or
-                            // RegisterAgentActivity or RegisterAddLink.
-                            let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                            put_validation_limbo(txn, &op_hash, status)?;
-                        }
-                        Outcome::MissingDhtDep => {
-                            missing += 1;
-                            // TODO: Not sure what missing dht dep is. Check if we need this.
-                            put_validation_limbo(txn, &op_hash, ValidationLimboStatus::Pending)?;
-                        }
-                        Outcome::Rejected => {
-                            rejected += 1;
-                            if let Dependency::Null = dependency {
-                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                space
+                    .dht_db
+                    .write_async(move |txn| {
+                        let mut summary = OutcomeSummary::default();
+                        for outcome in batch {
+                            let (op_hash, outcome, dependency) = outcome?;
+                            match outcome {
+                                Outcome::Accepted => {
+                                    summary.accepted += 1;
+                                    put_validation_limbo(
+                                        txn,
+                                        &op_hash,
+                                        ValidationLimboStatus::SysValidated,
+                                    )?;
+                                }
+                                Outcome::AwaitingOpDep(missing_dep) => {
+                                    summary.awaiting += 1;
+                                    // TODO: Try and get this dependency to add to limbo
+                                    //
+                                    // I actually can't see how we can do this because there's no
+                                    // way to get an DhtOpHash without either having the op or the full
+                                    // action. We have neither that's why where here.
+                                    //
+                                    // We need to be holding the dependency because
+                                    // we were meant to get a StoreRecord or StoreEntry or
+                                    // RegisterAgentActivity or RegisterAddLink.
+                                    let status =
+                                        ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+                                    put_validation_limbo(txn, &op_hash, status)?;
+                                }
+                                Outcome::MissingDhtDep => {
+                                    summary.missing += 1;
+                                    // TODO: Not sure what missing dht dep is. Check if we need this.
+                                    put_validation_limbo(
+                                        txn,
+                                        &op_hash,
+                                        ValidationLimboStatus::Pending,
+                                    )?;
+                                }
+                                Outcome::Rejected => {
+                                    summary.rejected += 1;
+                                    if let Dependency::Null = dependency {
+                                        put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
+                                    } else {
+                                        put_integration_limbo(
+                                            txn,
+                                            &op_hash,
+                                            ValidationStatus::Rejected,
+                                        )?;
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-                WorkflowResult::Ok((total, awaiting, missing, rejected))
-            })
-            .await?;
+                        WorkflowResult::Ok(summary)
+                    })
+                    .await
+            }
+            .boxed()
+        },
+    )
+    .await?;
 
-        total += t;
-        if let (Some(start), Some(round_time)) = (start, &mut round_time) {
-            let round_el = round_time.elapsed();
-            *round_time = std::time::Instant::now();
-            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
-            tracing::info!(
-                "Sys validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
-                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
-                avg_ops_ps,
-                ops_ps
-            );
-        }
-        tracing::debug!("{} committed, {} awaiting sys dep, {} missing dht dep, {} rejected. {} committed this round", t, a, m, r, total);
-    }
-    jh.await?;
-    tracing::debug!("Accepted {} ops", total);
     Ok(if saturated {
         WorkComplete::Incomplete
     } else {
@@ -239,7 +203,7 @@ pub(crate) async fn validate_op(
             }
             Ok(outcome)
         }
-        Err(e) => Err(e.into()),
+        Err(e) => Err(e.into()), // TODO questionable conversion, the state of one op validation should not determine the workflow result
     }
 }
 
@@ -888,5 +852,29 @@ impl From<&HostFnWorkspace> for SysValidationWorkspace {
             cache,
             dna_def: h.dna_def(),
         }
+    }
+}
+
+struct OutcomeSummary {
+    accepted: usize,
+    awaiting: usize,
+    missing: usize,
+    rejected: usize,
+}
+
+impl OutcomeSummary {
+    fn new() -> Self {
+        OutcomeSummary {
+            accepted: 0,
+            awaiting: 0,
+            missing: 0,
+            rejected: 0,
+        }
+    }
+}
+
+impl Default for OutcomeSummary {
+    fn default() -> Self {
+        OutcomeSummary::new()
     }
 }

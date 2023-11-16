@@ -1,6 +1,6 @@
 use crate::integrity::*;
-use hdk::prelude::*;
 use hdi::prelude::__hc__dna_info_1;
+use hdk::prelude::*;
 use serde_yaml::Value;
 
 #[hdk_extern]
@@ -42,9 +42,7 @@ fn remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         None,
         &(),
     )? {
-        ZomeCallResponse::Ok(extern_io) => {
-            Ok(extern_io.decode().map_err(|e| wasm_error!(e))?)
-        }
+        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode().map_err(|e| wasm_error!(e))?),
         not_ok => {
             tracing::warn!(?not_ok);
             Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
@@ -61,9 +59,7 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         None,
         agent_info()?.agent_initial_pubkey,
     )? {
-        ZomeCallResponse::Ok(extern_io) => {
-            Ok(extern_io.decode().map_err(|e| wasm_error!(e))?)
-        }
+        ZomeCallResponse::Ok(extern_io) => Ok(extern_io.decode().map_err(|e| wasm_error!(e))?),
         not_ok => {
             tracing::warn!(?not_ok);
             Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
@@ -194,7 +190,7 @@ fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
 }
 
 #[cfg(all(test, feature = "mock"))]
-pub mod tests {
+mod tests {
     use ::fixt::prelude::*;
     use hdk::prelude::*;
 

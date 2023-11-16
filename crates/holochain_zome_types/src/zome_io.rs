@@ -1,11 +1,8 @@
 use crate as zt;
-use crate::cell::CellId;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 pub use holochain_integrity_types::zome_io::*;
 use holochain_nonce::Nonce256Bits;
-use holochain_serialized_bytes::prelude::*;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
@@ -54,7 +51,7 @@ wasm_io_types! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::prelude::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -111,12 +108,12 @@ wasm_io_types! {
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
 
     // Retrieve an action from the DHT or short circuit.
-    fn must_get_action (zt::entry::MustGetActionInput) -> zt::SignedActionHashed;
+    fn must_get_action (zt::entry::MustGetActionInput) -> zt::prelude::SignedActionHashed;
 
     fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::RegisterAgentActivity>;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Record>;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::prelude::Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
@@ -218,7 +215,7 @@ impl ZomeCallAuthorization {
 pub enum ZomeCallResponse {
     /// Arbitrary response from zome fns to the outside world.
     /// Something like a 200 http response.
-    Ok(crate::ExternIO),
+    Ok(ExternIO),
     /// Cap grant failure.
     /// Something like a 401 http response.
     Unauthorized(
@@ -247,13 +244,13 @@ pub struct ZomeCallUnsigned {
     /// Function name to sign.
     pub fn_name: FunctionName,
     /// Cap secret to sign.
-    pub cap_secret: Option<crate::CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// Payload to sign.
     pub payload: ExternIO,
     /// Nonce to sign.
     pub nonce: Nonce256Bits,
     /// Time after which this zome call MUST NOT be accepted.
-    pub expires_at: crate::Timestamp,
+    pub expires_at: Timestamp,
 }
 
 impl ZomeCallUnsigned {

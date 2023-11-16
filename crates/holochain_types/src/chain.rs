@@ -8,12 +8,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::prelude::ChainStatus;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ChainFilter;
-use holochain_zome_types::ChainFilters;
-use holochain_zome_types::RegisterAgentActivity;
-use holochain_zome_types::SignedActionHashed;
+use holochain_zome_types::prelude::*;
 
 #[cfg(all(test, feature = "test_utils"))]
 pub mod test;
@@ -495,22 +490,12 @@ impl ChainFilterRange {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::BoundedMustGetAgentActivityResponse;
     use super::ChainBottomType;
     use super::ChainFilter;
     use super::ChainFilterRange;
-    use holochain_types::prelude::Action;
-    use holochain_types::prelude::ActionHash;
-    use holochain_types::prelude::ActionHashed;
-    use holochain_types::prelude::AgentPubKey;
-    use holochain_types::prelude::DnaHash;
-    use holochain_types::prelude::RegisterAgentActivity;
-    use holochain_types::prelude::Signature;
-    use holochain_types::prelude::SignedActionHashed;
-    use holochain_types::prelude::Timestamp;
-    use holochain_types::prelude::SIGNATURE_BYTES;
-    use holochain_zome_types::Dna;
+    use holochain_types::prelude::*;
     use test_case::test_case;
 
     /// If both sides are not activity then the acc should be returned.

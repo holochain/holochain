@@ -2,7 +2,7 @@
 
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::ChcImpl;
-use holochain_zome_types::CellId;
+use holochain_zome_types::prelude::*;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;

@@ -170,6 +170,7 @@ impl KitsuneP2pActor {
 
         // Start a loop to handle our fetch queue fetch items.
         FetchTask::spawn(
+            config.clone(),
             fetch_pool.clone(),
             host_api.clone(),
             internal_sender.clone(),
@@ -580,10 +581,10 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let this_addr = self.ep_hnd.local_addr();
-        Ok(async move { Ok(vec![url2::Url2::parse(this_addr?)]) }
-            .boxed()
-            .into())
+        let this_addr = self.ep_hnd.local_addr()?;
+        let url = url2::Url2::try_parse(&this_addr)
+            .map_err(|e| KitsuneError::bad_input(e, format!("{:?}", this_addr)))?;
+        Ok(async move { Ok(vec![url]) }.boxed().into())
     }
 
     fn handle_join(
@@ -801,8 +802,90 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     }
 
     fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
-        let fut = self.ep_hnd.dump_network_stats();
-        Ok(async move { Ok(fut.await?) }.boxed().into())
+        let peer_fut_list = self
+            .spaces
+            .keys()
+            .map(|space| {
+                self.host_api
+                    .legacy
+                    .query_agents(QueryAgentsEvt::new(space.clone()))
+            })
+            .collect::<Vec<_>>();
+        let stat_fut = self.ep_hnd.dump_network_stats();
+        Ok(async move {
+            let mut stats = stat_fut.await?;
+
+            let this_id: String = stats
+                .as_object()
+                .and_then(|obj| obj.get("thisId"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(String::new);
+
+            let all_peers = futures::future::join_all(peer_fut_list).await;
+
+            #[derive(serde::Serialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Agent {
+                pub expires_at_millis: u64,
+            }
+
+            for peer in all_peers {
+                for peer in peer? {
+                    if let Some(net_key) = peer.url_list.get(0).map(|u| {
+                        kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
+                            .digest()
+                            .to_string()
+                    }) {
+                        if net_key == this_id {
+                            continue;
+                        }
+
+                        let r = stats
+                            .as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .entry(net_key)
+                            .or_insert_with(|| serde_json::json!({}));
+
+                        let r = r
+                            .as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .entry("hcDnaHashesToAgents".to_string())
+                            .or_insert_with(|| serde_json::json!({}));
+
+                        use base64::Engine;
+
+                        let dna_hash = format!(
+                            "uhC0k{}",
+                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.space)
+                        );
+
+                        let r = r
+                            .as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .entry(dna_hash)
+                            .or_insert_with(|| serde_json::json!({}));
+
+                        let agent_pub_key = format!(
+                            "uhCAk{}",
+                            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&**peer.agent)
+                        );
+
+                        let agent = Agent {
+                            expires_at_millis: peer.expires_at_ms,
+                        };
+
+                        r.as_object_mut()
+                            .ok_or(KitsuneP2pError::from("InvalidStats"))?
+                            .insert(agent_pub_key, serde_json::json!(agent));
+                    }
+                }
+            }
+
+            Ok(stats)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_get_diagnostics(

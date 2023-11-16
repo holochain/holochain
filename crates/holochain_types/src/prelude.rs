@@ -10,23 +10,20 @@ pub use std::convert::TryInto;
 pub use crate::access::*;
 pub use crate::action::*;
 pub use crate::activity::*;
-pub use crate::app::error::*;
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
 pub use crate::chc::*;
 pub use crate::combinators::*;
 pub use crate::db::*;
-pub use crate::dht_op::error::*;
-pub use crate::dht_op::{facts as _, *};
-pub use crate::dna::error::*;
+pub use crate::db_cache::*;
+pub use crate::dht_op::*;
 pub use crate::dna::wasm::*;
 pub use crate::dna::*;
 pub use crate::entry::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
 pub use crate::rate_limit::*;
-pub use crate::record::error::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validation_receipt::*;
@@ -37,8 +34,5 @@ pub use crate::fixt::TimestampFixturator;
 
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::*;
-
-#[cfg(feature = "test_utils")]
-pub use crate::test_utils::*;
 
 pub use holochain_util::{ffs, tokio_helper};

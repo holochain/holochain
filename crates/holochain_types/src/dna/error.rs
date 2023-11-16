@@ -1,7 +1,9 @@
 //! Holochain DnaError type.
 
+#![allow(missing_docs)]
+
 use holo_hash::{DnaHash, WasmHash};
-use holochain_zome_types::zome::error::ZomeError;
+use holochain_zome_types::zome::ZomeError;
 use thiserror::Error;
 
 /// Holochain DnaError type.
