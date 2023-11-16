@@ -194,7 +194,7 @@
             export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
           '')
           + (lib.strings.optionalString pkgs.stdenv.isLinux ''
-            export RUSTFLAGS="$RUSTFLAGS -Clink-arg=-fuse-ld=mold"
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER="mold"
           '')
           ;
         };
