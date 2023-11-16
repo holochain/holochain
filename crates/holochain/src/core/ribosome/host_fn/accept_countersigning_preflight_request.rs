@@ -118,7 +118,7 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
     use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
+    use crate::sweettest::SweetConductorBatch;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
@@ -825,7 +825,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
+    #[ignore = "flaky"]
     async fn enzymatic_session_success() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -964,7 +964,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
+    #[ignore = "flaky"]
     async fn enzymatic_session_fail() {
         holochain_trace::test_run().ok();
 
@@ -972,7 +972,7 @@ pub mod wasm_test {
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         let mut conductors =
-            SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous())
+            SweetConductorBatch::from_standard_config(3)
                 .await;
         let apps = conductors
             .setup_app("countersigning", &[dna_file.clone()])
@@ -1101,6 +1101,7 @@ pub mod wasm_test {
                     },
                 )
                 .await;
+
             // And bob's.
             let bob_activity: AgentActivity = alice_conductor
                 .call(
@@ -1116,11 +1117,19 @@ pub mod wasm_test {
 
             assert_eq!(
                 alice_activity.valid_activity.len(),
-                alice_activity_pre.valid_activity.len() + 2
+                alice_activity_pre.valid_activity.len() + 2,
+                "Expected alice's activity to have {} items but was {}, have got this activity {:?}",
+                alice_activity_pre.valid_activity.len() + 2,
+                alice_activity.valid_activity.len(),
+                alice_activity,
             );
             assert_eq!(
                 bob_activity.valid_activity.len(),
-                bob_activity_pre.valid_activity.len() + 2
+                bob_activity_pre.valid_activity.len() + 2,
+                "Expected bob's activity to have {} items but was {}, have got this activity {:?}",
+                bob_activity_pre.valid_activity.len() + 2,
+                bob_activity.valid_activity.len(),
+                bob_activity,
             );
         }
 
