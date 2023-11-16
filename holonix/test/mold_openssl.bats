@@ -14,10 +14,6 @@ teardown() {
   rm -rf "${BATS_TMPDIR:?}"
 }
 
-@test "mold is available" {
-    mold --version
-}
-
 @test "main binary runs successfully" {
     cargo run --offline --locked
 }

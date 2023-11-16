@@ -58,6 +58,8 @@
 
           env CARGO_VENDOR_DIR="${moldOpensslDeps}" \
             bats ./test/mold_openssl.bats
+        '' + lib.strings.optionalString pkgs.stdenv.isLinux ''
+          bats ./test/shell-setup-linux.bats
         ''
         ;
 
