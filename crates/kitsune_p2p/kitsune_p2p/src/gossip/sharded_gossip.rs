@@ -566,7 +566,15 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
-                    tracing::error!("Tgt expired {:?}", cert);
+                    tracing::error!(
+                        "Peer node timed out its gossip round. Cert: {:?}, Local agents: {:?}, Remote agents: {:?}",
+                        cert,
+                        self.local_agents,
+                        remote_agent_list
+                            .iter()
+                            .map(|i| i.agent())
+                            .collect::<Vec<_>>()
+                    );
                     {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, true);
@@ -1087,7 +1095,7 @@ impl ShardedGossipLocal {
         self.inner
             .share_mut(|i, _| {
                 for (cert, ref r) in i.round_map.take_timed_out_rounds() {
-                    tracing::warn!("The node {:?} has timed out their gossip round", cert);
+                    tracing::warn!("The node {:?} has timed out its gossip round", cert);
                     let mut metrics = i.metrics.write();
                     metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
                     metrics.complete_current_round(&cert, true);
