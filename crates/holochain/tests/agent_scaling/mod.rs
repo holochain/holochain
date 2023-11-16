@@ -9,8 +9,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::inline_zome::BoxApi;
-use std::time::Instant;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 struct BaseTarget(AnyLinkableHash, AnyLinkableHash);

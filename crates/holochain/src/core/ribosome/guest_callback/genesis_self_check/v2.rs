@@ -86,7 +86,7 @@ pub(crate) mod slow_tests {
 
     use super::GenesisSelfCheckInvocationV2;
     use crate::sweettest::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm};
 

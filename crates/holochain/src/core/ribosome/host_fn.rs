@@ -79,7 +79,7 @@ host_fn_api_impls! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::prelude::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();

@@ -201,7 +201,7 @@ impl SpaceInternalHandler for Space {
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
         let internal_sender = self.i_s.clone();
         Ok(async move {
-            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
+            let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
             let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
@@ -249,7 +249,7 @@ impl SpaceInternalHandler for Space {
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
-            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
+            let urls = vec![TxUrl::try_from(ep_hnd.local_addr()?)?];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
@@ -1454,6 +1454,7 @@ impl Space {
                 config
                     .tuning_params
                     .bootstrap_check_delay_backoff_multiplier,
+                config.tuning_params.bootstrap_max_delay_s,
             );
         }
 

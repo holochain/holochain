@@ -15,7 +15,7 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
-use holochain_state::prelude::test_keystore;
+use holochain_keystore::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;

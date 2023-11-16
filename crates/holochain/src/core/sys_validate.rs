@@ -17,8 +17,7 @@ pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::ActionHashed;
-pub use holochain_zome_types::Timestamp;
+pub use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
@@ -824,13 +823,12 @@ pub mod test {
     use fixt::Predictable;
     use hdk::prelude::AgentPubKeyFixturator;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_state::test_utils::test_keystore;
     use holochain_zome_types::countersigning::PreflightResponse;
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_check_countersigning_preflight_response_signature() {
-        let keystore = test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
         assert_matches!(
