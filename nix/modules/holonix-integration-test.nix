@@ -34,7 +34,7 @@
             ${bats} ./test/scaffolding.bats
             ${bats} ./test/rust.bats
             ${bats} ./test/hc-sandbox.bats
-            
+
             env CARGO_VENDOR_DIR=${moldOpensslDeps}/ \
             ${bats} ./test/mold_openssl.bats
           '';
