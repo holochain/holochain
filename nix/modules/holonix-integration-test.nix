@@ -28,6 +28,7 @@
             set -Eeuo pipefail
             cd ${flake.config.srcCleanedHolonix}/holonix
 
+            ${bats} ./test/shell-setup.bats
             ${bats} ./test/holochain-binaries.bats
             ${bats} ./test/launcher.bats
             ${bats} ./test/scaffolding.bats
@@ -57,6 +58,8 @@
         checkPhase = ''
           # output to console and to logfile
           exec >> >(tee $out) 2>&1
+
+          eval "$shellHook"
 
           echo =============== TESTSCRIPT OUTPUT STARTS HERE ===============
           ${testScript}

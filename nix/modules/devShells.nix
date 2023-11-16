@@ -181,6 +181,7 @@
           ]);
 
           shellHook = ''
+            export HOLOCHAIN_DEVSHELL="rustDev"
             export CARGO_HOME="$PWD/.cargo"
             export CARGO_INSTALL_ROOT="$PWD/.cargo"
             export CARGO_TARGET_DIR="$PWD/target"
