@@ -2,7 +2,7 @@
 name = "kitsune_p2p"
 version = "0.3.0-beta-dev.21"
 description = "p2p / dht communication framework"
-license = "Apache-2.0"
+license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
