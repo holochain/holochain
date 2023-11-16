@@ -58,6 +58,7 @@ pub async fn call_zome_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    dbg!("call zome workflow");
     let coordinator_zome = args
         .ribosome
         .dna_def()

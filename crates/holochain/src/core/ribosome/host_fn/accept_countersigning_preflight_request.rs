@@ -117,15 +117,15 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
-    use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
-    use wasmer::RuntimeError;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use wasmer::RuntimeError;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -826,7 +826,6 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[ignore = "flaky"]
     async fn enzymatic_session_success() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -839,6 +838,19 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        // Run any arbitrary zome call for bob to force him to run init
+        let _: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
 
         // Start an enzymatic session
         let preflight_request: PreflightRequest = conductor
@@ -972,9 +984,7 @@ pub mod wasm_test {
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
-        let mut conductors =
-            SweetConductorBatch::from_standard_config(3)
-                .await;
+        let mut conductors = SweetConductorBatch::from_standard_config(3).await;
         let apps = conductors
             .setup_app("countersigning", &[dna_file.clone()])
             .await
