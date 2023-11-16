@@ -2,8 +2,9 @@ use clap::Parser;
 use tokio::io::AsyncWriteExt;
 use tx5_signal_srv::{Error, Result};
 
-#[derive(Debug, Parser)]
 /// Helper for running local Holochain bootstrap and WebRTC signal servers.
+#[derive(Debug, Parser)]
+#[command(version, about)]
 pub struct HcRunLocalServices {
     /// If set, write the bound address list to a new file, separated by
     /// newlines. If the file exists, an error will be returned.

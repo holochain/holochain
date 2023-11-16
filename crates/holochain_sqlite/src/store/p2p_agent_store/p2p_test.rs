@@ -60,7 +60,7 @@ async fn rand_insert(
         space.clone(),
         agent.clone(),
         half_len,
-        vec!["fake:".into()],
+        vec!["fake:".try_into().unwrap()],
         signed_at_ms,
         expires_at_ms,
         |_| async { Ok(Arc::new(KitsuneSignature(vec![0; 64]))) },
