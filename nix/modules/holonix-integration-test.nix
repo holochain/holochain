@@ -18,7 +18,7 @@
       };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
       moldOpensslDeps = craneLib.vendorCargoDeps {
-        src = flake.config.srcCleanedHolonix + "/holonix/test/mold_openssl";
+        src = "${flake.config.srcCleanedHolonix}/holonix/test/mold_openssl";
       };
     in
     {
