@@ -4,7 +4,7 @@ version = "0.3.0-beta-dev.1"
 authors = ["freesig <tom.gowan@holo.host>", "Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "tracing helpers"
-license = "MIT"
+license = "Apache-2.0"
 documentation = "https://docs.rs/holochain_trace"
 repository = "https://github.com/holochain/holochain"
 

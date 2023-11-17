@@ -14,6 +14,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20231115.003452
+
+## [hcterm-0.3.0-beta-dev.0](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.0)
+
+## [holochain\_cli-0.3.0-beta-dev.24](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain-0.3.0-beta-dev.24](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.22](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.14](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.24](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cascade-0.3.0-beta-dev.24](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.24](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.24)
+
+- Test: Add tests to App and Admin API to prevent unnoticed changes in serialization from breaking these interfaces.
+
+## [holochain\_metrics-0.3.0-beta-dev.6](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.19](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.22](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [hdk-0.3.0-beta-dev.19](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_state-0.3.0-beta-dev.23](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [hdi-0.4.0-beta-dev.15](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.15)
+
+## [holochain\_p2p-0.3.0-beta-dev.23](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_state\_types-0.3.0-beta-dev.22](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [hdk\_derive-0.3.0-beta-dev.15](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_types-0.3.0-beta-dev.21](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_keystore-0.3.0-beta-dev.17](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [holochain\_sqlite-0.3.0-beta-dev.21](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.16](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [kitsune\_p2p-0.3.0-beta-dev.21](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.21)
+
+- There were some places where parsing an invalid URL would crash kitsune. This is now fixed. [\#2689](https://github.com/holochain/holochain/pull/2689)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.15](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.19](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.15](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.13](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holo\_hash-0.3.0-beta-dev.12](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.12)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.13](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.13)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.13](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.13](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.13)
+
 # 20231101.003619
 
 ## [hcterm-0.2.0](crates/hcterm/CHANGELOG.md#0.2.0)

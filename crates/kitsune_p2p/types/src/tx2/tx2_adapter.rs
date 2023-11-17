@@ -247,7 +247,7 @@ pub mod test_utils {
 
             let t = KitsuneTimeout::from_millis(100);
 
-            let (ep, mut con_recv) = f.bind("test://none".into(), t).await.unwrap();
+            let (ep, mut con_recv) = f.bind("test://none".try_into().unwrap(), t).await.unwrap();
 
             let (con, mut chan_recv) = con_recv.next().await.unwrap().await.unwrap();
 
@@ -261,7 +261,10 @@ pub mod test_utils {
             buf.extend_from_slice(b"test");
             chan_send.write(0.into(), buf, t).await.unwrap();
 
-            let (con, mut chan_recv) = ep.connect("test://test".into(), t).await.unwrap();
+            let (con, mut chan_recv) = ep
+                .connect("test://test".try_into().unwrap(), t)
+                .await
+                .unwrap();
 
             let mut chan_recv = chan_recv.next().await.unwrap().await.unwrap();
 
