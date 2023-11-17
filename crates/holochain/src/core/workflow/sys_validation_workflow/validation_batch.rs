@@ -305,7 +305,7 @@ mod tests {
     }
 
     fn test_op() -> DhtOpHashed {
-        let mut create_action = fixt!(Create);
+        let create_action = fixt!(Create);
         let action = Action::Create(create_action);
 
         DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), action))
