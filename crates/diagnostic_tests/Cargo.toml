@@ -2,6 +2,7 @@
 name = "diagnostic_tests"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 
 [dependencies]
 chashmap = "2.2"
