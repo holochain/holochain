@@ -4,7 +4,7 @@ version = "0.3.0-beta-dev.21"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 description = "This crate is for generating nonces."
-license-file = "LICENSE_CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_nonces"
 
