@@ -141,9 +141,7 @@ pub enum ValidationOutcome {
     PrevActionError(#[from] PrevActionError),
     #[error("Private entry data should never be included in any op other than StoreEntry.")]
     PrivateEntryLeaked,
-    #[error(
-        "The DNA does not belong in this space! Action has {0:?}, expected {1:?}"
-    )]
+    #[error("The DNA does not belong in this space! Action has {0:?}, expected {1:?}")]
     WrongDna(DnaHash, DnaHash),
     #[error("Update original: {0:?} doesn't match new: {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
