@@ -1,7 +1,14 @@
 //! App Manifest format, installed_hash 1.
 //!
-//! NB: After stabilization, *do not modify this file*! Create a new installed_hash of
-//! the spec and leave this one alone to maintain backwards compatibility.
+//! **NB: do not modify the types in this file**!
+//! (at least not after this initial schema has been stabilized).
+//! For any modifications, create a new version of the spec and leave this one
+//! alone to maintain backwards compatibility.
+//!
+//! This is the initial version of the App Manifest. Not all functionality is
+//! implemented yet, notably:
+//! - Using existing Cells is not implemented
+//! - Specifying DNA version is not implemented (DNA migration needs to land first)
 
 use super::{
     app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
@@ -83,7 +90,12 @@ pub struct AppRoleDnaManifest {
     #[serde(flatten)]
     pub location: Option<mr_bundle::Location>,
 
-    /// Optional default modifier values. May be overridden during installation.
+    /// Optional default modifier values.
+    ///
+    /// Overrides any default modifiers specified in the DNA file,
+    /// and may also be overridden during installation.
+    /// A set of modifiers completely overrides previously specified default properties,
+    /// rather than being interpolated into them.
     #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
 

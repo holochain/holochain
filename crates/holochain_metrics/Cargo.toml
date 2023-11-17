@@ -1,10 +1,10 @@
 [package]
 name = "holochain_metrics"
-version = "0.3.0-beta-dev.5"
+version = "0.3.0-beta-dev.6"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "metrics helpers"
-license = "MIT"
+license = "Apache-2.0"
 documentation = "https://docs.rs/holochain_metrics"
 repository = "https://github.com/holochain/holochain"
 

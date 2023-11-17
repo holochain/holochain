@@ -138,6 +138,35 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     }
 }
 
+/// Drop the specified agent keys from each conductor's peer db.
+#[cfg(any(test, feature = "test_utils"))]
+pub async fn forget_peer_info(
+    all_envs: Vec<DbWrite<DbKindP2pAgents>>,
+    agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
+) {
+    use kitsune_p2p_types::KAgent;
+
+    let agents_to_forget: Vec<KAgent> = agents_to_forget
+        .into_iter()
+        .map(|a| a.to_kitsune())
+        .collect();
+
+    futures::future::join_all(all_envs.clone().into_iter().map(move |env| {
+        let agents = agents_to_forget.clone();
+
+        async move {
+            env.write_async(move |txn| {
+                for agent in agents.iter() {
+                    txn.p2p_remove_agent(agent).unwrap();
+                }
+                DatabaseResult::Ok(())
+            })
+            .await
+        }
+    }))
+    .await;
+}
+
 /// Interconnect provided pair of conductors via their peer store databases,
 /// according to the connectivity matrix
 #[cfg(any(test, feature = "test_utils"))]

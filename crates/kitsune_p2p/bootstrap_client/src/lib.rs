@@ -200,7 +200,7 @@ pub async fn proxy_list(url: Url2, net: BootstrapNet) -> BootstrapClientResult<V
         .await?
         .unwrap_or_default()
         .into_iter()
-        .map(Url2::parse)
+        .flat_map(|s| Url2::try_parse(s).ok())
         .collect())
 }
 
