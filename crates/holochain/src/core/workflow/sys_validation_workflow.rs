@@ -300,7 +300,7 @@ async fn validate_op_inner(
                     check_and_hold_store_record(
                         &ActionHash::with_data_sync(&action),
                         cascade,
-                        incoming_dht_ops_sender.clone(),
+                        incoming_dht_ops_sender,
                         dependency_check,
                     )
                     .await?;
