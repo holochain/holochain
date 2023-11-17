@@ -254,7 +254,7 @@ mod tests {
                             Dependency::Null,
                         ))
                     } else if op.hash == missing_dep_op.hash {
-                        Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null)) 
+                        Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null))
                     } else if op.hash == rejected_op.hash {
                         Ok((op.hash, Outcome::Rejected, Dependency::Null))
                     } else {
