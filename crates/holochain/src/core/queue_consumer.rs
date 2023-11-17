@@ -632,7 +632,7 @@ impl BackOff {
 pub enum WorkComplete {
     /// The queue has been exhausted
     Complete,
-    /// Items still remain on the queue. Optionally a delay in ms before retriggering.
+    /// Items still remain on the queue. Optionally specify a delay in ms before retriggering.
     Incomplete(Option<Duration>),
 }
 
