@@ -71,11 +71,19 @@ async fn validate_dna_op_mismatched_dna_hash() {
 
     let mut test_case = TestCase::new().await;
 
+    let mut mismatched_dna_hash = fixt!(DnaHash);
+    loop {
+        if mismatched_dna_hash != test_case.dna_def_hash().hash {
+            break;
+        }
+        mismatched_dna_hash = fixt!(DnaHash);
+    }
+
     let dna_action = HdkDna {
         author: test_case.agent.clone().into(),
         timestamp: Timestamp::now().into(),
         // Will not match the space hash from the test_case
-        hash: fixt!(DnaHash),
+        hash: mismatched_dna_hash,
     };
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
 
@@ -396,9 +404,17 @@ async fn validate_create_op_author_mismatch_with_prev() {
         .sign_action(Action::AgentValidationPkg(validation_package_action))
         .await;
 
+    let mut mismatched_author = fixt!(AgentPubKey);
+    loop {
+        if mismatched_author != test_case.agent {
+            break;
+        }
+        mismatched_author = fixt!(AgentPubKey);
+    }
+
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = fixt!(AgentPubKey);
+    create_action.author = mismatched_author;
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
@@ -731,7 +747,6 @@ async fn validate_store_entry_with_entry_with_wrong_entry_type() {
     );
 }
 
-// TODO Flaky
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_store_entry_with_entry_with_wrong_entry_hash() {
     holochain_trace::test_run().unwrap();
@@ -760,11 +775,20 @@ async fn validate_store_entry_with_entry_with_wrong_entry_hash() {
         EntryVisibility::Public,
     ));
     create_action.entry_hash = entry_hash.as_hash().clone();
+
+    let mut mismatched_entry = Entry::App(fixt!(AppEntryBytes));
+    loop {
+        if mismatched_entry != app_entry {
+            break;
+        }
+        mismatched_entry = Entry::App(fixt!(AppEntryBytes));
+    }
+
     let op = DhtOp::StoreRecord(
         fixt!(Signature),
         Action::Create(create_action),
         // Create some new data which will have a different hash
-        holochain_zome_types::record::RecordEntry::Present(Entry::App(fixt!(AppEntryBytes))),
+        holochain_zome_types::record::RecordEntry::Present(mismatched_entry),
     );
 
     let outcome = test_case
