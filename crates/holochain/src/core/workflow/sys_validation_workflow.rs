@@ -37,9 +37,9 @@ mod test_ideas;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod validate_op_tests;
-#[cfg(test)]
 mod unit_tests;
+#[cfg(test)]
+mod validate_op_tests;
 
 #[instrument(skip(
     workspace,
