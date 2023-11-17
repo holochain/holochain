@@ -174,7 +174,7 @@ async fn sys_validation_workflow_inner(
     .await?;
 
     Ok(if saturated {
-        WorkComplete::Incomplete
+        WorkComplete::Incomplete(None)
     } else {
         WorkComplete::Complete
     })

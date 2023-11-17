@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Fix: In many cases app validation would not be retriggered for ops that failed validation. Previously the app validation workflow had been retriggered only when the number of concurrent ops to be validated (50) was reached. Now the workflow will be retriggered whenever any ops could not be validated.
 
 ## 0.3.0-beta-dev.24
 
