@@ -260,71 +260,11 @@ async fn validate_create_op_with_prev_from_network() {
         });
 
     let outcome = test_case
-        .with_incoming_ops_sender()
+        .expect_incoming_ops_sender()
         .with_op(op)
         .execute()
         .await
         .unwrap();
-
-    assert!(
-        matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
-    );
-}
-
-// TODO This should not error but also represents a missed opportunity to capture an op.
-//      At the moment this is silently ignored because the `incoming_dht_ops_sender` is optional.
-#[tokio::test(flavor = "multi_thread")]
-async fn validate_create_op_with_prev_from_network_but_missing_op_sender() {
-    holochain_trace::test_run().unwrap();
-
-    let mut test_case = TestCase::new().await;
-
-    // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone().into();
-    validation_package_action.action_seq = 10;
-    let signed_action = test_case
-        .sign_action(Action::AgentValidationPkg(validation_package_action))
-        .await;
-
-    // Op to validate
-    let mut create_action = fixt!(Create);
-    create_action.author = signed_action.action().author().clone();
-    create_action.action_seq = signed_action.action().action_seq() + 1;
-    create_action.prev_action = signed_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
-
-    test_case
-        .cascade_mut()
-        .expect_retrieve_action()
-        .times(1)
-        .returning({
-            let signed_action = signed_action.clone();
-            move |_, _| {
-                let signed_action = signed_action.clone();
-                async move { Ok(Some((signed_action, CascadeSource::Local))) }.boxed()
-            }
-        });
-
-    test_case
-        .cascade_mut()
-        .expect_retrieve()
-        .times(1)
-        .returning(move |_hash, _options| {
-            let signed_action = signed_action.clone();
-            async move {
-                Ok(Some((
-                    Record::new(signed_action, None),
-                    CascadeSource::Network,
-                )))
-            }
-            .boxed()
-        });
-
-    let outcome = test_case.with_op(op).execute().await.unwrap();
 
     assert!(
         matches!(outcome, Outcome::Accepted),
@@ -1113,7 +1053,7 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, &cascade, None::<&MockDhtOpSender>)
+    let validation_outcome = validate_op(&op, &dna_def, &cascade, &MockDhtOpSender::new())
         .await
         .unwrap();
 
@@ -1126,7 +1066,7 @@ struct TestCase {
     cascade: MockCascade,
     dna_def: DnaDef,
     agent: HoloHash<Agent>,
-    incoming_ops_sender: Option<MockDhtOpSender>,
+    incoming_ops_sender: MockDhtOpSender,
 }
 
 impl TestCase {
@@ -1142,7 +1082,7 @@ impl TestCase {
             cascade: MockCascade::new(),
             dna_def,
             agent,
-            incoming_ops_sender: None,
+            incoming_ops_sender: MockDhtOpSender::new(),
         }
     }
 
@@ -1216,14 +1156,11 @@ impl TestCase {
         self
     }
 
-    fn with_incoming_ops_sender(&mut self) -> &mut Self {
-        let mut sender = MockDhtOpSender::new();
-        sender
+    fn expect_incoming_ops_sender(&mut self) -> &mut Self {
+        self.incoming_ops_sender
             .expect_send_register_agent_activity()
             .times(1)
             .returning(move |_| async move { Ok(()) }.boxed());
-
-        self.incoming_ops_sender = Some(sender);
 
         self
     }
@@ -1235,7 +1172,7 @@ impl TestCase {
             self.op.as_ref().expect("No op set, invalid test case"),
             &dna_def,
             &self.cascade,
-            self.incoming_ops_sender.as_ref(),
+            &self.incoming_ops_sender,
         )
         .await
     }

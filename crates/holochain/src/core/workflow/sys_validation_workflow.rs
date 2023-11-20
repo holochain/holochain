@@ -1,6 +1,5 @@
 //! The workflow and queue consumer for sys validation
 
-use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_record;
@@ -16,8 +15,6 @@ use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
-use holochain_state::host_fn_workspace::HostFnStores;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
 use std::convert::TryInto;
@@ -43,20 +40,18 @@ mod validate_op_tests;
 
 #[instrument(skip(
     workspace,
-    space,
+    incoming_dht_ops_sender,
     trigger_app_validation,
-    sys_validation_trigger,
     network
 ))]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
-    space: Arc<Space>,
+    incoming_dht_ops_sender: impl DhtOpSender + Send + Sync + Clone + 'static,
     trigger_app_validation: TriggerSender,
-    sys_validation_trigger: TriggerSender,
     network: Network,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
-        sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger).await?;
+        sys_validation_workflow_inner(workspace, incoming_dht_ops_sender, network).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -68,9 +63,8 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
 
 async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
-    space: Arc<Space>,
+    incoming_dht_ops_sender: impl DhtOpSender + Send + Sync + Clone + 'static,
     network: Network,
-    sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -87,15 +81,11 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
         sorted_ops,
         start,
         {
-            let space = space.clone();
+            let workspace = workspace.clone();
             move |so| {
-                // Create an incoming ops sender for any dependencies we find
-                // that we are meant to be holding but aren't.
-                // If we are not holding them they will be added to our incoming ops.
-                let incoming_dht_ops_sender =
-                    IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
                 let workspace = workspace.clone();
                 let cascade = cascade.clone();
+                let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
                 async move {
                     let (op, op_hash) = so.into_inner();
                     let op_type = op.get_type();
@@ -105,16 +95,16 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
                     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
                     let r =
-                        validate_op(&op, &dna_def, &cascade, Some(&incoming_dht_ops_sender)).await;
+                        validate_op(&op, &dna_def, &cascade, &incoming_dht_ops_sender).await;
                     r.map(|o| (op_hash, o, dependency))
                 }
                 .boxed()
             }
         },
         |batch| {
-            let space = space.clone();
+            let workspace = workspace.clone();
             async move {
-                space
+                workspace
                     .dht_db
                     .write_async(move |txn| {
                         let mut summary = OutcomeSummary::default();
@@ -188,7 +178,7 @@ pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
+    incoming_dht_ops_sender: &impl DhtOpSender,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(op, cascade, dna_def, incoming_dht_ops_sender).await {
         Ok(_) => Ok(Outcome::Accepted),
@@ -251,7 +241,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     cascade: &impl Cascade,
     dna_def: &DnaDefHashed,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
+    incoming_dht_ops_sender: &impl DhtOpSender,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     match op {
@@ -301,7 +291,7 @@ async fn validate_op_inner(
                     check_and_hold_store_record(
                         &ActionHash::with_data_sync(&action),
                         cascade,
-                        incoming_dht_ops_sender,
+                        Some(incoming_dht_ops_sender),
                         dependency_check,
                     )
                     .await?;
@@ -315,12 +305,12 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
-            register_agent_activity(action, cascade, dna_def, incoming_dht_ops_sender).await?;
+            register_agent_activity(action, cascade, dna_def, Some(incoming_dht_ops_sender)).await?;
             store_record(action, cascade).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
-            register_updated_content(action, cascade, incoming_dht_ops_sender).await?;
+            register_updated_content(action, cascade, Some(incoming_dht_ops_sender)).await?;
             if let Some(entry) = entry.as_option() {
                 store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
@@ -328,7 +318,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
-            register_updated_record(action, cascade, incoming_dht_ops_sender).await?;
+            register_updated_record(action, cascade, Some(incoming_dht_ops_sender)).await?;
             if let Some(entry) = entry.as_option() {
                 store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
@@ -336,19 +326,19 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterDeletedBy(_, action) => {
-            register_deleted_by(action, cascade, incoming_dht_ops_sender).await?;
+            register_deleted_by(action, cascade, Some(incoming_dht_ops_sender)).await?;
             Ok(())
         }
         DhtOp::RegisterDeletedEntryAction(_, action) => {
-            register_deleted_entry_action(action, cascade, incoming_dht_ops_sender).await?;
+            register_deleted_entry_action(action, cascade, Some(incoming_dht_ops_sender)).await?;
             Ok(())
         }
         DhtOp::RegisterAddLink(_, action) => {
-            register_add_link(action, cascade, incoming_dht_ops_sender).await?;
+            register_add_link(action, cascade, Some(incoming_dht_ops_sender)).await?;
             Ok(())
         }
         DhtOp::RegisterRemoveLink(_, action) => {
-            register_delete_link(action, cascade, incoming_dht_ops_sender).await?;
+            register_delete_link(action, cascade, Some(incoming_dht_ops_sender)).await?;
             Ok(())
         }
     }
@@ -652,7 +642,7 @@ fn update_check(entry_update: &Update, original_action: &Action) -> SysValidatio
 pub struct SysValidationWorkspace {
     scratch: Option<SyncScratch>,
     authored_db: DbRead<DbKindAuthored>,
-    dht_db: DbRead<DbKindDht>,
+    dht_db: DbWrite<DbKindDht>,
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
@@ -661,7 +651,7 @@ pub struct SysValidationWorkspace {
 impl SysValidationWorkspace {
     pub fn new(
         authored_db: DbRead<DbKindAuthored>,
-        dht_db: DbRead<DbKindDht>,
+        dht_db: DbWrite<DbKindDht>,
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
@@ -773,7 +763,7 @@ impl SysValidationWorkspace {
 
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> CascadeImpl {
-        let cascade = CascadeImpl::empty().with_dht(self.dht_db.clone());
+        let cascade = CascadeImpl::empty().with_dht(self.dht_db.clone().into());
         match &self.scratch {
             Some(scratch) => cascade
                 .with_authored(self.authored_db.clone())
@@ -788,7 +778,7 @@ impl SysValidationWorkspace {
         network: Network,
     ) -> CascadeImpl<Network> {
         let cascade = CascadeImpl::empty()
-            .with_dht(self.dht_db.clone())
+            .with_dht(self.dht_db.clone().into())
             .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
@@ -839,25 +829,6 @@ pub fn put_integrated(
     set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
-}
-
-impl From<&HostFnWorkspace> for SysValidationWorkspace {
-    fn from(h: &HostFnWorkspace) -> Self {
-        let HostFnStores {
-            cache,
-            scratch,
-            authored,
-            dht,
-        } = h.stores();
-        Self {
-            scratch,
-            authored_db: authored,
-            dht_db: dht,
-            dht_query_cache: None,
-            cache,
-            dna_def: h.dna_def(),
-        }
-    }
 }
 
 struct OutcomeSummary {

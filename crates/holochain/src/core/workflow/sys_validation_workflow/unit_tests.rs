@@ -2,6 +2,7 @@ use super::sys_validation_workflow;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
 use crate::conductor::space::TestSpace;
+use crate::core::IncomingDhtOpSender;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
 use crate::prelude::AgentPubKeyFixturator;
@@ -330,8 +331,6 @@ impl TestCase {
     }
 
     async fn run(&mut self) {
-        // TODO So this struct is just here to follow the 'workspace' pattern? The Space gets passed to the workflow anyway and most of the fields are shared.
-        //      Maybe just moving the Space to the workspace is enough to tidy this up?
         let workspace = SysValidationWorkspace::new(
             self.test_space.space.authored_db.clone().into(),
             self.test_space.space.dht_db.clone().into(),
@@ -348,11 +347,15 @@ impl TestCase {
             .unwrap_or_else(|| MockHolochainP2pDnaT::new());
         network.expect_clone().return_once(move || actual_network);
 
+        let op_sender = IncomingDhtOpSender::new(
+            Arc::new(self.test_space.space.clone()),
+            self.self_trigger.0.clone(),
+        );
+
         sys_validation_workflow(
             Arc::new(workspace),
-            Arc::new(self.test_space.space.clone()),
+            op_sender,
             self.app_validation_trigger.0.clone(),
-            self.self_trigger.0.clone(),
             network,
         )
         .await
