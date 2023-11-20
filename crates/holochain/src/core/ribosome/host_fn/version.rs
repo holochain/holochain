@@ -1,7 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use std::sync::Arc;
-use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::version::ZomeApiVersion;
 use wasmer::RuntimeError;
 
