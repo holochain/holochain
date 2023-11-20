@@ -69,6 +69,7 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
             (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
             (None, None) => RecordEntry::NA,
             (Some(_), None) => {
+                // TODO this is a problem case but it is reachable
                 unreachable!("Entry is present for an action type which has no entry reference")
             }
             (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,

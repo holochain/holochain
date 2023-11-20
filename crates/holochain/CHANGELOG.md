@@ -6,6 +6,8 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Added a new check to system validation to ensure that the `original_entry_address` of an update points to the same entry hash that the original action pointed to. [3023](https://github.com/holochain/holochain/pull/3023)
+
 - Fix: App validation would not be retriggered for ops that failed validation. The app validation workflow had only been retriggered when the number of concurrent ops to be validated (50) was reached. Now the workflow will be re-triggered after a 10 second delay whenever any ops could not be validated.
 
 ## 0.2.3
