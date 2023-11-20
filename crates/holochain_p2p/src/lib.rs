@@ -181,6 +181,7 @@ mockall::mock! {
             initial_arc: Option<crate::dht_arc::DhtArc>,
         ) -> actor::HolochainP2pResult<()>;
         async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
+        #[allow(clippy::too_many_arguments)]
         async fn call_remote(
             &self,
             from_agent: AgentPubKey,
@@ -193,6 +194,7 @@ mockall::mock! {
             nonce: Nonce256Bits,
             expires_at: Timestamp,
         ) -> actor::HolochainP2pResult<SerializedBytes>;
+        #[allow(clippy::too_many_arguments)]
         async fn remote_signal(
             &self,
             from_agent: AgentPubKey,
@@ -204,6 +206,7 @@ mockall::mock! {
             nonce: Nonce256Bits,
             expires_at: Timestamp,
         ) -> actor::HolochainP2pResult<()>;
+        #[allow(clippy::too_many_arguments)]
         async fn publish(
             &self,
             request_validation_receipt: bool,
