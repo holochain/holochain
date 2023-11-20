@@ -311,7 +311,7 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
                 .await;
 
             app.state.share_mut(|state| {
-                let val = state.commits[b] - links;
+                let val = state.commits[b].saturating_sub(links);
                 state.link_counts[n][b].0 = val;
                 state.link_counts[n][b].1 = Instant::now();
                 let (is_zero, is_done) = (val == 0, state.total_commits() >= MAX_COMMITS);
