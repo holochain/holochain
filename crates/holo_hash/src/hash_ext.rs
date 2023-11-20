@@ -15,7 +15,7 @@ use must_future::MustBoxFuture;
 
 /// The maximum size to hash synchronously. Anything larger than this will
 /// take too long to hash within a single tokio context
-pub const MAX_HASHABLE_CONTENT_LEN: usize = 16 * 1000 * 1000; // 16 MiB
+pub const MAX_HASHABLE_CONTENT_LEN: usize = 16 * 1000 * 1000; // 16 MB
 
 impl<T: HashTypeSync> HoloHash<T> {
     /// Synchronously hash a reference to the given content to produce a HoloHash

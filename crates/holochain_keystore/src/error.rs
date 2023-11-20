@@ -1,17 +1,10 @@
 use crate::*;
+use holochain_secure_primitive::SecurePrimitiveError;
 use holochain_zome_types::signature::Signature;
 
 /// Keystore Error Type.
 #[derive(Debug, thiserror::Error)]
 pub enum KeystoreError {
-    /// An error generated from the GhostActor system.
-    #[error("GhostError: {0}")]
-    GhostError(#[from] ghost_actor::GhostError),
-
-    /// Error from Lair
-    #[error(transparent)]
-    LairError(#[from] lair_keystore_api::LairError),
-
     /// Error serializing data.
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
@@ -20,23 +13,21 @@ pub enum KeystoreError {
     #[error("Invalid signature {0:?}, for {1}")]
     InvalidSignature(Signature, String),
 
+    /// Error from Lair
+    #[error(transparent)]
+    LairError(one_err::OneErr),
+
     /// Used in TryFrom implementations for some zome types.
     #[error("Secure primitive error: {0}")]
-    SecurePrimitiveError(#[from] holochain_zome_types::SecurePrimitiveError),
+    SecurePrimitiveError(#[from] SecurePrimitiveError),
 
     /// Unexpected Internal Error.
     #[error("Other: {0}")]
     Other(String),
 }
 
-impl From<KeystoreError> for lair_keystore_api::LairError {
-    fn from(e: KeystoreError) -> lair_keystore_api::LairError {
-        match e {
-            KeystoreError::LairError(e) => e,
-            _ => lair_keystore_api::LairError::other(e),
-        }
-    }
-}
+/// alias
+pub type KeystoreResult<T> = Result<T, KeystoreError>;
 
 impl std::cmp::PartialEq for KeystoreError {
     fn eq(&self, o: &Self) -> bool {

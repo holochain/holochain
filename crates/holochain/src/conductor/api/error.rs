@@ -1,10 +1,9 @@
-//! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
-
+//! Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
 use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use holo_hash::DnaHash;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
@@ -12,9 +11,10 @@ use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use mr_bundle::error::MrBundleError;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
-/// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
+/// Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// The Dna for this Cell is not installed in the conductor.
@@ -34,7 +34,7 @@ pub enum ConductorApiError {
 
     /// Conductor threw an error during API call.
     #[error("Conductor returned an error while using a ConductorApi: {0:?}")]
-    ConductorError(#[from] Box<ConductorError>),
+    ConductorError(#[from] ConductorError),
 
     /// Io error.
     #[error("Io error while using a Interface Api: {0:?}")]
@@ -49,18 +49,16 @@ pub enum ConductorApiError {
     DatabaseError(#[from] DatabaseError),
 
     /// Workspace error.
-    // TODO: Can be avoided if we can move workspace creation into the workflow
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
 
     /// Workflow error.
-    // TODO: perhaps this Box can be avoided with further reorganization
     #[error(transparent)]
-    WorkflowError(#[from] Box<WorkflowError>),
+    WorkflowError(#[from] WorkflowError),
 
     /// ZomeError
     #[error("ZomeError: {0}")]
-    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+    ZomeError(#[from] holochain_zome_types::zome::ZomeError),
 
     /// DnaError
     #[error("DnaError: {0}")]
@@ -107,6 +105,12 @@ pub enum ConductorApiError {
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
 
+    #[error(transparent)]
+    ChcError(#[from] ChcError),
+
+    #[error(transparent)]
+    RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -119,9 +123,9 @@ impl ConductorApiError {
     }
 }
 
-impl From<ConductorError> for ConductorApiError {
-    fn from(conductor_api_error: ConductorError) -> Self {
-        Self::from(Box::new(conductor_api_error))
+impl From<one_err::OneErr> for ConductorApiError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
     }
 }
 
@@ -160,5 +164,14 @@ impl From<SerializationError> for ExternalApiWireError {
 impl From<RibosomeError> for ExternalApiWireError {
     fn from(e: RibosomeError) -> Self {
         ExternalApiWireError::RibosomeError(e.to_string())
+    }
+}
+
+pub fn zome_call_response_to_conductor_api_result<T: DeserializeOwned + std::fmt::Debug>(
+    zcr: ZomeCallResponse,
+) -> ConductorApiResult<T> {
+    match zcr {
+        ZomeCallResponse::Ok(bytes) => Ok(bytes.decode().map_err(SerializationError::from)?),
+        other => Err(ConductorApiError::other(format!("{:?}", other))),
     }
 }

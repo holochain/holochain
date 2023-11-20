@@ -10,8 +10,7 @@
 //! and the validation status is the status of the DhtOp which that authority
 //! holds".
 
-use crate::ValidationStatus;
-use holochain_serialized_bytes::prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// Data with an optional validation status.
@@ -19,7 +18,7 @@ pub struct Judged<T> {
     /// The data that the status applies to.
     pub data: T,
     /// The validation status of the data.
-    status: Option<ValidationStatus>,
+    pub status: Option<ValidationStatus>,
 }
 
 impl<T> Judged<T> {

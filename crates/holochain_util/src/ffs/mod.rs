@@ -5,12 +5,12 @@
 //! the path used in the function call.
 //!
 //! This helps with "file not found" errors. Without ffs, the error would be:
-//! ```ignore
+//! ```text
 //! Error: No such file or directory (os error 2)
 //! ```
 //!
 //! and with ffs, the error becomes:
-//! ```ignore
+//! ```text
 //! ffs::IoError at path '/foo/bar': No such file or directory (os error 2)
 //! ```
 
@@ -38,7 +38,7 @@ macro_rules! impl_ffs {
         )*
 
         /// Wrap dunce::canonicalize, since std::fs::canonicalize has problems for Windows
-        /// (see https://docs.rs/dunce/1.0.1/dunce/index.html)
+        /// (see <https://docs.rs/dunce/1.0.1/dunce/index.html>)
         pub async fn canonicalize<P: Clone + AsRef<std::path::Path>>(path: P) -> IoResult<PathBuf> {
             dunce::canonicalize(path.clone()).map_err(mapper(path))
         }

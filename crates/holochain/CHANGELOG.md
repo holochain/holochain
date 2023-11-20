@@ -1,14 +1,515 @@
+---
+default_semver_increment_mode: !pre_minor beta-dev
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Fix: In many cases app validation would not be retriggered for ops that failed validation. Previously the app validation workflow had been retriggered only when the number of concurrent ops to be validated (50) was reached. Now the workflow will be retriggered whenever any ops could not be validated.
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+## 0.3.0-beta-dev.22
+
+- Fix an issue where enough validation receipts being received would not prevent the publish workflow from continuing to run. This was a terrible waste of data and compute and would build up over time as Holochain is used. [2931](https://github.com/holochain/holochain/pull/2931)
+- Improve log output for op publishing to accurately reflect the number of ops to be published. The number published which is logged later is accurate and it was confusing to see more ops published than were supposed to be. [2922](https://github.com/holochain/holochain/pull/2922)
+- Fix an issue which prevented the publish loop for a cell from suspending if there was either 1. publish activity pending for other cells or 2. enough validation receipts received. [2922](https://github.com/holochain/holochain/pull/2922)
+
+## 0.3.0-beta-dev.21
+
+- Fix an issue where receiving incoming ops can accidentally filter out some DHT data until Holochain is restarted. The state management for in-flight DHT ops is now guaranteed by a `Drop` implementation which will clean up state when the `incoming_dht_ops_workflow` finishes. [2913](https://github.com/holochain/holochain/pull/2913)
+- Performance improvement when sending validation receipts. When a batch of DHT ops is being processed and an author is unreachable it will no longer spend time trying to send more receipts to that author in serial and instead it sends receipts as a single batch per author. [2848](https://github.com/holochain/holochain/pull/2848)
+- Resilience improvement with handling keystore errors in the validation receipt workflow. Previously, all errors caused the workflow to restart from the beginning. This was good for transient errors such as the keystore being unavailable but it also meant that a single validation receipt failing to be signed (e.g. due to a local agent key being removed from the keystore) would prevent any more validation receipts being sent by that conductor. [2848](https://github.com/holochain/holochain/pull/2848)
+- **BREAKING CHANGE** Addressed an outstanding technical debt item to make the validation receipt workflow send a network notification (fire and forget) rather than waiting for a response. When the validation receipt workflow was written this functionality wasn’t available but now that it is, sending validation receipts can be sped up by not waiting for a peer to respond. The format has also been changed from sending one receipt at a time to sending batches so it was not possible to maintain backwards compatibility here. [2848](https://github.com/holochain/holochain/pull/2848)
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
+- Fix: App interfaces are persisted when shutting down conductor. After restart, app interfaces without connected receiver websocket had signal emission fail altogether. Send errors are only logged now instead.
+
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
+- Change `GenesisFailed` error to include `CellId` so that genesis failures can be correlated with the cells that failed. [2616](https://github.com/holochain/holochain/pull/2616)
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+- **BREAKING CHANGE** updating the project lock file to use the latest version of `serde` at `1.0.185` has changed how enums get serialized and as a knock on effect it has changed some hashes. This will make databases from previous versions incompatible with the next version of Holochain.
+
+## 0.3.0-beta-dev.14
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+- Improves error messages when validation fails with an InvalidCommit error
+- Fixed bug where if signature verification fails due to the lair service being unavailable, validation could fail. Now, that failure is treated as a normal error, so validation cannot proceed. [\#2604](https://github.com/holochain/holochain/pull/2604)
+
+## 0.3.0-beta-dev.10
+
+- Adds experimental Chain Head Coordinator feature, allowing multiple machines to share the same source chain. Holochain must be built with the `chc` feature flag (disabled by default).
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+- Fixes race condition which caused network instability. Newly joined nodes can get temporarily blocked by other nodes, causing connections to be repeatedly dropped. [\#2534](https://github.com/holochain/holochain/pull/2534)
+
+## 0.3.0-beta-dev.6
+
+## 0.3.0-beta-dev.5
+
+- **BREAKING CHANGE**: The DhtOp validation rules have been significantly expanded upon, and some logic around what ops are produced when has been altered. Your existing app may experience rejected ops due to these more strict rules.
+
+## 0.3.0-beta-dev.4
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
+
+- The feature `test_utils` is no longer a default feature. To consume `sweetest` from this crate please now use `default-features = false` and the feature `sweetest`.
+
+## 0.2.0
+
+## 0.2.0-beta-rc.7
+
+## 0.2.0-beta-rc.6
+
+- Feature renaming from `no-deps` to `sqlite` and `db-encryption` to `sqlite-encrypted`. It should not be necessary to configure these unless you are packaging `holochain` or have imported it as a dependency without default features. In the latter case, please update any references to the old feature names.
+
+## 0.2.0-beta-rc.5
+
+- Implements the `clone_only` cell provisioning strategy, desgined for situations where no cell should be installed upon app installation but clones may be created later, via `roles[].provisioning.strategy` in the app manifest [\#2243](https://github.com/holochain/holochain/pull/2243)
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+- BREAKING CHANGE - Removes conductor networking types “Proxy” (“proxy”) and “Quic” (“quic”). Please transition to “WebRTC” (“webrtc”). [\#2208](https://github.com/holochain/holochain/pull/2208)
+- Adds `DumpNetworkStats` api to admin websocket [\#2182](https://github.com/holochain/holochain/pull/2182).
+- System validation now ensures that all records in a source chain are by the same author [\#2189](https://github.com/holochain/holochain/pull/2189)
+
+## 0.2.0-beta-rc.2
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+
+- If AppManifest specifies an `installed_hash` for a DNA, it will check the conductor for an already-registered DNA at that hash, ignoring the DNA passed in as part of the bundle. Note that this means you can install apps without passing in any DNA, if the DNAs are already installed in the conductor. [\#2157](https://github.com/holochain/holochain/pull/2157)
+
+- Adds new functionality to the conductor admin API which returns disk storage information. The storage used by apps is broken down into blobs which are being used by one or more app.
+
+## 0.2.0-beta-rc.1
+
+## 0.2.0-beta-rc.0
+
+- When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
+  - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
+- Renames `OpType` to `FlatOp`, and `Op::to_type()` to `Op::flattened()`. Aliases for the old names still exist, so this is not a breaking change. [\#1909](https://github.com/holochain/holochain/pull/1909)
+- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where  `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
+
+## 0.1.0
+
+## 0.1.0-beta-rc.4
+
+- Fix: Disabled clone cells are no longer started when conductor restarts. [\#1775](https://github.com/holochain/holochain/pull/1775)
+
+## 0.1.0-beta-rc.3
+
+- Fix: calling `emit_signal` from the `post_commit` callback caused a panic, this is now fixed [\#1749](https://github.com/holochain/holochain/pull/1749)
+- Fix: When you install an app with a cell that already exists for the same agent, the installation will error now. [\#1773](https://github.com/holochain/holochain/pull/1773)
+- Fixes problem where disabling and re-enabling an app causes all of its cells to become unresponsive to any `get*` requests. [\#1744](https://github.com/holochain/holochain/pull/1744)
+- Fixes problem where a disabled cell can continue to respond to zome calls and transmit data until the conductor is restarted. [\#1761](https://github.com/holochain/holochain/pull/1761)
+- Adds Ctrl+C handling, so that graceful conductor shutdown is possible. [\#1761](https://github.com/holochain/holochain/pull/1761)
+- BREAKING CHANGE - Added zome name to the signal emitted when using `emit_signal`.
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
+
+- All zome calls must now be signed by the provenance, the signature is of the hash of the unsigned zome call, a unique nonce and expiry is also required [1510](https://github.com/holochain/holochain/pull/1510/files)
+
+## 0.0.175
+
+- BREAKING CHANGE - `ZomeId` and `zome_id` renamed to `ZomeIndex` and `zome_index` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryType.id` renamed to `AppEntryType.entry_index` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryType` renamed to `AppEntryDef` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryDefName` renamed to `AppEntryName` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppRoleId` renamed to `RoleName` [\#1667](https://github.com/holochain/holochain/pull/1667)
+
+## 0.0.174
+
+- BREAKING CHANGE - The max entry size has been lowered to 4MB (strictly 4,000,000 bytes) [\#1659](https://github.com/holochain/holochain/pull/1659)
+- BREAKING CHANGE - `emit_signal` permissions are changed so that it can be called during `post_commit`, which previously was not allowed [\#1661](https://github.com/holochain/holochain/pull/1661)
+
+## 0.0.173
+
+## 0.0.172
+
+- BREAKING CHANGE - Update wasmer crate dependency [\#1620](https://github.com/holochain/holochain/pull/1620)
+- Adds GossipInfo app interface method, which returns data about historical gossip progress which can be used to implement a progress bar in app UIs. [\#1649](https://github.com/holochain/holochain/pull/1649)
+- BREAKING CHANGE - Add `quantum_time` as a DNA modifier. The default is set to 5 minutes, which is what it was previously hardcoded to. DNA manifests do not need to be updated, but this will change the DNA hash of all existing DNAs.
+
+## 0.0.171
+
+## 0.0.170
+
+- Add call to authorize a zome call signing key to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+- Add call to request DNA definition to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+
+## 0.0.169
+
+## 0.0.168
+
+- Fixes bug that causes crash when starting a conductor with a clone cell installed
+
+## 0.0.167
+
+- Adds `SweetConductorConfig`, which adds a few builder methods for constructing variations of the standard ConductorConfig
+
+## 0.0.166
+
+- Fix restore clone cell by cell id. This used to fail with a “CloneCellNotFound” error. [\#1603](https://github.com/holochain/holochain/pull/1603)
+
+## 0.0.165
+
+- Revert requiring DNA modifiers when registering a DNA. These modifiers were optional before and were made mandatory by accident.
+
+## 0.0.164
+
+- Add App API call to archive an existing clone cell. [\#1578](https://github.com/holochain/holochain/pull/1578)
+- Add Admin API call to restore an archived clone cell. [\#1578](https://github.com/holochain/holochain/pull/1578)
+- Add Admin API call to delete all archived clone cells of an app’s role. For example, there is a base cell with role `document` and clones `document.0`, `document.1` etc.; this call deletes all clones permanently that have been archived before. This is not reversable; clones cannot be restored afterwards. [\#1578](https://github.com/holochain/holochain/pull/1578)
+
+## 0.0.163
+
+- Fixed rare “arc is not quantizable” panic, issuing a warning instead. [\#1577](https://github.com/holochain/holochain/pull/1577)
+
+## 0.0.162
+
+- **BREAKING CHANGE**: Implement App API call `CreateCloneCell`. **Role ids must not contain a dot `.` any more.** Clone ids make use of the dot as a delimiter to separate role id and clone index. [\#1547](https://github.com/holochain/holochain/pull/1547)
+- Remove conductor config legacy keystore config options. These config options have been broken since we removed legacy lair in \#1518, hence this fix itself is not a breaking change. Also adds the `lair_server_in_proc` keystore config option as the new default to run an embedded lair server inside the conductor process, no longer requiring a separate system process. [\#1571](https://github.com/holochain/holochain/pull/1571)
+
+## 0.0.161
+
+## 0.0.160
+
+## 0.0.159
+
+- Updates TLS certificate handling so that multiple conductors can share the same lair, but use different TLS certificates by storing a “tag” in the conductor state database. This should not be a breaking change, but *will* result in a new TLS certificate being used per conductor. [\#1519](https://github.com/holochain/holochain/pull/1519)
+
+## 0.0.158
+
+## 0.0.157
+
+## 0.0.156
+
+- Effectively disable Wasm metering by setting the cranelift cost\_function to always return 0. This is meant as a temporary stop-gap and give us time to figure out a configurable approach. [\#1535](https://github.com/holochain/holochain/pull/1535)
+
+## 0.0.155
+
+- **BREAKING CHANGE** - Removes legacy lair. You must now use lair-keystore \>= 0.2.0 with holochain. It is recommended to abandon your previous holochain agents, as there is not a straight forward migration path. To migrate: [dump the old keys](https://github.com/holochain/lair/blob/v0.0.11/crates/lair_keystore/src/bin/lair-keystore/main.rs#L38) -\> [write a utility to re-encode them](https://github.com/holochain/lair/tree/hc_seed_bundle-v0.1.2/crates/hc_seed_bundle) -\> [then import them to the new lair](https://github.com/holochain/lair/tree/lair_keystore-v0.2.0/crates/lair_keystore#lair-keystore-import-seed---help) – [\#1518](https://github.com/holochain/holochain/pull/1518)
+- New solution for adding `hdi_version_req` field to the output of `--build-info` argument. [\#1523](https://github.com/holochain/holochain/pull/1523)
+
+## 0.0.154
+
+- Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
+  
+  Reason: it causes a build failure of the *holochain*  crate on crates.io
+
+## 0.0.153
+
+- Add the `hdi_version_req` key:value field to the output of the `--build-info` argument
+
+## 0.0.152
+
+- Adds `AdminRequest::UpdateCoordinators` that allows swapping coordinator zomes for a running happ.
+
+## 0.0.151
+
+- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+- Allow deterministic bindings (dna\_info() & zome\_info()) to the genesis self check [\#1491](https://github.com/holochain/holochain/pull/1491).
+
+## 0.0.150
+
+## 0.0.149
+
+## 0.0.148
+
+- Added networking logic for enzymatic countersigning [\#1472](https://github.com/holochain/holochain/pull/1472)
+- Countersigning authority response network message changed to a session negotiation enum [/\#1472](https://github.com/holochain/holochain/pull/1472)
+
+## 0.0.147
+
+## 0.0.146
+
+## 0.0.145
+
+**MAJOR BREAKING CHANGE\!** This release includes a rename of two Holochain core concepts, which results in a LOT of changes to public APIs and type names:
+
+- “Element” has been renamed to “Record”
+- “Header” has been renamed to “Action”
+
+All names which include these words have also been renamed accordingly.
+
+As Holochain has evolved, the meaning behind these concepts, as well as our understanding of them, has evolved as well, to the point that the original names are no longer adequate descriptors. We chose new names to help better reflect what these concepts mean, to bring more clarity to how we write and talk about Holochain.
+
+## 0.0.144
+
+- Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Limit conductor calls to `10_000_000_000` Wasm operations [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+## 0.0.143
+
+## 0.0.142
+
+## 0.0.141
+
+## 0.0.140
+
+## 0.0.139
+
+- Udpate lair to 0.1.3 - largely just documentation updates, but also re-introduces some dependency pinning to fix mismatch client/server version check [\#1377](https://github.com/holochain/holochain/pull/1377)
+
+## 0.0.138
+
+## 0.0.137
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+- Update legacy lair to 0.0.10 - allowing “panicky” flag [\#1349](https://github.com/holochain/holochain/pull/1349)
+- Udpate lair to 0.1.1 - allowing usage in path with whitespace [\#1349](https://github.com/holochain/holochain/pull/1349)
+
+## 0.0.136
+
+## 0.0.135
+
+## 0.0.134
+
+## 0.0.133
+
+## 0.0.132
+
+## 0.0.131
+
+- When joining the network set arc size to previous value if available instead of full to avoid network load [1287](https://github.com/holochain/holochain/pull/1287)
+
+## 0.0.130
+
+- Workflow errors generally now log rather than abort the current app [1279](https://github.com/holochain/holochain/pull/1279/files)
+
+- Fixed broken links in Rust docs [\#1284](https://github.com/holochain/holochain/pull/1284)
+
+## 0.0.129
+
+## 0.0.128
+
+- Proxy server chosen from bootstrap server proxy\_list [1242](https://github.com/holochain/holochain/pull/1242)
+
+<!-- end list -->
+
+``` yaml
+network:
+  transport_pool:
+    - type: proxy
+      proxy_config:
+        type: remote_proxy_client_from_bootstrap
+        bootstrap_url: https://bootstrap.holo.host
+        fallback_proxy_url: ~
+```
+
+## 0.0.127
+
+- **BREAKING CHANGE** App validation callbacks are now run per `Op`. There is now only a single validation callback `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>` that is called for each `Op`. See the documentation for `Op` for more details on what data is passed to the callback. There are example use cases in `crates/test_utils/wasm/wasm_workspace/`. For example in the `validate` test wasm. To update an existing app, you to this version all `validate_*` callbacks including `validate_create_link` must be changed to the new `validate(..)` callback. [\#1212](https://github.com/holochain/holochain/pull/1212).
+
+- `RegisterAgentActivity` ops are now validated by app validation.
+
+- Init functions can now make zome calls. [\#1186](https://github.com/holochain/holochain/pull/1186)
+
+- Adds header hashing to `hash` host fn [1227](https://github.com/holochain/holochain/pull/1227)
+
+- Adds blake2b hashing to `hash` host fn [1228](https://github.com/holochain/holochain/pull/1228)
+
+## 0.0.126
+
+## 0.0.125
+
+## 0.0.124
+
+## 0.0.123
+
+- Fixes issue where holochain could get stuck in infinite loop when trying to send validation receipts. [\#1181](https://github.com/holochain/holochain/pull/1181).
+- Additional networking metric collection and associated admin api `DumpNetworkMetrics { dna_hash: Option<DnaHash> }` for inspection of metrics [\#1160](https://github.com/holochain/holochain/pull/1160)
+- **BREAKING CHANGE** - Schema change for metrics database. Holochain will persist historical metrics once per hour, if you do not clear the metrics database it will crash at that point. [\#1183](https://github.com/holochain/holochain/pull/1183)
+
+## 0.0.122
+
+- Adds better batching to validation workflows for much faster validation. [\#1167](https://github.com/holochain/holochain/pull/1167).
+
+## 0.0.121
+
+- **BREAKING CHANGE** Removed `app_info` from HDK [1108](https://github.com/holochain/holochain/pull/1108)
+- Permissions on host functions now return an error instead of panicking [1141](https://github.com/holochain/holochain/pull/1141)
+- Add `--build-info` CLI flag for displaying various information in JSON format. [\#1163](https://github.com/holochain/holochain/pull/1163)
+
+## 0.0.120
+
+## 0.0.119
+
+## 0.0.118
+
+- **BREAKING CHANGE** - Gossip now exchanges local peer info with `initiate` and `accept` request types. [\#1114](https://github.com/holochain/holochain/pull/1114).
+
+## 0.0.117
+
+## 0.0.116
+
+## 0.0.115
+
+- Fix [issue](https://github.com/holochain/holochain/issues/1100) where private dht ops were being leaked through the incoming ops sender. [1104](https://github.com/holochain/holochain/pull/1104).
+- Kitsune now attempts to rebind the network interface in the event of endpoint shutdown. Note, it’s still recommended to bind to `0.0.0.0` as the OS provides additional resiliency for interfaces coming and going. [\#1083](https://github.com/holochain/holochain/pull/1083)
+- **BREAKING CHANGE** current chain head including recent writes available in agent info [\#1079](https://github.com/holochain/holochain/pull/1079)
+- **BREAKING (If using new lair)** If you are using the new (non-legacy) `lair_server` keystore, you will need to rebuild your keystore, we now pre-hash the passphrase used to access it to mitigate some information leakage. [\#1094](https://github.com/holochain/holochain/pull/1094)
+- Better lair signature fallback child process management. The child process will now be properly restarted if it exits. (Note this can take a few millis on Windows, and may result in some signature errors.) [\#1094](https://github.com/holochain/holochain/pull/1094)
+
+## 0.0.114
+
+- `remote_signal` has always been a fire-and-forget operation. Now it also uses the more efficient fire-and-forget “notify” low-level networking plumbing. [\#1075](https://github.com/holochain/holochain/pull/1075)
+
+- **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
+
+- **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
+  
+  - The `slots` field in App manifests is now called `roles`
+  - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
+  - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
+  - See [\#1045](https://github.com/holochain/holochain/pull/1045)
+
+- Adds test utils for creating simulated networks. [\#1037](https://github.com/holochain/holochain/pull/1037).
+
+- Conductor can take a mocked network for testing simulated networks. [\#1036](https://github.com/holochain/holochain/pull/1036)
+
+- Added `DumpFullState` to the admin interface, as a more complete form of `DumpState` which returns full `Vec<DhtOp>` instead of just their count, enabling more introspection of the state of the cell [\#1065](https://github.com/holochain/holochain/pull/1065).
+
+- **BREAKING CHANGE** Added function name to call info in HDK. [\#1078](https://github.com/holochain/holochain/pull/1078).
+
+## 0.0.113
+
+- Post commit is now infallible and expects no return value [PR1049](https://github.com/holochain/holochain/pull/1049)
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+- `call_info` includes provenance and cap grant information [PR1063](https://github.com/holochain/holochain/pull/1063)
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+
+## 0.0.112
+
+- Always depend on `itertools` to make `cargo build --no-default-features` work [\#1060](https://github.com/holochain/holochain/pull/1060)
+
+## 0.0.111
+
+- `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
+
+- `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
+  
+  - `ZomeInfo` no longer includes what is now on `DnaInfo`
+  - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
+  - `DnaInfo` includes `name`, `hash`, `properties`
+
+- `post_commit` hook is implemented now [PR 1000](https://github.com/holochain/holochain/pull/1000)
+
+- Bump legacy lair version to 0.0.8 fixing a crash when error message was too long [\#1046](https://github.com/holochain/holochain/pull/1046)
+
+- Options to use new lair keystore [\#1040](https://github.com/holochain/holochain/pull/1040)
+
+<!-- end list -->
+
+``` yaml
+keystore:
+  type: danger_test_keystore
+```
+
+or
+
+``` yaml
+keystore:
+  type: lair_server
+  connection_url: "unix:///my/path/socket?k=Foo"
+```
+
+## 0.0.110
+
+- Publish now runs on a loop if there are ops still needing receipts. [\#1024](https://github.com/holochain/holochain/pull/1024)
+- Batch peer store write so we use less transactions. [\#1007](https://github.com/holochain/holochain/pull/1007/).
+- Preparation for new lair api [\#1017](https://github.com/holochain/holochain/pull/1017)
+  - there should be no functional changes with this update.
+  - adds new lair as an additional dependency and begins preparation for a config-time switch allowing use of new api lair keystore.
+- Add method `SweetDnaFile::from_bundle_with_overrides` [\#1030](https://github.com/holochain/holochain/pull/1030)
+- Some `SweetConductor::setup_app_*` methods now take anything iterable, instead of array slices, for specifying lists of agents and DNAs [\#1030](https://github.com/holochain/holochain/pull/1030)
+- BREAKING conductor config changes [\#1031](https://github.com/holochain/holochain/pull/1031)
+
+Where previously, you might have had:
+
+``` yaml
+use_dangerous_test_keystore: false
+keystore_path: /my/path
+passphrase_service:
+  type: danger_insecure_from_config
+  passphrase: "test-passphrase"
+```
+
+now you will use:
+
+``` yaml
+keystore:
+  type: lair_server_legacy_deprecated
+  keystore_path: /my/path
+  danger_passphrase_insecure_from_config: "test-passphrase"
+```
+
+or:
+
+``` yaml
+keystore:
+  type: danger_test_keystore_legacy_deprecated
+```
+
+## 0.0.109
+
+- Make validation run concurrently up to 50 DhtOps. This allows us to make progress on other ops when waiting for the network. [\#1005](https://github.com/holochain/holochain/pull/1005)
+- FIX: Prevent the conductor from trying to join cells to the network that are already in the process of joining. [\#1006](https://github.com/holochain/holochain/pull/1006)
+
+## 0.0.108
+
+- Refactor conductor to use parking lot rw lock instead of tokio rw lock. (Faster and prevents deadlocks.). [\#979](https://github.com/holochain/holochain/pull/979).
+
+### Changed
+
+- The scheduler should work now
+
+## 0.0.107
 
 ## 0.0.106
 
 ### Changed
 
-- HDK `sys_time` now returns a `holochain_zome_types::Timestamp` instead of a `core::time::Duration`.
+- All Holochain `Timestamp`s (including those in Headers) are now at the precision of microseconds rather than nanoseconds. This saves 4 bytes per timestamp in memory and on disk.
+- Various database field names changed. **Databases created in prior versions will be incompatible.**
+- HDK `sys_time` now returns a `holochain_zome_types::prelude::Timestamp` instead of a `core::time::Duration`.
 - Exposes `UninstallApp` in the conductor admin API.
 
 ## 0.0.105

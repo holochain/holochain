@@ -1,5 +1,4 @@
-use holochain_types::dht_op::DhtOpType;
-use holochain_zome_types::HeaderType;
+use holochain_types::prelude::*;
 use thiserror::Error;
 
 use crate::scratch::SyncScratchError;
@@ -14,15 +13,15 @@ pub enum StateQueryError {
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
-    DhtOpError(#[from] holochain_types::dht_op::error::DhtOpError),
+    DhtOpError(#[from] holochain_types::dht_op::DhtOpError),
     #[error("Unexpected op {0:?} for query")]
     UnexpectedOp(DhtOpType),
-    #[error("Unexpected header {0:?} for query")]
-    UnexpectedHeader(HeaderType),
+    #[error("Unexpected action {0:?} for query")]
+    UnexpectedAction(ActionType),
     #[error(transparent)]
-    WrongHeaderError(#[from] holochain_zome_types::WrongHeaderError),
+    WrongActionError(#[from] holochain_zome_types::prelude::WrongActionError),
     #[error(transparent)]
-    HeaderError(#[from] holochain_zome_types::header::HeaderError),
+    ActionError(#[from] holochain_zome_types::prelude::ActionError),
     #[error(transparent)]
     SyncScratchError(#[from] SyncScratchError),
 }

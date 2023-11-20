@@ -1,4 +1,5 @@
 use super::*;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 type KAgent = Arc<KitsuneAgent>;
 type KAgentMap = HashMap<KAgent, Arc<AgentInfoSigned>>;
@@ -23,6 +24,41 @@ ghost_actor::ghost_chan! {
     }
 }
 
+#[derive(Debug)]
+pub struct HarnessHost;
+
+impl HarnessHost {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self)
+    }
+}
+
+impl FetchPoolConfig for HarnessHost {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
+impl KitsuneHostDefaultError for HarnessHost {
+    const NAME: &'static str = "HarnessHost";
+
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: DhtArcSet,
+    ) -> KitsuneHostResult<Vec<f64>> {
+        box_fut(Ok(vec![]))
+    }
+
+    fn query_region_set(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs> {
+        box_fut(Ok(RegionSetLtcs::empty()))
+    }
+}
+
 pub(crate) async fn spawn_test_agent(
     harness_chan: HarnessEventChannel,
     config: KitsuneP2pConfig,
@@ -34,9 +70,14 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
+    let topology = Topology::standard_epoch_full();
+    let host = HarnessHost::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
-        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await.unwrap(),
+        kitsune_p2p_types::tls::TlsConfig::new_ephemeral()
+            .await
+            .unwrap(),
+        host,
     )
     .await?;
 
@@ -50,39 +91,53 @@ pub(crate) async fn spawn_test_agent(
         .create_channel::<HarnessAgentControl>()
         .await?;
 
-    let harness = AgentHarness::new(harness_chan).await?;
+    let harness = AgentHarness::new(harness_chan, topology).await?;
     let agent = harness.agent.clone();
     tokio::task::spawn(builder.spawn(harness));
 
     Ok((agent, p2p, control))
 }
 
-use lair_keystore_api::entry::EntrySignEd25519;
-use lair_keystore_api::internal::sign_ed25519::*;
+use kitsune_p2p_fetch::FetchPoolConfig;
+use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::box_fut;
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
+use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
+use kitsune_p2p_types::dht::spacetime::Topology;
+use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
+use kitsune_p2p_types::dht_arc::DhtArcSet;
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,
-    priv_key: SignEd25519PrivKey,
+    priv_key: sodoken::BufReadSized<{ sodoken::sign::SECRETKEYBYTES }>,
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
-    metric_store: KdMetricStore,
+    topology: Topology,
+    strat: ArqStrat,
 }
 
 impl AgentHarness {
-    pub async fn new(harness_chan: HarnessEventChannel) -> Result<Self, KitsuneP2pError> {
-        let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
+    pub async fn new(
+        harness_chan: HarnessEventChannel,
+        topology: Topology,
+    ) -> Result<Self, KitsuneP2pError> {
+        let pub_key = sodoken::BufWriteSized::new_no_lock();
+        let priv_key = sodoken::BufWriteSized::new_no_lock();
+        sodoken::sign::keypair(pub_key.clone(), priv_key.clone())
             .await
             .map_err(KitsuneP2pError::other)?;
-        let pub_key = (**pub_key).clone();
+
+        let pub_key = pub_key.read_lock().to_vec();
         let agent: Arc<KitsuneAgent> = Arc::new(KitsuneAgent::new(pub_key));
         Ok(Self {
             agent,
-            priv_key,
+            priv_key: priv_key.to_read_sized(),
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
-            metric_store: KdMetricStore::default(),
+            topology,
+            strat: ArqStrat::default(),
         })
     }
 }
@@ -95,7 +150,7 @@ impl HarnessAgentControlHandler for AgentHarness {
     fn handle_dump_agent_info(
         &mut self,
     ) -> HarnessAgentControlHandlerResult<Vec<Arc<AgentInfoSigned>>> {
-        let all = self.agent_store.values().map(|a| a.clone()).collect();
+        let all = self.agent_store.values().cloned().collect();
         Ok(async move { Ok(all) }.boxed().into())
     }
 
@@ -111,7 +166,7 @@ impl HarnessAgentControlHandler for AgentHarness {
         &mut self,
         data: String,
     ) -> HarnessAgentControlHandlerResult<Arc<KitsuneOpHash>> {
-        let op_hash: Arc<KitsuneOpHash> = TestVal::test_val();
+        let op_hash: Arc<KitsuneOpHash> = hash_op_data(data.as_bytes());
         self.gossip_store.insert(op_hash.clone(), data);
         Ok(async move { Ok(op_hash) }.boxed().into())
     }
@@ -149,46 +204,33 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_get_agent_info_signed(
+    fn handle_query_agents(
         &mut self,
-        input: GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        let res = self.agent_store.get(&input.agent).map(|i| (**i).clone());
-        Ok(async move { Ok(res) }.boxed().into())
-    }
-
-    fn handle_query_gossip_agents(
-        &mut self,
-        _input: crate::event::QueryGossipAgentsEvt,
-    ) -> KitsuneP2pEventHandlerResult<
-        Vec<(
-            Arc<crate::KitsuneAgent>,
-            kitsune_p2p_types::dht_arc::ArcInterval,
-        )>,
-    > {
-        todo!()
-    }
-
-    fn handle_query_agent_info_signed(
-        &mut self,
-        _input: QueryAgentInfoSignedEvt,
+        QueryAgentsEvt {
+            space: _,
+            agents,
+            window,
+            arc_set,
+            near_basis: _,
+            limit,
+        }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        let out = self.agent_store.values().map(|a| (**a).clone()).collect();
-        Ok(async move { Ok(out) }.boxed().into())
-    }
-
-    fn handle_query_agent_info_signed_near_basis(
-        &mut self,
-        _space: Arc<KitsuneSpace>,
-        _basis_loc: u32,
-        limit: u32,
-    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        // TODO - sort these?
+        let arc_set = arc_set.unwrap_or_else(|| Arc::new(DhtArcSet::Full));
+        let window = window.unwrap_or_else(full_time_window);
+        // TODO - sort by near_basis if set
         let out = self
             .agent_store
-            .values()
-            .map(|a| (**a).clone())
-            .take(limit as usize)
+            .iter()
+            .filter(|(a, _)| {
+                agents
+                    .as_ref()
+                    .map(|agents| agents.contains(*a))
+                    .unwrap_or(true)
+            })
+            .filter(|(_, i)| arc_set.contains(i.agent.get_loc()))
+            .filter(|(_, i)| window.contains(&Timestamp::from_micros(i.signed_at_ms as i64 * 1000)))
+            .take(limit.unwrap_or(u32::MAX) as usize)
+            .map(|(_, i)| (**i).clone())
             .collect();
         Ok(async move { Ok(out) }.boxed().into())
     }
@@ -196,36 +238,27 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_peer_density(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerDensity> {
-        todo!()
-    }
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
+        let strat = PeerStrat::from(self.strat.clone());
+        let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
 
-    fn handle_put_metric_datum(&mut self, datum: MetricDatum) -> KitsuneP2pEventHandlerResult<()> {
-        self.metric_store.put_metric_datum(datum);
-        Ok(async move { Ok(()) }.boxed().into())
-    }
+        // contains is already checked in the iterator
+        let view = strat.view(self.topology.clone(), dht_arc, arcs.as_slice());
 
-    fn handle_query_metrics(
-        &mut self,
-        query: MetricQuery,
-    ) -> KitsuneP2pEventHandlerResult<MetricQueryAnswer> {
-        let answer = self.metric_store.query_metrics(query);
-        Ok(async move { Ok(answer) }.boxed().into())
+        Ok(async move { Ok(view) }.boxed().into())
     }
 
     fn handle_call(
         &mut self,
         space: Arc<super::KitsuneSpace>,
         to_agent: Arc<super::KitsuneAgent>,
-        from_agent: Arc<super::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
         let data = String::from_utf8_lossy(&payload);
         self.harness_chan.publish(HarnessEventType::Call {
             space: space.into(),
             to_agent: to_agent.into(),
-            from_agent: from_agent.into(),
             payload: data.to_string(),
         });
         let data = format!("echo: {}", data);
@@ -237,27 +270,27 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         space: Arc<super::KitsuneSpace>,
         to_agent: Arc<super::KitsuneAgent>,
-        from_agent: Arc<super::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         let data = String::from_utf8_lossy(&payload);
         self.harness_chan.publish(HarnessEventType::Notify {
             space: space.into(),
             to_agent: to_agent.into(),
-            from_agent: from_agent.into(),
             payload: data.to_string(),
         });
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
-        _to_agent: Arc<super::KitsuneAgent>,
-        ops: Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        for (op_hash, op_data) in ops {
-            let op_data = String::from_utf8_lossy(&op_data).to_string();
+        for op_data in ops {
+            // TODO: check that we're handling string data uniformly in both directions
+            let op_data = String::from_utf8_lossy(&op_data.0).to_string();
+            let op_hash = hash_op_data(op_data.as_bytes());
             self.harness_chan.publish(HarnessEventType::Gossip {
                 op_hash: (&op_hash).into(),
                 op_data: op_data.clone(),
@@ -270,24 +303,36 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_op_hashes(
         &mut self,
         _input: QueryOpHashesEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindow)>> {
+    ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<super::KitsuneOpHash>>, TimeWindowInclusive)>>
+    {
         let hashes: Vec<Arc<super::KitsuneOpHash>> = self.gossip_store.keys().cloned().collect();
         let slug_hashes: Vec<Slug> = hashes.iter().map(|h| h.into()).collect();
         tracing::trace!(?slug_hashes, "FETCH_OP_HASHES");
-        Ok(async move { Ok(Some((hashes, full_time_range()))) }
-            .boxed()
-            .into())
+        Ok(
+            async move { Ok(Some((hashes, full_time_window_inclusive()))) }
+                .boxed()
+                .into(),
+        )
     }
 
     fn handle_fetch_op_data(
         &mut self,
         input: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>> {
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, KOp)>> {
         let mut out = Vec::new();
-        for hash in input.op_hashes {
-            if let Some(op) = self.gossip_store.get(&hash) {
-                out.push((hash.clone(), op.clone().into_bytes()));
+        match input.query {
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list: hashes,
+                ..
+            } => {
+                for hash in hashes {
+                    if let Some(op) = self.gossip_store.get(&hash) {
+                        let data = KitsuneOpData::new(op.clone().into_bytes());
+                        out.push((hash.clone(), data));
+                    }
+                }
             }
+            FetchOpDataEvtQuery::Regions(_coords) => unimplemented!(),
         }
         Ok(async move { Ok(out) }.boxed().into())
     }
@@ -296,10 +341,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         input: SignNetworkDataEvt,
     ) -> KitsuneP2pEventHandlerResult<KitsuneSignature> {
-        let sig = sign_ed25519(self.priv_key.clone(), input.data);
+        let sig = sodoken::BufWriteSized::new_no_lock();
+        let fut = sodoken::sign::detached(sig.clone(), input.data.to_vec(), self.priv_key.clone());
         Ok(async move {
-            let sig = sig.await.map_err(KitsuneP2pError::other)?;
-            let sig: Vec<u8> = (**sig).clone();
+            fut.await.map_err(KitsuneP2pError::other)?;
+            let sig = sig.read_lock().to_vec();
             Ok(sig.into())
         }
         .boxed()

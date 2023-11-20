@@ -21,7 +21,8 @@
 //! committing changes to the associated Workspace and triggering other
 //! workflows.
 
-pub mod error;
+mod error;
+pub use error::*;
 
 pub mod app_validation_workflow;
 pub mod call_zome_workflow;
@@ -34,7 +35,8 @@ pub mod publish_dht_ops_workflow;
 pub mod sys_validation_workflow;
 pub mod validation_receipt_workflow;
 
-// TODO: either remove wildcards or add wildcards for all above child modules
+// MAYBE: either remove wildcards or add wildcards for all above child modules
 pub use call_zome_workflow::*;
+
 pub use genesis_workflow::*;
 pub use initialize_zomes_workflow::*;

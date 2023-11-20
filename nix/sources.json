@@ -1,26 +1,50 @@
 {
-    "holonix": {
-        "branch": "develop",
-        "description": "NixOS && Holochain",
+    "crate2nix": {
+        "branch": "master",
+        "description": "nix build file generator for rust crates",
         "homepage": "",
-        "owner": "holochain",
-        "repo": "holonix",
-        "rev": "62659a81d9f2d25740c2b2f424b90f50a60eb80c",
-        "sha256": "0zavwn8fw13k80cr9kn7ldcxd3ypbg07qxl43bdbhv70f3dbafim",
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "rev": "8241d5f1069cd0fc2b8eb8b69b13d68933834373",
+        "sha256": "1m4ggqczfjgzn9vyih6j89km8dgnasl0526sk1ahlp9vq2bdgwfv",
         "type": "tarball",
-        "url": "https://github.com/holochain/holonix/archive/62659a81d9f2d25740c2b2f424b90f50a60eb80c.tar.gz",
+        "url": "https://github.com/kolloch/crate2nix/archive/8241d5f1069cd0fc2b8eb8b69b13d68933834373.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "niv": {
-        "branch": "master",
-        "description": "Easy dependency management for Nix projects",
-        "homepage": "https://github.com/nmattia/niv",
-        "owner": "nmattia",
-        "repo": "niv",
-        "rev": "e0ca65c81a2d7a4d82a189f1e23a48d59ad42070",
-        "sha256": "1pq9nh1d8nn3xvbdny8fafzw87mj7gsmp6pxkdl65w2g18rmcmzx",
+    "holochain-nixpkgs": {
+        "branch": "develop",
+        "description": null,
+        "homepage": null,
+        "owner": "holochain",
+        "repo": "holochain-nixpkgs",
+        "rev": "3f65731f306d5f67b5c4c68651e5008b58db9d41",
+        "sha256": "03sr8djgci2jvvc70bchdjwkxaazy9wisssknamx9s0aini11klz",
         "type": "tarball",
-        "url": "https://github.com/nmattia/niv/archive/e0ca65c81a2d7a4d82a189f1e23a48d59ad42070.tar.gz",
+        "url": "https://github.com/holochain/holochain-nixpkgs/archive/3f65731f306d5f67b5c4c68651e5008b58db9d41.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nextest": {
+        "branch": "main",
+        "description": "A next-generation test runner for Rust.",
+        "homepage": "https://nexte.st",
+        "owner": "nextest-rs",
+        "repo": "nextest",
+        "rev": "cc1ebea104e5705097c9f8da69023bf80d03dd6a",
+        "sha256": "1in972hzhy2zrf18v7a5m2pgll4znk9ipyzv1nih9vp5m2sg5nlx",
+        "type": "tarball",
+        "url": "https://github.com/nextest-rs/nextest/archive/cc1ebea104e5705097c9f8da69023bf80d03dd6a.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixos-unstable": {
+        "branch": "nixos-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "1d7db1b9e4cf1ee075a9f52e5c36f7b9f4207502",
+        "sha256": "1w7nrdq5pgmyc5p8lb86ljb3by02dhcmrc008hvaa4s45mf6p8qn",
+        "type": "tarball",
+        "url": "https://github.com/nixos/nixpkgs/archive/1d7db1b9e4cf1ee075a9f52e5c36f7b9f4207502.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

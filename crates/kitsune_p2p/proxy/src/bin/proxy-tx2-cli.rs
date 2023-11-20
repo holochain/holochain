@@ -19,7 +19,7 @@ pub struct Opt {
 
 #[tokio::main]
 async fn main() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     if let Err(e) = inner().await {
         eprintln!("{:?}", e);
@@ -36,9 +36,11 @@ async fn inner() -> KitsuneResult<()> {
     let f = tx2_pool_promote(f, Default::default());
     let f = tx2_proxy(f, Default::default())?;
 
-    let t = KitsuneTimeout::from_millis(30 * 1000);
+    let t = KitsuneTimeout::from_millis(60 * 1000);
 
-    let mut ep = f.bind("kitsune-quic://0.0.0.0:0".into(), t).await?;
+    let mut ep = f
+        .bind("kitsune-quic://0.0.0.0:0".try_into().unwrap(), t)
+        .await?;
 
     let ep_hnd = ep.handle().clone();
 
@@ -52,7 +54,9 @@ async fn inner() -> KitsuneResult<()> {
         KitsuneResult::Ok(())
     });
 
-    let con = ep_hnd.get_connection(opt.proxy_url.into(), t).await?;
+    let con = ep_hnd
+        .get_connection(opt.proxy_url.try_into().unwrap(), t)
+        .await?;
 
     con.write(0.into(), PoolBuf::new(), t).await?;
 

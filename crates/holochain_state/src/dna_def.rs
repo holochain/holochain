@@ -30,6 +30,7 @@ pub fn get(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<Option<Dna
     }
 }
 
+#[allow(clippy::let_and_return)] // required to drop temporary
 pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<DnaDefHashed>> {
     let mut stmt = txn.prepare(
         "
@@ -57,5 +58,5 @@ pub fn contains(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<bool>
 }
 
 pub fn put(txn: &mut Transaction, dna_def: DnaDef) -> StateMutationResult<()> {
-    mutations::insert_dna_def(txn, DnaDefHashed::from_content_sync(dna_def))
+    mutations::insert_dna_def(txn, &DnaDefHashed::from_content_sync(dna_def))
 }

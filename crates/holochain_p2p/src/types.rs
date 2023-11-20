@@ -29,6 +29,10 @@ pub enum HolochainP2pError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    /// Chain Head Coordination error
+    #[error(transparent)]
+    ChcError(#[from] holochain_types::chc::ChcError),
 }
 
 impl HolochainP2pError {
@@ -91,12 +95,12 @@ impl From<&str> for HolochainP2pError {
     }
 }
 
-/// Turn an [AgentKey] into a [KitsuneAgent]
+/// Turn an [`AgentKey`](holo_hash::AgentPubKey) into a [`KitsuneAgent`](kitsune_p2p::KitsuneAgent)
 pub fn agent_holo_to_kit(a: holo_hash::AgentPubKey) -> kitsune_p2p::KitsuneAgent {
     a.into_kitsune_raw()
 }
 
-/// Turn a [DnaHash] into a [KitsuneSpace]
+/// Turn a [`DnaHash`](holo_hash::DnaHash) into a [`KitsuneSpace`](kitsune_p2p::KitsuneSpace)
 pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
     d.into_kitsune_raw()
 }
@@ -104,26 +108,35 @@ pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
 pub mod actor;
 pub mod event;
 
+#[cfg(feature = "mock_network")]
+pub mod mock_network;
+
 pub(crate) mod wire;
+
+pub use wire::WireDhtOpData;
+pub use wire::WireMessage;
 
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
             /// Extension trait for holo/kitsune conversion
             pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into Arc<Kitsune> type
+                /// convert into `Arc<Kitsune>` type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
 
                 /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
 
-                /// to Arc<Kitsune> type
+                /// to `Arc<Kitsune>` type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
 
                 /// from Kitsune type
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self;
+
+                /// from Kitsune type
+                fn from_kitsune_raw(k: $k) -> Self;
             }
 
             impl $i for $h {
@@ -137,6 +150,10 @@ macro_rules! to_and_from_kitsune {
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
                     <$h>::from_raw_36((**k).clone().into()).into()
+                }
+
+                fn from_kitsune_raw(k: $k) -> Self {
+                    <$h>::from_raw_36(k.into()).into()
                 }
             }
         )*
@@ -154,13 +171,13 @@ macro_rules! to_kitsune {
         $(
             /// Extension trait for holo/kitsune conversion
             pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into Arc<Kitsune> type
+                /// convert into `Arc<Kitsune>` type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
 
                 /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
 
-                /// to Arc<Kitsune> type
+                /// to `Arc<Kitsune>` type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -181,4 +198,5 @@ macro_rules! to_kitsune {
 
 to_kitsune! {
     AnyDhtHashExt<holo_hash::AnyDhtHash> -> kitsune_p2p::KitsuneBasis,
+    AnyLinkableHashExt<holo_hash::AnyLinkableHash> -> kitsune_p2p::KitsuneBasis,
 }

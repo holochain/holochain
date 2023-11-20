@@ -1,51 +1,27 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
-use crate::core::workflow::countersigning_workflow::{
-    countersigning_workflow, CountersigningWorkspace,
-};
-use tokio::task::JoinHandle;
+use crate::conductor::manager::TaskManagerClient;
+use crate::core::workflow::countersigning_workflow::countersigning_workflow;
 use tracing::*;
 
 /// Spawn the QueueConsumer for countersigning workflow
-#[instrument(skip(env, stop, conductor_handle, workspace, cell_network, trigger_sys))]
+#[instrument(skip(space, tm, dna_network, trigger_sys))]
 pub(crate) fn spawn_countersigning_consumer(
-    env: EnvWrite,
-    mut stop: sync::broadcast::Receiver<()>,
-    conductor_handle: ConductorHandle,
-    workspace: CountersigningWorkspace,
-    cell_network: HolochainP2pCell,
+    space: Space,
+    tm: TaskManagerClient,
+    dna_network: HolochainP2pDna,
     trigger_sys: TriggerSender,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
-        loop {
-            // Wait for next job
-            if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
-                tracing::warn!(
-                    "Cell is shutting down: stopping countersigning_workflow queue consumer."
-                );
-                break;
-            }
+) -> TriggerSender {
+    let (tx, rx) = TriggerSender::new();
 
-            // Run the workflow
-            match countersigning_workflow(&env, &workspace, &cell_network, &trigger_sys).await {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        cell_network.cell_id(),
-                        err,
-                        "countersigning failure",
-                    )
-                    .await?
-                }
-                _ => (),
-            };
-        }
-        Ok(())
-    });
-    (tx, handle)
+    super::queue_consumer_dna_bound(
+        "countersigning_consumer",
+        space.dna_hash.clone(),
+        tm,
+        (tx.clone(), rx),
+        move || countersigning_workflow(space.clone(), dna_network.clone(), trigger_sys.clone()),
+    );
+
+    tx
 }

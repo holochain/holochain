@@ -13,18 +13,14 @@ impl ShardedGossipLocal {
 
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
-        let missing: Vec<_> =
-            store::agent_info_within_arc_set(&self.evt_sender, &self.space, common_arc_set)
-                .await?
-                .filter(|info| {
-                    // Check them against the bloom
-                    !remote_bloom.check(&Arc::new(MetaOpKey::Agent(
-                        info.agent.clone(),
-                        info.signed_at_ms,
-                    )))
-                })
-                .map(Arc::new)
-                .collect();
+        let missing: Vec<_> = get_agent_info(&self.host_api, &self.space, common_arc_set)
+            .await?
+            .filter(|info| {
+                // Check them against the bloom
+                !remote_bloom.check(&MetaOpKey::Agent(info.agent.clone(), info.signed_at_ms))
+            })
+            .map(Arc::new)
+            .collect();
 
         // Send any missing.
         Ok(if !missing.is_empty() {
@@ -42,34 +38,18 @@ impl ShardedGossipLocal {
     /// incoming agents within their arcs.
     pub(super) async fn incoming_missing_agents(
         &self,
-        state: RoundState,
         agents: &[Arc<AgentInfoSigned>],
     ) -> KitsuneResult<()> {
-        // Unpack state, get any agent and get all local agents.
-        let RoundState { common_arc_set, .. } = state;
-        let local_agents = self
-            .inner
-            .share_mut(|inner, _| Ok(inner.local_agents.clone()))?;
-
-        // Get all the local agents that are relevant to this
-        // common arc set.
-        let agents_within_common_arc: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, common_arc_set)
-                .await?
-                .into_iter()
-                .map(|(a, _)| a)
-                .filter(|a| local_agents.contains(a))
-                .collect();
-
         // Add the agents to the stores.
-        store::put_agent_info(
-            &self.evt_sender,
-            &self.space,
-            agents_within_common_arc,
-            agents,
-        )
-        .await?;
-
+        store::put_agent_info(&self.host_api, &self.space, agents).await?;
         Ok(())
     }
+}
+
+async fn get_agent_info(
+    host_api: &HostApiLegacy,
+    space: &Arc<KitsuneSpace>,
+    arc_set: Arc<DhtArcSet>,
+) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
+    store::agent_info_within_arc_set(host_api, space, arc_set).await
 }

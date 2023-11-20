@@ -25,7 +25,7 @@ pub(crate) mod util;
 #[cfg(feature = "packing")]
 mod packing;
 
-pub use bundle::Bundle;
+pub use bundle::{Bundle, RawBundle};
 pub use encoding::{decode, encode};
 pub use location::Location;
 pub use manifest::Manifest;

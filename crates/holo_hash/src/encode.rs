@@ -47,22 +47,22 @@ pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
-    let s = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+    let b = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
-    if s.len() != HOLO_HASH_FULL_LEN {
+    if b.len() != HOLO_HASH_FULL_LEN {
         return Err(HoloHashError::BadSize);
     }
     let loc_bytes = holo_dht_location_bytes(
-        &s[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
+        &b[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
     );
     let loc_bytes: &[u8] = &loc_bytes;
-    if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
-        return Err(HoloHashError::BadChecksum);
+    if loc_bytes != &b[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
+        return Err(HoloHashError::BadChecksum(s.to_string()));
     }
-    assert_length!(HOLO_HASH_FULL_LEN, &s);
-    Ok(s.to_vec())
+    assert_length!(HOLO_HASH_FULL_LEN, &b);
+    Ok(b.to_vec())
 }
 
 /// internal PARSE for holo hash REPR
@@ -70,14 +70,14 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
-    let s = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+    let b = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
-    if s.len() != HOLO_HASH_FULL_LEN {
+    if b.len() != HOLO_HASH_FULL_LEN {
         return Err(HoloHashError::BadSize);
     }
-    let actual_prefix: [u8; HOLO_HASH_PREFIX_LEN] = s[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
+    let actual_prefix: [u8; HOLO_HASH_PREFIX_LEN] = b[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
     if actual_prefix != prefix {
         return Err(HoloHashError::BadPrefix(
             format!("{:?}", prefix),
@@ -85,14 +85,14 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
         ));
     }
     let loc_bytes = holo_dht_location_bytes(
-        &s[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
+        &b[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
     );
     let loc_bytes: &[u8] = &loc_bytes;
-    if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
-        return Err(HoloHashError::BadChecksum);
+    if loc_bytes != &b[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
+        return Err(HoloHashError::BadChecksum(s.to_string()));
     }
-    assert_length!(HOLO_HASH_FULL_LEN, &s);
-    Ok(s.to_vec())
+    assert_length!(HOLO_HASH_FULL_LEN, &b);
+    Ok(b.to_vec())
 }
 
 /// internal compute the holo dht location u32
@@ -112,14 +112,26 @@ pub fn holo_dht_location_bytes(data: &[u8]) -> Vec<u8> {
     out
 }
 
+/// Arbitrary (within limits) output length blake2b
+pub fn blake2b_n(data: &[u8], length: usize) -> Result<Vec<u8>, HoloHashError> {
+    // blake2b_simd does an assert on the hash length and we allow happ devs
+    // to set this so we have to put a result guarding against the bounds.
+    if !(1..=blake2b_simd::OUTBYTES).contains(&length) {
+        return Err(HoloHashError::BadHashSize);
+    }
+    Ok(blake2b_simd::Params::new()
+        .hash_length(length)
+        .hash(data)
+        .as_bytes()
+        .to_vec())
+}
+
 /// internal compute a 32 byte blake2b hash
 pub fn blake2b_256(data: &[u8]) -> Vec<u8> {
-    let hash = blake2b_simd::Params::new().hash_length(32).hash(data);
-    hash.as_bytes().to_vec()
+    blake2b_n(data, 32).unwrap()
 }
 
 /// internal compute a 16 byte blake2b hash
 pub fn blake2b_128(data: &[u8]) -> Vec<u8> {
-    let hash = blake2b_simd::Params::new().hash_length(16).hash(data);
-    hash.as_bytes().to_vec()
+    blake2b_n(data, 16).unwrap()
 }

@@ -1,12 +1,12 @@
 use crate::actor::*;
-use crate::HolochainP2pCell;
+use crate::HolochainP2pDna;
 use crate::*;
 use ::fixt::prelude::*;
-use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-
+use holochain_nonce::Nonce256Bits;
+use holochain_zome_types::fixt::ActionFixturator;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -18,9 +18,12 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_leave(
         &mut self,
         dna_hash: DnaHash,
@@ -28,100 +31,160 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
+        signature: Signature,
         to_agent: AgentPubKey,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap_secret: Option<CapSecret>,
+        payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
+    ) -> HolochainP2pHandlerResult<SerializedBytes> {
+        Err("stub".into())
+    }
+
+    fn handle_remote_signal(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
-    ) -> HolochainP2pHandlerResult<SerializedBytes> {
-        Err("stub".into())
-    }
-    fn handle_publish(
-        &mut self,
-        dna_hash: DnaHash,
-        from_agent: AgentPubKey,
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-        timeout_ms: Option<u64>,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
-    fn handle_get_validation_package(
+
+    fn handle_publish(
         &mut self,
-        input: actor::GetValidationPackage,
-    ) -> HolochainP2pHandlerResult<ValidationPackageResponse> {
+        dna_hash: DnaHash,
+        request_validation_receipt: bool,
+        countersigning_session: bool,
+        basis_hash: holo_hash::OpBasis,
+        source: AgentPubKey,
+        op_hash_list: Vec<OpHashSized>,
+        timeout_ms: Option<u64>,
+        reflect_ops: Option<Vec<DhtOp>>,
+    ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
+    fn handle_publish_countersign(
+        &mut self,
+        dna_hash: DnaHash,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
         Err("stub".into())
     }
+
     fn handle_get_meta(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetMetaOptions,
     ) -> HolochainP2pHandlerResult<Vec<MetadataSet>> {
         Err("stub".into())
     }
+
     fn handle_get_links(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         link_key: WireLinkKey,
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         Err("stub".into())
     }
+
+    fn handle_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        query: WireLinkQuery,
+    ) -> HolochainP2pHandlerResult<CountLinksResponse> {
+        Err("stub".into())
+    }
+
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
         Err("stub".into())
     }
-    fn handle_send_validation_receipt(
-        &mut self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        from_agent: AgentPubKey,
-        receipt: SerializedBytes,
-    ) -> HolochainP2pHandlerResult<()> {
-        Err("stub".into())
-    }
-    fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
-        Err("stub".into())
-    }
-    fn handle_authority_for_hash(
+
+    fn handle_must_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
         agent: AgentPubKey,
-        dht_hash: AnyDhtHash,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> HolochainP2pHandlerResult<Vec<MustGetAgentActivityResponse>> {
+        Err("stub".into())
+    }
+
+    fn handle_send_validation_receipts(
+        &mut self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        receipts: ValidationReceiptBundle,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+
+    fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+
+    fn handle_authority_for_hash(
+        &mut self,
+        dna_hash: DnaHash,
+        basis_hash: OpBasis,
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())
     }
-    fn handle_countersigning_authority_response(
+    fn handle_countersigning_session_negotiation(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedHeader>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+
+    fn handle_dump_network_metrics(
+        &mut self,
+        dna_hash: Option<DnaHash>,
+    ) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
+    fn handle_dump_network_stats(&mut self) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
+    fn handle_get_diagnostics(
+        &mut self,
+        dna_hash: DnaHash,
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics> {
         Err("stub".into())
     }
 }
@@ -144,21 +207,21 @@ pub async fn stub_network() -> ghost_actor::GhostSender<HolochainP2p> {
 }
 
 fixturator!(
-    HolochainP2pCell;
+    HolochainP2pDna;
     curve Empty {
         tokio_helper::block_forever_on(async {
             let holochain_p2p = crate::test::stub_network().await;
-            holochain_p2p.to_cell(
+            holochain_p2p.to_dna(
                 DnaHashFixturator::new(Empty).next().unwrap(),
-                AgentPubKeyFixturator::new(Empty).next().unwrap(),
+                None
             )
         })
     };
     curve Unpredictable {
-        HolochainP2pCellFixturator::new(Empty).next().unwrap()
+        HolochainP2pDnaFixturator::new(Empty).next().unwrap()
     };
     curve Predictable {
-        HolochainP2pCellFixturator::new(Empty).next().unwrap()
+        HolochainP2pDnaFixturator::new(Empty).next().unwrap()
     };
 );
 
@@ -168,10 +231,16 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holochain_keystore::test_keystore;
+    use kitsune_p2p::dht::prelude::Topology;
+    use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
-    use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::dependencies::kitsune_p2p_proxy::TlsConfig;
-    use kitsune_p2p::KitsuneP2pConfig;
+    use crate::HolochainP2pSender;
+    use holochain_types::prelude::*;
+    use kitsune_p2p::*;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
+    use kitsune_p2p_types::tls::TlsConfig;
+    use std::sync::Mutex;
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -185,10 +254,10 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
-            newhash!(AgentPubKey, '1'),
+            fixt!(AgentPubKey, Predictable, 0),
             newhash!(AgentPubKey, '2'),
             newhash!(AgentPubKey, '3'),
         )
@@ -197,10 +266,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
+        let keystore = test_keystore();
 
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -223,23 +294,47 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
+
+        let zome_name: ZomeName = "".into();
+        let fn_name: FunctionName = "".into();
+        let nonce = Nonce256Bits::try_from([0; 32]).unwrap();
+        let cap_secret = None;
+        let payload = ExternIO::encode(b"yippo").unwrap();
+        let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
+
+        let signature = a1
+            .sign_raw(
+                &keystore,
+                ZomeCallUnsigned {
+                    provenance: a1.clone(),
+                    cell_id: CellId::new(dna.clone(), a2.clone()),
+                    zome_name: zome_name.clone(),
+                    fn_name: fn_name.clone(),
+                    cap_secret: cap_secret,
+                    payload: payload.clone(),
+                    nonce: nonce,
+                    expires_at: expires_at,
+                }
+                .data_to_sign()
+                .unwrap(),
+            )
+            .await
+            .unwrap();
 
         let res = p2p
             .call_remote(
-                dna,
-                a1,
-                a2,
-                "".into(),
-                "".into(),
-                None,
-                ExternIO::encode(b"yippo").unwrap(),
+                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce, expires_at,
             )
             .await
             .unwrap();
@@ -255,9 +350,10 @@ mod tests {
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
+        let (p2p, mut evt): (HolochainP2pRef, _) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -267,11 +363,10 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
-                    ValidationReceiptReceived {
-                        respond, receipt, ..
+                    ValidationReceiptsReceived {
+                        respond, receipts, ..
                     } => {
-                        let receipt: Vec<u8> = UnsafeBytes::from(receipt).into();
-                        assert_eq!(b"receipt-test".to_vec(), receipt);
+                        assert_eq!(1, receipts.into_iter().count());
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
@@ -280,22 +375,30 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
-        p2p.send_validation_receipt(
-            dna,
-            a2,
-            a1,
-            UnsafeBytes::from(b"receipt-test".to_vec()).into(),
-        )
-        .await
-        .unwrap();
+        let receipts = vec![SignedValidationReceipt {
+            receipt: ValidationReceipt {
+                dht_op_hash: fixt!(DhtOpHash),
+                validation_status: ValidationStatus::Valid,
+                validators: vec![],
+                when_integrated: Timestamp::now(),
+            },
+            validators_signatures: vec![],
+        }];
+        p2p.send_validation_receipts(dna, a1, receipts.into())
+            .await
+            .unwrap();
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
@@ -305,16 +408,33 @@ mod tests {
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let mut tuning_params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.gossip_strategy = "none".to_string();
+        let tuning_params = Arc::new(tuning_params);
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = tuning_params;
 
-        let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let host_list = Arc::new(Mutex::new(Vec::new()));
+        let test_host = {
+            let host_list = host_list.clone();
+            HostStub::with_check_op_data(Box::new(move |space, list, ctx| {
+                host_list
+                    .lock()
+                    .unwrap()
+                    .push(format!("{:?}:{:?}:{:?}", space, list, ctx,));
+                async move { Ok(list.into_iter().map(|_| false).collect()) }
+                    .boxed()
+                    .into()
+            }))
+        };
+        //let test_host = TestHost::default();
 
-        let recv_count_clone = recv_count.clone();
+        let (p2p, mut evt) =
+            spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap(), test_host)
+                .await
+                .unwrap();
+
         let r_task = tokio::task::spawn(async move {
             use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
@@ -322,7 +442,6 @@ mod tests {
                 match evt {
                     Publish { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
-                        recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     SignNetworkData { respond, .. } => {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
@@ -333,27 +452,48 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
-                    _ => {}
+                    QueryAgentInfoSignedNearBasis { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
+                    oth => {
+                        tracing::warn!(?oth, "@@@");
+                    }
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
-        p2p.join(dna.clone(), a3.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a3.clone(), None, None).await.unwrap();
 
-        let header_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
+        let action_hash = holo_hash::OpBasis::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyLinkable::Action,
         );
 
         // this will fail because we can't reach any remote nodes
         // but, it still published locally, so our test will work
         let _ = p2p
-            .publish(dna, a1, true, false, header_hash, vec![], Some(200))
+            .publish(
+                dna,
+                true,
+                false,
+                action_hash,
+                a1.clone(),
+                vec![],
+                Some(200),
+                None,
+            )
             .await;
 
-        assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            "KitsuneSpace(0x737373737373737373737373737373737373737373737373737373737373737373737373):[]:Some(FetchContext(1))",
+            host_list.lock().unwrap()[0],
+        );
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
@@ -361,25 +501,30 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna, a1, a2, _a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
-            TlsConfig::new_ephemeral().await.unwrap(),
-        )
-        .await
-        .unwrap();
+        let cert = TlsConfig::new_ephemeral().await.unwrap();
 
-        let test_1 = WireOps::Element(WireElementOps {
-            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+        let mut params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        params.default_rpc_multi_remote_agent_count = 1;
+        params.default_rpc_multi_remote_request_grace_ms = 100;
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = Arc::new(params);
+        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
+            .await
+            .unwrap();
+
+        let test_1 = WireOps::Record(WireRecordOps {
+            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
             deletes: vec![],
             updates: vec![],
             entry: None,
         });
-        let test_2 = WireOps::Element(WireElementOps {
-            header: Some(Judged::valid(SignedHeader(fixt!(Header), fixt!(Signature)))),
+        let test_2 = WireOps::Record(WireRecordOps {
+            action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
             deletes: vec![],
             updates: vec![],
             entry: None,
@@ -412,29 +557,33 @@ mod tests {
                     QueryOpHashes { respond, .. } => {
                         respond.r(Ok(async move { Ok(None) }.boxed().into()));
                     }
-                    evt => println!("unhandled: {:?}", evt),
+                    QueryPeerDensity { respond, .. } => {
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
+                    evt => tracing::trace!("unhandled: {:?}", evt),
                 }
             }
         });
 
         tracing::info!("test - join1");
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
         tracing::info!("test - join2");
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Action,
         );
 
         tracing::info!("test - get");
         let res = p2p
-            .get(dna, a1, hash, actor::GetOptions::default())
+            .get(dna, hash, crate::actor::GetOptions::default())
             .await
             .unwrap();
 
         tracing::info!("test - check res");
-        assert_eq!(2, res.len());
+        assert_eq!(1, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);
@@ -451,9 +600,17 @@ mod tests {
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
+        let mut params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        params.default_rpc_multi_remote_agent_count = 1;
+        params.default_rpc_multi_remote_request_grace_ms = 100;
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = Arc::new(params);
+
         let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
+            config,
             TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
         )
         .await
         .unwrap();
@@ -487,30 +644,37 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
                     _ => {}
                 }
             }
         });
 
-        p2p.join(dna.clone(), a1.clone()).await.unwrap();
-        p2p.join(dna.clone(), a2.clone()).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let hash = holo_hash::EntryHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::Entry,
         );
         let link_key = WireLinkKey {
-            base: hash,
-            zome_id: 0.into(),
+            base: hash.into(),
+            type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
 
         let res = p2p
-            .get_links(dna, a1, link_key, actor::GetLinksOptions::default())
+            .get_links(dna, link_key, crate::actor::GetLinksOptions::default())
             .await
             .unwrap();
 
-        assert_eq!(2, res.len());
+        assert_eq!(1, res.len());
 
         for r in res {
             assert_eq!(r, test_1);
@@ -518,5 +682,9 @@ mod tests {
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
+    }
+
+    fn test_peer_view() -> PeerView {
+        PeerViewQ::new(Topology::standard_epoch_full(), ArqStrat::default(), vec![]).into()
     }
 }

@@ -1,30 +1,90 @@
-use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
-use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
+use std::path::PathBuf;
+
+use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
+use crate::conductor::api::error::ConductorApiResult;
+use crate::sweettest::{SweetCell, SweetLocalRendezvous};
+use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+use std::time::Duration;
+
 /// A collection of SweetConductors, with methods for operating on the entire collection
-#[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
+#[derive(derive_more::Into, derive_more::IntoIterator, derive_more::Deref)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
+    /// Constructor with validation
+    pub fn new(conductors: Vec<SweetConductor>) -> Self {
+        let paths: HashSet<PathBuf> = conductors
+            .iter()
+            .map(|c| c.config.environment_path.clone().into())
+            .collect();
+        assert_eq!(
+            conductors.len(),
+            paths.len(),
+            "Some conductors in a SweetConductorBatch share the same database path!"
+        );
+        Self(conductors)
+    }
+
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_configs<I: IntoIterator<Item = ConductorConfig>>(
-        configs: I,
-    ) -> SweetConductorBatch {
-        future::join_all(configs.into_iter().map(SweetConductor::from_config))
-            .await
-            .into()
+    pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig>,
+        I: IntoIterator<Item = C>,
+    {
+        Self::new(
+            future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
+        )
+    }
+
+    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig>,
+        I: IntoIterator<Item = C>,
+    {
+        let rendezvous = SweetLocalRendezvous::new().await;
+        Self::new(
+            future::join_all(
+                configs
+                    .into_iter()
+                    .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
+            )
+            .await,
+        )
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config(num: usize, config: ConductorConfig) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat(config).take(num)).await
+    pub async fn from_config<C: Clone + Into<SweetConductorConfig>>(
+        num: usize,
+        config: C,
+    ) -> SweetConductorBatch {
+        let config = config.into();
+        Self::from_configs(std::iter::repeat_with(|| config.random_scope()).take(num)).await
+    }
+
+    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig> + Clone,
+    {
+        let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
+        let config = config.into();
+        Self::new(
+            future::join_all(
+                std::iter::repeat_with(|| config.random_scope())
+                    .take(num)
+                    .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
+            )
+            .await,
+        )
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
+        Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
     }
 
     /// Iterate over the SweetConductors
@@ -40,6 +100,31 @@ impl SweetConductorBatch {
     /// Convert to a Vec
     pub fn into_inner(self) -> Vec<SweetConductor> {
         self.0
+    }
+
+    /// Get the conductor at an index.
+    pub fn get(&self, i: usize) -> Option<&SweetConductor> {
+        self.0.get(i)
+    }
+
+    /// Add an existing conductor to this batch
+    pub fn add_conductor(&mut self, c: SweetConductor) {
+        self.0.push(c);
+    }
+
+    /// Create and add a new conductor to this batch
+    pub async fn add_conductor_from_config<C>(&mut self, c: C)
+    where
+        C: Into<SweetConductorConfig>,
+    {
+        let conductor =
+            if let Some(rendezvous) = self.0.first().and_then(|c| c.get_rendezvous_config()) {
+                SweetConductor::from_config_rendezvous(c, rendezvous).await
+            } else {
+                SweetConductor::from_config(c).await
+            };
+
+        self.0.push(conductor);
     }
 
     /// Opinionated app setup.
@@ -107,13 +192,40 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        let mut all = Vec::new();
-        for c in self.0.iter() {
-            for env in c.envs().p2p().lock().values() {
-                all.push(env.clone());
-            }
+        SweetConductor::exchange_peer_info(&self.0).await
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
+        SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
+        SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
+    }
+
+    /// Let a conductor know about all agents on some other conductor.
+    pub async fn reveal_peer_info(&self, observer: usize, seen: usize) {
+        let observer_conductor = &self.0[observer];
+        let mut observer_envs = Vec::new();
+        for env in observer_conductor
+            .spaces
+            .get_from_spaces(|s| s.p2p_agents_db.clone())
+        {
+            observer_envs.push(env.clone());
         }
-        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+
+        let seen_conductor = &self.0[seen];
+        let mut seen_envs = Vec::new();
+        for env in seen_conductor
+            .spaces
+            .get_from_spaces(|s| s.p2p_agents_db.clone())
+        {
+            seen_envs.push(env.clone());
+        }
+
+        crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
     }
 
     /// Force trigger all dht ops that haven't received
@@ -122,6 +234,23 @@ impl SweetConductorBatch {
         for c in self.0.iter() {
             c.force_all_publish_dht_ops().await;
         }
+    }
+
+    /// Wait for the first conductor to have started gossipping. If all conductors in this batch were
+    /// started at the same time, this should be enough to ensure that all conductors have started gossipping.
+    /// If other conductors are added later, separately check that they have started gossipping as required.
+    pub async fn require_initial_gossip_activity_for_cell(
+        &self,
+        cell: &SweetCell,
+        timeout: Duration,
+    ) {
+        SweetConductor::require_initial_gossip_activity_for_cell(
+            &self.0[0],
+            cell,
+            self.0.len() as u32,
+            timeout,
+        )
+        .await;
     }
 }
 

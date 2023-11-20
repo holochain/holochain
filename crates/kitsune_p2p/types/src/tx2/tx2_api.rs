@@ -1,4 +1,4 @@
-#![allow(clippy::mem_discriminant_non_enum)] // these actually *are* enums...
+#![allow(enum_intrinsics_non_enums)] // these actually *are* enums...
 //! Usability api for tx2 kitsune transports.
 
 use crate::codec::*;
@@ -208,6 +208,7 @@ fn rmap_insert<C: Codec + 'static + Send + Unpin>(
 pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     con: ConHnd,
+    #[allow(dead_code)]
     url: TxUrl,
     rmap: ShareRMap<C>,
     metrics: Arc<Tx2ApiMetrics>,
@@ -292,7 +293,6 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             let msg_id = MsgId::new_notify();
             let len = data.len();
             this.con.write(msg_id, data, timeout).await?;
-
             this.metrics.write_len(dbg_name, len);
 
             let peer_cert = this.peer_cert();
@@ -344,7 +344,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             this.metrics.write_len(dbg_name, len);
 
-            timeout.mix(r_res.map_err(KitsuneError::other)).await?
+            timeout
+                .mix(
+                    "Tx2ConHnd::priv_request",
+                    r_res.map_err(KitsuneError::other),
+                )
+                .await?
         }
     }
 
@@ -407,6 +412,14 @@ impl<C: Codec + 'static + Send + Unpin> std::hash::Hash for Tx2EpHnd<C> {
     }
 }
 
+impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2EpHnd<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tx2EpHnd")
+            .field("uniq", &self.0.uniq())
+            .finish()
+    }
+}
+
 impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
     /// Capture a debugging internal state dump.
     pub fn debug(&self) -> serde_json::Value {
@@ -454,24 +467,28 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
 
     /// Get an existing connection.
     /// If one is not available, establish a new connection.
-    pub fn get_connection<U: Into<TxUrl>>(
+    pub fn get_connection<U: TryInto<TxUrl, Error = KitsuneError>>(
         &self,
         remote: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Tx2ConHnd<C>>> + 'static + Send {
-        let remote = remote.into();
+        let ep_hnd = self.0.clone();
         let rmap = self.1.clone();
         let metrics = self.2.clone();
         let local_cert = self.3.clone();
-        let fut = self.0.get_connection(remote.clone(), timeout);
-        async move {
-            let con = fut.await?;
-            Ok(Tx2ConHnd::new(local_cert, con, remote, rmap, metrics))
+
+        match remote.try_into() {
+            Ok(remote) => async move {
+                let con = ep_hnd.get_connection(remote.clone(), timeout).await?;
+                Ok(Tx2ConHnd::new(local_cert, con, remote, rmap, metrics))
+            }
+            .boxed(),
+            Err(err) => async move { Err(err) }.boxed(),
         }
     }
 
     /// Write a notify to this connection.
-    pub fn notify<U: Into<TxUrl>>(
+    pub fn notify<U: TryInto<TxUrl, Error = KitsuneError>>(
         &self,
         remote: U,
         data: &C,
@@ -482,14 +499,14 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
-        let con_fut = self.get_connection(remote.into(), timeout);
+        let con_fut = self.get_connection(remote, timeout);
         futures::future::FutureExt::boxed(async move {
             con_fut.await?.priv_notify(buf, timeout, dbg_name).await
         })
     }
 
     /// Write a request to this connection.
-    pub fn request<U: Into<TxUrl>>(
+    pub fn request<U: TryInto<TxUrl, Error = KitsuneError>>(
         &self,
         remote: U,
         data: &C,
@@ -500,7 +517,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
-        let con_fut = self.get_connection(remote.into(), timeout);
+        let con_fut = self.get_connection(remote, timeout);
         futures::future::FutureExt::boxed(async move {
             con_fut.await?.priv_request(buf, timeout, dbg_name).await
         })
@@ -713,7 +730,6 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         let len = data.len();
                         let (_, c) = match C::decode_ref(&data) {
                             Err(e) => {
-                                // TODO - close connection?
                                 return std::task::Poll::Ready(Some(Tx2EpEvent::Error(
                                     KitsuneError::other(e),
                                 )));
@@ -772,7 +788,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             Tx2EpEvent::Tick
                         }
                         _ => {
-                            // TODO - should this be a connection-specific
+                            // MAYBE - should this be a connection-specific
                             // error type, so we can give the con handle?
                             Tx2EpEvent::Error(err)
                         }
@@ -895,7 +911,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tx2_api() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         tracing::trace!("bob");
 
         let t = KitsuneTimeout::from_millis(5000);
@@ -931,7 +947,7 @@ mod tests {
             let f = tx2_pool_promote(f, Default::default());
             let f = tx2_api(f, Default::default());
 
-            f.bind("none:", t).await.unwrap()
+            f.bind(TxUrl::from_str_panicking("none:"), t).await.unwrap()
         };
 
         let ep1 = mk_ep().await;
@@ -946,7 +962,7 @@ mod tests {
 
         println!("addr2: {}", addr2);
 
-        let con = ep1_hnd.get_connection(addr2, t).await.unwrap();
+        let con = ep1_hnd.get_connection(addr2.as_str(), t).await.unwrap();
         let res = con.request(&Test::one(42), t).await.unwrap();
 
         assert_eq!(&Test::one(43), &res);

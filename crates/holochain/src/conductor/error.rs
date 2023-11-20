@@ -1,10 +1,12 @@
 use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
-use crate::core::workflow::error::WorkflowError;
+use crate::conductor::conductor::CellStatus;
+use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -24,17 +26,23 @@ pub enum ConductorError {
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
 
-    #[error("Cell is not active yet.")]
-    CellNotActive,
-
-    #[error("Cell is already active.")]
-    CellAlreadyActive,
+    #[error("Cell already exists. CellId: {0:?}")]
+    CellAlreadyExists(CellId),
 
     #[error("Cell is not initialized.")]
     CellNotInitialized,
 
+    #[error("Cell network is not ready. Status: {0:?}")]
+    CellNetworkNotReady(CellStatus),
+
+    #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
+    CellDisabled(CellId),
+
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
+
+    #[error("Error while cloning cell: {0}")]
+    CloneCellError(String),
 
     #[error(transparent)]
     ConductorConfigError(#[from] ConductorConfigError),
@@ -48,9 +56,6 @@ pub enum ConductorError {
     #[error("Attempted to call into the conductor while it is shutting down")]
     ShuttingDown,
 
-    #[error("Miscellaneous error: {0}")]
-    Todo(String),
-
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -58,7 +63,7 @@ pub enum ConductorError {
     SubmitTaskError(String),
 
     #[error("ZomeError: {0}")]
-    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+    ZomeError(#[from] holochain_zome_types::zome::ZomeError),
 
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
@@ -74,7 +79,7 @@ pub enum ConductorError {
     InterfaceError(#[from] Box<InterfaceError>),
 
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
-    GenesisFailed { errors: Vec<CellError> },
+    GenesisFailed { errors: Vec<(CellId, CellError)> },
 
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
@@ -107,18 +112,43 @@ pub enum ConductorError {
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
 
     #[error(transparent)]
+    SourceChainError(#[from] holochain_state::source_chain::SourceChainError),
+
+    #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),
 
     #[error(transparent)]
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
 
     #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+
+    #[error(transparent)]
+    RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
+
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
-// TODO: can this be removed?
-impl From<String> for ConductorError {
-    fn from(s: String) -> Self {
-        ConductorError::Todo(s)
+impl ConductorError {
+    /// promote a custom error type to a ConductorError
+    pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Other(e.into())
+    }
+}
+
+impl From<one_err::OneErr> for ConductorError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
+    }
+}
+
+impl From<ConductorError> for WasmErrorInner {
+    fn from(e: ConductorError) -> Self {
+        Self::Host(e.to_string())
     }
 }

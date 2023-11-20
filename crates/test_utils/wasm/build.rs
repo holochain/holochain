@@ -12,14 +12,15 @@ fn main() {
     let wasms_path = format!("{}/{}/", env!("CARGO_MANIFEST_DIR"), "wasm_workspace");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
+
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
     // Cargo.toml, so we check each upstream local source directory directly.
     for dir in parse_cargo_toml_local_dependency_paths() {
-        println!("cargo:rerun-if-changed={}", dir);
         for item in walkdir::WalkDir::new(dir)
             .into_iter()
             .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
         {
             println!("cargo:rerun-if-changed={}", item.path().display());
         }
@@ -34,16 +35,33 @@ fn main() {
                 .unwrap_or(false)
         })
         .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
     {
         println!("cargo:rerun-if-changed={}", item.path().display());
     }
     let wasm_out = std::env::var_os("HC_TEST_WASM_DIR");
     let cargo_command = std::env::var_os("CARGO");
     let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
+
+    build_test_wasms(&wasm_out, cargo_command, should_build, false, &wasms_path);
+    build_test_wasms(&wasm_out, cargo_command, should_build, true, &wasms_path);
+}
+
+fn build_test_wasms(
+    wasm_out: &Option<std::ffi::OsString>,
+    cargo_command: &std::ffi::OsStr,
+    should_build: bool,
+    build_integrity_zomes: bool,
+    wasms_path: &str,
+) {
     let mut cmd = std::process::Command::new(cargo_command);
+    cmd.env_remove("RUSTFLAGS");
+    cmd.env_remove("CARGO_BUILD_RUSTFLAGS");
+    cmd.env_remove("CARGO_ENCODED_RUSTFLAGS");
     if should_build {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
+        cmd.env("RUSTFLAGS", "-C opt-level=z");
         cmd.arg("build")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml")
@@ -55,6 +73,12 @@ fn main() {
         cmd.arg("check")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml");
+    }
+    if build_integrity_zomes {
+        cmd.arg("--examples");
+        cmd.arg("--no-default-features");
+        cmd.arg("--features");
+        cmd.arg("integrity");
     }
     match wasm_out {
         Some(wasm_out) => {

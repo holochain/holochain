@@ -25,6 +25,10 @@ impl Outcome {
     pub fn awaiting<E, I: Into<AnyDhtHash> + Clone>(h: &I) -> OutcomeOrError<Self, E> {
         OutcomeOrError::Outcome(Outcome::AwaitingDeps(vec![h.clone().into()]))
     }
+    /// Helper function for creating rejected outcomes
+    pub fn rejected<E, I: Into<String>>(s: I) -> OutcomeOrError<Self, E> {
+        OutcomeOrError::Outcome(Outcome::Rejected(s.into()))
+    }
     /// Exit early with an awaiting outcome
     pub fn exit_with_awaiting<T, I: Into<AnyDhtHash>, It: IntoIterator<Item = I>>(
         h: It,
@@ -43,7 +47,7 @@ impl Outcome {
     }
 }
 
-/// Turn the OutcomeOrError into an Outcome or and Error
+/// Turn the OutcomeOrError into an Outcome or an Error
 impl<E> TryFrom<OutcomeOrError<Outcome, E>> for Outcome {
     type Error = E;
 

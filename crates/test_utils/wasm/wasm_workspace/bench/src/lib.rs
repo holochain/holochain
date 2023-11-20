@@ -1,10 +1,7 @@
-//! externs to help bench the wasm ribosome
+pub mod integrity;
 
-use hdk::prelude::*;
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
 
-/// round trip bytes back to the host
-/// useful to see what the basic throughput of our wasm implementation is
-#[hdk_extern]
-fn echo_bytes(bytes: Bytes) -> ExternResult<Bytes> {
-    Ok(bytes)
-}
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;

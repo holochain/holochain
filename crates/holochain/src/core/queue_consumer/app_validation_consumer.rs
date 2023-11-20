@@ -1,68 +1,40 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
 use holochain_p2p::*;
-use tokio::task::JoinHandle;
+use holochain_types::db_cache::DhtDbQueryCache;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
-#[instrument(skip(
-    env,
-    cache,
-    conductor_handle,
-    stop,
-    trigger_integration,
-    conductor_api,
-    network
-))]
+#[instrument(skip(workspace, conductor, trigger_integration, network, dht_query_cache))]
 pub fn spawn_app_validation_consumer(
-    env: EnvWrite,
-    cache: EnvWrite,
-    conductor_handle: ConductorHandle,
-    mut stop: sync::broadcast::Receiver<()>,
+    dna_hash: Arc<DnaHash>,
+    workspace: AppValidationWorkspace,
+    conductor: ConductorHandle,
     trigger_integration: TriggerSender,
-    conductor_api: impl CellConductorApiT + 'static,
-    network: HolochainP2pCell,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
-        loop {
-            // Wait for next job
-            if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
-                tracing::warn!(
-                    "Cell is shutting down: stopping app_validation_workflow queue consumer."
-                );
-                break;
-            }
+    network: HolochainP2pDna,
+    dht_query_cache: DhtDbQueryCache,
+) -> TriggerSender {
+    let (tx, rx) = TriggerSender::new();
+    let workspace = Arc::new(workspace);
 
-            // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone(), cache.clone());
-            let result = app_validation_workflow(
-                workspace,
+    super::queue_consumer_dna_bound(
+        "app_validation_consumer",
+        dna_hash.clone(),
+        conductor.task_manager(),
+        (tx.clone(), rx),
+        move || {
+            app_validation_workflow(
+                dna_hash.clone(),
+                workspace.clone(),
                 trigger_integration.clone(),
-                conductor_api.clone(),
+                conductor.clone(),
                 network.clone(),
+                dht_query_cache.clone(),
             )
-            .await;
-            match result {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        network.cell_id(),
-                        err,
-                        "app_validation failure",
-                    )
-                    .await?
-                }
-                _ => (),
-            };
-        }
-        Ok(())
-    });
-    (tx, handle)
+        },
+    );
+    tx
 }

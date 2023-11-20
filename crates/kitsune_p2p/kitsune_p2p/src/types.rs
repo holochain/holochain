@@ -24,29 +24,13 @@ pub enum KitsuneP2pError {
     #[error("Decoding Error: {0}")]
     DecodingError(Box<str>),
 
-    /// TransportError
-    #[error(transparent)]
-    TransportError(#[from] kitsune_p2p_types::transport::TransportError),
-
     /// std::io::Error
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
 
-    /// Reqwest crate.
-    #[error(transparent)]
-    Reqwest(#[from] reqwest::Error),
-
     /// Bootstrap call failed.
-    #[error("Bootstrap Error: {0}")]
-    Bootstrap(Box<str>),
-
-    /// SystemTime call failed.
     #[error(transparent)]
-    SystemTime(#[from] std::time::SystemTimeError),
-
-    /// Integer casting failed.
-    #[error(transparent)]
-    TryFromInt(#[from] std::num::TryFromIntError),
+    Bootstrap(#[from] BootstrapClientError),
 
     /// Other
     #[error("Other: {0}")]
@@ -87,6 +71,7 @@ impl From<&str> for KitsuneP2pError {
     }
 }
 
+use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 pub use kitsune_p2p_types::bin_types::*;
 
 /// Data structures to be stored in the agent/peer database.
@@ -97,8 +82,11 @@ pub mod agent_store {
 pub mod actor;
 pub mod event;
 pub(crate) mod gossip;
-pub(crate) mod wire;
+#[allow(missing_docs)]
+pub mod wire;
 
+pub use gossip::GossipModuleType;
+pub use kitsune_p2p_types::dht;
 pub use kitsune_p2p_types::dht_arc;
 
 #[allow(missing_docs)]

@@ -2,7 +2,7 @@
 , callPackage
 , lib
 , writeShellScriptBin
-
+, crate2nix
 , holonix
 , holonixPath
 , hcToplevelDir
@@ -14,82 +14,53 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
+    hc-test-standard
+    hc-test-slow
+    hc-test-wasm
+  '';
 
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo test --no-run --all-features --all-targets --manifest-path=crates/holochain/Cargo.toml
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
-    # run all the remaining cargo tests
-    cargo test --no-run --all-features --all-targets --workspace --exclude holochain --exclude release-automation
-    cargo test --workspace --exclude holochain --exclude release-automation -- --nocapture --test-threads 1
+  hcStandardTests = writeShellScriptBin "hc-test-standard" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # run all the non-slow cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,chc,test_utils,build_wasms,sqlite-encrypted --lib --tests --profile fast-test ''${1-} -- --nocapture
+  '';
+
+  hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # run all the cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run} ${
+      import ../../.config/nextest-args.nix
+    } ''${1-}
+  '';
+
+  hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
     # run all the wasm tests (within wasm) with the conductor mocked
-    cargo test --no-run --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
+    cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
+  hcStaticChecks =
+    let
+      pathPrefix = lib.makeBinPath (builtins.attrValues {
+        inherit (holonix.pkgs) hnRustClippy hnRustFmtCheck hnRustFmtFmt;
+      });
+    in
+    writeShellScriptBin "hc-static-checks" ''
+      export PATH=${pathPrefix}:$PATH
 
-    # make sure the binary is built
-    cargo build --manifest-path=crates/release-automation/Cargo.toml
-    # run the release-automation tests
-    cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
-  '';
-
-  hcReleaseAutomationTestRepo = let
-    crateCmd = logLevel: ''
-      ${releaseAutomation} \
-          --workspace-path=${hcToplevelDir} \
-          --log-level=${logLevel} \
-        crate \
-          apply-dev-versions \
-            --dry-run
+      set -euxo pipefail
+      export RUST_BACKTRACE=1
+      hn-rust-fmt-check
+      hn-rust-clippy
     '';
-    releaseCmd = logLevel: ''
-      ${releaseAutomation} \
-          --workspace-path=${hcToplevelDir} \
-          --log-level=${logLevel} \
-        release \
-          --dry-run \
-          --disallowed-version-reqs=">=0.1" \
-          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-          --steps=BumpReleaseVersions
-    '';
-    in writeShellScriptBin "hc-release-automation-test-repo" ''
-    set -euxo pipefail
-
-    # check the state of the repository
-    (
-      ${crateCmd "debug"}
-      ${releaseCmd "debug"}
-    ) || (
-      ${crateCmd "trace"}
-      ${releaseCmd "trace"}
-    )
-  '';
-
-  hcStaticChecks = let
-      pathPrefix = lib.makeBinPath
-        (builtins.attrValues { inherit (holonix.pkgs)
-          hnRustClippy
-          hnRustFmtCheck
-          hnRustFmtFmt
-          ;
-        })
-      ;
-    in writeShellScriptBin "hc-static-checks" ''
-    export PATH=${pathPrefix}:$PATH
-
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-    hn-rust-fmt-check
-    hn-rust-clippy
-  '';
 
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail
@@ -98,16 +69,12 @@ rec {
     hc-test
   '';
 
-  hcReleaseTest = writeShellScriptBin "hc-release-test" ''
+  hcReleaseTest = writeShellScriptBin "hc-test-release" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
-
-    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
-    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
+    ${hcReleaseAutomationTest}/bin/hc-test-release-automation
+    ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo
   '';
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
@@ -121,7 +88,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,chc,build_wasms -- --nocapture
     done
     for i in {0..100}
     do
@@ -225,10 +192,6 @@ rec {
     bench $compare
     add_comment_to_commit $compare $commit
   '';
-
-  hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
-    cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
-  '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''
     set -euxo pipefail
@@ -239,7 +202,7 @@ rec {
     # actually kcov does not work with workspace target either
     # we need to use targets in each crate - but that is slow
     # use symlinks so we don't have to recompile deps over and over
-    for i in ''$(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
+    for i in $(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
       # skip some crates that aren't ready yet
       case "$i" in
         "crates/dpki" | "crates/keystore" )
@@ -276,4 +239,5 @@ rec {
     # so we'll just open the coverage report in a browser
     xdg-open target/coverage/index.html
   '';
-} else { })
+} else
+  { })

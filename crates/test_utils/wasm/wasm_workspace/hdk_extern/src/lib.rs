@@ -12,3 +12,8 @@ fn bar(_: ()) -> ExternResult<String> {
     let foo: String = foo(())?;
     Ok(format!("{}{}", foo, "bar"))
 }
+
+#[hdk_extern(infallible)]
+fn infallible(_: ()) -> String {
+    String::from("infallible")
+}

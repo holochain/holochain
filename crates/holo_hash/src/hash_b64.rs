@@ -8,7 +8,8 @@ use super::*;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
 
-/// A wrapper around HoloHash to denote that deserialization should /// base-64 strings rather than raw byte arrays
+/// A wrapper around HoloHash that `Serialize`s into a base64 string
+/// rather than a raw byte array.
 #[derive(
     Debug,
     Clone,
@@ -44,10 +45,25 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(HoloHash::arbitrary(u)?.into())
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl<T: HashType + proptest::arbitrary::Arbitrary + 'static> proptest::arbitrary::Arbitrary
+    for HoloHashB64<T>
+where
+    T::Strategy: 'static,
+{
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHashB64<T>>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+        HoloHash::arbitrary().prop_map(Into::into).boxed()
     }
 }
 
@@ -66,8 +82,8 @@ pub type DhtOpHashB64 = HoloHashB64<hash_type::DhtOp>;
 /// Base64-ready version of EntryHash
 pub type EntryHashB64 = HoloHashB64<hash_type::Entry>;
 
-/// Base64-ready version of HeaderHash
-pub type HeaderHashB64 = HoloHashB64<hash_type::Header>;
+/// Base64-ready version of ActionHash
+pub type ActionHashB64 = HoloHashB64<hash_type::Action>;
 
 /// Base64-ready version of NetIdHash
 pub type NetIdHashB64 = HoloHashB64<hash_type::NetId>;
@@ -75,5 +91,35 @@ pub type NetIdHashB64 = HoloHashB64<hash_type::NetId>;
 /// Base64-ready version of WasmHash
 pub type WasmHashB64 = HoloHashB64<hash_type::Wasm>;
 
+/// Base64-ready version of ExternalHash
+pub type ExternalHashB64 = HoloHashB64<hash_type::External>;
+
 /// Base64-ready version of AnyDhtHash
 pub type AnyDhtHashB64 = HoloHashB64<hash_type::AnyDht>;
+
+/// Base64-ready version of AnyLinkableHash
+pub type AnyLinkableHashB64 = HoloHashB64<hash_type::AnyLinkable>;
+
+impl From<EntryHashB64> for AnyLinkableHash {
+    fn from(h: EntryHashB64) -> Self {
+        EntryHash::from(h).into()
+    }
+}
+
+impl From<ActionHashB64> for AnyLinkableHash {
+    fn from(h: ActionHashB64) -> Self {
+        ActionHash::from(h).into()
+    }
+}
+
+impl From<EntryHashB64> for AnyDhtHash {
+    fn from(h: EntryHashB64) -> Self {
+        EntryHash::from(h).into()
+    }
+}
+
+impl From<ActionHashB64> for AnyDhtHash {
+    fn from(h: ActionHashB64) -> Self {
+        ActionHash::from(h).into()
+    }
+}

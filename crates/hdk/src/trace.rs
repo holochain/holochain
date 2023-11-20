@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 
 #[derive(Default)]
 pub struct WasmSubscriber {
-    ids: AtomicUsize,
+    pub ids: AtomicUsize,
 }
 
 /// Very basic struct to hold strings that can be written to by the tracing crate and sent to the host when complete.
@@ -65,7 +65,7 @@ impl tracing_core::Subscriber for WasmSubscriber {
 
         // The event is pushed to the host to be picked up by the subscriber on that side.
         // The visitor is dropped.
-        HDK.with(|h| {
+        hdi::hdi::HDI.with(|h| {
             h.borrow()
                 .trace(TraceMsg {
                     level: event.metadata().level().into(),
