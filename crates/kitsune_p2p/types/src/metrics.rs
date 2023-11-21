@@ -1,7 +1,6 @@
 //! Utilities for helping with metric tracking.
 
 use crate::tracing;
-
 use holochain_trace::tracing::Instrument;
 use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_timestamp::Timestamp;
