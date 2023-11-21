@@ -67,10 +67,9 @@ pub(super) async fn validate_ops_batch(
 mod tests {
     use super::validate_ops_batch;
     use crate::core::workflow::error::WorkflowError;
+    use crate::core::workflow::sys_validation_workflow::types::Outcome;
     use crate::core::workflow::sys_validation_workflow::validation_batch::NUM_CONCURRENT_OPS;
     use crate::core::workflow::sys_validation_workflow::OutcomeSummary;
-    use crate::core::workflow::{error::WorkflowResult, sys_validation_workflow::types::Outcome};
-    use assert_cmd::assert;
     use fixt::prelude::*;
     use futures::FutureExt;
     use hdk::prelude::Action;
@@ -305,7 +304,7 @@ mod tests {
     }
 
     fn test_op() -> DhtOpHashed {
-        let mut create_action = fixt!(Create);
+        let create_action = fixt!(Create);
         let action = Action::Create(create_action);
 
         DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(fixt!(Signature), action))

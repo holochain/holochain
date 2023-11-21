@@ -3,26 +3,22 @@ use std::collections::HashSet;
 use maplit::hashset;
 
 use super::simple_report as report;
-use crate::Fact;
 use crate::dep::*;
 use crate::graph::*;
+use crate::Fact;
 
 fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
     let start_ix = graph
         .node_indices()
         .find(|i| graph[*i].dep == start)
         .unwrap();
-    let end_ix = graph
-        .node_indices()
-        .find(|i| graph[*i].dep == end)
-        .unwrap();
+    let end_ix = graph.node_indices().find(|i| graph[*i].dep == end).unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
         .map(|c| c.len())
         .collect()
 }
 
 type Checks<T> = Box<dyn Fn(&T) -> bool>;
-
 
 /// Tests exploring all the possible graphs involving a single node
 mod singleton {
@@ -32,19 +28,19 @@ mod singleton {
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     struct Singleton(bool, bool);
-    
+
     impl Fact for Singleton {
         type Context = ();
-    
+
         fn check(&self, (): &Self::Context) -> bool {
             self.0
         }
-    
+
         fn dep(&self, (): &Self::Context) -> DepResult<Self> {
             Ok(self.1.then_some(self.clone().into()))
         }
     }
-    
+
     #[test_case( Singleton(false, false) => Some(hashset! { Singleton(false, false).into() }) ; "failing single isolated fact produces only self")]
     #[test_case( Singleton(false, true)  => Some(hashset! { Singleton(false, true).into() }) ; "failing single self-referencing fact produces only self")]
     #[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
@@ -66,11 +62,10 @@ mod acyclic_single_path {
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     struct Countdown(u8);
-    
-    
+
     impl Fact for Countdown {
         type Context = Checks<Self>;
-    
+
         fn dep(&self, _: &Self::Context) -> DepResult<Self> {
             Ok(match self.0 {
                 3 => Some(Self(2).into()),
@@ -80,59 +75,61 @@ mod acyclic_single_path {
                 _ => unreachable!(),
             })
         }
-    
+
         fn check(&self, ctx: &Self::Context) -> bool {
             (ctx)(self)
         }
     }
-    
-    #[test_case( 
-        Countdown(3), 
+
+    #[test_case(
+        Countdown(3),
         None
         => hashset![3, 2, 1, 0]
         ; "Countdown from 3 with all false returns path from 3 to 0"
     )]
-    #[test_case( 
-        Countdown(2), 
-        Some(3) 
+    #[test_case(
+        Countdown(2),
+        Some(3)
         => hashset![2, 1, 0]
         ; "Countdown from 2 with 3 being true returns path from 2 to 0"
     )]
-    #[test_case( 
-        Countdown(3), 
-        Some(0) 
+    #[test_case(
+        Countdown(3),
+        Some(0)
         => hashset![3, 2, 1]
         ; "Countdown from 3 with 0 being true returns path from 3 to 1"
     )]
-    #[test_case( 
-        Countdown(3), 
-        Some(1) 
+    #[test_case(
+        Countdown(3),
+        Some(1)
         => hashset![3, 2]
         ; "Countdown from 3 with 1 being true returns path from 3 to 2"
     )]
-    #[test_case( 
-        Countdown(1), 
-        Some(2) 
+    #[test_case(
+        Countdown(1),
+        Some(2)
         => hashset![1, 0]
         ; "Countdown from 1 with 3 being true returns path from 1 to 0"
     )]
     fn single_path(countdown: Countdown, true_one: Option<u8>) -> HashSet<u8> {
         holochain_trace::test_run().ok().unwrap();
-    
+
         let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
         let tr = Dep::from(countdown).traverse(&checker);
         report(&tr);
-        let (graph, _passes) = tr
-            .fail()
-            .unwrap();
-    
-        let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
-            Dep::Fact(f) => f.0,
-            _ => unreachable!(),
-        }).collect();
-        
+        let (graph, _passes) = tr.fail().unwrap();
+
+        let nodes: HashSet<_> = graph
+            .deps()
+            .into_iter()
+            .map(|c| match c {
+                Dep::Fact(f) => f.0,
+                _ => unreachable!(),
+            })
+            .collect();
+
         let edges = graph.edge_count();
-    
+
         // If the number of edges is one less than the number of nodes, that implies a straight noncyclic path
         // (this doesn't test that something weird and ridiculous happens like a branch with a disconnected node)
         assert_eq!(nodes.len(), edges + 1);
@@ -166,51 +163,51 @@ mod single_loop {
         }
     }
 
-    #[test_case( 
-        Countdown(3), 
+    #[test_case(
+        Countdown(3),
         Some(0)
         => (hashset![3, 2, 1], 3)
         ; "Countdown from 3 with all in loop false returns entire loop"
-    )]    
-    #[test_case( 
-        Countdown(1), 
+    )]
+    #[test_case(
+        Countdown(1),
         Some(0)
         => (hashset![3, 2, 1], 3)
         ; "Countdown from 1 with all in loop false returns entire loop"
     )]
-    #[test_case( 
-        Countdown(1), 
+    #[test_case(
+        Countdown(1),
         Some(2)
         => (hashset![1, 3], 1)
         ; "Countdown from 1 with 2 true returns path 1->3"
-    )]    
-    #[test_case( 
-        Countdown(2), 
+    )]
+    #[test_case(
+        Countdown(2),
         Some(3)
         => (hashset![2, 1], 1)
         ; "Countdown from 2 with 3 true returns path 2->1"
     )]
     fn single_loop(countdown: Countdown, true_one: Option<u8>) -> (HashSet<u8>, usize) {
         holochain_trace::test_run().ok().unwrap();
-    
+
         let checker: Checks<Countdown> = Box::new(move |c| Some(c.0) == true_one);
         let tr = Dep::from(countdown).traverse(&checker);
         report(&tr);
-        let (graph, _passes) = tr
-            .fail()
-            .unwrap();
-    
-        let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
-            Dep::Fact(f) => f.0,
-            _ => unreachable!(),
-        }).collect();
-        
+        let (graph, _passes) = tr.fail().unwrap();
+
+        let nodes: HashSet<_> = graph
+            .deps()
+            .into_iter()
+            .map(|c| match c {
+                Dep::Fact(f) => f.0,
+                _ => unreachable!(),
+            })
+            .collect();
+
         let num_edges = graph.edge_count();
-    
+
         (nodes, num_edges)
     }
-
-    
 }
 
 /// Contrived test case involving graphs mostly consisting of ANY nodes
@@ -258,7 +255,6 @@ fn branching_any() {
         // no assertion here, just a smoke test. It's a neat case, check the graph output
     }
 }
-
 
 /// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
@@ -322,17 +318,17 @@ mod recipes {
         TunaMelt, hashset![Bread, Cheese]
         => hashset![Tuna, Vinegar, Eggs]
         ; "TunaMelt requires other essential ingredients"
-    )]    
+    )]
     #[test_case(
         TunaMelt, hashset![Bread, Cheese, TunaSalad]
         => hashset![TunaMelt]
         ; "TunaMelt can be made with these ingredients"
-    )]    
+    )]
     #[test_case(
         TunaMelt, hashset![Bread, Cheese, Eggs, Tuna]
         => hashset![Vinegar]
         ; "TunaMelt only requires vinegar"
-    )]    
+    )]
     #[test_case(
         TunaMelt, hashset![Bread, Cheese, Mayo]
         => hashset![Tuna]
@@ -347,12 +343,12 @@ mod recipes {
         let tr = Dep::from(item).traverse(&truths);
         report(&tr);
         let (g, _) = tr.fail().unwrap();
-        g.leaves().into_iter().map(|c| c.clone().into_fact().unwrap()).collect()
+        g.leaves()
+            .into_iter()
+            .map(|c| c.clone().into_fact().unwrap())
+            .collect()
     }
-
-
 }
-
 
 /// A test similar to what Holochain uses, since that's what this lib was written for
 #[test]

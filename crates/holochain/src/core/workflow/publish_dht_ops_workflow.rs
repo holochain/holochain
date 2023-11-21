@@ -68,7 +68,7 @@ pub async fn publish_dht_ops_workflow(
                 // If we get a routing error it means the space hasn't started yet and we should try publishing again.
                 if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
                     // TODO if this doesn't change what is the loop terminate condition?
-                    complete = WorkComplete::Incomplete;
+                    complete = WorkComplete::Incomplete(None);
                 }
                 warn!(failed_to_send_publish = ?e);
             }
