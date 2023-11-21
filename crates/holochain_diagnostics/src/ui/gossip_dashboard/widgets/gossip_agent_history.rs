@@ -26,7 +26,12 @@ pub fn _ui_gossip_agent_history_table(
 }
 
 fn _row(info: &PeerAgentHistory, own: bool) -> Row<'static> {
-    let active = if info.current_round { "*" } else { " " }.to_string();
+    let active = if info.current_rounds.is_empty() {
+        " "
+    } else {
+        "*"
+    }
+    .to_string();
 
     // let latency = format!("{:3}", *info.latency_micros / 1000.0);
     if own {
