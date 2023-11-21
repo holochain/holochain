@@ -13,10 +13,7 @@ fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec
         .node_indices()
         .find(|i| graph[*i].dep == start)
         .unwrap();
-    let end_ix = graph
-        .node_indices()
-        .find(|i| graph[*i].dep == end)
-        .unwrap();
+    let end_ix = graph.node_indices().find(|i| graph[*i].dep == end).unwrap();
     petgraph::algo::all_simple_paths::<Vec<_>, _>(&**graph, start_ix, end_ix, 0, None)
         .map(|c| c.len())
         .collect()
@@ -33,7 +30,6 @@ impl<'c, T: Fact> Traversal<'c, T> {
     }
 }
 
-
 /// Tests exploring all the possible graphs involving a single node
 mod singleton {
 
@@ -42,19 +38,19 @@ mod singleton {
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     struct Singleton(bool, bool);
-    
+
     impl Fact for Singleton {
         type Context = ();
-    
+
         fn check(&self, (): &Self::Context) -> bool {
             self.0
         }
-    
+
         fn dep(&self, (): &Self::Context) -> DepResult<Self> {
             Ok(self.1.then_some(self.clone().into()))
         }
     }
-    
+
     #[test_case( Singleton(false, false) => Some(hashset! { Singleton(false, false).into() }) ; "failing single isolated fact produces only self")]
     #[test_case( Singleton(false, true)  => Some(hashset! { Singleton(false, true).into() }) ; "failing single self-referencing fact produces only self")]
     #[test_case( Singleton(true, false) => None ; "passing single isolated fact produces Pass")]
@@ -77,8 +73,7 @@ mod acyclic_single_path {
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
     struct Countdown(u8);
-    
-    
+
     impl Fact for Countdown {
         type Context = HashSet<u8>;
     
@@ -91,7 +86,7 @@ mod acyclic_single_path {
                 _ => unreachable!(),
             })
         }
-    
+
         fn check(&self, ctx: &Self::Context) -> bool {
             ctx.contains(&self.0)
         }
@@ -146,7 +141,7 @@ mod acyclic_single_path {
         }).collect();
         
         let edges = graph.edge_count();
-    
+
         // If the number of edges is one less than the number of nodes, that implies a straight noncyclic path
         // (this doesn't test that something weird and ridiculous happens like a branch with a disconnected node)
         assert_eq!(nodes.len(), edges + 1);
@@ -224,11 +219,9 @@ mod single_loop {
         }).collect();
         
         let num_edges = graph.edge_count();
-    
+
         (nodes, num_edges)
     }
-
-    
 }
 
 /// Contrived test case involving graphs mostly consisting of ANY nodes
@@ -276,7 +269,6 @@ fn branching_any() {
         // no assertion here, just a smoke test. It's a neat case, check the graph output
     }
 }
-
 
 /// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
@@ -343,17 +335,17 @@ mod recipes {
         TunaMelt, hashset![Bread, Cheese]
         => hashset![Tuna, Vinegar, Eggs]
         ; "TunaMelt requires other essential ingredients"
-    )]    
+    )]
     #[test_case(
         TunaMelt, hashset![Bread, Cheese, TunaSalad]
         => hashset![TunaMelt]
         ; "TunaMelt can be made with these ingredients"
-    )]    
+    )]
     #[test_case(
         TunaMelt, hashset![Bread, Cheese, Eggs, Tuna]
         => hashset![Vinegar]
         ; "TunaMelt only requires vinegar"
-    )]    
+    )]
     #[test_case(
         TunaMelt, hashset![Bread, Cheese, Mayo]
         => hashset![Tuna]
@@ -419,7 +411,6 @@ mod recipes {
 
     }
 }
-
 
 /// A test similar to what Holochain uses, since that's what this lib was written for
 #[test]

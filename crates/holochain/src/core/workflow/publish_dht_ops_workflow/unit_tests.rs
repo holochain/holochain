@@ -64,7 +64,7 @@ async fn workflow_incomplete_on_routing_error() {
 
     let publish_timestamp = get_publish_time(vault, op_hash).await;
 
-    assert_eq!(WorkComplete::Incomplete, work_complete);
+    assert_eq!(WorkComplete::Incomplete(None), work_complete);
     assert!(!rx.is_paused());
     assert!(publish_timestamp.is_none());
 }

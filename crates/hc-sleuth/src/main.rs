@@ -18,8 +18,8 @@ fn main() {
             );
         }
         HcSleuth::Query {
-            op_hash,
-            node,
+            op_hash: _,
+            node: _,
             log_paths,
         } => {
             dbg!(log_paths);

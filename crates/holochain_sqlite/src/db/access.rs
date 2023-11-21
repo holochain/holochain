@@ -20,6 +20,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
+static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
@@ -122,9 +123,14 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .checkout_connection(self.read_semaphore.clone())
             .await?;
 
-        tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
-            .await
-            .map_err(DatabaseError::from)?
+        // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
+        // this timeout should prevent the caller being blocked by this await that may not finish.
+        tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
+                conn.execute_in_read_txn(f)
+            })).await.map_err(|e| {
+                tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
+                DatabaseError::from(e)
+            })?.map_err(DatabaseError::from)?
     }
 
     /// Intended to be used for transactions that need to be kept open for a longer period of time than just running a
@@ -336,9 +342,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
         let mut conn = self.get_connection_from_pool()?;
 
-        tokio::task::spawn_blocking(move || conn.execute_in_exclusive_rw_txn(f))
-            .await
-            .map_err(DatabaseError::from)?
+        // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
+        // this timeout should prevent the caller being blocked by this await that may not finish.
+        tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
+            conn.execute_in_exclusive_rw_txn(f)
+        })).await.map_err(|e| {
+            tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
+            DatabaseError::from(e)
+        })?.map_err(DatabaseError::from)?
     }
 
     pub fn available_writer_count(&self) -> usize {

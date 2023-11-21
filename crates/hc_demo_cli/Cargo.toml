@@ -2,6 +2,7 @@
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 edition = "2021"
+license = "Apache-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
