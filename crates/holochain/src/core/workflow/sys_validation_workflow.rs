@@ -9,14 +9,19 @@ use crate::core::workflow::error::WorkflowResult;
 use crate::core::workflow::sys_validation_workflow::validation_batch::{
     validate_ops_batch, NUM_CONCURRENT_OPS,
 };
+use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::StreamExt;
 use holo_hash::DhtOpHash;
+use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
+use holochain_cascade::CascadeSource;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 use tracing::*;
@@ -38,15 +43,13 @@ mod unit_tests;
 #[cfg(test)]
 mod validate_op_tests;
 
-#[instrument(skip(
-    workspace,
-    incoming_dht_ops_sender,
-    trigger_app_validation,
-    network
-))]
-pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
+#[instrument(skip(workspace, incoming_dht_ops_sender, trigger_app_validation, network))]
+pub async fn sys_validation_workflow<
+    Network: HolochainP2pDnaT + Clone + 'static,
+    Sender: DhtOpSender + Send + Sync + Clone + 'static,
+>(
     workspace: Arc<SysValidationWorkspace>,
-    incoming_dht_ops_sender: impl DhtOpSender + Send + Sync + Clone + 'static,
+    incoming_dht_ops_sender: Sender,
     trigger_app_validation: TriggerSender,
     network: Network,
 ) -> WorkflowResult<WorkComplete> {
@@ -68,14 +71,39 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
-    let start_len = sorted_ops.len();
-    tracing::debug!("Validating {} ops", start_len);
+
+    if sorted_ops.is_empty() {
+        tracing::trace!(
+            "Skipping sys_validation_workflow because there are no ops to be validated"
+        );
+        return Ok(WorkComplete::Complete);
+    }
+
+    let num_ops_to_validate = sorted_ops.len();
+    tracing::debug!("Validating {} ops", num_ops_to_validate);
     // TODO questionable check for saturation. The query can return up to 10,000 results and this function
     //      will process more than NUM_CONCURRENT_OPS ops, just not in parallel. Not necessarily true that
     //      there will be more ops to process after this workflow run.
-    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
+    let start = (num_ops_to_validate >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
-    let cascade = workspace.full_cascade(network);
+    let cascade = Arc::new(workspace.full_cascade(network));
+
+    // TODO This can now be used instead of the cascade for previous actions
+    let previous_actions = tokio::task::spawn({
+        let sorted_ops = sorted_ops.clone();
+        let workspace = workspace.clone();
+        async move {
+            let local_cascade = Arc::new(workspace.local_cascade());
+            fetch_previous_actions(
+                sorted_ops.into_iter().map(|op| op.action()),
+                local_cascade,
+            )
+            .await
+        }
+    })
+    .await?;
+
+    // let previous_actions = HashMap::new();
 
     validate_ops_batch(
         sorted_ops,
@@ -86,16 +114,24 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
                 let workspace = workspace.clone();
                 let cascade = cascade.clone();
                 let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
+                let previous_actions = previous_actions.clone();
                 async move {
                     let (op, op_hash) = so.into_inner();
                     let op_type = op.get_type();
                     let action = op.action();
 
+                    // TODO This is more like a 'required dependency' check and isn't actually used in validation
                     let dependency = get_dependency(op_type, &action);
                     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
-                    let r =
-                        validate_op(&op, &dna_def, &cascade, &incoming_dht_ops_sender).await;
+                    let r = validate_op(
+                        &op,
+                        &dna_def,
+                        cascade,
+                        &incoming_dht_ops_sender,
+                        previous_actions,
+                    )
+                    .await;
                     r.map(|o| (op_hash, o, dependency))
                 }
                 .boxed()
@@ -173,14 +209,78 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     })
 }
 
+async fn fetch_previous_actions<A, N>(
+    actions: A,
+    local_cascade: Arc<CascadeImpl<N>>,
+) -> HashMap<ActionHash, (SignedActionHashed, CascadeSource)>
+where
+    A: Iterator<Item = Action>,
+    // C: Cascade + Send + Sync,
+    N: HolochainP2pDnaT + Clone + 'static + Send + Sync,
+{
+    let action_fetches = actions.flat_map(|action| {
+        // For each previous action that will be needed for validation, map the action to a fetch for its hash
+        vec![
+            match &action {
+                Action::Update(update) => Some(update.original_action_address.clone()),
+                _ => None,
+            },
+            match action.prev_action().cloned() {
+                None => None,
+                hash => hash,
+            },
+        ]
+        .into_iter()
+        .filter_map(|hash| {
+            let local_cascade = local_cascade.clone();
+            match hash {
+                Some(h) => Some(
+                    async move { local_cascade.retrieve_action(h, Default::default()).await }
+                        .boxed(),
+                ),
+                None => None,
+            }
+        })
+    });
+
+    futures::stream::iter(action_fetches)
+    .filter_map(|r| async move {
+        // Filter out errors and not found actions, preparing the rest to be put into a HashMap for easy access.
+        // TODO distinguish these? Could use an Outcome here to be clear about what happened.
+        match r.await {
+            Ok(Some((signed_action, source))) => {
+                Some((signed_action.as_hash().clone(), (signed_action, source)))
+            }
+            Ok(None) => None,
+            Err(e) => {
+                tracing::error!(error = ?e, "Error retrieving prev action");
+                None
+            }
+        }
+    })
+    .collect::<HashMap<ActionHash, (SignedActionHashed, CascadeSource)>>().await
+}
+
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
-pub(crate) async fn validate_op(
+pub(crate) async fn validate_op<C>(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: &impl DhtOpSender,
-) -> WorkflowResult<Outcome> {
-    match validate_op_inner(op, cascade, dna_def, incoming_dht_ops_sender).await {
+    previous_actions: HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+) -> WorkflowResult<Outcome>
+where
+    C: Cascade + Send + Sync,
+{
+    match validate_op_inner(
+        op,
+        cascade,
+        dna_def,
+        incoming_dht_ops_sender,
+        previous_actions,
+    )
+    .await
+    {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -221,11 +321,9 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
+        // TODO The only place we mark as waiting for another op to be validated and it's not correct?
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep.clone()),
-        ValidationOutcome::PrevActionError(PrevActionError { source: inner, .. }) => match inner {
-            PrevActionErrorKind::MissingMeta(dep) => AwaitingOpDep(dep.clone().into()),
-            _ => Rejected,
-        },
+        ValidationOutcome::PrevActionError(_) => Rejected,
         ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
@@ -237,16 +335,20 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
     }
 }
 
-async fn validate_op_inner(
+async fn validate_op_inner<C>(
     op: &DhtOp,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: &impl DhtOpSender,
-) -> SysValidationResult<()> {
+    previous_actions: HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+) -> SysValidationResult<()>
+where
+    C: Cascade + Send + Sync,
+{
     check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
-            store_record(action, cascade).await?;
+            store_record(action, &previous_actions)?;
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = entry {
@@ -256,6 +358,7 @@ async fn validate_op_inner(
                         .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))?;
                     for action in session_data.build_action_set(entry_hash, weight)? {
                         let hh = ActionHash::with_data_sync(&action);
+                        // TODO eliminate me
                         if cascade
                             .retrieve_action(hh.clone(), Default::default())
                             .await?
@@ -290,7 +393,7 @@ async fn validate_op_inner(
                 for action in session_data.build_action_set(entry_hash, weight)? {
                     check_and_hold_store_record(
                         &ActionHash::with_data_sync(&action),
-                        cascade,
+                        cascade.clone(),
                         Some(incoming_dht_ops_sender),
                         dependency_check,
                     )
@@ -301,16 +404,18 @@ async fn validate_op_inner(
             store_entry((action).into(), entry, cascade).await?;
 
             let action = action.clone().into();
-            store_record(&action, cascade).await?;
+            store_record(&action, &previous_actions)?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
-            register_agent_activity(action, cascade, dna_def, Some(incoming_dht_ops_sender)).await?;
-            store_record(action, cascade).await?;
+            register_agent_activity(action, cascade, dna_def, Some(incoming_dht_ops_sender))
+                .await?;
+            store_record(action, &previous_actions)?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
-            register_updated_content(action, cascade, Some(incoming_dht_ops_sender)).await?;
+            register_updated_content(action, cascade.clone(), Some(incoming_dht_ops_sender))
+                .await?;
             if let Some(entry) = entry.as_option() {
                 store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
@@ -318,7 +423,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
-            register_updated_record(action, cascade, Some(incoming_dht_ops_sender)).await?;
+            register_updated_record(action, cascade.clone(), Some(incoming_dht_ops_sender)).await?;
             if let Some(entry) = entry.as_option() {
                 store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
@@ -350,10 +455,10 @@ async fn validate_op_inner(
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
-pub async fn sys_validate_record(
-    record: &Record,
-    cascade: &impl Cascade,
-) -> SysValidationOutcome<()> {
+pub async fn sys_validate_record<C>(record: &Record, cascade: Arc<C>) -> SysValidationOutcome<()>
+where
+    C: Cascade + Send + Sync,
+{
     match sys_validate_record_inner(record, cascade).await {
         // Validation succeeded
         Ok(_) => Ok(()),
@@ -371,44 +476,53 @@ pub async fn sys_validate_record(
     }
 }
 
-async fn sys_validate_record_inner(
-    record: &Record,
-    cascade: &impl Cascade,
-) -> SysValidationResult<()> {
+async fn sys_validate_record_inner<C>(record: &Record, cascade: Arc<C>) -> SysValidationResult<()>
+where
+    C: Cascade + Send + Sync,
+{
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
     counterfeit_check(signature, action).await?;
 
-    async fn validate(
+    async fn validate<C>(
         action: &Action,
         maybe_entry: Option<&Entry>,
-        cascade: &impl Cascade,
-    ) -> SysValidationResult<()> {
+        cascade: Arc<C>,
+    ) -> SysValidationResult<()>
+    where
+        C: Cascade + Send + Sync,
+    {
+        // TODO This is temporary to make the code build
+        // let previous_actions = fetch_previous_actions(vec![action.clone()], cascade.clone()).await;
+        let previous_actions: HashMap<ActionHash, (SignedActionHashed, CascadeSource)> =
+            HashMap::new();
+
         let incoming_dht_ops_sender: Option<&IncomingDhtOpSender> = None;
-        store_record(action, cascade).await?;
+        store_record(action, &previous_actions)?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
-                (action)
+                action
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                 maybe_entry,
-                cascade,
+                cascade.clone(),
             )
             .await?;
         }
         match action {
             Action::Update(action) => {
-                register_updated_content(action, cascade, incoming_dht_ops_sender).await?;
+                register_updated_content(action, cascade.clone(), incoming_dht_ops_sender).await?;
             }
             Action::Delete(action) => {
-                register_deleted_entry_action(action, cascade, incoming_dht_ops_sender).await?;
+                register_deleted_entry_action(action, cascade.clone(), incoming_dht_ops_sender)
+                    .await?;
             }
             Action::CreateLink(action) => {
-                register_add_link(action, cascade, incoming_dht_ops_sender).await?;
+                register_add_link(action, cascade.clone(), incoming_dht_ops_sender).await?;
             }
             Action::DeleteLink(action) => {
-                register_delete_link(action, cascade, incoming_dht_ops_sender).await?;
+                register_delete_link(action, cascade.clone(), incoming_dht_ops_sender).await?;
             }
             _ => {}
         }
@@ -420,12 +534,12 @@ async fn sys_validate_record_inner(
             if let Some(weight) = action.entry_rate_data() {
                 let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
                 for action in session.build_action_set(entry_hash, weight)? {
-                    validate(&action, maybe_entry, cascade).await?;
+                    validate(&action, maybe_entry, cascade.clone()).await?;
                 }
                 Ok(())
             } else {
                 tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
-                validate(action, maybe_entry, cascade).await
+                validate(action, maybe_entry, cascade.clone()).await
             }
         }
         _ => validate(action, maybe_entry, cascade).await,
@@ -440,12 +554,15 @@ pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysVal
     Ok(())
 }
 
-async fn register_agent_activity(
+async fn register_agent_activity<C>(
     action: &Action,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
 
@@ -466,17 +583,20 @@ async fn register_agent_activity(
     Ok(())
 }
 
-async fn store_record(action: &Action, cascade: &impl Cascade) -> SysValidationResult<()> {
+fn store_record(
+    action: &Action,
+    previous_actions: &HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
 
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let (prev_action, _) = cascade
-            .retrieve_action(prev_action_hash.clone(), Default::default())
-            .await?
+        let (prev_action, _) = previous_actions
+            .get(&prev_action_hash)
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
+        // TODO verify the op has actually been sys validated?
         check_prev_author(action, prev_action.action())?;
         check_prev_timestamp(action, prev_action.action())?;
         check_prev_seq(action, prev_action.action())?;
@@ -485,18 +605,22 @@ async fn store_record(action: &Action, cascade: &impl Cascade) -> SysValidationR
     Ok(())
 }
 
-async fn store_entry(
+async fn store_entry<C>(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    cascade: &impl Cascade,
-) -> SysValidationResult<()> {
+    // TODO can clone be eliminated for this bound?
+    cascade: Arc<C>,
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let entry_type = action.entry_type();
     let entry_hash = action.entry_hash();
 
     // Checks
     check_entry_type(entry_type, entry)?;
-    check_entry_hash(entry_hash, entry).await?;
+    check_entry_hash(entry_hash, entry)?;
     check_entry_size(entry)?;
 
     // Additional checks if this is an Update
@@ -508,6 +632,7 @@ async fn store_entry(
             .ok_or_else(|| {
                 ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
             })?;
+        // TODO verify previous has passed sys validation?
         update_check(entry_update, original_action.action())?;
     }
 
@@ -519,11 +644,14 @@ async fn store_entry(
     Ok(())
 }
 
-async fn register_updated_content(
+async fn register_updated_content<C>(
     entry_update: &Update,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
@@ -539,11 +667,14 @@ async fn register_updated_content(
     Ok(())
 }
 
-async fn register_updated_record(
+async fn register_updated_record<C>(
     entry_update: &Update,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
@@ -560,11 +691,14 @@ async fn register_updated_record(
     Ok(())
 }
 
-async fn register_deleted_by(
+async fn register_deleted_by<C>(
     record_delete: &Delete,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
@@ -582,11 +716,14 @@ async fn register_deleted_by(
     Ok(())
 }
 
-async fn register_deleted_entry_action(
+async fn register_deleted_entry_action<C>(
     record_delete: &Delete,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
@@ -604,20 +741,26 @@ async fn register_deleted_entry_action(
     Ok(())
 }
 
-async fn register_add_link(
+async fn register_add_link<C>(
     link_add: &CreateLink,
-    _cascade: &impl Cascade,
+    _cascade: Arc<C>,
     _incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     check_tag_size(&link_add.tag)?;
     Ok(())
 }
 
-async fn register_delete_link(
+async fn register_delete_link<C>(
     link_remove: &DeleteLink,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()> {
+) -> SysValidationResult<()>
+where
+    C: Cascade,
+{
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
 

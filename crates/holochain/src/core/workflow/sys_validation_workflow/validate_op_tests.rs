@@ -1,4 +1,6 @@
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
@@ -1053,9 +1055,15 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, &cascade, &MockDhtOpSender::new())
-        .await
-        .unwrap();
+    let validation_outcome = validate_op(
+        &op,
+        &dna_def,
+        Arc::new(cascade),
+        &MockDhtOpSender::new(),
+        HashMap::new(),
+    )
+    .await
+    .unwrap();
 
     assert!(matches!(validation_outcome, Outcome::Accepted));
 }
@@ -1165,14 +1173,19 @@ impl TestCase {
         self
     }
 
-    async fn execute(&self) -> WorkflowResult<Outcome> {
+    async fn execute(&mut self) -> WorkflowResult<Outcome> {
         let dna_def = self.dna_def_hash();
+
+        // Swap out the cascade so we can move it into the workflow
+        let mut new_cascade = MockCascade::new();
+        std::mem::swap(&mut new_cascade, &mut self.cascade);
 
         validate_op(
             self.op.as_ref().expect("No op set, invalid test case"),
             &dna_def,
-            &self.cascade,
+            Arc::new(new_cascade),
             &self.incoming_ops_sender,
+            HashMap::new(),
         )
         .await
     }

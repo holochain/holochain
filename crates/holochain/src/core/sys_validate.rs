@@ -375,7 +375,7 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
 }
 
 /// Check the actions entry hash matches the hash of the entry
-pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
+pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
     if *hash == EntryHash::with_data_sync(entry) {
         Ok(())
     } else {
@@ -518,14 +518,15 @@ fn check_prev_action_chain<A: ChainItem>(
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_register_add_link<F>(
+pub async fn check_and_hold_register_add_link<F, C>(
     hash: &ActionHash,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
+    C: Cascade,
 {
     let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
@@ -547,14 +548,15 @@ where
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_register_agent_activity<F>(
+pub async fn check_and_hold_register_agent_activity<F, C>(
     hash: &ActionHash,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
+    C: Cascade,
 {
     let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
@@ -576,14 +578,15 @@ where
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_store_entry<F>(
+pub async fn check_and_hold_store_entry<F, C>(
     hash: &ActionHash,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
+    C: Cascade,
 {
     let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
@@ -608,14 +611,15 @@ where
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_any_store_entry<F>(
+pub async fn check_and_hold_any_store_entry<F, C>(
     hash: &EntryHash,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
+    C: Cascade + Clone + Send + Sync,
 {
     let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
@@ -635,14 +639,15 @@ where
 ///
 /// Additionally sys validation will be triggered to
 /// run again if we weren't holding it.
-pub async fn check_and_hold_store_record<F>(
+pub async fn check_and_hold_store_record<F, C>(
     hash: &ActionHash,
-    cascade: &impl Cascade,
+    cascade: Arc<C>,
     incoming_dht_ops_sender: Option<&impl DhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
+    C: Cascade,
 {
     let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
@@ -752,14 +757,16 @@ impl AsRef<Record> for Source {
 /// This function also returns where the dependency
 /// was found so you can decide whether or not to add
 /// it to the incoming ops.
-async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
-    hash: &I,
-    cascade: &impl Cascade,
-) -> SysValidationResult<Source> {
+async fn check_and_hold<I, C>(hash: &I, cascade: Arc<C>) -> SysValidationResult<Source>
+where
+    I: Into<AnyDhtHash> + Clone,
+    C: Cascade,
+{
     let hash: AnyDhtHash = hash.clone().into();
     match cascade.retrieve(hash.clone(), Default::default()).await? {
         Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),
         Some((el, CascadeSource::Network)) => Ok(Source::Network(el.privatized().0)),
+        // TODO here NotHoldingDep means it wasn't found but is being translated to 'waiting for another op to be validated'
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }

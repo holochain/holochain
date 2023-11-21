@@ -121,8 +121,8 @@ async fn app_validation_workflow_inner(
                 });
 
                 // Validate this op
-                let cascade = workspace.full_cascade(network.clone());
-                let r = match dhtop_to_op(op, &cascade).await {
+                let cascade = Arc::new(workspace.full_cascade(network.clone()));
+                let r = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
                         validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
                     }
@@ -269,11 +269,14 @@ async fn app_validation_workflow_inner(
     })
 }
 
-pub async fn record_to_op(
+pub async fn record_to_op<C>(
     record: Record,
     op_type: DhtOpType,
-    cascade: &impl Cascade,
-) -> AppValidationOutcome<(Op, Option<Entry>)> {
+    cascade: Arc<C>,
+) -> AppValidationOutcome<(Op, Option<Entry>)>
+where
+    C: Cascade,
+{
     use DhtOpType::*;
 
     // Hide private data where appropriate
@@ -337,7 +340,10 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<Op> {
+async fn dhtop_to_op<C>(op: DhtOp, cascade: Arc<C>) -> AppValidationOutcome<Op>
+where
+    C: Cascade,
+{
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
