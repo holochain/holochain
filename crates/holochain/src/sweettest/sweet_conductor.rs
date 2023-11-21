@@ -214,9 +214,13 @@ impl SweetConductor {
 
         tracing::info!(?config);
 
-        let handle =
-            Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
-                .await;
+        let handle = Self::handle_from_existing(
+            &dir,
+            keystore.unwrap_or_else(holochain_keystore::test_keystore),
+            &config,
+            &[],
+        )
+        .await;
         Self::new(handle, dir, config, rendezvous).await
     }
 
@@ -606,6 +610,21 @@ impl SweetConductor {
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Drop the specified agent keys from each conductor's peer table
+    pub async fn forget_peer_info(
+        conductors: impl IntoIterator<Item = &Self>,
+        agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
+    ) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+
+        crate::conductor::p2p_agent_store::forget_peer_info(all, agents_to_forget).await;
     }
 
     /// Let each conductor know about each others' agents so they can do networking

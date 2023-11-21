@@ -3,7 +3,7 @@ use crate::KitsuneBinType;
 use crate::KitsuneOpHash;
 use crate::KitsuneSignature;
 use crate::KitsuneSpace;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 
 fixturator!(
     KitsuneAgent;

@@ -1,4 +1,4 @@
-use crate::CallbackResult;
+use crate::prelude::*;
 use holochain_wasmer_common::*;
 
 #[derive(Clone, Serialize, Deserialize, SerializedBytes, Debug)]

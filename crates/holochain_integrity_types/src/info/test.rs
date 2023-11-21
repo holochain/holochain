@@ -1,3 +1,5 @@
+use crate::UnitEnum;
+
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -259,7 +261,7 @@ enum EntryZomes {
     B(EntryTypes),
 }
 
-impl crate::UnitEnum for EntryTypes {
+impl UnitEnum for EntryTypes {
     type Unit = UnitEntry;
 
     fn to_unit(&self) -> Self::Unit {
@@ -333,7 +335,7 @@ impl From<(ZomeEntryTypesKey, Entry)> for EntryZomes {
                     zome_index: 0.into(),
                     type_index,
                 };
-                let unit: <EntryTypes as crate::UnitEnum>::Unit = k.into();
+                let unit: <EntryTypes as UnitEnum>::Unit = k.into();
                 let r = match unit {
                     UnitEntry::A => EntryTypes::A(entry.into()),
                     UnitEntry::B => EntryTypes::B(entry.into()),
@@ -348,7 +350,7 @@ impl From<(ZomeEntryTypesKey, Entry)> for EntryZomes {
                     zome_index: 0.into(),
                     type_index,
                 };
-                let unit: <EntryTypes as crate::UnitEnum>::Unit = k.into();
+                let unit: <EntryTypes as UnitEnum>::Unit = k.into();
                 let r = match unit {
                     UnitEntry::A => EntryTypes::A(entry.into()),
                     UnitEntry::B => EntryTypes::B(entry.into()),

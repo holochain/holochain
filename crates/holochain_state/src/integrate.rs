@@ -4,9 +4,8 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpHashed, DhtOpType},
-    prelude::DhtOpResult,
+    prelude::*,
 };
-use holochain_zome_types::{EntryVisibility, SignedAction};
 
 use crate::{prelude::*, query::get_public_op_from_db};
 
@@ -105,7 +104,7 @@ fn insert_locally_validated_op(
     // Insert the op.
     insert_op(txn, &op)?;
     // Set the status to valid because we authored it.
-    set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
+    set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
     // Set the stage to awaiting integration.
@@ -113,7 +112,7 @@ fn insert_locally_validated_op(
         // This set the validation stage to pending which is correct when
         // it's integrated.
         set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
-        set_when_integrated(txn, hash, holochain_zome_types::Timestamp::now())?;
+        set_when_integrated(txn, hash, holochain_zome_types::prelude::Timestamp::now())?;
     } else {
         set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
     }

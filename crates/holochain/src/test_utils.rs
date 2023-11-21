@@ -4,6 +4,7 @@ use crate::conductor::conductor::CellStatus;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
+use crate::conductor::integration_dump;
 use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
@@ -36,6 +37,8 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_types::test_utils::fake_dna_file;
+use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
@@ -488,7 +491,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
 /// If the timeout is reached, print a report including a diff of all published ops
 /// which were not integrated.
-#[tracing::instrument(skip(db))]
+#[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     db: &Db,
     published: &[DhtOp],
@@ -552,13 +555,16 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     let timeout = delay * num_attempts as u32;
 
+    let integration_dump = integration_dump(db).await.unwrap();
+
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n",
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
         timeout.as_millis(),
         num_published,
         num_integrated,
         header,
         unintegrated.join("\n"),
+        integration_dump,
     );
 }
 

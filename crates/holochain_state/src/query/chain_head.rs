@@ -1,6 +1,6 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::*;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
 
 use crate::prelude::HeadInfo;
@@ -24,12 +24,11 @@ impl Query for ChainHeadQuery {
 
     fn query(&self) -> String {
         "
-        SELECT blob, hash FROM (
-            SELECT Action.blob, Action.hash, MAX(action.seq)
-            FROM Action
-            JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE Action.author = :author
-        ) WHERE hash IS NOT NULL
+        SELECT Action.blob, Action.hash
+        FROM Action
+        JOIN DhtOp ON DhtOp.action_hash = Action.hash
+        WHERE Action.author = :author AND Action.hash IS NOT NULL
+        ORDER BY Action.seq DESC LIMIT 1
         "
         .into()
     }
@@ -99,7 +98,7 @@ mod tests {
     use crate::mutations::{insert_action, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::schema::SCHEMA_CELL;
-    use holochain_types::dht_op::DhtOpLight;
+    use holochain_types::dht_op::DhtOpLite;
     use holochain_types::dht_op::OpOrder;
 
     #[test]
@@ -116,7 +115,7 @@ mod tests {
 
         // Create 5 consecutive actions for the authoring agent,
         // as well as 5 other random actions, interspersed.
-        let shhs: Vec<_> = vec![
+        let mut actions: Vec<_> = vec![
             fixt!(ActionBuilderCommon),
             fixt!(ActionBuilderCommon),
             fixt!(ActionBuilderCommon),
@@ -142,19 +141,22 @@ mod tests {
         })
         .collect();
 
-        let expected_head = shhs[8].clone();
+        // Other actions have a different author, so the 9th action should be the head for our author's chain
+        let expected_head = actions[8].clone();
+        // Shuffle so the head will sometimes be in scratch and sometimes be in the database and not always the last action by our author.
+        actions.shuffle(&mut thread_rng());
 
-        for shh in &shhs[..6] {
-            let hash = shh.action_address();
-            let op = DhtOpLight::StoreRecord(hash.clone(), None, hash.clone().into());
-            let op_order = OpOrder::new(op.get_type(), shh.action().timestamp());
-            insert_action(&mut txn, shh).unwrap();
+        for action in &actions[..6] {
+            let hash = action.action_address();
+            let op = DhtOpLite::StoreRecord(hash.clone(), None, hash.clone().into());
+            let op_order = OpOrder::new(op.get_type(), action.action().timestamp());
+            insert_action(&mut txn, action).unwrap();
             insert_op_lite(
                 &mut txn,
                 &op,
                 &fixt!(DhtOpHash),
                 &op_order,
-                &shh.action().timestamp(),
+                &action.action().timestamp(),
             )
             .unwrap();
         }
@@ -163,8 +165,8 @@ mod tests {
 
         // It's also totally invalid for a call_zome scratch to contain actions
         // from other authors, but it doesn't matter here
-        for shh in &shhs[6..] {
-            scratch.add_action(shh.clone(), ChainTopOrdering::default());
+        for action in &actions[6..] {
+            scratch.add_action(action.clone(), ChainTopOrdering::default());
         }
 
         let query = ChainHeadQuery::new(Arc::new(author));

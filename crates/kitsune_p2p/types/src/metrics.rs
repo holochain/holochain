@@ -1,7 +1,6 @@
 //! Utilities for helping with metric tracking.
 
 use crate::tracing;
-use futures::FutureExt;
 use holochain_trace::tracing::Instrument;
 use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_timestamp::Timestamp;
@@ -162,19 +161,16 @@ where
     let counter = MetricTaskCounter::new();
     let task = async move {
         let _counter = counter;
-        let res = f.await;
+        let res = f
+            .instrument(tracing::error_span!("kitsune metric task", scope = scope))
+            .await;
         if let Err(e) = &res {
             ghost_actor::dependencies::tracing::error!(?e, "METRIC TASK ERROR");
         }
         res
     };
 
-    tokio::task::spawn(if let Some(scope) = scope {
-        task.instrument(tracing::error_span!("kitsune metric task", scope = scope))
-            .boxed()
-    } else {
-        task.boxed()
-    })
+    tokio::task::spawn(task)
 }
 
 /// System Info.

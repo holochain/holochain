@@ -1,4 +1,5 @@
-use crate::error::{BootstrapClientError, BootstrapClientResult};
+use kitsune_p2p_bootstrap::error::BootstrapClientError;
+use kitsune_p2p_bootstrap::error::BootstrapClientResult;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
 use once_cell::sync::Lazy;
@@ -7,11 +8,9 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use url2::Url2;
 
-mod error;
-
 pub mod prelude {
     pub use super::{now, now_once, proxy_list, put, random, BootstrapNet};
-    pub use crate::error::{BootstrapClientError, BootstrapClientResult};
+    pub use kitsune_p2p_bootstrap::error::*;
 }
 
 /// The "net" flag / bucket to use when talking to the bootstrap server.
@@ -201,7 +200,7 @@ pub async fn proxy_list(url: Url2, net: BootstrapNet) -> BootstrapClientResult<V
         .await?
         .unwrap_or_default()
         .into_iter()
-        .map(Url2::parse)
+        .flat_map(|s| Url2::try_parse(s).ok())
         .collect())
 }
 

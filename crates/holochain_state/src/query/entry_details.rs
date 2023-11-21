@@ -3,7 +3,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::Judged;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
 
 use super::*;

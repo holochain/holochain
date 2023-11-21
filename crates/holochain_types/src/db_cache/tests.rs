@@ -1,6 +1,6 @@
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
-use holochain_zome_types::NOISE;
+use holochain_zome_types::prelude::NOISE;
 use test_case::test_case;
 
 use super::*;

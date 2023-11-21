@@ -4,13 +4,12 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
-use holochain_state::test_utils::{test_db_dir, test_keystore};
-use holochain_types::prelude::*;
+use holochain_state::prelude::*;
 use holochain_zome_types::action;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
-    let keystore = test_keystore();
+    let keystore = holochain_keystore::test_keystore();
 
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
     let dna_file = fake_valid_dna_file("test_cell_handle_publish");

@@ -231,13 +231,12 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holochain_keystore::test_keystore;
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
     use crate::HolochainP2pSender;
-    use holochain_types::prelude::AgentPubKeyExt;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
-    use holochain_zome_types::ValidationStatus;
+    use holochain_types::prelude::*;
     use kitsune_p2p::*;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::tls::TlsConfig;

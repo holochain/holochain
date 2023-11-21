@@ -59,6 +59,7 @@ use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
+use crate::conductor::metrics::create_p2p_event_duration_metric;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::list_all_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
@@ -88,7 +89,6 @@ use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
-use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
@@ -99,12 +99,8 @@ use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
-use holochain_state::prelude::from_blob;
-use holochain_state::prelude::StateMutationResult;
-use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{wasm, *};
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
@@ -114,6 +110,7 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -2188,7 +2185,7 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use holochain_zome_types::builder;
+    use holochain_zome_types::action::builder;
 
     use super::*;
 
@@ -2250,7 +2247,7 @@ mod misc_impls {
             let out = JsonDump {
                 peer_dump,
                 source_chain_dump,
-                integration_dump: integration_dump(&dht_db.clone().into()).await?,
+                integration_dump: integration_dump(dht_db).await?,
             };
             // Add summary
             let summary = out.to_string();
@@ -2964,8 +2961,8 @@ pub(crate) async fn genesis_cells(
 }
 
 /// Dump the integration json state.
-pub async fn integration_dump(
-    vault: &DbRead<DbKindDht>,
+pub async fn integration_dump<Db: ReadAccess<DbKindDht>>(
+    vault: &Db,
 ) -> ConductorApiResult<IntegrationStateDump> {
     vault
         .read_async(move |txn| {
@@ -3077,15 +3074,19 @@ async fn p2p_event_task(
     const NUM_PARALLEL_EVTS: usize = 512;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let duration_metric = create_p2p_event_duration_metric();
     p2p_evt
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
             let handle = handle.clone();
             let num_tasks = num_tasks.clone();
             let max_time = max_time.clone();
+            let duration_metric = duration_metric.clone();
             async move {
-                let start = (num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
-                    >= NUM_PARALLEL_EVTS)
-                    .then(std::time::Instant::now);
+                // Track whether the concurrency limit has been reached and keep the start time for reporting if so.
+                let start = Instant::now();
+                let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+
+                let evt_dna_hash = evt.dna_hash().clone();
 
                 // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
                 match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
@@ -3101,19 +3102,23 @@ async fn p2p_event_task(
                     }
                 }
 
-                match start {
-                    Some(start) => {
-                        let el = start.elapsed();
-                        let us = el.as_micros() as u64;
-                        let max_us = max_time
-                            .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
-                            .max(us);
+                if current_num_tasks >= NUM_PARALLEL_EVTS {
+                    let el = start.elapsed();
+                    let us = el.as_micros() as u64;
+                    let max_us = max_time
+                        .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
+                        .max(us);
 
-                        let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
-                        s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
-                    }
-                    None => max_time.store(0, std::sync::atomic::Ordering::Relaxed),
+                    let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
+                    s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
+                } else {
+                    max_time.store(0, std::sync::atomic::Ordering::Relaxed);
                 }
+
+                duration_metric.record(start.elapsed().as_secs_f64(), &[
+                    opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", evt_dna_hash)),
+                ]);
+
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
                 .in_current_span()

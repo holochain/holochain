@@ -15,9 +15,6 @@ use holo_hash::EntryHash;
 use holochain_zome_types::op::EntryCreationAction;
 use holochain_zome_types::prelude::*;
 
-#[cfg(feature = "contrafact")]
-pub mod facts;
-
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
