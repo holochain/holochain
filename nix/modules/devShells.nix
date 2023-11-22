@@ -132,6 +132,7 @@
 
             packages = with pkgs; [
               cargo-nextest
+              graph-easy
 
               (pkgs.writeShellScriptBin "script-cargo-regen-lockfiles" ''
                 cargo fetch --locked
