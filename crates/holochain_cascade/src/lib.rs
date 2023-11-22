@@ -157,7 +157,7 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pDnaT + Clone>(
+    pub fn with_network<N: HolochainP2pDnaT>(
         self,
         network: N,
         cache_db: DbWrite<DbKindCache>,

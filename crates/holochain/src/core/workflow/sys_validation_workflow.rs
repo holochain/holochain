@@ -14,7 +14,6 @@ use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
-use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
@@ -43,6 +42,8 @@ mod test_ideas;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod unit_tests;
+#[cfg(test)]
 mod validate_op_tests;
 
 #[instrument(skip(
@@ -52,12 +53,12 @@ mod validate_op_tests;
     sys_validation_trigger,
     network
 ))]
-pub async fn sys_validation_workflow(
+pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     space: Arc<Space>,
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
-    network: HolochainP2pDna,
+    network: Network,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
         sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger).await?;
@@ -70,10 +71,10 @@ pub async fn sys_validation_workflow(
     Ok(complete)
 }
 
-async fn sys_validation_workflow_inner(
+async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     space: Arc<Space>,
-    network: HolochainP2pDna,
+    network: Network,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
