@@ -92,16 +92,21 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
     // TODO can these clones be eliminated?
-    let previous_records = fetch_previous_records(sorted_ops.clone().into_iter(), cascade.clone()).await;
+    let mut previous_records: ValidationDependencies =
+        fetch_previous_records(sorted_ops.clone().into_iter(), cascade.clone()).await;
 
     // TODO This can now be used instead of the cascade for previous actions
-    let mut previous_actions =
-        fetch_previous_actions(sorted_ops.iter().map(|op| op.action()), cascade.clone()).await;
+    let mut previous_actions = fetch_previous_actions(
+        sorted_ops.iter().map(|op| op.action()),
+        cascade.clone(),
+        &mut previous_records,
+    )
+    .await;
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     // TODO rename
-    for so in sorted_ops {
-        let (op, op_hash) = so.into_inner();
+    for hashed_op in sorted_ops {
+        let (op, op_hash) = hashed_op.into_inner();
         let op_type = op.get_type();
         let action = op.action();
 
@@ -283,6 +288,10 @@ impl ValidationDependencies {
         }
     }
 
+    fn has(&self, hash: &AnyDhtHash) -> bool {
+        self.dependencies.contains_key(hash)
+    }
+
     fn get(&mut self, hash: &AnyDhtHash) -> Option<&mut ValidationDependencyState> {
         match self.dependencies.get_mut(hash) {
             Some(Some(dep)) => Some(dep),
@@ -317,6 +326,16 @@ impl ValidationDependencyState {
             ValidationDependency::Record(record) => record.action(),
         }
     }
+
+    fn as_record(&self) -> Option<&Record> {
+        match &self.dependency {
+            ValidationDependency::Action(_) => {
+                tracing::warn!("Attempted to get a record from a dependency that is an action, this is a bug");
+                None
+            },
+            ValidationDependency::Record(record) => Some(record),
+        }
+    }
 }
 
 enum ValidationDependency {
@@ -342,7 +361,11 @@ impl From<(Record, CascadeSource)> for ValidationDependencyState {
     }
 }
 
-async fn fetch_previous_actions<A, C>(actions: A, cascade: Arc<C>) -> ValidationDependencies
+async fn fetch_previous_actions<A, C>(
+    actions: A,
+    cascade: Arc<C>,
+    previous_records: &ValidationDependencies,
+) -> ValidationDependencies
 where
     A: Iterator<Item = Action>,
     C: Cascade + Send + Sync,
@@ -363,15 +386,21 @@ where
         .filter_map(|hash| {
             let cascade = cascade.clone();
             match hash {
-                Some(h) => Some(
-                    async move {
-                        let fetched = cascade
-                            .retrieve_action(h.clone(), Default::default())
-                            .await;
-                        (h, fetched)
+                Some(h) => {
+                    // Skip fetching the action because we already have the Record in memory which contains the action anyway.
+                    if previous_records.has(&h.clone().into()) {
+                        None
+                    } else {
+                        Some(
+                            async move {
+                                let fetched =
+                                    cascade.retrieve_action(h.clone(), Default::default()).await;
+                                (h, fetched)
+                            }
+                            .boxed(),
+                        )
                     }
-                    .boxed(),
-                ),
+                }
                 None => None,
             }
         })
@@ -405,21 +434,34 @@ where
 {
     let action_fetches = ops.into_iter().flat_map(|op| {
         // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
-        vec![
-            match &op.content {
-                DhtOp::RegisterAgentActivity(_, action) => action.prev_action().map(|a| a.as_hash().clone()),
-                _ => None,
-            },
-        ]
+        vec![match &op.content {
+            DhtOp::RegisterAgentActivity(_, action) => {
+                action.prev_action().map(|a| a.as_hash().clone().into())
+            }
+            DhtOp::RegisterUpdatedContent(_, action, _) => {
+                Some(action.original_action_address.clone().into())
+            }
+            DhtOp::RegisterUpdatedRecord(_, action, _) => {
+                Some(action.original_action_address.clone().into())
+            }
+            DhtOp::RegisterDeletedBy(_, action) => {
+                Some(action.deletes_address.clone().into())
+            }
+            DhtOp::RegisterDeletedEntryAction(_, action) => {
+                Some(action.deletes_address.clone().into())
+            }
+            DhtOp::RegisterRemoveLink(_, action) => {
+                Some(action.link_add_address.clone().into())
+            }
+            _ => None,
+        }]
         .into_iter()
-        .filter_map(|hash| {
+        .filter_map(|hash: Option<AnyDhtHash>| {
             let cascade = cascade.clone();
             match hash {
                 Some(h) => Some(
                     async move {
-                        let fetched = cascade
-                            .retrieve(h.clone().into(), Default::default())
-                            .await;
+                        let fetched = cascade.retrieve(h.clone(), Default::default()).await;
                         (h, fetched)
                     }
                     .boxed(),
@@ -597,19 +639,14 @@ where
             store_entry((action).into(), entry, validation_dependencies).await?;
 
             let action = action.clone().into();
-            store_record(&action, validation_dependencies)?;
-            Ok(())
+            store_record(&action, validation_dependencies)
         }
         DhtOp::RegisterAgentActivity(_, action) => {
-            // TODO getting records for this
-            register_agent_activity(action, cascade, dna_def, Some(incoming_dht_ops_sender))
-                .await?;
-            store_record(action, validation_dependencies)?;
-            Ok(())
+            register_agent_activity(action, validation_dependencies, dna_def)?;
+            store_record(action, validation_dependencies)
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
-            register_updated_content(action, cascade.clone(), Some(incoming_dht_ops_sender))
-                .await?;
+            register_updated_content(action, validation_dependencies)?;
             if let Some(entry) = entry.as_option() {
                 store_entry(
                     NewEntryActionRef::Update(action),
@@ -622,7 +659,7 @@ where
             Ok(())
         }
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
-            register_updated_record(action, cascade.clone(), Some(incoming_dht_ops_sender)).await?;
+            register_updated_record(action, validation_dependencies)?;
             if let Some(entry) = entry.as_option() {
                 store_entry(
                     NewEntryActionRef::Update(action),
@@ -635,20 +672,16 @@ where
             Ok(())
         }
         DhtOp::RegisterDeletedBy(_, action) => {
-            register_deleted_by(action, cascade, Some(incoming_dht_ops_sender)).await?;
-            Ok(())
+            register_deleted_by(action, validation_dependencies)
         }
         DhtOp::RegisterDeletedEntryAction(_, action) => {
-            register_deleted_entry_action(action, cascade, Some(incoming_dht_ops_sender)).await?;
-            Ok(())
+            register_deleted_entry_action(action, validation_dependencies)
         }
         DhtOp::RegisterAddLink(_, action) => {
-            register_add_link(action, cascade, Some(incoming_dht_ops_sender)).await?;
-            Ok(())
+            register_add_link(action)
         }
         DhtOp::RegisterRemoveLink(_, action) => {
-            register_delete_link(action, cascade, Some(incoming_dht_ops_sender)).await?;
-            Ok(())
+            register_delete_link(action, validation_dependencies)
         }
     }
 }
@@ -697,11 +730,9 @@ where
     where
         C: Cascade + Send + Sync,
     {
-        // TODO This is temporary to make the code build
         let mut validation_dependencies =
-            fetch_previous_actions(vec![action.clone()].into_iter(), cascade.clone()).await;
+            fetch_previous_actions(vec![action.clone()].into_iter(), cascade.clone(), &ValidationDependencies::new()).await;
 
-        let incoming_dht_ops_sender: Option<&IncomingDhtOpSender> = None;
         store_record(action, &mut validation_dependencies)?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
@@ -715,21 +746,21 @@ where
         }
         match action {
             Action::Update(action) => {
-                register_updated_content(action, cascade.clone(), incoming_dht_ops_sender).await?;
+                register_updated_content(action, &mut validation_dependencies)
             }
             Action::Delete(action) => {
-                register_deleted_entry_action(action, cascade.clone(), incoming_dht_ops_sender)
-                    .await?;
+                register_deleted_entry_action(action, &mut validation_dependencies)
             }
             Action::CreateLink(action) => {
-                register_add_link(action, cascade.clone(), incoming_dht_ops_sender).await?;
+                register_add_link(action)
             }
             Action::DeleteLink(action) => {
-                register_delete_link(action, cascade.clone(), incoming_dht_ops_sender).await?;
+                register_delete_link(action, &mut validation_dependencies)
             }
-            _ => {}
+            _ => {
+                Ok(())
+            }
         }
-        Ok(())
     }
 
     match maybe_entry {
@@ -757,15 +788,11 @@ pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysVal
     Ok(())
 }
 
-async fn register_agent_activity<C>(
+fn register_agent_activity(
     action: &Action,
-    cascade: Arc<C>,
+    validation_dependencies: &mut ValidationDependencies,
     dna_def: &DnaDefHashed,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
 
@@ -773,16 +800,12 @@ where
     check_prev_action(action)?;
     check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        check_and_hold_register_agent_activity(
-            prev_action_hash,
-            cascade,
-            incoming_dht_ops_sender,
-            |_| Ok(()),
-        )
-        .await?;
+        // Just make sure we have the dependency and if not then don't mark this action as valid yet
+        validation_dependencies.get(&prev_action_hash.clone().into()).ok_or_else(|| {
+            ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into())
+        })?;
     }
-    // not appropriate for sys validation
-    // check_chain_rollback(action, workspace).await?;
+
     Ok(())
 }
 
@@ -844,131 +867,81 @@ async fn store_entry(
     Ok(())
 }
 
-async fn register_updated_content<C>(
+fn register_updated_content(
     entry_update: &Update,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
+    validation_dependencies: &mut ValidationDependencies,
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let dependency_check =
-        |original_record: &Record| update_check(entry_update, original_record.action());
-    check_and_hold_store_entry(
-        original_action_address,
-        cascade,
-        incoming_dht_ops_sender,
-        dependency_check,
-    )
-    .await?;
-    Ok(())
+    let state = validation_dependencies.get(&original_action_address.clone().into()).ok_or_else(|| {
+        ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+    })?;
+
+    update_check(entry_update, state.as_action())
 }
 
-async fn register_updated_record<C>(
+fn register_updated_record(
     entry_update: &Update,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
+    validation_dependencies: &mut ValidationDependencies,
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let dependency_check =
-        |original_record: &Record| update_check(entry_update, original_record.action());
+    let state = validation_dependencies.get(&original_action_address.clone().into()).ok_or_else(|| {
+        ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+    })?;
 
-    check_and_hold_store_record(
-        original_action_address,
-        cascade,
-        incoming_dht_ops_sender,
-        dependency_check,
-    )
-    .await?;
-    Ok(())
+    update_check(entry_update, state.as_action())
 }
 
-async fn register_deleted_by<C>(
+fn register_deleted_by(
     record_delete: &Delete,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
+    validation_dependencies: &mut ValidationDependencies,
 ) -> SysValidationResult<()>
-where
-    C: Cascade,
 {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    // Checks
-    let dependency_check =
-        |removed_action: &Record| check_new_entry_action(removed_action.action());
+    let state = validation_dependencies.get(&removed_action_address.clone().into()).ok_or_else(|| {
+        ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
+    })?;
 
-    check_and_hold_store_record(
-        removed_action_address,
-        cascade,
-        incoming_dht_ops_sender,
-        dependency_check,
-    )
-    .await?;
-    Ok(())
+    check_new_entry_action(state.as_action())
 }
 
-async fn register_deleted_entry_action<C>(
+fn register_deleted_entry_action(
     record_delete: &Delete,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
+    validation_dependencies: &mut ValidationDependencies,
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    // Checks
-    let dependency_check =
-        |removed_action: &Record| check_new_entry_action(removed_action.action());
+    let state = validation_dependencies.get(&removed_action_address.clone().into()).ok_or_else(|| {
+        ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
+    })?;
 
-    check_and_hold_store_entry(
-        removed_action_address,
-        cascade,
-        incoming_dht_ops_sender,
-        dependency_check,
-    )
-    .await?;
-    Ok(())
+    check_new_entry_action(state.as_action())
 }
 
-async fn register_add_link<C>(
+fn register_add_link(
     link_add: &CreateLink,
-    _cascade: Arc<C>,
-    _incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
-    check_tag_size(&link_add.tag)?;
-    Ok(())
+) -> SysValidationResult<()> {
+    check_tag_size(&link_add.tag)
 }
 
-async fn register_delete_link<C>(
+fn register_delete_link(
     link_remove: &DeleteLink,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
+    validation_dependencies: &mut ValidationDependencies
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
 
-    // Checks
-    check_and_hold_register_add_link(link_add_address, cascade, incoming_dht_ops_sender, |_| {
-        Ok(())
-    })
-    .await?;
+    // Just require that this link exists, don't need to check anything else about it here
+    validation_dependencies.get(&link_add_address.clone().into()).ok_or_else(|| {
+        ValidationOutcome::DepMissingFromDht(link_add_address.clone().into())
+    })?;
+
     Ok(())
 }
 
