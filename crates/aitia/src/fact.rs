@@ -22,20 +22,6 @@ pub enum Check<T: Fact> {
 }
 
 impl<T: Fact> Check<T> {
-    // pub fn deps(&self) -> &[Dep<T>] {
-    //     match self {
-    //         Check::Pass => &[],
-    //         Check::Fail(cs) => cs.as_slice(),
-    //     }
-    // }
-
-    // pub fn into_deps(self) -> Vec<Dep<T>> {
-    //     match self {
-    //         Check::Pass => vec![],
-    //         Check::Fail(cs) => cs,
-    //     }
-    // }
-
     pub fn is_pass(&self) -> bool {
         matches!(self, Check::Pass)
     }
