@@ -244,10 +244,11 @@ where
     });
 
     futures::stream::iter(action_fetches)
+    .buffer_unordered(10)
     .filter_map(|r| async move {
         // Filter out errors and not found actions, preparing the rest to be put into a HashMap for easy access.
         // TODO distinguish these? Could use an Outcome here to be clear about what happened.
-        match r.await {
+        match r {
             Ok(Some((signed_action, source))) => {
                 Some((signed_action.as_hash().clone(), (signed_action, source)))
             }
