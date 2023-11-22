@@ -65,7 +65,7 @@ pub fn simple_report<T: Fact>(traversal: &Traversal<T>) {
         Traversal::Pass => println!("PASS"),
         Traversal::Fail { tree, passes, ctx } => {
             tree.print();
-            let passes: Vec<_> = passes.into_iter().map(|p| p.explain(ctx)).collect();
+            let passes: Vec<_> = passes.iter().map(|p| p.explain(ctx)).collect();
             println!("Passing checks");
             for pass in passes {
                 println!("{pass}");

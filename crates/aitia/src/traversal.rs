@@ -95,6 +95,7 @@ fn traverse_inner<F: Fact>(
         }
     }
 
+    #[allow(clippy::type_complexity)]
     let mut recursive_checks = |cs: &[Dep<F>]| -> Result<Vec<(Dep<F>, Check<F>)>, DepError<F>> {
         let mut checks = vec![];
         for c in cs {
@@ -110,21 +111,19 @@ fn traverse_inner<F: Fact>(
             if f.check(ctx) {
                 tracing::trace!("fact pass");
                 Check::Pass
+            } else if let Some(sub_dep) = f.dep(ctx)? {
+                tracing::trace!("fact fail with dep, traversing");
+                let check = traverse_inner(&sub_dep, ctx, table).map_err(|err| {
+                    // Continue constructing the tree while we bubble up errors
+                    tracing::error!("traversal ending due to error: {err:?}");
+                    table.insert(dep.clone(), Some(Check::Fail(vec![sub_dep.clone()])));
+                    err
+                })?;
+                tracing::trace!("traversal done, check: {:?}", check);
+                Check::Fail(vec![sub_dep])
             } else {
-                if let Some(sub_dep) = f.dep(ctx)? {
-                    tracing::trace!("fact fail with dep, traversing");
-                    let check = traverse_inner(&sub_dep, ctx, table).map_err(|err| {
-                        // Continue constructing the tree while we bubble up errors
-                        tracing::error!("traversal ending due to error: {err:?}");
-                        table.insert(dep.clone(), Some(Check::Fail(vec![sub_dep.clone()])));
-                        err
-                    })?;
-                    tracing::trace!("traversal done, check: {:?}", check);
-                    Check::Fail(vec![sub_dep])
-                } else {
-                    tracing::trace!("fact fail with no dep, terminating");
-                    Check::Fail(vec![])
-                }
+                tracing::trace!("fact fail with no dep, terminating");
+                Check::Fail(vec![])
             }
         }
         Dep::Any(_, cs) => {
@@ -185,6 +184,7 @@ fn traverse_inner<F: Fact>(
 /// After pruning, the graph contains all edges starting with the specified dep
 /// and ending with a true dep.
 /// Passing facts are returned separately.
+#[allow(clippy::type_complexity)]
 pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Dep<T>,
@@ -194,7 +194,7 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
-        match table[&next].as_ref() {
+        match table[next].as_ref() {
             Some(Check::Fail(deps)) => {
                 let old = sub.insert(next, deps.as_slice());
                 if let Some(old) = old {
