@@ -131,7 +131,7 @@ ed25519-dalek = "1"
 indoc = "1.0"
 isotest = "0"
 maplit = "1"
-pretty_assertions = "0.6.1"
+pretty_assertions = "1.4"
 rand_dalek = {package = "rand", version = "0.7"}
 regex = "1.5"
 reqwest = "0.11.2"
