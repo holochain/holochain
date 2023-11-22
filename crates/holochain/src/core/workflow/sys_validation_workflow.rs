@@ -91,12 +91,15 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
 
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
+    // TODO can these clones be eliminated?
+    let previous_records = fetch_previous_records(sorted_ops.clone().into_iter(), cascade.clone()).await;
+
     // TODO This can now be used instead of the cascade for previous actions
     let mut previous_actions =
         fetch_previous_actions(sorted_ops.iter().map(|op| op.action()), cascade.clone()).await;
 
-    // TODO rename
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
+    // TODO rename
     for so in sorted_ops {
         let (op, op_hash) = so.into_inner();
         let op_type = op.get_type();
@@ -330,13 +333,22 @@ impl From<(SignedActionHashed, CascadeSource)> for ValidationDependencyState {
     }
 }
 
-async fn fetch_previous_actions<A, C>(actions: A, local_cascade: Arc<C>) -> ValidationDependencies
+impl From<(Record, CascadeSource)> for ValidationDependencyState {
+    fn from((record, fetched_from): (Record, CascadeSource)) -> Self {
+        Self {
+            dependency: ValidationDependency::Record(record),
+            fetched_from,
+        }
+    }
+}
+
+async fn fetch_previous_actions<A, C>(actions: A, cascade: Arc<C>) -> ValidationDependencies
 where
     A: Iterator<Item = Action>,
     C: Cascade + Send + Sync,
 {
     let action_fetches = actions.into_iter().flat_map(|action| {
-        // For each previous action that will be needed for validation, map the action to a fetch for its hash
+        // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
         vec![
             match &action {
                 Action::Update(update) => Some(update.original_action_address.clone()),
@@ -349,11 +361,11 @@ where
         ]
         .into_iter()
         .filter_map(|hash| {
-            let local_cascade = local_cascade.clone();
+            let cascade = cascade.clone();
             match hash {
                 Some(h) => Some(
                     async move {
-                        let fetched = local_cascade
+                        let fetched = cascade
                             .retrieve_action(h.clone(), Default::default())
                             .await;
                         (h, fetched)
@@ -373,6 +385,61 @@ where
             match r {
                 (hash, Ok(Some((signed_action, source)))) => {
                     Some((hash.into(), Some((signed_action, source).into())))
+                }
+                (hash, Ok(None)) => {
+                    Some((hash.into(), None))
+                },
+                (hash, Err(e)) => {
+                    tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
+                    None
+                }
+            }
+        })
+        .collect()
+}
+
+async fn fetch_previous_records<O, C>(ops: O, cascade: Arc<C>) -> ValidationDependencies
+where
+    O: Iterator<Item = DhtOpHashed>,
+    C: Cascade + Send + Sync,
+{
+    let action_fetches = ops.into_iter().flat_map(|op| {
+        // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
+        vec![
+            match &op.content {
+                DhtOp::RegisterAgentActivity(_, action) => action.prev_action().map(|a| a.as_hash().clone()),
+                _ => None,
+            },
+        ]
+        .into_iter()
+        .filter_map(|hash| {
+            let cascade = cascade.clone();
+            match hash {
+                Some(h) => Some(
+                    async move {
+                        let fetched = cascade
+                            .retrieve(h.clone().into(), Default::default())
+                            .await;
+                        (h, fetched)
+                    }
+                    .boxed(),
+                ),
+                None => None,
+            }
+        })
+    });
+
+    futures::future::join_all(action_fetches)
+        .await
+        .into_iter()
+        .filter_map(|r| {
+            // Filter out errors, preparing the rest to be put into a HashMap for easy access.
+            match r {
+                (hash, Ok(Some((record, CascadeSource::Local)))) => {
+                    Some((hash.into(), Some((record, CascadeSource::Local).into())))
+                }
+                (hash, Ok(Some((record, CascadeSource::Network)))) => {
+                    Some((hash.into(), Some((record.privatized().0, CascadeSource::Network).into())))
                 }
                 (hash, Ok(None)) => {
                     Some((hash.into(), None))
@@ -534,6 +601,7 @@ where
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
+            // TODO getting records for this
             register_agent_activity(action, cascade, dna_def, Some(incoming_dht_ops_sender))
                 .await?;
             store_record(action, validation_dependencies)?;
