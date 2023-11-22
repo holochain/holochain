@@ -9,6 +9,7 @@ use crate::core::workflow::error::WorkflowResult;
 use crate::core::workflow::sys_validation_workflow::validation_batch::{
     validate_ops_batch, NUM_CONCURRENT_OPS,
 };
+use futures::future;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use futures::StreamExt;
@@ -86,22 +87,11 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     //      there will be more ops to process after this workflow run.
     let start = (num_ops_to_validate >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
-    let cascade = Arc::new(workspace.full_cascade(network));
+    let cascade = Arc::new(workspace.local_cascade());
 
     // TODO This can now be used instead of the cascade for previous actions
-    let previous_actions = tokio::task::spawn({
-        let sorted_ops = sorted_ops.clone();
-        let workspace = workspace.clone();
-        async move {
-            let local_cascade = Arc::new(workspace.local_cascade());
-            fetch_previous_actions(
-                sorted_ops.into_iter().map(|op| op.action()),
-                local_cascade,
-            )
-            .await
-        }
-    })
-    .await?;
+    let previous_actions = fetch_previous_actions(sorted_ops.iter().map(|op| op.action()), cascade.clone())
+        .await;
 
     // let previous_actions = HashMap::new();
 
@@ -209,16 +199,15 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     })
 }
 
-async fn fetch_previous_actions<A, N>(
+async fn fetch_previous_actions<A, C>(
     actions: A,
-    local_cascade: Arc<CascadeImpl<N>>,
+    local_cascade: Arc<C>,
 ) -> HashMap<ActionHash, (SignedActionHashed, CascadeSource)>
 where
     A: Iterator<Item = Action>,
-    // C: Cascade + Send + Sync,
-    N: HolochainP2pDnaT + Clone + 'static + Send + Sync,
+    C: Cascade + Send + Sync,
 {
-    let action_fetches = actions.flat_map(|action| {
+    let action_fetches = actions.into_iter().flat_map(|action| {
         // For each previous action that will be needed for validation, map the action to a fetch for its hash
         vec![
             match &action {
@@ -243,23 +232,24 @@ where
         })
     });
 
-    futures::stream::iter(action_fetches)
-    .buffer_unordered(10)
-    .filter_map(|r| async move {
-        // Filter out errors and not found actions, preparing the rest to be put into a HashMap for easy access.
-        // TODO distinguish these? Could use an Outcome here to be clear about what happened.
-        match r {
-            Ok(Some((signed_action, source))) => {
-                Some((signed_action.as_hash().clone(), (signed_action, source)))
+    futures::future::join_all(action_fetches)
+        .await
+        .into_iter()
+        .filter_map(|r| {
+            // Filter out errors and not found actions, preparing the rest to be put into a HashMap for easy access.
+            // TODO distinguish these? Could use an Outcome here to be clear about what happened.
+            match r {
+                Ok(Some((signed_action, source))) => {
+                    Some((signed_action.as_hash().clone(), (signed_action, source)))
+                }
+                Ok(None) => None,
+                Err(e) => {
+                    tracing::error!(error = ?e, "Error retrieving prev action");
+                    None
+                }
             }
-            Ok(None) => None,
-            Err(e) => {
-                tracing::error!(error = ?e, "Error retrieving prev action");
-                None
-            }
-        }
-    })
-    .collect::<HashMap<ActionHash, (SignedActionHashed, CascadeSource)>>().await
+        })
+        .collect::<HashMap<ActionHash, (SignedActionHashed, CascadeSource)>>()
 }
 
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
@@ -495,9 +485,7 @@ where
         C: Cascade + Send + Sync,
     {
         // TODO This is temporary to make the code build
-        // let previous_actions = fetch_previous_actions(vec![action.clone()], cascade.clone()).await;
-        let previous_actions: HashMap<ActionHash, (SignedActionHashed, CascadeSource)> =
-            HashMap::new();
+        let previous_actions = fetch_previous_actions(vec![action.clone()].into_iter(), cascade.clone()).await;
 
         let incoming_dht_ops_sender: Option<&IncomingDhtOpSender> = None;
         store_record(action, &previous_actions)?;
