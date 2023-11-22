@@ -14,6 +14,7 @@ pub struct TraversalError<'c, F: Fact> {
 #[derive(Debug, derive_more::From)]
 pub enum TraversalInnerError<F: Fact> {
     Dep(DepError<F>),
+    // TODO: eventually allow errors in checks
     // Check(CheckError<F>),
 }
 
@@ -119,10 +120,6 @@ pub fn traverse<'c, F: Fact>(fact: F, ctx: &'c F::Context) -> TraversalResult<'c
         }
     }
 }
-
-// impl<T: Fact> Dep<T> {
-
-// }
 
 #[tracing::instrument(skip(ctx, table))]
 fn traverse_inner<F: Fact>(

@@ -93,13 +93,13 @@ mod flames;
 mod fmt;
 pub mod metrics;
 mod writer;
-// mod open;
 
-// #[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
-// pub use open::channel;
-// #[cfg(feature = "opentelemetry-on")]
-// pub use open::should_run;
-// pub use open::{Config, Context, MsgWrap, OpenSpanExt};
+mod open;
+#[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
+pub use open::channel;
+#[cfg(feature = "opentelemetry-on")]
+pub use open::should_run;
+pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
 use crate::flames::{toml_path, FlameTimedConsole};
 use crate::writer::InMemoryWriter;
@@ -123,8 +123,8 @@ pub enum Output {
     FlameTimed,
     /// Creates a flamegraph from timed spans using idle time
     IceTimed,
-    // /// Opentelemetry tracing
-    // OpenTel,
+    /// Opentelemetry tracing
+    OpenTel,
     /// No logging to console
     None,
 }
@@ -163,14 +163,14 @@ pub fn test_run() -> Result<(), errors::TracingError> {
     init_fmt(Output::Log)
 }
 
-// /// Run tracing in a test that uses open telemetry to
-// /// send span contexts across process and thread boundaries.
-// pub fn test_run_open() -> Result<(), errors::TracingError> {
-//     if std::env::var_os("RUST_LOG").is_none() {
-//         return Ok(());
-//     }
-//     init_fmt(Output::OpenTel)
-// }
+/// Run tracing in a test that uses open telemetry to
+/// send span contexts across process and thread boundaries.
+pub fn test_run_open() -> Result<(), errors::TracingError> {
+    if std::env::var_os("RUST_LOG").is_none() {
+        return Ok(());
+    }
+    init_fmt(Output::OpenTel)
+}
 
 /// Same as test_run but with timed spans
 pub fn test_run_timed() -> Result<(), errors::TracingError> {
@@ -284,7 +284,6 @@ where
             .ok();
     }
 
-    // let standard = tracing_subscriber::fmt::Layer::<_, _, _, _>::default()
     Ok(tracing_subscriber::fmt::Layer::default()
         .with_test_writer()
         .with_writer(writer)
@@ -292,16 +291,6 @@ where
         .with_line_number(true)
         .with_target(true)
         .with_filter(filter))
-
-    // Ok(Registry::default().with(layer).with(standard))
-
-    /*
-
-    impl<L, S> Subscriber for Layered<L, S>
-    where
-        L: Layer<S>,
-        S: Subscriber,
-         */
 }
 
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
@@ -358,29 +347,29 @@ where
                 .with(standard_layer(writer)?),
         ),
         Output::Compact => finish(subscriber.compact().finish().with(standard_layer(writer)?)),
-        // Output::OpenTel => {
-        //     #[cfg(feature = "opentelemetry-on")]
-        //     {
-        //         use open::OPEN_ON;
-        //         use opentelemetry::api::Provider;
-        //         OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
-        //         use tracing_subscriber::prelude::*;
-        //         open::init();
-        //         let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
-        //         let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-        //         finish(
-        //             subscriber
-        //                 .with_env_filter(filter)
-        //                 .finish()
-        //                 .with(telemetry)
-        //                 .with(open::OpenLayer),
-        //         )
-        //     }
-        //     #[cfg(not(feature = "opentelemetry-on"))]
-        //     {
-        //         Ok(())
-        //     }
-        // }
+        Output::OpenTel => {
+            #[cfg(feature = "opentelemetry-on")]
+            {
+                use open::OPEN_ON;
+                use opentelemetry::api::Provider;
+                OPEN_ON.store(true, std::sync::atomic::Ordering::SeqCst);
+                use tracing_subscriber::prelude::*;
+                open::init();
+                let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
+                let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+                finish(
+                    subscriber
+                        .with_env_filter(filter)
+                        .finish()
+                        .with(telemetry)
+                        .with(open::OpenLayer),
+                )
+            }
+            #[cfg(not(feature = "opentelemetry-on"))]
+            {
+                Ok(())
+            }
+        }
         Output::None => Ok(()),
     }
 }

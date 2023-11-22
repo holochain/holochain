@@ -18,6 +18,3 @@ pub trait Fact: FactTraits {
         crate::traversal::traverse(self, ctx)
     }
 }
-
-// #[derive(Debug)]
-// pub struct CheckError<F: Fact>(pub TraversalStep<F>);

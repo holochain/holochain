@@ -183,7 +183,6 @@ test_utils = [
   "contrafact",
   "diff",
   "ghost_actor/test_utils",
-  # "hc-sleuth",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
