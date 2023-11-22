@@ -59,7 +59,7 @@ fixt = { path = "../fixt" }
 holochain_wasm_test_utils = { path = "../test_utils/wasm" }
 matches = "0.1.8"
 holochain_trace = { version = "^0.3.0-beta-dev.2", path = "../holochain_trace" }
-pretty_assertions = "0.6.1"
+pretty_assertions = "1.4"
 
 tempfile = "3.3"
 
