@@ -32,6 +32,7 @@ pub(super) async fn validate_ops_batch(
         .buffer_unordered(NUM_CONCURRENT_OPS) // TODO So why sort the ops if we're going to run this through in any order?
         .ready_chunks(NUM_CONCURRENT_OPS * 100);
 
+    // TODO rescue the reporting!
     let mut summaries = vec![];
     let mut total = 0;
     let mut round_time = started_at.is_some().then(std::time::Instant::now);

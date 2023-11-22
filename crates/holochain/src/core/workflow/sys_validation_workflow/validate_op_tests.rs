@@ -45,6 +45,8 @@ use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedHashed;
 
+use super::ValidationDependencies;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
     holochain_trace::test_run().unwrap();
@@ -1060,7 +1062,7 @@ async fn crash_case() {
         &dna_def,
         Arc::new(cascade),
         &MockDhtOpSender::new(),
-        HashMap::new(),
+        &mut ValidationDependencies::new(),
     )
     .await
     .unwrap();
@@ -1185,7 +1187,7 @@ impl TestCase {
             &dna_def,
             Arc::new(new_cascade),
             &self.incoming_ops_sender,
-            HashMap::new(),
+            &mut ValidationDependencies::new(),
         )
         .await
     }

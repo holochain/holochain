@@ -36,6 +36,7 @@ pub enum Dependency {
     Null,
 }
 
+// TODO merge with new code
 pub fn get_dependency(op_type: DhtOpType, action: &Action) -> Dependency {
     match op_type {
         DhtOpType::StoreRecord | DhtOpType::StoreEntry => Dependency::Null,

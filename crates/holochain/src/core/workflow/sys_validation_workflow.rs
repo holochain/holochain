@@ -89,106 +89,178 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     let saturated = start.is_some();
     let cascade = Arc::new(workspace.local_cascade());
 
+    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
+
     // TODO This can now be used instead of the cascade for previous actions
-    let previous_actions = fetch_previous_actions(sorted_ops.iter().map(|op| op.action()), cascade.clone())
+    let mut previous_actions =
+        fetch_previous_actions(sorted_ops.iter().map(|op| op.action()), cascade.clone()).await;
+
+    // TODO rename
+    let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
+    for so in sorted_ops {
+        let (op, op_hash) = so.into_inner();
+        let op_type = op.get_type();
+        let action = op.action();
+
+        // TODO This is more like a 'required dependency' check and isn't actually used in validation
+        let dependency = get_dependency(op_type, &action);
+
+        let r = validate_op(
+            &op,
+            &dna_def,
+            cascade.clone(),
+            &incoming_dht_ops_sender,
+            &mut previous_actions,
+        )
         .await;
 
-    validate_ops_batch(
-        sorted_ops,
-        start,
-        {
-            let workspace = workspace.clone();
-            move |so| {
-                let workspace = workspace.clone();
-                let cascade = cascade.clone();
-                let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
-                let previous_actions = previous_actions.clone();
-                async move {
-                    let (op, op_hash) = so.into_inner();
-                    let op_type = op.get_type();
-                    let action = op.action();
-
-                    // TODO This is more like a 'required dependency' check and isn't actually used in validation
-                    let dependency = get_dependency(op_type, &action);
-                    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
-
-                    let r = validate_op(
-                        &op,
-                        &dna_def,
-                        cascade,
-                        &incoming_dht_ops_sender,
-                        previous_actions,
-                    )
-                    .await;
-                    r.map(|o| (op_hash, o, dependency))
-                }
-                .boxed()
+        match r {
+            Ok(outcome) => validation_outcomes.push((op_hash, outcome, dependency)),
+            Err(e) => {
+                tracing::error!(error = ?e, "Error validating op");
             }
-        },
-        |batch| {
-            let workspace = workspace.clone();
-            async move {
-                workspace
-                    .dht_db
-                    .write_async(move |txn| {
-                        let mut summary = OutcomeSummary::default();
-                        for outcome in batch {
-                            let (op_hash, outcome, dependency) = outcome?;
-                            match outcome {
-                                Outcome::Accepted => {
-                                    summary.accepted += 1;
-                                    put_validation_limbo(
-                                        txn,
-                                        &op_hash,
-                                        ValidationLimboStatus::SysValidated,
-                                    )?;
-                                }
-                                Outcome::AwaitingOpDep(missing_dep) => {
-                                    summary.awaiting += 1;
-                                    // TODO: Try and get this dependency to add to limbo
-                                    //
-                                    // I actually can't see how we can do this because there's no
-                                    // way to get an DhtOpHash without either having the op or the full
-                                    // action. We have neither that's why where here.
-                                    //
-                                    // We need to be holding the dependency because
-                                    // we were meant to get a StoreRecord or StoreEntry or
-                                    // RegisterAgentActivity or RegisterAddLink.
-                                    let status =
-                                        ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                                    put_validation_limbo(txn, &op_hash, status)?;
-                                }
-                                Outcome::MissingDhtDep => {
-                                    summary.missing += 1;
-                                    // TODO: Not sure what missing dht dep is. Check if we need this.
-                                    put_validation_limbo(
-                                        txn,
-                                        &op_hash,
-                                        ValidationLimboStatus::Pending,
-                                    )?;
-                                }
-                                Outcome::Rejected => {
-                                    summary.rejected += 1;
-                                    if let Dependency::Null = dependency {
-                                        put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                                    } else {
-                                        put_integration_limbo(
-                                            txn,
-                                            &op_hash,
-                                            ValidationStatus::Rejected,
-                                        )?;
-                                    }
-                                }
-                            }
+        }
+    }
+
+    let summary = workspace
+        .dht_db
+        .write_async(move |txn| {
+            let mut summary = OutcomeSummary::default();
+            for (op_hash, outcome, dependency) in validation_outcomes {
+                match outcome {
+                    Outcome::Accepted => {
+                        summary.accepted += 1;
+                        put_validation_limbo(txn, &op_hash, ValidationLimboStatus::SysValidated)?;
+                    }
+                    Outcome::AwaitingOpDep(missing_dep) => {
+                        summary.awaiting += 1;
+                        // TODO: Try and get this dependency to add to limbo
+                        //
+                        // I actually can't see how we can do this because there's no
+                        // way to get an DhtOpHash without either having the op or the full
+                        // action. We have neither that's why where here.
+                        //
+                        // We need to be holding the dependency because
+                        // we were meant to get a StoreRecord or StoreEntry or
+                        // RegisterAgentActivity or RegisterAddLink.
+                        let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+                        put_validation_limbo(txn, &op_hash, status)?;
+                    }
+                    Outcome::MissingDhtDep => {
+                        summary.missing += 1;
+                        // TODO: Not sure what missing dht dep is. Check if we need this.
+                        put_validation_limbo(txn, &op_hash, ValidationLimboStatus::Pending)?;
+                    }
+                    Outcome::Rejected => {
+                        summary.rejected += 1;
+                        if let Dependency::Null = dependency {
+                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
+                        } else {
+                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                         }
-                        WorkflowResult::Ok(summary)
-                    })
-                    .await
+                    }
+                }
             }
-            .boxed()
-        },
-    )
-    .await?;
+            WorkflowResult::Ok(summary)
+        })
+        .await?;
+
+    // validate_ops_batch(
+    //     sorted_ops,
+    //     start,
+    //     {
+    //         let workspace = workspace.clone();
+    //         move |so| {
+    //             let workspace = workspace.clone();
+    //             let cascade = cascade.clone();
+    //             let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
+    //             async move {
+    //                 let (op, op_hash) = so.into_inner();
+    //                 let op_type = op.get_type();
+    //                 let action = op.action();
+
+    //                 // TODO This is more like a 'required dependency' check and isn't actually used in validation
+    //                 let dependency = get_dependency(op_type, &action);
+    //                 let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
+
+    //                 let r = validate_op(
+    //                     &op,
+    //                     &dna_def,
+    //                     cascade,
+    //                     &incoming_dht_ops_sender,
+    //                     &mut previous_actions,
+    //                 )
+    //                 .await;
+    //                 r.map(|o| (op_hash, o, dependency))
+    //             }
+    //             .boxed()
+    //         }
+    //     },
+    //     |batch| {
+    //         let workspace = workspace.clone();
+    //         async move {
+    //             workspace
+    //                 .dht_db
+    //                 .write_async(move |txn| {
+    //                     let mut summary = OutcomeSummary::default();
+    //                     for outcome in batch {
+    //                         // TODO it's a mistake to bubble here! This error should be handled independently
+    //                         let (op_hash, outcome, dependency) = outcome?;
+    //                         match outcome {
+    //                             Outcome::Accepted => {
+    //                                 summary.accepted += 1;
+    //                                 put_validation_limbo(
+    //                                     txn,
+    //                                     &op_hash,
+    //                                     ValidationLimboStatus::SysValidated,
+    //                                 )?;
+    //                             }
+    //                             Outcome::AwaitingOpDep(missing_dep) => {
+    //                                 summary.awaiting += 1;
+    //                                 // TODO: Try and get this dependency to add to limbo
+    //                                 //
+    //                                 // I actually can't see how we can do this because there's no
+    //                                 // way to get an DhtOpHash without either having the op or the full
+    //                                 // action. We have neither that's why where here.
+    //                                 //
+    //                                 // We need to be holding the dependency because
+    //                                 // we were meant to get a StoreRecord or StoreEntry or
+    //                                 // RegisterAgentActivity or RegisterAddLink.
+    //                                 let status =
+    //                                     ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+    //                                 put_validation_limbo(txn, &op_hash, status)?;
+    //                             }
+    //                             Outcome::MissingDhtDep => {
+    //                                 summary.missing += 1;
+    //                                 // TODO: Not sure what missing dht dep is. Check if we need this.
+    //                                 put_validation_limbo(
+    //                                     txn,
+    //                                     &op_hash,
+    //                                     ValidationLimboStatus::Pending,
+    //                                 )?;
+    //                             }
+    //                             Outcome::Rejected => {
+    //                                 summary.rejected += 1;
+    //                                 if let Dependency::Null = dependency {
+    //                                     put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
+    //                                 } else {
+    //                                     put_integration_limbo(
+    //                                         txn,
+    //                                         &op_hash,
+    //                                         ValidationStatus::Rejected,
+    //                                     )?;
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+    //                     WorkflowResult::Ok(summary)
+    //                 })
+    //                 .await
+    //         }
+    //         .boxed()
+    //     },
+    // )
+    // .await?;
 
     Ok(if saturated {
         WorkComplete::Incomplete(None)
@@ -197,10 +269,68 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     })
 }
 
-async fn fetch_previous_actions<A, C>(
-    actions: A,
-    local_cascade: Arc<C>,
-) -> HashMap<ActionHash, (SignedActionHashed, CascadeSource)>
+pub(crate) struct ValidationDependencies {
+    dependencies: HashMap<AnyDhtHash, Option<ValidationDependencyState>>,
+}
+
+impl ValidationDependencies {
+    fn new() -> Self {
+        Self {
+            dependencies: HashMap::new(),
+        }
+    }
+
+    fn get(&mut self, hash: &AnyDhtHash) -> Option<&mut ValidationDependencyState> {
+        match self.dependencies.get_mut(hash) {
+            Some(Some(dep)) => Some(dep),
+            Some(None) => None,
+            None => {
+                tracing::warn!(hash = ?hash, "Have not attempted to fetch requested dependency, this is a bug");
+                None
+            }
+        }
+    }
+}
+
+impl FromIterator<(AnyDhtHash, Option<ValidationDependencyState>)> for ValidationDependencies {
+    fn from_iter<T: IntoIterator<Item = (AnyDhtHash, Option<ValidationDependencyState>)>>(
+        iter: T,
+    ) -> Self {
+        Self {
+            dependencies: iter.into_iter().collect(),
+        }
+    }
+}
+
+struct ValidationDependencyState {
+    dependency: ValidationDependency,
+    fetched_from: CascadeSource,
+}
+
+impl ValidationDependencyState {
+    fn as_action(&self) -> &Action {
+        match &self.dependency {
+            ValidationDependency::Action(signed_action) => signed_action.action(),
+            ValidationDependency::Record(record) => record.action(),
+        }
+    }
+}
+
+enum ValidationDependency {
+    Action(SignedActionHashed),
+    Record(Record),
+}
+
+impl From<(SignedActionHashed, CascadeSource)> for ValidationDependencyState {
+    fn from((signed_action, fetched_from): (SignedActionHashed, CascadeSource)) -> Self {
+        Self {
+            dependency: ValidationDependency::Action(signed_action),
+            fetched_from,
+        }
+    }
+}
+
+async fn fetch_previous_actions<A, C>(actions: A, local_cascade: Arc<C>) -> ValidationDependencies
 where
     A: Iterator<Item = Action>,
     C: Cascade + Send + Sync,
@@ -222,8 +352,13 @@ where
             let local_cascade = local_cascade.clone();
             match hash {
                 Some(h) => Some(
-                    async move { local_cascade.retrieve_action(h, Default::default()).await }
-                        .boxed(),
+                    async move {
+                        let fetched = local_cascade
+                            .retrieve_action(h.clone(), Default::default())
+                            .await;
+                        (h, fetched)
+                    }
+                    .boxed(),
                 ),
                 None => None,
             }
@@ -234,20 +369,21 @@ where
         .await
         .into_iter()
         .filter_map(|r| {
-            // Filter out errors and not found actions, preparing the rest to be put into a HashMap for easy access.
-            // TODO distinguish these? Could use an Outcome here to be clear about what happened.
+            // Filter out errors, preparing the rest to be put into a HashMap for easy access.
             match r {
-                Ok(Some((signed_action, source))) => {
-                    Some((signed_action.as_hash().clone(), (signed_action, source)))
+                (hash, Ok(Some((signed_action, source)))) => {
+                    Some((hash.into(), Some((signed_action, source).into())))
                 }
-                Ok(None) => None,
-                Err(e) => {
-                    tracing::error!(error = ?e, "Error retrieving prev action");
+                (hash, Ok(None)) => {
+                    Some((hash.into(), None))
+                },
+                (hash, Err(e)) => {
+                    tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
                     None
                 }
             }
         })
-        .collect::<HashMap<ActionHash, (SignedActionHashed, CascadeSource)>>()
+        .collect()
 }
 
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
@@ -256,7 +392,7 @@ pub(crate) async fn validate_op<C>(
     dna_def: &DnaDefHashed,
     cascade: Arc<C>,
     incoming_dht_ops_sender: &impl DhtOpSender,
-    previous_actions: HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+    validation_dependencies: &mut ValidationDependencies,
 ) -> WorkflowResult<Outcome>
 where
     C: Cascade + Send + Sync,
@@ -266,7 +402,7 @@ where
         cascade,
         dna_def,
         incoming_dht_ops_sender,
-        previous_actions,
+        validation_dependencies,
     )
     .await
     {
@@ -329,7 +465,7 @@ async fn validate_op_inner<C>(
     cascade: Arc<C>,
     dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: &impl DhtOpSender,
-    previous_actions: HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+    validation_dependencies: &mut ValidationDependencies,
 ) -> SysValidationResult<()>
 where
     C: Cascade + Send + Sync,
@@ -337,7 +473,7 @@ where
     check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
-            store_record(action, &previous_actions)?;
+            store_record(action, validation_dependencies)?;
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = entry {
@@ -365,7 +501,7 @@ where
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                     entry,
-                    &previous_actions,
+                    validation_dependencies,
                 )
                 .await?;
             }
@@ -391,23 +527,28 @@ where
                 }
             }
 
-            store_entry((action).into(), entry, &previous_actions).await?;
+            store_entry((action).into(), entry, validation_dependencies).await?;
 
             let action = action.clone().into();
-            store_record(&action, &previous_actions)?;
+            store_record(&action, validation_dependencies)?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, cascade, dna_def, Some(incoming_dht_ops_sender))
                 .await?;
-            store_record(action, &previous_actions)?;
+            store_record(action, validation_dependencies)?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
             register_updated_content(action, cascade.clone(), Some(incoming_dht_ops_sender))
                 .await?;
             if let Some(entry) = entry.as_option() {
-                store_entry(NewEntryActionRef::Update(action), entry, &previous_actions).await?;
+                store_entry(
+                    NewEntryActionRef::Update(action),
+                    entry,
+                    validation_dependencies,
+                )
+                .await?;
             }
 
             Ok(())
@@ -415,7 +556,12 @@ where
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
             register_updated_record(action, cascade.clone(), Some(incoming_dht_ops_sender)).await?;
             if let Some(entry) = entry.as_option() {
-                store_entry(NewEntryActionRef::Update(action), entry, &previous_actions).await?;
+                store_entry(
+                    NewEntryActionRef::Update(action),
+                    entry,
+                    validation_dependencies,
+                )
+                .await?;
             }
 
             Ok(())
@@ -484,17 +630,18 @@ where
         C: Cascade + Send + Sync,
     {
         // TODO This is temporary to make the code build
-        let previous_actions = fetch_previous_actions(vec![action.clone()].into_iter(), cascade.clone()).await;
+        let mut validation_dependencies =
+            fetch_previous_actions(vec![action.clone()].into_iter(), cascade.clone()).await;
 
         let incoming_dht_ops_sender: Option<&IncomingDhtOpSender> = None;
-        store_record(action, &previous_actions)?;
+        store_record(action, &mut validation_dependencies)?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
                 action
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                 maybe_entry,
-                &previous_actions,
+                &mut validation_dependencies,
             )
             .await?;
         }
@@ -573,7 +720,7 @@ where
 
 fn store_record(
     action: &Action,
-    previous_actions: &HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+    validation_dependencies: &mut ValidationDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
@@ -581,22 +728,23 @@ fn store_record(
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let (prev_action, _) = previous_actions
-            .get(&prev_action_hash)
+        let state = validation_dependencies
+            .get(&prev_action_hash.clone().into())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
-        // TODO verify the op has actually been sys validated?
-        check_prev_author(action, prev_action.action())?;
-        check_prev_timestamp(action, prev_action.action())?;
-        check_prev_seq(action, prev_action.action())?;
-        check_agent_validation_pkg_predecessor(action, prev_action.action())?;
+        let prev_action = state.as_action();
+        check_prev_author(action, prev_action)?;
+        check_prev_timestamp(action, prev_action)?;
+        check_prev_seq(action, prev_action)?;
+        check_agent_validation_pkg_predecessor(action, prev_action)?;
     }
+
     Ok(())
 }
 
 async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    previous_actions: &HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+    validation_dependencies: &mut ValidationDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = action.entry_type();
@@ -610,12 +758,14 @@ async fn store_entry(
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let (original_action, _) = previous_actions.get(&original_action_address)
+        let state = validation_dependencies
+            .get(&original_action_address.clone().into())
             .ok_or_else(|| {
                 ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
             })?;
+        let original_action = state.as_action();
         // TODO verify previous has passed sys validation?
-        update_check(entry_update, original_action.action())?;
+        update_check(entry_update, original_action)?;
     }
 
     // Additional checks if this is a countersigned entry.
