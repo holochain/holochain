@@ -93,8 +93,6 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     let previous_actions = fetch_previous_actions(sorted_ops.iter().map(|op| op.action()), cascade.clone())
         .await;
 
-    // let previous_actions = HashMap::new();
-
     validate_ops_batch(
         sorted_ops,
         start,
@@ -361,12 +359,13 @@ where
                         }
                     }
                 }
+                // Has to be async because of signature checks being async
                 store_entry(
                     (action)
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                     entry,
-                    cascade,
+                    &previous_actions,
                 )
                 .await?;
             }
@@ -392,7 +391,7 @@ where
                 }
             }
 
-            store_entry((action).into(), entry, cascade).await?;
+            store_entry((action).into(), entry, &previous_actions).await?;
 
             let action = action.clone().into();
             store_record(&action, &previous_actions)?;
@@ -408,7 +407,7 @@ where
             register_updated_content(action, cascade.clone(), Some(incoming_dht_ops_sender))
                 .await?;
             if let Some(entry) = entry.as_option() {
-                store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
+                store_entry(NewEntryActionRef::Update(action), entry, &previous_actions).await?;
             }
 
             Ok(())
@@ -416,7 +415,7 @@ where
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
             register_updated_record(action, cascade.clone(), Some(incoming_dht_ops_sender)).await?;
             if let Some(entry) = entry.as_option() {
-                store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
+                store_entry(NewEntryActionRef::Update(action), entry, &previous_actions).await?;
             }
 
             Ok(())
@@ -495,7 +494,7 @@ where
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                 maybe_entry,
-                cascade.clone(),
+                &previous_actions,
             )
             .await?;
         }
@@ -594,15 +593,11 @@ fn store_record(
     Ok(())
 }
 
-async fn store_entry<C>(
+async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    // TODO can clone be eliminated for this bound?
-    cascade: Arc<C>,
-) -> SysValidationResult<()>
-where
-    C: Cascade,
-{
+    previous_actions: &HashMap<ActionHash, (SignedActionHashed, CascadeSource)>,
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = action.entry_type();
     let entry_hash = action.entry_hash();
@@ -615,9 +610,7 @@ where
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let (original_action, _) = cascade
-            .retrieve_action(original_action_address.clone(), Default::default())
-            .await?
+        let (original_action, _) = previous_actions.get(&original_action_address)
             .ok_or_else(|| {
                 ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
             })?;
