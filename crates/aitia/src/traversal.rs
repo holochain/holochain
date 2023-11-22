@@ -152,6 +152,7 @@ fn traverse_inner<F: Fact>(
         }
     }
 
+    #[allow(clippy::type_complexity)]
     let mut recursive_checks =
         |cs: &[Dep<F>]| -> Result<Vec<(Dep<F>, TraversalStep<F>)>, TraversalInnerError<F>> {
             let mut checks = vec![];
@@ -268,7 +269,7 @@ pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     let mut to_add = vec![start];
 
     while let Some(next) = to_add.pop() {
-        if let Some(step) = table.get(&next) {
+        if let Some(step) = table.get(next) {
             match step.as_ref() {
                 Some(TraversalStep::Continue(deps)) => {
                     let old = sub.insert(next, deps.as_slice());
