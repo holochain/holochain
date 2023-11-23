@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 /// The outcome of sys validation
 pub(crate) enum Outcome {
     /// Moves to app validation

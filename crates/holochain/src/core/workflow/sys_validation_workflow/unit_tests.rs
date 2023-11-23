@@ -1,6 +1,7 @@
 use super::sys_validation_workflow;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
+use super::ValidationDependencies;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
@@ -54,11 +55,6 @@ async fn validate_op_with_no_dependency() {
         .save_op_to_db(test_case.dht_db_handle(), op)
         .await
         .unwrap();
-
-    let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_clone()
-        .return_once(move || MockHolochainP2pDnaT::new());
 
     test_case.run().await;
 
@@ -151,6 +147,8 @@ async fn validate_op_with_dependency_not_held() {
         .return_once(move |_, _| Ok(vec![response]));
 
     test_case.with_network_behaviour(network).run().await;
+
+    test_case.check_trigger_and_rerun().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.contains(&op_hash));
@@ -260,6 +258,7 @@ struct TestCase {
     test_space: TestSpace,
     keystore: MetaLairClient,
     agent: AgentPubKey,
+    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
@@ -281,6 +280,7 @@ impl TestCase {
             test_space,
             keystore,
             agent,
+            current_validation_dependencies: Arc::new(Mutex::new(Default::default())),
             app_validation_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,
@@ -340,13 +340,10 @@ impl TestCase {
             Arc::new(self.dna_def.clone()),
         );
 
-        let mut network = MockHolochainP2pDnaT::new();
-        // This can't be copied so if you want to call the run twice you would need to reset the network behaviour!
         let actual_network = self
             .actual_network
             .take()
             .unwrap_or_else(|| MockHolochainP2pDnaT::new());
-        network.expect_clone().return_once(move || actual_network);
 
         let op_sender = IncomingDhtOpSender::new(
             Arc::new(self.test_space.space.clone()),
@@ -356,13 +353,25 @@ impl TestCase {
         sys_validation_workflow(
             Arc::new(workspace),
             op_sender,
-            Arc::new(Mutex::new(Default::default())),
+            self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
             self.self_trigger.0.clone(),
-            network,
+            actual_network,
         )
         .await
         .unwrap();
+    }
+
+    async fn check_trigger_and_rerun(&mut self) {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            self.self_trigger.1.listen(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        self.run().await;
     }
 
     /// This provides a quick and reliable way to check that ops have been sys validated
