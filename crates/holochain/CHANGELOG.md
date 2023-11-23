@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
+
 ## 0.3.0-beta-dev.25
 
 - Fix: In many cases app validation would not be retriggered for ops that failed validation. Previously the app validation workflow had been retriggered only when the number of concurrent ops to be validated (50) was reached. Now the workflow will be retriggered whenever any ops could not be validated.
