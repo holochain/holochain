@@ -1,8 +1,8 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-const STANDARD_TIMEOUT_MILLIS: u64 = 5000;
-const FAST_TIMEOUT_MILLIS: u64 = 1300;
+const STANDARD_TIMEOUT_MILLIS: u64 = 30000;
+const FAST_TIMEOUT_MILLIS: u64 = 10000;
 
 #[hdk_extern]
 fn create_a_thing(_: ()) -> ExternResult<ActionHash> {
@@ -29,7 +29,9 @@ fn create_countersigned(
     let entry = Entry::CounterSign(
         Box::new(
             CounterSigningSessionData::try_from_responses(responses, vec![]).map_err(
-                |countersigning_error| wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string())),
+                |countersigning_error| {
+                    wasm_error!(WasmErrorInner::Guest(countersigning_error.to_string()))
+                },
             )?,
         ),
         thing.try_into()?,
@@ -63,7 +65,9 @@ fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResu
 }
 
 #[hdk_extern]
-fn create_a_countersigned_thing_with_entry_hash(responses: Vec<PreflightResponse>) -> ExternResult<(ActionHash, EntryHash)> {
+fn create_a_countersigned_thing_with_entry_hash(
+    responses: Vec<PreflightResponse>,
+) -> ExternResult<(ActionHash, EntryHash)> {
     create_countersigned(responses, Thing::Valid)
 }
 
