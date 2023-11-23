@@ -42,6 +42,7 @@ pub fn spawn_sys_validation_consumer(
                 incoming_dht_ops_sender,
                 current_validation_dependencies.clone(),
                 trigger_app_validation.clone(),
+                trigger_self.clone(),
                 network.clone(),
             )
         },

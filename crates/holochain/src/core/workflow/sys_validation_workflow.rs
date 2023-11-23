@@ -52,6 +52,7 @@ mod validate_op_tests;
     incoming_dht_ops_sender,
     current_validation_dependencies,
     trigger_app_validation,
+    trigger_self,
     network
 ))]
 pub async fn sys_validation_workflow<
@@ -62,6 +63,7 @@ pub async fn sys_validation_workflow<
     incoming_dht_ops_sender: Sender,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
+    trigger_self: TriggerSender,
     network: Network,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
@@ -77,8 +79,8 @@ pub async fn sys_validation_workflow<
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies.lock().get_missing_hashes();
 
-    futures::stream::iter(missing_action_hashes)
-        .for_each_concurrent(NUM_CONCURRENT_OPS, |hash| {
+    let num_fetched: usize =
+        futures::future::join_all(missing_action_hashes.into_iter().map(|hash| {
             let network_cascade = network_cascade.clone();
             let current_validation_dependencies = current_validation_dependencies.clone();
             async move {
@@ -88,19 +90,33 @@ pub async fn sys_validation_workflow<
 
                         // If the source was local then that means some other fetch has put this action into the cache,
                         // that's fine we'll just grab it here.
-                        deps.insert(record.signed_action, source);
+                        if deps.insert(record.signed_action, source) {
+                            1
+                        } else {
+                            0
+                        }
                     }
                     Ok(None) => {
                         // This is fine, we didn't find it on the network, so we'll have to try again.
                         // TODO put this on a timeout to avoid hitting the network too often for it?
+                        0
                     }
                     Err(e) => {
                         tracing::error!(error = ?e, "Error fetching missing dependency");
+                        0
                     }
                 }
-            }.boxed()
-        })
-        .await;
+            }
+            .boxed()
+        }))
+        .await
+        .into_iter()
+        .sum();
+
+    if num_fetched > 0 {
+        // retrigger this workflow because we fetched some missing dependencies from the network.
+        trigger_self.trigger(&"sys_validation_workflow");
+    }
 
     Ok(complete)
 }
@@ -270,14 +286,16 @@ impl ValidationDependencies {
             .collect()
     }
 
-    fn insert(&mut self, action: SignedActionHashed, source: CascadeSource) {
+    fn insert(&mut self, action: SignedActionHashed, source: CascadeSource) -> bool {
         let hash: AnyDhtHash = action.as_hash().clone().into();
         if self.has(&hash) {
             tracing::warn!(hash = ?hash, "Attempted to insert a dependency that was already present, this is not expected");
-            return;
+            return false;
         }
         self.dependencies
             .insert(hash, Some((action, source).into()));
+
+        true
     }
 
     fn clear_retained_deps(&mut self) {
