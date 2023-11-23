@@ -33,6 +33,7 @@ use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
+use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -355,6 +356,7 @@ impl TestCase {
         sys_validation_workflow(
             Arc::new(workspace),
             op_sender,
+            Arc::new(Mutex::new(Default::default())),
             self.app_validation_trigger.0.clone(),
             network,
         )

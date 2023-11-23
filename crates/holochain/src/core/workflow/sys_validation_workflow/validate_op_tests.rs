@@ -44,6 +44,7 @@ use holochain_zome_types::prelude::AgentValidationPkg;
 use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedHashed;
+use parking_lot::Mutex;
 
 use super::ValidationDependencies;
 
@@ -1063,7 +1064,7 @@ async fn crash_case() {
         // TODO
         // Arc::new(cascade),
         // &MockDhtOpSender::new(),
-        &mut ValidationDependencies::new(),
+        Arc::new(Mutex::new(ValidationDependencies::new())),
     )
     .await
     .unwrap();
@@ -1189,7 +1190,7 @@ impl TestCase {
             // TODO
             // Arc::new(new_cascade),
             // &self.incoming_ops_sender,
-            &mut ValidationDependencies::new(),
+            Arc::new(Mutex::new(ValidationDependencies::new())),
         )
         .await
     }
