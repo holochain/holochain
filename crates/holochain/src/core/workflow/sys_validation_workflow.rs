@@ -21,6 +21,7 @@ use holochain_cascade::CascadeSource;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
+use itertools::Itertools;
 use rusqlite::Transaction;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -55,7 +56,7 @@ pub async fn sys_validation_workflow<
     network: Network,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
-        sys_validation_workflow_inner(workspace, incoming_dht_ops_sender, network).await?;
+        sys_validation_workflow_inner(workspace).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -65,10 +66,8 @@ pub async fn sys_validation_workflow<
     Ok(complete)
 }
 
-async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'static>(
+async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
-    incoming_dht_ops_sender: impl DhtOpSender + Send + Sync + Clone + 'static,
-    network: Network,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -113,11 +112,11 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
         // TODO This is more like a 'required dependency' check and isn't actually used in validation
         let dependency = get_dependency(op_type, &action);
 
+        // Note that this is async only because of the signature checks done during countersigning. 
+        // In most cases this will be a fast synchronous call.
         let r = validate_op(
             &op,
             &dna_def,
-            cascade.clone(),
-            &incoming_dht_ops_sender,
             &mut previous_actions,
         )
         .await;
@@ -330,9 +329,11 @@ impl ValidationDependencyState {
     fn as_record(&self) -> Option<&Record> {
         match &self.dependency {
             ValidationDependency::Action(_) => {
-                tracing::warn!("Attempted to get a record from a dependency that is an action, this is a bug");
+                tracing::warn!(
+                    "Attempted to get a record from a dependency that is an action, this is a bug"
+                );
                 None
-            },
+            }
             ValidationDependency::Record(record) => Some(record),
         }
     }
@@ -434,40 +435,78 @@ where
 {
     let action_fetches = ops.into_iter().flat_map(|op| {
         // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
-        vec![match &op.content {
-            DhtOp::RegisterAgentActivity(_, action) => {
-                action.prev_action().map(|a| a.as_hash().clone().into())
+        match &op.content {
+            DhtOp::StoreRecord(_, action, RecordEntry::Present(entry)) => {
+                match entry {
+                    Entry::CounterSign(session_data, _) => {
+                        // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                        // won't matter that we've skipped fetching deps for it
+                        if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
+                            make_action_set_for_session_data(entry_rate_weight, entry, session_data)
+                                .ok()
+                                .map(|actions| {
+                                    actions
+                                        .into_iter()
+                                        .map(|a| -> AnyDhtHash { a.into() })
+                                        .collect()
+                                })
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                }
             }
+            DhtOp::StoreEntry(_, action, entry) => {
+                match entry {
+                    Entry::CounterSign(session_data, _) => {
+                        // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                        // won't matter that we've skipped fetching deps for it
+                        make_action_set_for_session_data(
+                            new_entry_action_to_entry_rate_weight(action),
+                            entry,
+                            &session_data,
+                        )
+                        .ok()
+                        .map(|actions| {
+                            actions
+                                .into_iter()
+                                .map(|a| -> AnyDhtHash { a.into() })
+                                .collect()
+                        })
+                    }
+                    _ => None,
+                }
+            }
+            DhtOp::RegisterAgentActivity(_, action) => action
+                .prev_action()
+                .map(|a| vec![a.as_hash().clone().into()]),
             DhtOp::RegisterUpdatedContent(_, action, _) => {
-                Some(action.original_action_address.clone().into())
+                Some(vec![action.original_action_address.clone().into()])
             }
             DhtOp::RegisterUpdatedRecord(_, action, _) => {
-                Some(action.original_action_address.clone().into())
+                Some(vec![action.original_action_address.clone().into()])
             }
             DhtOp::RegisterDeletedBy(_, action) => {
-                Some(action.deletes_address.clone().into())
+                Some(vec![action.deletes_address.clone().into()])
             }
             DhtOp::RegisterDeletedEntryAction(_, action) => {
-                Some(action.deletes_address.clone().into())
+                Some(vec![action.deletes_address.clone().into()])
             }
             DhtOp::RegisterRemoveLink(_, action) => {
-                Some(action.link_add_address.clone().into())
+                Some(vec![action.link_add_address.clone().into()])
             }
             _ => None,
-        }]
+        }
         .into_iter()
-        .filter_map(|hash: Option<AnyDhtHash>| {
+        .flatten()
+        .map(|hash: AnyDhtHash| {
             let cascade = cascade.clone();
-            match hash {
-                Some(h) => Some(
-                    async move {
-                        let fetched = cascade.retrieve(h.clone(), Default::default()).await;
-                        (h, fetched)
-                    }
-                    .boxed(),
-                ),
-                None => None,
+            async move {
+                let fetched = cascade.retrieve(hash.clone(), Default::default()).await;
+                (hash, fetched)
             }
+            .boxed()
         })
     });
 
@@ -496,21 +535,14 @@ where
 }
 
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
-pub(crate) async fn validate_op<C>(
+pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: &impl DhtOpSender,
     validation_dependencies: &mut ValidationDependencies,
-) -> WorkflowResult<Outcome>
-where
-    C: Cascade + Send + Sync,
-{
+) -> WorkflowResult<Outcome> {
     match validate_op_inner(
         op,
-        cascade,
         dna_def,
-        incoming_dht_ops_sender,
         validation_dependencies,
     )
     .await
@@ -569,16 +601,37 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
     }
 }
 
-async fn validate_op_inner<C>(
+fn action_to_entry_rate_weight(action: &Action) -> SysValidationResult<EntryRateWeight> {
+    action
+        .entry_rate_data()
+        .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))
+}
+
+fn new_entry_action_to_entry_rate_weight(action: &NewEntryAction) -> EntryRateWeight {
+    match action {
+        NewEntryAction::Create(h) => h.weight.clone(),
+        NewEntryAction::Update(h) => h.weight.clone(),
+    }
+}
+
+fn make_action_set_for_session_data(
+    entry_rate_weight: EntryRateWeight,
+    entry: &Entry,
+    session_data: &Box<CounterSigningSessionData>,
+) -> SysValidationResult<Vec<ActionHash>> {
+    let entry_hash = EntryHash::with_data_sync(entry);
+    Ok(session_data
+        .build_action_set(entry_hash, entry_rate_weight)?
+        .into_iter()
+        .map(|action| ActionHash::with_data_sync(&action))
+        .collect())
+}
+
+async fn validate_op_inner(
     op: &DhtOp,
-    cascade: Arc<C>,
     dna_def: &DnaDefHashed,
-    incoming_dht_ops_sender: &impl DhtOpSender,
     validation_dependencies: &mut ValidationDependencies,
-) -> SysValidationResult<()>
-where
-    C: Cascade + Send + Sync,
-{
+) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
@@ -586,22 +639,17 @@ where
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = entry {
-                    let entry_hash = EntryHash::with_data_sync(entry);
-                    let weight = action
-                        .entry_rate_data()
-                        .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))?;
-                    for action in session_data.build_action_set(entry_hash, weight)? {
-                        let hh = ActionHash::with_data_sync(&action);
-                        // TODO eliminate me
-                        if cascade
-                            .retrieve_action(hh.clone(), Default::default())
-                            .await?
-                            .is_none()
-                        {
-                            return Err(SysValidationError::ValidationOutcome(
-                                ValidationOutcome::DepMissingFromDht(hh.into()),
-                            ));
-                        }
+                    for action_hash in make_action_set_for_session_data(
+                        action_to_entry_rate_weight(action)?,
+                        entry,
+                        session_data,
+                    )? {
+                        // Just require that we are holding all the other actions
+                        validation_dependencies
+                            .get(&action_hash.clone().into())
+                            .ok_or_else(|| {
+                                ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                            })?;
                     }
                 }
                 // Has to be async because of signature checks being async
@@ -619,20 +667,17 @@ where
         DhtOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
             if let Entry::CounterSign(session_data, _) = entry {
-                let dependency_check = |_original_record: &Record| Ok(());
-                let entry_hash = EntryHash::with_data_sync(entry);
-                let weight = match action {
-                    NewEntryAction::Create(h) => h.weight.clone(),
-                    NewEntryAction::Update(h) => h.weight.clone(),
-                };
-                for action in session_data.build_action_set(entry_hash, weight)? {
-                    check_and_hold_store_record(
-                        &ActionHash::with_data_sync(&action),
-                        cascade.clone(),
-                        Some(incoming_dht_ops_sender),
-                        dependency_check,
-                    )
-                    .await?;
+                for action_hash in make_action_set_for_session_data(
+                    new_entry_action_to_entry_rate_weight(action),
+                    entry,
+                    session_data,
+                )? {
+                    // Just require that we are holding all the other actions
+                    validation_dependencies
+                    .get(&action_hash.clone().into())
+                    .ok_or_else(|| {
+                        ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
+                    })?;
                 }
             }
 
@@ -671,15 +716,11 @@ where
 
             Ok(())
         }
-        DhtOp::RegisterDeletedBy(_, action) => {
-            register_deleted_by(action, validation_dependencies)
-        }
+        DhtOp::RegisterDeletedBy(_, action) => register_deleted_by(action, validation_dependencies),
         DhtOp::RegisterDeletedEntryAction(_, action) => {
             register_deleted_entry_action(action, validation_dependencies)
         }
-        DhtOp::RegisterAddLink(_, action) => {
-            register_add_link(action)
-        }
+        DhtOp::RegisterAddLink(_, action) => register_add_link(action),
         DhtOp::RegisterRemoveLink(_, action) => {
             register_delete_link(action, validation_dependencies)
         }
@@ -730,8 +771,12 @@ where
     where
         C: Cascade + Send + Sync,
     {
-        let mut validation_dependencies =
-            fetch_previous_actions(vec![action.clone()].into_iter(), cascade.clone(), &ValidationDependencies::new()).await;
+        let mut validation_dependencies = fetch_previous_actions(
+            vec![action.clone()].into_iter(),
+            cascade.clone(),
+            &ValidationDependencies::new(),
+        )
+        .await;
 
         store_record(action, &mut validation_dependencies)?;
         if let Some(maybe_entry) = maybe_entry {
@@ -751,15 +796,11 @@ where
             Action::Delete(action) => {
                 register_deleted_entry_action(action, &mut validation_dependencies)
             }
-            Action::CreateLink(action) => {
-                register_add_link(action)
-            }
+            Action::CreateLink(action) => register_add_link(action),
             Action::DeleteLink(action) => {
                 register_delete_link(action, &mut validation_dependencies)
             }
-            _ => {
-                Ok(())
-            }
+            _ => Ok(()),
         }
     }
 
@@ -801,9 +842,9 @@ fn register_agent_activity(
     check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
         // Just make sure we have the dependency and if not then don't mark this action as valid yet
-        validation_dependencies.get(&prev_action_hash.clone().into()).ok_or_else(|| {
-            ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into())
-        })?;
+        validation_dependencies
+            .get(&prev_action_hash.clone().into())
+            .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
     }
 
     Ok(())
@@ -855,7 +896,6 @@ async fn store_entry(
                 ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
             })?;
         let original_action = state.as_action();
-        // TODO verify previous has passed sys validation?
         update_check(entry_update, original_action)?;
     }
 
@@ -874,9 +914,11 @@ fn register_updated_content(
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let state = validation_dependencies.get(&original_action_address.clone().into()).ok_or_else(|| {
-        ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
-    })?;
+    let state = validation_dependencies
+        .get(&original_action_address.clone().into())
+        .ok_or_else(|| {
+            ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+        })?;
 
     update_check(entry_update, state.as_action())
 }
@@ -888,9 +930,11 @@ fn register_updated_record(
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let state = validation_dependencies.get(&original_action_address.clone().into()).ok_or_else(|| {
-        ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
-    })?;
+    let state = validation_dependencies
+        .get(&original_action_address.clone().into())
+        .ok_or_else(|| {
+            ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
+        })?;
 
     update_check(entry_update, state.as_action())
 }
@@ -898,14 +942,15 @@ fn register_updated_record(
 fn register_deleted_by(
     record_delete: &Delete,
     validation_dependencies: &mut ValidationDependencies,
-) -> SysValidationResult<()>
-{
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let state = validation_dependencies.get(&removed_action_address.clone().into()).ok_or_else(|| {
-        ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
-    })?;
+    let state = validation_dependencies
+        .get(&removed_action_address.clone().into())
+        .ok_or_else(|| {
+            ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
+        })?;
 
     check_new_entry_action(state.as_action())
 }
@@ -917,30 +962,30 @@ fn register_deleted_entry_action(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let state = validation_dependencies.get(&removed_action_address.clone().into()).ok_or_else(|| {
-        ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
-    })?;
+    let state = validation_dependencies
+        .get(&removed_action_address.clone().into())
+        .ok_or_else(|| {
+            ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
+        })?;
 
     check_new_entry_action(state.as_action())
 }
 
-fn register_add_link(
-    link_add: &CreateLink,
-) -> SysValidationResult<()> {
+fn register_add_link(link_add: &CreateLink) -> SysValidationResult<()> {
     check_tag_size(&link_add.tag)
 }
 
 fn register_delete_link(
     link_remove: &DeleteLink,
-    validation_dependencies: &mut ValidationDependencies
+    validation_dependencies: &mut ValidationDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
 
     // Just require that this link exists, don't need to check anything else about it here
-    validation_dependencies.get(&link_add_address.clone().into()).ok_or_else(|| {
-        ValidationOutcome::DepMissingFromDht(link_add_address.clone().into())
-    })?;
+    validation_dependencies
+        .get(&link_add_address.clone().into())
+        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
 
     Ok(())
 }

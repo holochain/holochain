@@ -1060,8 +1060,9 @@ async fn crash_case() {
     let validation_outcome = validate_op(
         &op,
         &dna_def,
-        Arc::new(cascade),
-        &MockDhtOpSender::new(),
+        // TODO
+        // Arc::new(cascade),
+        // &MockDhtOpSender::new(),
         &mut ValidationDependencies::new(),
     )
     .await
@@ -1185,8 +1186,9 @@ impl TestCase {
         validate_op(
             self.op.as_ref().expect("No op set, invalid test case"),
             &dna_def,
-            Arc::new(new_cascade),
-            &self.incoming_ops_sender,
+            // TODO
+            // Arc::new(new_cascade),
+            // &self.incoming_ops_sender,
             &mut ValidationDependencies::new(),
         )
         .await
