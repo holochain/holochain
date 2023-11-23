@@ -6,6 +6,7 @@ use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::IncomingDhtOpSender;
+use crate::core::queue_consumer::WorkComplete;
 use crate::prelude::AgentPubKeyFixturator;
 use crate::prelude::AgentValidationPkgFixturator;
 use crate::prelude::CreateFixturator;
@@ -146,7 +147,9 @@ async fn validate_op_with_dependency_not_held() {
         .expect_get()
         .return_once(move |_, _| Ok(vec![response]));
 
-    test_case.with_network_behaviour(network).run().await;
+    let work_complete = test_case.with_network_behaviour(network).run().await;
+
+    test_case.run().await;
 
     test_case.check_trigger_and_rerun().await;
 
@@ -197,11 +200,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.is_empty());
 
-    // TODO Why trigger app validation if no new work was done by sys validation? App validation might need to be triggered for another reason
-    //      but is there a good reason for sys validation to just kick it off?
-    // test_case.expect_app_validation_not_triggered().await;
-
-    test_case.expect_app_validation_triggered().await;
+    test_case.expect_app_validation_not_triggered().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -245,11 +244,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.is_empty());
 
-    // TODO Why trigger app validation if no new work was done by sys validation? App validation might need to be triggered for another reason
-    //      but is there a good reason for sys validation to just kick it off?
-    // test_case.expect_app_validation_not_triggered().await;
-
-    test_case.expect_app_validation_triggered().await;
+    test_case.expect_app_validation_not_triggered().await;
 }
 
 struct TestCase {
@@ -331,7 +326,7 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
-    async fn run(&mut self) {
+    async fn run(&mut self) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
             self.test_space.space.authored_db.clone().into(),
             self.test_space.space.dht_db.clone().into(),
@@ -359,10 +354,10 @@ impl TestCase {
             actual_network,
         )
         .await
-        .unwrap();
+        .unwrap()
     }
 
-    async fn check_trigger_and_rerun(&mut self) {
+    async fn check_trigger_and_rerun(&mut self) -> WorkComplete {
         tokio::time::timeout(
             std::time::Duration::from_secs(3),
             self.self_trigger.1.listen(),
@@ -371,7 +366,7 @@ impl TestCase {
         .unwrap()
         .unwrap();
 
-        self.run().await;
+        self.run().await
     }
 
     /// This provides a quick and reliable way to check that ops have been sys validated
@@ -394,8 +389,6 @@ impl TestCase {
         .unwrap();
     }
 
-    // TODO The app validation workflow is unconditionally triggered
-    #[allow(unused)]
     async fn expect_app_validation_not_triggered(&mut self) {
         assert!(tokio::time::timeout(
             std::time::Duration::from_millis(1),

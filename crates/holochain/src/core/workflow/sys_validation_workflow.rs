@@ -5,7 +5,6 @@ use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use crate::core::workflow::error::WorkflowResult;
-use crate::core::workflow::sys_validation_workflow::validation_batch::NUM_CONCURRENT_OPS;
 use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
@@ -59,13 +58,14 @@ pub async fn sys_validation_workflow<
     network: Network,
 ) -> WorkflowResult<WorkComplete> {
     // Run the actual sys validation using data we have locally
-    let complete =
+    let outcome_summary =
         sys_validation_workflow_inner(workspace.clone(), current_validation_dependencies.clone())
             .await?;
 
-    // TODO remove WorkComplete above and return stats to here to help decide whether to proceed.
     // trigger app validation to process any ops that have been processed so far
-    trigger_app_validation.trigger(&"sys_validation_workflow");
+    if outcome_summary.accepted > 0 {
+        trigger_app_validation.trigger(&"sys_validation_workflow");
+    }
 
     // Now go to the network to try to fetch missing dependencies
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
@@ -105,9 +105,8 @@ pub async fn sys_validation_workflow<
         .into_iter()
         .sum();
 
-    // retrigger this workflow because we fetched some missing dependencies from the network.
     if num_fetched > 0 {
-        tracing::debug!(num_fetched = ?num_fetched, "Fetched missing dependencies from the network, retrying sys validation");
+        // If we fetched anything then we can re-run sys validation
         trigger_self.trigger(&"sys_validation_workflow");
     }
 
@@ -186,13 +185,19 @@ pub async fn sys_validation_workflow<
     }))
     .await;
 
-    Ok(complete)
+    if num_fetched < outcome_summary.missing {
+        Ok(WorkComplete::Incomplete(Some(std::time::Duration::from_secs(
+            10,
+        ))))
+    } else {
+        Ok(WorkComplete::Complete)
+    }
 }
 
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-) -> WorkflowResult<WorkComplete> {
+) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
 
@@ -200,24 +205,18 @@ async fn sys_validation_workflow_inner(
         tracing::trace!(
             "Skipping sys_validation_workflow because there are no ops to be validated"
         );
-        return Ok(WorkComplete::Complete);
+        return Ok(OutcomeSummary::new());
     }
 
     let num_ops_to_validate = sorted_ops.len();
     tracing::debug!("Validating {} ops", num_ops_to_validate);
-    // TODO questionable check for saturation. The query can return up to 10,000 results and this function
-    //      will process more than NUM_CONCURRENT_OPS ops, just not in parallel. Not necessarily true that
-    //      there will be more ops to process after this workflow run.
-    let start = (num_ops_to_validate >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
-    let saturated = start.is_some();
-    let cascade = Arc::new(workspace.local_cascade());
 
+    let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
     // Forget what dependencies are currently in use
     current_validation_dependencies.lock().clear_retained_deps();
 
-    // TODO can these clones be eliminated?
     fetch_previous_records(
         current_validation_dependencies.clone(),
         cascade.clone(),
@@ -298,18 +297,13 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    tracing::info!(
+    tracing::debug!(
         ?summary,
-        ?saturated,
         ?num_ops_to_validate,
         "Finished sys validation workflow"
     );
 
-    Ok(if saturated {
-        WorkComplete::Incomplete(None)
-    } else {
-        WorkComplete::Complete
-    })
+    Ok(summary)
 }
 
 pub struct ValidationDependencies {
