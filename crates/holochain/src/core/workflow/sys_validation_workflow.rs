@@ -2,26 +2,18 @@
 
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::core::sys_validate::check_and_hold_store_record;
 use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use crate::core::workflow::error::WorkflowResult;
-use crate::core::workflow::sys_validation_workflow::validation_batch::{
-    validate_ops_batch, NUM_CONCURRENT_OPS,
-};
-use futures::future;
-use futures::future::BoxFuture;
+use crate::core::workflow::sys_validation_workflow::validation_batch::NUM_CONCURRENT_OPS;
 use futures::FutureExt;
-use futures::StreamExt;
 use holo_hash::DhtOpHash;
-use holochain_cascade::error::CascadeResult;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_cascade::CascadeSource;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
-use itertools::Itertools;
 use parking_lot::Mutex;
 use rusqlite::Transaction;
 use std::collections::HashMap;
@@ -66,19 +58,19 @@ pub async fn sys_validation_workflow<
     trigger_self: TriggerSender,
     network: Network,
 ) -> WorkflowResult<WorkComplete> {
+    // Run the actual sys validation using data we have locally
     let complete =
         sys_validation_workflow_inner(workspace.clone(), current_validation_dependencies.clone())
             .await?;
-
-    // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // TODO remove WorkComplete above and return stats to here to help decide whether to proceed.
     // trigger app validation to process any ops that have been processed so far
     trigger_app_validation.trigger(&"sys_validation_workflow");
 
+    // Now go to the network to try to fetch missing dependencies
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies.lock().get_missing_hashes();
-
+    // TODO concurrency should be bounded here
     let num_fetched: usize =
         futures::future::join_all(missing_action_hashes.into_iter().map(|hash| {
             let network_cascade = network_cascade.clone();
@@ -113,10 +105,86 @@ pub async fn sys_validation_workflow<
         .into_iter()
         .sum();
 
+    // retrigger this workflow because we fetched some missing dependencies from the network.
     if num_fetched > 0 {
-        // retrigger this workflow because we fetched some missing dependencies from the network.
+        tracing::debug!(num_fetched = ?num_fetched, "Fetched missing dependencies from the network, retrying sys validation");
         trigger_self.trigger(&"sys_validation_workflow");
     }
+
+    // Finally, for anything we've fetched from the network we need to push it into the incoming dht ops workflow
+    let network_fetched_action_hashes = current_validation_dependencies
+        .lock()
+        .get_network_fetched_hashes();
+    futures::future::join_all(network_fetched_action_hashes.into_iter().map(|hash| {
+        let current_validation_dependencies = current_validation_dependencies.clone();
+        let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
+        async move {
+            let state = {
+                let mut deps = current_validation_dependencies.lock();
+                let mut state = deps.get(&hash);
+                if let Some(dep) = state.as_mut().and_then(|s| s.dependency.as_mut()) {
+                    match dep {
+                        ValidationDependency::Action(_, source) => {
+                            *source = CascadeSource::Local;
+                        }
+                        ValidationDependency::Record(_, source) => {
+                            *source = CascadeSource::Local;
+                        }
+                    }
+                }
+                
+                state.cloned()
+            };
+            
+            if let Some(state) = state {
+                let op_type = state.required_by_op_type.clone();
+                let record = state.as_record().cloned();
+                
+                if let (Some(op_type), Some(record)) = (op_type, record) {
+                    let result = match op_type {
+                        DhtOpType::StoreRecord => {
+                            incoming_dht_ops_sender
+                                .send_store_record(
+                                    record,
+                                )
+                                .await
+                        }
+                        DhtOpType::StoreEntry => {
+                            incoming_dht_ops_sender
+                                .send_store_entry(
+                                    record,
+                                )
+                                .await
+                        }
+                        DhtOpType::RegisterAgentActivity => {
+                            incoming_dht_ops_sender
+                                .send_register_agent_activity(
+                                    record,
+                                )
+                                .await
+                        }
+                        DhtOpType::RegisterAddLink => {
+                            incoming_dht_ops_sender
+                                .send_register_add_link(
+                                    record,
+                                )
+                                .await
+                        }
+                        _ => {
+                            tracing::warn!(op_type = ?op_type, "Unexpected op type for network fetched dependency");
+                            Ok(())
+                        }
+                    };
+
+                    if let Err(e) = result {
+                        tracing::error!(error = ?e, "Error sending network fetched dependency to incoming dht ops");
+                    }
+                }
+            }
+        }
+        .boxed()
+    }))
+    .await;
 
     Ok(complete)
 }
@@ -167,7 +235,6 @@ async fn sys_validation_workflow_inner(
     current_validation_dependencies.lock().purge_held_deps();
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
-    // TODO rename
     for hashed_op in sorted_ops {
         let (op, op_hash) = hashed_op.into_inner();
         let op_type = op.get_type();
@@ -286,14 +353,31 @@ impl ValidationDependencies {
             .collect()
     }
 
+    fn get_network_fetched_hashes(&self) -> Vec<AnyDhtHash> {
+        self.dependencies
+            .iter()
+            .filter_map(|(hash, state)| match state {
+                Some(ValidationDependencyState {
+                    dependency: Some(ValidationDependency::Action(_, CascadeSource::Network)),
+                    ..
+                } | ValidationDependencyState {
+                    dependency: Some(ValidationDependency::Record(_, CascadeSource::Network)),
+                    ..
+                }) => Some(hash.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn insert(&mut self, action: SignedActionHashed, source: CascadeSource) -> bool {
         let hash: AnyDhtHash = action.as_hash().clone().into();
         if self.has(&hash) {
             tracing::warn!(hash = ?hash, "Attempted to insert a dependency that was already present, this is not expected");
             return false;
         }
-        self.dependencies
-            .insert(hash, Some((action, source).into()));
+        // TODO op type?
+        // self.dependencies
+        //     .insert(hash, Some((action, source).into()));
 
         true
     }
@@ -325,51 +409,58 @@ impl FromIterator<(AnyDhtHash, Option<ValidationDependencyState>)> for Validatio
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct ValidationDependencyState {
-    dependency: ValidationDependency,
-    fetched_from: CascadeSource,
+    dependency: Option<ValidationDependency>,
+    // The type of the op that referenced this dependency
+    required_by_op_type: Option<DhtOpType>,
 }
 
 impl ValidationDependencyState {
-    fn as_action(&self) -> &Action {
+    fn as_action(&self) -> Option<&Action> {
         match &self.dependency {
-            ValidationDependency::Action(signed_action) => signed_action.action(),
-            ValidationDependency::Record(record) => record.action(),
+            Some(ValidationDependency::Action(signed_action, _)) => Some(signed_action.action()),
+            Some(ValidationDependency::Record(record, _)) => Some(record.action()),
+            None => None
         }
     }
 
     fn as_record(&self) -> Option<&Record> {
         match &self.dependency {
-            ValidationDependency::Action(_) => {
+            Some(ValidationDependency::Action(_, _)) => {
                 tracing::warn!(
                     "Attempted to get a record from a dependency that is an action, this is a bug"
                 );
                 None
             }
-            ValidationDependency::Record(record) => Some(record),
+            Some(ValidationDependency::Record(record, _)) => Some(record),
+            None => None,
         }
     }
 }
 
+#[derive(Clone, Debug)]
 enum ValidationDependency {
-    Action(SignedActionHashed),
-    Record(Record),
+    Action(SignedActionHashed, CascadeSource),
+    Record(Record, CascadeSource),
 }
 
 impl From<(SignedActionHashed, CascadeSource)> for ValidationDependencyState {
-    fn from((signed_action, fetched_from): (SignedActionHashed, CascadeSource)) -> Self {
+    fn from(
+        (signed_action, fetched_from): (SignedActionHashed, CascadeSource),
+    ) -> Self {
         Self {
-            dependency: ValidationDependency::Action(signed_action),
-            fetched_from,
+            dependency: Some(ValidationDependency::Action(signed_action, fetched_from)),
+            required_by_op_type: None,
         }
     }
 }
 
-impl From<(Record, CascadeSource)> for ValidationDependencyState {
-    fn from((record, fetched_from): (Record, CascadeSource)) -> Self {
+impl From<(Record, CascadeSource, DhtOpType)> for ValidationDependencyState {
+    fn from((record, fetched_from, op_type): (Record, CascadeSource, DhtOpType)) -> Self {
         Self {
-            dependency: ValidationDependency::Record(record),
-            fetched_from,
+            dependency: Some(ValidationDependency::Record(record, fetched_from)),
+            required_by_op_type: Some(op_type),
         }
     }
 }
@@ -461,14 +552,18 @@ async fn fetch_previous_records<C, O>(
                         // Discard errors here because we'll check later whether the input is valid. If it's not then it
                         // won't matter that we've skipped fetching deps for it
                         if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
-                            make_action_set_for_session_data(entry_rate_weight, entry, session_data)
-                                .ok()
-                                .map(|actions| {
-                                    actions
-                                        .into_iter()
-                                        .map(|a| -> AnyDhtHash { a.into() })
-                                        .collect()
-                                })
+                            make_action_set_for_session_data(
+                                entry_rate_weight,
+                                entry,
+                                session_data,
+                            )
+                            .ok()
+                            .map(|actions| {
+                                actions
+                                    .into_iter()
+                                    .map(|a| { (a.into(), op.get_type()) })
+                                    .collect()
+                            })
                         } else {
                             None
                         }
@@ -490,7 +585,7 @@ async fn fetch_previous_records<C, O>(
                         .map(|actions| {
                             actions
                                 .into_iter()
-                                .map(|a| -> AnyDhtHash { a.into() })
+                                .map(|a| { (a.into(), op.get_type()) })
                                 .collect()
                         })
                     }
@@ -499,32 +594,32 @@ async fn fetch_previous_records<C, O>(
             }
             DhtOp::RegisterAgentActivity(_, action) => action
                 .prev_action()
-                .map(|a| vec![a.as_hash().clone().into()]),
+                .map(|a| vec![(a.as_hash().clone().into(), op.get_type())]),
             DhtOp::RegisterUpdatedContent(_, action, _) => {
-                Some(vec![action.original_action_address.clone().into()])
+                Some(vec![(action.original_action_address.clone().into(), op.get_type())])
             }
             DhtOp::RegisterUpdatedRecord(_, action, _) => {
-                Some(vec![action.original_action_address.clone().into()])
+                Some(vec![(action.original_action_address.clone().into(), op.get_type())])
             }
             DhtOp::RegisterDeletedBy(_, action) => {
-                Some(vec![action.deletes_address.clone().into()])
+                Some(vec![(action.deletes_address.clone().into(), op.get_type())])
             }
             DhtOp::RegisterDeletedEntryAction(_, action) => {
-                Some(vec![action.deletes_address.clone().into()])
+                Some(vec![(action.deletes_address.clone().into(), op.get_type())])
             }
             DhtOp::RegisterRemoveLink(_, action) => {
-                Some(vec![action.link_add_address.clone().into()])
+                Some(vec![(action.link_add_address.clone().into(), op.get_type())])
             }
             _ => None,
         }
         .into_iter()
         .flatten()
-        .filter(|hash| !current_validation_dependencies.lock().has(hash))
-        .map(|hash: AnyDhtHash| {
+        .filter(|(hash, _)| !current_validation_dependencies.lock().has(hash))
+        .map(|(hash, op_type): (AnyDhtHash, DhtOpType)| {
             let cascade = cascade.clone();
             async move {
                 let fetched = cascade.retrieve(hash.clone(), Default::default()).await;
-                (hash, fetched)
+                (hash, op_type, fetched)
             }
             .boxed()
         })
@@ -536,16 +631,19 @@ async fn fetch_previous_records<C, O>(
         .filter_map(|r| {
             // Filter out errors, preparing the rest to be put into a HashMap for easy access.
             match r {
-                (hash, Ok(Some((record, CascadeSource::Local)))) => {
-                    Some((hash.into(), Some((record, CascadeSource::Local).into())))
+                (hash, op_type, Ok(Some((record, CascadeSource::Local)))) => {
+                    Some((hash.into(), Some((record, CascadeSource::Local, op_type).into())))
                 }
-                (hash, Ok(Some((record, CascadeSource::Network)))) => {
-                    Some((hash.into(), Some((record.privatized().0, CascadeSource::Network).into())))
+                (hash, op_type, Ok(Some((record, CascadeSource::Network)))) => {
+                    Some((hash.into(), Some((record.privatized().0, CascadeSource::Network, op_type).into())))
                 }
-                (hash, Ok(None)) => {
-                    Some((hash.into(), None))
+                (hash, op_type, Ok(None)) => {
+                    Some((hash.into(), Some(ValidationDependencyState {
+                        dependency: None,
+                        required_by_op_type: Some(op_type),
+                    })))
                 },
-                (hash, Err(e)) => {
+                (hash, _, Err(e)) => {
                     tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
                     None
                 }
@@ -664,6 +762,7 @@ async fn validate_op_inner(
                         let mut validation_dependencies = validation_dependencies.lock();
                         validation_dependencies
                             .get(&action_hash.clone().into())
+                            .and_then(|s| s.as_action())
                             .ok_or_else(|| {
                                 ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
                             })?;
@@ -693,6 +792,7 @@ async fn validate_op_inner(
                     let mut validation_dependencies = validation_dependencies.lock();
                     validation_dependencies
                         .get(&action_hash.clone().into())
+                        .and_then(|s| s.as_action())
                         .ok_or_else(|| {
                             ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
                         })?;
@@ -864,6 +964,7 @@ fn register_agent_activity(
         let mut validation_dependencies = validation_dependencies.lock();
         validation_dependencies
             .get(&prev_action_hash.clone().into())
+            .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
     }
 
@@ -881,10 +982,10 @@ fn store_record(
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
         let mut validation_dependencies = validation_dependencies.lock();
-        let state = validation_dependencies
+        let prev_action = validation_dependencies
             .get(&prev_action_hash.clone().into())
+            .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
-        let prev_action = state.as_action();
         check_prev_author(action, prev_action)?;
         check_prev_timestamp(action, prev_action)?;
         check_prev_seq(action, prev_action)?;
@@ -912,12 +1013,12 @@ async fn store_entry(
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
         let mut validation_dependencies = validation_dependencies.lock();
-        let state = validation_dependencies
+        let original_action = validation_dependencies
             .get(&original_action_address.clone().into())
+            .and_then(|s| s.as_action())
             .ok_or_else(|| {
                 ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
             })?;
-        let original_action = state.as_action();
         update_check(entry_update, original_action)?;
     }
 
@@ -937,13 +1038,14 @@ fn register_updated_content(
     let original_action_address = &entry_update.original_action_address;
 
     let mut validation_dependencies = validation_dependencies.lock();
-    let state = validation_dependencies
+    let original_action = validation_dependencies
         .get(&original_action_address.clone().into())
+        .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
         })?;
 
-    update_check(entry_update, state.as_action())
+    update_check(entry_update, original_action)
 }
 
 fn register_updated_record(
@@ -954,13 +1056,14 @@ fn register_updated_record(
     let original_action_address = &entry_update.original_action_address;
 
     let mut validation_dependencies = validation_dependencies.lock();
-    let state = validation_dependencies
+    let original_action = validation_dependencies
         .get(&original_action_address.clone().into())
+        .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
         })?;
 
-    update_check(entry_update, state.as_action())
+    update_check(entry_update, original_action)
 }
 
 fn register_deleted_by(
@@ -971,13 +1074,14 @@ fn register_deleted_by(
     let removed_action_address = &record_delete.deletes_address;
 
     let mut validation_dependencies = validation_dependencies.lock();
-    let state = validation_dependencies
+    let action = validation_dependencies
         .get(&removed_action_address.clone().into())
+        .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
         })?;
 
-    check_new_entry_action(state.as_action())
+    check_new_entry_action(action)
 }
 
 fn register_deleted_entry_action(
@@ -988,13 +1092,14 @@ fn register_deleted_entry_action(
     let removed_action_address = &record_delete.deletes_address;
 
     let mut validation_dependencies = validation_dependencies.lock();
-    let state = validation_dependencies
+    let action = validation_dependencies
         .get(&removed_action_address.clone().into())
+        .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
         })?;
 
-    check_new_entry_action(state.as_action())
+    check_new_entry_action(action)
 }
 
 fn register_add_link(link_add: &CreateLink) -> SysValidationResult<()> {
@@ -1012,6 +1117,7 @@ fn register_delete_link(
     let mut validation_dependencies = validation_dependencies.lock();
     validation_dependencies
         .get(&link_add_address.clone().into())
+        .and_then(|s| s.as_action())
         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
 
     Ok(())

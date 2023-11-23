@@ -358,6 +358,7 @@ impl TestCase {
             op_sender,
             Arc::new(Mutex::new(Default::default())),
             self.app_validation_trigger.0.clone(),
+            self.self_trigger.0.clone(),
             network,
         )
         .await
