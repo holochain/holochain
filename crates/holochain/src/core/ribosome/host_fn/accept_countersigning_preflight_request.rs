@@ -159,7 +159,6 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_timeout_session() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
