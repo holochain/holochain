@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 - Fix: App validation would not be retriggered for ops that failed validation. The app validation workflow had only been retriggered when the number of concurrent ops to be validated (50) was reached. Now the workflow will be re-triggered after a 10 second delay whenever any ops could not be validated.
 
+## 0.2.3
+
 ## 0.2.3-rc.1
 
 ## 0.2.3-rc.0
