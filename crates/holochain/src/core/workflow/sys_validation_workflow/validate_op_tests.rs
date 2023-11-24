@@ -266,7 +266,7 @@ async fn validate_create_op_with_prev_from_network() {
     test_case
         .current_validation_dependencies
         .lock()
-        .insert(previous_action, CascadeSource::Network);
+        .insert(Record::new(previous_action, None), CascadeSource::Network);
 
     // Run again to process new ops from the network
     let outcome = test_case.run().await.unwrap();

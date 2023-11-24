@@ -42,6 +42,7 @@ use arbitrary::Unstructured;
 use contrafact::Fact;
 use error::SysValidationError;
 
+use futures::FutureExt;
 use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
@@ -295,9 +296,16 @@ async fn check_previous_action() {
     // This check is manual because `validate_action` will modify any action
     // coming in with a 0 action_seq since it knows that can't be valid.
     {
+        let mut cascade = MockCascade::new();
+        cascade
+            .expect_retrieve_action()
+            .times(2)
+            // Doesn't matter what we return, the action should be rejected before deps are checked.
+            .returning(|_, _| async move { Ok(None) }.boxed() );
+
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,
-            Arc::new(MockCascade::new()),
+            Arc::new(cascade),
         )
         .await
         .unwrap_err()

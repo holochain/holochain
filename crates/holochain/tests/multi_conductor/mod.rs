@@ -73,8 +73,9 @@ async fn test_publish() -> anyhow::Result<()> {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
+    
+    holochain_trace::test_run().unwrap();
 
-    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let config = SweetConductorConfig::rendezvous(true);

@@ -84,7 +84,7 @@ pub async fn sys_validation_workflow<
 
                     // If the source was local then that means some other fetch has put this action into the cache,
                     // that's fine we'll just grab it here.
-                    if deps.insert(record.signed_action, source) {
+                    if deps.insert(record, source) {
                         1
                     } else {
                         0

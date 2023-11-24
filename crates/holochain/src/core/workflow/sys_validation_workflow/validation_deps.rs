@@ -3,7 +3,7 @@ use holochain_cascade::CascadeSource;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::{
     record::{Record, SignedActionHashed},
-    Action,
+    Action, action::ActionHashed,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -86,17 +86,25 @@ impl ValidationDependencies {
             .collect()
     }
 
-    ///
-    pub fn insert(&mut self, action: SignedActionHashed, source: CascadeSource) -> bool {
-        let hash: AnyDhtHash = action.as_hash().clone().into();
+    /// Insert a record which was found after this set of dependencies was created.
+    pub fn insert(&mut self, record: Record, source: CascadeSource) -> bool {
+        let hash: AnyDhtHash = ActionHashed::from_content_sync(record.action().clone()).hash.into();
+
+        // Note that `has` is checking that the dependency is actually set, not just that we have the key!
         if self.has(&hash) {
             tracing::warn!(hash = ?hash, "Attempted to insert a dependency that was already present, this is not expected");
             return false;
         }
-        self.retained_deps.insert(hash.clone());
-        self.states.insert(hash, (action, source).into());
 
-        true
+        self.retained_deps.insert(hash.clone());
+
+        if let Some(s) = self.states.get_mut(&hash) {
+            s.set_record(record);
+            s.set_source(source);
+            return true;
+        }
+
+        false
     }
 
     /// Forget which dependencies have been accessed since this method was last called.
@@ -128,8 +136,9 @@ impl FromIterator<(AnyDhtHash, ValidationDependencyState)> for ValidationDepende
 
 #[derive(Clone, Debug)]
 pub struct ValidationDependencyState {
+    /// The dependency if we've been able to fetch it, otherwise None until we manage to find it.
     dependency: Option<ValidationDependency>,
-    // The type of the op that referenced this dependency
+    /// The type of the op that referenced this dependency
     required_by_op_type: Option<DhtOpType>,
 }
 
@@ -146,6 +155,17 @@ impl ValidationDependencyState {
 
     pub fn required_by_op_type(&self) -> Option<DhtOpType> {
         self.required_by_op_type
+    }
+
+    pub fn set_record(&mut self, record: Record) {
+        match &mut self.dependency {
+            None => {
+                self.dependency = Some(ValidationDependency::Record(record, CascadeSource::Network))
+            }
+            _ => {
+                tracing::warn!("Attempted to set a record on a dependency that already has a value, this is a bug")
+            }
+        }
     }
 
     pub fn set_source(&mut self, new_source: CascadeSource) {
