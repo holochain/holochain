@@ -272,24 +272,10 @@ async fn sys_validation_workflow_inner(
                         summary.accepted += 1;
                         put_validation_limbo(txn, &op_hash, ValidationLimboStatus::SysValidated)?;
                     }
-                    Outcome::AwaitingOpDep(missing_dep) => {
-                        summary.awaiting += 1;
-                        // TODO: Try and get this dependency to add to limbo
-                        //
-                        // I actually can't see how we can do this because there's no
-                        // way to get an DhtOpHash without either having the op or the full
-                        // action. We have neither that's why where here.
-                        //
-                        // We need to be holding the dependency because
-                        // we were meant to get a StoreRecord or StoreEntry or
-                        // RegisterAgentActivity or RegisterAddLink.
+                    Outcome::MissingDhtDep(missing_dep) => {
+                        summary.missing += 1;
                         let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
                         put_validation_limbo(txn, &op_hash, status)?;
-                    }
-                    Outcome::MissingDhtDep => {
-                        summary.missing += 1;
-                        // TODO: Not sure what missing dht dep is. Check if we need this.
-                        put_validation_limbo(txn, &op_hash, ValidationLimboStatus::Pending)?;
                     }
                     Outcome::Rejected => {
                         summary.rejected += 1;
@@ -711,7 +697,7 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
         ValidationOutcome::ActionNotInCounterSigningSession(_, _) => Rejected,
-        ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
+        ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
         ValidationOutcome::EntryDefId(_) => Rejected,
         ValidationOutcome::EntryHash => Rejected,
         ValidationOutcome::EntryTooLarge(_) => Rejected,
@@ -721,8 +707,6 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
-        // TODO The only place we mark as waiting for another op to be validated and it's not correct?
-        ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep.clone()),
         ValidationOutcome::PrevActionError(_) => Rejected,
         ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
@@ -1357,7 +1341,6 @@ pub fn put_integrated(
 #[derive(Debug, Clone)]
 struct OutcomeSummary {
     accepted: usize,
-    awaiting: usize,
     missing: usize,
     rejected: usize,
 }
@@ -1366,7 +1349,6 @@ impl OutcomeSummary {
     fn new() -> Self {
         OutcomeSummary {
             accepted: 0,
-            awaiting: 0,
             missing: 0,
             rejected: 0,
         }

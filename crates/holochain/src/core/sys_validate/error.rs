@@ -133,8 +133,6 @@ pub enum ValidationOutcome {
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was {0:?}")]
     NotNewEntry(Action),
-    #[error("The dependency {0:?} is not held")]
-    NotHoldingDep(AnyDhtHash),
     #[error("The PreflightResponse signature was not valid {0:?}")]
     PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]

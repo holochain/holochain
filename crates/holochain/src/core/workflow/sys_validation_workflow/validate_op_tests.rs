@@ -44,8 +44,6 @@ use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
-
-use super::fetch_previous_actions;
 use super::fetch_previous_records;
 use super::ValidationDependencies;
 
@@ -262,7 +260,7 @@ async fn validate_create_op_with_prev_from_network() {
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
-    assert_eq!(outcome, Outcome::MissingDhtDep);
+    assert!(matches!(outcome, Outcome::MissingDhtDep(_)));
 
     // Simulate the dep being found on the network
     test_case
@@ -306,12 +304,12 @@ async fn validate_create_op_with_prev_action_not_found() {
         .cascade_mut()
         .expect_retrieve()
         .times(1)
-        .returning({ move |_, _| async move { Ok(None) }.boxed() });
+        .returning( move |_, _| async move { Ok(None) }.boxed() );
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep),
+        matches!(outcome, Outcome::MissingDhtDep(_)),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );

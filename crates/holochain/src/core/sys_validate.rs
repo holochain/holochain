@@ -5,12 +5,8 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
-use holochain_cascade::Cascade;
-use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
-use holochain_zome_types::countersigning::CounterSigningSessionData;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 pub use error::*;
@@ -510,155 +506,6 @@ fn check_prev_action_chain<A: ChainItem>(
     }
 }
 
-/// If we are not holding this action then
-/// retrieve it and send it as a RegisterAddLink DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_register_add_link<F, C>(
-    hash: &ActionHash,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-    C: Cascade,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender
-            .send_register_add_link(record)
-            .await?;
-    }
-    Ok(())
-}
-
-/// If we are not holding this action then
-/// retrieve it and send it as a RegisterAgentActivity DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_register_agent_activity<F, C>(
-    hash: &ActionHash,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-    C: Cascade,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender
-            .send_register_agent_activity(record)
-            .await?;
-    }
-    Ok(())
-}
-
-/// If we are not holding this action then
-/// retrieve it and send it as a StoreEntry DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_store_entry<F, C>(
-    hash: &ActionHash,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-    C: Cascade,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender.send_store_entry(record).await?;
-    }
-    Ok(())
-}
-
-/// If we are not holding this entry then
-/// retrieve any record at this EntryHash
-/// and send it as a StoreEntry DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Note this is different to check_and_hold_store_entry
-/// because it gets the Record via an EntryHash which
-/// means it will be any Record.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_any_store_entry<F, C>(
-    hash: &EntryHash,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-    C: Cascade + Clone + Send + Sync,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender.send_store_entry(record).await?;
-    }
-    Ok(())
-}
-
-/// If we are not holding this action then
-/// retrieve it and send it as a StoreRecord DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_store_record<F, C>(
-    hash: &ActionHash,
-    cascade: Arc<C>,
-    incoming_dht_ops_sender: Option<&impl DhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-    C: Cascade,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender.send_store_record(record).await?;
-    }
-    Ok(())
-}
-
 /// Allows DhtOps to be sent to some receiver
 #[async_trait::async_trait]
 #[cfg_attr(test, mockall::automock)]
@@ -730,44 +577,6 @@ impl DhtOpSender for IncomingDhtOpSender {
 
     async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
         self.send_op(make_register_agent_activity(record)).await
-    }
-}
-
-/// Where the record was found.
-enum Source {
-    /// Locally because we are holding it or
-    /// because we will be soon
-    Local(Record),
-    /// On the network.
-    /// This means we aren't holding it so
-    /// we should add it to our incoming ops
-    Network(Record),
-}
-
-impl AsRef<Record> for Source {
-    fn as_ref(&self) -> &Record {
-        match self {
-            Source::Local(el) | Source::Network(el) => el,
-        }
-    }
-}
-
-/// Check if we are holding a dependency and
-/// run a check callback on the it.
-/// This function also returns where the dependency
-/// was found so you can decide whether or not to add
-/// it to the incoming ops.
-async fn check_and_hold<I, C>(hash: &I, cascade: Arc<C>) -> SysValidationResult<Source>
-where
-    I: Into<AnyDhtHash> + Clone,
-    C: Cascade,
-{
-    let hash: AnyDhtHash = hash.clone().into();
-    match cascade.retrieve(hash.clone(), Default::default()).await? {
-        Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),
-        Some((el, CascadeSource::Network)) => Ok(Source::Network(el.privatized().0)),
-        // TODO here NotHoldingDep means it wasn't found but is being translated to 'waiting for another op to be validated'
-        None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
 
