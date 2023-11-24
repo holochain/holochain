@@ -227,12 +227,6 @@ async fn sys_validation_workflow_inner(
         sorted_ops.clone().into_iter(),
     )
     .await;
-    fetch_previous_actions(
-        current_validation_dependencies.clone(),
-        cascade.clone(),
-        sorted_ops.iter().map(|op| op.action()),
-    )
-    .await;
 
     // Now drop all the dependencies that we didn't just try to access while searching the current set of ops to validate.
     current_validation_dependencies.lock().purge_held_deps();
@@ -482,10 +476,6 @@ async fn fetch_previous_actions<A, C>(
     let action_fetches = actions.into_iter().flat_map(|action| {
         // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
         vec![
-            match &action {
-                Action::Update(update) => Some(update.original_action_address.clone()),
-                _ => None,
-            },
             match action.prev_action().cloned() {
                 None => None,
                 hash => hash,
@@ -606,18 +596,11 @@ async fn fetch_previous_records<C, O>(
                     _ => None,
                 }
             }
-            DhtOp::RegisterUpdatedContent(_, action, _) => Some(vec![(
+            DhtOp::RegisterUpdatedContent(_, action, _) | DhtOp::RegisterUpdatedRecord(_, action, _) => Some(vec![(
                 action.original_action_address.clone().into(),
                 op.get_type(),
             )]),
-            DhtOp::RegisterUpdatedRecord(_, action, _) => Some(vec![(
-                action.original_action_address.clone().into(),
-                op.get_type(),
-            )]),
-            DhtOp::RegisterDeletedBy(_, action) => {
-                Some(vec![(action.deletes_address.clone().into(), op.get_type())])
-            }
-            DhtOp::RegisterDeletedEntryAction(_, action) => {
+            DhtOp::RegisterDeletedBy(_, action) | DhtOp::RegisterDeletedEntryAction(_, action) => {
                 Some(vec![(action.deletes_address.clone().into(), op.get_type())])
             }
             DhtOp::RegisterRemoveLink(_, action) => Some(vec![(
@@ -626,6 +609,12 @@ async fn fetch_previous_records<C, O>(
             )]),
             _ => None,
         }
+        .and_then(|mut op_actions| {
+            if let Some(prev_action) = op.action().prev_action() {
+                op_actions.push((prev_action.clone().into(), op.get_type()));
+            }
+            Some(op_actions)
+        })
         .into_iter()
         .flatten()
         .filter(|(hash, _)| !current_validation_dependencies.lock().has(hash))
