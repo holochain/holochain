@@ -6,6 +6,7 @@ use crate::core::sys_validate::*;
 use crate::core::validation::*;
 use crate::core::workflow::error::WorkflowResult;
 use futures::FutureExt;
+use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -70,9 +71,8 @@ pub async fn sys_validation_workflow<
     // Now go to the network to try to fetch missing dependencies
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies.lock().get_missing_hashes();
-    // TODO concurrency should be bounded here
     let num_fetched: usize =
-        futures::future::join_all(missing_action_hashes.into_iter().map(|hash| {
+        futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
             let network_cascade = network_cascade.clone();
             let current_validation_dependencies = current_validation_dependencies.clone();
             async move {
@@ -100,8 +100,7 @@ pub async fn sys_validation_workflow<
                 }
             }
             .boxed()
-        }))
-        .await
+        })).buffer_unordered(10).collect::<Vec<usize>>().await
         .into_iter()
         .sum();
 

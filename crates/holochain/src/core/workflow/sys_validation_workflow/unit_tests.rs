@@ -147,7 +147,7 @@ async fn validate_op_with_dependency_not_held() {
         .expect_get()
         .return_once(move |_, _| Ok(vec![response]));
 
-    let work_complete = test_case.with_network_behaviour(network).run().await;
+    test_case.with_network_behaviour(network).run().await;
 
     test_case.run().await;
 
