@@ -178,7 +178,11 @@ pub async fn sys_validation_workflow<
                     if let Err(e) = result {
                         tracing::error!(error = ?e, "Error sending network fetched dependency to incoming dht ops");
                     }
+                } else {
+                    tracing::warn!("Missing op type or record for network fetched dependency");
                 }
+            } else {
+                tracing::warn!("Missing state for network fetched dependency");
             }
         }
         .boxed()
@@ -194,7 +198,7 @@ pub async fn sys_validation_workflow<
     }
 }
 
-async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'static>(
+async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<OutcomeSummary> {
@@ -486,6 +490,12 @@ async fn fetch_previous_actions<A, C>(
                 None => None,
                 hash => hash,
             },
+            match action {
+                Action::Update(action) => Some(action.original_action_address.clone().into()),
+                Action::Delete(action) => Some(action.deletes_address.clone().into()),
+                Action::DeleteLink(action) => Some(action.link_add_address.clone().into()),
+                _ => None,
+            }
         ]
         .into_iter()
         // TODO resolve differences with record fetch
