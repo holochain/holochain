@@ -306,11 +306,7 @@ async fn validate_create_op_with_prev_action_not_found() {
         .cascade_mut()
         .expect_retrieve()
         .times(1)
-        .returning({
-            move |_, _| {
-                async move { Ok(None) }.boxed()
-            }
-        });
+        .returning({ move |_, _| async move { Ok(None) }.boxed() });
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 

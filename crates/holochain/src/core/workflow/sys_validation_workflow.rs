@@ -65,44 +65,48 @@ pub async fn sys_validation_workflow<
 
     // trigger app validation to process any ops that have been processed so far
     if outcome_summary.accepted > 0 {
+        tracing::debug!("Sys validation accepted {} ops", outcome_summary.accepted);
+
         trigger_app_validation.trigger(&"sys_validation_workflow");
     }
 
     // Now go to the network to try to fetch missing dependencies
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies.lock().get_missing_hashes();
-    let num_fetched: usize =
-        futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
-            let network_cascade = network_cascade.clone();
-            let current_validation_dependencies = current_validation_dependencies.clone();
-            async move {
-                match network_cascade.retrieve(hash, Default::default()).await {
-                    Ok(Some((record, source))) => {
-                        let mut deps = current_validation_dependencies.lock();
+    let num_fetched: usize = futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
+        let network_cascade = network_cascade.clone();
+        let current_validation_dependencies = current_validation_dependencies.clone();
+        async move {
+            match network_cascade.retrieve(hash, Default::default()).await {
+                Ok(Some((record, source))) => {
+                    let mut deps = current_validation_dependencies.lock();
 
-                        // If the source was local then that means some other fetch has put this action into the cache,
-                        // that's fine we'll just grab it here.
-                        if deps.insert(record.signed_action, source) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                    Ok(None) => {
-                        // This is fine, we didn't find it on the network, so we'll have to try again.
-                        // TODO put this on a timeout to avoid hitting the network too often for it?
-                        0
-                    }
-                    Err(e) => {
-                        tracing::error!(error = ?e, "Error fetching missing dependency");
+                    // If the source was local then that means some other fetch has put this action into the cache,
+                    // that's fine we'll just grab it here.
+                    if deps.insert(record.signed_action, source) {
+                        1
+                    } else {
                         0
                     }
                 }
+                Ok(None) => {
+                    // This is fine, we didn't find it on the network, so we'll have to try again.
+                    // TODO put this on a timeout to avoid hitting the network too often for it?
+                    0
+                }
+                Err(e) => {
+                    tracing::error!(error = ?e, "Error fetching missing dependency");
+                    0
+                }
             }
-            .boxed()
-        })).buffer_unordered(10).collect::<Vec<usize>>().await
-        .into_iter()
-        .sum();
+        }
+        .boxed()
+    }))
+    .buffer_unordered(10)
+    .collect::<Vec<usize>>()
+    .await
+    .into_iter()
+    .sum();
 
     if num_fetched > 0 {
         // If we fetched anything then we can re-run sys validation
@@ -242,7 +246,8 @@ async fn sys_validation_workflow_inner(
         let op_type = op.get_type();
         let action = op.action();
 
-        // TODO This is more like a 'required dependency' check and isn't actually used in validation
+        // This is an optimization to skip app validation and integration for ops that are
+        // rejected and don't have dependencies.
         let dependency = get_dependency(op_type, &action);
 
         // Note that this is async only because of the signature checks done during countersigning.
@@ -504,7 +509,11 @@ async fn fetch_previous_actions<A, C>(
 {
     let action_fetches = get_dependency_hashes_from_actions(actions)
         .into_iter()
-        .filter(|hash| !current_validation_dependencies.lock().has(&hash.clone().into()))
+        .filter(|hash| {
+            !current_validation_dependencies
+                .lock()
+                .has(&hash.clone().into())
+        })
         .map(|h| {
             // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
             let cascade = cascade.clone();
@@ -603,18 +612,18 @@ async fn fetch_previous_records<C, O>(
             Some(mut actions) => {
                 actions.extend(
                     get_dependency_hashes_from_actions(vec![op.action()].into_iter())
-                    .into_iter()
-                    .map(|h| (h.into(), op.get_type()))
+                        .into_iter()
+                        .map(|h| (h.into(), op.get_type())),
                 );
-                
+
                 Some(actions)
             }
             None => {
-                let dependency_hashes: Vec<(AnyDhtHash, DhtOpType)> = get_dependency_hashes_from_actions(vec![op.action()].into_iter())
-                .into_iter()
-                .map(|h| -> (AnyDhtHash, DhtOpType) {
-                    (h.into(), op.get_type())
-            }).collect();
+                let dependency_hashes: Vec<(AnyDhtHash, DhtOpType)> =
+                    get_dependency_hashes_from_actions(vec![op.action()].into_iter())
+                        .into_iter()
+                        .map(|h| -> (AnyDhtHash, DhtOpType) { (h.into(), op.get_type()) })
+                        .collect();
 
                 if dependency_hashes.is_empty() {
                     None
