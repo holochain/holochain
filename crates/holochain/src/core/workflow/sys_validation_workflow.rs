@@ -16,15 +16,12 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
 use rusqlite::Transaction;
-use std::collections::HashMap;
-use std::collections::HashSet;
 use std::convert::TryInto;
 use std::sync::Arc;
 use tracing::*;
 use types::Outcome;
 
 use self::validation_deps::ValidationDependencies;
-use self::validation_deps::ValidationDependency;
 use self::validation_deps::ValidationDependencyState;
 
 pub mod types;
@@ -316,7 +313,7 @@ where
                 },
             ]
             .into_iter()
-            .filter_map(|maybe_hash| maybe_hash)
+            .flatten()
         })
         .collect()
 }
@@ -413,7 +410,7 @@ async fn fetch_previous_records<C, O>(
                         make_action_set_for_session_data(
                             new_entry_action_to_entry_rate_weight(action),
                             entry,
-                            &session_data,
+                            session_data,
                         )
                         .ok()
                         .map(|actions| {
@@ -474,13 +471,13 @@ async fn fetch_previous_records<C, O>(
             // Filter out errors, preparing the rest to be put into a HashMap for easy access.
             match r {
                 (hash, op_type, Ok(Some((record, CascadeSource::Local)))) => {
-                    Some((hash.into(), (record, CascadeSource::Local, op_type).into()))
+                    Some((hash, (record, CascadeSource::Local, op_type).into()))
                 }
                 (hash, op_type, Ok(Some((record, CascadeSource::Network)))) => {
-                    Some((hash.into(), (record.privatized().0, CascadeSource::Network, op_type).into()))
+                    Some((hash, (record.privatized().0, CascadeSource::Network, op_type).into()))
                 }
                 (hash, op_type, Ok(None)) => {
-                    Some((hash.into(), ValidationDependencyState::new(
+                    Some((hash, ValidationDependencyState::new(
                         None,
                         Some(op_type)
                     )))
@@ -571,7 +568,7 @@ fn new_entry_action_to_entry_rate_weight(action: &NewEntryAction) -> EntryRateWe
 fn make_action_set_for_session_data(
     entry_rate_weight: EntryRateWeight,
     entry: &Entry,
-    session_data: &Box<CounterSigningSessionData>,
+    session_data: &CounterSigningSessionData,
 ) -> SysValidationResult<Vec<ActionHash>> {
     let entry_hash = EntryHash::with_data_sync(entry);
     Ok(session_data
@@ -1099,7 +1096,7 @@ impl SysValidationWorkspace {
     pub fn local_cascade(&self) -> CascadeImpl {
         let cascade = CascadeImpl::empty()
             .with_dht(self.dht_db.clone().into())
-            .with_cache(self.cache.clone().into());
+            .with_cache(self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
                 .with_authored(self.authored_db.clone())

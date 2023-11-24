@@ -145,7 +145,7 @@ impl ValidationDependencyState {
     }
 
     pub fn required_by_op_type(&self) -> Option<DhtOpType> {
-        self.required_by_op_type.clone()
+        self.required_by_op_type
     }
 
     pub fn set_source(&mut self, new_source: CascadeSource) {
@@ -184,6 +184,7 @@ impl ValidationDependencyState {
 
 /// A validation dependency which is either an Action or a Record, and the source of the dependency.
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ValidationDependency {
     /// The dependency is represented by an Action when it has been fetched for inline validation.
     Action(SignedActionHashed, CascadeSource),
