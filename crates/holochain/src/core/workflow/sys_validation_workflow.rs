@@ -209,11 +209,17 @@ async fn sys_validation_workflow_inner(
         tracing::trace!(
             "Skipping sys_validation_workflow because there are no ops to be validated"
         );
+
+        // If there's nothing to validate then we can clear the dependencies and save some memory.
+        let mut deps = current_validation_dependencies.lock();
+        deps.clear_retained_deps();
+        deps.purge_held_deps();
+
         return Ok(OutcomeSummary::new());
     }
 
     let num_ops_to_validate = sorted_ops.len();
-    tracing::debug!("Validating {} ops", num_ops_to_validate);
+    tracing::debug!("Sys validating {} ops", num_ops_to_validate);
 
     let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
