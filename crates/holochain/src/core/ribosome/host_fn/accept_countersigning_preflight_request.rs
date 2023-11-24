@@ -394,7 +394,6 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
 
@@ -511,7 +510,11 @@ pub mod wasm_test {
             )
             .await;
         assert!(matches!(countersign_fail_create_alice, Err(_)));
-        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+
+        let _: ActionHash = conductor
+            .call_fallible(&alice, "create_a_thing", ())
+            .await
+            .unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
