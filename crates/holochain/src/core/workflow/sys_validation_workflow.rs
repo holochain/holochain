@@ -190,9 +190,9 @@ pub async fn sys_validation_workflow<
     .await;
 
     if num_fetched < outcome_summary.missing {
-        Ok(WorkComplete::Incomplete(Some(std::time::Duration::from_secs(
-            10,
-        ))))
+        Ok(WorkComplete::Incomplete(Some(
+            std::time::Duration::from_secs(10),
+        )))
     } else {
         Ok(WorkComplete::Complete)
     }
@@ -465,6 +465,30 @@ impl From<(Record, CascadeSource, DhtOpType)> for ValidationDependencyState {
     }
 }
 
+fn get_dependency_hashes_from_actions<A>(actions: A) -> Vec<ActionHash>
+where
+    A: Iterator<Item = Action>,
+{
+    actions
+        .flat_map(|action| {
+            vec![
+                match action.prev_action().cloned() {
+                    None => None,
+                    hash => hash,
+                },
+                match action {
+                    Action::Update(action) => Some(action.original_action_address),
+                    Action::Delete(action) => Some(action.deletes_address),
+                    Action::DeleteLink(action) => Some(action.link_add_address),
+                    _ => None,
+                },
+            ]
+            .into_iter()
+            .filter_map(|maybe_hash| maybe_hash)
+        })
+        .collect()
+}
+
 async fn fetch_previous_actions<A, C>(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     cascade: Arc<C>,
@@ -473,49 +497,19 @@ async fn fetch_previous_actions<A, C>(
     A: Iterator<Item = Action>,
     C: Cascade + Send + Sync,
 {
-    let action_fetches = actions.into_iter().flat_map(|action| {
-        // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
-        vec![
-            match action.prev_action().cloned() {
-                None => None,
-                hash => hash,
-            },
-            match action {
-                Action::Update(action) => Some(action.original_action_address.clone().into()),
-                Action::Delete(action) => Some(action.deletes_address.clone().into()),
-                Action::DeleteLink(action) => Some(action.link_add_address.clone().into()),
-                _ => None,
-            }
-        ]
+    let action_fetches = get_dependency_hashes_from_actions(actions)
         .into_iter()
-        // TODO resolve differences with record fetch
-        .filter_map(|hash| {
+        .filter(|hash| !current_validation_dependencies.lock().has(&hash.clone().into()))
+        .map(|h| {
+            // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
             let cascade = cascade.clone();
-            match hash {
-                Some(h) => {
-                    // Skip fetching the action because we already have the Record in memory which contains the action anyway.
-                    if current_validation_dependencies
-                        .lock()
-                        .has(&h.clone().into())
-                    {
-                        tracing::info!(hash = ?h, "Already have action for validation");
-                        None
-                    } else {
-                        Some(
-                            async move {
-                                let fetched =
-                                    cascade.retrieve_action(h.clone(), Default::default()).await;
-                                tracing::info!(hash = ?h, fetched = ?fetched, "Fetched action for validation");
-                                (h, fetched)
-                            }
-                            .boxed(),
-                        )
-                    }
-                }
-                None => None,
+            async move {
+                let fetched = cascade.retrieve_action(h.clone(), Default::default()).await;
+                tracing::info!(hash = ?h, fetched = ?fetched, "Fetched action for validation");
+                (h, fetched)
             }
-        })
-    });
+            .boxed()
+        });
 
     let new_deps: ValidationDependencies = futures::future::join_all(action_fetches)
         .await
@@ -553,7 +547,7 @@ async fn fetch_previous_records<C, O>(
 {
     let action_fetches = ops.into_iter().flat_map(|op| {
         // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
-        match &op.content {
+        let actions_from_op = match &op.content {
             DhtOp::StoreRecord(_, action, RecordEntry::Present(entry)) => {
                 match entry {
                     Entry::CounterSign(session_data, _) => {
@@ -566,7 +560,7 @@ async fn fetch_previous_records<C, O>(
                                     actions
                                         .into_iter()
                                         .map(|a| (a.into(), op.get_type()))
-                                        .collect()
+                                        .collect::<Vec<_>>()
                                 })
                         } else {
                             None
@@ -596,25 +590,34 @@ async fn fetch_previous_records<C, O>(
                     _ => None,
                 }
             }
-            DhtOp::RegisterUpdatedContent(_, action, _) | DhtOp::RegisterUpdatedRecord(_, action, _) => Some(vec![(
-                action.original_action_address.clone().into(),
-                op.get_type(),
-            )]),
-            DhtOp::RegisterDeletedBy(_, action) | DhtOp::RegisterDeletedEntryAction(_, action) => {
-                Some(vec![(action.deletes_address.clone().into(), op.get_type())])
-            }
-            DhtOp::RegisterRemoveLink(_, action) => Some(vec![(
-                action.link_add_address.clone().into(),
-                op.get_type(),
-            )]),
             _ => None,
-        }
-        .and_then(|mut op_actions| {
-            if let Some(prev_action) = op.action().prev_action() {
-                op_actions.push((prev_action.clone().into(), op.get_type()));
+        };
+
+        // Always include the previous action if there is one
+        match actions_from_op {
+            Some(mut actions) => {
+                actions.extend(
+                    get_dependency_hashes_from_actions(vec![op.action()].into_iter())
+                    .into_iter()
+                    .map(|h| (h.into(), op.get_type()))
+                );
+                
+                Some(actions)
             }
-            Some(op_actions)
-        })
+            None => {
+                let dependency_hashes: Vec<(AnyDhtHash, DhtOpType)> = get_dependency_hashes_from_actions(vec![op.action()].into_iter())
+                .into_iter()
+                .map(|h| -> (AnyDhtHash, DhtOpType) {
+                    (h.into(), op.get_type())
+            }).collect();
+
+                if dependency_hashes.is_empty() {
+                    None
+                } else {
+                    Some(dependency_hashes)
+                }
+            }
+        }
         .into_iter()
         .flatten()
         .filter(|(hash, _)| !current_validation_dependencies.lock().has(hash))

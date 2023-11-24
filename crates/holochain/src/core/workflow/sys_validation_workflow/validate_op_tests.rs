@@ -149,7 +149,7 @@ async fn non_dna_op_as_first_action() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -183,7 +183,7 @@ async fn validate_valid_agent_validation_package_op() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::AgentValidationPkg(action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -219,7 +219,7 @@ async fn validate_valid_create_op() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -256,7 +256,7 @@ async fn validate_create_op_with_prev_from_network() {
 
     test_case
         .cascade_mut()
-        .expect_retrieve_action()
+        .expect_retrieve()
         .times(1)
         .returning(move |_, _| async move { Ok(None) }.boxed());
 
@@ -304,11 +304,10 @@ async fn validate_create_op_with_prev_action_not_found() {
 
     test_case
         .cascade_mut()
-        .expect_retrieve_action()
+        .expect_retrieve()
         .times(1)
         .returning({
             move |_, _| {
-                // Not found here, even though `retrieve` found it so not entirely realistic but good enough.
                 async move { Ok(None) }.boxed()
             }
         });
@@ -353,7 +352,7 @@ async fn validate_create_op_author_mismatch_with_prev() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -392,7 +391,7 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -431,7 +430,7 @@ async fn validate_create_op_with_timestamp_before_prev() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -467,7 +466,7 @@ async fn validate_create_op_seq_number_decrements() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -503,7 +502,7 @@ async fn validate_create_op_seq_number_reused() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -541,7 +540,7 @@ async fn validate_create_op_not_preceeded_by_avp() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -581,7 +580,7 @@ async fn validate_avp_op_not_followed_by_create() {
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::CreateLink(create_link_action));
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -622,7 +621,7 @@ async fn validate_valid_store_entry_with_no_entry() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -666,7 +665,7 @@ async fn validate_store_entry_with_entry_with_wrong_entry_type() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -724,7 +723,7 @@ async fn validate_store_entry_with_entry_with_wrong_entry_hash() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -785,7 +784,7 @@ async fn validate_store_entry_with_large_entry() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
@@ -855,7 +854,7 @@ async fn validate_valid_store_entry_update() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![to_update_signed_action, previous_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, previous_action])
         .with_op(op)
         .run()
         .await
@@ -909,7 +908,7 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
         .with_op(op)
         .run()
         .await
@@ -980,7 +979,7 @@ async fn validate_store_entry_update_changes_entry_type() {
     );
 
     let outcome = test_case
-        .expect_retrieve_actions_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
         .with_op(op)
         .run()
         .await
@@ -1109,7 +1108,7 @@ impl TestCase {
             .unwrap()
     }
 
-    pub fn expect_retrieve_actions_from_cascade(
+    pub fn expect_retrieve_records_from_cascade(
         &mut self,
         previous_actions: Vec<SignedActionHashed>,
     ) -> &mut Self {
@@ -1118,13 +1117,17 @@ impl TestCase {
             .map(|a| (a.as_hash().clone(), a))
             .collect::<HashMap<_, _>>();
         self.cascade
-            .expect_retrieve_action()
+            .expect_retrieve()
             .times(previous_actions.len())
             .returning({
                 let previous_actions = previous_actions.clone();
                 move |hash, _| {
-                    let action = previous_actions.get(&hash).unwrap().clone();
-                    async move { Ok(Some((action, CascadeSource::Local))) }.boxed()
+                    let action = previous_actions
+                        .get(&hash.try_into().unwrap())
+                        .unwrap()
+                        .clone();
+                    async move { Ok(Some((Record::new(action, None), CascadeSource::Local))) }
+                        .boxed()
                 }
             });
 
@@ -1150,18 +1153,6 @@ impl TestCase {
                 .clone()]
             .into_iter()
             .map(|op| DhtOpHashed::from_content_sync(op)),
-        )
-        .await;
-        fetch_previous_actions(
-            self.current_validation_dependencies.clone(),
-            cascade.clone(),
-            vec![self
-                .op
-                .as_ref()
-                .expect("No op set, invalid test case")
-                .clone()]
-            .into_iter()
-            .map(|op| op.action()),
         )
         .await;
 
