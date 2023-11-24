@@ -194,7 +194,7 @@ pub async fn sys_validation_workflow<
     }
 }
 
-async fn sys_validation_workflow_inner(
+async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<OutcomeSummary> {
