@@ -111,6 +111,8 @@ pub async fn sys_validation_workflow<
     .sum();
 
     if num_fetched > 0 {
+        tracing::debug!("Fetched {} missing dependencies from the network", num_fetched);
+
         // If we fetched anything then we can re-run sys validation
         trigger_self.trigger(&"sys_validation_workflow");
     }
@@ -1097,22 +1099,6 @@ impl SysValidationWorkspace {
         let cascade = CascadeImpl::empty()
             .with_dht(self.dht_db.clone().into())
             .with_cache(self.cache.clone());
-        match &self.scratch {
-            Some(scratch) => cascade
-                .with_authored(self.authored_db.clone())
-                .with_scratch(scratch.clone()),
-            None => cascade,
-        }
-    }
-
-    /// Create a cascade with access to local data as well as network data
-    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
-        &self,
-        network: Network,
-    ) -> CascadeImpl<Network> {
-        let cascade = CascadeImpl::empty()
-            .with_dht(self.dht_db.clone().into())
-            .with_network(network, self.cache.clone());
         match &self.scratch {
             Some(scratch) => cascade
                 .with_authored(self.authored_db.clone())

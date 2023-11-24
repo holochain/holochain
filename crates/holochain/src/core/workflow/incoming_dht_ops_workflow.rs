@@ -188,7 +188,7 @@ pub async fn incoming_dht_ops_workflow(
                     }
 
                     // trigger validation of queued ops
-                    tracing::info!(
+                    tracing::debug!(
                         "Incoming dht ops workflow is now triggering the sys_validation_trigger"
                     );
                     sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
