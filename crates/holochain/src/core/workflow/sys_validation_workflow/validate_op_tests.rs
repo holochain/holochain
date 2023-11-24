@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::fetch_previous_records;
+use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
 use crate::core::workflow::WorkflowResult;
@@ -44,8 +46,6 @@ use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
-use super::fetch_previous_records;
-use super::ValidationDependencies;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -304,7 +304,7 @@ async fn validate_create_op_with_prev_action_not_found() {
         .cascade_mut()
         .expect_retrieve()
         .times(1)
-        .returning( move |_, _| async move { Ok(None) }.boxed() );
+        .returning(move |_, _| async move { Ok(None) }.boxed());
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
@@ -1029,7 +1029,7 @@ async fn crash_case() {
         .returning(move |_hash, _options| {
             let signed_action = signed_action.clone();
             async move {
-                // TODO this line createx the problem, expects a None value
+                // TODO this line creates the problem, expects a None value
                 Ok(Some((
                     Record::new(signed_action, Some(Entry::Agent(fixt!(AgentPubKey)))),
                     CascadeSource::Local,
@@ -1041,9 +1041,6 @@ async fn crash_case() {
     let validation_outcome = validate_op(
         &op,
         &dna_def,
-        // TODO
-        // Arc::new(cascade),
-        // &MockDhtOpSender::new(),
         Arc::new(Mutex::new(ValidationDependencies::new())),
     )
     .await

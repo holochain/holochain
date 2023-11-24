@@ -23,8 +23,13 @@ use std::sync::Arc;
 use tracing::*;
 use types::Outcome;
 
+use self::validation_deps::ValidationDependencies;
+use self::validation_deps::ValidationDependency;
+use self::validation_deps::ValidationDependencyState;
+
 pub mod types;
 
+pub mod validation_deps;
 pub mod validation_query;
 
 #[cfg(test)]
@@ -123,23 +128,15 @@ pub async fn sys_validation_workflow<
         async move {
             let state = {
                 let mut deps = current_validation_dependencies.lock();
-                let mut state = deps.get(&hash);
-                if let Some(dep) = state.as_mut().and_then(|s| s.dependency.as_mut()) {
-                    match dep {
-                        ValidationDependency::Action(_, source) => {
-                            *source = CascadeSource::Local;
-                        }
-                        ValidationDependency::Record(_, source) => {
-                            *source = CascadeSource::Local;
-                        }
-                    }
+                if let Some(state) = deps.get(&hash) {
+                    state.set_source(CascadeSource::Local);
                 }
 
-                state.cloned()
+                deps.get(&hash).cloned()
             };
 
             if let Some(state) = state {
-                let op_type = state.required_by_op_type.clone();
+                let op_type = state.required_by_op_type();
                 let record = state.as_record().cloned();
 
                 if let (Some(op_type), Some(record)) = (op_type, record) {
@@ -300,167 +297,6 @@ async fn sys_validation_workflow_inner(
     Ok(summary)
 }
 
-pub struct ValidationDependencies {
-    states: HashMap<AnyDhtHash, ValidationDependencyState>,
-    retained_deps: HashSet<AnyDhtHash>,
-}
-
-impl Default for ValidationDependencies {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ValidationDependencies {
-    pub fn new() -> Self {
-        Self {
-            states: HashMap::new(),
-            retained_deps: HashSet::new(),
-        }
-    }
-
-    pub fn has(&mut self, hash: &AnyDhtHash) -> bool {
-        self.retained_deps.insert(hash.clone());
-        self.states
-            .get(hash)
-            .map(|state| state.dependency.is_some())
-            .unwrap_or(false)
-    }
-
-    pub fn get(&mut self, hash: &AnyDhtHash) -> Option<&mut ValidationDependencyState> {
-        match self.states.get_mut(hash) {
-            Some(dep) => Some(dep),
-            None => {
-                tracing::warn!(hash = ?hash, "Have not attempted to fetch requested dependency, this is a bug");
-                None
-            }
-        }
-    }
-
-    fn get_missing_hashes(&self) -> Vec<AnyDhtHash> {
-        self.states
-            .iter()
-            .filter_map(|(hash, state)| {
-                if state.dependency.is_none() {
-                    Some(hash.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    fn get_network_fetched_hashes(&self) -> Vec<AnyDhtHash> {
-        self.states
-            .iter()
-            .filter_map(|(hash, state)| match state {
-                ValidationDependencyState {
-                    dependency: Some(ValidationDependency::Action(_, CascadeSource::Network)),
-                    ..
-                }
-                | ValidationDependencyState {
-                    dependency: Some(ValidationDependency::Record(_, CascadeSource::Network)),
-                    ..
-                } => Some(hash.clone()),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn insert(&mut self, action: SignedActionHashed, source: CascadeSource) -> bool {
-        let hash: AnyDhtHash = action.as_hash().clone().into();
-        if self.has(&hash) {
-            tracing::warn!(hash = ?hash, "Attempted to insert a dependency that was already present, this is not expected");
-            return false;
-        }
-        self.retained_deps.insert(hash.clone());
-        self.states.insert(hash, (action, source).into());
-
-        true
-    }
-
-    fn clear_retained_deps(&mut self) {
-        self.retained_deps.clear();
-    }
-
-    fn purge_held_deps(&mut self) {
-        self.states.retain(|k, _| self.retained_deps.contains(k));
-    }
-
-    // TODO too simple a merge? We don't expect to have any duplicates in the two sets because we
-    //      filter before we fetch.
-    fn merge(&mut self, other: Self) {
-        self.retained_deps.extend(other.states.keys().cloned());
-        self.states.extend(other.states);
-    }
-}
-
-impl FromIterator<(AnyDhtHash, ValidationDependencyState)> for ValidationDependencies {
-    fn from_iter<T: IntoIterator<Item = (AnyDhtHash, ValidationDependencyState)>>(iter: T) -> Self {
-        Self {
-            states: iter.into_iter().collect(),
-            retained_deps: HashSet::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ValidationDependencyState {
-    dependency: Option<ValidationDependency>,
-    // The type of the op that referenced this dependency
-    required_by_op_type: Option<DhtOpType>,
-}
-
-impl ValidationDependencyState {
-    fn as_action(&self) -> Option<&Action> {
-        match &self.dependency {
-            Some(ValidationDependency::Action(signed_action, _)) => Some(signed_action.action()),
-            Some(ValidationDependency::Record(record, _)) => Some(record.action()),
-            None => {
-                tracing::warn!("Attempted to get an action from a dependency that is None");
-                None
-            }
-        }
-    }
-
-    fn as_record(&self) -> Option<&Record> {
-        match &self.dependency {
-            Some(ValidationDependency::Action(_, _)) => {
-                tracing::warn!(
-                    "Attempted to get a record from a dependency that is an action, this is a bug"
-                );
-                None
-            }
-            Some(ValidationDependency::Record(record, _)) => Some(record),
-            None => None,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-enum ValidationDependency {
-    Action(SignedActionHashed, CascadeSource),
-    Record(Record, CascadeSource),
-}
-
-impl From<(SignedActionHashed, CascadeSource)> for ValidationDependencyState {
-    fn from((signed_action, fetched_from): (SignedActionHashed, CascadeSource)) -> Self {
-        Self {
-            dependency: Some(ValidationDependency::Action(signed_action, fetched_from)),
-            required_by_op_type: None,
-        }
-    }
-}
-
-impl From<(Record, CascadeSource, DhtOpType)> for ValidationDependencyState {
-    fn from((record, fetched_from, op_type): (Record, CascadeSource, DhtOpType)) -> Self {
-        Self {
-            dependency: Some(ValidationDependency::Record(record, fetched_from)),
-            required_by_op_type: Some(op_type),
-        }
-    }
-}
-
 fn get_dependency_hashes_from_actions<A>(actions: A) -> Vec<ActionHash>
 where
     A: Iterator<Item = Action>,
@@ -521,10 +357,10 @@ async fn fetch_previous_actions<A, C>(
                     Some((hash.into(), (signed_action, source).into()))
                 }
                 (hash, Ok(None)) => {
-                    Some((hash.into(), ValidationDependencyState {
-                        dependency: None,
-                        required_by_op_type: None,
-                    }))
+                    Some((hash.into(), ValidationDependencyState::new(
+                        None,
+                        None
+                    )))
                 },
                 (hash, Err(e)) => {
                     tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
@@ -644,10 +480,10 @@ async fn fetch_previous_records<C, O>(
                     Some((hash.into(), (record.privatized().0, CascadeSource::Network, op_type).into()))
                 }
                 (hash, op_type, Ok(None)) => {
-                    Some((hash.into(), ValidationDependencyState {
-                        dependency: None,
-                        required_by_op_type: Some(op_type),
-                    }))
+                    Some((hash.into(), ValidationDependencyState::new(
+                        None,
+                        Some(op_type)
+                    )))
                 },
                 (hash, _, Err(e)) => {
                     tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
@@ -682,7 +518,7 @@ pub(crate) async fn validate_op(
             }
             Ok(outcome)
         }
-        Err(e) => Err(e.into()), // TODO questionable conversion, the state of one op validation should not determine the workflow result
+        Err(e) => Err(e.into()),
     }
 }
 
