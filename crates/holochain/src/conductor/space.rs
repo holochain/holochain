@@ -125,7 +125,7 @@ pub struct TestSpace {
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
-        let root_db_dir = config.environment_path.clone();
+        let root_db_dir = config.data_root_path.clone();
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,

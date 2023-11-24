@@ -18,12 +18,12 @@ impl SweetConductorBatch {
     pub fn new(conductors: Vec<SweetConductor>) -> Self {
         let paths: HashSet<PathBuf> = conductors
             .iter()
-            .map(|c| c.config.environment_path.clone().into())
+            .map(|c| c.config.data_root_path.clone().into())
             .collect();
         assert_eq!(
             conductors.len(),
             paths.len(),
-            "Some conductors in a SweetConductorBatch share the same database path!"
+            "Some conductors in a SweetConductorBatch share the same data path!"
         );
         Self(conductors)
     }

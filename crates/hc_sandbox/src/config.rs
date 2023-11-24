@@ -8,15 +8,13 @@ use holochain_conductor_api::config::conductor::KeystoreConfig;
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
-/// Create a new default [`ConductorConfig`] with environment path,
+/// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.
-pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> ConductorConfig {
+pub fn create_config(data_root_path: PathBuf, con_url: Option<url2::Url2>) -> ConductorConfig {
     let mut conductor_config = ConductorConfig {
-        environment_path: environment_path.clone().into(),
+        data_root_path: data_root_path.clone().into(),
         ..Default::default()
     };
-    let mut keystore_path = environment_path.clone();
-    keystore_path.push("keystore");
     match con_url {
         Some(url) => {
             conductor_config.keystore = KeystoreConfig::LairServer {

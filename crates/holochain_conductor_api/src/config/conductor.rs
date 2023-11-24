@@ -12,10 +12,8 @@ mod dpki_config;
 #[allow(missing_docs)]
 mod error;
 mod keystore_config;
-pub mod paths;
 //mod logger_config;
 //mod signal_config;
-pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -24,6 +22,7 @@ pub use error::*;
 pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
+use std::path::PathBuf;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
@@ -33,9 +32,10 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub tracing_override: Option<String>,
 
-    /// The path to the database for this conductor;
+    /// The path to the data root for this conductor;
     /// if omitted, chooses a default path.
-    pub environment_path: DatabaseRootPath,
+    /// The database and compiled wasm directories are derived from this path.
+    pub data_root_path: PathBuf,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -146,7 +146,7 @@ mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -224,7 +224,7 @@ mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: PathBuf::from("/path/to/env").into(),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
-    environment_path: /path/to/env
+        data_root_path: /path/to/env
     keystore_path: /path/to/keystore
 
     keystore:
@@ -257,7 +257,7 @@ mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {

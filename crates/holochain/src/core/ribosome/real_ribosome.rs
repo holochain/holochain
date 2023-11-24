@@ -113,22 +113,22 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-pub static SERIALIZED_MODULE_CACHE: Lazy<RwLock<SerializedModuleCache>> = Lazy::new(|| {
-    RwLock::new(SerializedModuleCache {
-        cranelift,
-        maybe_fs_dir: Some(CompiledWasmsRootPath::default().into()),
-        plru: MicroCache::default(),
-        key_map: PlruKeyMap::default(),
-        cache: BTreeMap::default(),
-    })
-});
-pub static INSTANCE_CACHE: Lazy<RwLock<InstanceCache>> =
-    Lazy::new(|| RwLock::new(InstanceCache::default()));
+// pub static SERIALIZED_MODULE_CACHE: Lazy<RwLock<SerializedModuleCache>> = Lazy::new(|| {
+//     println!("{:?}", CompiledWasmsRootPath::default());
+//     RwLock::new(SerializedModuleCache {
+//         cranelift,
+//         maybe_fs_dir: Some(CompiledWasmsRootPath::default().into()),
+//         plru: MicroCache::default(),
+//         key_map: PlruKeyMap::default(),
+//         cache: BTreeMap::default(),
+//     })
+// });
+// pub static INSTANCE_CACHE: Lazy<RwLock<InstanceCache>> =
+//     Lazy::new(|| RwLock::new(InstanceCache::default()));
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
-
 pub struct RealRibosome {
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
@@ -141,6 +141,10 @@ pub struct RealRibosome {
 
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
+
+    pub serialized_module_cache: Arc<RwLock<SerializedModuleCache>>,
+
+    pub instance_cache: Arc<RwLock<InstanceCache>>,
 }
 
 struct HostFnBuilder {
@@ -253,13 +257,13 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
+    pub fn new(dna_file: DnaFile, maybe_fs_dir: Option<PathBuf>) -> RibosomeResult<Self> {
         // Create an empty ribosome.
-        let ribosome = Self {
-            dna_file,
-            zome_types: Default::default(),
-            zome_dependencies: Default::default(),
-        };
+        // let ribosome = Self {
+        //     dna_file,
+        //     zome_types: Default::default(),
+        //     zome_dependencies: Default::default(),
+        // };
 
         // Collect the number of entry and link types
         // for each integrity zome.
@@ -344,6 +348,14 @@ impl RealRibosome {
             dna_file: ribosome.dna_file,
             zome_types,
             zome_dependencies: Arc::new(zome_dependencies),
+            serialized_module_cache: Arc::new(RwLock::new(SerializedModuleCache {
+                plru: MicroCache::default(),
+                key_map: PlruKeyMap::default(),
+                cache: BTreeMap::default(),
+                cranelift,
+                maybe_fs_dir,
+            })),
+            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         })
     }
 
@@ -353,6 +365,14 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            serialized_module_cache: Arc::new(RwLock::new(SerializedModuleCache {
+                plru: MicroCache::default(),
+                key_map: PlruKeyMap::default(),
+                cache: BTreeMap::default(),
+                cranelift,
+                maybe_fs_dir: None,
+            })),
+            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         }
     }
 
@@ -524,9 +544,9 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );
-        let mut lock = INSTANCE_CACHE.write();
+        // let mut lock = self.instance_cache.write();
         // Get the first available key.
-        let key = lock
+        let key = instance_cache
             .cache()
             .range(key_start..key_end)
             .next()
