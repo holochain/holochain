@@ -25,7 +25,6 @@ use types::Outcome;
 
 pub mod types;
 
-mod validation_batch;
 pub mod validation_query;
 
 #[cfg(test)]
@@ -91,7 +90,8 @@ pub async fn sys_validation_workflow<
                 }
                 Ok(None) => {
                     // This is fine, we didn't find it on the network, so we'll have to try again.
-                    // TODO put this on a timeout to avoid hitting the network too often for it?
+                    // TODO This will hit the network again fairly quickly if sys validation is triggered again soon.
+                    //      It would be more efficient to wait a bit before trying again.
                     0
                 }
                 Err(e) => {
