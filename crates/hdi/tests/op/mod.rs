@@ -27,7 +27,7 @@ pub struct D {
 #[derive(Clone, PartialEq, Eq)]
 pub enum EntryTypes {
     A(A),
-    #[entry_def(visibility = "private")]
+    #[entry_type(visibility = "private")]
     B(B),
     C(C),
 }

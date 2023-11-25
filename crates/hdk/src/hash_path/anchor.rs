@@ -5,8 +5,40 @@ use hdi::hash_path::{
     path::{Component, Path},
 };
 
-pub trait TryFromPath {
-    fn try_from_path(path: &Path) -> Result<Anchor, WasmError>;
+/// This is the root of the [ `Path` ] tree.
+///
+/// Forms the entry point to all anchors so that agents can navigate down the tree from here.
+pub const ROOT: &[u8; 2] = &[0x00, 0x00];
+
+#[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
+/// An anchor can only be 1 or 2 levels deep as "type" and "text".
+///
+/// The second level is optional and the Strings use the standard [ `TryInto` ] for path [ `Component` ] internally.
+///
+/// __Anchors are required to be included in an application's [ `entry_defs` ]__ callback and so implement all the standard methods.
+/// Technically the [ `Anchor` ] entry definition is the [ `Path` ] definition.
+///
+/// e.g. `entry_defs![Anchor::entry_types()]`
+///
+/// The methods implemented on anchor follow the patterns that predate the Path module but `Path::from(&anchor)` is always possible to use the newer APIs.
+pub struct Anchor {
+    pub anchor_type: String,
+    pub anchor_text: Option<String>,
+}
+
+/// Anchors are just a special case of path, so we can move from anchor to path losslessly.
+/// We simply format the anchor structure into a string that works with the path string handling.
+impl From<&Anchor> for Path {
+    fn from(anchor: &Anchor) -> Self {
+        let mut components = vec![
+            Component::new(ROOT.to_vec()),
+            Component::from(anchor.anchor_type.as_bytes().to_vec()),
+        ];
+        if let Some(text) = anchor.anchor_text.as_ref() {
+            components.push(Component::from(text.as_bytes().to_vec()));
+        }
+        components.into()
+    }
 }
 
 /// Paths are more general than anchors so a path could be represented that is not a valid anchor.

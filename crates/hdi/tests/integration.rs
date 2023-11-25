@@ -207,11 +207,11 @@ mod entry_defs_overrides_mod {
     #[hdk_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitFoo)]
     pub enum EntryTypes {
-        #[entry_def(name = "hey")]
+        #[entry_type(name = "hey")]
         A(A),
-        #[entry_def(visibility = "private")]
+        #[entry_type(visibility = "private")]
         B(A),
-        #[entry_def(required_validations = 10, cache_at_agent_activity = true)]
+        #[entry_type(required_validations = 10, cache_at_agent_activity = true)]
         C(A),
     }
 }

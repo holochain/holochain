@@ -2,7 +2,7 @@ use hdk::prelude::hdi::prelude::*;
 
 #[derive(EntryDefRegistration)]
 enum Nesting {
-    #[entry_def(name = 55)]
+    #[entry_type(name = 55)]
     A(A),
     B(B),
 }

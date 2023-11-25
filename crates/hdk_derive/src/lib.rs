@@ -220,9 +220,9 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
 /// #[unit_enum(UnitEntryTypes)]
 /// pub enum EntryTypes {
 ///     Post(Post),
-///     #[entry_def(required_validations = 5)]
+///     #[entry_type(required_validations = 5)]
 ///     Msg(Msg),
-///     #[entry_def(name = "hidden_msg", required_validations = 5, visibility = "private")]
+///     #[entry_type(name = "hidden_msg", required_validations = 5, visibility = "private")]
 ///     PrivMsg(PrivMsg),
 /// }
 /// ```

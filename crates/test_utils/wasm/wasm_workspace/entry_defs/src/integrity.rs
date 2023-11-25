@@ -10,6 +10,6 @@ pub struct Comment;
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Post(Post),
-    #[entry_def(visibility = "private")]
+    #[entry_type(visibility = "private")]
     Comment(Comment),
 }

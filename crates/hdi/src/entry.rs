@@ -213,18 +213,18 @@ macro_rules! app_entry {
 /// e.g. the following are the same
 ///
 /// ```ignore
-/// entry_defs![ Foo::entry_def() ];
+/// entry_defs![ Foo::entry_type() ];
 /// ```
 ///
 /// ```ignore
 /// #[hdk_extern]
 /// fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
-///   Ok(vec![ Foo::entry_def() ].into())
+///   Ok(vec![ Foo::entry_type() ].into())
 /// }
 /// ```
 #[doc(hidden)]
 #[macro_export]
-macro_rules! entry_defs {
+macro_rules! entry_types {
     [ $( $def:expr ),* ] => {
         #[hdk_extern]
         pub fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
