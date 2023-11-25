@@ -88,7 +88,7 @@ struct TimedBloomFilter {
 
 /// Gossip has two distinct variants which share a lot of similarities but
 /// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GossipType {
     /// The Recent gossip type is aimed at rapidly syncing the most recent
     /// data. It runs frequently and expects frequent diffs at each round.
@@ -554,7 +554,15 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
-                    tracing::warn!("Gossip partner has timed out, considering them expired for the current round {:?}", cert);
+                    tracing::warn!(
+                        "Peer node timed out its gossip round. Cert: {:?}, Local agents: {:?}, Remote agents: {:?}",
+                        cert,
+                        self.local_agents,
+                        remote_agent_list
+                            .iter()
+                            .map(|i| i.agent())
+                            .collect::<Vec<_>>()
+                    );
                     {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, true);
@@ -1074,7 +1082,7 @@ impl ShardedGossipLocal {
         self.inner
             .share_mut(|i, _| {
                 for (cert, ref r) in i.round_map.take_timed_out_rounds() {
-                    tracing::warn!("The node {:?} has timed out their gossip round", cert);
+                    tracing::warn!("The node {:?} has timed out its gossip round", cert);
                     let mut metrics = i.metrics.write();
                     metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
                     metrics.complete_current_round(&cert, true);
@@ -1455,6 +1463,15 @@ impl From<GossipType> for GossipModuleType {
         match g {
             GossipType::Recent => GossipModuleType::ShardedRecent,
             GossipType::Historical => GossipModuleType::ShardedHistorical,
+        }
+    }
+}
+
+impl From<GossipModuleType> for GossipType {
+    fn from(g: GossipModuleType) -> Self {
+        match g {
+            GossipModuleType::ShardedRecent => GossipType::Recent,
+            GossipModuleType::ShardedHistorical => GossipType::Historical,
         }
     }
 }

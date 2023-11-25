@@ -2,7 +2,7 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.2.2";
+        url = "github:holochain/holochain/holochain-0.2.3";
         flake = false;
       };
 

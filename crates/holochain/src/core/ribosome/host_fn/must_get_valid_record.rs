@@ -6,14 +6,17 @@ use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
+#[tracing::instrument(skip(_ribosome, call_context))]
 pub fn must_get_valid_record<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: MustGetValidRecordInput,
 ) -> Result<Record, RuntimeError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    tracing::debug!("begin must_get_valid_record");
+    let ret = match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
             ..
@@ -92,5 +95,7 @@ pub fn must_get_valid_record<'a>(
             .to_string(),
         ))
         .into()),
-    }
+    };
+    tracing::debug!(?ret);
+    ret
 }

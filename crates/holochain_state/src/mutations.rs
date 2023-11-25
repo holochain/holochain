@@ -12,7 +12,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DnaDefHashed;
@@ -99,7 +99,7 @@ pub fn insert_op_scratch(
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
-    let op_light = op.to_light();
+    let op_light = op.to_lite();
     let action = op.action();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry().into_option() {
@@ -134,7 +134,7 @@ pub fn insert_record_scratch(
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
-    let op_light = op.to_light();
+    let op_light = op.to_lite();
     let action = op.action();
     let timestamp = action.timestamp();
     let signature = op.signature().clone();
@@ -155,7 +155,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     Ok(())
 }
 
-/// Insert a [`DhtOpLight`] into an authored database.
+/// Insert a [`DhtOpLite`] into an authored database.
 /// This sets the sql fields so the authored database
 /// can be used in queries with other databases.
 /// Because we are sharing queries across databases
@@ -163,7 +163,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 #[tracing::instrument(skip(txn))]
 pub fn insert_op_lite_into_authored(
     txn: &mut Transaction,
-    op_lite: &DhtOpLight,
+    op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
@@ -174,10 +174,10 @@ pub fn insert_op_lite_into_authored(
     Ok(())
 }
 
-/// Insert a [`DhtOpLight`] into the database.
+/// Insert a [`DhtOpLite`] into the database.
 pub fn insert_op_lite(
     txn: &mut Transaction,
-    op_lite: &DhtOpLight,
+    op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     timestamp: &Timestamp,
@@ -451,6 +451,10 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
     let now = holochain_zome_types::prelude::Timestamp::now();
+    // TODO num_validation_attempts is incremented every time this is called but never reset between sys and app validation
+    // which means that if an op takes a few tries to pass sys validation then it will be 'deprioritised' in the app validation
+    // query rather than sorted by OpOrder. Check for/add a test that checks app validation is resilient to this and isn't relying on
+    // op order from the database query.
     txn.execute(
         "
         UPDATE DhtOp

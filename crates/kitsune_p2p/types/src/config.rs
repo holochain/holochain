@@ -393,7 +393,7 @@ impl Default for KitsuneP2pConfig {
 fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
     match bind_to {
         Some(bind_to) => bind_to.clone().into(),
-        None => "kitsune-quic://0.0.0.0:0".into(),
+        None => TxUrl::from_str_panicking("kitsune-quic://0.0.0.0:0"),
     }
 }
 
