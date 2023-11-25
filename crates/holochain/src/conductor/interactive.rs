@@ -6,7 +6,6 @@ use holochain_conductor_api::conductor::ConductorConfigError;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorError;
 use crate::conductor::error::ConductorResult;
-use crate::conductor::paths::ConfigFilePath;
 use std::path::Path;
 
 /// Prompt the user to answer Y or N.
@@ -58,30 +57,6 @@ pub fn prompt_for_database_dir(path: &Path) -> std::io::Result<()> {
             "Cannot continue without database.",
         ))
     }
-}
-
-/// If config_path is Some, attempt to load the config from that path, and return error if file not found
-/// If config_path is None, attempt to load config from default path, and offer to create config if file not found
-pub fn load_config_or_prompt_for_default(
-    config_path: ConfigFilePath,
-) -> ConductorResult<Option<ConductorConfig>> {
-    ConductorConfig::load_yaml(config_path.as_ref()).map(Some).or_else(|err| {
-        if let ConductorConfigError::ConfigMissing(_) = err {
-            let prompt = format!(
-                "There is no conductor config YAML file at the path specified ({})\nWould you like to create a default config file at this location?",
-                config_path
-            );
-            if ask_yn(prompt, Some(true))? {
-                let config = save_default_config_yaml(config_path.as_ref())?;
-                println!("Conductor config written.");
-                Ok(Some(config))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Err(err.into())
-        }
-    })
 }
 
 /// Save the default [ConductorConfig] to `path`

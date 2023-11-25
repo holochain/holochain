@@ -48,14 +48,6 @@ struct Opt {
     pub piped: bool,
 
     #[structopt(
-        short = "i",
-        long,
-        help = "Receive helpful prompts to create missing files and directories,
-    useful when running a conductor for the first time"
-    )]
-    interactive: bool,
-
-    #[structopt(
         long,
         help = "Display version information such as git revision and HDK version"
     )]

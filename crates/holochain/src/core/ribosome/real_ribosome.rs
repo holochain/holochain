@@ -112,19 +112,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-
-// pub static SERIALIZED_MODULE_CACHE: Lazy<RwLock<SerializedModuleCache>> = Lazy::new(|| {
-//     println!("{:?}", CompiledWasmsRootPath::default());
-//     RwLock::new(SerializedModuleCache {
-//         cranelift,
-//         maybe_fs_dir: Some(CompiledWasmsRootPath::default().into()),
-//         plru: MicroCache::default(),
-//         key_map: PlruKeyMap::default(),
-//         cache: BTreeMap::default(),
-//     })
-// });
-// pub static INSTANCE_CACHE: Lazy<RwLock<InstanceCache>> =
-//     Lazy::new(|| RwLock::new(InstanceCache::default()));
+use holochain_conductor_api::config::conductor::paths::WASM_DIRECTORY;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -257,13 +245,21 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile, maybe_fs_dir: Option<PathBuf>) -> RibosomeResult<Self> {
+    pub fn new(dna_file: DnaFile, maybe_data_root_path: Option<PathBuf>) -> RibosomeResult<Self> {
         // Create an empty ribosome.
-        // let ribosome = Self {
-        //     dna_file,
-        //     zome_types: Default::default(),
-        //     zome_dependencies: Default::default(),
-        // };
+        let mut ribosome = Self {
+            dna_file,
+            zome_types: Default::default(),
+            zome_dependencies: Default::default(),
+            serialized_module_cache: Arc::new(RwLock::new(SerializedModuleCache {
+                plru: MicroCache::default(),
+                key_map: PlruKeyMap::default(),
+                cache: BTreeMap::default(),
+                cranelift,
+                maybe_fs_dir: maybe_data_root_path.map(|data_root_path| data_root_path.join(WASM_DIRECTORY)),
+            })),
+            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
+        };
 
         // Collect the number of entry and link types
         // for each integrity zome.
@@ -300,7 +296,7 @@ impl RealRibosome {
         // Create the global zome types from the totals.
         let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
 
-        let zome_types = Arc::new(map?);
+        ribosome.zome_types = Arc::new(map?);
 
         // Create a map of integrity zome names to ZomeIndexes.
         let integrity_zomes: HashMap<_, _> = ribosome
@@ -313,7 +309,7 @@ impl RealRibosome {
             .ok_or(ZomeTypesError::ZomeIndexOverflow)?;
 
         // Collect the dependencies for each zome.
-        let zome_dependencies = ribosome
+        ribosome.zome_dependencies = ribosome
             .dna_def()
             .all_zomes()
             .map(|(zome_name, def)| {
@@ -342,21 +338,9 @@ impl RealRibosome {
 
                 Ok((zome_name.clone(), dependencies))
             })
-            .collect::<RibosomeResult<HashMap<_, _>>>()?;
+            .collect::<RibosomeResult<HashMap<_, _>>>()?.into();
 
-        Ok(Self {
-            dna_file: ribosome.dna_file,
-            zome_types,
-            zome_dependencies: Arc::new(zome_dependencies),
-            serialized_module_cache: Arc::new(RwLock::new(SerializedModuleCache {
-                plru: MicroCache::default(),
-                key_map: PlruKeyMap::default(),
-                cache: BTreeMap::default(),
-                cranelift,
-                maybe_fs_dir,
-            })),
-            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
-        })
+        Ok(ribosome)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -391,7 +375,7 @@ impl RealRibosome {
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<ModuleWithStore>> {
-        Ok(SERIALIZED_MODULE_CACHE.write().get(
+        Ok(self.serialized_module_cache.write().get(
             self.wasm_cache_key(zome_name)?,
             &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
         )?)
@@ -429,7 +413,7 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             context_key,
         );
-        INSTANCE_CACHE.write().put_item(key, instance_with_store);
+        self.instance_cache.write().put_item(key, instance_with_store);
 
         Ok(())
     }
@@ -544,9 +528,9 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );
-        // let mut lock = self.instance_cache.write();
+        let mut lock = self.instance_cache.write();
         // Get the first available key.
-        let key = instance_cache
+        let key = lock
             .cache()
             .range(key_start..key_end)
             .next()
@@ -596,7 +580,7 @@ impl RealRibosome {
             coordinator_zomes: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
-        let empty_ribosome = RealRibosome::new(empty_dna_file)?;
+        let empty_ribosome = RealRibosome::new(empty_dna_file, None)?;
         let context_key = RealRibosome::next_context_key();
         let mut store = Store::default();
         // We just leave this Env uninitialized as default because we never make it

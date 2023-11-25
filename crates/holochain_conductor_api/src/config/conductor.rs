@@ -12,6 +12,8 @@ mod dpki_config;
 #[allow(missing_docs)]
 mod error;
 mod keystore_config;
+/// Defines subdirectories of the config directory.
+pub mod paths;
 //mod logger_config;
 //mod signal_config;
 

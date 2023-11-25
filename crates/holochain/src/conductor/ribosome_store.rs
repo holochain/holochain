@@ -19,14 +19,6 @@ impl RibosomeStore {
         })
     }
 
-    #[instrument]
-    pub fn add_dna(&mut self, dna: DnaFile) -> RibosomeResult<()> {
-        let hash = dna.dna_hash().clone();
-        let ribosome = RealRibosome::new(dna)?;
-        self.ribosomes.insert(hash, ribosome);
-        Ok(())
-    }
-
     pub fn add_ribosome(&mut self, ribosome: RealRibosome) {
         self.ribosomes.insert(ribosome.dna_hash().clone(), ribosome);
     }

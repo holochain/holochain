@@ -85,7 +85,7 @@ impl ConductorBuilder {
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
                     let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
-                        let mut p: std::path::PathBuf = self.config.environment_path.clone().into();
+                        let mut p: std::path::PathBuf = self.config.data_root_path.clone().into();
                         p.push("keystore");
                         p
                     });
@@ -326,7 +326,7 @@ impl ConductorBuilder {
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
-        self.config.environment_path = env_path.to_path_buf().into();
+        self.config.data_root_path = env_path.to_path_buf().into();
 
         let spaces = Spaces::new(&self.config)?;
         let tag = spaces.get_state().await?.tag().clone();

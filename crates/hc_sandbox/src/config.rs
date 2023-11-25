@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
+use holochain_conductor_api::config::conductor::paths::KEYSTORE_DIRECTORY;
 
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
@@ -22,9 +23,8 @@ pub fn create_config(data_root_path: PathBuf, con_url: Option<url2::Url2>) -> Co
             };
         }
         None => {
-            let mut lair_root = environment_path;
-            // Keep the path short so that when it's used in CI the path doesn't get too long to be used as a domain socket
-            lair_root.push("ks");
+            let mut lair_root = data_root_path;
+            lair_root.push(KEYSTORE_DIRECTORY);
             conductor_config.keystore = KeystoreConfig::LairServerInProc {
                 lair_root: Some(lair_root),
             };

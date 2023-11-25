@@ -126,7 +126,7 @@ impl SweetConductor {
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
         let spaces = Spaces::new(&ConductorConfig {
-            environment_path: env_dir.to_path_buf().into(),
+            data_root_path: env_dir.to_path_buf().into(),
             ..Default::default()
         })
         .unwrap();
