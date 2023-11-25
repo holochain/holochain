@@ -27,4 +27,3 @@ pub use crate::x_salsa20_poly1305::*;
 pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
-pub use crate::*;

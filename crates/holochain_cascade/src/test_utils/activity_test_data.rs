@@ -6,7 +6,7 @@ use holochain_types::activity::ChainItems;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 
 /// A collection of fixtures used to create scenarios for testing the Cascade
 #[derive(Debug)]

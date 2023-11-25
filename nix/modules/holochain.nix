@@ -21,10 +21,6 @@
 
         CARGO_PROFILE = "";
 
-        OPENSSL_NO_VENDOR = "1";
-        OPENSSL_LIB_DIR = "${self'.packages.opensslStatic.out}/lib";
-        OPENSSL_INCLUDE_DIR = "${self'.packages.opensslStatic.dev}/include";
-
         buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [

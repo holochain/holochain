@@ -7,8 +7,6 @@ use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
-use holochain_types::prelude::block::BlockTargetId;
-use holochain_types::prelude::*;
 use rusqlite::Transaction;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -185,7 +183,7 @@ async fn test_block_invalid_receipt() {
         _ => Ok(ValidateResult::Valid),
     });
 
-    let config = SweetConductorConfig::rendezvous();
+    let config = SweetConductorConfig::rendezvous(true);
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let mut conductors = conductors.into_inner().into_iter();

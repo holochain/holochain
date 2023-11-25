@@ -185,7 +185,7 @@ mod tests {
     use crate::wire::Wire;
     use crate::KitsuneP2pResult;
     use crate::{GossipModuleType, KitsuneP2pError};
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use futures::channel::mpsc::channel;
     use futures::future::BoxFuture;
     use futures::{FutureExt, SinkExt, StreamExt};

@@ -5,8 +5,6 @@ use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
 use crate::prelude::*;
-use error::RecordGroupError;
-use error::RecordGroupResult;
 use holochain_keystore::KeystoreError;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
@@ -15,7 +13,8 @@ use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 #[allow(missing_docs)]
-pub mod error;
+mod error;
+pub use error::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 /// A condensed version of get record request.

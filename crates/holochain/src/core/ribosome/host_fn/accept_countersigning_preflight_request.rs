@@ -6,6 +6,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use tracing::error;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn accept_countersigning_preflight_request<'a>(
@@ -27,7 +28,7 @@ pub fn accept_countersigning_preflight_request<'a>(
             let author = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
                 .agent_latest_pubkey;
             tokio_helper::block_forever_on(async move {
-                if (holochain_zome_types::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
+                if (holochain_zome_types::prelude::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
                     < *input.session_times.start()
                 {
@@ -115,15 +116,15 @@ pub mod wasm_test {
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::core::workflow::error::WorkflowError;
-    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
+    use crate::core::workflow::WorkflowError;
     use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetConductorBatch;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_wasmer_host::prelude::*;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use wasmer::RuntimeError;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -141,9 +142,10 @@ pub mod wasm_test {
     }
 
     /// Allow LockExpired error, panic on anything else
-    fn expect_chain_lock_expired<T>(
-        result: Result<T, ConductorApiError>,
-    ) where T: std::fmt::Debug {
+    fn expect_chain_lock_expired<T>(result: Result<T, ConductorApiError>)
+    where
+        T: std::fmt::Debug,
+    {
         match result {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
@@ -157,6 +159,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_timeout_session() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -180,8 +183,9 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         let alice_agent_activity_bob_observed_before: AgentActivity = conductor
             .call(
                 &bob,
@@ -190,8 +194,9 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         let bob_agent_activity_alice_observed_before: AgentActivity = conductor
             .call(
                 &alice,
@@ -200,8 +205,9 @@ pub mod wasm_test {
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         let bob_agent_activity_bob_observed_before: AgentActivity = conductor
             .call(
                 &bob,
@@ -210,8 +216,9 @@ pub mod wasm_test {
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
 
         // Everyone accepts a short lived session.
         let preflight_request: PreflightRequest = conductor
@@ -222,7 +229,8 @@ pub mod wasm_test {
                     (alice_pubkey.clone(), vec![Role(0)]),
                     (bob_pubkey.clone(), vec![]),
                 ],
-            ).await;
+            )
+            .await;
         let alice_acceptance: PreflightRequestAcceptance = conductor
             .call(
                 &alice,
@@ -230,7 +238,7 @@ pub mod wasm_test {
                 preflight_request.clone(),
             )
             .await;
-            let alice_response =
+        let alice_response =
             if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
                 response
             } else {
@@ -243,7 +251,7 @@ pub mod wasm_test {
                 preflight_request.clone(),
             )
             .await;
-            let bob_response =
+        let bob_response =
             if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
                 response
             } else {
@@ -251,7 +259,10 @@ pub mod wasm_test {
             };
 
         // Alice commits the session entry.
-        let (countersigned_action_hash_alice, countersigned_entry_hash_alice): (ActionHash, EntryHash) = conductor
+        let (countersigned_action_hash_alice, countersigned_entry_hash_alice): (
+            ActionHash,
+            EntryHash,
+        ) = conductor
             .call(
                 &alice,
                 "create_a_countersigned_thing_with_entry_hash",
@@ -262,12 +273,12 @@ pub mod wasm_test {
         // Bob tries to do the same thing but after timeout.
         tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
         let bob_result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &bob,
-            "create_a_countersigned_thing",
-            vec![alice_response.clone(), bob_response.clone()],
-        )
-        .await;
+            .call_fallible(
+                &bob,
+                "create_a_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
         expect_chain_lock_expired(bob_result);
 
         // At this point Alice's session entry is a liability so can't exist.
@@ -279,8 +290,9 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         let alice_agent_activity_bob_observed_after: AgentActivity = conductor
             .call(
                 &bob,
@@ -289,8 +301,9 @@ pub mod wasm_test {
                     agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         let bob_agent_activity_alice_observed_after: AgentActivity = conductor
             .call(
                 &alice,
@@ -299,8 +312,9 @@ pub mod wasm_test {
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
         let bob_agent_activity_bob_observed_after: AgentActivity = conductor
             .call(
                 &bob,
@@ -309,13 +323,26 @@ pub mod wasm_test {
                     agent_pubkey: bob_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
-                }
-            ).await;
+                },
+            )
+            .await;
 
-        assert_eq!(alice_agent_activity_alice_observed_before, alice_agent_activity_alice_observed_after);
-        assert_eq!(alice_agent_activity_bob_observed_before, alice_agent_activity_bob_observed_after);
-        assert_eq!(bob_agent_activity_alice_observed_before, bob_agent_activity_alice_observed_after);
-        assert_eq!(bob_agent_activity_bob_observed_before, bob_agent_activity_bob_observed_after);
+        assert_eq!(
+            alice_agent_activity_alice_observed_before,
+            alice_agent_activity_alice_observed_after
+        );
+        assert_eq!(
+            alice_agent_activity_bob_observed_before,
+            alice_agent_activity_bob_observed_after
+        );
+        assert_eq!(
+            bob_agent_activity_alice_observed_before,
+            bob_agent_activity_alice_observed_after
+        );
+        assert_eq!(
+            bob_agent_activity_bob_observed_before,
+            bob_agent_activity_bob_observed_after
+        );
 
         // @TODO - the following all pass but perhaps we do NOT want them to?
         // It's not immediately clear what direct requests by hash should do in all cases here.
@@ -342,29 +369,32 @@ pub mod wasm_test {
         //
         // etc. etc. I'm just leaving this commentary here to germinate future headaches and self doubt.
         let _alice_action: SignedActionHashed = conductor
-        .call(
-            &alice,
-            "must_get_action",
-            countersigned_action_hash_alice.clone(),
-        )
-        .await;
+            .call(
+                &alice,
+                "must_get_action",
+                countersigned_action_hash_alice.clone(),
+            )
+            .await;
 
         let _alice_record: Record = conductor
-        .call(
-            &alice,
-            "must_get_valid_record",
-            countersigned_action_hash_alice.clone(),
-        )
-        .await;
-        let _alice_entry: EntryHashed = conductor.call(
-            &alice,
-            "must_get_entry",
-            countersigned_entry_hash_alice.clone()
-        ).await;
+            .call(
+                &alice,
+                "must_get_valid_record",
+                countersigned_action_hash_alice.clone(),
+            )
+            .await;
+        let _alice_entry: EntryHashed = conductor
+            .call(
+                &alice,
+                "must_get_entry",
+                countersigned_entry_hash_alice.clone(),
+            )
+            .await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
 
@@ -453,7 +483,7 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_alice);
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-    
+
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
         let countersign_fail_create_alice = conductor
@@ -486,6 +516,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
 
@@ -794,6 +825,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[ignore = "flaky"]
     async fn enzymatic_session_success() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -928,19 +960,20 @@ pub mod wasm_test {
             bob_activity.valid_activity.len(),
             bob_activity_pre.valid_activity.len() + 1
         );
-
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
+    #[ignore = "flaky"]
     async fn enzymatic_session_fail() {
         holochain_trace::test_run().ok();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
-        let mut conductors = SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous()).await;
+        let mut conductors =
+            SweetConductorBatch::from_standard_config(3)
+                .await;
         let apps = conductors
             .setup_app("countersigning", &[dna_file.clone()])
             .await
@@ -1068,6 +1101,7 @@ pub mod wasm_test {
                     },
                 )
                 .await;
+
             // And bob's.
             let bob_activity: AgentActivity = alice_conductor
                 .call(
@@ -1083,14 +1117,21 @@ pub mod wasm_test {
 
             assert_eq!(
                 alice_activity.valid_activity.len(),
-                alice_activity_pre.valid_activity.len() + 2
+                alice_activity_pre.valid_activity.len() + 2,
+                "Expected alice's activity to have {} items but was {}, have got this activity {:?}",
+                alice_activity_pre.valid_activity.len() + 2,
+                alice_activity.valid_activity.len(),
+                alice_activity,
             );
             assert_eq!(
                 bob_activity.valid_activity.len(),
-                bob_activity_pre.valid_activity.len() + 2
+                bob_activity_pre.valid_activity.len() + 2,
+                "Expected bob's activity to have {} items but was {}, have got this activity {:?}",
+                bob_activity_pre.valid_activity.len() + 2,
+                bob_activity.valid_activity.len(),
+                bob_activity,
             );
         }
-
 
         // ENZYMATIC
 

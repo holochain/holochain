@@ -2,7 +2,7 @@
 
 use crate::agent_info::AgentInfoSigned;
 use crate::agent_info::UrlList;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use kitsune_p2p_bin_data::fixt::KitsuneAgentFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSignatureFixturator;
 use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;

@@ -42,7 +42,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;

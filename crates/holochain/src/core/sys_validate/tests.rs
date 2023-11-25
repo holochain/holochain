@@ -43,6 +43,7 @@ use contrafact::Fact;
 use error::SysValidationError;
 
 use holochain_cascade::MockCascade;
+use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::SerializedBytes;
@@ -52,6 +53,7 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
+use holochain_zome_types::facts::ActionRefMut;
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::time::Duration;
@@ -154,6 +156,8 @@ async fn record_with_deps_fixup(
                     update.original_action_address = create.action_address().clone();
                     update.original_entry_address =
                         create.entry().as_option().unwrap().to_hash().clone();
+                    *create.as_action_mut().entry_data_mut().unwrap().0 =
+                        create.entry().as_option().unwrap().to_hash().clone();
                     *create.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
                     deps.push(create);
                 }
@@ -209,7 +213,7 @@ async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Reco
 #[allow(dead_code)]
 async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
     let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
+    let cascade: MockCascade = MockCascade::with_records(deps.clone());
     sys_validate_record(&record, &cascade).await
 }
 
@@ -238,14 +242,11 @@ async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
 async fn test_record_with_cascade() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     for _ in 0..100 {
-        let op = holochain_types::dht_op::facts::valid_dht_op(
-            keystore.clone(),
-            fake_agent_pubkey_1(),
-            false,
-        )
-        .build(&mut g);
+        let op =
+            holochain_types::facts::valid_dht_op(keystore.clone(), fake_agent_pubkey_1(), false)
+                .build(&mut g);
         let action = op.action().clone();
         assert_valid_action(&keystore, action).await;
     }
@@ -256,7 +257,7 @@ async fn test_record_with_cascade() {
 async fn verify_action_signature_test() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     let action = CreateLink::arbitrary(&mut g).unwrap();
     let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
@@ -276,7 +277,7 @@ async fn verify_action_signature_test() {
 async fn check_previous_action() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     let mut action = Action::Delete(Delete::arbitrary(&mut g).unwrap());
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
@@ -606,8 +607,8 @@ async fn check_update_reference_test() {
     .build(&mut g);
 
     let net = new_entry_type.clone();
-    let entry = contrafact::brute("matching entry", move |e: &Entry| {
-        entry_type_matches(&net, e)
+    let entry = contrafact::brute("matching entry, not countersigning", move |e: &Entry| {
+        !matches!(e, Entry::CounterSign(_, _)) && entry_type_matches(&net, e)
     })
     .build(&mut g);
 

@@ -49,14 +49,27 @@ fn make_tuning(
     tuning
 }
 
-fn make_config(
+#[derive(Clone, Debug)]
+struct TestConfig {
     publish: bool,
     recent: bool,
     historical: bool,
+    bootstrap: bool,
     recent_threshold: Option<u64>,
-) -> SweetConductorConfig {
-    let tuning = make_tuning(publish, recent, historical, recent_threshold);
-    SweetConductorConfig::rendezvous().set_tuning_params(tuning)
+}
+
+impl From<TestConfig> for SweetConductorConfig {
+    fn from(tc: TestConfig) -> Self {
+        let TestConfig {
+            publish,
+            recent,
+            historical,
+            bootstrap,
+            recent_threshold,
+        } = tc;
+        let tuning = make_tuning(publish, recent, historical, recent_threshold);
+        SweetConductorConfig::rendezvous(bootstrap).set_tuning_params(tuning)
+    }
 }
 
 #[cfg(feature = "test_utils")]
@@ -68,7 +81,13 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
-        make_config(false, true, true, None),
+        TestConfig {
+            publish: false,
+            recent: true,
+            historical: true,
+            bootstrap: true,
+            recent_threshold: None,
+        },
     )
     .await;
 
@@ -120,7 +139,13 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
-        make_config(false, false, true, Some(0)),
+        TestConfig {
+            publish: false,
+            recent: false,
+            historical: true,
+            bootstrap: true,
+            recent_threshold: Some(0),
+        },
     )
     .await;
 
@@ -225,13 +250,21 @@ async fn test_zero_arc_no_gossip_2way() {
     holochain_trace::test_run().ok();
 
     // Standard config
-    let config_0 = make_config(true, true, true, None);
+
+    let config_0 = TestConfig {
+        publish: true,
+        recent: true,
+        historical: true,
+        bootstrap: true,
+        recent_threshold: None,
+    }
+    .into();
 
     // Standard config with arc clamped to zero and publishing off
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::rendezvous().set_tuning_params(tuning_1);
+    let config_1 = SweetConductorConfig::rendezvous(true).set_tuning_params(tuning_1);
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
@@ -274,20 +307,34 @@ async fn test_zero_arc_no_gossip_4way() {
 
     let configs = [
         // Standard config
-        make_config(true, true, true, None),
+        TestConfig {
+            publish: true,
+            recent: true,
+            historical: true,
+            bootstrap: true,
+            recent_threshold: None,
+        }
+        .into(),
         // Publishing turned off
-        make_config(false, true, true, None),
+        TestConfig {
+            publish: false,
+            recent: true,
+            historical: true,
+            bootstrap: true,
+            recent_threshold: None,
+        }
+        .into(),
         {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true).set_tuning_params(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true).set_tuning_params(tuning)
         },
     ];
 
@@ -384,8 +431,17 @@ async fn test_zero_arc_no_gossip_4way() {
 #[ignore = "deal with connections closing and banning for 10s"]
 async fn test_gossip_shutdown() {
     holochain_trace::test_run().ok();
-    let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(2, make_config(false, true, true, None)).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        2,
+        TestConfig {
+            publish: false,
+            recent: true,
+            historical: true,
+            bootstrap: true,
+            recent_threshold: None,
+        },
+    )
+    .await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -467,8 +523,15 @@ async fn test_gossip_startup() {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
     holochain_trace::test_run().ok();
-    let config = make_config(false, true, false, None);
-    three_way_gossip(config).await;
+    let config = TestConfig {
+        publish: false,
+        recent: true,
+        historical: false,
+        // NOTE: disable bootstrap so we can selectively ignore the shut-down conductor
+        bootstrap: false,
+        recent_threshold: None,
+    };
+    three_way_gossip(config.into()).await;
 }
 
 #[cfg(feature = "slow_tests")]
@@ -476,8 +539,15 @@ async fn three_way_gossip_recent() {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
     holochain_trace::test_run().ok();
-    let config = make_config(false, false, true, Some(0));
-    three_way_gossip(config).await;
+    let config = TestConfig {
+        publish: false,
+        recent: false,
+        historical: true,
+        // NOTE: disable bootstrap so we can selectively ignore the shut-down conductor
+        bootstrap: false,
+        recent_threshold: Some(0),
+    };
+    three_way_gossip(config.into()).await;
 }
 
 /// Test that:
@@ -496,6 +566,16 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     }))
     .await;
 
+    conductors.exchange_peer_info().await;
+
+    println!(
+        "Initial agents: {:#?}",
+        cells
+            .iter()
+            .map(|c| c.agent_pubkey().to_kitsune())
+            .collect::<Vec<_>>()
+    );
+
     let zomes: Vec<_> = cells
         .iter()
         .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
@@ -511,7 +591,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    consistency_60s([&cells[0], &cells[1]]).await;
+    consistency_10s([&cells[0], &cells[1]]).await;
 
     println!(
         "Done waiting for consistency between first two nodes. Elapsed: {:?}",
@@ -536,10 +616,16 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
     assert_eq!(records_0, records_1);
 
+    // Forget the first node's peer info before it gets gossiped to the third node.
+    // NOTE: this simulates "leave network", which we haven't yet implemented. The test will work without this,
+    // but there is a high chance of a 60 second timeout which flakily slows down this test beyond any acceptable duration.
+    conductors.forget_peer_info([cells[0].agent_pubkey()]).await;
     conductors[0].shutdown().await;
 
+    let new_config = config.random_scope();
+    let new_scope = new_config.tracing_scope.clone().unwrap();
     // Bring a third conductor online
-    conductors.add_conductor_from_config(config).await;
+    conductors.add_conductor_from_config(new_config).await;
 
     let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
@@ -547,14 +633,26 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .unwrap()
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+    SweetConductor::exchange_peer_info([&conductors[1], &conductors[2]]).await;
+
+    println!(
+        "Newcomer agent joined: scope={}, agent={:#?}",
+        new_scope,
+        cell.agent_pubkey().to_kitsune()
+    );
 
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
+        .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(10))
         .await;
+
+    println!(
+        "Initial gossip activity completed. Elapsed: {:?}",
+        start.elapsed()
+    );
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
-        30,
+        10,
         std::time::Duration::from_secs(1),
     )
     .await;
@@ -586,7 +684,13 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_config_rendezvous(
-        make_config(false, true, true, None),
+        TestConfig {
+            publish: false,
+            recent: true,
+            historical: true,
+            bootstrap: true,
+            recent_threshold: None,
+        },
         SweetLocalRendezvous::new().await,
     )
     .await;
@@ -650,7 +754,6 @@ async fn mock_network_sharded_gossip() {
         },
     };
     use kitsune_p2p::gossip::sharded_gossip::test_utils::*;
-    use kitsune_p2p::*;
     use kitsune_p2p_types::config::TransportConfig;
     use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 

@@ -7,8 +7,8 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use regex::Regex;
 
-use crate::dht_op::error::DhtOpError;
-use crate::dht_op::error::DhtOpResult;
+use crate::dht_op::DhtOpError;
+use crate::dht_op::DhtOpResult;
 use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;

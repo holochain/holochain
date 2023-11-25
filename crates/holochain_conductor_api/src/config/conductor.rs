@@ -108,7 +108,7 @@ impl ConductorConfig {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;

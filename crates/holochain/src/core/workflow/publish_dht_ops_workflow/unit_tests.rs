@@ -1,24 +1,17 @@
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use crate::prelude::AgentPubKeyFixturator;
-use crate::prelude::MockHolochainP2pDnaT;
-use crate::prelude::SignatureFixturator;
+use crate::prelude::*;
+use ::fixt::prelude::*;
 use chrono::Utc;
-use fixt::prelude::*;
 use hdk::prelude::Action;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
+use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::prelude::DatabaseResult;
-use holochain_sqlite::prelude::DbWrite;
-use holochain_state::prelude::set_receipts_complete;
-use holochain_state::prelude::StateMutationResult;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::fixt::CreateFixturator;
-use holochain_types::prelude::DhtOpHash;
-use holochain_types::prelude::DhtOpHashed;
+use holochain_sqlite::prelude::*;
+use holochain_state::prelude::*;
 use rusqlite::named_params;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -71,7 +64,7 @@ async fn workflow_incomplete_on_routing_error() {
 
     let publish_timestamp = get_publish_time(vault, op_hash).await;
 
-    assert_eq!(WorkComplete::Incomplete, work_complete);
+    assert_eq!(WorkComplete::Incomplete(None), work_complete);
     assert!(!rx.is_paused());
     assert!(publish_timestamp.is_none());
 }

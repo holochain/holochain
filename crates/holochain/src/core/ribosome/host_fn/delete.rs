@@ -10,6 +10,7 @@ use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_types::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn delete<'a>(
