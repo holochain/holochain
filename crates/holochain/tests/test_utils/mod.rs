@@ -331,12 +331,12 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
-pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
+pub fn create_config(port: u16, data_root_path: PathBuf) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }]),
-        environment_path: environment_path.into(),
+        data_root_path,
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
     }

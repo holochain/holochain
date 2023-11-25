@@ -426,7 +426,7 @@ pub async fn setup_app_with_network(
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    db_dir: &Path,
+    data_root_path: &DataPath,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
@@ -437,9 +437,9 @@ pub async fn setup_app_inner(
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
             network,
-            ..Default::default()
+            data_root_path: data_root_path.clone(),
         })
-        .test(db_dir, &[])
+        .test(data_root_path, &[])
         .await
         .unwrap();
 

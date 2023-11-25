@@ -20,6 +20,7 @@ pub mod autonomic;
 pub mod chain;
 pub mod chc;
 pub mod combinators;
+pub mod db;
 pub mod db_cache;
 pub mod dht_op;
 pub mod dna;

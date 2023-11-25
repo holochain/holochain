@@ -26,7 +26,13 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
-            ..Default::default()
+            data_root_path: tempfile::tempdir().unwrap().into_path().into(),
+            chc_url: Default::default(),
+            db_sync_strategy: Default::default(),
+            dpki: Default::default(),
+            keystore: Default::default(),
+            tracing_override: Default::default(),
+            tracing_scope: Default::default(),
         }
         .into()
     }

@@ -9,7 +9,7 @@ use crate::conductor::ConductorHandle;
 #[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
-    pub config: ConductorConfig,
+    pub config: Option<ConductorConfig>,
     /// The RibosomeStore (mockable)
     pub ribosome_store: RibosomeStore,
     /// For new lair, passphrase is required
@@ -33,7 +33,7 @@ impl ConductorBuilder {
 impl ConductorBuilder {
     /// Set the ConductorConfig used to build this Conductor
     pub fn config(mut self, config: ConductorConfig) -> Self {
-        self.config = config;
+        self.config = Some(config);
         self
     }
 
@@ -320,13 +320,13 @@ impl ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     pub async fn test(
         mut self,
-        env_path: &std::path::Path,
+        data_root_path: &DataPath,
         extra_dnas: &[DnaFile],
     ) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
-        self.config.data_root_path = env_path.to_path_buf().into();
+        self.config.data_root_path = data_root_path;
 
         let spaces = Spaces::new(&self.config)?;
         let tag = spaces.get_state().await?.tag().clone();

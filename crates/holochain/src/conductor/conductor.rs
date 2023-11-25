@@ -107,6 +107,7 @@ use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Instant;
@@ -628,7 +629,8 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file, Some(self.config.data_root_path.clone()))?;
+                let ribosome =
+                    RealRibosome::new(dna_file, Some(self.config.data_root_path.clone()))?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -636,7 +638,7 @@ mod dna_impls {
         }
 
         /// Get the root environment directory.
-        pub fn root_db_dir(&self) -> &DatabaseRootPath {
+        pub fn root_db_dir(&self) -> &PathBuf {
             &self.spaces.db_dir
         }
 

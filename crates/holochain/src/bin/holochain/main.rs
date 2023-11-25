@@ -1,10 +1,10 @@
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::interactive;
 use holochain::conductor::manager::handle_shutdown;
-use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_api::config::conductor::paths::ConfigPath;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_trace::Output;
 use holochain_util::tokio_helper;
@@ -81,7 +81,7 @@ async fn async_main() {
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 
-    holochain_metrics::HolochainMetricsConfig::new(config.environment_path.as_ref())
+    holochain_metrics::HolochainMetricsConfig::new(config.data_root_path.as_ref())
         .init()
         .await;
 
@@ -118,17 +118,7 @@ fn get_conductor_config(opt: &Opt) -> ConductorConfig {
     let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
     debug!("config_path: {}", config_path);
 
-    let config: ConductorConfig = if opt.interactive {
-        // Load config, offer to create default config if missing
-        interactive::load_config_or_prompt_for_default(config_path)
-            .expect("Could not load conductor config")
-            .unwrap_or_else(|| {
-                println!("Cannot continue without configuration");
-                std::process::exit(ERROR_CODE);
-            })
-    } else {
-        load_config(&config_path, config_path_default)
-    };
+    let config: ConductorConfig = load_config(&config_path, config_path_default);
 
     config
 }
@@ -148,13 +138,9 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
 
     // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
-    let env_path = PathBuf::from(config.environment_path.clone());
+    let env_path = PathBuf::from(config.data_root_path.clone());
     if !env_path.is_dir() {
-        let result = if opt.interactive {
-            interactive::prompt_for_database_dir(&env_path)
-        } else {
-            std::fs::create_dir_all(&env_path)
-        };
+        let result = std::fs::create_dir_all(&env_path);
         match result {
             Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {

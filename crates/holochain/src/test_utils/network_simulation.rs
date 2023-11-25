@@ -381,11 +381,19 @@ async fn create_test_data(
     tuning.gossip_strategy = "none".to_string();
     tuning.disable_publish = true;
 
+    let tmpdir = tempdir::TempDir::new("holochain-network-simulation-test-data").unwrap();
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network: Some(network),
-        ..Default::default()
+        admin_interfaces: Default::default(),
+        chc_url: Default::default(),
+        data_root_path: tmpdir.path().into(),
+        db_sync_strategy: Default::default(),
+        dpki: Default::default(),
+        keystore: Default::default(),
+        tracing_override: Default::default(),
+        tracing_scope: Default::default(),
     };
     let mut conductor = SweetConductor::from_config(config).await;
     let mut agents = Vec::new();

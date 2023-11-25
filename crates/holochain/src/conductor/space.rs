@@ -19,7 +19,7 @@ use crate::core::{
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
@@ -44,6 +44,7 @@ use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::{agent_info::AgentInfoSigned, config::KitsuneP2pConfig};
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
+use std::path::PathBuf;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -55,7 +56,7 @@ mod tests;
 /// installed on this conductor.
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    pub(crate) db_dir: Arc<DatabaseRootPath>,
+    pub(crate) db_dir: Arc<DataPath>,
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
@@ -670,7 +671,7 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
-        root_db_dir: &DatabaseRootPath,
+        root_db_dir: &PathBuf,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
@@ -790,7 +791,7 @@ impl TestSpaces {
             .tempdir()
             .unwrap();
         let spaces = Spaces::new(&ConductorConfig {
-            environment_path: temp_dir.path().to_path_buf().into(),
+            data_root_path: temp_dir.path().to_path_buf().into(),
             ..Default::default()
         })
         .unwrap();

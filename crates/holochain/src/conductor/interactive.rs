@@ -58,29 +58,3 @@ pub fn prompt_for_database_dir(path: &Path) -> std::io::Result<()> {
         ))
     }
 }
-
-/// Save the default [ConductorConfig] to `path`
-fn save_default_config_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
-    let dir = path.parent().ok_or_else(|| {
-        ConductorError::ConfigError(format!("Bad path for conductor config: {}", path.display()))
-    })?;
-    std::fs::create_dir_all(dir)?;
-    let default = ConductorConfig::default();
-    let content_yaml = serde_yaml::to_string(&default)?;
-    std::fs::write(path, content_yaml)?;
-    Ok(default)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::save_default_config_yaml;
-    use crate::conductor::config::ConductorConfig;
-    #[test]
-    fn test_save_default_config() {
-        let tmp = tempfile::tempdir().unwrap();
-        let config_path = tmp.path().join("config.yaml");
-        save_default_config_yaml(&config_path).unwrap();
-        let config = ConductorConfig::load_yaml(config_path.as_ref()).unwrap();
-        assert_eq!(config, ConductorConfig::default());
-    }
-}

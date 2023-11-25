@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::db::DbSyncStrategy;
+use holochain_types::prelude::DbSyncStrategy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -26,9 +26,11 @@ pub use keystore_config::KeystoreConfig;
 use std::path::Path;
 use std::path::PathBuf;
 
+use crate::config::conductor::paths::DataPath;
+
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -37,7 +39,7 @@ pub struct ConductorConfig {
     /// The path to the data root for this conductor;
     /// if omitted, chooses a default path.
     /// The database and compiled wasm directories are derived from this path.
-    pub data_root_path: PathBuf,
+    pub data_root_path: DataPath,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]

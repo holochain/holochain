@@ -2,9 +2,9 @@
 
 use std::path::PathBuf;
 
+use holochain_conductor_api::config::conductor::paths::KEYSTORE_DIRECTORY;
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
-use holochain_conductor_api::config::conductor::paths::KEYSTORE_DIRECTORY;
 
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";

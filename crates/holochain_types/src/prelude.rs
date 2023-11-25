@@ -15,6 +15,7 @@ pub use crate::autonomic::*;
 pub use crate::chain::*;
 pub use crate::chc::*;
 pub use crate::combinators::*;
+pub use crate::db::*;
 pub use crate::db_cache::*;
 pub use crate::dht_op::*;
 pub use crate::dna::wasm::*;

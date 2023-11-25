@@ -95,8 +95,8 @@ use wasmer::Type;
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::RwLock;
 
-use crate::conductor::paths::CompiledWasmsRootPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use holochain_conductor_api::config::conductor::paths::WASM_DIRECTORY;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::module::InstanceCache;
@@ -112,7 +112,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use holochain_conductor_api::config::conductor::paths::WASM_DIRECTORY;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -256,7 +255,8 @@ impl RealRibosome {
                 key_map: PlruKeyMap::default(),
                 cache: BTreeMap::default(),
                 cranelift,
-                maybe_fs_dir: maybe_data_root_path.map(|data_root_path| data_root_path.join(WASM_DIRECTORY)),
+                maybe_fs_dir: maybe_data_root_path
+                    .map(|data_root_path| data_root_path.join(WASM_DIRECTORY)),
             })),
             instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         };
@@ -338,7 +338,8 @@ impl RealRibosome {
 
                 Ok((zome_name.clone(), dependencies))
             })
-            .collect::<RibosomeResult<HashMap<_, _>>>()?.into();
+            .collect::<RibosomeResult<HashMap<_, _>>>()?
+            .into();
 
         Ok(ribosome)
     }
@@ -413,7 +414,9 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             context_key,
         );
-        self.instance_cache.write().put_item(key, instance_with_store);
+        self.instance_cache
+            .write()
+            .put_item(key, instance_with_store);
 
         Ok(())
     }

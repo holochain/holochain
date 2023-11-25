@@ -18,7 +18,7 @@ impl SweetConductorBatch {
     pub fn new(conductors: Vec<SweetConductor>) -> Self {
         let paths: HashSet<PathBuf> = conductors
             .iter()
-            .map(|c| c.config.data_root_path.clone().into())
+            .map(|c| c.config.data_root_path.as_ref().clone())
             .collect();
         assert_eq!(
             conductors.len(),

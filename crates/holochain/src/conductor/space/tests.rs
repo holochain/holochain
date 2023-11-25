@@ -39,10 +39,10 @@ async fn test_region_queries() {
     let mut g = random_generator();
 
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let path = temp_dir.path().to_path_buf();
+    let data_root_path = temp_dir.path().to_path_buf();
 
     let spaces = Spaces::new(&ConductorConfig {
-        environment_path: path.into(),
+        data_root_path,
         ..Default::default()
     })
     .unwrap();

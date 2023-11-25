@@ -85,7 +85,7 @@ async fn app_ids_are_unique() {
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
-        environment_path: db_dir.path().to_path_buf().into(),
+        data_root_path: db_dir.path().to_path_buf(),
         ..Default::default()
     })
     .unwrap();
