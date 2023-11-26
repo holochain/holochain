@@ -627,12 +627,23 @@ where
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
-                        txn.query_row(
-                            SELECT_VALID_UNRESTRICTED_CAP_GRANT,
-                            params![CapAccess::Unrestricted.as_sql(), author],
-                            query_row_fn,
-                        )
-                        .optional()?
+                        let mut stmt = txn.prepare(SELECT_VALID_UNRESTRICTED_CAP_GRANT)?;
+                        let mut result =
+                            stmt.query(params![CapAccess::Unrestricted.as_sql(), author])?;
+                        // loop over all found cap grants and check if one of them is valid
+                        while let Some(row) = result.next()? {
+                            let entry = query_row_fn(row)?;
+                            if let Some(cap_grant) = entry.as_cap_grant() {
+                                if cap_grant.is_valid(
+                                    &check_function,
+                                    &check_agent,
+                                    check_secret.as_ref(),
+                                ) {
+                                    return Ok(Some(cap_grant));
+                                }
+                            }
+                        }
+                        None
                     };
 
                     let maybe_cap_grant = maybe_entry.and_then(|entry| entry.as_cap_grant());
