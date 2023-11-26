@@ -1865,8 +1865,8 @@ mod tests {
         // Two source chains of the same DNA on the same conductor share DB tables.
         // That could lead to cap grants looked up by being unrestricted alone
         // being returned for any agent on the conductor.
-        // in this case carol should not get an unrestricted cap grant for
-        // bob's chain
+        // In this case carol should not get an unrestricted cap grant for
+        // bob's chain.
         {
             {
                 source_chain::genesis(
@@ -1925,6 +1925,75 @@ mod tests {
                 .await?,
             None
         );
+
+        // Create two unrestricted cap grants in alice's chain to make sure
+        // that all of them are considered when checking grant validity
+        // instead of only the first cap grant found.
+
+        // first unrestricted cap grant with irrelevant zome and fn
+        let some_zome_name: ZomeName = "some_zome".into();
+        let some_fn_name: FunctionName = "some_fn".into();
+        let mut granted_fns = BTreeSet::new();
+        granted_fns.insert((some_zome_name.clone(), some_fn_name.clone()));
+        let first_unrestricted_grant = ZomeCallCapGrant::new(
+            "unrestricted_1".into(),
+            CapAccess::Unrestricted,
+            GrantedFunctions::Listed(granted_fns),
+        );
+        
+        // second unrestricted cap grant with the actually granted zome and fn
+        let granted_zome_name: ZomeName = "granted_zome".into();
+        let granted_fn_name: FunctionName = "granted_fn".into();
+        let mut granted_fns = BTreeSet::new();
+        granted_fns.insert((granted_zome_name.clone(), granted_fn_name.clone()));
+        let second_unrestricted_grant = ZomeCallCapGrant::new(
+            "unrestricted_2".into(),
+            CapAccess::Unrestricted,
+            GrantedFunctions::Listed(granted_fns),
+        );
+
+        {
+            let chain = SourceChain::new(
+                db.clone().into(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
+
+            // commit first grant to alice's chain
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(first_unrestricted_grant.clone()))
+                    .into_inner();
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let _ = chain
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
+            
+            // commit second grant to alice's chain
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(second_unrestricted_grant.clone()))
+                    .into_inner();
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let _ = chain
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
+
+            chain.flush(&mock).await.unwrap();
+        }
+
+        let actual_cap_grant = chain
+            .valid_cap_grant((granted_zome_name, granted_fn_name), bob, None)
+            .await
+            .unwrap();
+        assert_eq!(actual_cap_grant, Some(second_unrestricted_grant.into()));
 
         Ok(())
     }
