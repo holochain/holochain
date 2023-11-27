@@ -5,7 +5,7 @@ pub use crate::ed25519::verify_signature_raw;
 pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
-pub use crate::entry_defs;
+pub use crate::entry_types;
 pub use crate::flat_op::*;
 pub use crate::hash::*;
 pub use crate::hash_path::anchor::Anchor;
