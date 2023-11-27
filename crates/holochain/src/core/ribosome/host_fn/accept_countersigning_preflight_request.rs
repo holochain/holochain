@@ -270,7 +270,7 @@ pub mod wasm_test {
             .await;
 
         // Bob tries to do the same thing but after timeout.
-        tokio::time::sleep(std::time::Duration::from_millis(8000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
         let bob_result: Result<ActionHash, _> = conductor
             .call_fallible(
                 &bob,
