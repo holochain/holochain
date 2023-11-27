@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Fixed spammy "Recorded initiate|accept with current round already set" warning. [#3060](https://github.com/holochain/holochain/pull/3060)
 
+## 0.2.3
+
 ## 0.2.3-rc.1
 
 ## 0.2.3-rc.0
