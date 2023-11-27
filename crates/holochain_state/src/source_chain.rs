@@ -588,80 +588,62 @@ where
         }
 
         // remote caller
-        self.vault
+        let maybe_cap_grant = self
+            .vault
             .read_async({
                 let author = self.agent_pubkey().clone();
-                // closure to process resulting rows from query
-                let query_row_fn = |row: &Row| {
-                    from_blob::<Entry>(row.get("blob")?).map_err(|err| {
-                        holochain_sqlite::rusqlite::Error::InvalidColumnType(
-                            0,
-                            err.to_string(),
-                            holochain_sqlite::rusqlite::types::Type::Blob,
-                        )
-                    })
-                };
                 move |txn| -> Result<_, DatabaseError> {
-                    // prepare sql statement depending on provided cap secret
-                    // and query for one cap grant
-                    //
-                    // query row is called inside the two arms instead of once
-                    // afterwards because of difficulty passing around params
-                    // between scopes
-                    let maybe_cap_grant = if let Some(cap_secret) = &check_secret {
-                        // cap grant for cap secret must exist
-                        // that has not been updated or deleted
+                    // closure to process resulting rows from query
+                    let query_row_fn = |row: &Row| {
+                        from_blob::<Entry>(row.get("blob")?).map_err(|err| {
+                            holochain_sqlite::rusqlite::Error::InvalidColumnType(
+                                0,
+                                err.to_string(),
+                                holochain_sqlite::rusqlite::types::Type::Blob,
+                            )
+                        })
+                    };
+
+                    // query cap grants depending on whether cap secret provided or not
+                    let mut entries = if let Some(cap_secret) = &check_secret {
                         let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
                             DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
                                 err.to_string(),
                             ))
                         })?;
-                        match txn.query_row(
-                            SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET,
-                            params![cap_secret_blob, author],
-                            query_row_fn,
-                        ) {
-                            Ok(row) => row.as_cap_grant().and_then(|cap_grant| {
-                                cap_grant
-                                    .is_valid(&check_function, &check_agent, check_secret.as_ref())
-                                    .then_some(cap_grant)
-                            }),
-                            Err(rusqlite::Error::QueryReturnedNoRows) => None,
-                            Err(err) => {
-                                tracing::error!(
-                                    "Database error while querying cap grant with secret: {:?}",
-                                    err
-                                );
-                                None
-                            }
-                        }
+
+                        // cap grant for cap secret must exist
+                        // that has not been updated or deleted
+                        let mut stmt = txn.prepare(SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET)?;
+                        let rows = stmt.query(params![cap_secret_blob, author])?;
+                        let entries: Vec<Entry> = rows.map(query_row_fn).collect()?;
+                        entries.into_iter()
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
                         let mut stmt = txn.prepare(SELECT_VALID_UNRESTRICTED_CAP_GRANT)?;
-                        let mut rows =
-                            stmt.query(params![CapAccess::Unrestricted.as_sql(), author])?;
-                        // loop over all found unrestricted cap grants and
-                        // check if one of them is valid for assignee and function
-                        while let Some(row) = rows.next()? {
-                            let entry = query_row_fn(row)?;
-                            if let Some(cap_grant) = entry.as_cap_grant() {
-                                if cap_grant.is_valid(
-                                    &check_function,
-                                    &check_agent,
-                                    check_secret.as_ref(),
-                                ) {
-                                    return Ok(Some(cap_grant));
-                                }
+                        let rows = stmt.query(params![CapAccess::Unrestricted.as_sql(), author])?;
+                        let entries: Vec<Entry> = rows.map(query_row_fn).collect()?;
+                        entries.into_iter()
+                    };
+                    // loop over all found cap grants and check if one of them
+                    // is valid for assignee and function
+                    while let Some(entry) = entries.next() {
+                        if let Some(cap_grant) = entry.as_cap_grant() {
+                            if cap_grant.is_valid(
+                                &check_function,
+                                &check_agent,
+                                check_secret.as_ref(),
+                            ) {
+                                return Ok(Some(cap_grant));
                             }
                         }
-                        None
-                    };
-                    Ok(maybe_cap_grant)
+                    }
+                    Ok(None)
                 }
             })
-            .await
-            .map_err(|err| SourceChainError::DatabaseError(err))
+            .await?;
+        Ok(maybe_cap_grant)
     }
 
     /// Query Actions in the source chain.
