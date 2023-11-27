@@ -3,7 +3,7 @@ use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
 use tracing::*;
 
-use crate::core::ribosome::{error::RibosomeResult, real_ribosome::RealRibosome, RibosomeT};
+use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
 
 #[derive(Default, Debug)]
 pub struct RibosomeStore {

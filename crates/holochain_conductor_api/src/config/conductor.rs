@@ -24,7 +24,6 @@ pub use error::*;
 pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
-use std::path::PathBuf;
 
 use crate::config::conductor::paths::DataPath;
 
@@ -91,6 +90,23 @@ where
 }
 
 impl ConductorConfig {
+
+    /// Create a new default config from a data path.
+    pub fn new(data_root_path: DataPath) -> Self {
+        Self {
+            tracing_override: None,
+            data_root_path,
+            network: None,
+            dpki: None,
+            keystore: KeystoreConfig::default(),
+            admin_interfaces: None,
+            db_sync_strategy: DbSyncStrategy::default(),
+            tracing_scope: None,
+            #[cfg(feature = "chc")]
+            chc_url: None,
+        }
+    }
+
     /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {

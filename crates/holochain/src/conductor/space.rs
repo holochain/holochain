@@ -8,6 +8,7 @@ use super::{
     error::ConductorResult,
     p2p_agent_store::{self, P2pBatch},
 };
+use crate::conductor::paths::DataPath;
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::{
     queue_consumer::QueueConsumerMap,
@@ -790,11 +791,7 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(&ConductorConfig {
-            data_root_path: temp_dir.path().to_path_buf().into(),
-            ..Default::default()
-        })
-        .unwrap();
+        let spaces = Spaces::new(&ConductorConfig::new(temp_dir.path().to_path_buf().into())).unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces

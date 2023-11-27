@@ -12,10 +12,8 @@ pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 /// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.
 pub fn create_config(data_root_path: PathBuf, con_url: Option<url2::Url2>) -> ConductorConfig {
-    let mut conductor_config = ConductorConfig {
-        data_root_path: data_root_path.clone().into(),
-        ..Default::default()
-    };
+    let mut conductor_config = ConductorConfig::new(
+        data_root_path.clone().into());
     match con_url {
         Some(url) => {
             conductor_config.keystore = KeystoreConfig::LairServer {

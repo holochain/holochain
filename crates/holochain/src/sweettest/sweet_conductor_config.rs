@@ -21,12 +21,12 @@ pub struct SweetConductorConfig(ConductorConfig);
 
 impl From<KitsuneP2pConfig> for SweetConductorConfig {
     fn from(network: KitsuneP2pConfig) -> Self {
+        let mut config = ConductorConfig::new()
         ConductorConfig {
             network: Some(network),
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
-            data_root_path: tempfile::tempdir().unwrap().into_path().into(),
             chc_url: Default::default(),
             db_sync_strategy: Default::default(),
             dpki: Default::default(),

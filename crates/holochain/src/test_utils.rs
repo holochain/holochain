@@ -14,6 +14,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
+use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
@@ -44,7 +45,6 @@ use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -353,8 +353,8 @@ pub async fn setup_app_in_new_conductor(
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 
-    let conductor_handle = ConductorBuilder::new()
-        .test(db_dir.path(), &[])
+    let conductor_handle = ConductorBuilder::new(db_dir.path().to_path_buf().into())
+        .test(&[])
         .await
         .unwrap();
 
@@ -408,7 +408,8 @@ pub async fn setup_app_with_names(
     dnas: Vec<DnaFile>,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, None).await;
+    let (iface, handle) =
+        setup_app_inner(dir.path().to_path_buf().into(), apps_data, dnas, None).await;
     (dir, iface, handle)
 }
 
@@ -420,26 +421,29 @@ pub async fn setup_app_with_network(
     network: KitsuneP2pConfig,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, Some(network)).await;
+    let (iface, handle) = setup_app_inner(
+        dir.path().to_path_buf().into(),
+        apps_data,
+        dnas,
+        Some(network),
+    )
+    .await;
     (dir, iface, handle)
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    data_root_path: &DataPath,
+    data_root_path: DataPath,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
 ) -> (RealAppInterfaceApi, ConductorHandle) {
-    let conductor_handle = ConductorBuilder::new()
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            network,
-            data_root_path: data_root_path.clone(),
-        })
-        .test(data_root_path, &[])
+    let mut config = ConductorConfig::new(data_root_path.clone());
+    config.admin_interfaces = Some(vec![AdminInterfaceConfig {
+        driver: InterfaceDriver::Websocket { port: 0 },
+    }]);
+    let conductor_handle = ConductorBuilder::new_from_config(config)
+        .test(&[])
         .await
         .unwrap();
 

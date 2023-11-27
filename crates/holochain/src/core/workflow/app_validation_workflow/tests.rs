@@ -258,7 +258,11 @@ async fn check_app_entry_def_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();
-    let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+    let data_root_dir: DataPath = db_dir.path().to_path_buf().into();
+    let conductor_handle = Conductor::builder(data_root_dir.clone())
+        .test(&[])
+        .await
+        .unwrap();
 
     // ## Dna is missing
     let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);

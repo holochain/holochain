@@ -84,10 +84,7 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        data_root_path: db_dir.path().to_path_buf(),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(&ConductorConfig::new(db_dir.path().to_path_buf().into()))
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),

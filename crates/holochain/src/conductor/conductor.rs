@@ -62,6 +62,7 @@ use crate::conductor::metrics::create_p2p_event_duration_metric;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::list_all_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
+use crate::conductor::paths::DataPath;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
@@ -245,9 +246,14 @@ pub struct Conductor {
 }
 
 impl Conductor {
-    /// Create a conductor builder
-    pub fn builder() -> ConductorBuilder {
-        ConductorBuilder::new()
+    /// Create a conductor builder.
+    pub fn builder(data_root_path: DataPath) -> ConductorBuilder {
+        ConductorBuilder::new(data_root_path)
+    }
+
+    /// Create a conductor builder from a config.
+    pub fn builder_from_config(config: ConductorConfig) -> ConductorBuilder {
+        ConductorBuilder::new_from_config(config)
     }
 }
 

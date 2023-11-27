@@ -95,6 +95,7 @@ use wasmer::Type;
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::RwLock;
 
+use crate::conductor::paths::DataPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
 use holochain_conductor_api::config::conductor::paths::WASM_DIRECTORY;
 use holochain_types::zome_types::GlobalZomeTypes;
@@ -106,7 +107,6 @@ use holochain_wasmer_host::module::PlruKeyMap;
 use holochain_wasmer_host::plru::MicroCache;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
-use once_cell::sync::OnceCell;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -244,7 +244,7 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile, maybe_data_root_path: Option<PathBuf>) -> RibosomeResult<Self> {
+    pub fn new(dna_file: DnaFile, maybe_data_root_path: Option<DataPath>) -> RibosomeResult<Self> {
         // Create an empty ribosome.
         let mut ribosome = Self {
             dna_file,

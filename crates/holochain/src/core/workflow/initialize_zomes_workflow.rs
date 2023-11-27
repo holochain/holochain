@@ -201,7 +201,10 @@ mod tests {
             .return_const(dna_def_hashed.clone());
 
         let db_dir = test_db_dir();
-        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let conductor_handle = Conductor::builder(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             conductor_handle,

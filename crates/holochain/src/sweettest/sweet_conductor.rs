@@ -14,6 +14,7 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -127,7 +128,14 @@ impl SweetConductor {
         // some other better integration between the two.
         let spaces = Spaces::new(&ConductorConfig {
             data_root_path: env_dir.to_path_buf().into(),
-            ..Default::default()
+            admin_interfaces: Default::default(),
+            chc_url: Default::default(),
+            db_sync_strategy: Default::default(),
+            dpki: Default::default(),
+            keystore: Default::default(),
+            network: Default::default(),
+            tracing_override: Default::default(),
+            tracing_scope: Default::default(),
         })
         .unwrap();
 
@@ -215,7 +223,7 @@ impl SweetConductor {
         tracing::info!(?config);
 
         let handle = Self::handle_from_existing(
-            &dir,
+            dir.as_ref().to_path_buf().into(),
             keystore.unwrap_or_else(holochain_keystore::test_keystore),
             &config,
             &[],
@@ -225,25 +233,29 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
-    pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
+    pub async fn from_builder(builder: ConductorBuilder) -> ConductorResult<SweetConductor> {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
-        let handle = builder.test(&db_dir, &[]).await.unwrap();
-        Self::new(handle, db_dir, config, None).await
+        let handle = builder
+            .with_data_root_path(db_dir.as_ref().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
+        Ok(Self::new(handle, db_dir, config, None).await)
     }
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        db_dir: &Path,
+        data_root_dir: DataPath,
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
-        Conductor::builder()
+        Conductor::builder(data_root_dir.clone())
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test(db_dir, extra_dnas)
+            .test(extra_dnas)
             .await
             .unwrap()
     }
@@ -540,7 +552,7 @@ impl SweetConductor {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
-                    &self.db_dir,
+                    self.db_dir.as_ref().to_path_buf().into(),
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),

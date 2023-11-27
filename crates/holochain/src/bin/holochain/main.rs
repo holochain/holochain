@@ -151,8 +151,7 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
     }
 
     // Initialize the Conductor
-    match Conductor::builder()
-        .config(config)
+    match Conductor::builder_from_config(config)
         .passphrase(passphrase)
         .build()
         .await

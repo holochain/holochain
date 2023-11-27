@@ -459,7 +459,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
-    let conductor_handle = Conductor::builder().config(config).build().await?;
+    let conductor_handle = Conductor::builder_from_config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
@@ -554,7 +554,7 @@ async fn connection_limit_is_respected() {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
-    let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
+    let conductor_handle = Conductor::builder_from_config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
     let url = url2!("ws://127.0.0.1:{}", port);

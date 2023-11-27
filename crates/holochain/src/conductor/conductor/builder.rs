@@ -2,14 +2,14 @@ use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
+use crate::conductor::paths::DataPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
-#[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
-    pub config: Option<ConductorConfig>,
+    pub config: ConductorConfig,
     /// The RibosomeStore (mockable)
     pub ribosome_store: RibosomeStore,
     /// For new lair, passphrase is required
@@ -24,16 +24,35 @@ pub struct ConductorBuilder {
 }
 
 impl ConductorBuilder {
-    /// Default ConductorBuilder
-    pub fn new() -> Self {
-        Self::default()
+    /// Default ConductorBuilder.
+    pub fn new(data_root_path: DataPath) -> Self {
+        Self {
+            config: ConductorConfig::new(data_root_path),
+            ribosome_store: Default::default(),
+            passphrase: Default::default(),
+            keystore: Default::default(),
+            state: Default::default(),
+            no_print_setup: Default::default(),
+        }
+    }
+
+    /// Create a new ConductorBuilder from a ConductorConfig.
+    pub fn new_from_config(config: ConductorConfig) -> Self {
+        Self {
+            config,
+            ribosome_store: Default::default(),
+            passphrase: Default::default(),
+            keystore: Default::default(),
+            state: Default::default(),
+            no_print_setup: Default::default(),
+        }
     }
 }
 
 impl ConductorBuilder {
     /// Set the ConductorConfig used to build this Conductor
     pub fn config(mut self, config: ConductorConfig) -> Self {
-        self.config = Some(config);
+        self.config = config;
         self
     }
 
@@ -46,6 +65,12 @@ impl ConductorBuilder {
     /// Set up the builder to skip printing setup
     pub fn no_print_setup(mut self) -> Self {
         self.no_print_setup = true;
+        self
+    }
+
+    /// Set the data root path for the conductor that will be built.
+    pub fn with_data_root_path(mut self, data_root_path: DataPath) -> Self {
+        self.config.data_root_path = data_root_path;
         self
     }
 
@@ -85,7 +110,7 @@ impl ConductorBuilder {
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
                     let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
-                        let mut p: std::path::PathBuf = self.config.data_root_path.clone().into();
+                        let mut p: std::path::PathBuf = self.config.data_root_path.as_ref().clone();
                         p.push("keystore");
                         p
                     });
@@ -318,15 +343,10 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    pub async fn test(
-        mut self,
-        data_root_path: &DataPath,
-        extra_dnas: &[DnaFile],
-    ) -> ConductorResult<ConductorHandle> {
+    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
-        self.config.data_root_path = data_root_path;
 
         let spaces = Spaces::new(&self.config)?;
         let tag = spaces.get_state().await?.tag().clone();
