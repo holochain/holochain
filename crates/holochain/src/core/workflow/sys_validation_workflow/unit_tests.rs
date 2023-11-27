@@ -157,6 +157,102 @@ async fn validate_op_with_dependency_not_held() {
     test_case.expect_app_validation_triggered().await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_op_with_dependency_not_found_on_the_dht() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous op, to be referenced but not found on the dht
+    let mut validation_package_action = fixt!(AgentValidationPkg);
+    validation_package_action.author = test_case.agent.clone();
+    validation_package_action.action_seq = 10;
+    let previous_action = test_case
+        .sign_action(Action::AgentValidationPkg(
+            validation_package_action.clone(),
+        ))
+        .await;
+
+    // Op to validate, to go in the dht database
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.prev_action = previous_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+
+    test_case
+        .save_op_to_db(test_case.dht_db_handle(), op)
+        .await
+        .unwrap();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    // Just return an empty response, nothing found for the request
+    let response = WireOps::Record(WireRecordOps::new());
+    network
+        .expect_get()
+        .return_once(move |_, _| Ok(vec![response]));
+
+    test_case.with_network_behaviour(network).run().await;
+
+    let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
+    assert!(ops_to_app_validate.is_empty());
+
+    // TODO Why trigger app validation if no new work was done by sys validation? App validation might need to be triggered for another reason
+    //      but is there a good reason for sys validation to just kick it off?
+    // test_case.expect_app_validation_not_triggered().await;
+
+    test_case.expect_app_validation_triggered().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_app_validation() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous op, to be found in the cache
+    let mut validation_package_action = fixt!(AgentValidationPkg);
+    validation_package_action.author = test_case.agent.clone();
+    validation_package_action.action_seq = 10;
+    let previous_action = test_case
+        .sign_action(Action::AgentValidationPkg(
+            validation_package_action.clone(),
+        ))
+        .await;
+    let previous_op = DhtOp::RegisterAgentActivity(
+        fixt!(Signature),
+        Action::AgentValidationPkg(validation_package_action),
+    );
+    test_case
+        .save_op_to_db(test_case.cache_db_handle(), previous_op)
+        .await
+        .unwrap();
+
+    // Op to validate, to go in the dht database
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 31;
+    create_action.prev_action = previous_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    test_case
+        .save_op_to_db(test_case.dht_db_handle(), op)
+        .await
+        .unwrap();
+
+    test_case.run().await;
+
+    let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
+    assert!(ops_to_app_validate.is_empty());
+
+    // TODO Why trigger app validation if no new work was done by sys validation? App validation might need to be triggered for another reason
+    //      but is there a good reason for sys validation to just kick it off?
+    // test_case.expect_app_validation_not_triggered().await;
+
+    test_case.expect_app_validation_triggered().await;
+}
+
 struct TestCase {
     dna_def: DnaDef,
     dna_hash: DnaDefHashed,
@@ -289,5 +385,17 @@ impl TestCase {
         .await
         .expect("Timed out waiting for app validation to be triggered")
         .unwrap();
+    }
+
+    // TODO The app validation workflow is unconditionally triggered
+    #[allow(unused)]
+    async fn expect_app_validation_not_triggered(&mut self) {
+        assert!(tokio::time::timeout(
+            std::time::Duration::from_millis(1),
+            self.app_validation_trigger.1.listen(),
+        )
+        .await
+        .err()
+        .is_some());
     }
 }
