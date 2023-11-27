@@ -4,6 +4,7 @@ use anyhow::Result;
 use arbitrary::Arbitrary;
 use ed25519_dalek::{Keypair, Signer};
 use holochain::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
@@ -331,12 +332,12 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
-pub fn create_config(port: u16, data_root_path: PathBuf) -> ConductorConfig {
+pub fn create_config(port: u16, data_root_path: DataPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }]),
-        data_root_path,
+        data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
     }

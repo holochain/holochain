@@ -127,7 +127,10 @@ pub struct TestSpace {
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
-        let root_db_dir = config.data_root_path.clone();
+        let root_db_dir = config
+            .data_root_path
+            .clone()
+            .ok_or(ConductorError::NoDataPath)?;
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
@@ -791,7 +794,11 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(&ConductorConfig::new(temp_dir.path().to_path_buf().into())).unwrap();
+        let spaces = Spaces::new(&ConductorConfig {
+            data_root_path: Some(temp_dir.path().to_path_buf().into()),
+            ..Default::default()
+        })
+        .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
                 test_spaces

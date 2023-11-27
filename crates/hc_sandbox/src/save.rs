@@ -9,10 +9,11 @@ use std::path::PathBuf;
 
 use crate::config;
 use crate::config::CONDUCTOR_CONFIG;
+use holochain_conductor_api::conductor::paths::DataPath;
 use once_cell::sync::Lazy;
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
-pub fn save(mut hc_dir: PathBuf, paths: Vec<PathBuf>) -> anyhow::Result<()> {
+pub fn save(mut hc_dir: PathBuf, paths: Vec<DataPath>) -> anyhow::Result<()> {
     use std::io::Write;
     std::fs::create_dir_all(&hc_dir)?;
     hc_dir.push(".hc");
@@ -97,7 +98,7 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
             let r = match verbose {
                 false => format!("{}{}: {}\n", out, i, path.display()),
                 true => {
-                    let config = config::read_config(path.clone())?;
+                    let config = config::read_config(DataPath::from(path.clone()))?;
                     format!(
                         "{}{}: {}\nConductor Config:\n{:?}\n",
                         out,

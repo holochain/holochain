@@ -353,7 +353,8 @@ pub async fn setup_app_in_new_conductor(
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 
-    let conductor_handle = ConductorBuilder::new(db_dir.path().to_path_buf().into())
+    let conductor_handle = ConductorBuilder::new()
+        .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
         .await
         .unwrap();
@@ -438,11 +439,16 @@ pub async fn setup_app_inner(
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
 ) -> (RealAppInterfaceApi, ConductorHandle) {
-    let mut config = ConductorConfig::new(data_root_path.clone());
-    config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port: 0 },
-    }]);
-    let conductor_handle = ConductorBuilder::new_from_config(config)
+    let config = ConductorConfig {
+        data_root_path: Some(data_root_path.clone()),
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket { port: 0 },
+        }]),
+        network,
+        ..Default::default()
+    };
+    let conductor_handle = ConductorBuilder::new()
+        .config(config)
         .test(&[])
         .await
         .unwrap();

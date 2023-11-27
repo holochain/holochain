@@ -41,8 +41,10 @@ async fn test_region_queries() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let data_root_path = temp_dir.path().to_path_buf().into();
 
-    let spaces = Spaces::new(&ConductorConfig::new(
-        data_root_path))
+    let spaces = Spaces::new(&ConductorConfig {
+        data_root_path: Some(data_root_path),
+        ..Default::default()
+    })
     .unwrap();
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();

@@ -39,7 +39,7 @@ pub async fn websocket_stress() {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port: 0 },
         }]),
-        data_root_path,
+        data_root_path: Some(data_root_path.into()),
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
     };

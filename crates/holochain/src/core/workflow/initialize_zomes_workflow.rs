@@ -201,7 +201,8 @@ mod tests {
             .return_const(dna_def_hashed.clone());
 
         let db_dir = test_db_dir();
-        let conductor_handle = Conductor::builder(db_dir.path().to_path_buf().into())
+        let conductor_handle = Conductor::builder()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await
             .unwrap();

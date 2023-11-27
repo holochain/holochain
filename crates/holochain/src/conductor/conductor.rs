@@ -62,7 +62,6 @@ use crate::conductor::metrics::create_p2p_event_duration_metric;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::list_all_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
-use crate::conductor::paths::DataPath;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
@@ -247,13 +246,8 @@ pub struct Conductor {
 
 impl Conductor {
     /// Create a conductor builder.
-    pub fn builder(data_root_path: DataPath) -> ConductorBuilder {
-        ConductorBuilder::new(data_root_path)
-    }
-
-    /// Create a conductor builder from a config.
-    pub fn builder_from_config(config: ConductorConfig) -> ConductorBuilder {
-        ConductorBuilder::new_from_config(config)
+    pub fn builder() -> ConductorBuilder {
+        ConductorBuilder::new()
     }
 }
 
@@ -635,8 +629,7 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome =
-                    RealRibosome::new(dna_file, Some(self.config.data_root_path.clone()))?;
+                let ribosome = RealRibosome::new(dna_file, self.config.data_root_path.clone())?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -754,7 +747,7 @@ mod dna_impls {
 
         /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-            let ribosome = RealRibosome::new(dna, Some(self.config.data_root_path.clone()))?;
+            let ribosome = RealRibosome::new(dna, self.config.data_root_path.clone())?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
             self.register_dna_entry_defs(entry_defs);
             self.add_ribosome_to_store(ribosome);

@@ -3062,6 +3062,7 @@ version = "0.3.0-beta-dev.17"
 dependencies = [
  "assert_cmd 2.0.12",
  "base64 0.13.1",
+ "derive_more",
  "futures",
  "holo_hash",
  "holochain_secure_primitive",
@@ -3077,6 +3078,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_yaml",
+ "shrinkwraprs",
  "sodoken",
  "tempdir",
  "thiserror",

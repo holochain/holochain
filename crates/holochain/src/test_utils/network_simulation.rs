@@ -387,14 +387,8 @@ async fn create_test_data(
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network: Some(network),
-        admin_interfaces: Default::default(),
-        chc_url: Default::default(),
-        data_root_path: tmpdir.path().to_path_buf().into(),
-        db_sync_strategy: Default::default(),
-        dpki: Default::default(),
-        keystore: Default::default(),
-        tracing_override: Default::default(),
-        tracing_scope: Default::default(),
+        data_root_path: Some(tmpdir.path().to_path_buf().into()),
+        ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
     let mut agents = Vec::new();

@@ -44,7 +44,7 @@ async fn call_admin() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(port, environment_path);
+    let config = create_config(port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let uuid = uuid::Uuid::new_v4();
@@ -114,7 +114,7 @@ async fn call_zome() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -324,7 +324,7 @@ async fn emit_signals() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -432,7 +432,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     holochain_trace::test_run().ok();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
+    let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
@@ -458,8 +458,8 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
-    let conductor_handle = Conductor::builder_from_config(config).build().await?;
+    let config = create_config(0, environment_path.into());
+    let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
@@ -497,7 +497,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
+    let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
@@ -553,8 +553,8 @@ async fn connection_limit_is_respected() {
 
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
-    let conductor_handle = Conductor::builder_from_config(config).build().await.unwrap();
+    let config = create_config(0, environment_path.into());
+    let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
     let url = url2!("ws://127.0.0.1:{}", port);
@@ -619,7 +619,7 @@ async fn concurrent_install_dna() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;

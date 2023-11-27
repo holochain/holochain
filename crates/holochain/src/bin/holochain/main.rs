@@ -1,5 +1,6 @@
 use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::interactive;
+use holochain::conductor::error::ConductorError;
+use holochain::conductor::error::ConductorResult;
 use holochain::conductor::manager::handle_shutdown;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
@@ -54,12 +55,12 @@ struct Opt {
     build_info: bool,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     // the async_main function should only end if our program is done
     tokio_helper::block_forever_on(async_main())
 }
 
-async fn async_main() {
+async fn async_main() -> anyhow::Result<()> {
     // Sets up a human-readable panic message with a request for bug reports
     //
     // See https://docs.rs/human-panic/1.0.3/human_panic/
@@ -69,10 +70,10 @@ async fn async_main() {
 
     if opt.build_info {
         println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
-        return;
+        return Ok(());
     }
 
-    let config = get_conductor_config(&opt);
+    let config = get_conductor_config(&opt)?;
 
     if let Some(t) = &config.tracing_override {
         std::env::set_var("CUSTOM_FILTER", t);
@@ -81,13 +82,18 @@ async fn async_main() {
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 
-    holochain_metrics::HolochainMetricsConfig::new(config.data_root_path.as_ref())
-        .init()
-        .await;
+    holochain_metrics::HolochainMetricsConfig::new(
+        config
+            .data_root_path
+            .as_ref()
+            .ok_or(ConductorError::NoDataPath)?,
+    )
+    .init()
+    .await;
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
-    let conductor = conductor_handle_from_config(&opt, config).await;
+    let conductor = conductor_handle_from_config(&opt, config).await?;
 
     info!("Conductor successfully initialized.");
 
@@ -110,20 +116,26 @@ async fn async_main() {
     tracing::info!("Gracefully shutting down conductor...");
     let shutdown_result = conductor.shutdown().await;
     handle_shutdown(shutdown_result);
+    Ok(())
 }
 
-fn get_conductor_config(opt: &Opt) -> ConductorConfig {
+fn get_conductor_config(opt: &Opt) -> ConductorResult<ConductorConfig> {
     let config_path = opt.config_path.clone();
     let config_path_default = config_path.is_none();
-    let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
-    debug!("config_path: {}", config_path);
+    let config_path: ConfigPath = config_path
+        .map(Into::into)
+        .ok_or(ConductorError::NoConfigPath)?;
+    debug!("config_path: {}", config_path.display());
 
     let config: ConductorConfig = load_config(&config_path, config_path_default);
 
-    config
+    Ok(config)
 }
 
-async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> ConductorHandle {
+async fn conductor_handle_from_config(
+    opt: &Opt,
+    config: ConductorConfig,
+) -> ConductorResult<ConductorHandle> {
     // read the passphrase to prepare for usage
     let passphrase = match &config.keystore {
         KeystoreConfig::DangerTestKeystore => None,
@@ -138,9 +150,13 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
 
     // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
-    let env_path = PathBuf::from(config.data_root_path.clone());
+    let env_path = config
+        .data_root_path
+        .as_ref()
+        .ok_or(ConductorError::NoDataPath)?
+        .clone();
     if !env_path.is_dir() {
-        let result = std::fs::create_dir_all(&env_path);
+        let result = std::fs::create_dir_all(env_path.as_ref());
         match result {
             Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {
@@ -151,7 +167,8 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
     }
 
     // Initialize the Conductor
-    match Conductor::builder_from_config(config)
+    match Conductor::builder()
+        .config(config)
         .passphrase(passphrase)
         .build()
         .await
@@ -160,12 +177,12 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
             "Could not initialize Conductor from configuration: {:?}",
             err
         ),
-        Ok(res) => res,
+        Ok(res) => Ok(res),
     }
 }
 
 /// Load config, throw friendly error on failure
-fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> ConductorConfig {
+fn load_config(config_path: &ConfigPath, config_path_default: bool) -> ConductorConfig {
     match ConductorConfig::load_yaml(config_path.as_ref()) {
         Err(ConductorConfigError::ConfigMissing(_)) => {
             display_friendly_missing_config_message(config_path, config_path_default);
@@ -179,10 +196,7 @@ fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> Condu
     }
 }
 
-fn display_friendly_missing_config_message(
-    config_path: &ConfigFilePath,
-    config_path_default: bool,
-) {
+fn display_friendly_missing_config_message(config_path: &ConfigPath, config_path_default: bool) {
     if config_path_default {
         println!(
             "
@@ -195,7 +209,7 @@ again with the -c option. Otherwise, please either create a YAML config file at
 this path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
-            path = config_path,
+            path = config_path.display(),
         );
     } else {
         println!(
@@ -208,15 +222,12 @@ but this file doesn't exist. Please either create a YAML config file at this
 path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
-            path = config_path,
+            path = config_path.display(),
         );
     }
 }
 
-fn display_friendly_malformed_config_message(
-    config_path: &ConfigFilePath,
-    error: serde_yaml::Error,
-) {
+fn display_friendly_malformed_config_message(config_path: &ConfigPath, error: serde_yaml::Error) {
     println!(
         "
 The specified config file ({})
@@ -227,6 +238,7 @@ a valid default configuration. Details:
     {}
 
     ",
-        config_path, error
+        config_path.display(),
+        error
     )
 }

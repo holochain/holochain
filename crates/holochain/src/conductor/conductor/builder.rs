@@ -5,8 +5,10 @@ use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDu
 use crate::conductor::paths::DataPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
+#[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
     pub config: ConductorConfig,
@@ -25,27 +27,8 @@ pub struct ConductorBuilder {
 
 impl ConductorBuilder {
     /// Default ConductorBuilder.
-    pub fn new(data_root_path: DataPath) -> Self {
-        Self {
-            config: ConductorConfig::new(data_root_path),
-            ribosome_store: Default::default(),
-            passphrase: Default::default(),
-            keystore: Default::default(),
-            state: Default::default(),
-            no_print_setup: Default::default(),
-        }
-    }
-
-    /// Create a new ConductorBuilder from a ConductorConfig.
-    pub fn new_from_config(config: ConductorConfig) -> Self {
-        Self {
-            config,
-            ribosome_store: Default::default(),
-            passphrase: Default::default(),
-            keystore: Default::default(),
-            state: Default::default(),
-            no_print_setup: Default::default(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -70,7 +53,7 @@ impl ConductorBuilder {
 
     /// Set the data root path for the conductor that will be built.
     pub fn with_data_root_path(mut self, data_root_path: DataPath) -> Self {
-        self.config.data_root_path = data_root_path;
+        self.config.data_root_path = Some(data_root_path);
         self
     }
 
@@ -109,14 +92,22 @@ impl ConductorBuilder {
                 }
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
-                    let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
-                        let mut p: std::path::PathBuf = self.config.data_root_path.as_ref().clone();
-                        p.push("keystore");
-                        p
-                    });
-                    keystore_config_path.push("lair-keystore-config.yaml");
+
+                    let keystore_root_path: KeystorePath = match lair_root {
+                        Some(lair_root) => lair_root.clone(),
+                        None => self
+                            .config
+                            .data_root_path
+                            .as_ref()
+                            .ok_or(ConductorError::NoDataPath)?
+                            .clone()
+                            .into(),
+                    };
+                    let keystore_config_path = keystore_root_path
+                        .as_ref()
+                        .join("lair-keystore-config.yaml");
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await?
+                    spawn_lair_keystore_in_proc(&keystore_config_path, passphrase).await?
                 }
             }
         };

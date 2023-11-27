@@ -14,7 +14,6 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -127,15 +126,8 @@ impl SweetConductor {
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
         let spaces = Spaces::new(&ConductorConfig {
-            data_root_path: env_dir.to_path_buf().into(),
-            admin_interfaces: Default::default(),
-            chc_url: Default::default(),
-            db_sync_strategy: Default::default(),
-            dpki: Default::default(),
-            keystore: Default::default(),
-            network: Default::default(),
-            tracing_override: Default::default(),
-            tracing_scope: Default::default(),
+            data_root_path: Some(env_dir.to_path_buf().into()),
+            ..Default::default()
         })
         .unwrap();
 
@@ -223,7 +215,6 @@ impl SweetConductor {
         tracing::info!(?config);
 
         let handle = Self::handle_from_existing(
-            dir.as_ref().to_path_buf().into(),
             keystore.unwrap_or_else(holochain_keystore::test_keystore),
             &config,
             &[],
@@ -246,12 +237,11 @@ impl SweetConductor {
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        data_root_dir: DataPath,
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
-        Conductor::builder(data_root_dir.clone())
+        Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
@@ -550,9 +540,15 @@ impl SweetConductor {
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
+            // There's a db dir in the sweet conductor and the config, that are
+            // supposed to be the same. Let's assert that they are.
+            assert_eq!(
+                Some(self.db_dir.as_ref().to_path_buf().into()),
+                self.config.data_root_path,
+                "SweetConductor db_dir and config.data_root_path are not the same",
+            );
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
-                    self.db_dir.as_ref().to_path_buf().into(),
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),

@@ -29,16 +29,17 @@ use crate::config::conductor::paths::DataPath;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
     pub tracing_override: Option<String>,
 
     /// The path to the data root for this conductor;
-    /// if omitted, chooses a default path.
+    /// This can be `None` while building up the config programatically but MUST
+    /// be set by the time the config is used to build a conductor.
     /// The database and compiled wasm directories are derived from this path.
-    pub data_root_path: DataPath,
+    pub data_root_path: Option<DataPath>,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -90,23 +91,6 @@ where
 }
 
 impl ConductorConfig {
-
-    /// Create a new default config from a data path.
-    pub fn new(data_root_path: DataPath) -> Self {
-        Self {
-            tracing_override: None,
-            data_root_path,
-            network: None,
-            dpki: None,
-            keystore: KeystoreConfig::default(),
-            admin_interfaces: None,
-            db_sync_strategy: DbSyncStrategy::default(),
-            tracing_scope: None,
-            #[cfg(feature = "chc")]
-            chc_url: None,
-        }
-    }
-
     /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
@@ -166,7 +150,7 @@ mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
-                data_root_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -244,7 +228,7 @@ mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                data_root_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
@@ -277,7 +261,7 @@ mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                data_root_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {

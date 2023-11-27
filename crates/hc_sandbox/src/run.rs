@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
 
+use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use holochain_trace::Output;
 use tokio::io::AsyncBufReadExt;
@@ -36,7 +37,7 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 /// a random free port will be chosen.
 pub async fn run(
     holochain_path: &Path,
-    sandbox_path: PathBuf,
+    sandbox_path: DataPath,
     conductor_index: usize,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
@@ -90,17 +91,15 @@ pub async fn run(
 /// a random free port will be chosen.
 pub async fn run_async(
     holochain_path: &Path,
-    sandbox_path: PathBuf,
+    sandbox_path: DataPath,
     force_admin_port: Option<u16>,
     structured: Output,
 ) -> anyhow::Result<(u16, Child, Option<Child>)> {
     let mut config = match read_config(sandbox_path.clone())? {
         Some(c) => c,
         None => {
-            let mut keystore_dir = sandbox_path.clone();
-            keystore_dir.push("keystore");
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(&keystore_dir, passphrase)?;
+            let con_url = crate::generate::init_lair(&sandbox_path.clone().into(), passphrase)?;
             create_config(sandbox_path.clone(), Some(con_url))
         }
     };

@@ -12,9 +12,10 @@ use ws::WebsocketResult;
 
 use crate::config::read_config;
 use crate::config::write_config;
+use holochain_conductor_api::conductor::paths::DataPath;
 
 /// Update the first admin interface to use this port.
-pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
+pub fn force_admin_port(path: DataPath, port: u16) -> anyhow::Result<()> {
     let mut config = read_config(path.clone())?.expect("Failed to find config to force admin port");
     set_admin_port(&mut config, port);
     write_config(path, &config);
@@ -30,7 +31,7 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
             ports.push(port);
             continue;
         }
-        if let Some(config) = read_config(p)? {
+        if let Some(config) = read_config(DataPath::from(p))? {
             if let Some(ai) = config.admin_interfaces {
                 if let Some(AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port },

@@ -431,7 +431,11 @@ mod test {
     async fn unrecoverable_error() {
         holochain_trace::test_run().ok();
         let db_dir = test_db_dir();
-        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let handle = Conductor::builder()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         let tm = handle.task_manager();
         tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| async {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -460,7 +464,11 @@ mod test {
     async fn unrecoverable_panic() {
         holochain_trace::test_run().ok();
         let db_dir = test_db_dir();
-        let handle = Conductor::builder(db_dir.as_ref().to_path_buf().into()).test(&[]).await.unwrap();
+        let handle = Conductor::builder()
+            .with_data_root_path(db_dir.as_ref().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         let tm = handle.task_manager();
 
         tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| async {
