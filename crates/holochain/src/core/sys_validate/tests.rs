@@ -301,7 +301,7 @@ async fn check_previous_action() {
             .expect_retrieve_action()
             .times(2)
             // Doesn't matter what we return, the action should be rejected before deps are checked.
-            .returning(|_, _| async move { Ok(None) }.boxed() );
+            .returning(|_, _| async move { Ok(None) }.boxed());
 
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,

@@ -2,8 +2,9 @@ use holo_hash::AnyDhtHash;
 use holochain_cascade::CascadeSource;
 use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::{
+    action::ActionHashed,
     record::{Record, SignedActionHashed},
-    Action, action::ActionHashed,
+    Action,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -88,7 +89,9 @@ impl ValidationDependencies {
 
     /// Insert a record which was found after this set of dependencies was created.
     pub fn insert(&mut self, record: Record, source: CascadeSource) -> bool {
-        let hash: AnyDhtHash = ActionHashed::from_content_sync(record.action().clone()).hash.into();
+        let hash: AnyDhtHash = ActionHashed::from_content_sync(record.action().clone())
+            .hash
+            .into();
 
         // Note that `has` is checking that the dependency is actually set, not just that we have the key!
         if self.has(&hash) {

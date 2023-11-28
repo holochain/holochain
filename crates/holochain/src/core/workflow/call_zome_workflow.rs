@@ -102,8 +102,8 @@ where
                             }
                         }
                         None => {
-                            trigger_publish_dht_ops.trigger(&"trigger_publish_dht_ops");
-                            trigger_integrate_dht_ops.trigger(&"trigger_integrate_dht_ops");
+                            trigger_publish_dht_ops.trigger(&"call_zome_workflow");
+                            trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
                 }

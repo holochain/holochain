@@ -47,6 +47,12 @@ pub async fn publish_dht_ops_workflow(
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
+    if to_publish_count == 0 {
+        tracing::trace!("Skipping publish DHT ops workflow, nothing to publish");
+
+        return Ok(complete);
+    }
+
     // Commit to the network
     info!("publishing {} ops", to_publish_count);
     let mut success = Vec::with_capacity(to_publish.len());

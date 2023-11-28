@@ -973,6 +973,7 @@ impl Cell {
             conductor_handle,
             signal_tx,
             cell_id: self.id.clone(),
+            integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)

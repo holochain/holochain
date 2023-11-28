@@ -33,11 +33,11 @@ pub fn spawn_sys_validation_consumer(
             // Create an incoming ops sender for any dependencies we find
             // that we are meant to be holding but aren't.
             // If we are not holding them they will be added to our incoming ops.
-            let incoming_dht_ops_sender =
-                IncomingDhtOpSender::new(space.clone(), trigger_self.clone());
+            // let incoming_dht_ops_sender =
+            //     IncomingDhtOpSender::new(space.clone(), trigger_self.clone());
             sys_validation_workflow(
                 workspace.clone(),
-                incoming_dht_ops_sender,
+                // incoming_dht_ops_sender,
                 current_validation_dependencies.clone(),
                 trigger_app_validation.clone(),
                 trigger_self.clone(),

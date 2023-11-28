@@ -149,13 +149,12 @@ async fn validate_op_with_dependency_not_held() {
 
     test_case.with_network_behaviour(network).run().await;
 
-    // Because the previous op was found on the network,  the op that is previous to our 'previous' action 
-    // will be searched for on the network during the network workflow run. That's a good thing, 
+    // TODO not convinced by this, I think we're going to wide on what we're fetching. Recheck!
+    // Because the previous op was found on the network,  the op that is previous to our 'previous' action
+    // will be searched for on the network during the network workflow run. That's a good thing,
     // it's supposed to happen but we don't care about it here so just make sure the mock is valid!
     let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_get()
-        .return_once(move |_, _| Ok(vec![]));
+    network.expect_get().return_once(move |_, _| Ok(vec![]));
     test_case.with_network_behaviour(network);
 
     test_case.check_trigger_and_rerun().await;
@@ -344,22 +343,19 @@ impl TestCase {
             Arc::new(self.dna_def.clone()),
         );
 
-        let actual_network = self
-            .actual_network
-            .take()
-            .unwrap_or_else(|| {
-                tracing::info!("Creating default network");
-                MockHolochainP2pDnaT::new()
-            });
+        let actual_network = self.actual_network.take().unwrap_or_else(|| {
+            tracing::info!("Creating default network");
+            MockHolochainP2pDnaT::new()
+        });
 
-        let op_sender = IncomingDhtOpSender::new(
-            Arc::new(self.test_space.space.clone()),
-            self.self_trigger.0.clone(),
-        );
+        // let op_sender = IncomingDhtOpSender::new(
+        //     Arc::new(self.test_space.space.clone()),
+        //     self.self_trigger.0.clone(),
+        // );
 
         sys_validation_workflow(
             Arc::new(workspace),
-            op_sender,
+            // op_sender,
             self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
             self.self_trigger.0.clone(),

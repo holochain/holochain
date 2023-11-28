@@ -146,6 +146,9 @@ pub async fn incoming_dht_ops_workflow(
 
     // Check again whether everything has been filtered out and avoid launching a Tokio task if so
     if filter_ops.is_empty() {
+        tracing::trace!(
+            "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
+        );
         return Ok(());
     }
 

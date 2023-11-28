@@ -42,7 +42,7 @@ mod validate_op_tests;
 
 #[instrument(skip(
     workspace,
-    incoming_dht_ops_sender,
+    // incoming_dht_ops_sender,
     current_validation_dependencies,
     trigger_app_validation,
     trigger_self,
@@ -50,10 +50,10 @@ mod validate_op_tests;
 ))]
 pub async fn sys_validation_workflow<
     Network: HolochainP2pDnaT + Clone + 'static,
-    Sender: DhtOpSender + Send + Sync + Clone + 'static,
+    // Sender: DhtOpSender + Send + Sync + Clone + 'static,
 >(
     workspace: Arc<SysValidationWorkspace>,
-    incoming_dht_ops_sender: Sender,
+    // incoming_dht_ops_sender: Sender,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
     trigger_self: TriggerSender,
@@ -111,82 +111,85 @@ pub async fn sys_validation_workflow<
     .sum();
 
     if num_fetched > 0 {
-        tracing::debug!("Fetched {} missing dependencies from the network", num_fetched);
+        tracing::debug!(
+            "Fetched {} missing dependencies from the network",
+            num_fetched
+        );
 
         // If we fetched anything then we can re-run sys validation
         trigger_self.trigger(&"sys_validation_workflow");
     }
 
     // Finally, for anything we've fetched from the network we need to push it into the incoming dht ops workflow
-    let network_fetched_action_hashes = current_validation_dependencies
-        .lock()
-        .get_network_fetched_hashes();
-    futures::future::join_all(network_fetched_action_hashes.into_iter().map(|hash| {
-        let current_validation_dependencies = current_validation_dependencies.clone();
-        let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
-        async move {
-            let state = {
-                let mut deps = current_validation_dependencies.lock();
-                if let Some(state) = deps.get(&hash) {
-                    state.set_source(CascadeSource::Local);
-                }
+    // let network_fetched_action_hashes = current_validation_dependencies
+    //     .lock()
+    //     .get_network_fetched_hashes();
+    // futures::future::join_all(network_fetched_action_hashes.into_iter().map(|hash| {
+    //     let current_validation_dependencies = current_validation_dependencies.clone();
+    //     let incoming_dht_ops_sender = incoming_dht_ops_sender.clone();
+    //     async move {
+    //         let state = {
+    //             let mut deps = current_validation_dependencies.lock();
+    //             if let Some(state) = deps.get(&hash) {
+    //                 state.set_source(CascadeSource::Local);
+    //             }
 
-                deps.get(&hash).cloned()
-            };
+    //             deps.get(&hash).cloned()
+    //         };
 
-            if let Some(state) = state {
-                let op_type = state.required_by_op_type();
-                let record = state.as_record().cloned();
+    //         if let Some(state) = state {
+    //             let op_type = state.required_by_op_type();
+    //             let record = state.as_record().cloned();
 
-                if let (Some(op_type), Some(record)) = (op_type, record) {
-                    let result = match op_type {
-                        DhtOpType::StoreRecord => {
-                            incoming_dht_ops_sender
-                                .send_store_record(
-                                    record,
-                                )
-                                .await
-                        }
-                        DhtOpType::StoreEntry => {
-                            incoming_dht_ops_sender
-                                .send_store_entry(
-                                    record,
-                                )
-                                .await
-                        }
-                        DhtOpType::RegisterAgentActivity => {
-                            incoming_dht_ops_sender
-                                .send_register_agent_activity(
-                                    record,
-                                )
-                                .await
-                        }
-                        DhtOpType::RegisterAddLink => {
-                            incoming_dht_ops_sender
-                                .send_register_add_link(
-                                    record,
-                                )
-                                .await
-                        }
-                        _ => {
-                            tracing::warn!(op_type = ?op_type, "Unexpected op type for network fetched dependency");
-                            Ok(())
-                        }
-                    };
+    //             if let (Some(op_type), Some(record)) = (op_type, record) {
+    //                 let result = match op_type {
+    //                     DhtOpType::StoreRecord => {
+    //                         incoming_dht_ops_sender
+    //                             .send_store_record(
+    //                                 record,
+    //                             )
+    //                             .await
+    //                     }
+    //                     DhtOpType::StoreEntry => {
+    //                         incoming_dht_ops_sender
+    //                             .send_store_entry(
+    //                                 record,
+    //                             )
+    //                             .await
+    //                     }
+    //                     DhtOpType::RegisterAgentActivity => {
+    //                         incoming_dht_ops_sender
+    //                             .send_register_agent_activity(
+    //                                 record,
+    //                             )
+    //                             .await
+    //                     }
+    //                     DhtOpType::RegisterAddLink => {
+    //                         incoming_dht_ops_sender
+    //                             .send_register_add_link(
+    //                                 record,
+    //                             )
+    //                             .await
+    //                     }
+    //                     _ => {
+    //                         tracing::warn!(op_type = ?op_type, "Unexpected op type for network fetched dependency");
+    //                         Ok(())
+    //                     }
+    //                 };
 
-                    if let Err(e) = result {
-                        tracing::error!(error = ?e, "Error sending network fetched dependency to incoming dht ops");
-                    }
-                } else {
-                    tracing::warn!("Missing op type or record for network fetched dependency");
-                }
-            } else {
-                tracing::warn!("Missing state for network fetched dependency");
-            }
-        }
-        .boxed()
-    }))
-    .await;
+    //                 if let Err(e) = result {
+    //                     tracing::error!(error = ?e, "Error sending network fetched dependency to incoming dht ops");
+    //                 }
+    //             } else {
+    //                 tracing::warn!("Missing op type or record for network fetched dependency");
+    //             }
+    //         } else {
+    //             tracing::warn!("Missing state for network fetched dependency");
+    //         }
+    //     }
+    //     .boxed()
+    // }))
+    // .await;
 
     if num_fetched < outcome_summary.missing {
         Ok(WorkComplete::Incomplete(Some(
