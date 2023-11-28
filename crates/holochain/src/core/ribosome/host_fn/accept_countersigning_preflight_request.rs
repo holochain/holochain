@@ -118,14 +118,13 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
     use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
+    use crate::sweettest::SweetConductorBatch;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_wasmer_host::prelude::*;
-    use wasmer::RuntimeError;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use wasmer::RuntimeError;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(

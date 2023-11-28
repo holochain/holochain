@@ -17,7 +17,10 @@ use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
+use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
+
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
+static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
@@ -80,6 +83,7 @@ pub struct DbRead<Kind: DbKindT> {
     statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
+    use_time_metric: UseTimeMetric,
 }
 
 impl<Kind: DbKindT> std::fmt::Debug for DbRead<Kind> {
@@ -119,9 +123,14 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .checkout_connection(self.read_semaphore.clone())
             .await?;
 
-        tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
-            .await
-            .map_err(DatabaseError::from)?
+        // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
+        // this timeout should prevent the caller being blocked by this await that may not finish.
+        tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
+                conn.execute_in_read_txn(f)
+            })).await.map_err(|e| {
+                tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
+                DatabaseError::from(e)
+            })?.map_err(DatabaseError::from)?
     }
 
     /// Intended to be used for transactions that need to be kept open for a longer period of time than just running a
@@ -149,6 +158,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         }
 
         let permit = Self::acquire_reader_permit(semaphore).await?;
+
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
         let mut conn = self.get_connection_from_pool()?;
@@ -156,7 +166,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
             conn.trace(self.statement_trace_fn);
         }
 
-        Ok(PConnGuard::new(conn, permit))
+        Ok(PConnGuard::new(conn, permit, self.use_time_metric.clone()))
     }
 
     /// Get a connection from the pool.
@@ -290,17 +300,31 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
-        Ok(DbWrite(DbRead {
+        let use_time_metric = create_connection_use_time_metric(kind.kind());
+
+        let db_read = DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
             long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
             max_readers: num_read_threads() * 2,
             num_readers: Arc::new(AtomicUsize::new(0)),
-            kind,
+            kind: kind.clone(),
             path: path.unwrap_or_default(),
             connection_pool: pool,
             statement_trace_fn,
-        }))
+            use_time_metric,
+        };
+
+        create_pool_usage_metric(
+            kind.kind(),
+            vec![
+                db_read.write_semaphore.clone(),
+                db_read.read_semaphore.clone(),
+                db_read.long_read_semaphore.clone(),
+            ],
+        );
+
+        Ok(DbWrite(db_read))
     }
 
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
@@ -318,9 +342,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
         let mut conn = self.get_connection_from_pool()?;
 
-        tokio::task::spawn_blocking(move || conn.execute_in_exclusive_rw_txn(f))
-            .await
-            .map_err(DatabaseError::from)?
+        // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
+        // this timeout should prevent the caller being blocked by this await that may not finish.
+        tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
+            conn.execute_in_exclusive_rw_txn(f)
+        })).await.map_err(|e| {
+            tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
+            DatabaseError::from(e)
+        })?.map_err(DatabaseError::from)?
     }
 
     pub fn available_writer_count(&self) -> usize {

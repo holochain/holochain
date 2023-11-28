@@ -1,7 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::*;
 use once_cell::unsync::Lazy;
 use std::sync::Arc;
 use tracing::*;

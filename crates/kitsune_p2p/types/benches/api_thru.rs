@@ -49,7 +49,7 @@ impl Test {
 
         let con = self
             .src_ep
-            .get_connection(self.dst_url.clone(), t)
+            .get_connection(self.dst_url.as_str(), t)
             .await
             .unwrap();
 
@@ -73,7 +73,7 @@ async fn mk_core() -> (TxUrl, Tx2Ep<TestData>, Tx2EpHnd<TestData>) {
     let f = tx2_pool_promote(f, Default::default());
     let f = tx2_api(f, Default::default());
 
-    let ep = f.bind("none:", t).await.unwrap();
+    let ep = f.bind(TxUrl::from_str_panicking("none:"), t).await.unwrap();
     let ep_hnd = ep.handle().clone();
     let addr = ep_hnd.local_addr().unwrap();
 
