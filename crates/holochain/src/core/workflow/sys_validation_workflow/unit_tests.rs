@@ -6,7 +6,6 @@ use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::core::IncomingDhtOpSender;
 use crate::prelude::AgentPubKeyFixturator;
 use crate::prelude::AgentValidationPkgFixturator;
 use crate::prelude::CreateFixturator;
@@ -348,14 +347,8 @@ impl TestCase {
             MockHolochainP2pDnaT::new()
         });
 
-        // let op_sender = IncomingDhtOpSender::new(
-        //     Arc::new(self.test_space.space.clone()),
-        //     self.self_trigger.0.clone(),
-        // );
-
         sys_validation_workflow(
             Arc::new(workspace),
-            // op_sender,
             self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
             self.self_trigger.0.clone(),
