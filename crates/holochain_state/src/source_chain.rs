@@ -595,17 +595,28 @@ where
                 move |txn| -> Result<_, DatabaseError> {
                     // closure to process resulting rows from query
                     let query_row_fn = |row: &Row| {
-                        from_blob::<Entry>(row.get("blob")?).map_err(|err| {
-                            holochain_sqlite::rusqlite::Error::InvalidColumnType(
-                                0,
-                                err.to_string(),
-                                holochain_sqlite::rusqlite::types::Type::Blob,
-                            )
-                        })
+                        from_blob::<Entry>(row.get("blob")?)
+                            .and_then(|entry| {
+                                entry.as_cap_grant().ok_or_else(|| {
+                                    crate::query::StateQueryError::SerializedBytesError(
+                                        SerializedBytesError::Deserialize(
+                                            "could not deserialize cap grant from entry"
+                                                .to_string(),
+                                        ),
+                                    )
+                                })
+                            })
+                            .map_err(|err| {
+                                holochain_sqlite::rusqlite::Error::InvalidColumnType(
+                                    0,
+                                    err.to_string(),
+                                    holochain_sqlite::rusqlite::types::Type::Blob,
+                                )
+                            })
                     };
 
                     // query cap grants depending on whether cap secret provided or not
-                    let mut entries = if let Some(cap_secret) = &check_secret {
+                    let cap_grants = if let Some(cap_secret) = &check_secret {
                         let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
                             DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
                                 err.to_string(),
@@ -616,27 +627,22 @@ where
                         // that has not been updated or deleted
                         let mut stmt = txn.prepare(SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET)?;
                         let rows = stmt.query(params![cap_secret_blob, author])?;
-                        let entries: Vec<Entry> = rows.map(query_row_fn).collect()?;
-                        entries.into_iter()
+                        let cap_grant: Vec<CapGrant> = rows.map(query_row_fn).collect()?;
+                        cap_grant
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
                         let mut stmt = txn.prepare(SELECT_VALID_UNRESTRICTED_CAP_GRANT)?;
                         let rows = stmt.query(params![CapAccess::Unrestricted.as_sql(), author])?;
-                        let entries: Vec<Entry> = rows.map(query_row_fn).collect()?;
-                        entries.into_iter()
+                        let cap_grants: Vec<CapGrant> = rows.map(query_row_fn).collect()?;
+                        cap_grants
                     };
                     // loop over all found cap grants and check if one of them
                     // is valid for assignee and function
-                    while let Some(entry) = entries.next() {
-                        if let Some(cap_grant) = entry.as_cap_grant() {
-                            if cap_grant.is_valid(
-                                &check_function,
-                                &check_agent,
-                                check_secret.as_ref(),
-                            ) {
-                                return Ok(Some(cap_grant));
-                            }
+                    for cap_grant in cap_grants {
+                        if cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref())
+                        {
+                            return Ok(Some(cap_grant));
                         }
                     }
                     Ok(None)
@@ -1716,8 +1722,8 @@ mod tests {
             Some(updated_grant.clone().into())
         );
 
-        // // carol must not get a valid cap grant with either the original secret (because it was replaced)
-        // // or the updated secret (because she is not an assignee)
+        // carol must not get a valid cap grant with either the original secret (because it was replaced)
+        // or the updated secret (because she is not an assignee)
         assert_eq!(
             chain
                 .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
