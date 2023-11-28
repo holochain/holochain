@@ -206,11 +206,15 @@ impl SweetConductor {
                 .await;
         }
 
-        let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
+        let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.into().into_conductor_config(&*r).await
         } else {
             config.into().into()
         };
+
+        if config.data_root_path.is_none() {
+            config.data_root_path = Some(dir.as_ref().to_path_buf().into());
+        }
 
         tracing::info!(?config);
 
