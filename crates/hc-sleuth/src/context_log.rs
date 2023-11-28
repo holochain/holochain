@@ -5,18 +5,21 @@ use aitia::{
     Fact, FactTraits,
 };
 use holochain_types::prelude::*;
+use once_cell::sync::OnceCell;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 
 use super::*;
 
-pub type ContextWriter = aitia::logging::LogWriter<Context>;
+pub type ContextSubscriber = aitia::logging::AitiaSubscriber<Context>;
 
 // #[derive(Debug, derive_more::From)]
 pub type CtxError = String;
 pub type ContextResult<T> = Result<T, CtxError>;
 
-pub fn init_subscriber() -> ContextWriter {
-    let w = ContextWriter::default();
+pub fn init_subscriber() -> ContextSubscriber {
+    let w = SUBSCRIBER
+        .get_or_init(|| ContextSubscriber::default())
+        .clone();
     let ww = w.clone();
     tracing_subscriber::registry()
         .with(holochain_trace::standard_layer(std::io::stderr).unwrap())
@@ -25,19 +28,32 @@ pub fn init_subscriber() -> ContextWriter {
     w
 }
 
+pub static SUBSCRIBER: OnceCell<ContextSubscriber> = OnceCell::new();
+
 #[derive(Default, Debug)]
 pub struct Context {
-    /// All steps recorded
+    /// All facts ever recorded
     pub facts: HashSet<Event>,
 
-    ///
-    pub entry_actions: HashMap<EntryHash, ActionHash>,
+    /// Track which agents are part of which nodes
     pub map_node_to_agents: HashMap<SleuthId, HashSet<AgentPubKey>>,
+
+    /// Track which node an agent is part of
     pub map_agent_to_node: HashMap<AgentPubKey, SleuthId>,
+
+    /// Track the sys validation deps for an op hash
     pub map_op_to_sysval_dep_hash: HashMap<OpRef, Option<ActionHash>>,
+
+    /// Track the app validation deps for an op hash
     pub map_op_to_appval_dep_hash: HashMap<OpRef, HashSet<AnyDhtHash>>,
+
+    /// Track which op a dependency is part of
     pub map_dep_hash_to_op: HashMap<AnyDhtHash, OpRef>,
+
+    /// Map the (action hash + op type) representation to the actual op hash
     pub map_action_to_op: HashMap<OpAction, OpRef>,
+
+    /// The full info associated with each op hash
     pub op_info: HashMap<OpRef, OpInfo>,
 }
 

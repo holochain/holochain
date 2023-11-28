@@ -113,7 +113,6 @@ pub fn traverse<'c, F: Fact>(fact: F, ctx: &'c F::Context) -> TraversalResult<'c
                 dep.clone(),
                 Some(TraversalStep::Continue(vec![dep.clone()])),
             );
-            dbg!(&table);
             let (graph, _) = produce_graph(&table, &dep, ctx);
 
             Err(TraversalError { graph, inner })

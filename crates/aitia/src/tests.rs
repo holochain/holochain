@@ -2,11 +2,12 @@ use std::collections::HashSet;
 
 use maplit::hashset;
 
-use super::simple_report as report;
+use super::print_simple_report as report;
 use crate::Fact;
 use crate::dep::*;
 use crate::graph::*;
 use crate::traversal::Traversal;
+
 
 fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
     let start_ix = graph
@@ -274,7 +275,7 @@ fn branching_any() {
 mod recipes {
 
 
-    use crate::fact_problem;
+    use crate::TraversalOutcome;
 
     use super::*;
     use test_case::test_case;
@@ -394,8 +395,10 @@ mod recipes {
         {
             let tr = TunaMelt.traverse(&truths);
             report(&tr);
-            assert_eq!(tr.unwrap().terminals, hashset![Cheese.into()]);
-            assert!(fact_problem(&truths, &TunaMelt).is_some());
+            let t = tr.unwrap();
+            assert_eq!(t.terminals, hashset![Cheese.into()]);
+            let o = TraversalOutcome::from_traversal(&t);
+            assert!(o.report().is_some());
         }
         
 
@@ -404,8 +407,10 @@ mod recipes {
         {
             let tr = TunaMelt.traverse(&truths);
             report(&tr);
-            assert_eq!(tr.unwrap().terminals, hashset![Cheese.into(), Mayo.into()]);
-            assert!(fact_problem(&truths, &TunaMelt).is_some());
+            let t = tr.unwrap();
+            assert_eq!(t.terminals, hashset![Cheese.into(), Mayo.into()]);
+            let o = TraversalOutcome::from_traversal(&t);
+            assert!(o.report().is_some());
         }
 
 

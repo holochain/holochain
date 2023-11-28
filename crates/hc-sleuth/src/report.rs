@@ -3,5 +3,7 @@ use aitia::{simple_report, Fact};
 use super::*;
 
 pub fn report(event: Event, ctx: &Context) {
-    simple_report(&event.traverse(ctx))
+    if let Some(report) = simple_report(&event.traverse(ctx)) {
+        println!("hc-sleuth simple report:\n{report}");
+    }
 }

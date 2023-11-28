@@ -522,7 +522,7 @@ async fn test_gossip_startup() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    let aw = hc_sleuth::init_subscriber();
+    hc_sleuth::init_subscriber();
     let config = TestConfig {
         publish: false,
         recent: true,
@@ -531,14 +531,14 @@ async fn three_way_gossip_recent() {
         bootstrap: false,
         recent_threshold: None,
     };
-    three_way_gossip(config.into(), aw).await;
+    three_way_gossip(config.into()).await;
 }
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    let aw = hc_sleuth::init_subscriber();
+    holochain_trace::test_run().ok();
     let config = TestConfig {
         publish: false,
         recent: false,
@@ -547,17 +547,14 @@ async fn three_way_gossip_historical() {
         bootstrap: false,
         recent_threshold: Some(0),
     };
-    three_way_gossip(config.into(), aw).await;
+    three_way_gossip(config.into()).await;
 }
 
 /// Test that:
 /// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(
-    config: holochain::sweettest::SweetConductorConfig,
-    aw: hc_sleuth::ContextWriter,
-) {
+async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 
@@ -644,8 +641,8 @@ async fn three_way_gossip(
         cell.agent_pubkey().to_kitsune()
     );
 
-    {
-        let ctx = aw.lock();
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        let ctx = s.lock();
         dbg!(&ctx.map_agent_to_node);
 
         let step = hc_sleuth::Event::Integrated {
@@ -665,9 +662,8 @@ async fn three_way_gossip(
         .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(10))
         .await;
 
-    {
-        // TODO: use assertion
-        let ctx = aw.lock();
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        let ctx = s.lock();
         let step = hc_sleuth::Event::Integrated {
             by: conductors[2].id(),
             op: ctx
