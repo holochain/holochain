@@ -132,6 +132,7 @@
 
             packages = with pkgs; [
               cargo-nextest
+              graph-easy
 
               (pkgs.writeShellScriptBin "script-cargo-regen-lockfiles" ''
                 cargo fetch --locked
@@ -181,6 +182,7 @@
           ]);
 
           shellHook = ''
+            export HOLOCHAIN_DEVSHELL="rustDev"
             export CARGO_HOME="$PWD/.cargo"
             export CARGO_INSTALL_ROOT="$PWD/.cargo"
             export CARGO_TARGET_DIR="$PWD/target"
@@ -194,7 +196,7 @@
             export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
           '')
           + (lib.strings.optionalString pkgs.stdenv.isLinux ''
-            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="$RUSTFLAGS -Clink-arg=-fuse-ld=mold"
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="$CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -Clink-arg=-fuse-ld=mold"
           '')
           ;
         };

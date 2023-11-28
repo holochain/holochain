@@ -281,7 +281,7 @@ pub mod wasm_test {
                         .await
                         .write()
                         .await
-                        .call::<_, Option<Record>, _>(&bob.zome(TestWasm::Create), "get_entry", ())
+                        .call::<_, Option<Record>>(&bob.zome(TestWasm::Create), "get_entry", ())
                         .await,
                     |x: &Option<Record>| x.is_some(),
                     |_| true
