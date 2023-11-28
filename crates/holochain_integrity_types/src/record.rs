@@ -39,7 +39,7 @@ impl<A> AsRef<A> for Record<A> {
 }
 
 /// Represents the different ways the entry_address reference within an action
-/// can be intepreted
+/// can be interpreted
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(
     feature = "fuzzing",
@@ -75,6 +75,7 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
             (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
             (None, None) => RecordEntry::NA,
             (Some(_), None) => {
+                // TODO this is a problem case but it is reachable
                 unreachable!("Entry is present for an action type which has no entry reference")
             }
             (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,

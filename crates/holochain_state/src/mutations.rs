@@ -451,6 +451,10 @@ pub fn set_validation_stage(
         ValidationLimboStatus::AwaitingIntegration => Some(3),
     };
     let now = holochain_zome_types::prelude::Timestamp::now();
+    // TODO num_validation_attempts is incremented every time this is called but never reset between sys and app validation
+    // which means that if an op takes a few tries to pass sys validation then it will be 'deprioritised' in the app validation
+    // query rather than sorted by OpOrder. Check for/add a test that checks app validation is resilient to this and isn't relying on
+    // op order from the database query.
     txn.execute(
         "
         UPDATE DhtOp

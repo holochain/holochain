@@ -1,6 +1,7 @@
 use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
+use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 
@@ -192,11 +193,14 @@ impl ConductorBuilder {
         conductor_handle: ConductorHandle,
         receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         stop: StopReceiver,
+        duration_metric: PostCommitDurationMetric,
     ) {
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
         stop.fuse_with(receiver_stream)
             .for_each_concurrent(POST_COMMIT_CONCURRENT_LIMIT, move |post_commit_args| {
+                let start = Instant::now();
                 let conductor_handle = conductor_handle.clone();
+                let duration_metric = duration_metric.clone();
                 async move {
                     let PostCommitArgs {
                         host_access,
@@ -219,6 +223,20 @@ impl ConductorBuilder {
                             tracing::error!(?e);
                         }
                     }
+
+                    duration_metric.record(
+                        start.elapsed().as_secs_f64(),
+                        &[
+                            opentelemetry_api::KeyValue::new(
+                                "dna_hash",
+                                format!("{:?}", cell_id.dna_hash()),
+                            ),
+                            opentelemetry_api::KeyValue::new(
+                                "agent",
+                                format!("{:?}", cell_id.agent_pubkey()),
+                            ),
+                        ],
+                    );
                 }
             })
             .await;
@@ -241,8 +259,15 @@ impl ConductorBuilder {
 
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
+        let post_commit_duration_metric = create_post_commit_duration_metric();
         tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
-            Self::spawn_post_commit(conductor2, post_commit_receiver, stop).map(Ok)
+            Self::spawn_post_commit(
+                conductor2,
+                post_commit_receiver,
+                stop,
+                post_commit_duration_metric,
+            )
+            .map(Ok)
         });
 
         let configs = conductor_config.admin_interfaces.unwrap_or_default();

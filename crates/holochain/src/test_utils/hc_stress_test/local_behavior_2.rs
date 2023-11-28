@@ -143,7 +143,7 @@ impl LocalBehavior2 {
 }
 
 async fn loc_test_conductor(dna_files: &[DnaFile], rendezvous: DynSweetRendezvous) -> HcStressTest {
-    let config = SweetConductorConfig::rendezvous();
+    let config = SweetConductorConfig::rendezvous(true);
     let conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
     HcStressTest::new(conductor, dna_files).await
 }

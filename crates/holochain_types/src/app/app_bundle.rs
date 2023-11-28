@@ -1,3 +1,5 @@
+//! An App Bundle is an AppManifest bundled together with DNA bundles.
+
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use self::error::AppBundleResult;
