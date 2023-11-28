@@ -4,8 +4,8 @@ use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_test_wasm_common::MyValidDnaProperties;
+use holochain_types::prelude::DnaModifiersOpt;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::DnaModifiersOpt;
 use serde::{Deserialize, Serialize};
 
 #[tokio::test(flavor = "multi_thread")]
