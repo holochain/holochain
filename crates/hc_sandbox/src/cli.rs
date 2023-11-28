@@ -17,6 +17,7 @@ const DEFAULT_APP_ID: &str = "test-app";
 /// Everything you need to quickly run your app in Holochain,
 /// or create complex multi-conductor setups for testing.
 #[derive(Debug, Parser)]
+#[command(version, about)]
 pub struct HcSandbox {
     #[command(subcommand)]
     subcommand: HcSandboxSubcommand,

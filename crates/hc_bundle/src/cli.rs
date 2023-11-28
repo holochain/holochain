@@ -22,6 +22,7 @@ pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 
 /// Work with Holochain DNA bundles.
 #[derive(Debug, Parser)]
+#[command(version, about)]
 pub struct HcDnaBundle {
     /// The `hc dna` subcommand to run.
     #[command(subcommand)]
@@ -101,6 +102,7 @@ pub enum HcDnaBundleSubcommand {
 
 /// Work with Holochain hApp bundles.
 #[derive(Debug, Parser)]
+#[command(version, about)]
 pub struct HcAppBundle {
     /// The `hc app` subcommand to run.
     #[command(subcommand)]
@@ -182,6 +184,7 @@ pub enum HcAppBundleSubcommand {
 
 /// Work with Holochain web-hApp bundles.
 #[derive(Debug, Parser)]
+#[command(version, about)]
 pub struct HcWebAppBundle {
     /// The `hc web-app` subcommand to run.
     #[command(subcommand)]

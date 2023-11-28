@@ -7,7 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- In the CloneOnly provisioning strategy, `installed_hash` is no longer required (it's now optional). [#2600](https://github.com/holochain/holochain/pull/2600)
+## 0.2.3
+
+## 0.2.3-rc.1
+
+## 0.2.3-rc.0
+
+- In the CloneOnly provisioning strategy, `installed_hash` is no longer required (it’s now optional). [\#2600](https://github.com/holochain/holochain/pull/2600)
 
 ## 0.2.3-beta-rc.0
 
