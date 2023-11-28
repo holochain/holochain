@@ -323,7 +323,7 @@ impl InvocationAuth {
     }
 }
 
-pub trait Invocation {
+pub trait Invocation: Clone {
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
     /// zome in order for the Dna overall to successfully init.
@@ -480,7 +480,7 @@ mockall::mock! {
 
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
     /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
