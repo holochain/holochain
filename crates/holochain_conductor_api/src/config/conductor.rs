@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
+use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use serde::de::DeserializeOwned;
@@ -14,6 +15,7 @@ mod error;
 mod keystore_config;
 /// Defines subdirectories of the config directory.
 pub mod paths;
+pub mod process;
 //mod logger_config;
 //mod signal_config;
 
@@ -108,6 +110,23 @@ impl ConductorConfig {
             .as_ref()
             .map(|c| c.tuning_params.clone())
             .unwrap_or_default()
+    }
+
+    /// Get the data directory for this config or say something nice and die.
+    pub fn data_root_path_or_die(&self) -> DataPath {
+        match &self.data_root_path {
+            Some(path) => path.clone().into(),
+            None => {
+                println!(
+                    "
+                    The conductor config does not contain a data_root_path. Please check and fix the
+                    config file. Details:
+
+                        Missing field `data_root_path`",
+                );
+                std::process::exit(ERROR_CODE);
+            }
+        }
     }
 }
 
