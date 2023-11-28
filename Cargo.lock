@@ -3709,6 +3709,7 @@ dependencies = [
  "holochain_trace",
  "itertools 0.10.5",
  "kitsune_p2p",
+ "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_fetch",

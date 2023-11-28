@@ -23,6 +23,7 @@ itertools = "0.10"
 kitsune_p2p_fetch = { version = "^0.2.3", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.2.3", path = "../mdns" }
 kitsune_p2p_proxy = { version = "^0.2.3", path = "../proxy" }
+kitsune_p2p_bin_data = { version = "^0.2.3", path = "../bin_data" }
 kitsune_p2p_timestamp = { version = "^0.2.3", path = "../timestamp", features = ["now"] }
 kitsune_p2p_block = { version = "^0.2.3", path = "../block" }
 kitsune_p2p_transport_quic = { version = "^0.2.3", path = "../transport_quic", optional = true }
