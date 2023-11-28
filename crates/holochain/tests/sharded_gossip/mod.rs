@@ -20,7 +20,6 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_ag
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
-use wasmer::RuntimeError;
 
 fn make_tuning(
     publish: bool,
@@ -412,7 +411,7 @@ async fn test_zero_arc_no_gossip_4way() {
                     };
                     holochain::wait_for!(
                         WaitFor::new(std::time::Duration::from_secs(5), 10),
-                        c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
+                        c.call::<_, Option<Record>>(&zome, "read", hash.clone())
                             .await
                             .is_some(),
                         |x: &bool| *x,
