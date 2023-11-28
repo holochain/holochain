@@ -194,6 +194,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
 #[ignore = "performance test meant to be run manually"]
 async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
     use holochain_conductor_api::{AppRequest, AppResponse, ZomeCall};
+    use std::time::Instant;
 
     holochain_trace::test_run().ok();
     const NUM_AGENTS: usize = 30;
@@ -246,8 +247,7 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
     ) {
         let calls = future::join_all(std::iter::zip(cells, clients.iter_mut()).map(
             |(cell, client)| async move {
-                let (nonce, expires_at) =
-                    holochain_state::nonce::fresh_nonce(Timestamp::now()).unwrap();
+                let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
                 let cell_id = cell.cell_id().clone();
                 let call = ZomeCall::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
