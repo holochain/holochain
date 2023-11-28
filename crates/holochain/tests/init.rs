@@ -29,7 +29,7 @@ async fn call_init_from_init_across_cells() {
             inits1.fetch_add(1, Ordering::SeqCst);
             Ok(InitCallbackResult::Pass)
         })
-        .function("touch", |api, _: ()| {
+        .function("touch", |_api, _: ()| {
             // just triggers init
             Ok(())
         });
@@ -48,7 +48,7 @@ async fn call_init_from_init_across_cells() {
             inits2.fetch_add(1, Ordering::SeqCst);
             Ok(InitCallbackResult::Pass)
         })
-        .function("touch", |api, _: ()| {
+        .function("touch", |_api, _: ()| {
             // just triggers init
             Ok(())
         });
