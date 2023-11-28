@@ -210,7 +210,7 @@ async fn sys_validation_workflow_inner(
     jh.await?;
     tracing::debug!("Accepted {} ops", total);
     Ok(if saturated {
-        WorkComplete::Incomplete
+        WorkComplete::Incomplete(None)
     } else {
         WorkComplete::Complete
     })
