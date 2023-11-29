@@ -21,15 +21,25 @@ macro_rules! trace {
         // Note the tracing level doesn't matter when using the AitiaWriter, but it
         // of course affects whether this will be present in the normal logs
 
-        // XXX: bedep the JSON representation is wonky, especially for hashes,
+        // XXX: because the JSON representation is wonky, especially for hashes,
         //      we also redundantly print a normal debug for better log readability
         let fact = $fact;
-        tracing::info!(
-            aitia = "json",
-            ?fact,
-            "<AITIA>{}</AITIA>",
-            $crate::logging::LogLine::encode(fact)
-        );
+
+        if std::env::var("AITIA_LOG").is_ok() {
+            tracing::info!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            );
+        } else {
+            tracing::trace!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            );
+        }
     };
 }
 

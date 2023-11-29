@@ -76,15 +76,19 @@
 use tracing::Subscriber;
 use tracing_subscriber::{
     filter::EnvFilter,
-    fmt::{format::FmtSpan, time::UtcTime, SubscriberBuilder},
+    fmt::{
+        format::{DefaultFields, FmtSpan, Format},
+        time::UtcTime,
+    },
     layer::SubscriberExt,
     registry::LookupSpan,
-    Layer,
+    util::SubscriberInitExt,
+    Layer, Registry,
 };
 
 use derive_more::Display;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::{str::FromStr, sync::Once};
 
 use flames::FlameTimed;
 use fmt::*;
@@ -131,8 +135,6 @@ pub enum Output {
 
 /// ParseError is a String
 pub type ParseError = String;
-
-static INIT: Once = Once::new();
 
 impl FromStr for Output {
     type Err = ParseError;
@@ -264,16 +266,13 @@ pub fn test_run_timed_ice_console(
     }))
 }
 
-/// Return a subscriber builder directly, for times when you need more control over the
-/// produced subscriber
-pub fn standard_layer<W, S>(writer: W) -> Result<impl Layer<S>, errors::TracingError>
-where
-    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
-    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
-{
+/// Build the canonical filter based on env
+pub fn standard_filter() -> Result<EnvFilter, errors::TracingError> {
     let mut filter = match std::env::var("RUST_LOG") {
-        Ok(_) => EnvFilter::from_default_env(),
-        Err(_) => EnvFilter::from_default_env().add_directive("[wasm_debug]=debug".parse()?),
+        Ok(_) => EnvFilter::from_default_env().add_directive("[{aitia}]=debug".parse()?),
+        Err(_) => EnvFilter::from_default_env()
+            .add_directive("[wasm_debug]=debug".parse()?)
+            .add_directive("[{aitia}]=off".parse()?),
     };
     if std::env::var("CUSTOM_FILTER").is_ok() {
         EnvFilter::try_from_env("CUSTOM_FILTER")
@@ -283,14 +282,36 @@ where
             })
             .ok();
     }
+    Ok(filter)
+}
 
+/// Return a subscriber builder directly, for times when you need more control over the
+/// produced subscriber
+pub fn standard_layer_unfiltered<W, S>(
+    writer: W,
+) -> Result<tracing_subscriber::fmt::Layer<S, DefaultFields, Format, W>, errors::TracingError>
+where
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
+{
     Ok(tracing_subscriber::fmt::Layer::default()
         .with_test_writer()
         .with_writer(writer)
         .with_file(true)
         .with_line_number(true)
-        .with_target(true)
-        .with_filter(filter))
+        .with_target(true))
+}
+
+/// Return a subscriber builder directly, for times when you need more control over the
+/// produced subscriber
+pub fn standard_layer<W, S>(writer: W) -> Result<impl Layer<S>, errors::TracingError>
+where
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
+{
+    let filter = standard_filter()?;
+
+    Ok(standard_layer_unfiltered(writer)?.with_filter(filter))
 }
 
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
@@ -303,50 +324,68 @@ fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::Tracin
 where
     W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
-    let subscriber = SubscriberBuilder::default();
+    let filter = standard_filter()?;
 
     match output {
-        Output::Json => finish(
-            subscriber
-                .with_timer(UtcTime::rfc_3339())
-                .json()
-                .event_format(FormatEvent)
-                .finish()
-                .with(standard_layer(writer)?),
-        ),
-        Output::JsonTimed => finish(
-            subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .with_timer(UtcTime::rfc_3339())
-                .json()
-                .event_format(FormatEvent)
-                .finish()
-                .with(standard_layer(writer)?),
-        ),
-        Output::Log => Ok(()),
-        Output::LogTimed => finish(
-            subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .finish()
-                .with(standard_layer(writer)?),
-        ),
-        Output::FlameTimed => finish(
-            subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .with_timer(UtcTime::rfc_3339())
-                .event_format(FormatEventFlame)
-                .finish()
-                .with(standard_layer(writer)?),
-        ),
-        Output::IceTimed => finish(
-            subscriber
-                .with_span_events(FmtSpan::CLOSE)
-                .with_timer(UtcTime::rfc_3339())
-                .event_format(FormatEventIce)
-                .finish()
-                .with(standard_layer(writer)?),
-        ),
-        Output::Compact => finish(subscriber.compact().finish().with(standard_layer(writer)?)),
+        Output::Json => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_timer(UtcTime::rfc_3339())
+                    .json()
+                    .event_format(FormatEvent)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::JsonTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_timer(UtcTime::rfc_3339())
+                    .json()
+                    .event_format(FormatEvent)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::Log => Registry::default().with(standard_layer(writer)?).init(),
+
+        Output::LogTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::FlameTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_timer(UtcTime::rfc_3339())
+                    .event_format(FormatEventFlame)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::IceTimed => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .with_span_events(FmtSpan::CLOSE)
+                    .with_timer(UtcTime::rfc_3339())
+                    .event_format(FormatEventIce)
+                    .with_filter(filter),
+            )
+            .init(),
+
+        Output::Compact => Registry::default()
+            .with(
+                standard_layer_unfiltered(writer)?
+                    .compact()
+                    .with_filter(filter),
+            )
+            .init(),
+
         Output::OpenTel => {
             #[cfg(feature = "opentelemetry-on")]
             {
@@ -358,31 +397,21 @@ where
                 let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
                 let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
                 finish(
-                    subscriber
-                        .with_env_filter(filter)
-                        .finish()
+                    Registry::default()
+                        .with(standard_layer(writer)?)
                         .with(telemetry)
-                        .with(open::OpenLayer),
+                        .with(open::OpenLayer)
+                        .init(),
                 )
             }
             #[cfg(not(feature = "opentelemetry-on"))]
             {
-                Ok(())
+                init_fmt_with_opts(Output::Log, writer)?
             }
         }
-        Output::None => Ok(()),
-    }
-}
-
-fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
-where
-    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
-{
-    let mut result = Ok(());
-    INIT.call_once(|| {
-        result = tracing::subscriber::set_global_default(subscriber).map_err(Into::into);
-    });
-    result
+        Output::None => (),
+    };
+    Ok(())
 }
 
 pub mod errors {

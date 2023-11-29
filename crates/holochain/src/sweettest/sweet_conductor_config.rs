@@ -54,8 +54,6 @@ impl SweetConductorConfig {
             }
         }
 
-        tracing::info!(?config);
-
         config
     }
 
