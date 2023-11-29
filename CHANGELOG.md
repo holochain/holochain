@@ -14,6 +14,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20231129.004341
+
+## [hcterm-0.3.0-beta-dev.2](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.2)
+
+## [holochain\_cli-0.3.0-beta-dev.26](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain-0.3.0-beta-dev.26](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.24](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cascade-0.3.0-beta-dev.26](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.26](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.21](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.24](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [hdk-0.3.0-beta-dev.21](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.21)
+
+- Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor. [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## [holochain\_state-0.3.0-beta-dev.25](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [hdi-0.4.0-beta-dev.17](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.17)
+
+- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## [holochain\_p2p-0.3.0-beta-dev.25](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_types-0.3.0-beta-dev.23](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_sqlite-0.3.0-beta-dev.23](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.23)
+
 # 20231122.004553
 
 ## [hcterm-0.3.0-beta-dev.1](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.1)
