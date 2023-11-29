@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
-        data_root_path: /path/to/env
+    data_root_path: /path/to/env
     keystore_path: /path/to/keystore
 
     keystore:
