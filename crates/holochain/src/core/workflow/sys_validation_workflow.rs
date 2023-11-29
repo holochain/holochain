@@ -159,7 +159,7 @@ async fn sys_validation_workflow_inner(
     let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
-    fetch_previous_records(
+    fetch_previous_actions_for_ops(
         current_validation_dependencies.clone(),
         cascade.clone(),
         sorted_ops.clone().into_iter(),
@@ -253,6 +253,8 @@ where
         .collect()
 }
 
+/// Examine the list of provided actions and create a list of actions which are sys validation dependencies for those actions.
+/// The actions are merged into `current_validation_dependencies`.
 async fn fetch_previous_actions<A, C>(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     cascade: Arc<C>,
@@ -302,40 +304,41 @@ async fn fetch_previous_actions<A, C>(
     current_validation_dependencies.lock().merge(new_deps);
 }
 
-async fn fetch_previous_records<C, O>(
-    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-    cascade: Arc<C>,
-    ops: O,
-) where
-    C: Cascade + Send + Sync,
+fn get_dependency_hashes_from_ops<O>(ops: O) -> Vec<ActionHash>
+where
     O: Iterator<Item = DhtOpHashed>,
 {
-    let action_fetches = ops.into_iter().flat_map(|op| {
+    ops.into_iter().filter_map(|op| {
         // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
-        let actions_from_op = match &op.content {
-            DhtOp::StoreRecord(_, action, RecordEntry::Present(entry)) => {
-                match entry {
-                    Entry::CounterSign(session_data, _) => {
+        match &op.content {
+            DhtOp::StoreRecord(_, action, entry) => {
+                let mut actions = match entry {
+                    RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
                         // Discard errors here because we'll check later whether the input is valid. If it's not then it
                         // won't matter that we've skipped fetching deps for it
                         if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
                             make_action_set_for_session_data(entry_rate_weight, entry, session_data)
-                                .ok()
-                                .map(|actions| {
-                                    actions
-                                        .into_iter()
-                                        .map(|a| -> AnyDhtHash { a.into() })
-                                        .collect::<Vec<_>>()
-                                })
+                                .unwrap_or_else(|_| vec![])
+                                .into_iter()
+                                .map(|action| { action.into_hash() })
+                                .collect::<Vec<_>>()
                         } else {
-                            None
+                            vec![]
                         }
                     }
-                    _ => None,
+                    _ => vec![],
+                };
+
+                if let Some(prev_action) = action.prev_action() {
+                    actions.push(prev_action.as_hash().clone());
                 }
+                if let Action::Update(update) = action {
+                    actions.push(update.original_action_address.clone());
+                }
+                Some(actions)
             }
             DhtOp::StoreEntry(_, action, entry) => {
-                match entry {
+                let mut actions = match entry {
                     Entry::CounterSign(session_data, _) => {
                         // Discard errors here because we'll check later whether the input is valid. If it's not then it
                         // won't matter that we've skipped fetching deps for it
@@ -344,56 +347,67 @@ async fn fetch_previous_records<C, O>(
                             entry,
                             session_data,
                         )
-                        .ok()
-                        .map(|actions| {
-                            actions
-                                .into_iter()
-                                .map(|a| -> AnyDhtHash { a.into() })
-                                .collect()
-                        })
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
-        };
-
-        // Always include the previous action if there is one
-        match actions_from_op {
-            Some(mut actions) => {
-                actions.extend(
-                    get_dependency_hashes_from_actions(vec![op.action()].into_iter())
+                        .unwrap_or_else(|_| vec![])
                         .into_iter()
-                        .map(|h| -> AnyDhtHash { h.into() }),
-                );
+                        .map(|action| { action.into_hash() })
+                        .collect::<Vec<_>>()
+                    }
+                    _ => vec![],
+                };
 
+                match action {
+                    NewEntryAction::Create(create) => {
+                        actions.push(create.prev_action.as_hash().clone());
+                    }
+                    NewEntryAction::Update(update) => {
+                        actions.push(update.prev_action.as_hash().clone());
+                        actions.push(update.original_action_address.clone());
+                    }
+                }
                 Some(actions)
             }
-            None => {
-                let dependency_hashes: Vec<AnyDhtHash> =
-                    get_dependency_hashes_from_actions(vec![op.action()].into_iter())
-                        .into_iter()
-                        .map(|h| -> AnyDhtHash { h.into() })
-                        .collect();
-
-                if dependency_hashes.is_empty() {
-                    None
-                } else {
-                    Some(dependency_hashes)
-                }
+            DhtOp::RegisterAgentActivity(_, action) => action
+                .prev_action()
+                .map(|action| vec![action.as_hash().clone()]),
+            DhtOp::RegisterUpdatedContent(_, action, _) => {
+                Some(vec![action.original_action_address.clone()])
             }
+            DhtOp::RegisterUpdatedRecord(_, action, _) => {
+                Some(vec![action.original_action_address.clone()])
+            }
+            DhtOp::RegisterDeletedBy(_, action) => {
+                Some(vec![action.deletes_address.clone()])
+            }
+            DhtOp::RegisterDeletedEntryAction(_, action) => {
+                Some(vec![action.deletes_address.clone()])
+            }
+            DhtOp::RegisterRemoveLink(_, action) => {
+                Some(vec![action.link_add_address.clone()])
+            }
+            _ => None,
         }
-        .into_iter()
-        .flatten()
-        .filter(|hash| !current_validation_dependencies.lock().has(hash))
-        .map(|hash: AnyDhtHash| {
-            let cascade = cascade.clone();
-            async move {
-                let fetched = cascade.retrieve(hash.clone(), Default::default()).await;
-                (hash, fetched)
-            }
-            .boxed()
-        })
+    }).flatten().collect()
+}
+
+/// Examine the list of provided ops and create a list of actions which are sys validation dependencies for those ops.
+/// The actions are merged into `current_validation_dependencies`.
+async fn fetch_previous_actions_for_ops<C, O>(
+    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    cascade: Arc<C>,
+    ops: O,
+) where
+    C: Cascade + Send + Sync,
+    O: Iterator<Item = DhtOpHashed>,
+{
+    let action_fetches = get_dependency_hashes_from_ops(ops).into_iter()
+    .filter(|hash| !current_validation_dependencies.lock().has(&hash.clone().into()))
+    .map(|hash| {
+        let cascade = cascade.clone();
+        async move {
+            let fetched = cascade.retrieve(hash.clone().into(), Default::default()).await;
+            (hash.into(), fetched)
+        }
+        .boxed()
     });
 
     let new_deps = futures::future::join_all(action_fetches)

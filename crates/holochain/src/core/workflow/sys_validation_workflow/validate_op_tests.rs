@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::fetch_previous_records;
+use super::fetch_previous_actions_for_ops;
 use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
@@ -1134,7 +1134,7 @@ impl TestCase {
 
         let cascade = Arc::new(new_cascade);
 
-        fetch_previous_records(
+        fetch_previous_actions_for_ops(
             self.current_validation_dependencies.clone(),
             cascade.clone(),
             vec![self
