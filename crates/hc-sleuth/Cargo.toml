@@ -1,0 +1,41 @@
+[package]
+name = "hc-sleuth"
+version = "0.1.0"
+edition = "2021"
+
+
+[[bin]]
+name = "hc-sleuth"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+aitia = { path = "../aitia" }
+derive_more = "0.99"
+holochain_state_types = { path = "../holochain_state_types" }
+holochain_types = { path = "../holochain_types" }
+holochain_trace = { path = "../holochain_trace" }
+kitsune_p2p = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/kitsune_p2p" }
+once_cell = "1.18"
+parking_lot = "0.10"
+petgraph = "0.6"
+regex = "1"
+serde = { version = "1.0", features = ["derive"]}
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+structopt = "0.3"
+
+[dev-dependencies]
+arbitrary = { version = "1.0", features = ["derive"] }
+hc-sleuth = { path = ".", features = ["test_utils"]}
+pretty_assertions = "*"
+
+[features]
+
+test_utils = [
+    "holochain_types/fuzzing",
+    "kitsune_p2p/fuzzing",
+    "holochain_types/test_utils",
+    "kitsune_p2p/test_utils",
+]
