@@ -143,12 +143,8 @@ pub struct ValidationDependencyState {
 }
 
 impl ValidationDependencyState {
-    pub fn new(
-        dependency: Option<ValidationDependency>,
-    ) -> Self {
-        Self {
-            dependency,
-        }
+    pub fn new(dependency: Option<ValidationDependency>) -> Self {
+        Self { dependency }
     }
 
     pub fn set_record(&mut self, record: Record) {

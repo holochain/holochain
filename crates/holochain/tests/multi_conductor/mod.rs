@@ -4,10 +4,10 @@ use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::consistency_10s;
+use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
 use unwrap_to::unwrap_to;
-use holochain_conductor_api::conductor::ConductorTuningParams;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]
@@ -78,7 +78,7 @@ async fn test_publish() -> anyhow::Result<()> {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
-    
+
     holochain_trace::test_run().unwrap();
 
     const NUM_CONDUCTORS: usize = 3;

@@ -341,9 +341,10 @@ impl TestCase {
             std::time::Duration::from_secs(10),
         );
 
-        let actual_network = self.actual_network.take().unwrap_or_else(|| {
-            MockHolochainP2pDnaT::new()
-        });
+        let actual_network = self
+            .actual_network
+            .take()
+            .unwrap_or_else(|| MockHolochainP2pDnaT::new());
 
         sys_validation_workflow(
             Arc::new(workspace),

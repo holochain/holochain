@@ -48,9 +48,7 @@ mod validate_op_tests;
     trigger_self,
     network
 ))]
-pub async fn sys_validation_workflow<
-    Network: HolochainP2pDnaT + Clone + 'static,
->(
+pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     trigger_app_validation: TriggerSender,
@@ -115,14 +113,17 @@ pub async fn sys_validation_workflow<
             outcome_summary.missing
         );
     }
-    
+
     if num_fetched > 0 {
         // If we fetched anything then we can re-run sys validation
         trigger_self.trigger(&"sys_validation_workflow");
     }
 
     if num_fetched < outcome_summary.missing {
-        tracing::info!("Sys validation sleeping for {:?}", workspace.sys_validation_retry_delay);
+        tracing::info!(
+            "Sys validation sleeping for {:?}",
+            workspace.sys_validation_retry_delay
+        );
         Ok(WorkComplete::Incomplete(Some(
             workspace.sys_validation_retry_delay,
         )))

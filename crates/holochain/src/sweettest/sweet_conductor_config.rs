@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use crate::sweettest::SweetRendezvous;
-use holochain_conductor_api::{conductor::{ConductorConfig, ConductorTuningParams}, AdminInterfaceConfig, InterfaceDriver};
+use holochain_conductor_api::{
+    conductor::{ConductorConfig, ConductorTuningParams},
+    AdminInterfaceConfig, InterfaceDriver,
+};
 use kitsune_p2p_types::{
     config::{KitsuneP2pConfig, TransportConfig},
     dependencies::lair_keystore_api::dependencies::nanoid::nanoid,
@@ -26,7 +29,7 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
-            tuning_params: Some(ConductorTuningParams { 
+            tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
                 ..Default::default()
             }),

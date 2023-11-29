@@ -313,7 +313,8 @@ async fn test_zero_arc_no_gossip_4way() {
             historical: true,
             bootstrap: true,
             recent_threshold: None,
-        }).tune_conductor(|params| {
+        })
+        .tune_conductor(|params| {
             // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
             params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
         }),
@@ -324,7 +325,8 @@ async fn test_zero_arc_no_gossip_4way() {
             historical: true,
             bootstrap: true,
             recent_threshold: None,
-        }).tune_conductor(|params| {
+        })
+        .tune_conductor(|params| {
             // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
             params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
         }),
@@ -332,19 +334,23 @@ async fn test_zero_arc_no_gossip_4way() {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous(true).tune_conductor(|params| {
-                // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
-                params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
-            }).set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true)
+                .tune_conductor(|params| {
+                    // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+                    params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+                })
+                .set_tuning_params(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous(true).tune_conductor(|params| {
-                // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
-                params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
-            }).set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true)
+                .tune_conductor(|params| {
+                    // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+                    params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+                })
+                .set_tuning_params(tuning)
         },
     ];
 
