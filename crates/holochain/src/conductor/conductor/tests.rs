@@ -271,11 +271,11 @@ async fn test_uninstall_app() {
         .await;
 
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
+        .call::<_, Option<Record>>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
+        .call::<_, Option<Record>>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_some());
 
@@ -297,11 +297,11 @@ async fn test_uninstall_app() {
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
+        .call::<_, Option<Record>>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone())
+        .call::<_, Option<Record>>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_some());
 
@@ -325,11 +325,11 @@ async fn test_uninstall_app() {
     //   of the cells was destroyed, all data was destroyed as well.
     let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
+        .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_none());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone())
+        .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_none());
 }
@@ -596,7 +596,7 @@ async fn test_enable_disable_enable_app() {
 
     // - We can't make a zome call while disabled
     assert!(conductor
-        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
+        .call_fallible::<_, Option<Record>>(&cell.zome("zome"), "get", hash.clone())
         .await
         .is_err());
 
@@ -604,7 +604,7 @@ async fn test_enable_disable_enable_app() {
 
     // - We can still make a zome call after reactivation
     assert!(conductor
-        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
+        .call_fallible::<_, Option<Record>>(&cell.zome("zome"), "get", hash.clone())
         .await
         .is_ok());
 

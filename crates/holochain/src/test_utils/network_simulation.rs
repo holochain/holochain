@@ -416,7 +416,7 @@ async fn create_test_data(
         eprintln!("Calling {}", i);
         let e = entries.take(approx_num_ops_held).collect::<Vec<_>>();
         conductor
-            .call::<_, (), _>(&cell.zome("zome1"), "create_many", e)
+            .call::<_, ()>(&cell.zome("zome1"), "create_many", e)
             .await;
     }
     let mut authored = HashMap::new();

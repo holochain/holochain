@@ -1272,17 +1272,16 @@ mod network_impls {
         }
 
         /// Make a zome call with deserialization and some error unwrapping built in
-        pub async fn easy_call_zome<I, O, Z, F>(
+        pub async fn easy_call_zome<I, O, Z>(
             &self,
             provenance: &AgentPubKey,
             cap_secret: Option<CapSecret>,
             cell_id: CellId,
             zome_name: Z,
-            fn_name: F,
+            fn_name: impl Into<FunctionName>,
             payload: I,
         ) -> ConductorApiResult<O>
         where
-            FunctionName: From<F>,
             ZomeName: From<Z>,
             I: Serialize + std::fmt::Debug,
             O: serde::de::DeserializeOwned + std::fmt::Debug,

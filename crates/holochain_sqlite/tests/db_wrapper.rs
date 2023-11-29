@@ -1,3 +1,5 @@
+#![cfg(all(feature = "slow_tests", feature = "test_utils"))]
+
 use common::TestDatabaseKind;
 use holochain_sqlite::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
