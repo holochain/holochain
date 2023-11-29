@@ -288,10 +288,7 @@ async fn fetch_previous_actions<A, C>(
                     Some((hash.into(), (signed_action, source).into()))
                 }
                 (hash, Ok(None)) => {
-                    Some((hash.into(), ValidationDependencyState::new(
-                        None,
-                        None
-                    )))
+                    Some((hash.into(), ValidationDependencyState::new(None)))
                 },
                 (hash, Err(e)) => {
                     tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
@@ -326,7 +323,7 @@ async fn fetch_previous_records<C, O>(
                                 .map(|actions| {
                                     actions
                                         .into_iter()
-                                        .map(|a| (a.into(), op.get_type()))
+                                        .map(|a| -> AnyDhtHash { a.into() })
                                         .collect::<Vec<_>>()
                                 })
                         } else {
@@ -350,7 +347,7 @@ async fn fetch_previous_records<C, O>(
                         .map(|actions| {
                             actions
                                 .into_iter()
-                                .map(|a| (a.into(), op.get_type()))
+                                .map(|a| -> AnyDhtHash { a.into() })
                                 .collect()
                         })
                     }
@@ -366,16 +363,16 @@ async fn fetch_previous_records<C, O>(
                 actions.extend(
                     get_dependency_hashes_from_actions(vec![op.action()].into_iter())
                         .into_iter()
-                        .map(|h| (h.into(), op.get_type())),
+                        .map(|h| -> AnyDhtHash { h.into() }),
                 );
 
                 Some(actions)
             }
             None => {
-                let dependency_hashes: Vec<(AnyDhtHash, DhtOpType)> =
+                let dependency_hashes: Vec<AnyDhtHash> =
                     get_dependency_hashes_from_actions(vec![op.action()].into_iter())
                         .into_iter()
-                        .map(|h| -> (AnyDhtHash, DhtOpType) { (h.into(), op.get_type()) })
+                        .map(|h| -> AnyDhtHash { h.into() })
                         .collect();
 
                 if dependency_hashes.is_empty() {
@@ -387,12 +384,12 @@ async fn fetch_previous_records<C, O>(
         }
         .into_iter()
         .flatten()
-        .filter(|(hash, _)| !current_validation_dependencies.lock().has(hash))
-        .map(|(hash, op_type): (AnyDhtHash, DhtOpType)| {
+        .filter(|hash| !current_validation_dependencies.lock().has(hash))
+        .map(|hash: AnyDhtHash| {
             let cascade = cascade.clone();
             async move {
                 let fetched = cascade.retrieve(hash.clone(), Default::default()).await;
-                (hash, op_type, fetched)
+                (hash, fetched)
             }
             .boxed()
         })
@@ -404,19 +401,16 @@ async fn fetch_previous_records<C, O>(
         .filter_map(|r| {
             // Filter out errors, preparing the rest to be put into a HashMap for easy access.
             match r {
-                (hash, op_type, Ok(Some((record, CascadeSource::Local)))) => {
-                    Some((hash, (record, CascadeSource::Local, op_type).into()))
+                (hash, Ok(Some((record, CascadeSource::Local)))) => {
+                    Some((hash, (record, CascadeSource::Local).into()))
                 }
-                (hash, op_type, Ok(Some((record, CascadeSource::Network)))) => {
-                    Some((hash, (record.privatized().0, CascadeSource::Network, op_type).into()))
+                (hash, Ok(Some((record, CascadeSource::Network)))) => {
+                    Some((hash, (record.privatized().0, CascadeSource::Network).into()))
                 }
-                (hash, op_type, Ok(None)) => {
-                    Some((hash, ValidationDependencyState::new(
-                        None,
-                        Some(op_type)
-                    )))
+                (hash, Ok(None)) => {
+                    Some((hash, ValidationDependencyState::new(None)))
                 },
-                (hash, _, Err(e)) => {
+                (hash, Err(e)) => {
                     tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
                     None
                 }

@@ -1,6 +1,5 @@
 use holo_hash::AnyDhtHash;
 use holochain_cascade::CascadeSource;
-use holochain_types::dht_op::DhtOpType;
 use holochain_zome_types::{
     action::ActionHashed,
     record::{Record, SignedActionHashed},
@@ -141,23 +140,15 @@ impl FromIterator<(AnyDhtHash, ValidationDependencyState)> for ValidationDepende
 pub struct ValidationDependencyState {
     /// The dependency if we've been able to fetch it, otherwise None until we manage to find it.
     dependency: Option<ValidationDependency>,
-    /// The type of the op that referenced this dependency
-    required_by_op_type: Option<DhtOpType>,
 }
 
 impl ValidationDependencyState {
     pub fn new(
         dependency: Option<ValidationDependency>,
-        required_by_op_type: Option<DhtOpType>,
     ) -> Self {
         Self {
             dependency,
-            required_by_op_type,
         }
-    }
-
-    pub fn required_by_op_type(&self) -> Option<DhtOpType> {
-        self.required_by_op_type
     }
 
     pub fn set_record(&mut self, record: Record) {
@@ -221,16 +212,14 @@ impl From<(SignedActionHashed, CascadeSource)> for ValidationDependencyState {
     fn from((signed_action, fetched_from): (SignedActionHashed, CascadeSource)) -> Self {
         Self {
             dependency: Some(ValidationDependency::Action(signed_action, fetched_from)),
-            required_by_op_type: None,
         }
     }
 }
 
-impl From<(Record, CascadeSource, DhtOpType)> for ValidationDependencyState {
-    fn from((record, fetched_from, op_type): (Record, CascadeSource, DhtOpType)) -> Self {
+impl From<(Record, CascadeSource)> for ValidationDependencyState {
+    fn from((record, fetched_from): (Record, CascadeSource)) -> Self {
         Self {
             dependency: Some(ValidationDependency::Record(record, fetched_from)),
-            required_by_op_type: Some(op_type),
         }
     }
 }
