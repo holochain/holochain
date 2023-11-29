@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
 
     keystore:
       type: danger_test_keystore
@@ -187,7 +187,7 @@ mod tests {
         holochain_trace::test_run().ok();
 
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
     signing_service_uri: ws://localhost:9001
     encryption_service_uri: ws://localhost:9002
     decryption_service_uri: ws://localhost:9003
