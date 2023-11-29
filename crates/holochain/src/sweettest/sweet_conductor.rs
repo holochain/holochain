@@ -228,7 +228,7 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
-    pub async fn from_builder(builder: ConductorBuilder) -> ConductorResult<SweetConductor> {
+    pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
         let handle = builder
@@ -236,7 +236,7 @@ impl SweetConductor {
             .test(&[])
             .await
             .unwrap();
-        Ok(Self::new(handle, db_dir, config, None).await)
+        Self::new(handle, db_dir, config, None).await
     }
 
     /// Create a handle from an existing environment and config
