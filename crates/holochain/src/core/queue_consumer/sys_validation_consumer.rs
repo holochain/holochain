@@ -29,9 +29,6 @@ pub fn spawn_sys_validation_consumer(
         conductor.task_manager(),
         (tx.clone(), rx),
         move || {
-            // Create an incoming ops sender for any dependencies we find
-            // that we are meant to be holding but aren't.
-            // If we are not holding them they will be added to our incoming ops.
             sys_validation_workflow(
                 workspace.clone(),
                 current_validation_dependencies.clone(),
