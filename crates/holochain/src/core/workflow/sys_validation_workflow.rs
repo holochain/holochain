@@ -108,11 +108,14 @@ pub async fn sys_validation_workflow<
     .into_iter()
     .sum();
 
-    tracing::debug!(
-        "Fetched {}/{} missing dependencies from the network",
-        num_fetched,
-        outcome_summary.missing
-    );
+    if outcome_summary.missing > 0 {
+        tracing::debug!(
+            "Fetched {}/{} missing dependencies from the network",
+            num_fetched,
+            outcome_summary.missing
+        );
+    }
+    
     if num_fetched > 0 {
         // If we fetched anything then we can re-run sys validation
         trigger_self.trigger(&"sys_validation_workflow");
