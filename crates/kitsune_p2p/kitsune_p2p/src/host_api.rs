@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod};
 use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
@@ -102,6 +102,24 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
             async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) },
         )
         .into()
+    }
+
+    /// Do something whenever a batch of op hashes was received and stored in the FetchPool
+    fn handle_op_hash_received(
+        &self,
+        _space: &KitsuneSpace,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
+    ) {
+    }
+
+    /// Do something whenever a batch of op hashes was sent to another node
+    fn handle_op_hash_transmitted(
+        &self,
+        _space: &KitsuneSpace,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
+    ) {
     }
 
     /// Get the lair "tag" identifying the id seed to use for crypto signing.

@@ -756,6 +756,13 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
     cascade: &impl Cascade,
 ) -> SysValidationResult<Source> {
+    // TODO: when looking for validation dependencies, we need to be
+    // looking for the action under a particular OpType, not just any op.
+    // Otherwise, honest nodes could arrive at different outcomes if they
+    // use different ops to satisfy the validation dependency. Let's make
+    // that that's the case here. It probably is, since the method of fetching
+    // for Entries and Actions goes to the proper authorities, but I'm making
+    // a note to double check it.
     let hash: AnyDhtHash = hash.clone().into();
     match cascade.retrieve(hash.clone(), Default::default()).await? {
         Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),

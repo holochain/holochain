@@ -16,7 +16,7 @@ use tokio::time::{Duration, Instant};
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace};
 use linked_hash_map::{Entry, LinkedHashMap};
 
-use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt};
+use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt, TransferMethod};
 
 mod pool_reader;
 pub use pool_reader::*;
@@ -174,6 +174,7 @@ impl State {
             space,
             source,
             size,
+            transfer_method,
         } = args;
 
         match self.queue.entry(key) {
@@ -183,10 +184,10 @@ impl State {
                     //      this data from. See one of the call sites for `push` to see where this was intended to be used from.
                     Sources(
                         [
-                            (source.clone(), SourceRecord::new(source)),
+                            (source.clone(), SourceRecord::new(source, transfer_method)),
                             (
                                 FetchSource::Agent(author.clone()),
-                                SourceRecord::agent(author),
+                                SourceRecord::agent(author, transfer_method),
                             ),
                         ]
                         .into_iter()
@@ -194,7 +195,7 @@ impl State {
                     )
                 } else {
                     Sources(
-                        [(source.clone(), SourceRecord::new(source))]
+                        [(source.clone(), SourceRecord::new(source, transfer_method))]
                             .into_iter()
                             .collect(),
                     )
@@ -212,7 +213,7 @@ impl State {
                 let v = e.get_mut();
                 v.sources
                     .0
-                    .insert(source.clone(), SourceRecord::new(source));
+                    .insert(source.clone(), SourceRecord::new(source, transfer_method));
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
                     (Some(a), None) => Some(a),
@@ -335,19 +336,21 @@ pub struct FetchPoolItem {
 #[derive(Debug, PartialEq, Eq)]
 struct SourceRecord {
     source: FetchSource,
+    transfer_method: TransferMethod,
     last_request: Option<Instant>,
 }
 
 impl SourceRecord {
-    fn new(source: FetchSource) -> Self {
+    fn new(source: FetchSource, transfer_method: TransferMethod) -> Self {
         Self {
             source,
+            transfer_method,
             last_request: None,
         }
     }
 
-    fn agent(agent: KAgent) -> Self {
-        Self::new(FetchSource::Agent(agent))
+    fn agent(agent: KAgent, transfer_method: TransferMethod) -> Self {
+        Self::new(FetchSource::Agent(agent), transfer_method)
     }
 }
 
@@ -421,7 +424,7 @@ mod tests {
             sources: Sources(
                 sources
                     .into_iter()
-                    .map(|s| (s.clone(), SourceRecord::new(s)))
+                    .map(|s| (s.clone(), SourceRecord::new(s, TransferMethod::Gossip)))
                     .collect(),
             ),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
@@ -444,6 +447,7 @@ mod tests {
                 SourceRecord {
                     source: test_source(1),
                     last_request: None,
+                    transfer_method: TransferMethod::Gossip,
                 },
             )]
             .into_iter()
@@ -468,6 +472,7 @@ mod tests {
                     SourceRecord {
                         source: test_source(1),
                         last_request: Some(Instant::now()),
+                        transfer_method: TransferMethod::Gossip,
                     },
                 ),
                 (
@@ -475,6 +480,7 @@ mod tests {
                     SourceRecord {
                         source: test_source(2),
                         last_request: None,
+                        transfer_method: TransferMethod::Gossip,
                     },
                 ),
             ]
@@ -515,6 +521,7 @@ mod tests {
                     SourceRecord {
                         source: test_source(1),
                         last_request: Some(Instant::now()), // recently tried
+                        transfer_method: TransferMethod::Gossip,
                     },
                 ),
                 (
@@ -522,6 +529,7 @@ mod tests {
                     SourceRecord {
                         source: test_source(2),
                         last_request: None, // never checked
+                        transfer_method: TransferMethod::Gossip,
                     },
                 ),
                 (
@@ -529,6 +537,7 @@ mod tests {
                     SourceRecord {
                         source: test_source(3),
                         last_request: None, // never checked
+                        transfer_method: TransferMethod::Gossip,
                     },
                 ),
             ]
@@ -565,6 +574,7 @@ mod tests {
                     SourceRecord {
                         source: test_source(i as u8),
                         last_request: Instant::now().checked_sub(duration),
+                        transfer_method: TransferMethod::Gossip,
                     },
                 )
             })
@@ -843,6 +853,7 @@ mod tests {
             size: None,   // Not important for this test
             author: None, // Unused field, ignore
             context: test_ctx(u32::arbitrary(&mut u).unwrap()),
+            transfer_method: TransferMethod::Gossip,
         });
 
         let mut failed_count = 0;
@@ -856,6 +867,7 @@ mod tests {
                     size: None,   // Not important for this test
                     author: None, // Unused field, ignore
                     context: test_ctx(u32::arbitrary(&mut u).unwrap()),
+                    transfer_method: TransferMethod::Gossip,
                 });
             }
 

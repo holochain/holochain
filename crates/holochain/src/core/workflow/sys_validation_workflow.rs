@@ -14,6 +14,7 @@ use futures::FutureExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::HostFnStores;
@@ -46,7 +47,8 @@ mod validate_op_tests;
     space,
     trigger_app_validation,
     sys_validation_trigger,
-    network
+    network,
+    config
 ))]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
@@ -54,9 +56,11 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     network: Network,
+    config: Arc<ConductorConfig>,
 ) -> WorkflowResult<WorkComplete> {
     let complete =
-        sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger).await?;
+        sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger, &config)
+            .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -71,6 +75,7 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     space: Arc<Space>,
     network: Network,
     sys_validation_trigger: TriggerSender,
+    config: &ConductorConfig,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -82,6 +87,7 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
     let cascade = workspace.full_cascade(network);
+    let sleuth_id = config.sleuth_id();
 
     validate_ops_batch(
         sorted_ops,
@@ -101,7 +107,7 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
                     let op_type = op.get_type();
                     let action = op.action();
 
-                    let dependency = get_dependency(op_type, &action);
+                    let dependency = op_type.sys_validation_dependency(&action);
                     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
                     let r =
@@ -113,6 +119,7 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
         },
         |batch| {
             let space = space.clone();
+            let sleuth_id = sleuth_id.clone();
             async move {
                 space
                     .dht_db
@@ -126,8 +133,13 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
                                     put_validation_limbo(
                                         txn,
                                         &op_hash,
-                                        ValidationLimboStatus::SysValidated,
+                                        ValidationStage::SysValidated,
                                     )?;
+
+                                    aitia::trace!(&hc_sleuth::Event::SysValidated {
+                                        by: sleuth_id.clone(),
+                                        op: op_hash
+                                    });
                                 }
                                 Outcome::AwaitingOpDep(missing_dep) => {
                                     summary.awaiting += 1;
@@ -140,22 +152,17 @@ async fn sys_validation_workflow_inner<Network: HolochainP2pDnaT + Clone + 'stat
                                     // We need to be holding the dependency because
                                     // we were meant to get a StoreRecord or StoreEntry or
                                     // RegisterAgentActivity or RegisterAddLink.
-                                    let status =
-                                        ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+                                    let status = ValidationStage::AwaitingSysDeps(missing_dep);
                                     put_validation_limbo(txn, &op_hash, status)?;
                                 }
                                 Outcome::MissingDhtDep => {
                                     summary.missing += 1;
                                     // TODO: Not sure what missing dht dep is. Check if we need this.
-                                    put_validation_limbo(
-                                        txn,
-                                        &op_hash,
-                                        ValidationLimboStatus::Pending,
-                                    )?;
+                                    put_validation_limbo(txn, &op_hash, ValidationStage::Pending)?;
                                 }
                                 Outcome::Rejected => {
                                     summary.rejected += 1;
-                                    if let Dependency::Null = dependency {
+                                    if dependency.is_none() {
                                         put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                                     } else {
                                         put_integration_limbo(
@@ -812,7 +819,7 @@ impl SysValidationWorkspace {
 fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    status: ValidationStage,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
     Ok(())
@@ -824,7 +831,7 @@ fn put_integration_limbo(
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     Ok(())
 }
 
@@ -836,7 +843,7 @@ pub fn put_integrated(
     set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationStage::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }

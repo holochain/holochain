@@ -4,7 +4,7 @@ use crate::core::workflow::sys_validation_workflow::OutcomeSummary;
 use futures::future::BoxFuture;
 use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
-use holochain_state::prelude::Dependency;
+use holochain_state::prelude::SysValDep;
 use holochain_types::prelude::DhtOpHashed;
 use std::time::Instant;
 
@@ -13,11 +13,11 @@ pub const NUM_CONCURRENT_OPS: usize = 50;
 pub(super) async fn validate_ops_batch(
     ops: Vec<DhtOpHashed>,
     started_at: Option<Instant>,
-    validator_fn: impl Fn(DhtOpHashed) -> BoxFuture<'static, WorkflowResult<(DhtOpHash, Outcome, Dependency)>>
+    validator_fn: impl Fn(DhtOpHashed) -> BoxFuture<'static, WorkflowResult<(DhtOpHash, Outcome, SysValDep)>>
         + Send
         + 'static,
     commit_outcome_batch_fn: impl Fn(
-        Vec<WorkflowResult<(DhtOpHash, Outcome, Dependency)>>,
+        Vec<WorkflowResult<(DhtOpHash, Outcome, SysValDep)>>,
     ) -> BoxFuture<'static, WorkflowResult<OutcomeSummary>>,
 ) -> WorkflowResult<Vec<OutcomeSummary>> {
     let start_len = ops.len();
@@ -77,7 +77,6 @@ mod tests {
     use hdk::prelude::SignatureFixturator;
     use holo_hash::fixt::AnyDhtHashFixturator;
     use holochain::prelude::DhtOp;
-    use holochain_state::prelude::Dependency;
     use holochain_types::prelude::DhtOpHashed;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
@@ -88,7 +87,7 @@ mod tests {
         let summaries = validate_ops_batch(
             vec![],
             None,
-            |op| async move { Ok((op.hash, Outcome::Accepted, Dependency::Null)) }.boxed(),
+            |op| async move { Ok((op.hash, Outcome::Accepted, None)) }.boxed(),
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
@@ -112,7 +111,7 @@ mod tests {
         let summaries = validate_ops_batch(
             vec![test_op()],
             None,
-            |op| async move { Ok((op.hash, Outcome::Accepted, Dependency::Null)) }.boxed(),
+            |op| async move { Ok((op.hash, Outcome::Accepted, None)) }.boxed(),
             |batch| {
                 async move {
                     Ok(OutcomeSummary {
@@ -157,7 +156,7 @@ mod tests {
                             high_water_mark.store(num_in_flight, Ordering::SeqCst);
                         }
 
-                        Ok((op.hash, Outcome::Accepted, Dependency::Null))
+                        Ok((op.hash, Outcome::Accepted, None))
                     }
                     .boxed()
                 }
@@ -195,7 +194,7 @@ mod tests {
                     if rand::random::<bool>() {
                         Err(WorkflowError::other("test error"))
                     } else {
-                        Ok((op.hash, Outcome::Accepted, Dependency::Null))
+                        Ok((op.hash, Outcome::Accepted, None))
                     }
                 }
                 .boxed()
@@ -246,17 +245,13 @@ mod tests {
 
                 async move {
                     if op.hash == success_op.hash {
-                        Ok((op.hash, Outcome::Accepted, Dependency::Null))
+                        Ok((op.hash, Outcome::Accepted, None))
                     } else if op.hash == awaiting_dep_op.hash {
-                        Ok((
-                            op.hash,
-                            Outcome::AwaitingOpDep(fixt!(AnyDhtHash)),
-                            Dependency::Null,
-                        ))
+                        Ok((op.hash, Outcome::AwaitingOpDep(fixt!(AnyDhtHash)), None))
                     } else if op.hash == missing_dep_op.hash {
-                        Ok((op.hash, Outcome::MissingDhtDep, Dependency::Null))
+                        Ok((op.hash, Outcome::MissingDhtDep, None))
                     } else if op.hash == rejected_op.hash {
-                        Ok((op.hash, Outcome::Rejected, Dependency::Null))
+                        Ok((op.hash, Outcome::Rejected, None))
                     } else {
                         unreachable!("Unexpected op")
                     }

@@ -489,7 +489,7 @@ async fn test_gossip_startup() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mk_conductor = || async {
         let cfg = config();
-        assert!(cfg.network.as_ref().unwrap().is_tx5());
+        assert!(cfg.network.is_tx5());
         let mut conductor =
             SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
         // let mut conductor = SweetConductor::from_config(config()).await;
@@ -522,7 +522,7 @@ async fn test_gossip_startup() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
-    holochain_trace::test_run().ok();
+    hc_sleuth::init_subscriber();
     let config = TestConfig {
         publish: false,
         recent: true,
@@ -538,7 +538,7 @@ async fn three_way_gossip_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
-    holochain_trace::test_run().ok();
+    hc_sleuth::init_subscriber();
     let config = TestConfig {
         publish: false,
         recent: false,
@@ -622,10 +622,10 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     conductors.forget_peer_info([cells[0].agent_pubkey()]).await;
     conductors[0].shutdown().await;
 
-    let new_config = config.random_scope();
-    let new_scope = new_config.tracing_scope.clone().unwrap();
     // Bring a third conductor online
-    conductors.add_conductor_from_config(new_config).await;
+    conductors.add_conductor_from_config(config).await;
+
+    conductors.persist_dbs();
 
     let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
@@ -637,13 +637,44 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     println!(
         "Newcomer agent joined: scope={}, agent={:#?}",
-        new_scope,
+        conductors[2].get_config().sleuth_id(),
         cell.agent_pubkey().to_kitsune()
     );
+
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        let ctx = s.lock();
+        dbg!(&ctx.map_agent_to_node);
+
+        let step = hc_sleuth::Event::Integrated {
+            by: conductors[2].id(),
+            op: ctx
+                .op_from_action(
+                    hashes[0].clone(),
+                    holochain_types::prelude::DhtOpType::StoreRecord,
+                )
+                .unwrap(),
+        };
+
+        hc_sleuth::report(step, &ctx);
+    }
 
     conductors[2]
         .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(10))
         .await;
+
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        let ctx = s.lock();
+        let step = hc_sleuth::Event::Integrated {
+            by: conductors[2].id(),
+            op: ctx
+                .op_from_action(
+                    hashes[0].clone(),
+                    holochain_types::prelude::DhtOpType::StoreRecord,
+                )
+                .unwrap(),
+        };
+        hc_sleuth::report(step, &ctx);
+    }
 
     println!(
         "Initial gossip activity completed. Elapsed: {:?}",
@@ -1152,7 +1183,7 @@ async fn mock_network_sharded_gossip() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);
@@ -1661,7 +1692,7 @@ async fn mock_network_sharding() {
     }];
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
 
     // Add it to the conductor builder.
     let builder = ConductorBuilder::new().config(config);

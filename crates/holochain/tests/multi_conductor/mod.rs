@@ -33,7 +33,7 @@ async fn test_publish() -> anyhow::Result<()> {
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =

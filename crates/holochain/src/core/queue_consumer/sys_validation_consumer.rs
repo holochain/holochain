@@ -18,6 +18,7 @@ pub fn spawn_sys_validation_consumer(
     let trigger_self = tx.clone();
     let workspace = Arc::new(workspace);
     let space = Arc::new(space);
+    let config = conductor.config.clone();
 
     super::queue_consumer_dna_bound(
         "sys_validation_consumer",
@@ -31,6 +32,7 @@ pub fn spawn_sys_validation_consumer(
                 trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),
+                config.clone(),
             )
         },
     );

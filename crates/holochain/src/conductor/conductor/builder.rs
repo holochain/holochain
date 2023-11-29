@@ -102,9 +102,11 @@ impl ConductorBuilder {
             ..
         } = self;
 
+        let config = Arc::new(config);
+
         let ribosome_store = RwShare::new(ribosome_store);
 
-        let spaces = Spaces::new(&config)?;
+        let spaces = Spaces::new(config.clone())?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -113,7 +115,7 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone().unwrap_or_default();
+        let network_config = config.network.clone();
         let (cert_digest, cert, cert_priv_key) = keystore
             .get_or_create_tls_cert_by_tag(tag.0.clone())
             .await?;
@@ -127,8 +129,8 @@ impl ConductorBuilder {
 
         let host = KitsuneHostImpl::new(
             spaces.clone(),
+            config.clone(),
             ribosome_store.clone(),
-            network_config.tuning_params.clone(),
             strat,
             Some(tag_ed),
             Some(keystore.lair_client()),
@@ -244,7 +246,7 @@ impl ConductorBuilder {
 
     pub(crate) async fn finish(
         conductor: ConductorHandle,
-        conductor_config: ConductorConfig,
+        config: Arc<ConductorConfig>,
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
@@ -270,7 +272,7 @@ impl ConductorBuilder {
             .map(Ok)
         });
 
-        let configs = conductor_config.admin_interfaces.unwrap_or_default();
+        let configs = config.admin_interfaces.clone().unwrap_or_default();
         let cell_startup_errors = conductor
             .clone()
             .initialize_conductor(outcome_receiver, configs)
@@ -328,7 +330,8 @@ impl ConductorBuilder {
             .unwrap_or_else(holochain_keystore::test_keystore);
         self.config.environment_path = env_path.to_path_buf().into();
 
-        let spaces = Spaces::new(&self.config)?;
+        let config = Arc::new(self.config);
+        let spaces = Spaces::new(config.clone())?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -337,15 +340,14 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = self.config.network.clone().unwrap_or_default();
-        let tuning_params = network_config.tuning_params.clone();
-        let strat = tuning_params.to_arq_strat();
+        let network_config = config.network.clone();
+        let strat = network_config.tuning_params.to_arq_strat();
 
         let ribosome_store = RwShare::new(self.ribosome_store);
         let host = KitsuneHostImpl::new(
             spaces.clone(),
+            config.clone(),
             ribosome_store.clone(),
-            tuning_params,
             strat,
             Some(tag_ed),
             Some(keystore.lair_client()),
@@ -361,7 +363,7 @@ impl ConductorBuilder {
         let (outcome_tx, outcome_rx) = futures::channel::mpsc::channel(8);
 
         let conductor = Conductor::new(
-            self.config.clone(),
+            config.clone(),
             ribosome_store,
             keystore,
             holochain_p2p,
@@ -388,7 +390,7 @@ impl ConductorBuilder {
 
         Self::finish(
             handle,
-            self.config,
+            config,
             p2p_evt,
             post_commit_receiver,
             outcome_rx,
