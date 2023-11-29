@@ -1,13 +1,11 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::hash::Hash;
 
 use crate::context_log::CtxError;
 use crate::*;
-use aitia::logging::FactLogTraits;
+use aitia::Dep;
 use aitia::DepError;
 use aitia::DepResult;
-use aitia::{Dep, FactTraits};
-use holochain_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 
 /// A DhtOpLite along with its corresponding DhtOpHash
@@ -192,12 +190,15 @@ impl aitia::Fact for Event {
             AppValidated { by, op } => Some(SysValidated { by, op }.into()),
 
             // TODO
-            MissingAppValDep { by, op, deps: _ } => todo!(),
+            MissingAppValDep {
+                by: _,
+                op: _,
+                deps: _,
+            } => todo!(),
 
             // Ops can only be sys validated after being fetched from an authority, and after
             // its dependency has been integrated
             SysValidated { by, op } => {
-                let op_info = ctx.op_info(&op).map_err(mapper)?;
                 let dep = ctx.sysval_op_dep(&op).map_err(mapper)?;
 
                 let fetched = Fetched {
@@ -207,7 +208,10 @@ impl aitia::Fact for Event {
                 .into();
 
                 if let Some(dep) = dep {
-                    let integrated = Dep::from(Integrated { by, op });
+                    let integrated = Dep::from(Integrated {
+                        by,
+                        op: dep.hash.clone(),
+                    });
                     // TODO: eventually we don't want to just use anything we fetched, right?
                     // TODO: currently we don't actually need to integrate the dep, it can just exist in the cache
                     Some(Dep::every_named("Exists", vec![fetched, integrated]))
@@ -236,7 +240,7 @@ impl aitia::Fact for Event {
             // We can only receive a hash via a given method if some other node has sent it
             // via that method
             ReceivedHash { by, op, method } => {
-                let mut others: Vec<_> = ctx
+                let others: Vec<_> = ctx
                     .map_node_to_agents
                     .keys()
                     .filter(|i| **i != by)
@@ -250,20 +254,21 @@ impl aitia::Fact for Event {
                         .into()
                     })
                     .collect();
+
                 Some(Dep::any_named("Received hash from authority", others))
             }
 
             // An agent can author an op at any time, but must have joined the network first
-            Authored { by, op } => {
+            Authored { by, op: _ } => {
                 let node = ctx.agent_node(&by).map_err(mapper)?.clone();
                 Some(Dep::from(AgentJoined { node, agent: by }))
             }
 
             // An agent can join at any time
-            AgentJoined { node, agent } => None,
+            AgentJoined { .. } => None,
 
             // "Special" cause
-            SweetConductorShutdown { node } => None,
+            SweetConductorShutdown { .. } => None,
         })
     }
 
