@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Fix: Maximum one unrestricted cap grant was looked up from the source chain to authorize a remote call. Now all unrestricted cap grants are checked for validity.
 
 ## 0.2.3
 
