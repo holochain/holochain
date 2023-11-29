@@ -138,15 +138,16 @@ async fn sys_validation_workflow_inner(
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
 
+    // Forget what dependencies are currently in use
+    current_validation_dependencies.lock().clear_retained_deps();
+
     if sorted_ops.is_empty() {
         tracing::trace!(
             "Skipping sys_validation_workflow because there are no ops to be validated"
         );
 
         // If there's nothing to validate then we can clear the dependencies and save some memory.
-        let mut deps = current_validation_dependencies.lock();
-        deps.clear_retained_deps();
-        deps.purge_held_deps();
+        current_validation_dependencies.lock().purge_held_deps();
 
         return Ok(OutcomeSummary::new());
     }
@@ -156,9 +157,6 @@ async fn sys_validation_workflow_inner(
 
     let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
-
-    // Forget what dependencies are currently in use
-    current_validation_dependencies.lock().clear_retained_deps();
 
     fetch_previous_records(
         current_validation_dependencies.clone(),
@@ -274,7 +272,7 @@ async fn fetch_previous_actions<A, C>(
             let cascade = cascade.clone();
             async move {
                 let fetched = cascade.retrieve_action(h.clone(), Default::default()).await;
-                tracing::info!(hash = ?h, fetched = ?fetched, "Fetched action for validation");
+                tracing::trace!(hash = ?h, fetched = ?fetched, "Fetched action for validation");
                 (h, fetched)
             }
             .boxed()

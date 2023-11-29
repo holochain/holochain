@@ -196,6 +196,7 @@ mod tests {
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
+                tuning_params: None,
             }
         );
     }
@@ -279,6 +280,7 @@ mod tests {
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
+                tuning_params: None,
             }
         );
     }
@@ -309,6 +311,7 @@ mod tests {
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
+                tuning_params: None,
             }
         );
     }

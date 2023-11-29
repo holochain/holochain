@@ -332,8 +332,6 @@ impl TestCase {
     }
 
     async fn run(&mut self) -> WorkComplete {
-        tracing::info!("Run got called");
-
         let workspace = SysValidationWorkspace::new(
             self.test_space.space.authored_db.clone().into(),
             self.test_space.space.dht_db.clone().into(),
@@ -344,7 +342,6 @@ impl TestCase {
         );
 
         let actual_network = self.actual_network.take().unwrap_or_else(|| {
-            tracing::info!("Creating default network");
             MockHolochainP2pDnaT::new()
         });
 
@@ -360,7 +357,6 @@ impl TestCase {
     }
 
     async fn check_trigger_and_rerun(&mut self) -> WorkComplete {
-        tracing::info!("Checking trigger and rerunning");
         tokio::time::timeout(
             std::time::Duration::from_secs(3),
             self.self_trigger.1.listen(),
