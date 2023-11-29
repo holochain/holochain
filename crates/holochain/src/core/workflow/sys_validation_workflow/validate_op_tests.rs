@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::fetch_previous_actions_for_ops;
+use super::retrieve_previous_actions_for_ops;
 use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
@@ -254,7 +254,7 @@ async fn validate_create_op_with_prev_from_network() {
 
     test_case
         .cascade_mut()
-        .expect_retrieve()
+        .expect_retrieve_action()
         .times(1)
         .returning(move |_, _| async move { Ok(None) }.boxed());
 
@@ -266,7 +266,7 @@ async fn validate_create_op_with_prev_from_network() {
     test_case
         .current_validation_dependencies
         .lock()
-        .insert(Record::new(previous_action, None), CascadeSource::Network);
+        .insert(previous_action, CascadeSource::Network);
 
     // Run again to process new ops from the network
     let outcome = test_case.run().await.unwrap();
@@ -302,7 +302,7 @@ async fn validate_create_op_with_prev_action_not_found() {
 
     test_case
         .cascade_mut()
-        .expect_retrieve()
+        .expect_retrieve_action()
         .times(1)
         .returning(move |_, _| async move { Ok(None) }.boxed());
 
@@ -1108,7 +1108,7 @@ impl TestCase {
             .map(|a| (a.as_hash().clone(), a))
             .collect::<HashMap<_, _>>();
         self.cascade
-            .expect_retrieve()
+            .expect_retrieve_action()
             .times(previous_actions.len())
             .returning({
                 let previous_actions = previous_actions.clone();
@@ -1117,8 +1117,7 @@ impl TestCase {
                         .get(&hash.try_into().unwrap())
                         .unwrap()
                         .clone();
-                    async move { Ok(Some((Record::new(action, None), CascadeSource::Local))) }
-                        .boxed()
+                    async move { Ok(Some((action, CascadeSource::Local))) }.boxed()
                 }
             });
 
@@ -1134,7 +1133,7 @@ impl TestCase {
 
         let cascade = Arc::new(new_cascade);
 
-        fetch_previous_actions_for_ops(
+        retrieve_previous_actions_for_ops(
             self.current_validation_dependencies.clone(),
             cascade.clone(),
             vec![self

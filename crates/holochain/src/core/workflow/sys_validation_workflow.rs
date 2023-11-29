@@ -10,7 +10,6 @@ use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
-use holochain_cascade::CascadeSource;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -74,13 +73,16 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
         let network_cascade = network_cascade.clone();
         let current_validation_dependencies = current_validation_dependencies.clone();
         async move {
-            match network_cascade.retrieve(hash, Default::default()).await {
-                Ok(Some((record, source))) => {
+            match network_cascade
+                .retrieve_action(hash, Default::default())
+                .await
+            {
+                Ok(Some((action, source))) => {
                     let mut deps = current_validation_dependencies.lock();
 
                     // If the source was local then that means some other fetch has put this action into the cache,
                     // that's fine we'll just grab it here.
-                    if deps.insert(record, source) {
+                    if deps.insert(action, source) {
                         1
                     } else {
                         0
@@ -159,7 +161,7 @@ async fn sys_validation_workflow_inner(
     let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
-    fetch_previous_actions_for_ops(
+    retrieve_previous_actions_for_ops(
         current_validation_dependencies.clone(),
         cascade.clone(),
         sorted_ops.clone().into_iter(),
@@ -229,6 +231,50 @@ async fn sys_validation_workflow_inner(
     Ok(summary)
 }
 
+async fn retrieve_actions<C, A>(
+    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    cascade: Arc<C>,
+    action_hashes: A,
+) where
+    A: Iterator<Item = ActionHash>,
+    C: Cascade + Send + Sync,
+{
+    let action_fetches = action_hashes
+        .filter(|hash| !current_validation_dependencies.lock().has(hash))
+        .map(|h| {
+            // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
+            let cascade = cascade.clone();
+            async move {
+                let fetched = cascade.retrieve_action(h.clone(), Default::default()).await;
+                tracing::trace!(hash = ?h, fetched = ?fetched, "Fetched action for validation");
+                (h, fetched)
+            }
+            .boxed()
+        });
+
+    let new_deps: ValidationDependencies = futures::future::join_all(action_fetches)
+        .await
+        .into_iter()
+        .filter_map(|r| {
+            // Filter out errors, preparing the rest to be put into a HashMap for easy access.
+            match r {
+                (hash, Ok(Some((signed_action, source)))) => {
+                    Some((hash, (signed_action, source).into()))
+                }
+                (hash, Ok(None)) => {
+                    Some((hash, ValidationDependencyState::new(None)))
+                },
+                (hash, Err(e)) => {
+                    tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
+                    None
+                }
+            }
+        })
+        .collect();
+
+    current_validation_dependencies.lock().merge(new_deps);
+}
+
 fn get_dependency_hashes_from_actions<A>(actions: A) -> Vec<ActionHash>
 where
     A: Iterator<Item = Action>,
@@ -263,135 +309,105 @@ async fn fetch_previous_actions<A, C>(
     A: Iterator<Item = Action>,
     C: Cascade + Send + Sync,
 {
-    let action_fetches = get_dependency_hashes_from_actions(actions)
-        .into_iter()
-        .filter(|hash| {
-            !current_validation_dependencies
-                .lock()
-                .has(&hash.clone().into())
-        })
-        .map(|h| {
-            // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
-            let cascade = cascade.clone();
-            async move {
-                let fetched = cascade.retrieve_action(h.clone(), Default::default()).await;
-                tracing::trace!(hash = ?h, fetched = ?fetched, "Fetched action for validation");
-                (h, fetched)
-            }
-            .boxed()
-        });
-
-    let new_deps: ValidationDependencies = futures::future::join_all(action_fetches)
-        .await
-        .into_iter()
-        .filter_map(|r| {
-            // Filter out errors, preparing the rest to be put into a HashMap for easy access.
-            match r {
-                (hash, Ok(Some((signed_action, source)))) => {
-                    Some((hash.into(), (signed_action, source).into()))
-                }
-                (hash, Ok(None)) => {
-                    Some((hash.into(), ValidationDependencyState::new(None)))
-                },
-                (hash, Err(e)) => {
-                    tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
-                    None
-                }
-            }
-        })
-        .collect();
-
-    current_validation_dependencies.lock().merge(new_deps);
+    retrieve_actions(
+        current_validation_dependencies,
+        cascade,
+        get_dependency_hashes_from_actions(actions).into_iter(),
+    )
+    .await;
 }
 
 fn get_dependency_hashes_from_ops<O>(ops: O) -> Vec<ActionHash>
 where
     O: Iterator<Item = DhtOpHashed>,
 {
-    ops.into_iter().filter_map(|op| {
-        // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
-        match &op.content {
-            DhtOp::StoreRecord(_, action, entry) => {
-                let mut actions = match entry {
-                    RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
-                        // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                        // won't matter that we've skipped fetching deps for it
-                        if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
-                            make_action_set_for_session_data(entry_rate_weight, entry, session_data)
+    ops.into_iter()
+        .filter_map(|op| {
+            // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
+            match &op.content {
+                DhtOp::StoreRecord(_, action, entry) => {
+                    let mut actions = match entry {
+                        RecordEntry::Present(entry @ Entry::CounterSign(session_data, _)) => {
+                            // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                            // won't matter that we've skipped fetching deps for it
+                            if let Ok(entry_rate_weight) = action_to_entry_rate_weight(action) {
+                                make_action_set_for_session_data(
+                                    entry_rate_weight,
+                                    entry,
+                                    session_data,
+                                )
                                 .unwrap_or_else(|_| vec![])
                                 .into_iter()
-                                .map(|action| { action.into_hash() })
+                                .map(|action| action.into_hash())
                                 .collect::<Vec<_>>()
-                        } else {
-                            vec![]
+                            } else {
+                                vec![]
+                            }
                         }
-                    }
-                    _ => vec![],
-                };
+                        _ => vec![],
+                    };
 
-                if let Some(prev_action) = action.prev_action() {
-                    actions.push(prev_action.as_hash().clone());
-                }
-                if let Action::Update(update) = action {
-                    actions.push(update.original_action_address.clone());
-                }
-                Some(actions)
-            }
-            DhtOp::StoreEntry(_, action, entry) => {
-                let mut actions = match entry {
-                    Entry::CounterSign(session_data, _) => {
-                        // Discard errors here because we'll check later whether the input is valid. If it's not then it
-                        // won't matter that we've skipped fetching deps for it
-                        make_action_set_for_session_data(
-                            new_entry_action_to_entry_rate_weight(action),
-                            entry,
-                            session_data,
-                        )
-                        .unwrap_or_else(|_| vec![])
-                        .into_iter()
-                        .map(|action| { action.into_hash() })
-                        .collect::<Vec<_>>()
+                    if let Some(prev_action) = action.prev_action() {
+                        actions.push(prev_action.as_hash().clone());
                     }
-                    _ => vec![],
-                };
-
-                match action {
-                    NewEntryAction::Create(create) => {
-                        actions.push(create.prev_action.as_hash().clone());
-                    }
-                    NewEntryAction::Update(update) => {
-                        actions.push(update.prev_action.as_hash().clone());
+                    if let Action::Update(update) = action {
                         actions.push(update.original_action_address.clone());
                     }
+                    Some(actions)
                 }
-                Some(actions)
+                DhtOp::StoreEntry(_, action, entry) => {
+                    let mut actions = match entry {
+                        Entry::CounterSign(session_data, _) => {
+                            // Discard errors here because we'll check later whether the input is valid. If it's not then it
+                            // won't matter that we've skipped fetching deps for it
+                            make_action_set_for_session_data(
+                                new_entry_action_to_entry_rate_weight(action),
+                                entry,
+                                session_data,
+                            )
+                            .unwrap_or_else(|_| vec![])
+                            .into_iter()
+                            .map(|action| action.into_hash())
+                            .collect::<Vec<_>>()
+                        }
+                        _ => vec![],
+                    };
+
+                    match action {
+                        NewEntryAction::Create(create) => {
+                            actions.push(create.prev_action.as_hash().clone());
+                        }
+                        NewEntryAction::Update(update) => {
+                            actions.push(update.prev_action.as_hash().clone());
+                            actions.push(update.original_action_address.clone());
+                        }
+                    }
+                    Some(actions)
+                }
+                DhtOp::RegisterAgentActivity(_, action) => action
+                    .prev_action()
+                    .map(|action| vec![action.as_hash().clone()]),
+                DhtOp::RegisterUpdatedContent(_, action, _) => {
+                    Some(vec![action.original_action_address.clone()])
+                }
+                DhtOp::RegisterUpdatedRecord(_, action, _) => {
+                    Some(vec![action.original_action_address.clone()])
+                }
+                DhtOp::RegisterDeletedBy(_, action) => Some(vec![action.deletes_address.clone()]),
+                DhtOp::RegisterDeletedEntryAction(_, action) => {
+                    Some(vec![action.deletes_address.clone()])
+                }
+                DhtOp::RegisterRemoveLink(_, action) => Some(vec![action.link_add_address.clone()]),
+                _ => None,
             }
-            DhtOp::RegisterAgentActivity(_, action) => action
-                .prev_action()
-                .map(|action| vec![action.as_hash().clone()]),
-            DhtOp::RegisterUpdatedContent(_, action, _) => {
-                Some(vec![action.original_action_address.clone()])
-            }
-            DhtOp::RegisterUpdatedRecord(_, action, _) => {
-                Some(vec![action.original_action_address.clone()])
-            }
-            DhtOp::RegisterDeletedBy(_, action) => {
-                Some(vec![action.deletes_address.clone()])
-            }
-            DhtOp::RegisterDeletedEntryAction(_, action) => {
-                Some(vec![action.deletes_address.clone()])
-            }
-            DhtOp::RegisterRemoveLink(_, action) => {
-                Some(vec![action.link_add_address.clone()])
-            }
-            _ => None,
-        }
-    }).flatten().collect()
+        })
+        .flatten()
+        .collect()
 }
 
 /// Examine the list of provided ops and create a list of actions which are sys validation dependencies for those ops.
 /// The actions are merged into `current_validation_dependencies`.
-async fn fetch_previous_actions_for_ops<C, O>(
+async fn retrieve_previous_actions_for_ops<C, O>(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     cascade: Arc<C>,
     ops: O,
@@ -399,41 +415,12 @@ async fn fetch_previous_actions_for_ops<C, O>(
     C: Cascade + Send + Sync,
     O: Iterator<Item = DhtOpHashed>,
 {
-    let action_fetches = get_dependency_hashes_from_ops(ops).into_iter()
-    .filter(|hash| !current_validation_dependencies.lock().has(&hash.clone().into()))
-    .map(|hash| {
-        let cascade = cascade.clone();
-        async move {
-            let fetched = cascade.retrieve(hash.clone().into(), Default::default()).await;
-            (hash.into(), fetched)
-        }
-        .boxed()
-    });
-
-    let new_deps = futures::future::join_all(action_fetches)
-        .await
-        .into_iter()
-        .filter_map(|r| {
-            // Filter out errors, preparing the rest to be put into a HashMap for easy access.
-            match r {
-                (hash, Ok(Some((record, CascadeSource::Local)))) => {
-                    Some((hash, (record, CascadeSource::Local).into()))
-                }
-                (hash, Ok(Some((record, CascadeSource::Network)))) => {
-                    Some((hash, (record.privatized().0, CascadeSource::Network).into()))
-                }
-                (hash, Ok(None)) => {
-                    Some((hash, ValidationDependencyState::new(None)))
-                },
-                (hash, Err(e)) => {
-                    tracing::error!(error = ?e, action_hash = ?hash, "Error retrieving prev action");
-                    None
-                }
-            }
-        })
-        .collect();
-
-    current_validation_dependencies.lock().merge(new_deps);
+    retrieve_actions(
+        current_validation_dependencies,
+        cascade,
+        get_dependency_hashes_from_ops(ops).into_iter(),
+    )
+    .await;
 }
 
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
