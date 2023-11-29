@@ -340,6 +340,7 @@ impl TestCase {
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone().into(),
             Arc::new(self.dna_def.clone()),
+            std::time::Duration::from_secs(10),
         );
 
         let actual_network = self.actual_network.take().unwrap_or_else(|| {

@@ -18,6 +18,7 @@ use parking_lot::Mutex;
 use rusqlite::Transaction;
 use std::convert::TryInto;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::*;
 use types::Outcome;
 
@@ -107,19 +108,20 @@ pub async fn sys_validation_workflow<
     .into_iter()
     .sum();
 
+    tracing::debug!(
+        "Fetched {}/{} missing dependencies from the network",
+        num_fetched,
+        outcome_summary.missing
+    );
     if num_fetched > 0 {
-        tracing::debug!(
-            "Fetched {} missing dependencies from the network",
-            num_fetched
-        );
-
         // If we fetched anything then we can re-run sys validation
         trigger_self.trigger(&"sys_validation_workflow");
     }
 
     if num_fetched < outcome_summary.missing {
+        tracing::info!("Sys validation sleeping for {:?}", workspace.sys_validation_retry_delay);
         Ok(WorkComplete::Incomplete(Some(
-            std::time::Duration::from_secs(10),
+            workspace.sys_validation_retry_delay,
         )))
     } else {
         Ok(WorkComplete::Complete)
@@ -908,6 +910,7 @@ pub struct SysValidationWorkspace {
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
+    sys_validation_retry_delay: Duration,
 }
 
 impl SysValidationWorkspace {
@@ -917,14 +920,16 @@ impl SysValidationWorkspace {
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
+        sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {
+            scratch: None,
             authored_db,
             dht_db,
             dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
-            scratch: None,
+            sys_validation_retry_delay,
         }
     }
 

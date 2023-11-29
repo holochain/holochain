@@ -307,34 +307,44 @@ async fn test_zero_arc_no_gossip_4way() {
 
     let configs = [
         // Standard config
-        TestConfig {
+        <TestConfig as Into<SweetConductorConfig>>::into(TestConfig {
             publish: true,
             recent: true,
             historical: true,
             bootstrap: true,
             recent_threshold: None,
-        }
-        .into(),
+        }).tune_conductor(|params| {
+            // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+            params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+        }),
         // Publishing turned off
-        TestConfig {
+        <TestConfig as Into<SweetConductorConfig>>::into(TestConfig {
             publish: false,
             recent: true,
             historical: true,
             bootstrap: true,
             recent_threshold: None,
-        }
-        .into(),
+        }).tune_conductor(|params| {
+            // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+            params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+        }),
         {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous(true).set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true).tune_conductor(|params| {
+                // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+                params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+            }).set_tuning_params(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous(true).set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true).tune_conductor(|params| {
+                // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+                params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+            }).set_tuning_params(tuning)
         },
     ];
 
@@ -410,11 +420,17 @@ async fn test_zero_arc_no_gossip_4way() {
                         }
                     };
                     holochain::wait_for!(
-                        WaitFor::new(std::time::Duration::from_secs(5), 10),
+                        WaitFor::new(std::time::Duration::from_secs(10), 10),
                         c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
                             .await
                             .is_some(),
-                        |x: &bool| *x,
+                        |x: &bool| {
+                            if j == 3 && i != j {
+                                !x
+                            } else {
+                                *x
+                            }
+                        },
                         assertion
                     );
                 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::sweettest::SweetRendezvous;
-use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
+use holochain_conductor_api::{conductor::{ConductorConfig, ConductorTuningParams}, AdminInterfaceConfig, InterfaceDriver};
 use kitsune_p2p_types::{
     config::{KitsuneP2pConfig, TransportConfig},
     dependencies::lair_keystore_api::dependencies::nanoid::nanoid,
@@ -26,6 +26,7 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
+            tuning_params: Some(Default::default()),
             ..Default::default()
         }
         .into()
@@ -125,6 +126,14 @@ impl SweetConductorConfig {
             .as_mut()
             .expect("failed to tune network")
             .tuning_params = Arc::new(tuning_params);
+        self
+    }
+
+    /// Apply a function to the conductor's tuning parameters to customise them.
+    pub fn tune_conductor(mut self, f: impl FnOnce(&mut ConductorTuningParams)) -> Self {
+        if let Some(ref mut params) = self.0.tuning_params {
+            f(params);
+        }
         self
     }
 
