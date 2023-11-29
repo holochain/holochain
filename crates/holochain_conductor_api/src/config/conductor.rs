@@ -115,7 +115,7 @@ impl ConductorConfig {
     /// Get the data directory for this config or say something nice and die.
     pub fn data_root_path_or_die(&self) -> DataPath {
         match &self.data_root_path {
-            Some(path) => path.clone().into(),
+            Some(path) => path.clone(),
             None => {
                 println!(
                     "

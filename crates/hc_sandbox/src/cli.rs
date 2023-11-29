@@ -148,7 +148,7 @@ impl HcSandbox {
                     .into_iter()
                     .zip(paths.clone().into_iter())
                 {
-                    crate::force_admin_port(DataPath::from(path), port)?;
+                    crate::force_admin_port(path, port)?;
                 }
                 if let Some(ports) = run {
                     let holochain_path = self.holochain_path.clone();

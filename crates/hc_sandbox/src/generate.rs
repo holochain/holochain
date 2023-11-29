@@ -131,7 +131,7 @@ pub(crate) fn init_lair_inner(
 
     let conf = dir.as_ref().join("lair-keystore-config.yaml");
 
-    let conf = std::fs::read(&conf)?;
+    let conf = std::fs::read(conf)?;
 
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]

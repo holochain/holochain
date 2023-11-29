@@ -22,7 +22,7 @@ pub async fn spawn_lair_keystore_in_proc(
     config_path: &PathBuf,
     passphrase: sodoken::BufRead,
 ) -> LairResult<MetaLairClient> {
-    let config = get_config(&config_path, passphrase.clone()).await?;
+    let config = get_config(config_path, passphrase.clone()).await?;
     let connection_url = config.connection_url.clone();
 
     // rather than using the in-proc server directly,
