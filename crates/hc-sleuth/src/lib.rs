@@ -2,11 +2,6 @@ use std::collections::HashMap;
 
 pub(crate) use holochain_types::prelude::*;
 
-// alternate Context, based on database queries rather than trace logs
-// can probably remove, but keeping it here for now just in case we
-// want to use this
-// pub mod context_db;
-
 pub mod context_log;
 pub mod query;
 mod report;

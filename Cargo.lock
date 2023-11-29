@@ -2529,6 +2529,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc-sleuth"
+version = "0.1.0"
+dependencies = [
+ "aitia",
+ "anyhow",
+ "arbitrary",
+ "derive_more",
+ "hc-sleuth",
+ "holochain_state_types",
+ "holochain_trace 0.3.0-beta-dev.2",
+ "holochain_types",
+ "kitsune_p2p",
+ "once_cell",
+ "parking_lot 0.10.2",
+ "petgraph",
+ "pretty_assertions",
+ "regex",
+ "serde",
+ "structopt",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
