@@ -210,18 +210,13 @@ mod tests {
 
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
-        let cell_id = CellId::new(dna_def_hashed.to_hash(), author.clone());
-        let integrate_dht_ops_trigger = conductor_handle
-            .get_cell_triggers(&cell_id)
-            .await
-            .unwrap()
-            .integrate_dht_ops;
+        let integrate_dht_ops_trigger = TriggerSender::new();
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             conductor_handle,
             signal_tx: SignalBroadcaster::noop(),
-            cell_id,
-            integrate_dht_ops_trigger,
+            cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
+            integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
         };
         let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pDna);
