@@ -119,10 +119,8 @@ pub(crate) async fn graft_records_onto_source_chain(
 
         // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
         conductor
-            .get_cell_triggers(&cell_id)
-            .await?
-            .integrate_dht_ops
-            .trigger(&"graft_records_onto_source_chain");
+            .cell_by_id(&cell_id, false).await?
+            .notify_authored_ops_moved_to_limbo();
     }
     Ok(())
 }

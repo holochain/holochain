@@ -433,12 +433,26 @@ pub(crate) async fn validate_op(
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
-            info!(
-                msg = "DhtOp did not pass system validation. (If rejected, a warning will follow.)",
-                ?op,
-                error = ?e,
-                error_msg = %e
-            );
+            match e {
+                // This is expected if the dependency isn't held locally and needs to be fetched from the network
+                // so downgrade the logging to trace.
+                ValidationOutcome::DepMissingFromDht(_) => {
+                    tracing::trace!(
+                        msg = "DhtOp has a missing dependency",
+                        ?op,
+                        error = ?e,
+                        error_msg = %e
+                    );
+                }
+                _ => {
+                    info!(
+                        msg = "DhtOp did not pass system validation. (If rejected, a warning will follow.)",
+                        ?op,
+                        error = ?e,
+                        error_msg = %e
+                    );
+                }
+            }
             let outcome = handle_failed(&e);
             if let Outcome::Rejected = outcome {
                 warn!(msg = "DhtOp was rejected during system validation.", ?op, error = ?e, error_msg = %e)
@@ -528,7 +542,7 @@ async fn validate_op_inner(
                         // Just require that we are holding all the other actions
                         let mut validation_dependencies = validation_dependencies.lock();
                         validation_dependencies
-                            .get(&action_hash.clone().into())
+                            .get(&action_hash)
                             .and_then(|s| s.as_action())
                             .ok_or_else(|| {
                                 ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
@@ -558,7 +572,7 @@ async fn validate_op_inner(
                     // Just require that we are holding all the other actions
                     let mut validation_dependencies = validation_dependencies.lock();
                     validation_dependencies
-                        .get(&action_hash.clone().into())
+                        .get(&action_hash)
                         .and_then(|s| s.as_action())
                         .ok_or_else(|| {
                             ValidationOutcome::DepMissingFromDht(action_hash.clone().into())
@@ -730,7 +744,7 @@ fn register_agent_activity(
         // Just make sure we have the dependency and if not then don't mark this action as valid yet
         let mut validation_dependencies = validation_dependencies.lock();
         validation_dependencies
-            .get(&prev_action_hash.clone().into())
+            .get(prev_action_hash)
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
     }
@@ -750,7 +764,7 @@ fn store_record(
     if let Some(prev_action_hash) = prev_action_hash {
         let mut validation_dependencies = validation_dependencies.lock();
         let prev_action = validation_dependencies
-            .get(&prev_action_hash.clone().into())
+            .get(prev_action_hash)
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
         check_prev_author(action, prev_action)?;
@@ -781,7 +795,7 @@ async fn store_entry(
         let original_action_address = &entry_update.original_action_address;
         let mut validation_dependencies = validation_dependencies.lock();
         let original_action = validation_dependencies
-            .get(&original_action_address.clone().into())
+            .get(original_action_address)
             .and_then(|s| s.as_action())
             .ok_or_else(|| {
                 ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
@@ -806,7 +820,7 @@ fn register_updated_content(
 
     let mut validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
-        .get(&original_action_address.clone().into())
+        .get(original_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
@@ -824,7 +838,7 @@ fn register_updated_record(
 
     let mut validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
-        .get(&original_action_address.clone().into())
+        .get(original_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
@@ -842,7 +856,7 @@ fn register_deleted_by(
 
     let mut validation_dependencies = validation_dependencies.lock();
     let action = validation_dependencies
-        .get(&removed_action_address.clone().into())
+        .get(removed_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
@@ -860,7 +874,7 @@ fn register_deleted_entry_action(
 
     let mut validation_dependencies = validation_dependencies.lock();
     let action = validation_dependencies
-        .get(&removed_action_address.clone().into())
+        .get(removed_action_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| {
             ValidationOutcome::DepMissingFromDht(removed_action_address.clone().into())
@@ -883,7 +897,7 @@ fn register_delete_link(
     // Just require that this link exists, don't need to check anything else about it here
     let mut validation_dependencies = validation_dependencies.lock();
     validation_dependencies
-        .get(&link_add_address.clone().into())
+        .get(link_add_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
 

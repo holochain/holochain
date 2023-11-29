@@ -97,7 +97,7 @@ impl ValidationDependencies {
 
         self.retained_deps.insert(hash.clone());
 
-        if let Some(s) = self.states.get_mut(&hash) {
+        if let Some(s) = self.states.get_mut(hash) {
             s.set_action(action);
             s.set_source(source);
             return true;

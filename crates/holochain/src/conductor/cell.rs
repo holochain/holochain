@@ -1039,6 +1039,12 @@ impl Cell {
         &self.space.cache_db
     }
 
+    pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {
+        self.queue_triggers
+            .integrate_dht_ops
+            .trigger(&"notify_authored_ops_moved_to_limbo");
+    }
+
     #[cfg(any(test, feature = "test_utils"))]
     /// Get the triggers for the cell
     /// Useful for testing when you want to
