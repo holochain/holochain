@@ -1,9 +1,5 @@
-use std::{collections::HashSet, hash::Hash, io::BufRead, sync::Arc};
+use std::{collections::HashSet, io::BufRead};
 
-use aitia::{
-    logging::{Log, LogLine},
-    Fact, FactTraits,
-};
 use holochain_types::prelude::*;
 use once_cell::sync::OnceCell;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
@@ -150,7 +146,7 @@ impl aitia::logging::Log for Context {
             Event::Integrated { .. } => {}
             Event::AppValidated { .. } => {}
             Event::SysValidated { .. } => {}
-            Event::MissingAppValDep { by, op, deps } => {
+            Event::MissingAppValDep { by: _, op, deps } => {
                 self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
