@@ -532,7 +532,10 @@ pub mod wasm_test {
         // Before the preflight creation of things should work.
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
-        // Alice can create multiple preflight requests.
+        // Bob's zome must be initialized for countersigning to work.
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        // Alice can create a preflight request.
         let preflight_request: PreflightRequest = conductor
             .call(
                 &alice,
@@ -543,19 +546,6 @@ pub mod wasm_test {
                 ],
             )
             .await;
-        let preflight_request_2: PreflightRequest = conductor
-            .call(
-                &alice,
-                "generate_countersigning_preflight_request",
-                vec![
-                    (alice_pubkey.clone(), vec![Role(1)]),
-                    (bob_pubkey.clone(), vec![]),
-                ],
-            )
-            .await;
-
-        // Alice can still create things before the preflight is accepted.
-        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
         // Alice can accept the preflight request.
         let alice_acceptance: PreflightRequestAcceptance = conductor
@@ -571,6 +561,18 @@ pub mod wasm_test {
             } else {
                 unreachable!();
             };
+
+        // Alice can create a second preflight request.
+        let preflight_request_2: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request",
+                vec![
+                    (alice_pubkey.clone(), vec![Role(1)]),
+                    (bob_pubkey.clone(), vec![]),
+                ],
+            )
+            .await;
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
@@ -664,9 +666,6 @@ pub mod wasm_test {
             .await;
         expect_chain_locked(thing_fail_create_bob);
 
-        // Bob's zome must be initialized for countersigning to work.
-        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
-
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
         let countersigned_action_hash_alice: ActionHash = conductor
@@ -716,7 +715,7 @@ pub mod wasm_test {
                 },
             )
             .await;
-        assert_eq!(alice_activity_pre.valid_activity.len(), 6);
+        assert_eq!(alice_activity_pre.valid_activity.len(), 5);
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
@@ -800,9 +799,9 @@ pub mod wasm_test {
 
         consistency_10s([&alice_cell, &bob_cell]).await;
 
-        assert_eq!(alice_activity.valid_activity.len(), 8);
+        assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
-            &alice_activity.valid_activity[6].1,
+            &alice_activity.valid_activity[5].1,
             countersigned_action_alice.action_address(),
         );
 
