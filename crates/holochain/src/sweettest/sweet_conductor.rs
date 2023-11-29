@@ -509,6 +509,17 @@ impl SweetConductor {
         websocket_client_by_port(port).await.unwrap()
     }
 
+    /// Create a new app interface and get a websocket client which can send requests
+    /// to it.
+    pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+        let port = self
+            .raw_handle()
+            .add_app_interface(either::Either::Left(0))
+            .await
+            .expect("Couldn't create app interface");
+        websocket_client_by_port(port).await.unwrap()
+    }
+
     /// Shutdown this conductor.
     /// This will wait for the conductor to shutdown but
     /// keep the inner state to restart it.
