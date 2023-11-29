@@ -420,7 +420,7 @@ async fn test_zero_arc_no_gossip_4way() {
                         }
                     };
                     holochain::wait_for!(
-                        WaitFor::new(std::time::Duration::from_secs(10), 10),
+                        WaitFor::new(std::time::Duration::from_secs(5), 10),
                         c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
                             .await
                             .is_some(),
