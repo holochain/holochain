@@ -108,6 +108,7 @@ where
     // FIXME: For some reason if we don't spawn here
     // this future never gets polled again.
     let ws = workspace.clone();
+
     tokio::task::spawn(async move {
         ws.source_chain()
             .put(
