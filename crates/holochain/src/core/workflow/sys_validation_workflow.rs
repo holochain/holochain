@@ -140,9 +140,7 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let mut sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
-    sorted_ops.sort_by_cached_key(|op| {
-        OpOrder::new(op.get_type(), op.timestamp())
-    });
+    sorted_ops.sort_by_cached_key(|op| OpOrder::new(op.get_type(), op.timestamp()));
 
     // Forget what dependencies are currently in use
     current_validation_dependencies.lock().clear_retained_deps();
@@ -275,8 +273,7 @@ async fn retrieve_actions(
     current_validation_dependencies.lock().merge(new_deps);
 }
 
-fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> Vec<ActionHash>
-{
+fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> Vec<ActionHash> {
     actions
         .flat_map(|action| {
             vec![
@@ -621,7 +618,10 @@ async fn validate_op_inner(
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
-pub async fn sys_validate_record(record: &Record, cascade: Arc<impl Cascade + Send + Sync>) -> SysValidationOutcome<()> {
+pub async fn sys_validate_record(
+    record: &Record,
+    cascade: Arc<impl Cascade + Send + Sync>,
+) -> SysValidationOutcome<()> {
     match sys_validate_record_inner(record, cascade).await {
         // Validation succeeded
         Ok(_) => Ok(()),
@@ -639,7 +639,10 @@ pub async fn sys_validate_record(record: &Record, cascade: Arc<impl Cascade + Se
     }
 }
 
-async fn sys_validate_record_inner(record: &Record, cascade: Arc<impl Cascade + Send + Sync>) -> SysValidationResult<()> {
+async fn sys_validate_record_inner(
+    record: &Record,
+    cascade: Arc<impl Cascade + Send + Sync>,
+) -> SysValidationResult<()> {
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();

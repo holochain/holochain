@@ -273,8 +273,7 @@ pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
     cascade: Arc<impl Cascade>,
-) -> AppValidationOutcome<(Op, Option<Entry>)>
-{
+) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
 
     // Hide private data where appropriate
@@ -338,8 +337,7 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op>
-{
+async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(

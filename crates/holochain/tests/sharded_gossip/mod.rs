@@ -145,7 +145,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
             historical: true,
             bootstrap: true,
             recent_threshold: Some(0),
-        }).tune_conductor(|p| {
+        })
+        .tune_conductor(|p| {
             // Running too often here seems to not give other things enough time to process these ops. 2s seems to be a good middle ground
             // to make this test pass and be stable.
             p.sys_validation_retry_delay = Some(std::time::Duration::from_secs(2));
