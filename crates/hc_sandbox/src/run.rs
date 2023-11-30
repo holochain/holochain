@@ -11,6 +11,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -91,16 +92,16 @@ pub async fn run(
 /// a random free port will be chosen.
 pub async fn run_async(
     holochain_path: &Path,
-    sandbox_path: DataPath,
+    data_root_path: DataPath,
     force_admin_port: Option<u16>,
     structured: Output,
 ) -> anyhow::Result<(u16, Child, Option<Child>)> {
-    let mut config = match read_config(sandbox_path.clone())? {
+    let mut config = match read_config(data_root_path.clone())? {
         Some(c) => c,
         None => {
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(&sandbox_path.clone().into(), passphrase)?;
-            create_config(sandbox_path.clone(), Some(con_url))
+            let con_url = crate::generate::init_lair(&data_root_path.clone().into(), passphrase)?;
+            create_config(data_root_path.clone(), Some(con_url))
         }
     };
     match force_admin_port {
@@ -109,10 +110,10 @@ pub async fn run_async(
         }
         None => random_admin_port(&mut config),
     }
-    let config_path = write_config(sandbox_path.clone(), &config);
+    let config_path = write_config(data_root_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
     let (child, lair) =
-        start_holochain(holochain_path, &config, config_path, structured, tx_config).await?;
+        start_holochain(holochain_path, &config, config_path, data_root_path, structured, tx_config).await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
@@ -130,19 +131,16 @@ async fn start_holochain(
     holochain_path: &Path,
     config: &ConductorConfig,
     config_path: PathBuf,
+    data_root_path: DataPath,
     structured: Output,
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Option<Child>)> {
     use tokio::io::AsyncWriteExt;
     let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
 
-    let mut lair_path = config_path.clone();
-    lair_path.pop();
-    lair_path.push("keystore");
-
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
-            let lair = start_lair(passphrase.as_slice(), lair_path).await?;
+            let lair = start_lair(passphrase.as_slice(), data_root_path.clone().into()).await?;
             Some(lair)
         }
         _ => None,
@@ -171,13 +169,13 @@ async fn start_holochain(
     Ok((holochain, lair))
 }
 
-async fn start_lair(passphrase: &[u8], lair_path: PathBuf) -> anyhow::Result<Child> {
+async fn start_lair(passphrase: &[u8], lair_path: KeystorePath) -> anyhow::Result<Child> {
     use tokio::io::AsyncWriteExt;
 
     tracing::info!("\n\n----\nstarting lair\n----\n\n");
     let mut cmd = Command::new("lair-keystore");
     cmd.arg("--lair-root")
-        .arg(lair_path)
+        .arg(lair_path.as_ref())
         .arg("server")
         .arg("--piped")
         .stdin(Stdio::piped())

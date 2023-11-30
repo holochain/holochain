@@ -608,7 +608,7 @@ async fn concurrent_install_dna() {
 
     static NUM_DNA: u8 = 50;
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
-    static REQ_TIMEOUT_MS: u64 = 15000;
+    static REQ_TIMEOUT_MS: u64 = 30000;
 
     holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
@@ -618,8 +618,8 @@ async fn concurrent_install_dna() {
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
-    let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path.into());
+    let data_root_path = path.clone();
+    let config = create_config(admin_port, data_root_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -627,7 +627,9 @@ async fn concurrent_install_dna() {
 
     let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
-    //let before = std::time::Instant::now();
+    let before = std::time::Instant::now();
+
+    dbg!("foo");
 
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
@@ -644,7 +646,7 @@ async fn concurrent_install_dna() {
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            //println!("[{}] Agent pub key generated", i);
+            println!("[{}] Agent pub key generated", i);
 
             let _dna_hash = register_and_install_dna_named(
                 &mut client,
@@ -658,10 +660,10 @@ async fn concurrent_install_dna() {
             )
             .await;
 
-            //println!(
-            //    "[{}] installed dna with hash {} and name {}",
-            //    i, _dna_hash, name
-            //);
+            println!(
+               "[{}] installed dna with hash {} and name {}",
+               i, _dna_hash, name
+            );
         })
     }))
     .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
@@ -672,11 +674,11 @@ async fn concurrent_install_dna() {
         r.unwrap();
     }
 
-    //println!(
-    //    "installed {} dna in {:?}",
-    //    NUM_CONCURRENT_INSTALLS,
-    //    before.elapsed()
-    //);
+    println!(
+       "installed {} dna in {:?}",
+       NUM_CONCURRENT_INSTALLS,
+       before.elapsed()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

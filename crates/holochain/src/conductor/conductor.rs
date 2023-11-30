@@ -747,6 +747,7 @@ mod dna_impls {
 
         /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+            dbg!("register_dna");
             let ribosome = RealRibosome::new(dna, self.config.data_root_path.clone())?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
             self.register_dna_entry_defs(entry_defs);
@@ -1324,6 +1325,7 @@ mod app_impls {
             installed_app_id: InstalledAppId,
             cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
         ) -> ConductorResult<()> {
+            dbg!("install_app_legacy");
             crate::conductor::conductor::genesis_cells(
                 self.clone(),
                 cell_data
@@ -1347,6 +1349,7 @@ mod app_impls {
             self: Arc<Self>,
             payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
+            dbg!("install_app_bundle");
             #[cfg(feature = "chc")]
             let ignore_genesis_failure = payload.ignore_genesis_failure;
             #[cfg(not(feature = "chc"))]
