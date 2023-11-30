@@ -44,7 +44,7 @@ mod test {
     use crate::sweettest::SweetConductorBatch;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::{consistency_10s};
+    use crate::test_utils::consistency_10s;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;

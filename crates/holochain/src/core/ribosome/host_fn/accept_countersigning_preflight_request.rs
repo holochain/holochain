@@ -1135,7 +1135,22 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     #[ignore = "flaky"]
-    async fn enzymatic_session_success() {
+    /// TODO: this test and the following one (`enzymatic_session_success_forced_init`) form a pair.
+    /// The latter includes a "fix" to the test to remove the flakiness, but the flakiness itself is a problem
+    /// that we need to address.
+    /// The flakiness is described in https://github.com/holochain/holochain/pull/3046. When that is resolved,
+    /// this test can be unignored, and the companion test can be removed.
+    async fn enzymatic_session_success_flaky() {
+        enzymatic_session_success(false).await
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
+    async fn enzymatic_session_success_forced_init() {
+        enzymatic_session_success(true).await
+    }
+
+    async fn enzymatic_session_success(force_init: bool) {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -1147,6 +1162,21 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        if force_init {
+            // Run any arbitrary zome call for bob to force him to run init
+            let _: AgentActivity = conductor
+                .call(
+                    &bob,
+                    "get_agent_activity",
+                    GetAgentActivityInput {
+                        agent_pubkey: bob_pubkey.clone(),
+                        chain_query_filter: ChainQueryFilter::new(),
+                        activity_request: ActivityRequest::Full,
+                    },
+                )
+                .await;
+        }
 
         // Start an enzymatic session
         let preflight_request: PreflightRequest = conductor
