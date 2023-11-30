@@ -239,7 +239,7 @@ pub struct Conductor {
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
-    pub(crate) services: RwShare<Option<ConductorServices>>,
+    pub(crate) services: RwShare<ConductorServices>,
 }
 
 impl Conductor {
@@ -287,7 +287,7 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
-                services: RwShare::new(None),
+                services: RwShare::new(ConductorServices::default()),
             }
         }
 
@@ -343,6 +343,7 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
+            // TODO: move to initialize method
             self.services.share_mut(|services| {
                 let mut dpki = MockDpkiService::new();
                 dpki.expect_is_key_valid()
@@ -350,12 +351,7 @@ mod startup_shutdown_impls {
                 dpki.expect_key_mutation()
                     .returning(|_, _| box_fut_plain(Ok(())));
 
-                let app_store = MockAppStoreService::new();
-
-                *services = Some(ConductorServices {
-                    dpki: Arc::new(dpki),
-                    app_store: Arc::new(app_store),
-                });
+                services.dpki = Some(Arc::new(dpki));
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;

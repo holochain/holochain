@@ -75,9 +75,7 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     fn conductor_services(&self) -> ConductorServices {
-        self.conductor_handle
-            .services
-            .share_ref(|s| s.clone().expect("Conductor services not yet initialized"))
+        self.conductor_handle.services.share_ref(|s| s.clone())
     }
 
     fn keystore(&self) -> &MetaLairClient {
