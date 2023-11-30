@@ -214,13 +214,6 @@ async fn record_with_cascade(
     (record, Arc::new(MockCascade::with_records(deps)))
 }
 
-#[allow(dead_code)]
-async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
-    let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = Arc::new(MockCascade::with_records(deps.clone()));
-    sys_validate_record(&record, cascade).await
-}
-
 async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     let (record, deps) = record_with_deps(keystore, action).await;
     let cascade = Arc::new(MockCascade::with_records(deps.clone()));
@@ -228,16 +221,6 @@ async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     if result.is_err() {
         dbg!(&deps, &record);
         result.unwrap();
-    }
-}
-
-#[allow(dead_code)]
-async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
-    let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = Arc::new(MockCascade::with_records(deps.clone()));
-    let result = sys_validate_record(&record, cascade).await;
-    if result.is_ok() {
-        result.unwrap_err();
     }
 }
 

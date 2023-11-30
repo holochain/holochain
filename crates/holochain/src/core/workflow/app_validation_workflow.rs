@@ -269,13 +269,11 @@ async fn app_validation_workflow_inner(
     })
 }
 
-pub async fn record_to_op<C>(
+pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
-    cascade: Arc<C>,
+    cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, Option<Entry>)>
-where
-    C: Cascade,
 {
     use DhtOpType::*;
 
@@ -340,9 +338,7 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op<C>(op: DhtOp, cascade: Arc<C>) -> AppValidationOutcome<Op>
-where
-    C: Cascade,
+async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op>
 {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {

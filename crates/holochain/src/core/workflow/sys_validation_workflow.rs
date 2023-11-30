@@ -139,7 +139,10 @@ async fn sys_validation_workflow_inner(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
-    let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
+    let mut sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
+    sorted_ops.sort_by_cached_key(|op| {
+        OpOrder::new(op.get_type(), op.timestamp())
+    });
 
     // Forget what dependencies are currently in use
     current_validation_dependencies.lock().clear_retained_deps();
@@ -231,14 +234,11 @@ async fn sys_validation_workflow_inner(
     Ok(summary)
 }
 
-async fn retrieve_actions<C, A>(
+async fn retrieve_actions(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-    cascade: Arc<C>,
-    action_hashes: A,
-) where
-    A: Iterator<Item = ActionHash>,
-    C: Cascade + Send + Sync,
-{
+    cascade: Arc<impl Cascade + Send + Sync>,
+    action_hashes: impl Iterator<Item = ActionHash>,
+) {
     let action_fetches = action_hashes
         .filter(|hash| !current_validation_dependencies.lock().has(hash))
         .map(|h| {
@@ -275,9 +275,7 @@ async fn retrieve_actions<C, A>(
     current_validation_dependencies.lock().merge(new_deps);
 }
 
-fn get_dependency_hashes_from_actions<A>(actions: A) -> Vec<ActionHash>
-where
-    A: Iterator<Item = Action>,
+fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> Vec<ActionHash>
 {
     actions
         .flat_map(|action| {
@@ -301,14 +299,11 @@ where
 
 /// Examine the list of provided actions and create a list of actions which are sys validation dependencies for those actions.
 /// The actions are merged into `current_validation_dependencies`.
-async fn fetch_previous_actions<A, C>(
+async fn fetch_previous_actions(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-    cascade: Arc<C>,
-    actions: A,
-) where
-    A: Iterator<Item = Action>,
-    C: Cascade + Send + Sync,
-{
+    cascade: Arc<impl Cascade + Send + Sync>,
+    actions: impl Iterator<Item = Action>,
+) {
     retrieve_actions(
         current_validation_dependencies,
         cascade,
@@ -317,10 +312,7 @@ async fn fetch_previous_actions<A, C>(
     .await;
 }
 
-fn get_dependency_hashes_from_ops<O>(ops: O) -> Vec<ActionHash>
-where
-    O: Iterator<Item = DhtOpHashed>,
-{
+fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec<ActionHash> {
     ops.into_iter()
         .filter_map(|op| {
             // For each previous action that will be needed for validation, map the action to a fetch Record for its hash
@@ -407,14 +399,11 @@ where
 
 /// Examine the list of provided ops and create a list of actions which are sys validation dependencies for those ops.
 /// The actions are merged into `current_validation_dependencies`.
-async fn retrieve_previous_actions_for_ops<C, O>(
+async fn retrieve_previous_actions_for_ops(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
-    cascade: Arc<C>,
-    ops: O,
-) where
-    C: Cascade + Send + Sync,
-    O: Iterator<Item = DhtOpHashed>,
-{
+    cascade: Arc<impl Cascade + Send + Sync>,
+    ops: impl Iterator<Item = DhtOpHashed>,
+) {
     retrieve_actions(
         current_validation_dependencies,
         cascade,
@@ -632,10 +621,7 @@ async fn validate_op_inner(
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
-pub async fn sys_validate_record<C>(record: &Record, cascade: Arc<C>) -> SysValidationOutcome<()>
-where
-    C: Cascade + Send + Sync,
-{
+pub async fn sys_validate_record(record: &Record, cascade: Arc<impl Cascade + Send + Sync>) -> SysValidationOutcome<()> {
     match sys_validate_record_inner(record, cascade).await {
         // Validation succeeded
         Ok(_) => Ok(()),
@@ -653,23 +639,17 @@ where
     }
 }
 
-async fn sys_validate_record_inner<C>(record: &Record, cascade: Arc<C>) -> SysValidationResult<()>
-where
-    C: Cascade + Send + Sync,
-{
+async fn sys_validate_record_inner(record: &Record, cascade: Arc<impl Cascade + Send + Sync>) -> SysValidationResult<()> {
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
     counterfeit_check(signature, action).await?;
 
-    async fn validate<C>(
+    async fn validate(
         action: &Action,
         maybe_entry: Option<&Entry>,
-        cascade: Arc<C>,
-    ) -> SysValidationResult<()>
-    where
-        C: Cascade + Send + Sync,
-    {
+        cascade: Arc<impl Cascade + Send + Sync>,
+    ) -> SysValidationResult<()> {
         let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
         fetch_previous_actions(
             validation_dependencies.clone(),

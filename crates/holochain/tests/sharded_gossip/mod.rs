@@ -132,20 +132,24 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    // let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
-        TestConfig {
+        <TestConfig as Into<SweetConductorConfig>>::into(TestConfig {
             publish: false,
             recent: false,
             historical: true,
             bootstrap: true,
             recent_threshold: Some(0),
-        },
+        }).tune_conductor(|p| {
+            // Running too often here seems to not give other things enough time to process these ops. 2s seems to be a good middle ground
+            // to make this test pass and be stable.
+            p.sys_validation_retry_delay = Some(std::time::Duration::from_secs(2));
+        }),
     )
     .await;
 
