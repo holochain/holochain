@@ -2,9 +2,8 @@
 
 use anyhow::anyhow;
 use std::path::Path;
-use std::{path::PathBuf, process::Stdio};
+use std::{process::Stdio};
 
-use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use holochain_trace::Output;
 use tokio::io::AsyncBufReadExt;
@@ -12,6 +11,8 @@ use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 use holochain_conductor_api::conductor::paths::KeystorePath;
+use holochain_conductor_api::conductor::paths::ConfigFilePath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -38,7 +39,7 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 /// a random free port will be chosen.
 pub async fn run(
     holochain_path: &Path,
-    sandbox_path: DataPath,
+    sandbox_path: ConfigRootPath,
     conductor_index: usize,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
@@ -92,16 +93,16 @@ pub async fn run(
 /// a random free port will be chosen.
 pub async fn run_async(
     holochain_path: &Path,
-    data_root_path: DataPath,
+    config_root_path: ConfigRootPath,
     force_admin_port: Option<u16>,
     structured: Output,
 ) -> anyhow::Result<(u16, Child, Option<Child>)> {
-    let mut config = match read_config(data_root_path.clone())? {
+    let mut config = match read_config(config_root_path.clone())? {
         Some(c) => c,
         None => {
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(&data_root_path.clone().into(), passphrase)?;
-            create_config(data_root_path.clone(), Some(con_url))
+            let con_url = crate::generate::init_lair(&config_root_path.is_also_data_root_path().into(), passphrase)?;
+            create_config(config_root_path.clone(), Some(con_url))
         }
     };
     match force_admin_port {
@@ -110,10 +111,10 @@ pub async fn run_async(
         }
         None => random_admin_port(&mut config),
     }
-    let config_path = write_config(data_root_path.clone(), &config);
+    let _config_file_path = write_config(config_root_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
     let (child, lair) =
-        start_holochain(holochain_path, &config, config_path, data_root_path, structured, tx_config).await?;
+        start_holochain(holochain_path, &config, config_root_path, structured, tx_config).await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
@@ -130,8 +131,7 @@ pub async fn run_async(
 async fn start_holochain(
     holochain_path: &Path,
     config: &ConductorConfig,
-    config_path: PathBuf,
-    data_root_path: DataPath,
+    config_root_path: ConfigRootPath,
     structured: Output,
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Option<Child>)> {
@@ -140,7 +140,7 @@ async fn start_holochain(
 
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
-            let lair = start_lair(passphrase.as_slice(), data_root_path.clone().into()).await?;
+            let lair = start_lair(passphrase.as_slice(), config_root_path.is_also_data_root_path().into()).await?;
             Some(lair)
         }
         _ => None,
@@ -151,7 +151,7 @@ async fn start_holochain(
     cmd.arg("--piped")
         .arg(format!("--structured={}", structured))
         .arg("--config-path")
-        .arg(config_path)
+        .arg(ConfigFilePath::from(config_root_path).as_ref())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

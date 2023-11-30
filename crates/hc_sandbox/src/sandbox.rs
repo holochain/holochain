@@ -4,8 +4,8 @@ use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
 
-use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_types::prelude::InstalledAppId;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 use crate::calls::InstallApp;
 use crate::cmds::*;
@@ -23,7 +23,7 @@ pub async fn default_with_network(
     app_id: InstalledAppId,
     network_seed: Option<String>,
     structured: Output,
-) -> anyhow::Result<DataPath> {
+) -> anyhow::Result<ConfigRootPath> {
     let Create {
         network,
         root,
@@ -57,7 +57,7 @@ pub async fn default_n(
     app_id: InstalledAppId,
     network_seed: Option<String>,
     structured: Output,
-) -> anyhow::Result<Vec<DataPath>> {
+) -> anyhow::Result<Vec<ConfigRootPath>> {
     let num_sandboxes = create.num_sandboxes;
     msg!(
         "Creating {} conductor sandboxes with same settings",

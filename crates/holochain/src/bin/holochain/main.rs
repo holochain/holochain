@@ -5,7 +5,7 @@ use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_conductor_api::conductor::process::ERROR_CODE;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_conductor_api::config::conductor::paths::ConfigPath;
+use holochain_conductor_api::config::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_trace::Output;
 use holochain_util::tokio_helper;
@@ -72,7 +72,7 @@ async fn async_main() {
         return;
     }
 
-    let config_path = opt.config_path.clone().map(ConfigPath::from);
+    let config_path = opt.config_path.clone().map(ConfigRootPath::from);
 
     let config = load_config(config_path);
 
@@ -159,27 +159,27 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
 }
 
 /// Load config, throw friendly error on failure
-fn load_config(maybe_config_path: Option<ConfigPath>) -> ConductorConfig {
-    if let Some(ref config_path) = maybe_config_path {
-        match ConductorConfig::load_yaml(config_path.as_ref()) {
+fn load_config(maybe_config_root_path: Option<ConfigRootPath>) -> ConductorConfig {
+    if let Some(ref config_root_path) = maybe_config_root_path {
+        match ConductorConfig::load_yaml(config_root_path.as_ref()) {
             Err(ConductorConfigError::ConfigMissing(_)) => {
-                display_friendly_missing_config_message(maybe_config_path.as_ref());
+                display_friendly_missing_config_message(maybe_config_root_path.as_ref());
                 std::process::exit(ERROR_CODE);
             }
             Err(ConductorConfigError::SerializationError(err)) => {
-                display_friendly_malformed_config_message(config_path, err);
+                display_friendly_malformed_config_message(config_root_path, err);
                 std::process::exit(ERROR_CODE);
             }
             result => result.expect("Could not load conductor config"),
         }
     } else {
-        display_friendly_missing_config_message(maybe_config_path.as_ref());
+        display_friendly_missing_config_message(maybe_config_root_path.as_ref());
         std::process::exit(ERROR_CODE);
     }
 }
 
-fn display_friendly_missing_config_message(maybe_config_path: Option<&ConfigPath>) {
-    if let Some(config_path) = maybe_config_path {
+fn display_friendly_missing_config_message(maybe_config_root_path: Option<&ConfigRootPath>) {
+    if let Some(config_root_path) = maybe_config_root_path {
         println!(
             "
     Error: You asked to load configuration from the path:
@@ -188,7 +188,7 @@ fn display_friendly_missing_config_message(maybe_config_path: Option<&ConfigPath
 
     but this file doesn't exist. Please create a YAML config file at this path.
             ",
-            path = config_path.display(),
+            path = config_root_path.display(),
         );
     } else {
         println!(
@@ -202,7 +202,7 @@ fn display_friendly_missing_config_message(maybe_config_path: Option<&ConfigPath
     }
 }
 
-fn display_friendly_malformed_config_message(config_path: &ConfigPath, error: serde_yaml::Error) {
+fn display_friendly_malformed_config_message(config_root_path: &ConfigRootPath, error: serde_yaml::Error) {
     println!(
         "
 The specified config file ({})
@@ -212,7 +212,7 @@ file. Details:
     {}
 
     ",
-        config_path.display(),
+        config_root_path.display(),
         error
     )
 }

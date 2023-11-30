@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
-use holochain_conductor_api::conductor::paths::DataPath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
@@ -236,7 +236,7 @@ pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyho
                         {
                             let (port, holochain, lair) = run_async(
                                 holochain_path,
-                                DataPath::from(path),
+                                ConfigRootPath::from(path),
                                 None,
                                 structured.clone(),
                             )

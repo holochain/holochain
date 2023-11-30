@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
-use holochain_conductor_api::conductor::paths::DataPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 use crate::config::create_config;
 use crate::config::write_config;
@@ -23,7 +23,7 @@ pub fn generate(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     in_process_lair: bool,
-) -> anyhow::Result<DataPath> {
+) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url);
@@ -52,7 +52,7 @@ pub fn generate_with_config(
     config: Option<ConductorConfig>,
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
-) -> anyhow::Result<DataPath> {
+) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, true)?;
     let config = config.unwrap_or_else(|| {
         let mut config = create_config(dir.clone(), con_url.clone());
@@ -72,7 +72,7 @@ pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     initialise_lair: bool,
-) -> anyhow::Result<(DataPath, Option<url2::Url2>)> {
+) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
     let passphrase = holochain_util::pw::pw_get()?;
 
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
@@ -80,8 +80,8 @@ pub fn generate_directory(
     dir.push(directory);
     std::fs::create_dir(&dir)?;
 
-    let data_root_path = DataPath::from(dir);
-    let keystore_path = KeystorePath::from(data_root_path.clone());
+    let config_root_path = ConfigRootPath::from(dir);
+    let keystore_path = KeystorePath::from(config_root_path.is_also_data_root_path());
     std::fs::create_dir(keystore_path.as_ref())?;
 
     let con_url = if initialise_lair {
@@ -90,7 +90,7 @@ pub fn generate_directory(
         None
     };
 
-    Ok((data_root_path, con_url))
+    Ok((config_root_path, con_url))
 }
 
 pub(crate) fn init_lair(
