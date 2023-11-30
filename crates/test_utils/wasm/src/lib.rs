@@ -38,6 +38,7 @@ pub enum TestWasm {
     GenesisSelfCheckValidV1,
     GenesisSelfCheckInvalid,
     GenesisSelfCheckValid,
+    GenesisSelfCheckRequiresProperties,
     HashPath,
     HdkExtern,
     InitFail,
@@ -138,6 +139,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::GenesisSelfCheckValidV1 => "genesis_self_check_1",
             TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
             TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
+            TestWasm::GenesisSelfCheckRequiresProperties => "genesis_self_check_requires_properties",
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
@@ -210,6 +212,9 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::GenesisSelfCheckValid => {
                 "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_valid.wasm"
+            }
+            TestWasm::GenesisSelfCheckRequiresProperties => {
+                "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_requires_properties.wasm"
             }
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
