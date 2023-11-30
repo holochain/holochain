@@ -1,3 +1,5 @@
+resolver = "2"
+
 [workspace]
 members = [
   "crates/aitia",
@@ -57,7 +59,9 @@ members = [
 
 exclude = ["crates/release-automation"]
 
-resolver = "2"
+[workspace.dependencies]
+derive_more = "0.99"
+
 
 [profile.fast-test]
 inherits = "dev"
@@ -74,6 +78,7 @@ codegen-units = 16
 [profile.release]
 opt-level = "z"
 lto = true
+
 
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }
