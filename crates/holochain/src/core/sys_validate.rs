@@ -9,8 +9,6 @@ use holochain_cascade::Cascade;
 use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
-use holochain_zome_types::countersigning::CounterSigningSessionData;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 pub use error::*;
