@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use crate::conductor::api::error::ConductorApiError;
 use crate::{conductor::error::ConductorError, sweettest::*};
 use ::fixt::prelude::strum_macros;
 use holo_hash::{AgentPubKey, DnaHash};
@@ -7,7 +8,6 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
-use crate::conductor::api::error::ConductorApiError;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
@@ -122,7 +122,9 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .unwrap_err();
         assert_matches!(
             err,
-            ConductorApiError::ConductorError(ConductorError::AppError(AppError::CloneLimitExceeded(1, _)))
+            ConductorApiError::ConductorError(ConductorError::AppError(
+                AppError::CloneLimitExceeded(1, _)
+            ))
         );
         let state = conductor.get_state().await.unwrap();
         let app = state.get_app(&"app_1".to_string()).unwrap();

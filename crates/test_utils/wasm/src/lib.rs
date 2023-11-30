@@ -139,7 +139,9 @@ impl From<TestWasm> for ZomeName {
             TestWasm::GenesisSelfCheckValidV1 => "genesis_self_check_1",
             TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
             TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
-            TestWasm::GenesisSelfCheckRequiresProperties => "genesis_self_check_requires_properties",
+            TestWasm::GenesisSelfCheckRequiresProperties => {
+                "genesis_self_check_requires_properties"
+            }
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
