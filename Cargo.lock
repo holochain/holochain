@@ -2774,6 +2774,7 @@ dependencies = [
  "hdk",
  "holo_hash",
  "holochain",
+ "holochain-services",
  "holochain_cascade",
  "holochain_conductor_api",
  "holochain_keystore",
@@ -2858,6 +2859,22 @@ dependencies = [
  "uuid 0.7.4",
  "wasmer",
  "wasmer-middlewares",
+]
+
+[[package]]
+name = "holochain-services"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "derive_more",
+ "futures",
+ "holochain_keystore",
+ "holochain_types",
+ "mockall",
+ "must_future",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

@@ -1,0 +1,19 @@
+[package]
+name = "holochain-services"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "*"
+async-trait = "*"
+derive_more = "*"
+futures = "*"
+mockall = "*"
+must_future = "*"
+serde = "*"
+thiserror = "*"
+
+holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "../holochain_keystore", default-features = false }
+holochain_types = { version = "^0.3.0-beta-dev.17", path = "../holochain_types" }

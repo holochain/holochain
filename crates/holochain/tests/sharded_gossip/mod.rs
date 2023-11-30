@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
-use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
