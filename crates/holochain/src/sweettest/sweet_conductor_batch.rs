@@ -27,7 +27,7 @@ impl SweetConductorBatch {
         assert_eq!(
             conductors.len(),
             paths.len(),
-            "Some conductors in a SweetConductorBatch share the same data path!"
+            "Some conductors in a SweetConductorBatch share the same data path (or don't have a path)!"
         );
         Self(conductors)
     }
