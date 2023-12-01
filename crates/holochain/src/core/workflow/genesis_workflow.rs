@@ -115,8 +115,9 @@ where
     // Don't proceed if DPKI is initialized and the agent key is not valid
     if let Some(dpki) = api.conductor_services().dpki.as_ref() {
         if !dpki
-            .is_key_valid(agent_pubkey.clone(), Timestamp::now())
+            .key_state(agent_pubkey.clone(), Timestamp::now())
             .await?
+            .is_valid()
         {
             return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
         }

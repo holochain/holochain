@@ -344,16 +344,8 @@ mod startup_shutdown_impls {
             });
 
             let state = self.get_state().await?;
-            if let Some(deepkey_cell_id) = state.conductor_services.deepkey.as_ref() {
-                self.services.share_mut(|services| {
-                    let deepkey = DeepkeyBuiltin::new(
-                        self.clone(),
-                        self.keystore().clone(),
-                        deepkey_cell_id.clone(),
-                    );
-                    services.dpki = Some(Arc::new(deepkey));
-                });
-            }
+
+            self.clone().initialize_deepkey(None).await?;
 
             self.clone().add_admin_interfaces(admin_configs).await?;
             self.clone().startup_app_interfaces().await?;
@@ -2085,26 +2077,37 @@ mod app_status_impls {
 
 /// Methods related to management of Conductor state
 mod service_impls {
+
     use super::*;
 
     impl Conductor {
         pub(crate) async fn initialize_deepkey(
             self: Arc<Self>,
-            dna: DnaFile,
+            dna: Option<DnaFile>,
         ) -> ConductorResult<()> {
-            let agent = self.keystore().new_sign_keypair_random().await?;
-            let cell_id = CellId::new(dna.dna_hash().clone(), agent);
-            let cell_id_2 = cell_id.clone();
-            self.update_state(move |mut state| {
-                state.conductor_services.deepkey = Some(cell_id_2);
-                Ok(state)
-            })
-            .await?;
+            let cell_id = if let Some(dna) = dna {
+                let dna_hash = dna.dna_hash().clone();
+                todo!("install cell which is not part of any app");
+                let agent = self.keystore().new_sign_keypair_random().await?;
+                let cell_id = CellId::new(dna_hash, agent);
+                let cell_id_2 = cell_id.clone();
+                self.update_state(move |mut state| {
+                    state.conductor_services.deepkey = Some(cell_id_2);
+                    Ok(state)
+                })
+                .await?;
+                Some(cell_id)
+            } else {
+                self.get_state().await?.conductor_services.deepkey
+            };
 
-            self.services.share_mut(|s| {
-                let deepkey = DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), cell_id);
-                s.dpki = Some(Arc::new(deepkey));
-            });
+            if let Some(cell_id) = cell_id {
+                self.services.share_mut(|s| {
+                    let deepkey =
+                        DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), cell_id);
+                    s.dpki = Some(Arc::new(deepkey));
+                });
+            }
 
             Ok(())
         }

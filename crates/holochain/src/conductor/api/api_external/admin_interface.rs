@@ -464,23 +464,6 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn initialize_deepkey() {
-        holochain_trace::test_run().ok();
-
-        let env_dir = test_db_dir();
-        let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
-        let admin_api = RealAdminInterfaceApi::new(handle.clone());
-
-        let deepkey_dna = todo!("get fixture deepkey dna");
-        let response = admin_api
-            .handle_admin_request(AdminRequest::InitializeDeepkey { deepkey_dna })
-            .await;
-        assert_eq!(response, AdminResponse::Ok);
-
-        todo!("now try installing an app with and without proper deepkey verification")
-    }
-
     // @todo fix test by using new InstallApp call
     // #[tokio::test(flavor = "multi_thread")]
     // async fn install_list_dna_app() {

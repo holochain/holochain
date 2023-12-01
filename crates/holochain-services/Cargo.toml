@@ -17,3 +17,12 @@ thiserror = "*"
 
 holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "../holochain_keystore", default-features = false }
 holochain_types = { version = "^0.3.0-beta-dev.17", path = "../holochain_types" }
+
+arbitrary = { version = "*", optional = true }
+
+[features]
+test_utils = ["fuzzing"]
+
+fuzzing = [
+    "arbitrary"
+]

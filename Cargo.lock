@@ -2866,6 +2866,7 @@ name = "holochain-services"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arbitrary",
  "async-trait",
  "derive_more",
  "futures",

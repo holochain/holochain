@@ -1,5 +1,6 @@
 mod agent_scaling;
 mod authored_test;
+mod conductor_services;
 mod dht_arc;
 mod inline_zome_spec;
 mod integrity_zome;
