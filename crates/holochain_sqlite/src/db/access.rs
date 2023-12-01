@@ -463,6 +463,9 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
         // Ensure everything in the WAL is written to the main database
         conn.execute("VACUUM", ())?;
 
+        // Start an exclusive transaction to avoid anybody writing to the database while we're migrating it
+        conn.execute("BEGIN EXCLUSIVE", ())?;
+
         conn.execute(
             "ATTACH DATABASE :db_name AS encrypted KEY :key",
             rusqlite::named_params! {
@@ -472,6 +475,8 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
         )?;
 
         conn.query_row("SELECT sqlcipher_export('encrypted')", (), |_| Ok(0))?;
+
+        conn.execute("COMMIT", ())?;
 
         conn.execute("DETACH DATABASE encrypted", ())?;
         conn.close().map_err(|(_, err)| err)?;
