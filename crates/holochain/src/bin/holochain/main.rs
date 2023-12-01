@@ -202,7 +202,10 @@ fn display_friendly_missing_config_message(maybe_config_root_path: Option<&Confi
     }
 }
 
-fn display_friendly_malformed_config_message(config_root_path: &ConfigRootPath, error: serde_yaml::Error) {
+fn display_friendly_malformed_config_message(
+    config_root_path: &ConfigRootPath,
+    error: serde_yaml::Error,
+) {
     println!(
         "
 The specified config file ({})

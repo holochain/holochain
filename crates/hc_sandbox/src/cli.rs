@@ -2,12 +2,12 @@
 
 use crate::cmds::*;
 use clap::{ArgAction, Parser};
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_trace::Output;
 use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 const DEFAULT_APP_ID: &str = "test-app";
 

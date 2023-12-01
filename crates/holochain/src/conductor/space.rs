@@ -19,6 +19,7 @@ use crate::core::{
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
+use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
@@ -46,7 +47,6 @@ use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
 use tracing::instrument;
-use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 
 #[cfg(test)]
 mod tests;

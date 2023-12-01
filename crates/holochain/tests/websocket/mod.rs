@@ -661,8 +661,8 @@ async fn concurrent_install_dna() {
             .await;
 
             println!(
-               "[{}] installed dna with hash {} and name {}",
-               i, _dna_hash, name
+                "[{}] installed dna with hash {} and name {}",
+                i, _dna_hash, name
             );
         })
     }))
@@ -675,9 +675,9 @@ async fn concurrent_install_dna() {
     }
 
     println!(
-       "installed {} dna in {:?}",
-       NUM_CONCURRENT_INSTALLS,
-       before.elapsed()
+        "installed {} dna in {:?}",
+        NUM_CONCURRENT_INSTALLS,
+        before.elapsed()
     );
 }
 

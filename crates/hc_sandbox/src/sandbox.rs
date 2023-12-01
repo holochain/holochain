@@ -4,8 +4,8 @@ use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
 
-use holochain_types::prelude::InstalledAppId;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_types::prelude::InstalledAppId;
 
 use crate::calls::InstallApp;
 use crate::cmds::*;

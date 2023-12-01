@@ -1,13 +1,16 @@
 //! Helpers for creating, reading and writing [`ConductorConfig`]s.
 
-use holochain_conductor_api::config::conductor::ConductorConfig;
-use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::config::conductor::ConductorConfig;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 
 /// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.
-pub fn create_config(config_root_path: ConfigRootPath, con_url: Option<url2::Url2>) -> anyhow::Result<ConductorConfig> {
+pub fn create_config(
+    config_root_path: ConfigRootPath,
+    con_url: Option<url2::Url2>,
+) -> anyhow::Result<ConductorConfig> {
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
         ..Default::default()
@@ -30,7 +33,11 @@ pub fn create_config(config_root_path: ConfigRootPath, con_url: Option<url2::Url
 /// Write [`ConductorConfig`] to [`CONDUCTOR_CONFIG`].
 pub fn write_config(config_root_path: ConfigRootPath, config: &ConductorConfig) -> ConfigFilePath {
     let config_file_path: ConfigFilePath = config_root_path.into();
-    std::fs::write(config_file_path.as_ref(), serde_yaml::to_string(&config).unwrap()).unwrap();
+    std::fs::write(
+        config_file_path.as_ref(),
+        serde_yaml::to_string(&config).unwrap(),
+    )
+    .unwrap();
     config_file_path
 }
 

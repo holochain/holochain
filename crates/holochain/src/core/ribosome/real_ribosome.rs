@@ -97,6 +97,7 @@ use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lo
 
 use crate::conductor::paths::DataRootPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use holochain_conductor_api::conductor::paths::WasmRootPath;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::module::InstanceCache;
@@ -111,7 +112,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use holochain_conductor_api::conductor::paths::WasmRootPath;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -244,9 +244,14 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile, maybe_data_root_path: Option<DataRootPath>) -> RibosomeResult<Self> {
+    pub fn new(
+        dna_file: DnaFile,
+        maybe_data_root_path: Option<DataRootPath>,
+    ) -> RibosomeResult<Self> {
         let maybe_fs_dir = match maybe_data_root_path {
-            Some(data_root_path) => Some(WasmRootPath::try_from(data_root_path)?.as_ref().to_owned()),
+            Some(data_root_path) => {
+                Some(WasmRootPath::try_from(data_root_path)?.as_ref().to_owned())
+            }
             None => None,
         };
         // Create an empty ribosome.

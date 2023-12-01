@@ -8,8 +8,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::config;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use once_cell::sync::Lazy;
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.

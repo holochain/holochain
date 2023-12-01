@@ -2,17 +2,17 @@
 
 use anyhow::anyhow;
 use std::path::Path;
-use std::{process::Stdio};
+use std::process::Stdio;
 
+use holochain_conductor_api::conductor::paths::ConfigFilePath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use holochain_trace::Output;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-use holochain_conductor_api::conductor::paths::KeystorePath;
-use holochain_conductor_api::conductor::paths::ConfigFilePath;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -101,7 +101,10 @@ pub async fn run_async(
         Some(c) => c,
         None => {
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(&config_root_path.is_also_data_root_path().try_into()?, passphrase)?;
+            let con_url = crate::generate::init_lair(
+                &config_root_path.is_also_data_root_path().try_into()?,
+                passphrase,
+            )?;
             create_config(config_root_path.clone(), Some(con_url))?
         }
     };
@@ -113,8 +116,14 @@ pub async fn run_async(
     }
     let _config_file_path = write_config(config_root_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (child, lair) =
-        start_holochain(holochain_path, &config, config_root_path, structured, tx_config).await?;
+    let (child, lair) = start_holochain(
+        holochain_path,
+        &config,
+        config_root_path,
+        structured,
+        tx_config,
+    )
+    .await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
@@ -140,7 +149,11 @@ async fn start_holochain(
 
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
-            let lair = start_lair(passphrase.as_slice(), config_root_path.is_also_data_root_path().try_into()?).await?;
+            let lair = start_lair(
+                passphrase.as_slice(),
+                config_root_path.is_also_data_root_path().try_into()?,
+            )
+            .await?;
             Some(lair)
         }
         _ => None,
