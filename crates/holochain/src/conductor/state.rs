@@ -23,6 +23,13 @@ impl Default for ConductorStateTag {
     }
 }
 
+/// Info required to re-initialize conductor services upon restart
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Default, Debug, SerializedBytes)]
+pub struct ConductorServicesState {
+    /// The cell ID used by the built-in Deepkey implementation of the DPKI service
+    pub deepkey: Option<CellId>,
+}
+
 /// Mutable conductor state, stored in a DB and writable only via Admin interface.
 ///
 /// References between structs (cell configs pointing to
@@ -37,6 +44,12 @@ pub struct ConductorState {
     /// Apps that have been installed, regardless of status.
     #[serde(default)]
     installed_apps: InstalledAppMap,
+
+    /// Conductor services that have been installed, to enable initialization
+    /// upon restart
+    #[serde(default)]
+    conductor_services: ConductorServicesState,
+
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
@@ -192,6 +205,11 @@ impl ConductorState {
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
+    }
+
+    /// Accessor
+    pub fn conductor_services(&self) -> &ConductorServicesState {
+        &self.conductor_services
     }
 }
 

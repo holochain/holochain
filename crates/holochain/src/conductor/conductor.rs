@@ -30,6 +30,7 @@
 //!
 
 pub use self::share::RwShare;
+use super::api::error::ConductorApiError;
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
@@ -251,7 +252,6 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use kitsune_p2p_types::box_fut_plain;
 
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
@@ -343,16 +343,17 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
-            // TODO: move to initialize method
-            self.services.share_mut(|services| {
-                let mut dpki = MockDpkiService::new();
-                dpki.expect_is_key_valid()
-                    .returning(|_, _| box_fut_plain(Ok(true)));
-                dpki.expect_key_mutation()
-                    .returning(|_, _| box_fut_plain(Ok(())));
-
-                services.dpki = Some(Arc::new(dpki));
-            });
+            let state = self.get_state().await?;
+            if let Some(deepkey_cell_id) = state.conductor_services().deepkey.as_ref() {
+                self.services.share_mut(|services| {
+                    let deepkey = DeepkeyBuiltin::new(
+                        self.clone(),
+                        self.keystore().clone(),
+                        deepkey_cell_id.clone(),
+                    );
+                    services.dpki = Some(Arc::new(deepkey));
+                });
+            }
 
             self.clone().add_admin_interfaces(admin_configs).await?;
             self.clone().startup_app_interfaces().await?;
@@ -2462,6 +2463,41 @@ mod accessor_impls {
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl holochain_services::CellRunner for Conductor {
+    async fn call_zome(
+        &self,
+        provenance: &AgentPubKey,
+        cap_secret: Option<CapSecret>,
+        cell_id: CellId,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        payload: ExternIO,
+    ) -> anyhow::Result<ExternIO> {
+        let now = Timestamp::now();
+        let (nonce, expires_at) =
+            holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
+        let call_unsigned = ZomeCallUnsigned {
+            cell_id,
+            zome_name: zome_name.into(),
+            fn_name: fn_name.into(),
+            cap_secret,
+            provenance: provenance.clone(),
+            payload,
+            nonce,
+            expires_at,
+        };
+        let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+        let response = self.call_zome(call).await;
+        match response {
+            Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),
+            Ok(Ok(other)) => Err(anyhow::anyhow!(other.clone())),
+            Ok(Err(error)) => Err(error.into()),
+            Err(error) => Err(error.into()),
         }
     }
 }
