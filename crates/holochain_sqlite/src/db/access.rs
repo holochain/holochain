@@ -277,8 +277,17 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                         },
                         ..,
                     )) => {
+                        // Check if the database might be unencrypted.
+                        if "true"
+                            == std::env::var("HOLOCHAIN_MIGRATE_UNENCRYPTED")
+                                .unwrap_or_default()
+                                .as_str()
+                        {
+                            #[cfg(feature = "sqlite-encrypted")]
+                            encrypt_unencrypted_database(&path)?;
+                        }
                         // Check if this database kind requires wiping.
-                        if kind.if_corrupt_wipe() {
+                        else if kind.if_corrupt_wipe() {
                             std::fs::remove_file(&path)?;
                         } else {
                             // If we don't wipe we need to return an error.
@@ -420,6 +429,58 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 .unwrap()
         })
     }
+}
+
+#[cfg(feature = "sqlite-encrypted")]
+pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
+    // e.g. conductor/conductor.sqlite3 -> conductor/conductor-encrypted.sqlite3
+    let encrypted_path = path
+        .parent()
+        .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
+        .join(
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
+                .to_string()
+                + "-encrypted."
+                + path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?,
+        );
+
+    tracing::warn!(
+        "Attempting encryption of unencrypted database: {:?} -> {:?}",
+        path,
+        encrypted_path
+    );
+
+    // Migrate the database
+    {
+        let conn = Connection::open(path)?;
+
+        // Ensure everything in the WAL is written to the main database
+        conn.execute("VACUUM", ())?;
+
+        conn.execute(
+            "ATTACH DATABASE :db_name AS encrypted KEY :key",
+            rusqlite::named_params! {
+                ":db_name": encrypted_path.to_str(),
+                ":key": super::pool::FAKE_KEY,
+            },
+        )?;
+
+        conn.query_row("SELECT sqlcipher_export('encrypted')", (), |_| Ok(0))?;
+
+        conn.execute("DETACH DATABASE encrypted", ())?;
+        conn.close().map_err(|(_, err)| err)?;
+    }
+
+    // Swap the databases over
+    std::fs::remove_file(path)?;
+    std::fs::rename(encrypted_path, path)?;
+
+    Ok(())
 }
 
 #[cfg(feature = "test_utils")]
