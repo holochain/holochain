@@ -6,6 +6,8 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Refactor: Remove shadowing glob re-exports that were shadowing other exports.
+
 
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
