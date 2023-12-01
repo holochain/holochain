@@ -27,20 +27,30 @@ use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::*;
 
+use crate::spawn::actor::InternalSender;
+use crate::spawn::KitsuneP2pEvent;
+use crate::spawn::PutAgentInfoSignedEvt;
+use crate::types::event::KitsuneP2pEventSender;
+use kitsune_p2p_block::BlockTargetId;
+use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
-
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_CODE;
+use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_REASON;
 
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p WebRTC wrapper enum.
     codec WireWrap {
         /// Notification not needing a response.
         Notify(0x00) {
-            data.0: WireData,
+            msg_id.0: u64,
+            data.1: WireData,
         },
 
         /// Request that expects a response.
@@ -55,6 +65,13 @@ kitsune_p2p_types::write_codec_enum! {
             data.1: WireData,
         },
     }
+}
+
+fn next_msg_id() -> u64 {
+    static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    // MAYBE - track these message ids at the connection level
+    // to prevent mismatches
+    MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 pub type RespondFut = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'static + Send>>;
@@ -109,6 +126,65 @@ pub enum MetaNetEvt {
     },
 }
 
+impl MetaNetEvt {
+    pub fn con(&self) -> &MetaNetCon {
+        match self {
+            MetaNetEvt::Connected { con, .. }
+            | MetaNetEvt::Disconnected { con, .. }
+            | MetaNetEvt::Request { con, .. }
+            | MetaNetEvt::Notify { con, .. } => con,
+        }
+    }
+
+    pub fn maybe_space(&self) -> Option<Arc<KitsuneSpace>> {
+        match self {
+            MetaNetEvt::Request { data, .. } | MetaNetEvt::Notify { data, .. } => {
+                data.maybe_space()
+            }
+            MetaNetEvt::Connected { .. } | MetaNetEvt::Disconnected { .. } => None,
+        }
+    }
+}
+
+pub enum MetaNetAuth {
+    Authorized,
+    UnauthorizedIgnore,
+    UnauthorizedDisconnect,
+}
+
+async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, now: Timestamp) -> MetaNetAuth {
+    match host.is_blocked(BlockTargetId::Node(node_id), now).await {
+        Ok(true) => MetaNetAuth::UnauthorizedDisconnect,
+        Ok(false) => MetaNetAuth::Authorized,
+        Err(_) => MetaNetAuth::UnauthorizedIgnore,
+    }
+}
+
+pub async fn nodespace_is_authorized(
+    host: &HostApi,
+    node_id: Arc<[u8; 32]>,
+    maybe_space: Option<Arc<KitsuneSpace>>,
+    now: Timestamp,
+) -> MetaNetAuth {
+    if let Some(space) = maybe_space {
+        match node_is_authorized(host, node_id.clone(), now).await {
+            MetaNetAuth::Authorized => {
+                match host
+                    .is_blocked(BlockTargetId::NodeSpace(node_id, space), now)
+                    .await
+                {
+                    Ok(true) => MetaNetAuth::UnauthorizedIgnore,
+                    Ok(false) => MetaNetAuth::Authorized,
+                    Err(_) => MetaNetAuth::UnauthorizedIgnore,
+                }
+            }
+            unauthorized => unauthorized,
+        }
+    } else {
+        MetaNetAuth::Authorized
+    }
+}
+
 pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
 type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;
@@ -116,19 +192,25 @@ type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
-    Tx2(Tx2ConHnd<wire::Wire>),
+    Tx2(Tx2ConHnd<wire::Wire>, HostApi),
 
     #[cfg(feature = "tx5")]
-    Tx5(tx5::Ep, tx5::Tx5Url, ResStore),
+    Tx5 {
+        host: HostApi,
+        ep: tx5::Ep,
+        rem_url: tx5::Tx5Url,
+        res: ResStore,
+        tun: KitsuneP2pTuningParams,
+    },
 }
 
 impl PartialEq for MetaNetCon {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             #[cfg(feature = "tx2")]
-            (MetaNetCon::Tx2(a), MetaNetCon::Tx2(b)) => a == b,
+            (MetaNetCon::Tx2(a, _), MetaNetCon::Tx2(b, _)) => a == b,
             #[cfg(feature = "tx5")]
-            (MetaNetCon::Tx5(a, _, _), MetaNetCon::Tx5(b, _, _)) => a == b,
+            (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => a == b,
             _ => false,
         }
     }
@@ -140,26 +222,35 @@ impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNetCon::Tx2(con) = self {
+            if let MetaNetCon::Tx2(con, _) = self {
                 con.close(code, reason).await;
                 return;
             }
         }
 
-        // TODO - no way to close a tx5 con currently
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNetCon::Tx5 {
+                ep, rem_url, tun, ..
+            } = self
+            {
+                ep.ban(rem_url.id().unwrap(), tun.tx5_ban_time());
+                return;
+            }
+        }
     }
 
     pub fn is_closed(&self) -> bool {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNetCon::Tx2(con) = self {
+            if let MetaNetCon::Tx2(con, _) = self {
                 return con.is_closed();
             }
         }
 
         #[cfg(feature = "tx5")]
         {
-            // TODO - erm, tx5 connections are never exactly "closed"
+            // NOTE - tx5 connections are never exactly "closed"
             //        since it's more of a message queue...
             return false;
         }
@@ -167,31 +258,61 @@ impl MetaNetCon {
         true
     }
 
+    async fn wire_is_authorized(&self, payload: &wire::Wire, now: Timestamp) -> MetaNetAuth {
+        match self {
+            MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
+                nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
+            }
+        }
+    }
+
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con) = self {
-                return con.notify(payload, timeout).await;
+        let start = std::time::Instant::now();
+        let msg_id = next_msg_id();
+
+        let result = (move || async move {
+            match self.wire_is_authorized(payload, Timestamp::now()).await {
+                MetaNetAuth::Authorized => {
+                    #[cfg(feature = "tx2")]
+                    {
+                        if let MetaNetCon::Tx2(con, _) = self {
+                            return con.notify(payload, timeout).await;
+                        }
+                    }
+
+                    #[cfg(feature = "tx5")]
+                    {
+                        if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
+                            let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                            let wrap = WireWrap::notify(msg_id, WireData(wire));
+
+                            let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                            ep.send(rem_url.clone(), data.as_slice())
+                                .await
+                                .map_err(KitsuneError::other)?;
+                            return Ok(());
+                        }
+                    }
+
+                    return Err("invalid features".into());
+                }
+                MetaNetAuth::UnauthorizedIgnore => {
+                    return Ok(());
+                }
+                MetaNetAuth::UnauthorizedDisconnect => {
+                    self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                        .await;
+                    return Ok(());
+                }
             }
-        }
+        })()
+        .await;
 
-        #[cfg(feature = "tx5")]
-        {
-            if let MetaNetCon::Tx5(ep, rem_url, _res_store) = self {
-                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
-                let wrap = WireWrap::notify(WireData(wire));
+        let elapsed_s = start.elapsed().as_secs_f64();
 
-                let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
-                wrap.encode(&mut writer).map_err(KitsuneError::other)?;
-                let data = writer.finish();
-                ep.send(rem_url.clone(), data)
-                    .await
-                    .map_err(KitsuneError::other)?;
-                return Ok(());
-            }
-        }
+        tracing::trace!(%elapsed_s, %msg_id, ?payload, ?result, "sent notify");
 
-        Err("invalid features".into())
+        result
     }
 
     pub async fn request(
@@ -199,55 +320,82 @@ impl MetaNetCon {
         payload: &wire::Wire,
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<wire::Wire> {
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con) = self {
-                return con.request(payload, timeout).await;
+        let start = std::time::Instant::now();
+        let msg_id = next_msg_id();
+
+        tracing::trace!(?payload, "initiating request");
+
+        let result = (move || async move {
+            match self.wire_is_authorized(payload, Timestamp::now()).await {
+                MetaNetAuth::Authorized => {
+                    #[cfg(feature = "tx2")]
+                    {
+                        if let MetaNetCon::Tx2(con, _) = self {
+                            return con.request(payload, timeout).await;
+                        }
+                    }
+
+                    #[cfg(feature = "tx5")]
+                    {
+                        if let MetaNetCon::Tx5 {
+                            ep,
+                            rem_url,
+                            res: res_store,
+                            ..
+                        } = self
+                        {
+                            let (s, r) = tokio::sync::oneshot::channel();
+                            res_store.lock().insert(msg_id, s);
+
+                            let res_store = res_store.clone();
+                            tokio::task::spawn(async move {
+                                tokio::time::sleep(timeout.time_remaining()).await;
+                                res_store.lock().remove(&msg_id);
+                            });
+
+                            let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                            let wrap = WireWrap::request(msg_id, WireData(wire));
+                            let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+
+                            ep.send(rem_url.clone(), data.as_slice())
+                                .await
+                                .map_err(KitsuneError::other)?;
+                            return r.await.map_err(|_| KitsuneError::other("timeout"));
+                        }
+                    }
+
+                    return Err("invalid features".into());
+                }
+                MetaNetAuth::UnauthorizedIgnore => {
+                    return Err(KitsuneErrorKind::Unauthorized.into());
+                }
+                MetaNetAuth::UnauthorizedDisconnect => {
+                    self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                        .await;
+                    return Err(KitsuneErrorKind::Unauthorized.into());
+                }
             }
-        }
+        })()
+        .await;
 
-        #[cfg(feature = "tx5")]
-        {
-            if let MetaNetCon::Tx5(ep, rem_url, res_store) = self {
-                static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-                let msg_id = MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                let (s, r) = tokio::sync::oneshot::channel();
-                res_store.lock().insert(msg_id, s);
+        let elapsed_s = start.elapsed().as_secs_f64();
 
-                let res_store = res_store.clone();
-                tokio::task::spawn(async move {
-                    // TODO - use tuning_params.implicit_timeout
-                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    res_store.lock().remove(&msg_id);
-                });
+        tracing::trace!(%elapsed_s, %msg_id, ?payload, ?result, "sent request");
 
-                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
-                let wrap = WireWrap::request(msg_id, WireData(wire));
-
-                let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
-                wrap.encode(&mut writer).map_err(KitsuneError::other)?;
-                let data = writer.finish();
-                ep.send(rem_url.clone(), data)
-                    .await
-                    .map_err(KitsuneError::other)?;
-                return Ok(r.await.map_err(|_| KitsuneError::other("timeout"))?);
-            }
-        }
-
-        Err("invalid features".into())
+        result
     }
 
     pub fn peer_id(&self) -> Arc<[u8; 32]> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNetCon::Tx2(con) = self {
+            if let MetaNetCon::Tx2(con, _) = self {
                 return con.peer_cert().into();
             }
         }
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNetCon::Tx5(_con, rem_url, _res_store) = self {
+            if let MetaNetCon::Tx5 { rem_url, .. } = self {
                 let id = rem_url.id().unwrap();
                 return Arc::new(id.0);
             }
@@ -258,21 +406,28 @@ impl MetaNetCon {
 }
 
 /// Networking abstraction to handle feature flipping.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum MetaNet {
     /// Tx2 Abstraction
     #[cfg(feature = "tx2")]
-    Tx2(Tx2EpHnd<wire::Wire>),
+    Tx2(Tx2EpHnd<wire::Wire>, HostApi),
 
     /// Tx5 Abstraction
     #[cfg(feature = "tx5")]
-    Tx5(tx5::Ep, tx5::Tx5Url, ResStore),
+    Tx5 {
+        host: HostApi,
+        ep: tx5::Ep,
+        url: tx5::Tx5Url,
+        res: ResStore,
+        tun: KitsuneP2pTuningParams,
+    },
 }
 
 impl MetaNet {
     /// Construct abstraction with tx2 backend.
     #[cfg(feature = "tx2")]
     pub async fn new_tx2(
+        host: HostApi,
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         metrics: Tx2ApiMetrics,
@@ -286,7 +441,7 @@ impl MetaNet {
         let mut is_mock = false;
 
         // set up our backend based on config
-        let (f, bind_to) = match tx2_conf.backend {
+        let (f, bind_to): (_, kitsune_p2p_types::tx2::tx2_utils::TxUrl) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
                 let mut conf = MemConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -298,6 +453,7 @@ impl MetaNet {
                     "none:".into(),
                 )
             }
+            /*
             KitsuneP2pTx2Backend::Quic { bind_to } => {
                 let mut conf = QuicConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -309,6 +465,7 @@ impl MetaNet {
                     bind_to,
                 )
             }
+            */
             KitsuneP2pTx2Backend::Mock { mock_network } => {
                 is_mock = true;
                 (mock_network, "none:".into())
@@ -340,8 +497,11 @@ impl MetaNet {
                     };
                     conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
                         Box::pin(async move {
-                            match crate::spawn::actor::bootstrap::proxy_list(bootstrap_url.into())
-                                .await
+                            match crate::spawn::actor::bootstrap::proxy_list(
+                                bootstrap_url.into(),
+                                crate::spawn::actor::bootstrap::BootstrapNet::Tx2,
+                            )
+                            .await
                             {
                                 Ok(mut proxy_list) => {
                                     if proxy_list.is_empty() {
@@ -380,6 +540,7 @@ impl MetaNet {
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
 
+        let return_host = host.clone();
         tokio::task::spawn(async move {
             let tuning_params = &tuning_params;
             while let Some(evt) = ep.next().await {
@@ -388,7 +549,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                             })
                             .await
                             .is_err()
@@ -400,7 +561,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                             })
                             .await
                             .is_err()
@@ -412,7 +573,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                             })
                             .await
                             .is_err()
@@ -430,7 +591,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Request {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                                 data,
                                 respond: Box::new(move |data| {
                                     let out: RespondFut = Box::pin(async move {
@@ -449,7 +610,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Notify {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                                 data,
                             })
                             .await
@@ -463,7 +624,7 @@ impl MetaNet {
             }
         });
 
-        Ok((MetaNet::Tx2(ep_hnd), evt_recv))
+        Ok((MetaNet::Tx2(ep_hnd, return_host), evt_recv))
     }
 
     /// Construct abstraction with tx5 backend.
@@ -471,6 +632,8 @@ impl MetaNet {
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
         host: HostApi,
+        kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
+        evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         signal_url: String,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         let (mut evt_send, evt_recv) =
@@ -480,7 +643,56 @@ impl MetaNet {
             .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
             .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
             .with_max_conn_count(tuning_params.tx5_max_conn_count)
-            .with_max_conn_init(tuning_params.tx5_max_conn_init());
+            .with_max_conn_init(tuning_params.tx5_max_conn_init())
+            .with_conn_preflight(move |_, _| {
+                let i_s = kitsune_internal_sender.clone();
+
+                Box::pin(async move {
+                    match i_s.get_all_local_joined_agent_infos().await {
+                        Ok(agent_list) => Ok(wire::Wire::peer_unsolicited(agent_list)
+                            .encode_vec()
+                            .ok()
+                            .map(|v| v.into())),
+                        Err(err) => {
+                            tracing::warn!(?err, "error getting local peer list");
+                            Ok(None)
+                        }
+                    }
+                })
+            })
+            .with_conn_validate(move |_, _, maybe_data| {
+                let e_s = evt_sender.clone();
+                Box::pin(async move {
+                    match maybe_data.map(|data| wire::Wire::decode_ref(&data)) {
+                        Some(Ok((
+                            _,
+                            wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
+                        ))) => {
+                            // @todo This loop only exists because we have to put a
+                            // space on PutAgentInfoSignedEvt, if the internal peer
+                            // space was used instead we could do this in a single
+                            // event with the whole list.
+                            for peer in peer_list {
+                                if let Err(err) = e_s
+                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        space: peer.space.clone(),
+                                        peer_data: vec![peer.clone()],
+                                    })
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        ?err,
+                                        "error processing incoming agent info unsolicited"
+                                    );
+                                }
+                            }
+                        }
+                        Some(Err(err)) => tracing::warn!(?err, "error decoding connection peers"),
+                        _ => {}
+                    }
+                    Ok(())
+                })
+            });
 
         tracing::info!(/*?tx5_config,*/ "meta net startup tx5");
 
@@ -501,12 +713,16 @@ impl MetaNet {
 
         let ep_hnd2 = ep_hnd.clone();
         let res_store2 = res_store.clone();
+        let tuning_params2 = tuning_params.clone();
+        let spawn_host = host.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
                 let evt = match evt {
                     Ok(evt) => evt,
-                    // TODO - FIXME - handle errors / reconnect?
-                    Err(err) => panic!("{:?}", err),
+                    Err(err) => {
+                        tracing::error!(?err, "tx5 err event");
+                        continue;
+                    }
                 };
 
                 match evt {
@@ -514,11 +730,13 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx5(
-                                    ep_hnd2.clone(),
-                                    rem_cli_url,
-                                    res_store2.clone(),
-                                ),
+                                con: MetaNetCon::Tx5 {
+                                    host: spawn_host.clone(),
+                                    ep: ep_hnd2.clone(),
+                                    rem_url: rem_cli_url,
+                                    res: res_store2.clone(),
+                                    tun: tuning_params2.clone(),
+                                },
                             })
                             .await
                             .is_err()
@@ -530,11 +748,13 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx5(
-                                    ep_hnd2.clone(),
-                                    rem_cli_url,
-                                    res_store2.clone(),
-                                ),
+                                con: MetaNetCon::Tx5 {
+                                    host: spawn_host.clone(),
+                                    ep: ep_hnd2.clone(),
+                                    rem_url: rem_cli_url,
+                                    res: res_store2.clone(),
+                                    tun: tuning_params2.clone(),
+                                },
                             })
                             .await
                             .is_err()
@@ -544,21 +764,26 @@ impl MetaNet {
                     }
                     tx5::EpEvt::Data {
                         rem_cli_url,
-                        mut data,
+                        data,
                         permit,
                     } => {
-                        let data = match WireWrap::decode(&mut data) {
-                            Ok(WireWrap::Notify(Notify { data })) => {
+                        tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+
+                        match WireWrap::decode(&mut bytes::Buf::reader(data)) {
+                            Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
+                                        tracing::trace!(%msg_id, ?data, "received notify");
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
                                                 remote_url: rem_cli_url.to_string(),
-                                                con: MetaNetCon::Tx5(
-                                                    ep_hnd2.clone(),
-                                                    rem_cli_url,
-                                                    res_store2.clone(),
-                                                ),
+                                                con: MetaNetCon::Tx5 {
+                                                    host: spawn_host.clone(),
+                                                    ep: ep_hnd2.clone(),
+                                                    rem_url: rem_cli_url,
+                                                    res: res_store2.clone(),
+                                                    tun: tuning_params2.clone(),
+                                                },
                                                 data,
                                             })
                                             .await
@@ -586,26 +811,26 @@ impl MetaNet {
                                                 };
                                                 let wrap =
                                                     WireWrap::response(msg_id, WireData(wire));
-                                                let mut writer = match tx5::Buf::from_writer() {
-                                                    Ok(writer) => writer,
+                                                let data = match wrap.encode_vec() {
+                                                    Ok(data) => data,
                                                     Err(_) => return,
                                                 };
-                                                if wrap.encode(&mut writer).is_err() {
-                                                    return;
-                                                }
-                                                let data = writer.finish();
-                                                let _ = ep_hnd.send(rem_cli_url2, data).await;
+                                                let _ = ep_hnd
+                                                    .send(rem_cli_url2, data.as_slice())
+                                                    .await;
                                             });
                                             out
                                         });
                                         if evt_send
                                             .send(MetaNetEvt::Request {
                                                 remote_url: rem_cli_url.to_string(),
-                                                con: MetaNetCon::Tx5(
-                                                    ep_hnd2.clone(),
-                                                    rem_cli_url,
-                                                    res_store2.clone(),
-                                                ),
+                                                con: MetaNetCon::Tx5 {
+                                                    host: spawn_host.clone(),
+                                                    ep: ep_hnd2.clone(),
+                                                    rem_url: rem_cli_url,
+                                                    res: res_store2.clone(),
+                                                    tun: tuning_params2.clone(),
+                                                },
                                                 data,
                                                 respond,
                                             })
@@ -641,28 +866,37 @@ impl MetaNet {
                                 // TODO - drop connection??
                                 continue;
                             }
-                        };
+                        }
                     }
                     tx5::EpEvt::Demo { rem_cli_url: _ } => (),
                 }
             }
         });
 
-        Ok((MetaNet::Tx5(ep_hnd, cli_url, res_store), evt_recv))
+        Ok((
+            MetaNet::Tx5 {
+                host,
+                ep: ep_hnd,
+                url: cli_url,
+                res: res_store,
+                tun: tuning_params,
+            },
+            evt_recv,
+        ))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 return ep.local_addr().map(|s| s.to_string());
             }
         }
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(_ep, cli_url, _res_store) = self {
-                return Ok(cli_url.to_string());
+            if let MetaNet::Tx5 { url, .. } = self {
+                return Ok(url.to_string());
             }
         }
 
@@ -672,15 +906,15 @@ impl MetaNet {
     pub fn local_id(&self) -> Arc<[u8; 32]> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 return ep.local_cert().into();
             }
         }
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(_ep, cli_url, _res_store) = self {
-                if let Some(id) = cli_url.id() {
+            if let MetaNet::Tx5 { url, .. } = self {
+                if let Some(id) = url.id() {
                     return Arc::new(id.0);
                 }
             }
@@ -689,10 +923,40 @@ impl MetaNet {
         panic!("invalid features");
     }
 
+    pub async fn broadcast(
+        &self,
+        payload: &wire::Wire,
+        timeout: KitsuneTimeout,
+    ) -> KitsuneResult<()> {
+        let msg_id = next_msg_id();
+
+        #[cfg(feature = "tx2")]
+        {
+            tracing::debug!("broadcast on tx2");
+            return Ok(());
+        }
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5 { ep, .. } = self {
+                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                let wrap = WireWrap::notify(msg_id, WireData(wire));
+
+                let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                ep.broadcast(data.as_slice())
+                    .await
+                    .map_err(KitsuneError::other)?;
+                return Ok(());
+            }
+        }
+
+        Err("invalid features".into())
+    }
+
     pub async fn close(&self, code: u32, reason: &str) {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 ep.close(code, reason).await;
                 return;
             }
@@ -708,23 +972,55 @@ impl MetaNet {
     ) -> KitsuneResult<MetaNetCon> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, host) = self {
                 let con = ep.get_connection(remote_url, timeout).await?;
-                return Ok(MetaNetCon::Tx2(con));
+                return Ok(MetaNetCon::Tx2(con, host.clone()));
             }
         }
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(ep, _cli_url, res_store) = self {
-                return Ok(MetaNetCon::Tx5(
-                    ep.clone(),
-                    tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
-                    res_store.clone(),
-                ));
+            if let MetaNet::Tx5 {
+                host, ep, res, tun, ..
+            } = self
+            {
+                return Ok(MetaNetCon::Tx5 {
+                    host: host.clone(),
+                    ep: ep.clone(),
+                    rem_url: tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
+                    res: res.clone(),
+                    tun: tun.clone(),
+                });
             }
         }
 
         Err("invalid features".into())
+    }
+
+    pub fn dump_network_stats(
+        &self,
+    ) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
+        use futures::FutureExt;
+
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep, _) = self {
+                let mut res = ep.debug();
+                if let Some(map) = res.as_object_mut() {
+                    map.insert("backend".into(), "tx2-quic".into());
+                }
+                return async move { Ok(res) }.boxed();
+            }
+        }
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5 { ep, .. } = self {
+                let fut = ep.get_stats();
+                return async move { fut.await.map_err(KitsuneError::other) }.boxed();
+            }
+        }
+
+        async move { Err("invalid features".into()) }.boxed()
     }
 }

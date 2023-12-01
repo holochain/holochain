@@ -55,7 +55,7 @@ pub fn create<'a>(
                             entry_def_index,
                         }) => {
                             let app_entry_def =
-                            AppEntryDef::new(entry_def_index, zome_index, entry_visibility);
+                                AppEntryDef::new(entry_def_index, zome_index, entry_visibility);
                             EntryType::App(app_entry_def)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
@@ -117,7 +117,7 @@ pub mod wasm_test {
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestWasmPair;
-    use observability;
+    use holochain_trace;
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -155,8 +155,10 @@ pub mod wasm_test {
                     .source_chain()
                     .as_ref()
                     .unwrap()
-                    .chain_head()?
-                    .0,
+                    .chain_head()
+                    .unwrap()
+                    .unwrap()
+                    .action,
             )
         })
         .unwrap();
@@ -166,7 +168,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Create).await;
@@ -199,7 +201,7 @@ pub mod wasm_test {
     async fn multiple_create_entry_limit_test() {
         const N: u32 = 50;
 
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         let mut conductor = SweetConductor::from_standard_config().await;
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
@@ -225,7 +227,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_serialize_bytes_hash() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize, Debug)]
         #[repr(transparent)]
         #[serde(transparent)]

@@ -1,7 +1,7 @@
 { self
 , lib
 , ...
-}: {
+} @ flake: {
   perSystem =
     { self'
     , config
@@ -14,7 +14,7 @@
         pkgs.writeShellScript ""
           ''
             set -Eeuo pipefail
-            cd ${self}/holonix
+            cd ${flake.config.srcCleanedHolonix}/holonix
 
             ${bats} ./test/holochain-binaries.bats
             ${bats} ./test/launcher.bats
@@ -23,10 +23,9 @@
           '';
     in
     {
-      packages.holonix-tests-integration = self'.devShells.holonix.overrideAttrs (old: {
+      packages.build-holonix-tests-integration = self'.devShells.holonix.overrideAttrs (old: {
         buildPhase = ''
-          ${testScript}
-          touch $out
+          ${testScript} 2>&1 | ${pkgs.coreutils}/bin/tee $out
         '';
       });
     };

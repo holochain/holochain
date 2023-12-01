@@ -1,3 +1,22 @@
+# Loaded as part for `release.yml`
+# Contains a single job called `prepare`.
+#
+# As input it receives a branch to be released (aka. source branch).
+# It then merges the source branch into the release branch (usually `release`).
+#
+# The merged state of the repo is then serialized and cached to use in the subsequent `release.yml` workflow.
+#
+# This workflow also caches cargo related state and build files between runs.
+#
+#
+# Relevant Steps:
+# - Merge the source branch into the release branch
+# - Restore holochain cargo related state and build files
+# - (Checks files) Detect missing release headings
+# - (Changes files) Generate crate READMEs from doc comments
+# - (Changes files) Bump the crate versions for the release
+# - Cache the repo and set outputs
+
 on:
   workflow_call:
     inputs:
@@ -21,14 +40,6 @@ on:
         type: string
         required: false
         default: "https://github.com/holochain/holochain"
-      HOLOCHAIN_NIXPKGS_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holochain-nixkpgs.git"
-      HOLONIX_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holonix.git"
       HOLOCHAIN_REPO:
         type: string
         required: false
@@ -45,12 +56,12 @@ on:
         required: true
 
     outputs:
-      tag:
+      latest_holochain_tag:
         description: "which holochain tag, if one, will be released"
-        value: ${{ jobs.prepare.outputs.tag }}
-      version:
+        value: ${{ jobs.prepare.outputs.latest_holochain_tag }}
+      latest_holochain_version:
         description: "which holochain version, if one, will be released"
-        value: ${{ jobs.prepare.outputs.version }}
+        value: ${{ jobs.prepare.outputs.latest_holochain_version }}
       release_branch:
         description: "the branch that contains the changes made during this action"
         value: ${{ jobs.prepare.outputs.release_branch }}
@@ -68,8 +79,8 @@ jobs:
       CACHIX_REV: ${{ inputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.write-env-and-tag.outputs.tag }}
-      version: ${{ steps.write-env-and-tag.outputs.version }}
+      latest_holochain_tag: ${{ steps.write-env-and-tag.outputs.latest_holochain_tag }}
+      latest_holochain_version: ${{ steps.write-env-and-tag.outputs.latest_holochain_version }}
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
       repo_nix_store_path: ${{ steps.write-env-and-tag.outputs.repo_nix_store_path }}
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
@@ -77,12 +88,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Extend space
-        uses: ./.github/actions/extend-space
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-
       - name: Install nix
-        uses: cachix/install-nix-action@v19
+        uses: cachix/install-nix-action@v20
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         with:
@@ -95,7 +102,7 @@ jobs:
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Prepare the holochain repository
+      - name: Merge source branch (${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}) into target branch (${{ inputs.HOLOCHAIN_TARGET_BRANCH }})
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
@@ -136,13 +143,13 @@ jobs:
             git branch -D ${obsolete_branches}
           fi
 
-          # Merge source branch into the release branch
+          # Merge source branch into the target branch
           if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH}
           else
             git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
-            git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
           fi
+          git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
 
       - name: Restore holochain cargo related state and build files
         if: ${{ inputs.skip_prepare_logic != 'true' }}
@@ -203,12 +210,20 @@ jobs:
               --log-level=debug \
               --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
-                --no-verify-pre \
+                --no-verify \
                 --force-tag-creation \
                 --force-branch-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-                --disallowed-version-reqs=">=0.3" \
+                --allowed-semver-increment-modes="!pre_minor beta-dev" \
                 --steps=CreateReleaseBranch,BumpReleaseVersions
+
+            release-automation \
+                --workspace-path=$PWD \
+                --log-level=debug \
+                release \
+                  --dry-run \
+                  --no-verify \
+                  --steps=PublishToCratesIo
 
             cargo sweep -f
             '
@@ -246,16 +261,16 @@ jobs:
 
           git tag --sort=-taggerdate | grep holochain-
 
-          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export VERSION=${TAG/holochain-/}
+          export LATEST_HOLOCHAIN_TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
+          export LATEST_HOLOCHAIN_VERSION=${LATEST_HOLOCHAIN_TAG/holochain-/}
           export RELEASE_BRANCH=$(git branch --show-current)
 
           # clean the repo before adding it to the store
-          git clean -fdx
+          git clean -ffdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "latest_holochain_tag=${LATEST_HOLOCHAIN_TAG}" >> $GITHUB_OUTPUT
+          echo "latest_holochain_version=${LATEST_HOLOCHAIN_VERSION}" >> $GITHUB_OUTPUT
           echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
           echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
 

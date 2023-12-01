@@ -219,6 +219,13 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> WireLinkOps;
 
+        /// A remote node is requesting a link count from us.
+        fn count_links(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            query: WireLinkQuery,
+        ) -> CountLinksResponse;
+
         /// A remote node is requesting agent activity from us.
         fn get_agent_activity(
             dna_hash: DnaHash,
@@ -288,6 +295,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }

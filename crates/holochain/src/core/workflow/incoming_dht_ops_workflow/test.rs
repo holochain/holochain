@@ -6,7 +6,7 @@ use holochain_keystore::AgentPubKeyExt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
-    observability::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
     let keystore = holochain_state::test_utils::test_keystore();
@@ -43,7 +43,7 @@ async fn incoming_ops_to_limbo() {
 
     futures::future::try_join_all(all).await.unwrap();
 
-    fresh_reader_test(env, |txn| {
+    env.read_async(move |txn| -> DatabaseResult<()> {
         for hash in hash_list {
             let found: bool = txn
                 .query_row(
@@ -62,5 +62,9 @@ async fn incoming_ops_to_limbo() {
                 .unwrap();
             assert!(found);
         }
-    });
+
+        Ok(())
+    })
+    .await
+    .unwrap();
 }

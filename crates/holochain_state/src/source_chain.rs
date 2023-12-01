@@ -15,7 +15,11 @@ use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::rusqlite::params;
+use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
+use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
@@ -26,9 +30,9 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
+use holochain_types::prelude::AddRecordPayload;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
-use holochain_types::EntryHashed;
 use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::Action;
@@ -69,6 +73,8 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
+use holochain_sqlite::rusqlite;
+use holochain_zome_types::EntryType;
 
 mod error;
 
@@ -80,11 +86,22 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     dht_db_cache: DhtDbQueryCache,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
-    persisted_seq: u32,
-    persisted_head: ActionHash,
-    persisted_timestamp: Timestamp,
+    head_info: Option<HeadInfo>,
     public_only: bool,
     zomes_initialized: Arc<AtomicBool>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HeadInfo {
+    pub action: ActionHash,
+    pub seq: u32,
+    pub timestamp: Timestamp,
+}
+
+impl HeadInfo {
+    pub fn into_tuple(self) -> (ActionHash, u32, Timestamp) {
+        (self.action, self.seq, self.timestamp)
+    }
 }
 
 /// A source chain with read only access to the underlying databases.
@@ -111,9 +128,12 @@ pub struct SourceChainJsonRecord {
 /// Writable functions for a source chain with write access.
 impl SourceChain {
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
-        let author = self.author.clone();
         self.vault
-            .async_commit(move |txn| unlock_chain(txn, &author))
+            .write_async({
+                let author = self.author.clone();
+
+                move |txn| unlock_chain(txn, &author)
+            })
             .await?;
         Ok(())
     }
@@ -136,12 +156,15 @@ impl SourceChain {
 
         let countersigning_agent_state = self
             .vault
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
-                let (persisted_head, persisted_seq, _) =
-                    chain_head_db_nonempty(txn, author.clone())?;
+                let HeadInfo {
+                    action: persisted_head,
+                    seq: persisted_seq,
+                    ..
+                } = chain_head_db_nonempty(txn, author.clone())?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
@@ -219,7 +242,11 @@ impl SourceChain {
         chain_top_ordering: ChainTopOrdering,
         weight: W,
     ) -> SourceChainResult<ActionHash> {
-        let (prev_action, chain_head_seq, chain_head_timestamp) = self.chain_head()?;
+        let HeadInfo {
+            action: prev_action,
+            seq: chain_head_seq,
+            timestamp: chain_head_timestamp,
+        } = self.chain_head_nonempty()?;
         let action_seq = chain_head_seq + 1;
 
         // Build the action.
@@ -274,22 +301,29 @@ impl SourceChain {
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
-        let (scheduled_fns, actions, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let (actions, ops) =
-                build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+        let (scheduled_fns, actions, ops, entries, records) =
+            self.scratch.apply_and_then(|scratch| {
+                let records: Vec<Record> = scratch.records().collect();
 
-            // Drain out any entries.
-            let entries = scratch.drain_entries().collect::<Vec<_>>();
-            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-            SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
-        })?;
+                let (actions, ops) =
+                    build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+
+                // Drain out any entries.
+                let entries = scratch.drain_entries().collect::<Vec<_>>();
+                let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
+            })?;
 
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
-            chc.add_entries(entries.clone())
-                .await
-                .map_err(SourceChainError::other)?;
-            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_actions(actions.clone()).await
+            let payload = AddRecordPayload::from_records(
+                self.keystore.clone(),
+                (*self.author).clone(),
+                records,
+            )
+            .await
+            .map_err(SourceChainError::other)?;
+            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
             {
                 return Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
@@ -319,17 +353,19 @@ impl SourceChain {
 
         // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
-        let persisted_head = self.persisted_head.clone();
+        let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
         match self
             .vault
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
+
                 // As at check.
-                let (latest_head, latest_head_seq, new_timestamp) =
-                    chain_head_db_nonempty(txn, author.clone())?;
+                let head_info = chain_head_db(txn, author.clone())?;
+                let latest_head = head_info.as_ref().map(|h| h.action.clone());
+
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
@@ -339,8 +375,8 @@ impl SourceChain {
                     return Err(SourceChainError::HeadMoved(
                         actions,
                         entries,
-                        Some(persisted_head),
-                        Some((latest_head, latest_head_seq, new_timestamp)),
+                        persisted_head,
+                        head_info,
                     ));
                 }
 
@@ -375,12 +411,7 @@ impl SourceChain {
             })
             .await
         {
-            Err(SourceChainError::HeadMoved(
-                actions,
-                entries,
-                old_head,
-                Some((new_persisted_head, latest_head_seq, new_timestamp)),
-            )) => {
+            Err(SourceChainError::HeadMoved(actions, entries, old_head, Some(new_head_info))) => {
                 let is_relaxed =
                     self.scratch
                         .apply_and_then::<bool, SyncScratchError, _>(|scratch| {
@@ -398,14 +429,8 @@ impl SourceChain {
                         (*self.author).clone(),
                     )
                     .await?;
-                    let rebased_actions = rebase_actions_on(
-                        &keystore,
-                        actions,
-                        new_persisted_head,
-                        latest_head_seq,
-                        new_timestamp,
-                    )
-                    .await?;
+                    let rebased_actions =
+                        rebase_actions_on(&keystore, actions, new_head_info).await?;
                     child_chain.scratch.apply(move |scratch| {
                         for action in rebased_actions {
                             scratch.add_action(action, ChainTopOrdering::Relaxed);
@@ -420,7 +445,7 @@ impl SourceChain {
                         actions,
                         entries,
                         old_head,
-                        Some((new_persisted_head, latest_head_seq, new_timestamp)),
+                        Some(new_head_info),
                     ))
                 }
             }
@@ -454,12 +479,14 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let (persisted_head, persisted_seq, persisted_timestamp) = vault
-            .async_reader({
-                let author = author.clone();
-                move |txn| chain_head_db_nonempty(&txn, author)
-            })
-            .await?;
+        let head_info = Some(
+            vault
+                .read_async({
+                    let author = author.clone();
+                    move |txn| chain_head_db_nonempty(&txn, author)
+                })
+                .await?,
+        );
         Ok(Self {
             scratch,
             vault,
@@ -467,9 +494,7 @@ where
             dht_db_cache,
             keystore,
             author,
-            persisted_seq,
-            persisted_head,
-            persisted_timestamp,
+            head_info,
             public_only: false,
             zomes_initialized: Arc::new(AtomicBool::new(false)),
         })
@@ -488,19 +513,12 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let (persisted_head, persisted_seq, persisted_timestamp) = vault
-            .async_reader({
+        let head_info = vault
+            .read_async({
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
             })
-            .await?
-            .unwrap_or_else(|| {
-                (
-                    ActionHash::from_raw_32(vec![0u8; 32]),
-                    0,
-                    Timestamp::from_micros(0),
-                )
-            });
+            .await?;
         Ok(Self {
             scratch,
             vault,
@@ -508,9 +526,7 @@ where
             dht_db_cache,
             keystore,
             author,
-            persisted_seq,
-            persisted_head,
-            persisted_timestamp,
+            head_info,
             public_only: false,
             zomes_initialized: Arc::new(AtomicBool::new(false)),
         })
@@ -567,7 +583,7 @@ where
             return Ok(true);
         }
         let query_filter = ChainQueryFilter {
-            action_type: Some(ActionType::InitZomesComplete),
+            action_type: Some(vec![ActionType::InitZomesComplete]),
             ..QueryFilter::default()
         };
         let init_zomes_complete_actions = self.query(query_filter).await?;
@@ -589,35 +605,33 @@ where
 
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
-    pub fn persisted_chain_head(&self) -> (ActionHash, u32, Timestamp) {
-        (
-            self.persisted_head.clone(),
-            self.persisted_seq,
-            self.persisted_timestamp,
-        )
+    pub fn persisted_head_info(&self) -> Option<HeadInfo> {
+        self.head_info.clone()
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
+    pub fn chain_head(&self) -> SourceChainResult<Option<HeadInfo>> {
         // Check scratch for newer head.
-        Ok(self.scratch.apply(|scratch| {
-            scratch
-                .chain_head()
-                .unwrap_or_else(|| self.persisted_chain_head())
-        })?)
+        Ok(self
+            .scratch
+            .apply(|scratch| scratch.chain_head().or_else(|| self.persisted_head_info()))?)
     }
 
-    // FIXME: the SourceChain was originally designed to only be initializable if genesis has been run,
-    //   i.e. it can't be empty. However, now we have a `raw_empty` function which initializes an empty
-    //   chain with a persisted_seq of 0, which is wrong. That will lead to a len() of 1 even for an empty
-    //   chain. This needs to be fixed.
+    pub fn chain_head_nonempty(&self) -> SourceChainResult<HeadInfo> {
+        // Check scratch for newer head.
+        self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
+    }
+
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
-            let scratch_max = scratch.chain_head().map(|(_, s, _)| s);
-            scratch_max
-                .map(|s| std::cmp::max(s, self.persisted_seq))
-                .unwrap_or(self.persisted_seq)
-                + 1
+            let scratch_max = scratch.chain_head().map(|h| h.seq);
+            let persisted_max = self.head_info.as_ref().map(|h| h.seq);
+            match (scratch_max, persisted_max) {
+                (None, None) => 0,
+                (Some(s), None) => s + 1,
+                (None, Some(s)) => s + 1,
+                (Some(a), Some(b)) => a.max(b) + 1,
+            }
         })?)
     }
     pub async fn valid_cap_grant(
@@ -628,113 +642,87 @@ where
     ) -> SourceChainResult<Option<CapGrant>> {
         let author_grant = CapGrant::from(self.agent_pubkey().clone());
         if author_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+            // caller is source chain author
             return Ok(Some(author_grant));
         }
-        let author = self.author.clone();
-        // TODO: SQL_PERF: This query could have a fast upper bound if we add indexes.
-        let valid_cap_grant = self
+
+        // remote caller
+        let maybe_cap_grant: Option<CapGrant> = self
             .vault
-            .async_reader(move |txn| {
-                let not_referenced_action = "
-            SELECT COUNT(H_REF.hash)
-            FROM Action AS H_REF
-            JOIN DhtOp AS D_REF ON D_REF.action_hash = H_REF.hash
-            WHERE
-            H_REF.author = :author
-            AND
-            (H_REF.original_action_hash = Action.hash
-            OR
-            H_REF.deletes_action_hash = Action.hash)
-            ";
-                let sql = format!(
-                    "
-                SELECT DISTINCT Entry.blob
-                FROM Entry
-                JOIN Action ON Action.entry_hash = Entry.hash
-                JOIN DhtOp ON Action.hash = DhtOp.action_hash
-                WHERE
-                Action.author = :author
-                AND
-                Entry.access_type IS NOT NULL
-                AND
-                ({}) = 0
-                ",
-                    not_referenced_action
-                );
-                txn.prepare(&sql)?
-                    .query_and_then(
-                        named_params! {
-                            ":author": author,
-                        },
-                        |row| from_blob(row.get("blob")?),
-                    )?
-                    .filter_map(|result: StateQueryResult<Entry>| match result {
-                        Ok(entry) => entry
-                            .as_cap_grant()
-                            .filter(|grant| !matches!(grant, CapGrant::ChainAuthor(_)))
-                            .filter(|grant| {
-                                grant.is_valid(&check_function, &check_agent, check_secret.as_ref())
-                            })
-                            .map(|cap| Some(Ok(cap)))
-                            .unwrap_or(None),
-                        Err(e) => Some(Err(e)),
-                    })
-                    // if there are still multiple grants, fold them down based on specificity
-                    // authorship > assigned > transferable > unrestricted
-                    .fold(
-                        Ok(None),
-                        |acc: StateQueryResult<Option<CapGrant>>, grant| {
-                            let grant = grant?;
-                            let acc = acc?;
-                            let acc = match &grant {
-                                CapGrant::RemoteAgent(zome_call_cap_grant) => {
-                                    match &zome_call_cap_grant.access {
-                                        CapAccess::Assigned { .. } => match &acc {
-                                            Some(CapGrant::RemoteAgent(
-                                                acc_zome_call_cap_grant,
-                                            )) => {
-                                                match acc_zome_call_cap_grant.access {
-                                                    // an assigned acc takes precedence
-                                                    CapAccess::Assigned { .. } => acc,
-                                                    // current grant takes precedence over all other accs
-                                                    _ => Some(grant),
-                                                }
-                                            }
-                                            None => Some(grant),
-                                            // authorship should be short circuit and filtered
-                                            _ => unreachable!(),
-                                        },
-                                        CapAccess::Transferable { .. } => match &acc {
-                                            Some(CapGrant::RemoteAgent(
-                                                acc_zome_call_cap_grant,
-                                            )) => {
-                                                match acc_zome_call_cap_grant.access {
-                                                    // an assigned acc takes precedence
-                                                    CapAccess::Assigned { .. } => acc,
-                                                    // transferable acc takes precedence
-                                                    CapAccess::Transferable { .. } => acc,
-                                                    // current grant takes preference over other accs
-                                                    _ => Some(grant),
-                                                }
-                                            }
-                                            None => Some(grant),
-                                            // authorship should be short circuited and filtered by now
-                                            _ => unreachable!(),
-                                        },
-                                        CapAccess::Unrestricted => match acc {
-                                            Some(_) => acc,
-                                            None => Some(grant),
-                                        },
-                                    }
-                                }
-                                // ChainAuthor should have short circuited and be filtered out already
-                                _ => unreachable!(),
-                            };
-                            Ok(acc)
-                        },
-                    )
+            .read_async({
+                let agent_pubkey = self.agent_pubkey().clone();
+                move |txn| -> Result<_, DatabaseError> {
+                    // closure to process resulting rows from query
+                    let query_row_fn = |row: &Row| {
+                        from_blob::<Entry>(row.get("blob")?).map_err(|err| {
+                            holochain_sqlite::rusqlite::Error::InvalidColumnType(
+                                0,
+                                err.to_string(),
+                                holochain_sqlite::rusqlite::types::Type::Blob,
+                            )
+                        })
+                    };
+                    // prepare sql statement depending on provided cap secret
+                    // and query for one cap grant
+                    //
+                    // query row is called inside the two arms instead of once
+                    // afterwards because of difficulty passing around params
+                    // between scopes
+                    let maybe_entry = if let Some(cap_secret) = &check_secret {
+                        // cap grant for cap secret must exist
+                        // that has not been updated or deleted
+                        let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
+                            DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
+                                err.to_string(),
+                            ))
+                        })?;
+                        txn.query_row(
+                            SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET,
+                            params![cap_secret_blob, agent_pubkey],
+                            query_row_fn,
+                        )
+                        .optional()?
+                    } else {
+                        // unrestricted cap grant must exist
+                        // that has not been updated or deleted
+                        txn.query_row(
+                            SELECT_VALID_UNRESTRICTED_CAP_GRANT,
+                            params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
+                            query_row_fn,
+                        )
+                        .optional()?
+                    };
+
+                    Ok(maybe_entry)
+                }
             })
-            .await?;
+            .await?
+            .and_then(|entry| entry.as_cap_grant());
+
+        let valid_cap_grant = match maybe_cap_grant {
+            None => None,
+            Some(cap_grant) => {
+                // validate cap grant in itself, especially check if functions are authorized
+                if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+                    return Ok(None);
+                }
+                match &cap_grant {
+                    CapGrant::RemoteAgent(zome_call_cap_grant) => {
+                        match &zome_call_cap_grant.access {
+                            // transferable and assigned cap grant when cap secret provided
+                            CapAccess::Transferable { .. } => Some(cap_grant),
+                            CapAccess::Assigned { assignees, .. } => {
+                                assignees.contains(&check_agent).then_some(cap_grant)
+                            }
+                            // unrestricted cap grant only possible without cap secret
+                            CapAccess::Unrestricted => Some(cap_grant),
+                        }
+                    }
+                    // chain author cap grant has been handled at the beginning
+                    CapGrant::ChainAuthor(_) => unreachable!(),
+                }
+            }
+        };
         Ok(valid_cap_grant)
     }
 
@@ -755,7 +743,7 @@ where
         let public_only = self.public_only;
         let mut records = self
             .vault
-            .async_reader({
+            .read_async({
                 let query = query.clone();
                 move |txn| {
                     let mut sql = "
@@ -811,46 +799,81 @@ where
                             (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                     });
+
+                    let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
+                    let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
+
                     sql.push_str(
-                        "
+                        format!("
                         )
                         AND
-                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        (:entry_type IS NULL OR Action.entry_type IN ({}))
                         AND
-                        (:action_type IS NULL OR Action.type = :action_type)
-                        ORDER BY Action.seq 
-                        ",
+                        (:action_type IS NULL OR Action.type IN ({}))
+                        ORDER BY Action.seq
+                        ", named_param_seq("entry_type", entry_type_filters_count), named_param_seq("action_type", action_type_filters_count)).as_str(),
                     );
                     sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
+
+                    // This type is similar to what `named_params!` from rusqlite creates, escept for the use of boxing to allow references to be passed to the query.
+                    // The reserved capacity here should account for the number of parameters inserted below, including the variable inputs like entry_types and actions_types.
+                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + entry_type_filters_count + action_type_filters_count);
+                    args.push((":author".to_string(), Box::new(author)));
+
+                    match &query.entry_type {
+                        None => {
+                            args.push((":entry_type".to_string(), Box::new(None::<EntryType>.as_sql())))
+                        }
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":entry_type".to_string(), Box::new(types.get(0).unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":entry_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    match &query.action_type {
+                        None => args.push((":action_type".to_string(), Box::new(None::<EntryType>.as_sql()))),
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":action_type".to_string(), Box::new(types.get(0).as_ref().unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":action_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    args.push((":range_start".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
+                        _ => None,
+                    })));
+
+                    args.push((":range_start_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(_, end_hash)
+                        | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_prior_count".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
+                        _ => None,
+                    })));
+
                     let records = stmt
                         .query_and_then(
-                        named_params! {
-                                ":author": author.as_ref(),
-                                ":entry_type": query.entry_type.as_sql(),
-                                ":action_type": query.action_type.as_sql(),
-                                ":range_start": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
-                                    _ => None,
-                                },
-                                ":range_end": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
-                                    _ => None,
-                                },
-                                ":range_start_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_end_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(_, end_hash)
-                                    | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_prior_count": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
-                                    _ => None,
-                                },
-                            },
+                            args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                                 let SignedAction(action, signature) = action;
@@ -900,7 +923,7 @@ where
         let author = self.author.clone();
         Ok(self
             .vault
-            .async_reader(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
+            .read_async(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
             .await?)
     }
 
@@ -924,13 +947,26 @@ where
                             Some(DhtOp::StoreEntry(
                                 shh.signature().clone(),
                                 shh.action().clone().try_into().ok()?,
-                                Box::new((**entry).clone()),
+                                (**entry).clone(),
                             ))
                         })
                 })
         })?;
         Ok(r)
     }
+}
+
+fn named_param_seq(base_name: &str, repeat: usize) -> String {
+    if repeat == 0 {
+        return String::new();
+    }
+
+    let mut seq = format!(":{}", base_name);
+    for i in 1..repeat {
+        seq.push_str(format!(", :{}_{}", base_name, i).as_str());
+    }
+
+    seq
 }
 
 pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
@@ -994,18 +1030,16 @@ fn build_ops_from_actions(
 async fn rebase_actions_on(
     keystore: &MetaLairClient,
     mut actions: Vec<SignedActionHashed>,
-    mut rebase_action: ActionHash,
-    mut rebase_seq: u32,
-    mut rebase_timestamp: Timestamp,
+    mut head: HeadInfo,
 ) -> Result<Vec<SignedActionHashed>, ScratchError> {
     actions.sort_by_key(|shh| shh.action().action_seq());
     for shh in actions.iter_mut() {
         let mut action = shh.action().clone();
-        action.rebase_on(rebase_action.clone(), rebase_seq, rebase_timestamp)?;
-        rebase_seq = action.action_seq();
-        rebase_timestamp = action.timestamp();
+        action.rebase_on(head.action.clone(), head.seq, head.timestamp)?;
+        head.seq = action.action_seq();
+        head.timestamp = action.timestamp();
         let hh = ActionHashed::from_content_sync(action);
-        rebase_action = hh.as_hash().clone();
+        head.action = hh.as_hash().clone();
         let new_shh = SignedActionHashed::sign(keystore, hh).await?;
         *shh = new_shh;
     }
@@ -1031,9 +1065,9 @@ pub async fn genesis(
     let dna_action = ActionHashed::from_content_sync(dna_action);
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
-    let record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_records(vec![&record])?;
-    let (dna_action, _) = record.into_inner();
+    let dna_record = Record::new(dna_action, None);
+    let dna_ops = produce_op_lights_from_records(vec![&dna_record])?;
+    let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
     let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
@@ -1047,9 +1081,9 @@ pub async fn genesis(
     let agent_validation_action =
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
-    let record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_records(vec![&record])?;
-    let (agent_validation_action, _) = record.into_inner();
+    let agent_validation_record = Record::new(agent_validation_action, None);
+    let avh_ops = produce_op_lights_from_records(vec![&agent_validation_record])?;
+    let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
     let agent_action = Action::Create(action::Create {
@@ -1064,27 +1098,22 @@ pub async fn genesis(
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lights_from_records(vec![&record])?;
-    let (agent_action, agent_entry) = record.into_inner();
+    let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
+    let agent_ops = produce_op_lights_from_records(vec![&agent_record])?;
+    let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
 
     if let Some(chc) = chc {
-        chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
-            agent_pubkey,
-        ))])
+        let payload = AddRecordPayload::from_records(
+            keystore.clone(),
+            agent_pubkey.clone(),
+            vec![dna_record, agent_validation_record, agent_record],
+        )
         .await
         .map_err(SourceChainError::other)?;
-        match chc
-            .add_actions(vec![
-                dna_action.clone(),
-                agent_validation_action.clone(),
-                agent_action.clone(),
-            ])
-            .await
-        {
+        match chc.add_records_request(payload).await {
             Err(e @ ChcError::InvalidChain(_, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
             }
@@ -1093,7 +1122,7 @@ pub async fn genesis(
     }
 
     let ops_to_integrate = authored
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
             ops_to_integrate.extend(source_chain::put_raw(
                 txn,
@@ -1154,7 +1183,7 @@ pub fn put_raw(
 pub fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<(ActionHash, u32, Timestamp)>> {
+) -> SourceChainResult<Option<HeadInfo>> {
     let chain_head = ChainHeadQuery::new(author);
     Ok(chain_head.run(Txn::from(txn))?)
 }
@@ -1164,7 +1193,7 @@ pub fn chain_head_db(
 pub fn chain_head_db_nonempty(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
-) -> SourceChainResult<(ActionHash, u32, Timestamp)> {
+) -> SourceChainResult<HeadInfo> {
     chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
 }
 
@@ -1180,7 +1209,7 @@ pub fn current_countersigning_session(
             // We haven't done genesis so no session can be active.
             Err(e) => Err(e),
             Ok(None) => Ok(None),
-            Ok(Some((hash, _, _))) => {
+            Ok(Some(HeadInfo { action: hash, .. })) => {
                 let txn: Txn = txn.into();
                 // Get the session data from the database.
                 let record = match txn.get_record(&hash.into())? {
@@ -1209,9 +1238,17 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     action_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<ActionHash> {
-    let (prev_action, last_action_seq, _) = fresh_reader_test!(vault, |txn| {
-        chain_head_db_nonempty(&txn, author.clone())
-    })?;
+    let HeadInfo {
+        action: prev_action,
+        seq: last_action_seq,
+        ..
+    } = vault
+        .read_async({
+            let query_author = author.clone();
+
+            move |txn| chain_head_db_nonempty(&txn, query_author.clone())
+        })
+        .await?;
     let action_seq = last_action_seq + 1;
 
     let common = ActionBuilderCommon {
@@ -1228,27 +1265,31 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
-    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-        let (new_head, new_seq, new_timestamp) = chain_head_db_nonempty(txn, author.clone())?;
-        if new_head != prev_action {
-            let entries = match (entry, action.action().entry_hash()) {
-                (Some(e), Some(entry_hash)) => {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e,
-                        entry_hash.clone(),
-                    )]
+    vault
+        .write_async(
+            move |txn: &mut Transaction| -> SourceChainResult<Vec<DhtOpHash>> {
+                let head_info = chain_head_db_nonempty(txn, author.clone())?;
+                if head_info.action != prev_action {
+                    let entries = match (entry, action.action().entry_hash()) {
+                        (Some(e), Some(entry_hash)) => {
+                            vec![holochain_types::EntryHashed::with_pre_hashed(
+                                e,
+                                entry_hash.clone(),
+                            )]
+                        }
+                        _ => vec![],
+                    };
+                    return Err(SourceChainError::HeadMoved(
+                        vec![action],
+                        entries,
+                        Some(prev_action),
+                        Some(head_info),
+                    ));
                 }
-                _ => vec![],
-            };
-            return Err(SourceChainError::HeadMoved(
-                vec![action],
-                entries,
-                Some(prev_action),
-                Some((new_head, new_seq, new_timestamp)),
-            ));
-        }
-        SourceChainResult::Ok(put_raw(txn, action, ops, entry)?)
-    })?;
+                Ok(put_raw(txn, action, ops, entry)?)
+            },
+        )
+        .await?;
     Ok(hash)
 }
 
@@ -1258,7 +1299,7 @@ pub async fn dump_state(
     author: AgentPubKey,
 ) -> Result<SourceChainJsonDump, SourceChainError> {
     Ok(vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let records = txn
                 .prepare(
                     "
@@ -1325,9 +1366,7 @@ impl From<SourceChain> for SourceChainRead {
             scratch: chain.scratch,
             keystore: chain.keystore,
             author: chain.author,
-            persisted_seq: chain.persisted_seq,
-            persisted_head: chain.persisted_head,
-            persisted_timestamp: chain.persisted_timestamp,
+            head_info: chain.head_info,
             public_only: chain.public_only,
             zomes_initialized: Arc::new(AtomicBool::new(false)),
         }
@@ -1412,9 +1451,10 @@ pub mod tests {
         let author = Arc::new(alice);
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
-        let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
-            .await?;
+        let seq = db
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .await?
+            .seq;
         assert_eq!(seq, 3);
 
         assert!(matches!(
@@ -1422,20 +1462,23 @@ pub mod tests {
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
         let author_2 = Arc::clone(&author);
-        let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
-            .await?;
+        let seq = db
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
+            .await?
+            .seq;
         assert_eq!(seq, 3);
 
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
-        let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
-            .await?;
+        let seq = db
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
+            .await?
+            .seq;
         assert_eq!(seq, 4);
 
         Ok(())
     }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
         let test_db = test_authored_db();
@@ -1527,9 +1570,10 @@ pub mod tests {
         let author = Arc::new(alice);
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
-        let (_, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
-            .await?;
+        let seq = db
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .await?
+            .seq;
         assert_eq!(seq, 3);
 
         assert!(matches!(
@@ -1539,17 +1583,17 @@ pub mod tests {
 
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
-        let (h2, seq, _) = db
-            .async_commit(move |txn: &mut Transaction| {
+        let head = db
+            .write_async(move |txn: &mut Transaction| {
                 chain_head_db_nonempty(&txn, author_2.clone())
             })
             .await?;
 
         // not equal since action hash change due to rebasing
-        assert_ne!(h2, old_h2);
-        assert_eq!(seq, 4);
+        assert_ne!(head.action, old_h2);
+        assert_eq!(head.seq, 4);
 
-        fresh_reader_test!(db, |txn| {
+        db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
             let store = Txn::from(&txn);
             let h1_record_entry_fetched = store
@@ -1559,14 +1603,17 @@ pub mod tests {
                 .into_inner()
                 .1;
             let h2_record_entry_fetched = store
-                .get_record(&h2.clone().into())
+                .get_record(&head.action.clone().into())
                 .expect("error retrieving")
                 .expect("entry not found")
                 .into_inner()
                 .1;
             assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
             assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
-        });
+
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }
@@ -1579,6 +1626,7 @@ pub mod tests {
         let keystore = test_keystore();
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        // create transferable cap grant
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1594,6 +1642,8 @@ pub mod tests {
         let mut agents = AgentPubKeyFixturator::new(Predictable);
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
+        // predictable fixturator creates only two different agent keys
+        let carol = keystore.new_sign_keypair_random().await.unwrap();
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
@@ -1607,40 +1657,33 @@ pub mod tests {
         .await
         .unwrap();
 
-        {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
+        let chain = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        // alice as chain author always has a valid cap grant; provided secrets
+        // are ignored
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
 
-            // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                None
-            );
-        }
+        // bob should not get a cap grant as the secret hasn't been committed yet
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
 
+        // write cap grant to alice's source chain
         let (original_action_address, original_entry_address) = {
-            let chain = SourceChain::new(
-                db.clone().into(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
             let action_builder = builder::Create {
@@ -1650,47 +1693,49 @@ pub mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-
             chain.flush(&mock).await.unwrap();
-
             (action, entry_hash)
         };
 
-        {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
-            // alice should find her own authorship with higher priority than the committed grant
-            // even if she passes in the secret
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
+        // alice should find her own authorship with higher priority than the
+        // committed grant even if she passes in the secret
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
 
-            // bob should be granted with the committed grant as it matches the secret he passes to
-            // alice at runtime
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                Some(grant.clone().into())
-            );
-        }
+        // bob and carol (and everyone else) should be authorized with transferable cap grant
+        // when passing in the secret
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            Some(grant.clone().into())
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .await?,
+            Some(grant.clone().into())
+        );
+        // bob should not be authorized for other zomes/functions than the ones granted
+        assert_eq!(
+            chain
+                .valid_cap_grant(("boo".into(), "far".into()), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
 
-        // let's roll the secret and assign the grant to bob specifically
+        // convert transferable cap grant to assigned with bob as assignee
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
+        // commit grant update to alice's source chain
         let (updated_action_hash, updated_entry_hash) = {
             let chain = SourceChain::new(
                 db.clone().into(),
@@ -1711,51 +1756,59 @@ pub mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-
             chain.flush(&mock).await.unwrap();
 
             (action, entry_hash)
         };
 
-        {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
-            // alice should find her own authorship with higher priority than the committed grant
-            // even if she passes in the secret
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
+        // alice as chain owner should be unaffected by updates
+        // chain author grant should always be returned
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
 
-            // bob MUST provide the updated secret as the old one is invalidated by the new one
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                None
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
-                    .await?,
-                Some(updated_grant.into())
-            );
-        }
+        // bob must not get a valid cap grant with the initial cap secret,
+        // as it is invalidated by the cap grant update
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
+        // when bob provides the updated secret, validation should succeed,
+        // bob being an assignee
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
+                .await?,
+            Some(updated_grant.clone().into())
+        );
 
+        // carol must not get a valid cap grant with either the original secret (because it was replaced)
+        // or the updated secret (because she is not an assignee)
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .await?,
+            None
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), updated_secret.clone())
+                .await?,
+            None
+        );
+
+        // delete updated cap grant
         {
             let chain = SourceChain::new(
                 db.clone().into(),
@@ -1772,47 +1825,110 @@ pub mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-
             chain.flush(&mock).await.unwrap();
         }
 
-        {
+        // alice should get her author cap grant as always, independent of
+        // any provided secret
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
+
+        // bob should not get a cap grant for any secret anymore
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
+                .await?,
+            None
+        );
+
+        // create an unrestricted cap grant in alice's chain
+        let unrestricted_grant = ZomeCallCapGrant::new(
+            "unrestricted".into(),
+            CapAccess::Unrestricted,
+            GrantedFunctions::All,
+        );
+        let (original_action_address, original_entry_address) = {
             let chain = SourceChain::new(
-                db.clone(),
+                db.clone().into(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
                 alice.clone(),
             )
             .await?;
-            // alice should find her own authorship
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice)),
-            );
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
+                    .into_inner();
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let action = chain
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
+            chain.flush(&mock).await.unwrap();
+            (action, entry_hash)
+        };
 
-            // bob has no access
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                None
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
-                    .await?,
-                None
-            );
+        // bob should get a cap grant for any zome and function
+        let granted_function: GrantedFunction = ("zome".into(), "fn".into());
+        assert_eq!(
+            chain
+                .valid_cap_grant(granted_function.clone(), bob.clone(), None)
+                .await?,
+            Some(unrestricted_grant.clone().into())
+        );
+        // carol should get a cap grant now too
+        assert_eq!(
+            chain
+                .valid_cap_grant(granted_function.clone(), carol.clone(), None)
+                .await?,
+            Some(unrestricted_grant.clone().into())
+        );
+
+        // delete unrestricted cap grant
+        {
+            let chain = SourceChain::new(
+                db.clone().into(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
+            let action_builder = builder::Delete {
+                deletes_address: original_action_address,
+                deletes_entry_address: original_entry_address,
+            };
+            chain
+                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .await?;
+            chain.flush(&mock).await.unwrap();
         }
+
+        // bob must not get unrestricted cap grant any longer
+        assert_eq!(
+            chain
+                .valid_cap_grant(granted_function.clone(), bob.clone(), None)
+                .await?,
+            None
+        );
 
         Ok(())
     }
@@ -1862,7 +1978,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
@@ -1874,9 +1990,18 @@ pub mod tests {
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
-        fresh_reader_test!(vault, |txn| {
-            assert_matches!(chain_head_db(&txn, author.clone()), Ok(None));
-        });
+        vault
+            .read_async({
+                let query_author = author.clone();
+
+                move |txn| -> DatabaseResult<()> {
+                    assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
         genesis(
             vault.clone().into(),
             dht_db.to_db(),
@@ -1919,21 +2044,37 @@ pub mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
-        fresh_reader_test!(vault, |txn| {
-            assert_eq!(chain_head_db_nonempty(&txn, author.clone()).unwrap().0, h2);
-            // get the full record
-            let store = Txn::from(&txn);
-            let h1_record_fetched = store
-                .get_record(&h1.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            let h2_record_fetched = store
-                .get_record(&h2.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            assert_eq!(h1, *h1_record_fetched.action_address());
-            assert_eq!(h2, *h2_record_fetched.action_address());
-        });
+        vault
+            .read_async({
+                let check_h1 = h1.clone();
+                let check_h2 = h2.clone();
+                let check_author = author.clone();
+
+                move |txn| -> DatabaseResult<()> {
+                    assert_eq!(
+                        chain_head_db_nonempty(&txn, check_author.clone())
+                            .unwrap()
+                            .action,
+                        check_h2
+                    );
+                    // get the full record
+                    let store = Txn::from(&txn);
+                    let h1_record_fetched = store
+                        .get_record(&check_h1.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    let h2_record_fetched = store
+                        .get_record(&check_h2.clone().into())
+                        .expect("error retrieving")
+                        .expect("entry not found");
+                    assert_eq!(check_h1, *h1_record_fetched.action_address());
+                    assert_eq!(check_h2, *h2_record_fetched.action_address());
+
+                    Ok(())
+                }
+            })
+            .await
+            .unwrap();
 
         // check that you can iterate on the chain
         let source_chain = SourceChain::new(
@@ -2052,15 +2193,15 @@ pub mod tests {
         let cases = [
             ((None, None, vec![], false), 3),
             ((None, None, vec![], true), 3),
-            ((Some(ActionType::Dna), None, vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
-            ((Some(ActionType::Create), None, vec![], false), 1),
-            ((Some(ActionType::Create), None, vec![], true), 1),
+            ((Some(vec![ActionType::Dna]), None, vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], true), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], false), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], true), 1),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![],
                     false,
                 ),
@@ -2068,9 +2209,28 @@ pub mod tests {
             ),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![records[2].action().entry_hash().unwrap().clone()],
+                    true,
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(vec![ActionType::Create, ActionType::Dna]),
+                    None,
+                    vec![],
+                    true,
+                ),
+                2,
+            ),
+            (
+                (
+                    None,
+                    // Redundant but covers the code that constructs the IN query
+                    Some(vec![EntryType::AgentPubKey, EntryType::AgentPubKey]),
+                    vec![],
                     true,
                 ),
                 1,

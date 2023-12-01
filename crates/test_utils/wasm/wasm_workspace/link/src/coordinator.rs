@@ -227,3 +227,13 @@ fn commit_existing_path(_: ()) -> ExternResult<()> {
 fn get_long_path(_: ()) -> ExternResult<Vec<Link>> {
     Path::from("a").typed(LinkTypes::SomeLinks)?.children()
 }
+
+#[hdk_extern]
+fn get_count_base(_: ()) -> ExternResult<AnyLinkableHash> {
+    base()
+}
+
+#[hdk_extern]
+fn get_count(link_query: LinkQuery) -> ExternResult<usize> {
+    hdk::prelude::count_links(link_query)
+}

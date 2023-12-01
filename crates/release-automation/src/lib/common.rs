@@ -63,7 +63,7 @@ pub fn load_from_file(path: &Path) -> Fallible<String> {
     Ok(s)
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum SemverIncrementMode {
     Major,

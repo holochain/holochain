@@ -21,11 +21,6 @@ fixturator!(
 );
 
 fixturator!(
-    CellId;
-    constructor fn new(DnaHash, AgentPubKey);
-);
-
-fixturator!(
     NewEntryAction;
     variants [
         Create(Create)

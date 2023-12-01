@@ -70,6 +70,13 @@ pub enum AppRequest {
 
     /// Info about networking processes
     NetworkInfo(Box<NetworkInfoRequestPayload>),
+
+    /// List all host functions available to wasm on this conductor.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::ListWasmHostFunctions`]
+    ListWasmHostFunctions,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -112,6 +119,9 @@ pub enum AppResponse {
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
+
+    /// All the wasm host functions supported by this conductor.
+    ListWasmHostFunctions(Vec<String>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -247,27 +257,39 @@ impl CellInfo {
 /// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
+    /// The hash of the DNA that this cell would be instantiated from
     pub original_dna_hash: DnaHash,
+    /// The DNA modifiers that will be used when instantiating the cell
     pub dna_modifiers: DnaModifiers,
+    /// An optional name to override the cell's bundle name when instantiating
     pub name: Option<String>,
 }
 
 /// Provisioned cell, a cell instantiated from a DNA on app installation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProvisionedCell {
+    /// The cell's identifying data
     pub cell_id: CellId,
+    /// The DNA modifiers that were used to instantiate the cell
     pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
     pub name: String,
 }
 
 /// Cloned cell that was created from a provisioned cell at runtime.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ClonedCell {
+    /// The cell's identifying data
     pub cell_id: CellId,
+    /// A conductor-local clone identifier
     pub clone_id: CloneId,
+    /// The hash of the DNA that this cell was instantiated from
     pub original_dna_hash: DnaHash,
+    /// The DNA modifiers that were used to instantiate this clone cell
     pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
     pub name: String,
+    /// Whether or not the cell is running
     pub enabled: bool,
 }
 
@@ -284,6 +306,9 @@ pub struct AppInfo {
     pub status: AppInfoStatus,
     /// The app's agent pub key.
     pub agent_pub_key: AgentPubKey,
+    /// The original AppManifest used to install the app, which can also be used to
+    /// install the app again under a new agent.
+    pub manifest: AppManifest,
 }
 
 impl AppInfo {
@@ -294,6 +319,7 @@ impl AppInfo {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
         let agent_pub_key = app.agent_key().to_owned();
+        let mut manifest = app.manifest().clone();
 
         let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
@@ -310,6 +336,17 @@ impl AppInfo {
                         dna_def.name.to_owned(),
                     );
                     cell_info_for_role.push(cell_info);
+
+                    // Update the manifest with the installed hash
+                    match &mut manifest {
+                        AppManifest::V1(manifest) => {
+                            if let Some(role) =
+                                manifest.roles.iter_mut().find(|r| r.name == *role_name)
+                            {
+                                role.dna.installed_hash = Some(dna_def.hash.clone().into());
+                            }
+                        }
+                    }
                 } else {
                     tracing::error!("no DNA definition found for cell id {}", provisioned_cell);
                 }
@@ -365,6 +402,7 @@ impl AppInfo {
             cell_info,
             status,
             agent_pub_key,
+            manifest,
         }
     }
 }
@@ -398,9 +436,14 @@ impl From<AppInfoStatus> for AppStatus {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
     pub fetch_pool_info: FetchPoolInfo,
+    pub current_number_of_peers: u32,
+    pub arc_size: f64,
+    pub total_network_peers: u32,
+    pub bytes_since_last_time_queried: u64,
+    pub completed_rounds_since_last_time_queried: u32,
 }
 
 #[test]

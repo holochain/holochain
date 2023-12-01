@@ -2,10 +2,11 @@ use ::fixt::prelude::*;
 use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
-use holochain::sweettest::SweetAgents;
+use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
         api::{AdminRequest, AdminResponse},
@@ -14,6 +15,7 @@ use holochain::{
     },
     fixt::*,
 };
+use holochain_trace;
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -21,7 +23,6 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
-use observability;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -34,7 +35,7 @@ use crate::test_utils::*;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "glacial_tests")]
 async fn call_admin() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -104,7 +105,7 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "glacial_tests")]
 async fn call_zome() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -245,8 +246,9 @@ async fn call_zome() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -254,6 +256,16 @@ async fn remote_signals() -> anyhow::Result<()> {
     // MAYBE: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
+
+    // Check that there are no duplicate agents
+    assert_eq!(
+        all_agents.len(),
+        all_agents
+            .clone()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -270,9 +282,8 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().subscribe_separately())
+        rxs.extend(h.signal_broadcaster().subscribe_separately())
     }
-    let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
     let signal = fixt!(ExternIo);
 
@@ -287,14 +298,16 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-
-    let signal = AppSignal::new(signal);
-    for mut rx in rxs {
-        let r = rx.try_recv();
-        // Each handle should recv a signal
-        assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
-    }
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        let signal = AppSignal::new(signal);
+        for mut rx in rxs {
+            let r = rx.recv().await;
+            // Each handle should recv a signal
+            assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
+        }
+    })
+    .await
+    .unwrap();
 
     Ok(())
 }
@@ -302,7 +315,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -405,7 +418,7 @@ async fn emit_signals() {
         Signal::App {
             cell_id,
             zome_name,
-            signal: AppSignal::new(ExternIO::encode(()).unwrap())
+            signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
         Signal::try_from(sig1.clone()).unwrap(),
     );
@@ -416,7 +429,7 @@ async fn emit_signals() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
@@ -443,7 +456,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces_succeeds() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -482,7 +495,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 }
 
 async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -540,27 +553,56 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn too_many_open() {
-    observability::test_run().ok();
+#[cfg(feature = "slow_tests")]
+async fn connection_limit_is_respected() {
+    holochain_trace::test_run().ok();
 
-    info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
-    info!("building conductor");
-    for _i in 0..1000 {
-        holochain_websocket::connect(
-            url2!("ws://127.0.0.1:{}", port),
-            Arc::new(WebsocketConfig {
-                default_request_timeout_s: 1,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+
+    let url = url2!("ws://127.0.0.1:{}", port);
+    let cfg = Arc::new(WebsocketConfig::default());
+
+    // Retain handles so that the test can control when to disconnect clients
+    let mut handles = Vec::new();
+
+    // The first `MAX_CONNECTIONS` connections should succeed
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
     }
+
+    // Try lots of failed connections to make sure the limit is respected
+    for _ in 0..2 * MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+
+        // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
+        sender
+            .request::<AdminRequest, AdminResponse>(AdminRequest::ListDnas)
+            .await
+            .expect_err("Should be no available connection slots");
+    }
+
+    // Disconnect all the clients
+    handles.clear();
+
+    // Should now be possible to connect new clients
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
+    }
+
     conductor_handle.shutdown();
 }
 
@@ -574,7 +616,7 @@ async fn concurrent_install_dna() {
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
     static REQ_TIMEOUT_MS: u64 = 15000;
 
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -640,8 +682,42 @@ async fn concurrent_install_dna() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore)]
+async fn network_stats() {
+    holochain_trace::test_run().ok();
+
+    let mut batch =
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous()).await;
+
+    let dna_file = SweetDnaFile::unique_empty().await;
+
+    let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
+    batch.exchange_peer_info().await;
+
+    let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
+
+    #[cfg(not(feature = "tx5"))]
+    const EXPECT: &str = "tx2-quic";
+    #[cfg(feature = "tx5")]
+    const EXPECT: &str = "go-pion";
+
+    let req = AdminRequest::DumpNetworkStats;
+    let res: AdminResponse = client.request(req).await.unwrap();
+    match res {
+        AdminResponse::NetworkStatsDumped(json) => {
+            println!("{json}");
+
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            let backend = parsed.as_object().unwrap().get("backend").unwrap();
+            assert_eq!(EXPECT, backend);
+        }
+        _ => panic!("unexpected"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 

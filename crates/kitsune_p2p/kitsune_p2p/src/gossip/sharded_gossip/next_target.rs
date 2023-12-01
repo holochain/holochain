@@ -18,6 +18,7 @@ impl ShardedGossipLocal {
         &self,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
+        all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<Arc<[u8; 32]>, Node> = HashMap::new();
 
@@ -31,9 +32,8 @@ impl ShardedGossipLocal {
                 .collect();
 
         // Get all the agent info for these remote nodes.
-        for info in store::all_agent_info(&self.evt_sender, &self.space)
-            .await?
-            .into_iter()
+        for info in all_agents
+            .iter()
             .filter(|a| {
                 std::time::Duration::from_millis(a.expires_at_ms)
                     > std::time::UNIX_EPOCH
@@ -54,8 +54,6 @@ impl ShardedGossipLocal {
                         .map(|purl| (info.clone(), purl.digest().0, url.to_string()))
                 })
                 .next();
-
-            // dbg!(&info);
 
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
@@ -97,8 +95,6 @@ fn next_remote_node(
 ) -> Option<Node> {
     use rand::prelude::*;
     let mut rng = thread_rng();
-
-    // dbg!(&remote_nodes, metrics);
 
     // Sort the nodes by longest time since we last successfully gossiped with them.
     // Randomly break ties between nodes we haven't successfully gossiped with.

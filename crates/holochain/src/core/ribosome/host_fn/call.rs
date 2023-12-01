@@ -54,9 +54,10 @@ pub fn call(
                             .expect("Must have source chain to know provenance")
                             .agent_pubkey()
                             .clone();
-                        let (nonce, expires_at) = fresh_nonce(Timestamp::now()).map_err(|e| -> RuntimeError {
-                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                        })?;
+                        let (nonce, expires_at) =
+                            fresh_nonce(Timestamp::now()).map_err(|e| -> RuntimeError {
+                                wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                            })?;
 
                         let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
@@ -78,8 +79,16 @@ pub fn call(
                                     .network()
                                     .call_remote(
                                         provenance.clone(),
-                                        zome_call_unsigned.provenance
-                                            .sign_raw(call_context.host_context.keystore(), zome_call_unsigned.data_to_sign().map_err(|e| -> RuntimeError { wasm_error!(e.to_string()).into() })?)
+                                        zome_call_unsigned
+                                            .provenance
+                                            .sign_raw(
+                                                call_context.host_context.keystore(),
+                                                zome_call_unsigned.data_to_sign().map_err(
+                                                    |e| -> RuntimeError {
+                                                        wasm_error!(e.to_string()).into()
+                                                    },
+                                                )?,
+                                            )
                                             .await
                                             .map_err(|e| -> RuntimeError {
                                                 wasm_error!(WasmErrorInner::Host(e.to_string()))
@@ -95,10 +104,10 @@ pub fn call(
                                     )
                                     .await
                                 {
-                                    Ok(serialized_bytes) => ZomeCallResponse::try_from(
-                                        serialized_bytes,
-                                    )
-                                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() }),
+                                    Ok(serialized_bytes) => {
+                                        ZomeCallResponse::try_from(serialized_bytes)
+                                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
+                                    }
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             }
@@ -119,9 +128,7 @@ pub fn call(
                                                 &role_name,
                                             )
                                             .await
-                                            .map_err(|e| -> RuntimeError {
-                                                wasm_error!(e).into()
-                                            })
+                                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
                                                     RuntimeError::from(wasm_error!(
@@ -217,7 +224,6 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
     use holo_hash::ActionHash;
-    use holochain_state::prelude::fresh_reader_test;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
@@ -228,10 +234,11 @@ pub mod wasm_test {
     use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::new_zome_call_unsigned;
     use holochain_conductor_api::ZomeCall;
+    use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let test_wasm = TestWasm::WhoAmI;
         let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
@@ -281,7 +288,7 @@ pub mod wasm_test {
     /// when they are both writing (moving the source chain forward)
     #[tokio::test(flavor = "multi_thread")]
     async fn call_the_same_cell() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let zomes = vec![TestWasm::WhoAmI, TestWasm::Create];
         let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
@@ -293,7 +300,9 @@ pub mod wasm_test {
             new_zome_call_unsigned(&alice_cell_id, "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let zome_call =
-            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned).await.unwrap();
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned)
+                .await
+                .unwrap();
         let result = handle.call_zome(zome_call).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
@@ -304,16 +313,19 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
-            txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
-                named_params! {
-                    ":hash": action_hash
-                },
-                |row| row.get(0),
-            )
-            .unwrap()
-        });
+        let has_hash: bool = alice_call_data
+            .authored_db
+            .read_async(move |txn| -> DatabaseResult<bool> {
+                Ok(txn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
+                    named_params! {
+                        ":hash": action_hash
+                    },
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap();
         assert!(has_hash);
 
         conductor_test.shutdown_conductor().await;
@@ -326,7 +338,7 @@ pub mod wasm_test {
     //        not be supported.
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -354,23 +366,26 @@ pub mod wasm_test {
             .await;
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice.dht_db().clone(), |txn| {
-            txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
-                named_params! {
-                    ":hash": action_hash
-                },
-                |row| row.get(0),
-            )
-            .unwrap()
-        });
+        let has_hash: bool = alice
+            .dht_db()
+            .read_async(move |txn| -> DatabaseResult<bool> {
+                Ok(txn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
+                    named_params! {
+                        ":hash": action_hash
+                    },
+                    |row| row.get(0),
+                )?)
+            })
+            .await
+            .unwrap();
         assert!(has_hash);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

@@ -1,3 +1,8 @@
+# Scheduled action to update:
+# - flake inputs of ./versions/
+# - rust-overlay flake input
+# - nixpkgs flake input
+
 name: "trigger source updates"
 on:
   # push:
@@ -29,7 +34,9 @@ jobs:
             skip: true
         update:
           - source: "versions/0_1"
-            cmd: "nix run --override-input versions ./versions/0_1 .#scripts-repo-flake-update"
+            cmd: "nix run .#scripts-repo-flake-update 0_1"
+          - source: "versions/0_2"
+            cmd: "nix run .#scripts-repo-flake-update 0_2"
           - source: "rust-overlay"
             cmd: "nix flake lock --update-input rust-overlay"
           - source: "nixpkgs"

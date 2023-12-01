@@ -225,6 +225,11 @@ impl Action {
         }
     }
 
+    pub fn entry_visibility(&self) -> Option<&EntryVisibility> {
+        self.entry_data()
+            .map(|(_, entry_type)| entry_type.visibility())
+    }
+
     pub fn entry_hash(&self) -> Option<&EntryHash> {
         self.entry_data().map(|d| d.0)
     }
@@ -521,8 +526,10 @@ pub struct Create<W = EntryRateWeight> {
 /// - Create a metadata relationship between the original entry and this new action
 ///
 /// The original action is required to prevent update loops:
-/// If you update A to B and B back to A, and then you don't know which one came first,
-/// or how to break the loop.
+/// If you update entry A to B and B back to A, and only track the original entry,
+/// then you have a loop of references. Every update introduces a new action,
+/// so there can only be a linear history of action updates, even if the entry history
+/// experiences repeats.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Update<W = EntryRateWeight> {

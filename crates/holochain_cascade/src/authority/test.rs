@@ -1,7 +1,6 @@
 use super::*;
 use crate::authority::handle_get_agent_activity;
 use crate::test_utils::*;
-use ghost_actor::dependencies::observability;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_dht_db;
@@ -17,12 +16,12 @@ fn options() -> holochain_p2p::event::GetOptions {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = EntryTestData::create();
 
-    fill_db(&db.to_db(), td.store_entry_op.clone());
+    fill_db(&db.to_db(), td.store_entry_op.clone()).await;
     let options = options();
 
     let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
@@ -36,7 +35,7 @@ async fn get_entry() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.delete_entry_action_op.clone());
+    fill_db(&db.to_db(), td.delete_entry_action_op.clone()).await;
 
     let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
         .await
@@ -49,7 +48,7 @@ async fn get_entry() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.update_content_op.clone());
+    fill_db(&db.to_db(), td.update_content_op.clone()).await;
 
     let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
         .await
@@ -65,12 +64,12 @@ async fn get_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_record() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = RecordTestData::create();
 
-    fill_db(&db.to_db(), td.store_record_op.clone());
+    fill_db(&db.to_db(), td.store_record_op.clone()).await;
 
     let options = options();
 
@@ -85,7 +84,7 @@ async fn get_record() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.deleted_by_op.clone());
+    fill_db(&db.to_db(), td.deleted_by_op.clone()).await;
 
     let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
         .await
@@ -98,7 +97,7 @@ async fn get_record() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.update_record_op.clone());
+    fill_db(&db.to_db(), td.update_record_op.clone()).await;
 
     let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
         .await
@@ -111,7 +110,7 @@ async fn get_record() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.any_store_record_op.clone());
+    fill_db(&db.to_db(), td.any_store_record_op.clone()).await;
 
     let result = handle_get_record(
         db.to_db().into(),
@@ -131,12 +130,12 @@ async fn get_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn retrieve_record() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = RecordTestData::create();
 
-    fill_db_pending(&db.to_db(), td.store_record_op.clone());
+    fill_db_pending(&db.to_db(), td.store_record_op.clone()).await;
 
     let mut options = options();
     options.request_type = GetRequest::Pending;
@@ -155,13 +154,13 @@ async fn retrieve_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = EntryTestData::create();
 
-    fill_db(&db.to_db(), td.store_entry_op.clone());
-    fill_db(&db.to_db(), td.create_link_op.clone());
+    fill_db(&db.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&db.to_db(), td.create_link_op.clone()).await;
     let options = actor::GetLinksOptions::default();
 
     let result = handle_get_links(db.to_db().into(), td.link_key.clone(), (&options).into())
@@ -173,7 +172,7 @@ async fn get_links() {
     };
     assert_eq!(result, expected);
 
-    fill_db(&db.to_db(), td.delete_link_op.clone());
+    fill_db(&db.to_db(), td.delete_link_op.clone()).await;
 
     let result = handle_get_links(
         db.to_db().into(),
@@ -191,16 +190,16 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = ActivityTestData::valid_chain_scenario();
 
     for hash_op in td.hash_ops.iter().cloned() {
-        fill_db(&db.to_db(), hash_op);
+        fill_db(&db.to_db(), hash_op).await;
     }
     for hash_op in td.noise_ops.iter().cloned() {
-        fill_db(&db.to_db(), hash_op);
+        fill_db(&db.to_db(), hash_op).await;
     }
 
     let options = actor::GetActivityOptions {

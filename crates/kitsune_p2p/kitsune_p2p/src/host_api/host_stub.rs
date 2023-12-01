@@ -1,6 +1,7 @@
 use super::*;
 use crate::KitsuneHostDefaultError;
 use kitsune_p2p_fetch::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -14,6 +15,7 @@ pub type CheckOpDataImpl = Box<
         + Sync,
 >;
 
+#[derive(Debug)]
 struct HostStubErr;
 
 impl KitsuneHostDefaultError for HostStubErr {
@@ -30,6 +32,13 @@ impl FetchPoolConfig for HostStubErr {
 pub struct HostStub {
     err: HostStubErr,
     check_op_data_impl: Option<CheckOpDataImpl>,
+}
+
+/// Manual implementation of debug to skip over underivable Debug field.
+impl std::fmt::Debug for HostStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HostStub").field("err", &self.err).finish()
+    }
 }
 
 impl HostStub {
@@ -51,6 +60,22 @@ impl HostStub {
 }
 
 impl KitsuneHost for HostStub {
+    fn block(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::block(&self.err, input)
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::unblock(&self.err, input)
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::is_blocked(&self.err, input, timestamp)
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,

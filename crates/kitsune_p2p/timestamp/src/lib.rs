@@ -160,12 +160,6 @@ impl Timestamp {
     pub fn saturating_from_dur(duration: &core::time::Duration) -> Self {
         Timestamp(std::cmp::min(duration.as_micros(), i64::MAX as u128) as i64)
     }
-
-    /// Convert this timestamp to fit into a SQLite integer which is an i64.
-    /// The value will be clamped to the valid range supported by SQLite
-    pub fn into_sql_lossy(self) -> Self {
-        Self(i64::clamp(self.0, -62167219200 * MM, 106751991167 * MM))
-    }
 }
 
 impl TryFrom<core::time::Duration> for Timestamp {
@@ -184,9 +178,7 @@ impl TryFrom<core::time::Duration> for Timestamp {
 #[cfg(feature = "rusqlite")]
 impl rusqlite::ToSql for Timestamp {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        Ok(rusqlite::types::ToSqlOutput::Owned(
-            self.into_sql_lossy().0.into(),
-        ))
+        Ok(rusqlite::types::ToSqlOutput::Owned(self.0.into()))
     }
 }
 
@@ -200,6 +192,34 @@ impl rusqlite::types::FromSql for Timestamp {
             rusqlite::types::ValueRef::Integer(i) => Ok(Self::from_micros(i)),
             _ => Err(rusqlite::types::FromSqlError::InvalidType),
         }
+    }
+}
+
+/// It's an interval bounded by timestamps that are not infinite.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct InclusiveTimestampInterval {
+    start: Timestamp,
+    end: Timestamp,
+}
+
+impl InclusiveTimestampInterval {
+    /// Try to make the interval but fail if it ends before it starts.
+    pub fn try_new(start: Timestamp, end: Timestamp) -> TimestampResult<Self> {
+        if start > end {
+            Err(TimestampError::OutOfOrder)
+        } else {
+            Ok(Self { start, end })
+        }
+    }
+
+    /// Accessor for start timestamp.
+    pub fn start(&self) -> Timestamp {
+        self.start
+    }
+
+    /// Accessor for end timestamp.
+    pub fn end(&self) -> Timestamp {
+        self.end
     }
 }
 
@@ -228,7 +248,7 @@ mod tests {
     #[test]
     fn micros_roundtrip() {
         for t in [Timestamp(1234567890), Timestamp(987654321)] {
-            let micros = t.clone().into_sql_lossy().as_micros();
+            let micros = t.clone().as_micros();
             let r = Timestamp::from_micros(micros);
             assert_eq!(t.0, r.0);
             assert_eq!(t, r);
@@ -251,5 +271,21 @@ mod tests {
         let s: S = sb.try_into().unwrap();
         let t = s.0;
         assert_eq!(TEST_TS, &t.to_string());
+    }
+
+    #[test]
+    fn inclusive_timestamp_interval_test_new() {
+        // valids.
+        for (start, end) in vec![(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
+            InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end)).unwrap();
+        }
+
+        // invalids.
+        for (start, end) in vec![(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
+            assert!(
+                super::InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end))
+                    .is_err()
+            );
+        }
     }
 }

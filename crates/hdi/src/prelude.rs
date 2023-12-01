@@ -6,6 +6,7 @@ pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
 pub use crate::entry_defs;
+pub use crate::flat_op::*;
 pub use crate::hash::*;
 pub use crate::hdi::*;
 pub use crate::info::dna_info;
@@ -77,6 +78,7 @@ macro_rules! holochain_externs {
             verify_signature:1,
             zome_info:1,
             dna_info:1,
+            dna_info:2,
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,

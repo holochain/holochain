@@ -1,5 +1,7 @@
 //! Defines a Record, the basic unit of Holochain data.
 
+use std::borrow::Borrow;
+
 use crate::action::conversions::WrongActionError;
 use crate::action::ActionHashed;
 use crate::action::CreateLink;
@@ -12,6 +14,7 @@ use holo_hash::ActionHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
+use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
 
 /// a chain record containing the signed action along with the
@@ -23,7 +26,7 @@ pub struct Record<A = SignedActionHashed> {
     pub signed_action: A,
     /// If there is an entry associated with this action it will be here.
     /// If not, there will be an enum variant explaining the reason.
-    pub entry: RecordEntry,
+    pub entry: RecordEntry<Entry>,
 }
 
 impl<A> AsRef<A> for Record<A> {
@@ -34,21 +37,125 @@ impl<A> AsRef<A> for Record<A> {
 
 /// Represents the different ways the entry_address reference within an action
 /// can be intepreted
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum RecordEntry {
+pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
-    Present(Entry),
+    Present(E),
     /// The Action has an entry_address reference, but we are in a public
     /// context and the entry is private.
     Hidden,
-    /// The Action does not contain an entry_address reference.
-    NotApplicable,
+    /// The Action does not contain an entry_address reference, so there will
+    /// never be an associated Entry.
+    NA,
     /// The Action has an entry but was stored without it.
     /// This can happen when you receive gossip of just an action
-    /// when the action type is a [`crate::EntryCreationAction`]
+    /// when the action type is a [`crate::EntryCreationAction`],
+    /// in particular for certain DhtOps
     NotStored,
 }
+
+impl<E: Borrow<Entry>> From<E> for RecordEntry<E> {
+    fn from(entry: E) -> Self {
+        RecordEntry::Present(entry)
+    }
+}
+
+impl<E: Borrow<Entry>> RecordEntry<E> {
+    /// Constructor based on Action data
+    pub fn new(vis: Option<&EntryVisibility>, maybe_entry: Option<E>) -> Self {
+        match (maybe_entry, vis) {
+            (Some(entry), Some(_)) => RecordEntry::Present(entry),
+            (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
+            (None, None) => RecordEntry::NA,
+            (Some(_), None) => {
+                unreachable!("Entry is present for an action type which has no entry reference")
+            }
+            (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
+        }
+    }
+
+    /// Provides entry data by reference if it exists
+    ///
+    /// Collapses the enum down to the two possibilities of
+    /// extant or nonextant Entry data
+    pub fn as_option(&self) -> Option<&E> {
+        if let RecordEntry::Present(ref entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Provides entry data as owned value if it exists.
+    ///
+    /// Collapses the enum down to the two possibilities of
+    /// extant or nonextant Entry data
+    pub fn into_option(self) -> Option<E> {
+        if let RecordEntry::Present(entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Provides deserialized app entry if it exists
+    ///
+    /// same as as_option but handles deserialization
+    /// anything other than RecordEntry::Present returns None
+    /// a present entry that fails to deserialize cleanly is an error
+    /// a present entry that deserializes cleanly is returned as the provided type A
+    pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+        &self,
+    ) -> Result<Option<A>, SerializedBytesError> {
+        match self.as_option().map(|e| e.borrow()) {
+            Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
+            _ => Ok(None),
+        }
+    }
+
+    /// Use a reference to the Entry, if present
+    pub fn as_ref<'a>(&'a self) -> RecordEntry<&'a E>
+    where
+        &'a E: Borrow<Entry>,
+    {
+        match self {
+            RecordEntry::Present(ref e) => RecordEntry::Present(e),
+            RecordEntry::Hidden => RecordEntry::Hidden,
+            RecordEntry::NA => RecordEntry::NA,
+            RecordEntry::NotStored => RecordEntry::NotStored,
+        }
+    }
+
+    /// Provides CapGrantEntry if it exists
+    ///
+    /// same as as_option but handles cap grants
+    /// anything other tha RecordEntry::Present for a Entry::CapGrant returns None
+    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
+        match self.as_option().map(|e| e.borrow()) {
+            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
+            _ => None,
+        }
+    }
+
+    /// If no entry is available, return Hidden, else return Present
+    pub fn or_hidden(entry: Option<E>) -> Self {
+        entry.map(Self::Present).unwrap_or(Self::Hidden)
+    }
+
+    /// If no entry is available, return NotApplicable, else return Present
+    pub fn or_not_applicable(entry: Option<E>) -> Self {
+        entry.map(Self::Present).unwrap_or(Self::NA)
+    }
+
+    /// If no entry is available, return NotStored, else return Present
+    pub fn or_not_stored(entry: Option<E>) -> Self {
+        entry.map(Self::Present).unwrap_or(Self::NotStored)
+    }
+}
+
+/// Alias for record with ref entry
+pub type RecordEntryRef<'a> = RecordEntry<&'a Entry>;
 
 /// The hashed action and the signature that signed it
 pub type SignedActionHashed = SignedHashed<Action>;
@@ -73,20 +180,10 @@ where
 
 impl Record {
     /// Raw record constructor.  Used only when we know that the values are valid.
+    /// NOTE: this will NOT hide private entry data if present!
     pub fn new(signed_action: SignedActionHashed, maybe_entry: Option<Entry>) -> Self {
-        let maybe_visibility = signed_action
-            .action()
-            .entry_data()
-            .map(|(_, entry_type)| entry_type.visibility());
-        let entry = match (maybe_entry, maybe_visibility) {
-            (Some(entry), Some(_)) => RecordEntry::Present(entry),
-            (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
-            (None, None) => RecordEntry::NotApplicable,
-            (Some(_), None) => {
-                unreachable!("Entry is present for an action type which has no entry reference")
-            }
-            (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
-        };
+        let maybe_visibility = signed_action.action().entry_visibility();
+        let entry = RecordEntry::new(maybe_visibility, maybe_entry);
         Self {
             signed_action,
             entry,
@@ -108,25 +205,27 @@ impl Record {
     }
 
     /// If the Record contains private entry data, set the RecordEntry
-    /// to Hidden so that it cannot be leaked
-    pub fn privatized(self) -> Self {
-        let entry = if let Some(EntryVisibility::Private) = self
+    /// to Hidden so that it cannot be leaked. If the entry was hidden,
+    /// return it separately.
+    pub fn privatized(self) -> (Self, Option<Entry>) {
+        let (entry, hidden) = if let Some(EntryVisibility::Private) = self
             .signed_action
             .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility())
         {
             match self.entry {
-                RecordEntry::Present(_) => RecordEntry::Hidden,
-                other => other,
+                RecordEntry::Present(entry) => (RecordEntry::Hidden, Some(entry)),
+                other => (other, None),
             }
         } else {
-            self.entry
+            (self.entry, None)
         };
-        Self {
+        let privatized = Self {
             signed_action: self.signed_action,
             entry,
-        }
+        };
+        (privatized, hidden)
     }
 
     /// Access the action address from this record's signed action
@@ -169,57 +268,6 @@ impl<A> Record<A> {
     /// The inner signed-action
     pub fn signed_action(&self) -> &A {
         &self.signed_action
-    }
-}
-
-impl RecordEntry {
-    /// Provides entry data by reference if it exists
-    ///
-    /// Collapses the enum down to the two possibilities of
-    /// extant or nonextant Entry data
-    pub fn as_option(&self) -> Option<&Entry> {
-        if let RecordEntry::Present(ref entry) = self {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-    /// Provides entry data as owned value if it exists.
-    ///
-    /// Collapses the enum down to the two possibilities of
-    /// extant or nonextant Entry data
-    pub fn into_option(self) -> Option<Entry> {
-        if let RecordEntry::Present(entry) = self {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-
-    /// Provides deserialized app entry if it exists
-    ///
-    /// same as as_option but handles deserialization
-    /// anything other tha RecordEntry::Present returns None
-    /// a present entry that fails to deserialize cleanly is an error
-    /// a present entry that deserializes cleanly is returned as the provided type A
-    pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
-        &self,
-    ) -> Result<Option<A>, SerializedBytesError> {
-        match self.as_option() {
-            Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
-            _ => Ok(None),
-        }
-    }
-
-    /// Provides CapGrantEntry if it exists
-    ///
-    /// same as as_option but handles cap grants
-    /// anything other tha RecordEntry::Present for a Entry::CapGrant returns None
-    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
-        match self.as_option() {
-            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
-            _ => None,
-        }
     }
 }
 
@@ -306,6 +354,19 @@ impl SignedActionHashed {
         let action = content.into();
         let hashed = ActionHashed::with_pre_hashed(action, hash);
         Self { hashed, signature }
+    }
+}
+
+impl<C: HashableContent<HashType = T>, T: PrimitiveHashType> HashableContent for SignedHashed<C> {
+    type HashType = C::HashType;
+
+    fn hash_type(&self) -> Self::HashType {
+        T::new()
+    }
+
+    fn hashable_content(&self) -> holo_hash::HashableContentBytes {
+        use holo_hash::HasHash;
+        holo_hash::HashableContentBytes::Prehashed39(self.hashed.as_hash().get_raw_39().to_vec())
     }
 }
 

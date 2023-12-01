@@ -27,6 +27,8 @@
 // TODO - address the underlying issue:
 #![allow(clippy::result_large_err)]
 
+#[allow(missing_docs)]
+pub mod block;
 pub mod chain_lock;
 #[allow(missing_docs)]
 pub mod dna_def;

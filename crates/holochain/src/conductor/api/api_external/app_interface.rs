@@ -109,9 +109,12 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
             AppRequest::NetworkInfo(payload) => {
-                let info = self.conductor_handle.network_info(&payload.dnas).await?;
+                let info = self.conductor_handle.network_info(&payload).await?;
                 Ok(AppResponse::NetworkInfo(info))
             }
+            AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
+                self.conductor_handle.list_wasm_host_functions().await?,
+            )),
         }
     }
 }

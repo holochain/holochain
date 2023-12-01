@@ -12,6 +12,7 @@ use self::{
 use super::error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::Query;
 use holochain_state::query::Txn;
 use holochain_types::prelude::*;
@@ -34,9 +35,7 @@ pub async fn handle_get_entry(
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
     let query = GetEntryOpsQuery::new(hash);
-    let results = db
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
-        .await?;
+    let results = db.read_async(move |txn| query.run(Txn::from(&txn))).await?;
     Ok(results)
 }
 
@@ -49,7 +48,7 @@ pub async fn handle_get_record(
 ) -> CascadeResult<WireRecordOps> {
     let query = GetRecordOpsQuery::new(hash, options);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -64,7 +63,7 @@ pub async fn handle_get_agent_activity(
 ) -> CascadeResult<AgentActivityResponse<ActionHash>> {
     let query = GetAgentActivityQuery::new(agent, query, options);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -89,7 +88,7 @@ pub async fn handle_get_agent_activity_deterministic(
 ) -> CascadeResult<DeterministicGetAgentActivityResponse> {
     let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -103,7 +102,24 @@ pub async fn handle_get_links(
 ) -> CascadeResult<WireLinkOps> {
     let query = GetLinksOpsQuery::new(link_key);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
+}
+
+/// Handler for querying links
+#[instrument(skip(db))]
+pub async fn handle_get_links_query(
+    db: DbRead<DbKindDht>,
+    query: WireLinkQuery,
+) -> CascadeResult<Vec<Link>> {
+    let get_links_query = GetLinksQuery::new(
+        query.base.clone(),
+        query.link_type.clone(),
+        query.tag_prefix.clone(),
+        query.into(),
+    );
+    Ok(db
+        .read_async(move |txn| get_links_query.run(Txn::from(&txn)))
+        .await?)
 }

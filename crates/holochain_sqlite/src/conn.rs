@@ -3,6 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     any::Any,
     collections::HashMap,
@@ -10,6 +11,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+
+static CONNECTION_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -113,8 +116,15 @@ pub(crate) fn new_connection_pool(
         None => SqliteConnectionManager::memory(),
     };
     let customizer = Box::new(ConnCustomizer { synchronous_level });
-    // We need the same amount of connections as reader threads plus one for the writer thread.
-    let max_cons = num_read_threads() + 1;
+
+    /*
+     * We want
+     * - num_read_threads connections for standard read limit
+     * - num_read_threads for use in long running read transactions, to allow the normal pool to continue to be used
+     * - 1 connection for writing
+     */
+    let max_cons = num_read_threads() * 2 + 1;
+
     r2d2::Pool::builder()
         // Only up to 20 connections at a time
         .max_size(max_cons as u32)
@@ -122,6 +132,9 @@ pub(crate) fn new_connection_pool(
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
         .idle_timeout(Some(Duration::from_secs(30)))
+        .connection_timeout(Duration::from_millis(
+            CONNECTION_TIMEOUT_MS.load(Ordering::Acquire),
+        ))
         .thread_pool(R2D2_THREADPOOL.clone())
         .connection_customizer(customizer)
         .build(manager)
@@ -188,7 +201,7 @@ pub(crate) fn initialize_connection(
     // Tell SQLite to wait this long during write contention.
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
-    #[cfg(feature = "db-encryption")]
+    #[cfg(feature = "sqlite-encrypted")]
     {
         use std::io::Write;
         let key = get_encryption_key_shim();
@@ -222,7 +235,7 @@ pub(crate) fn initialize_connection(
     Ok(())
 }
 
-#[cfg(feature = "db-encryption")]
+#[cfg(feature = "sqlite-encrypted")]
 /// Simulate getting an encryption key from Lair.
 fn get_encryption_key_shim() -> [u8; 32] {
     [
@@ -231,6 +244,7 @@ fn get_encryption_key_shim() -> [u8; 32] {
     ]
 }
 
+// TODO once `conn` has been removed from the public interface, this can be made pub(crate)
 /// Singleton Connection
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
@@ -243,4 +257,9 @@ impl PConn {
     pub(crate) fn new(inner: PConnInner) -> Self {
         Self { inner }
     }
+}
+
+#[cfg(feature = "test_utils")]
+pub fn set_connection_timeout(timeout_ms: u64) {
+    CONNECTION_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
 }

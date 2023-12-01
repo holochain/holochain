@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -26,7 +26,7 @@ pub fn get_details<'a>(
                             any_dht_hash,
                             get_options,
                         } = input;
-                        Cascade::from_workspace_and_network(
+                        CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )
@@ -66,7 +66,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Crud).await;

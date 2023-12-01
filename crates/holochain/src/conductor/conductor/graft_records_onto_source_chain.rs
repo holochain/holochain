@@ -54,7 +54,7 @@ pub(crate) async fn graft_records_onto_source_chain(
     // Commit the records to the source chain.
     let ops_to_integrate = space
         .authored_db
-        .async_commit({
+        .write_async({
             let cell_id = cell_id.clone();
             move |txn| {
                 if let Some((_, seq)) = chain_top {
@@ -101,7 +101,7 @@ pub(crate) async fn graft_records_onto_source_chain(
     // Check which ops need to be integrated.
     // Only integrated if a cell is installed.
     if handle
-        .list_cell_ids(Some(CellStatus::Joined))
+        .running_cell_ids(Some(CellStatus::Joined))
         .contains(&cell_id)
     {
         holochain_state::integrate::authored_ops_to_dht_db(

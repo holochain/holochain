@@ -34,6 +34,7 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
                 dependencies: vec!["b".into()],
+                preserialized_path: None,
             })),
         ),
         (
@@ -41,6 +42,7 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
                 dependencies: vec!["b".into(), "a".into()],
+                preserialized_path: None,
             })),
         ),
     ];
@@ -65,6 +67,7 @@ async fn test_update_coordinators() {
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["b".into()],
+            preserialized_path: None,
         })),
     )];
     let old_wasm = dna
@@ -96,6 +99,7 @@ async fn test_update_coordinators() {
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["a".into()],
+            preserialized_path: None,
         })),
     )];
     let old_wasm = dna
@@ -135,6 +139,7 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
                 dependencies: vec!["a".into()],
+                preserialized_path: None,
             })),
         ),
         (
@@ -142,6 +147,7 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[1]).await,
                 dependencies: vec!["a".into()],
+                preserialized_path: None,
             })),
         ),
         (
@@ -149,6 +155,7 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[2]).await,
                 dependencies: vec!["a".into()],
+                preserialized_path: None,
             })),
         ),
         (
@@ -156,6 +163,7 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[3]).await,
                 dependencies: vec!["a".into()],
+                preserialized_path: None,
             })),
         ),
     ];
@@ -227,6 +235,7 @@ async fn test_update_coordinators_checks_deps() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
                 dependencies: vec!["b".into()],
+                preserialized_path: None,
             })),
         ),
         (
@@ -234,6 +243,7 @@ async fn test_update_coordinators_checks_deps() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
                 dependencies: vec!["b".into(), "a".into()],
+                preserialized_path: None,
             })),
         ),
     ];
@@ -256,6 +266,7 @@ async fn test_update_coordinators_checks_deps() {
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["z".into()],
+            preserialized_path: None,
         })),
     )];
     let err = dna
@@ -274,6 +285,7 @@ async fn test_update_coordinators_checks_deps() {
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["z".into()],
+            preserialized_path: None,
         })),
     )];
     let err = dna

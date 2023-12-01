@@ -12,6 +12,8 @@ use crate::query::StateQueryError;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 
+use super::HeadInfo;
+
 #[derive(Error, Debug)]
 pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
@@ -24,7 +26,7 @@ pub enum SourceChainError {
         Vec<SignedActionHashed>,
         Vec<EntryHashed>,
         Option<ActionHash>,
-        Option<(ActionHash, u32, Timestamp)>,
+        Option<HeadInfo>,
     ),
 
     #[error(

@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::Cascade;
+use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -24,11 +24,11 @@ pub fn must_get_action<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = match call_context.host_context {
+                let cascade = match call_context.host_context {
                     HostContext::Validate(_) => {
-                        Cascade::from_workspace_stores(workspace.stores(), None)
+                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
                     }
-                    _ => Cascade::from_workspace_and_network(
+                    _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
@@ -39,10 +39,11 @@ pub fn must_get_action<'a>(
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(action) => Ok(action),
+                    Some((action, _)) => Ok(action),
                     None => match call_context.host_context {
                         HostContext::EntryDefs(_)
-                        | HostContext::GenesisSelfCheck(_)
+                        | HostContext::GenesisSelfCheckV1(_)
+                        | HostContext::GenesisSelfCheckV2(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(

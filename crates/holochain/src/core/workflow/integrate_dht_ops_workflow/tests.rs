@@ -7,13 +7,11 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
-use holochain_sqlite::db::WriteManager;
-use holochain_state::query::link::GetLinksQuery;
-use holochain_state::workspace::WorkspaceError;
+use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
+use holochain_trace;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
-use observability;
 
 #[derive(Clone)]
 struct TestData {
@@ -142,8 +140,7 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: DbWrite<DbKindDht>, here: String) {
-        fresh_reader_test(env, |txn| {
-            // print_stmts_test(env, |txn| {
+        env.read_async(move |txn| -> DatabaseResult<()> {
             for expect in expects {
                 match expect {
                     Db::Integrated(op) => {
@@ -307,52 +304,54 @@ impl Db {
                             link_add.base_address.clone(),
                             LinkTypeFilter::single_type(link_add.zome_index, link_add.link_type),
                             Some(link_add.tag.clone()),
+                            GetLinksFilter::default(),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();
                         assert_eq!(res.len(), 0, "{}", here);
                     }
                 }
             }
-        })
+
+            Ok(())
+        }).await.unwrap();
     }
 
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
-        env.conn()
-            .unwrap()
-            .with_commit_sync::<WorkspaceError, _, _>(|txn| {
-                for state in pre_state {
-                    match state {
-                        Db::Integrated(op) => {
-                            let op = DhtOpHashed::from_content_sync(op.clone());
-                            let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, &op).unwrap();
-                            mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
-                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
-                                .unwrap();
-                        }
-                        Db::IntQueue(op) => {
-                            let op = DhtOpHashed::from_content_sync(op.clone());
-                            let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, &op).unwrap();
-                            mutations::set_validation_stage(
-                                txn,
-                                &hash,
-                                ValidationLimboStatus::AwaitingIntegration,
-                            )
+        env.write_async(move |txn| -> DatabaseResult<()> {
+            for state in pre_state {
+                match state {
+                    Db::Integrated(op) => {
+                        let op = DhtOpHashed::from_content_sync(op.clone());
+                        let hash = op.as_hash().clone();
+                        mutations::insert_op(txn, &op).unwrap();
+                        mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+                        mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                             .unwrap();
-                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
-                                .unwrap();
-                        }
-                        _ => {
-                            unimplemented!("Use Db::Integrated");
-                        }
+                    }
+                    Db::IntQueue(op) => {
+                        let op = DhtOpHashed::from_content_sync(op.clone());
+                        let hash = op.as_hash().clone();
+                        mutations::insert_op(txn, &op).unwrap();
+                        mutations::set_validation_stage(
+                            txn,
+                            &hash,
+                            ValidationLimboStatus::AwaitingIntegration,
+                        )
+                        .unwrap();
+                        mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
+                            .unwrap();
+                    }
+                    _ => {
+                        unimplemented!("Use Db::Integrated");
                     }
                 }
-                Ok(())
-            })
-            .unwrap();
+            }
+            Ok(())
+        })
+        .await
+        .unwrap();
     }
 }
 
@@ -366,16 +365,15 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs(env: DbWrite<DbKindDht>) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            txn.execute("DELETE FROM DhtOP", []).unwrap();
-            txn.execute("DELETE FROM Action", []).unwrap();
-            txn.execute("DELETE FROM Entry", []).unwrap();
-            StateMutationResult::Ok(())
-        })
-        .unwrap();
+async fn clear_dbs(env: DbWrite<DbKindDht>) {
+    env.write_async(move |txn| -> StateMutationResult<()> {
+        txn.execute("DELETE FROM DhtOP", []).unwrap();
+        txn.execute("DELETE FROM Action", []).unwrap();
+        txn.execute("DELETE FROM Entry", []).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 // TESTS BEGIN HERE
@@ -405,12 +403,12 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
-        Some(a.original_entry.clone().into()),
+        a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterUpdatedRecord(
         a.signature.clone(),
         a.entry_update_action.clone(),
-        Some(a.new_entry.clone().into()),
+        a.new_entry.clone().into(),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
@@ -432,7 +430,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     let op = DhtOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
-        Some(a.new_entry.clone().into()),
+        a.new_entry.clone().into(),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
@@ -468,7 +466,7 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
-        Some(a.original_entry.clone().into()),
+        a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![Db::IntQueue(op.clone()), Db::Integrated(original_op)];
@@ -517,7 +515,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 // This runs the above tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let env = test_db.to_db();
 
@@ -532,7 +530,7 @@ async fn test_ops_state() {
     ];
 
     for t in tests.iter() {
-        clear_dbs(env.clone());
+        clear_dbs(env.clone()).await;
         println!("test_ops_state on function {:?}", t);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);

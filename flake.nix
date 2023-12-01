@@ -3,6 +3,10 @@
     "Holochain is an open-source framework to develop peer-to-peer applications with high levels of security, reliability, and performance.";
 
   inputs = {
+    # empty repo that can be detected as such, used for the input override implementation
+    empty.url = "github:steveej/empty";
+    empty.flake = false;
+
     # nix packages pointing to the github repo
     nixpkgs.url = "nixpkgs/nixos-unstable";
 
@@ -25,24 +29,24 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
+
+    # To execute checks when making a commit
+    # Only /flake-module.nix is needed here -> Importing with `flake=false`.
+    pre-commit-hooks-nix.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit-hooks-nix.flake = false;
+
     # rustup, rust and cargo
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    versions = {
-      url = "github:holochain/holochain?dir=versions/0_1";
-    };
+    versions.url = "github:holochain/holochain?dir=versions/0_1";
 
-    holochain.follows = "versions/holochain";
-    holochain.flake = false;
-    lair.follows = "versions/lair";
-    lair.flake = false;
-    launcher.follows = "versions/launcher";
-    launcher.flake = false;
-    scaffolding.follows = "versions/scaffolding";
-    scaffolding.flake = false;
+    holochain.follows = "empty";
+    lair.follows = "empty";
+    launcher.follows = "empty";
+    scaffolding.follows = "empty";
 
     cargo-chef = {
       url = "github:LukeMathWalker/cargo-chef/main";
@@ -61,9 +65,15 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" "aarch64-linux" ];
 
-      # auto import all nix code from `./modules`, treat each one as a flake and merge them
-      imports = map (m: "${./.}/nix/modules/${m}")
-        (builtins.attrNames (builtins.readDir ./nix/modules));
+      imports =
+        # auto import all nix code from `./modules`, treat each one as a flake and merge them
+        (
+          map (m: "${./.}/nix/modules/${m}")
+            (builtins.attrNames (builtins.readDir ./nix/modules))
+        )
+        ++ [
+          (inputs.pre-commit-hooks-nix + /flake-module.nix)
+        ];
 
       perSystem = { pkgs, ... }: {
         legacyPackages = pkgs;

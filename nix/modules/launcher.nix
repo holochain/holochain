@@ -3,7 +3,6 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
       rustToolchain = config.rust.mkRust {
         track = "stable";
         version = "1.66.1";
@@ -13,36 +12,51 @@
       commonArgs = {
 
         pname = "hc-launch";
-        src = inputs.launcher;
+        src = flake.config.reconciledInputs.launcher;
 
         CARGO_PROFILE = "release";
 
         cargoExtraArgs = "--bin hc-launch";
 
-        buildInputs =
+        buildInputs = (with pkgs; [
+          openssl
+
+          # this is required for glib-networking
+          glib
+        ])
+        ++ (lib.optionals pkgs.stdenv.isLinux
           (with pkgs; [
-            openssl
-            glib
+            webkitgtk.dev
+            gdk-pixbuf
+            gtk3
+          ]))
+        ++ lib.optionals pkgs.stdenv.isDarwin
+          (with self'.legacyPackages.apple_sdk'.frameworks; [
+            AppKit
+            CoreFoundation
+            CoreServices
+            Security
+            IOKit
+            WebKit
           ])
-          ++ (lib.optionals pkgs.stdenv.isLinux
-            (with pkgs; [
-              webkitgtk.dev
-              gdk-pixbuf
-              gtk3
-            ]))
-          ++ lib.optionals pkgs.stdenv.isDarwin (builtins.attrValues (builtins.removeAttrs pkgs.darwin.apple_sdk.frameworks [ "QuickTime" ]))
         ;
 
-        nativeBuildInputs =
-          (with pkgs;
-          [
-            perl
-            pkg-config
-          ])
-          ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
-            xcbuild
-            libiconv
-          ]);
+        nativeBuildInputs = (with pkgs; [
+          perl
+          pkg-config
+
+          # currently needed to build tx5
+          self'.packages.goWrapper
+        ])
+        ++ (lib.optionals pkgs.stdenv.isLinux
+          (with pkgs; [
+            wrapGAppsHook
+          ]))
+        ++ (lib.optionals pkgs.stdenv.isDarwin [
+          pkgs.xcbuild
+          pkgs.libiconv
+        ])
+        ;
 
         doCheck = false;
       };
@@ -59,10 +73,14 @@
         ];
 
         preFixup = ''
-          wrapProgram $out/bin/hc-launch \
-            --set WEBKIT_DISABLE_COMPOSITING_MODE 1 \
-            --set GIO_MODULE_DIR ${pkgs.glib-networking}/lib/gio/modules \
-            --prefix GIO_EXTRA_MODULES : ${pkgs.glib-networking}/lib/gio/modules
+          gappsWrapperArgs+=(
+            --set WEBKIT_DISABLE_COMPOSITING_MODE 1
+          )
+
+          # without this the DevTools will just display an unparsed HTML file (see https://github.com/tauri-apps/tauri/issues/5711#issuecomment-1336409601)
+          gappsWrapperArgs+=(
+            --prefix XDG_DATA_DIRS : "${pkgs.shared-mime-info}/share"
+          )
         '';
       });
 
@@ -70,7 +88,6 @@
     {
       packages = {
         hc-launch = package;
-        launcherDeps = deps;
       };
     };
 }

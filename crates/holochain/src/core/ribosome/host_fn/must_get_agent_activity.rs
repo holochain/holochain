@@ -3,7 +3,7 @@ use crate::core::ribosome::HostContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -26,11 +26,11 @@ pub fn must_get_agent_activity(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = match call_context.host_context {
+                let cascade = match call_context.host_context {
                     HostContext::Validate(_) => {
-                        Cascade::from_workspace_stores(workspace.stores(), None)
+                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
                     }
-                    _ => Cascade::from_workspace_and_network(
+                    _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
@@ -114,7 +114,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

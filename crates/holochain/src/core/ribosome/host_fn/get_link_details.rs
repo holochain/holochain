@@ -3,7 +3,7 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use futures::future::join_all;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -34,7 +34,7 @@ pub fn get_link_details<'a>(
                             type_query: link_type,
                             tag: tag_prefix,
                         };
-                        Ok(Cascade::from_workspace_and_network(
+                        Ok(CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )
@@ -76,7 +76,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashPath).await;
