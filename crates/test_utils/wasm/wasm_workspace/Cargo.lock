@@ -312,9 +312,9 @@ checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
 name = "core-foundation-sys"
-version = "0.8.4"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
+checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
 name = "corosensei"
@@ -1151,9 +1151,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.88"
+version = "0.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a262ac5cf3e791ff1b4e5d474a94f15658146b3dd99f71f6e4b904584eee72f"
+checksum = "7b019eb03d5f29d36dfdfe618192edd291ec84a40b5df8b4361fb32e925fc4df"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1165,9 +1165,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.88"
+version = "0.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42e0f347517e99b63ff277a121325bb714600f580375239f26c832451036439b"
+checksum = "dd0253a32f8687ab5a3150768793cb9addb45a000cd9c5f6e7aaf594ffe602d1"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -3293,9 +3293,9 @@ checksum = "7ab9b36309365056cd639da3134bf87fa8f3d86008abf99e612384a6eecd459f"
 
 [[package]]
 name = "wasm-encoder"
-version = "0.38.0"
+version = "0.38.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b09bc5df933a3dabbdb72ae4b6b71be8ae07f58774d5aa41bd20adcd41a235a"
+checksum = "0ad2b51884de9c7f4fe2fd1043fccb8dcad4b1e29558146ee57a144d15779f3f"
 dependencies = [
  "leb128",
 ]
@@ -3443,9 +3443,9 @@ dependencies = [
 
 [[package]]
 name = "wast"
-version = "69.0.0"
+version = "69.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efa51b5ad1391943d1bfad537e50f28fe938199ee76b115be6bae83802cd5185"
+checksum = "c1ee37317321afde358e4d7593745942c48d6d17e0e6e943704de9bbee121e7a"
 dependencies = [
  "leb128",
  "memchr",
@@ -3455,9 +3455,9 @@ dependencies = [
 
 [[package]]
 name = "wat"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74a4c2488d058326466e086a43f5d4ea448241a8d0975e3eb0642c0828be1eb3"
+checksum = "aeb338ee8dee4d4cd05e6426683f21c5087dc7cfc8903e839ccf48d43332da3c"
 dependencies = [
  "wast",
 ]

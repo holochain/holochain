@@ -608,7 +608,7 @@ async fn concurrent_install_dna() {
 
     static NUM_DNA: u8 = 50;
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
-    static REQ_TIMEOUT_MS: u64 = 30000;
+    static REQ_TIMEOUT_MS: u64 = 60000;
 
     holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that

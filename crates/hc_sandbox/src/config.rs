@@ -7,7 +7,7 @@ use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 /// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.
-pub fn create_config(config_root_path: ConfigRootPath, con_url: Option<url2::Url2>) -> ConductorConfig {
+pub fn create_config(config_root_path: ConfigRootPath, con_url: Option<url2::Url2>) -> anyhow::Result<ConductorConfig> {
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
         ..Default::default()
@@ -20,11 +20,11 @@ pub fn create_config(config_root_path: ConfigRootPath, con_url: Option<url2::Url
         }
         None => {
             conductor_config.keystore = KeystoreConfig::LairServerInProc {
-                lair_root: Some(config_root_path.is_also_data_root_path().into()),
+                lair_root: Some(config_root_path.is_also_data_root_path().try_into()?),
             };
         }
     }
-    conductor_config
+    Ok(conductor_config)
 }
 
 /// Write [`ConductorConfig`] to [`CONDUCTOR_CONFIG`].

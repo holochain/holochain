@@ -14,7 +14,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
-use holochain_conductor_api::conductor::paths::DataPath;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
@@ -434,7 +434,7 @@ pub async fn setup_app_with_network(
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    data_root_path: DataPath,
+    data_root_path: DataRootPath,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,

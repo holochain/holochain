@@ -28,7 +28,7 @@ pub struct ConfigRootPath(PathBuf);
 impl ConfigRootPath {
     /// Create a new config root path from a data path.
     /// This is useful for when you want to use the same path for both.
-    pub fn is_also_data_root_path(&self) -> DataPath {
+    pub fn is_also_data_root_path(&self) -> DataRootPath {
         self.0.clone().into()
     }
 }
@@ -64,10 +64,57 @@ impl From<ConfigRootPath> for ConfigFilePath {
     serde::Deserialize,
     Clone,
 )]
-pub struct DataPath(PathBuf);
+pub struct DataRootPath(PathBuf);
 
-impl From<DataPath> for KeystorePath {
-    fn from(data_path: DataPath) -> Self {
-        Self::from(data_path.0.join(KEYSTORE_DIRECTORY))
+impl TryFrom<DataRootPath> for KeystorePath {
+    type Error = std::io::Error;
+    fn try_from(data_root_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_root_path.0.join(KEYSTORE_DIRECTORY);
+        std::fs::create_dir_all(path.clone())?;
+        Ok(Self::from(path))
+    }
+}
+
+/// Newtype to make sure we never accidentaly use or not use the databases path.
+/// Intentionally has no default value.
+#[derive(
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
+pub struct DatabasesRootPath(PathBuf);
+
+impl TryFrom<DataRootPath> for DatabasesRootPath {
+    type Error = std::io::Error;
+    fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_path.0.join(DATABASES_DIRECTORY);
+        std::fs::create_dir_all(path.clone())?;
+        Ok(Self::from(path))
+    }
+}
+
+/// Newtype to make sure we never accidentaly use or not use the wasm path.
+/// Intentionally has no default value.
+#[derive(
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
+pub struct WasmRootPath(PathBuf);
+
+impl TryFrom<DataRootPath> for WasmRootPath {
+    type Error = std::io::Error;
+    fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_path.0.join(WASM_DIRECTORY);
+        std::fs::create_dir_all(path.clone())?;
+        Ok(Self::from(path))
     }
 }

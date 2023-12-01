@@ -18,7 +18,7 @@ use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holochain_conductor_api::conductor::paths::DataPath;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::test_utils::test_db_dir;
@@ -259,7 +259,7 @@ async fn check_app_entry_def_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();
-    let data_root_dir: DataPath = db_dir.path().to_path_buf().into();
+    let data_root_dir: DataRootPath = db_dir.path().to_path_buf().into();
     let conductor_handle = Conductor::builder()
         .with_data_root_path(data_root_dir)
         .test(&[])

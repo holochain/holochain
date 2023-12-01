@@ -26,7 +26,7 @@ pub fn generate(
 ) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
-    let mut config = create_config(dir.clone(), con_url);
+    let mut config = create_config(dir.clone(), con_url)?;
     config.network = network;
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
@@ -54,15 +54,18 @@ pub fn generate_with_config(
     directory: Option<PathBuf>,
 ) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, true)?;
-    let config = config.unwrap_or_else(|| {
-        let mut config = create_config(dir.clone(), con_url.clone());
-        config.keystore = KeystoreConfig::LairServer {
-            connection_url: con_url.expect(
-                "Lair should have been initialised but did not get a connection URL for it",
-            ),
-        };
-        config
-    });
+    let config = match config {
+        Some(config) => config,
+        None => {
+            let mut config = create_config(dir.clone(), con_url.clone())?;
+            config.keystore = KeystoreConfig::LairServer {
+                connection_url: con_url.expect(
+                    "Lair should have been initialised but did not get a connection URL for it",
+                ),
+            };
+            config
+        }
+    };
     write_config(dir.clone(), &config);
     Ok(dir)
 }
@@ -81,7 +84,7 @@ pub fn generate_directory(
     std::fs::create_dir(&dir)?;
 
     let config_root_path = ConfigRootPath::from(dir);
-    let keystore_path = KeystorePath::from(config_root_path.is_also_data_root_path());
+    let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
     std::fs::create_dir(keystore_path.as_ref())?;
 
     let con_url = if initialise_lair {

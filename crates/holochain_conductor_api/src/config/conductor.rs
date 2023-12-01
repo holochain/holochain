@@ -27,7 +27,7 @@ pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
 
-use crate::config::conductor::paths::DataPath;
+use crate::config::conductor::paths::DataRootPath;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
@@ -41,7 +41,7 @@ pub struct ConductorConfig {
     /// This can be `None` while building up the config programatically but MUST
     /// be set by the time the config is used to build a conductor.
     /// The database and compiled wasm directories are derived from this path.
-    pub data_root_path: Option<DataPath>,
+    pub data_root_path: Option<DataRootPath>,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -113,7 +113,7 @@ impl ConductorConfig {
     }
 
     /// Get the data directory for this config or say something nice and die.
-    pub fn data_root_path_or_die(&self) -> DataPath {
+    pub fn data_root_path_or_die(&self) -> DataRootPath {
         match &self.data_root_path {
             Some(path) => path.clone(),
             None => {

@@ -101,8 +101,8 @@ pub async fn run_async(
         Some(c) => c,
         None => {
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(&config_root_path.is_also_data_root_path().into(), passphrase)?;
-            create_config(config_root_path.clone(), Some(con_url))
+            let con_url = crate::generate::init_lair(&config_root_path.is_also_data_root_path().try_into()?, passphrase)?;
+            create_config(config_root_path.clone(), Some(con_url))?
         }
     };
     match force_admin_port {
@@ -140,7 +140,7 @@ async fn start_holochain(
 
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
-            let lair = start_lair(passphrase.as_slice(), config_root_path.is_also_data_root_path().into()).await?;
+            let lair = start_lair(passphrase.as_slice(), config_root_path.is_also_data_root_path().try_into()?).await?;
             Some(lair)
         }
         _ => None,

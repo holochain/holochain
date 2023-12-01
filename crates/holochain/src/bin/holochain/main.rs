@@ -2,7 +2,7 @@ use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::manager::handle_shutdown;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
-use holochain_conductor_api::conductor::paths::DataPath;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::conductor::process::ERROR_CODE;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_conductor_api::config::conductor::paths::ConfigRootPath;
@@ -83,7 +83,7 @@ async fn async_main() {
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 
-    let data_root_path: DataPath = config.data_root_path_or_die();
+    let data_root_path: DataRootPath = config.data_root_path_or_die();
 
     holochain_metrics::HolochainMetricsConfig::new(data_root_path.as_ref())
         .init()

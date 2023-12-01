@@ -8,7 +8,6 @@ use super::{
     error::ConductorResult,
     p2p_agent_store::{self, P2pBatch},
 };
-use crate::conductor::paths::DataPath;
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::{
     queue_consumer::QueueConsumerMap,
@@ -47,6 +46,7 @@ use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
 use tracing::instrument;
+use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 
 #[cfg(test)]
 mod tests;
@@ -57,7 +57,7 @@ mod tests;
 /// installed on this conductor.
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    pub(crate) db_dir: Arc<DataPath>,
+    pub(crate) db_dir: Arc<DatabasesRootPath>,
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
@@ -127,15 +127,17 @@ pub struct TestSpace {
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
-        let root_db_dir = config
+        let root_db_dir: DatabasesRootPath = config
             .data_root_path
             .clone()
-            .ok_or(ConductorError::NoDataPath)?;
+            .ok_or(ConductorError::NoDataRootPath)?
+            .try_into()?;
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
+        dbg!("new space", &root_db_dir);
         let conductor_db =
             DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
         let wasm_db =

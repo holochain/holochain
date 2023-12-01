@@ -2,7 +2,7 @@ use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
-use crate::conductor::paths::DataPath;
+use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
@@ -52,7 +52,7 @@ impl ConductorBuilder {
     }
 
     /// Set the data root path for the conductor that will be built.
-    pub fn with_data_root_path(mut self, data_root_path: DataPath) -> Self {
+    pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
         self.config.data_root_path = Some(data_root_path);
         self
     }
@@ -99,9 +99,9 @@ impl ConductorBuilder {
                             .config
                             .data_root_path
                             .as_ref()
-                            .ok_or(ConductorError::NoDataPath)?
+                            .ok_or(ConductorError::NoDataRootPath)?
                             .clone()
-                            .into(),
+                            .try_into()?,
                     };
                     let keystore_config_path = keystore_root_path
                         .as_ref()
