@@ -7,11 +7,11 @@
 // TODO: move entire module to `holochain_types`
 
 use crate::prelude::*;
+pub use error::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
-pub use error::*;
 
 mod error;
 
