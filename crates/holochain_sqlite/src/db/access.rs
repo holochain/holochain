@@ -431,6 +431,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     }
 }
 
+// The method for this function is taken from https://discuss.zetetic.net/t/how-to-encrypt-a-plaintext-sqlite-database-to-use-sqlcipher-and-avoid-file-is-encrypted-or-is-not-a-database-errors/868
 #[cfg(feature = "sqlite-encrypted")]
 pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
     // e.g. conductor/conductor.sqlite3 -> conductor/conductor-encrypted.sqlite3
