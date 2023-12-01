@@ -48,7 +48,7 @@ pub struct ConductorState {
     /// Conductor services that have been installed, to enable initialization
     /// upon restart
     #[serde(default)]
-    conductor_services: ConductorServicesState,
+    pub(crate) conductor_services: ConductorServicesState,
 
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
@@ -205,11 +205,6 @@ impl ConductorState {
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
-    }
-
-    /// Accessor
-    pub fn conductor_services(&self) -> &ConductorServicesState {
-        &self.conductor_services
     }
 }
 

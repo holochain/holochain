@@ -344,7 +344,7 @@ mod startup_shutdown_impls {
             });
 
             let state = self.get_state().await?;
-            if let Some(deepkey_cell_id) = state.conductor_services().deepkey.as_ref() {
+            if let Some(deepkey_cell_id) = state.conductor_services.deepkey.as_ref() {
                 self.services.share_mut(|services| {
                     let deepkey = DeepkeyBuiltin::new(
                         self.clone(),
@@ -2079,6 +2079,34 @@ mod app_status_impls {
                 )) => e.is_connect(),
                 _ => false,
             }
+        }
+    }
+}
+
+/// Methods related to management of Conductor state
+mod service_impls {
+    use super::*;
+
+    impl Conductor {
+        pub(crate) async fn initialize_deepkey(
+            self: Arc<Self>,
+            dna: DnaFile,
+        ) -> ConductorResult<()> {
+            let agent = self.keystore().new_sign_keypair_random().await?;
+            let cell_id = CellId::new(dna.dna_hash().clone(), agent);
+            let cell_id_2 = cell_id.clone();
+            self.update_state(move |mut state| {
+                state.conductor_services.deepkey = Some(cell_id_2);
+                Ok(state)
+            })
+            .await?;
+
+            self.services.share_mut(|s| {
+                let deepkey = DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), cell_id);
+                s.dpki = Some(Arc::new(deepkey));
+            });
+
+            Ok(())
         }
     }
 }

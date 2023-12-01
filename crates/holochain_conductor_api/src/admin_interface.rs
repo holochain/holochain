@@ -329,6 +329,9 @@ pub enum AdminRequest {
 
     /// Info about storage used by apps
     StorageInfo,
+
+    /// Initialize the DPKI conductor service by providing a Deepkey DNA
+    InitializeDeepkey { deepkey_dna: DnaFile },
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -465,6 +468,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::StorageInfo`].
     StorageInfo(StorageInfo),
+
+    /// Successful response to whatever request was made, with no extra information included
+    Ok,
 }
 
 /// Error type that goes over the websocket wire.
