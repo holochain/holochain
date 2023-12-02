@@ -49,8 +49,6 @@ pub use crate::zome_io::*;
 pub use holochain_integrity_types::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
-pub use crate::zome::inline_zome::error::*;
-#[cfg(feature = "full-dna-def")]
 pub use crate::zome::inline_zome::*;
 
 #[cfg(feature = "fixturators")]
