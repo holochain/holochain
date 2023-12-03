@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Refactor: Remove shadowing glob re-exports that were shadowing other exports.
 
 
+- Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
+
 ## 0.3.0-beta-dev.26
 
 ## 0.3.0-beta-dev.25
