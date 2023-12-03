@@ -32,7 +32,6 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
     /// Deal with error cases produced by `handle_admin_request_inner`
     async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
-        dbg!("Admin request: {:?}", &request);
         debug!("admin request: {:?}", request);
 
         let res = match self.handle_admin_request_inner(request).await {
@@ -142,7 +141,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::CoordinatorsUpdated)
             }
             InstallApp(payload) => {
-                dbg!("InstallApp");
                 let app: InstalledApp = self
                     .conductor_handle
                     .clone()

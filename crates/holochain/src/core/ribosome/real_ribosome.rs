@@ -398,7 +398,6 @@ impl RealRibosome {
         let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
-        dbg!(&key);
         Ok(key)
     }
 
@@ -580,7 +579,6 @@ impl RealRibosome {
     }
 
     pub async fn tooling_imports() -> RibosomeResult<Vec<String>> {
-        dbg!("tooooling imnports");
         let empty_dna_def = DnaDef {
             name: Default::default(),
             modifiers: DnaModifiers {
