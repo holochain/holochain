@@ -294,7 +294,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stdout) = stdout {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                // dbg!("holochain bin stdout: {}", &line);
+                println!("holochain bin stdout: {}", &line);
                 tx = tx
                     .take()
                     .and_then(|tx| match check_line_for_admin_port(&line) {
@@ -311,7 +311,9 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stderr) = stderr {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                // dbg!("holochain bin stderr: {}", &line);
+                if !line.contains("Binary([") {
+                    println!("holochain bin stderr: {}", &line);
+                }
             }
         }
     });
