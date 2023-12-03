@@ -2667,6 +2667,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_dna_properties"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "hdi",
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_emit_signal"
 version = "0.0.1"
 dependencies = [
