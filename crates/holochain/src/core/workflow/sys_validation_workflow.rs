@@ -612,12 +612,12 @@ async fn validate_op_inner(
     }
 }
 
-// #[instrument(skip(record, call_zome_workspace, network))]
-/// Direct system validation call that takes
-/// a Record instead of an op.
-/// Does not require holding dependencies.
-/// Will not await dependencies and instead returns
-/// that outcome immediately.
+/// Run system validation for a single [`Record`] instead of the usual [`DhtOp`] input for the system validation workflow.
+/// It is expected that the provided cascade will include a network so that dependencies which we either do not hold yet, or
+/// should not hold, can be fetched and cached for use in validation.
+/// 
+/// Note that the conditions on the action being validated are slightly stronger than the usual system validation workflow. This is because
+/// it is intended to be used for validation of records which have been authored locally so we should always be able to check the previous action.
 pub async fn sys_validate_record(
     record: &Record,
     cascade: Arc<impl Cascade + Send + Sync>,
