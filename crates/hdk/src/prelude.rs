@@ -75,6 +75,7 @@ pub use hdi::prelude::Path;
 pub use hdi::prelude::ShardStrategy;
 pub use hdi::prelude::TypedPath;
 pub use hdk_derive;
+pub use hdk_derive::dna_properties;
 pub use hdk_derive::hdk_dependent_entry_types;
 pub use hdk_derive::hdk_dependent_link_types;
 pub use hdk_derive::hdk_entry_defs;
