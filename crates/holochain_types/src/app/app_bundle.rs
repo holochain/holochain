@@ -2,8 +2,6 @@
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
-use self::error::AppBundleResult;
-
 use super::{AppManifest, AppManifestValidated};
 use crate::prelude::*;
 

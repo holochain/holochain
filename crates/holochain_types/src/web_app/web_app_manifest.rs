@@ -10,8 +10,6 @@ pub(crate) mod web_app_manifest_v1;
 
 pub use current::*;
 
-use web_app_manifest_v1::WebAppManifestV1;
-
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]

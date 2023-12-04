@@ -19,7 +19,6 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
-use error::AppValidationResult;
 pub use error::*;
 use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
