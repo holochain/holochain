@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Fixed spammy "Recorded initiate|accept with current round already set" warning. [#3060](https://github.com/holochain/holochain/pull/3060)
 
 - Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
 
