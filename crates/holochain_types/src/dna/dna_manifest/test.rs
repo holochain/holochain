@@ -209,12 +209,12 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-  let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
-  assert!(
-      err.to_string().contains("unknown field `not_a_real_field`"),
-      "Should have rejected unknown field but actually got: {}",
-      err.to_string(),
-  );
+    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    assert!(
+        err.to_string().contains("unknown field `not_a_real_field`"),
+        "Should have rejected unknown field but actually got: {}",
+        err.to_string(),
+    );
 }
 
 #[test]
@@ -260,10 +260,10 @@ coordinator:
       not_a_real_field: ~
         "#;
 
-  let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
-  assert!(
-      err.to_string().contains("unknown field `not_a_real_field`"),
-      "Should have rejected unknown field but actually got: {}",
-      err.to_string(),
-  );
+    let err = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap_err();
+    assert!(
+        err.to_string().contains("unknown field `not_a_real_field`"),
+        "Should have rejected unknown field but actually got: {}",
+        err.to_string(),
+    );
 }
