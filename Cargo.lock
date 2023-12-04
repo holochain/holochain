@@ -4225,7 +4225,7 @@ dependencies = [
  "structopt",
  "tokio",
  "tracing-subscriber",
- "webpki 0.21.4",
+ "webpki",
 ]
 
 [[package]]
@@ -4256,7 +4256,7 @@ dependencies = [
  "rustls 0.20.9",
  "serde",
  "tokio",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -4296,7 +4296,7 @@ dependencies = [
  "ureq",
  "url 2.5.0",
  "url2",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -5884,7 +5884,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -5904,7 +5904,7 @@ dependencies = [
  "thiserror",
  "tinyvec",
  "tracing",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -6651,7 +6651,7 @@ dependencies = [
  "log",
  "ring 0.16.20",
  "sct",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -7836,7 +7836,7 @@ checksum = "c43ee83903113e03984cb9e5cebe6c04a5116269e900e3ddba8f068a62adda59"
 dependencies = [
  "rustls 0.20.9",
  "tokio",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -7889,7 +7889,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.4",
  "tungstenite 0.18.0",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -8196,7 +8196,7 @@ dependencies = [
  "thiserror",
  "url 2.5.0",
  "utf-8",
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
@@ -8480,7 +8480,7 @@ dependencies = [
  "once_cell",
  "rustls 0.20.9",
  "url 2.5.0",
- "webpki 0.22.2",
+ "webpki",
  "webpki-roots 0.22.6",
 ]
 
@@ -9081,16 +9081,6 @@ dependencies = [
 
 [[package]]
 name = "webpki"
-version = "0.21.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
-dependencies = [
- "ring 0.16.20",
- "untrusted 0.7.1",
-]
-
-[[package]]
-name = "webpki"
 version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07ecc0cd7cac091bf682ec5efa18b1cff79d617b84181f38b3951dbe135f607f"
@@ -9105,7 +9095,7 @@ version = "0.22.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
 dependencies = [
- "webpki 0.22.2",
+ "webpki",
 ]
 
 [[package]]
