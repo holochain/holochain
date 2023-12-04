@@ -49,8 +49,7 @@ pub use app_manifest_v1::{AppRoleDnaManifest, CellProvisioning};
 pub use current::*;
 pub use error::*;
 
-use self::{app_manifest_validated::AppManifestValidated, error::AppManifestResult};
-use app_manifest_v1::AppManifestV1;
+use self::app_manifest_validated::AppManifestValidated;
 
 use super::InstalledCell;
 
