@@ -2869,6 +2869,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_no_types"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
