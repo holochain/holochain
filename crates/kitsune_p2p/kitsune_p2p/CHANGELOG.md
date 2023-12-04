@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Fixed spammy "Recorded initiate|accept with current round already set" warning. [#3060](https://github.com/holochain/holochain/pull/3060)
 
+- Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
+
 ## 0.2.3
 
 ## 0.2.3-rc.1
@@ -16,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Add additional configuration options to network\_tuning for setting the allowed ephemeral port range for tx5 connections: tx5\_min\_ephemeral\_udp\_port and tx5\_max\_ephemeral\_udp\_port
 - Adjust bootstrap max\_delay from 60 minutes -\> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
+>>>>>>> 596e2502c086e8b44a0dd9876fabf6e54d52a205
 
 ## 0.2.3-beta-rc.0
 
