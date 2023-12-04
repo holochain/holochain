@@ -43,7 +43,7 @@ impl RibosomeStore {
     }
 
     // TODO: use Arc, eliminate cloning
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.ribosomes.get(hash).map(|r| r.dna_file().clone())
     }
