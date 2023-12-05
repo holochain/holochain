@@ -214,7 +214,7 @@ mod tests {
             .test(&[])
             .await
             .unwrap();
-            let integrate_dht_ops_trigger = TriggerSender::new();
+        let integrate_dht_ops_trigger = TriggerSender::new();
 
         let args = InitializeZomesWorkflowArgs {
             ribosome,
