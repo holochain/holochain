@@ -11,6 +11,7 @@ members = [
     "crd",
     "crud",
     "debug",
+    "dna_properties",
     "emit_signal",
     "entry_defs",
     "hash_entry",
