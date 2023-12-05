@@ -489,10 +489,7 @@ where
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
-            let cascade = CascadeImpl::from_workspace_and_network(
-                &workspace,
-                network.clone(),
-            );
+            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
             store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
         }
         Op::StoreEntry(StoreEntry {
@@ -645,15 +642,16 @@ async fn store_record_zomes_to_invoke(
     // was a create or a delete for an app entry type.
     let action = match action {
         Action::Delete(Delete {
-            deletes_address,
-            ..
-        }) | Action::DeleteLink(DeleteLink {
+            deletes_address, ..
+        })
+        | Action::DeleteLink(DeleteLink {
             link_add_address: deletes_address,
             ..
         }) => {
-            let (deletes_action, _) = cascade.retrieve_action(deletes_address.clone(), NetworkGetOptions::default()).await?.ok_or_else(|| {
-                Outcome::awaiting(deletes_address)
-            })?;
+            let (deletes_action, _) = cascade
+                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+                .await?
+                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
 
             deletes_action.action().clone()
         }
