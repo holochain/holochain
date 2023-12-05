@@ -24,14 +24,12 @@ pub fn generate(
     directory: Option<PathBuf>,
     in_process_lair: bool,
 ) -> anyhow::Result<ConfigRootPath> {
-    dbg!("generate", &root, &directory);
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
     config.network = network;
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
-    dbg!("generate 2", &path);
     msg!("Config {:?}", config);
     msg!(
         "Created directory at: {} {} It has also been saved to a file called `.hc` in your current working directory.",
@@ -78,7 +76,6 @@ pub fn generate_directory(
     directory: Option<PathBuf>,
     initialise_lair: bool,
 ) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
-    dbg!("generate_directory", &root, &directory);
     let passphrase = holochain_util::pw::pw_get()?;
 
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
@@ -86,12 +83,8 @@ pub fn generate_directory(
     dir.push(directory);
     std::fs::create_dir(&dir)?;
 
-    dbg!("generate_directory 2", &dir);
-
     let config_root_path = ConfigRootPath::from(dir);
     let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
-
-    dbg!("generate_directory 3", &keystore_path);
 
     let con_url = if initialise_lair {
         Some(init_lair(&keystore_path, passphrase)?)
@@ -120,16 +113,13 @@ pub(crate) fn init_lair_inner(
     dir: &KeystorePath,
     passphrase: sodoken::BufRead,
 ) -> anyhow::Result<url2::Url2> {
-    dbg!("init_lair_inner", &dir);
     let mut cmd = std::process::Command::new("lair-keystore");
 
     cmd.args(["init", "--piped"])
         .current_dir(dir.as_ref())
         .stdin(std::process::Stdio::piped());
 
-    dbg!("init_lair_inner 1");
     let mut proc = cmd.spawn()?;
-    dbg!("init_lair_inner 1.1");
     let mut stdin = proc.stdin.take().unwrap();
 
     use std::io::Write;
@@ -138,10 +128,8 @@ pub(crate) fn init_lair_inner(
     drop(stdin);
 
     if !proc.wait()?.success() {
-        dbg!("init_lair_inner fail 1");
         return Err(std::io::Error::new(std::io::ErrorKind::Other, "LairInitFail").into());
     }
-    dbg!("init_lair_inner 2");
     let conf = dir.as_ref().join("lair-keystore-config.yaml");
 
     let conf = std::fs::read(conf)?;
