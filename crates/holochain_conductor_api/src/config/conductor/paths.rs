@@ -70,7 +70,9 @@ impl TryFrom<DataRootPath> for KeystorePath {
     type Error = std::io::Error;
     fn try_from(data_root_path: DataRootPath) -> Result<Self, Self::Error> {
         let path = data_root_path.0.join(KEYSTORE_DIRECTORY);
-        std::fs::create_dir_all(path.clone())?;
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
         Ok(Self::from(path))
     }
 }
@@ -92,7 +94,9 @@ impl TryFrom<DataRootPath> for DatabasesRootPath {
     type Error = std::io::Error;
     fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
         let path = data_path.0.join(DATABASES_DIRECTORY);
-        std::fs::create_dir_all(path.clone())?;
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
         Ok(Self::from(path))
     }
 }
@@ -114,7 +118,9 @@ impl TryFrom<DataRootPath> for WasmRootPath {
     type Error = std::io::Error;
     fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
         let path = data_path.0.join(WASM_DIRECTORY);
-        std::fs::create_dir_all(path.clone())?;
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
         Ok(Self::from(path))
     }
 }
