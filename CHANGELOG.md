@@ -14,6 +14,220 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20231129.004341
+
+## [hcterm-0.3.0-beta-dev.2](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.2)
+
+## [holochain\_cli-0.3.0-beta-dev.26](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain-0.3.0-beta-dev.26](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.24](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cascade-0.3.0-beta-dev.26](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.26](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.21](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.24](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [hdk-0.3.0-beta-dev.21](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.21)
+
+- Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor. [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## [holochain\_state-0.3.0-beta-dev.25](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [hdi-0.4.0-beta-dev.17](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.17)
+
+- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## [holochain\_p2p-0.3.0-beta-dev.25](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_types-0.3.0-beta-dev.23](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_sqlite-0.3.0-beta-dev.23](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.23)
+
+# 20231122.004553
+
+## [hcterm-0.3.0-beta-dev.1](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.1)
+
+- Change the license from MIT to Apache-2.0.
+
+## [holochain\_cli-0.3.0-beta-dev.25](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain-0.3.0-beta-dev.25](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.25)
+
+- Fix: In many cases app validation would not be retriggered for ops that failed validation. Previously the app validation workflow had been retriggered only when the number of concurrent ops to be validated (50) was reached. Now the workflow will be retriggered whenever any ops could not be validated.
+
+- Added a new check to system validation to ensure that the `original_entry_address` of an update points to the same entry hash that the original action pointed to. [3023](https://github.com/holochain/holochain/pull/3023)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.23](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.15](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.25](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_cascade-0.3.0-beta-dev.25](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.25)
+
+- Change licensing from CAL-1.0 to Apache-2.0.
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.25](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_metrics-0.3.0-beta-dev.7](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.7)
+
+- Change the license from MIT to Apache-2.0.
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.20](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.23](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_websocket-0.3.0-beta-dev.5](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.5)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [hdk-0.3.0-beta-dev.20](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_state-0.3.0-beta-dev.24](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.24)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [hdi-0.4.0-beta-dev.16](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.16)
+
+- Change the license from Apache-2.0 to CAL-1.0 to match the HDK.
+
+## [holochain\_p2p-0.3.0-beta-dev.24](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.24)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [holochain\_state\_types-0.3.0-beta-dev.23](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.23)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [hdk\_derive-0.3.0-beta-dev.16](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_types-0.3.0-beta-dev.22](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.22)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [holochain\_keystore-0.3.0-beta-dev.18](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.18)
+
+- Change licensing from CAL-1.0 to Apache-2.0.
+
+## [holochain\_sqlite-0.3.0-beta-dev.22](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.17](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [kitsune\_p2p-0.3.0-beta-dev.22](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.22)
+
+- Update to a tx5 version that includes go code that is statically linked for all platform that support it. Windows and Android will remain dynamically linked. [\#2967](https://github.com/holochain/holochain/pull/2967)
+- Change the license from Apache-2.0 to CAL-1.0.
+- Fixed spammy “Recorded initiate|accept with current round already set” warning. [\#3060](https://github.com/holochain/holochain/pull/3060)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.16](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_nonce-0.3.0-beta-dev.22](crates/holochain_nonce/CHANGELOG.md#0.3.0-beta-dev.22)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [kitsune\_p2p\_block-0.3.0-beta-dev.11](crates/kitsune_p2p_block/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.20](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.16](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.14](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holo\_hash-0.3.0-beta-dev.13](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_secure\_primitive-0.3.0-beta-dev.21](crates/holochain_secure_primitive/CHANGELOG.md#0.3.0-beta-dev.21)
+
+- Change the license from CAL-1.0 to Apache-2.0.
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.14](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.14)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.14](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.14](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [kitsune\_p2p\_bin\_data-0.3.0-beta-dev.10](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [kitsune\_p2p\_dht-0.3.0-beta-dev.10](crates/kitsune_p2p_dht/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [kitsune\_p2p\_dht\_arc-0.3.0-beta-dev.9](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_trace-0.3.0-beta-dev.2](crates/holochain_trace/CHANGELOG.md#0.3.0-beta-dev.2)
+
+- Change the license from MIT to Apache-2.0.
+
+# 20231115.003452
+
+## [hcterm-0.3.0-beta-dev.0](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.0)
+
+## [holochain\_cli-0.3.0-beta-dev.24](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain-0.3.0-beta-dev.24](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.22](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.14](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.24](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cascade-0.3.0-beta-dev.24](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.24](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.24)
+
+- Test: Add tests to App and Admin API to prevent unnoticed changes in serialization from breaking these interfaces.
+
+## [holochain\_metrics-0.3.0-beta-dev.6](crates/holochain_metrics/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.19](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.22](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [hdk-0.3.0-beta-dev.19](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_state-0.3.0-beta-dev.23](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [hdi-0.4.0-beta-dev.15](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.15)
+
+## [holochain\_p2p-0.3.0-beta-dev.23](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_state\_types-0.3.0-beta-dev.22](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [hdk\_derive-0.3.0-beta-dev.15](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holochain\_types-0.3.0-beta-dev.21](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_keystore-0.3.0-beta-dev.17](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [holochain\_sqlite-0.3.0-beta-dev.21](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.16](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [kitsune\_p2p-0.3.0-beta-dev.21](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.21)
+
+- There were some places where parsing an invalid URL would crash kitsune. This is now fixed. [\#2689](https://github.com/holochain/holochain/pull/2689)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.15](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.19](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.15](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.13](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holo\_hash-0.3.0-beta-dev.12](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.12)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.13](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.13)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.13](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.13](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.13)
+
 # 20231101.003619
 
 ## [hcterm-0.2.0](crates/hcterm/CHANGELOG.md#0.2.0)

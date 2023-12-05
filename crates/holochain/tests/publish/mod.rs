@@ -20,7 +20,7 @@ async fn publish_termination() {
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
-        SweetConductorConfig::rendezvous(),
+        SweetConductorConfig::rendezvous(true),
     )
     .await;
 
@@ -37,10 +37,10 @@ async fn publish_termination() {
     // Wait until they all see the created entry, at that point validation receipts should be getting sent soon
     consistency_60s([&alice, &bobbo, &carol, &danny, &emma, &fred]).await;
 
-    let ops_to_publish = tokio::time::timeout(Duration::from_secs(30), async {
+    let ops_to_publish = tokio::time::timeout(Duration::from_secs(60), async {
         let alice_pub_key = alice.agent_pubkey().clone();
         loop {
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
 
             let ops_to_publish = alice
                 .authored_db()

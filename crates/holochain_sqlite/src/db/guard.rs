@@ -5,11 +5,27 @@ use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 use tokio::sync::OwnedSemaphorePermit;
 
-pub(super) struct PConnGuard(PConn, OwnedSemaphorePermit);
+use super::metrics::UseTimeMetric;
+
+pub(super) struct PConnGuard {
+    conn: PConn,
+    created: Instant,
+    use_time_metric: UseTimeMetric,
+    _permit: OwnedSemaphorePermit,
+}
 
 impl PConnGuard {
-    pub(super) fn new(conn: PConn, permit: OwnedSemaphorePermit) -> Self {
-        PConnGuard(conn, permit)
+    pub(super) fn new(
+        conn: PConn,
+        permit: OwnedSemaphorePermit,
+        use_time_metric: UseTimeMetric,
+    ) -> Self {
+        PConnGuard {
+            conn,
+            created: Instant::now(),
+            use_time_metric,
+            _permit: permit,
+        }
     }
 }
 
@@ -17,13 +33,20 @@ impl Deref for PConnGuard {
     type Target = PConn;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.conn
     }
 }
 
 impl DerefMut for PConnGuard {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.conn
+    }
+}
+
+impl Drop for PConnGuard {
+    fn drop(&mut self) {
+        self.use_time_metric
+            .record(self.created.elapsed().as_secs_f64(), &[]);
     }
 }
 

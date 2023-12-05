@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+//! An App Bundle is an AppManifest bundled together with DNA bundles.
 
-use self::error::AppBundleResult;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use super::{AppManifest, AppManifestValidated};
 use crate::prelude::*;

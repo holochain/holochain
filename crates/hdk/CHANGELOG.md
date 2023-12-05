@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 * If the `mock` feature is enabled, pass it to the HDI as well. [#1548](https://github.com/holochain/holochain/pull/1548)
 
+## 0.3.0-beta-dev.21
+
+- Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor. [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
 ## 0.3.0-beta-dev.18
 
 ## 0.3.0-beta-dev.17

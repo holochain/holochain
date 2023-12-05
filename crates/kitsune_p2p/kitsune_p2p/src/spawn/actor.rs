@@ -170,6 +170,7 @@ impl KitsuneP2pActor {
 
         // Start a loop to handle our fetch queue fetch items.
         FetchTask::spawn(
+            config.clone(),
             fetch_pool.clone(),
             host_api.clone(),
             internal_sender.clone(),
@@ -580,10 +581,10 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        let this_addr = self.ep_hnd.local_addr();
-        Ok(async move { Ok(vec![url2::Url2::parse(this_addr?)]) }
-            .boxed()
-            .into())
+        let this_addr = self.ep_hnd.local_addr()?;
+        let url = url2::Url2::try_parse(&this_addr)
+            .map_err(|e| KitsuneError::bad_input(e, format!("{:?}", this_addr)))?;
+        Ok(async move { Ok(vec![url]) }.boxed().into())
     }
 
     fn handle_join(
