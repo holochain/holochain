@@ -1,15 +1,22 @@
-//! App Manifest format, version 1.
+//! App Manifest format, installed_hash 1.
 //!
-//! NB: After stabilization, *do not modify this file*! Create a new version of
-//! the spec and leave this one alone to maintain backwards compatibility.
+//! **NB: do not modify the types in this file**!
+//! (at least not after this initial schema has been stabilized).
+//! For any modifications, create a new version of the spec and leave this one
+//! alone to maintain backwards compatibility.
+//!
+//! This is the initial version of the App Manifest. Not all functionality is
+//! implemented yet, notably:
+//! - Using existing Cells is not implemented
+//! - Specifying DNA version is not implemented (DNA migration needs to land first)
 
 use super::{
-    app_manifest_validated::{AppManifestValidated, AppSlotManifestValidated},
+    app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
     error::{AppManifestError, AppManifestResult},
 };
-use crate::prelude::{SlotId, YamlProperties};
-use holo_hash::{DnaHash, DnaHashB64};
-use holochain_zome_types::Uid;
+use crate::prelude::{RoleName, YamlProperties};
+use holo_hash::DnaHashB64;
+use holochain_zome_types::prelude::*;
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema
@@ -17,7 +24,10 @@ use std::collections::HashMap;
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -25,44 +35,53 @@ pub struct AppManifestV1 {
     /// Description of the app, just for context.
     pub description: Option<String>,
 
-    /// The Cell manifests that make up this app.
-    pub slots: Vec<AppSlotManifest>,
+    /// The roles that need to be filled (by DNAs) for this app.
+    pub roles: Vec<AppRoleManifest>,
 }
 
-/// Description of an app "slot" defined by this app.
-/// Slots get filled according to the provisioning rules, as well as by
+/// Description of an app "role" defined by this app.
+/// Roles get filled according to the provisioning rules, as well as by
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppSlotManifest {
-    /// The SlotId which will be given to the installed Cell for this Dna.
-    pub id: SlotId,
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub struct AppRoleManifest {
+    /// The ID which will be used to refer to:
+    /// - this role,
+    /// - the DNA which fills it,
+    /// - and the cell(s) created from that DNA
+    pub name: RoleName,
 
     /// Determines if, how, and when a Cell will be provisioned.
     pub provisioning: Option<CellProvisioning>,
 
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
-    pub dna: AppSlotDnaManifest,
+    pub dna: AppRoleDnaManifest,
 }
 
-impl AppSlotManifest {
-    /// Create a sample AppSlotManifest as a template to be followed
-    pub fn sample(id: SlotId) -> Self {
+impl AppRoleManifest {
+    /// Create a sample AppRoleManifest as a template to be followed
+    pub fn sample(name: RoleName) -> Self {
         Self {
-            id,
+            name,
             provisioning: Some(CellProvisioning::default()),
-            dna: AppSlotDnaManifest::sample(),
+            dna: AppRoleDnaManifest::sample(),
         }
     }
 }
 
-/// The DNA portion of an app slot
+/// The DNA portion of an app role
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppSlotDnaManifest {
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub struct AppRoleDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
     ///
@@ -71,57 +90,41 @@ pub struct AppSlotDnaManifest {
     #[serde(flatten)]
     pub location: Option<mr_bundle::Location>,
 
-    /// Optional default properties. May be overridden during installation.
-    pub properties: Option<YamlProperties>,
+    /// Optional default modifier values.
+    ///
+    /// Overrides any default modifiers specified in the DNA file,
+    /// and may also be overridden during installation.
+    /// A set of modifiers completely overrides previously specified default properties,
+    /// rather than being interpolated into them.
+    #[serde(default)]
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
 
-    /// Optional fixed UID. May be overridden during installation.
-    pub uid: Option<Uid>,
-
-    /// The versioning constraints for the DNA. Ensures that only a DNA that
-    /// matches the version spec will be used.
-    pub version: Option<DnaVersionFlexible>,
+    /// The hash of the DNA to be installed. If specified, will cause installation to
+    /// fail if the bundled DNA hash does not match this.
+    ///
+    /// Also allows the conductor to search for an already-installed DNA using this hash,
+    /// which allows for re-installing an app which has already been installed by manifest
+    /// only (no need to include the DNAs, since they are already installed in the conductor).
+    /// In this case, `location` does not even need to be set.
+    #[serde(default)]
+    pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
-    /// Each runtime clone is created by the `CreateClone` strategy,
-    /// regardless of the provisioning strategy set in the manifest.
     /// Default: 0
     #[serde(default)]
     pub clone_limit: u32,
 }
 
-impl AppSlotDnaManifest {
-    /// Create a sample AppSlotDnaManifest as a template to be followed
+impl AppRoleDnaManifest {
+    /// Create a sample AppRoleDnaManifest as a template to be followed
     pub fn sample() -> Self {
         Self {
             location: Some(mr_bundle::Location::Bundled(
                 "./path/to/my/dnabundle.dna".into(),
             )),
-            properties: None,
-            uid: None,
-            version: None,
+            modifiers: DnaModifiersOpt::none(),
+            installed_hash: None,
             clone_limit: 0,
-        }
-    }
-}
-
-/// Allow the DNA version to be specified as a single hash, rather than a
-/// singleton list. Just a convenience.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-#[serde(rename_all = "snake_case")]
-#[serde(untagged)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum DnaVersionFlexible {
-    /// A version spec with a single hash
-    Singleton(DnaHashB64),
-    /// An actual version spec
-    Multiple(DnaVersionSpec),
-}
-
-impl From<DnaVersionFlexible> for DnaVersionSpec {
-    fn from(v: DnaVersionFlexible) -> Self {
-        match v {
-            DnaVersionFlexible::Singleton(h) => DnaVersionSpec(vec![h]),
-            DnaVersionFlexible::Multiple(v) => v,
         }
     }
 }
@@ -129,54 +132,35 @@ impl From<DnaVersionFlexible> for DnaVersionSpec {
 /// Specifies remote, local, or bundled location of DNA
 pub type DnaLocation = mr_bundle::Location;
 
-/// Defines a criterion for a DNA version to match against.
-///
-/// Currently we're using the most simple possible version spec: A list of
-/// valid DnaHashes. The order of the list is from latest version to earliest.
-/// In subsequent manifest versions, this will become more expressive.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct DnaVersionSpec(Vec<DnaHashB64>);
-
-// NB: the following is likely to remain in the API for DnaVersionSpec
-impl DnaVersionSpec {
-    /// Check if a DNA satisfies this version spec
-    pub fn matches(&self, hash: DnaHash) -> bool {
-        self.0.contains(&hash.into())
-    }
-}
-
-// NB: the following is likely to be removed from the API for DnaVersionSpec
-// after our versioning becomes more sophisticated
-impl DnaVersionSpec {
-    /// Return the list of hashes covered by a version (obviously temporary,
-    /// while we don't have real versioning)
-    pub fn dna_hashes(&self) -> Vec<&DnaHashB64> {
-        self.0.iter().collect()
-    }
-}
-
 /// Rules to determine if and how a Cell will be created for this Dna
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
-    /// Always create a new Cell when installing the App,
-    /// and use a unique UID to ensure a distinct DHT network
-    CreateClone { deferred: bool },
-    /// Require that a Cell is already installed which matches the DNA version
-    /// spec, and which has an Agent that's associated with this App's agent
-    /// via DPKI. If no such Cell exists, *app installation fails*.
-    UseExisting { deferred: bool },
-    /// Try `UseExisting`, and if that fails, fallback to `Create`
-    CreateIfNotExists { deferred: bool },
-    /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
-    Disabled,
+
+    /*
+        TODO: implement
+
+        /// Require that a Cell is already installed which matches the DNA installed_hash
+        /// spec, and which has an Agent that's associated with this App's agent
+        /// via DPKI. If no such Cell exists, *app installation fails*.
+        UseExisting { deferred: bool },
+
+        /// Try `UseExisting`, and if that fails, fallback to `Create`
+        CreateIfNotExists { deferred: bool },
+
+    */
+    /// Install or locate the DNA, but never create a Cell for this DNA.
+    /// Only allow clones to be created from the DNA specified.
+    /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
+    CloneOnly,
 }
 
 impl Default for CellProvisioning {
@@ -186,17 +170,20 @@ impl Default for CellProvisioning {
 }
 
 impl AppManifestV1 {
-    /// Update the UID for all DNAs used in Create-provisioned Cells.
+    /// Update the network seed for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
     ///
     // TODO: it probably makes sense to do this for CreateIfNotExists cells
     // too, in the Create case, but we would have to do that during installation
     // rather than simply updating the manifest. Let's hold off on that until
     // we know we need it, since this way is substantially simpler.
-    pub fn set_uid(&mut self, uid: Uid) {
-        for mut slot in self.slots.iter_mut() {
-            if matches!(slot.provisioning, Some(CellProvisioning::Create { .. })) {
-                slot.dna.uid = Some(uid.clone());
+    pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
+        for role in self.roles.iter_mut() {
+            // Only update the network seed for roles for which it makes sense to do so
+            match role.provisioning.clone().unwrap_or_default() {
+                CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
+                    role.dna.modifiers.network_seed = Some(network_seed.clone());
+                }
             }
         }
     }
@@ -205,71 +192,68 @@ impl AppManifestV1 {
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {
             name,
-            slots,
+            roles,
             description: _,
         } = self;
-        let slots = slots
+        let roles = roles
             .into_iter()
             .map(
-                |AppSlotManifest {
-                     id,
+                |AppRoleManifest {
+                     name,
                      provisioning,
                      dna,
                  }| {
-                    let AppSlotDnaManifest {
+                    let AppRoleDnaManifest {
                         location,
-                        properties,
-                        version,
-                        uid,
+                        installed_hash,
                         clone_limit,
+                        modifiers,
                     } = dna;
+                    let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
-                    let version = version.map(Into::into);
+                    let installed_hash = installed_hash.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
-                        CellProvisioning::Create { deferred } => AppSlotManifestValidated::Create {
+                        CellProvisioning::Create { deferred } => AppRoleManifestValidated::Create {
                             deferred,
                             clone_limit,
-                            location: Self::require(location, "slots.dna.(path|url)")?,
-                            properties,
-                            uid,
-                            version,
+                            location: Self::require(location, "roles.dna.(path|url)")?,
+                            modifiers,
+                            installed_hash,
                         },
-                        CellProvisioning::CreateClone { deferred } => {
-                            AppSlotManifestValidated::CreateClone {
-                                deferred,
-                                clone_limit,
-                                location: Self::require(location, "slots.dna.(path|url)")?,
-                                properties,
-                                version,
-                            }
-                        }
-                        CellProvisioning::UseExisting { deferred } => {
-                            AppSlotManifestValidated::UseExisting {
-                                deferred,
-                                clone_limit,
-                                version: Self::require(version, "slots.dna.version")?,
-                            }
-                        }
-                        CellProvisioning::CreateIfNotExists { deferred } => {
-                            AppSlotManifestValidated::CreateIfNotExists {
-                                deferred,
-                                clone_limit,
-                                location: Self::require(location, "slots.dna.(path|url)")?,
-                                version: Self::require(version, "slots.dna.version")?,
-                                properties,
-                                uid,
-                            }
-                        }
-                        CellProvisioning::Disabled => AppSlotManifestValidated::Disabled {
+                        // CellProvisioning::UseExisting { deferred } => {
+                        //     AppRoleManifestValidated::UseExisting {
+                        //         deferred,
+                        //         clone_limit,
+                        //         installed_hash: Self::require(
+                        //             installed_hash,
+                        //             "roles.dna.installed_hash",
+                        //         )?,
+                        //     }
+                        // }
+                        // CellProvisioning::CreateIfNotExists { deferred } => {
+                        //     AppRoleManifestValidated::CreateIfNotExists {
+                        //         deferred,
+                        //         clone_limit,
+                        //         location: Self::require(location, "roles.dna.(path|url)")?,
+                        //         installed_hash: Self::require(
+                        //             installed_hash,
+                        //             "roles.dna.installed_hash",
+                        //         )?,
+                        //         modifiers,
+                        //     }
+                        // }
+                        CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
-                            version: Self::require(version, "slots.dna.version")?,
+                            location: Self::require(location, "roles.dna.(path|url)")?,
+                            installed_hash,
+                            modifiers,
                         },
                     };
-                    Ok((id, validated))
+                    AppManifestResult::Ok((name, validated))
                 },
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
-        AppManifestValidated::new(name, slots)
+        AppManifestValidated::new(name, roles)
     }
 
     fn require<T>(maybe: Option<T>, context: &str) -> AppManifestResult<T> {
@@ -279,15 +263,13 @@ impl AppManifestV1 {
 
 #[cfg(test)]
 pub mod tests {
-    use futures::future::join_all;
-
     use super::*;
     use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 
-    #[cfg(feature = "arbitrary")]
+    #[cfg(feature = "fuzzing")]
     use arbitrary::Arbitrary;
 
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -304,42 +286,40 @@ pub mod tests {
         )
     }
 
-    pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
+    pub async fn app_manifest_fixture(
         location: Option<mr_bundle::Location>,
-        dnas: I,
-    ) -> (AppManifest, Vec<DnaHashB64>) {
-        let hashes = join_all(
-            dnas.into_iter()
-                .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
-        )
-        .await;
-
-        let version = DnaVersionSpec::from(hashes.clone()).into();
-
-        let slots = vec![AppSlotManifest {
-            id: "nick".into(),
-            dna: AppSlotDnaManifest {
+        installed_hash: DnaHash,
+        modifiers: DnaModifiersOpt<YamlProperties>,
+    ) -> AppManifestV1 {
+        let roles = vec![AppRoleManifest {
+            name: "role_name".into(),
+            dna: AppRoleDnaManifest {
                 location,
-                properties: Some(app_manifest_properties_fixture()),
-                uid: Some("uid".into()),
-                version: Some(version),
+                modifiers,
+                installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
-        let manifest = AppManifest::V1(AppManifestV1 {
+        AppManifestV1 {
             name: "Test app".to_string(),
             description: Some("Serialization roundtrip test".to_string()),
-            slots,
-        });
-        (manifest, hashes)
+            roles,
+        }
     }
 
     #[tokio::test]
     async fn manifest_v1_roundtrip() {
         let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna")));
-        let (manifest, dna_hashes) =
-            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)]).await;
+        let modifiers = DnaModifiersOpt {
+            properties: Some(app_manifest_properties_fixture()),
+            network_seed: Some("network_seed".into()),
+            origin_time: None,
+            quantum_time: None,
+        };
+        let installed_hash = fixt!(DnaHash);
+        let manifest = app_manifest_fixture(location, installed_hash.clone(), modifiers).await;
+        let manifest = AppManifest::from(manifest);
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
 
@@ -351,66 +331,79 @@ pub mod tests {
 manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
-slots:
-  - id: "nick"
+roles:
+  - name: "role_name"
     provisioning:
       strategy: "create"
       deferred: false
     dna:
       path: /tmp/test.dna
-      version:
-        - {}
-        - {}
+      installed_hash: {}
       clone_limit: 50
-      uid: uid
-      properties:
-        salad: "bar"
+      network_seed: network_seed
+      modifiers:
+        properties:
+          salad: "bar"
 
         "#,
-            dna_hashes[0], dna_hashes[1]
+            installed_hash
         );
         let actual = serde_yaml::to_value(&manifest).unwrap();
         let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();
 
         // Check a handful of fields. Order matters in YAML, so to check the
         // entire structure would be too fragile for testing.
-        let fields = &[
-            "slots[0].id",
-            "slots[0].provisioning.deferred",
-            "slots[0].dna.version[1]",
-            "slots[0].dna.properties",
-        ];
-        assert_eq!(actual.get(fields[0]), expected.get(fields[0]));
-        assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
-        assert_eq!(actual.get(fields[2]), expected.get(fields[2]));
-        assert_eq!(actual.get(fields[3]), expected.get(fields[3]));
+
+        for getter in [
+            |v: &serde_yaml::Value| v["roles"][0]["name"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
+        ] {
+            let left = getter(&actual);
+            let right = getter(&expected);
+            assert_eq!(left, right);
+            assert!(!left.is_null());
+        }
     }
 
     #[tokio::test]
-    async fn manifest_v1_set_uid() {
+    async fn manifest_v1_set_network_seed() {
         let mut u = arbitrary::Unstructured::new(&[0]);
         let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
-        manifest.slots = vec![
-            AppSlotManifest::arbitrary(&mut u).unwrap(),
-            AppSlotManifest::arbitrary(&mut u).unwrap(),
-            AppSlotManifest::arbitrary(&mut u).unwrap(),
-            AppSlotManifest::arbitrary(&mut u).unwrap(),
+        manifest.roles = vec![
+            AppRoleManifest::arbitrary(&mut u).unwrap(),
+            AppRoleManifest::arbitrary(&mut u).unwrap(),
+            // AppRoleManifest::arbitrary(&mut u).unwrap(),
+            // AppRoleManifest::arbitrary(&mut u).unwrap(),
         ];
-        manifest.slots[0].provisioning = Some(CellProvisioning::Create { deferred: false });
-        manifest.slots[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        manifest.slots[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        manifest.slots[3].provisioning =
-            Some(CellProvisioning::CreateIfNotExists { deferred: false });
+        manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
+        manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
+        // manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
+        // manifest.roles[3].provisioning =
+        //     Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
-        let uid = Uid::from("blabla");
-        manifest.set_uid(uid.clone());
+        let network_seed = NetworkSeed::from("blabla");
+        manifest.set_network_seed(network_seed.clone());
 
-        // - The Create slots have the UID rewritten.
-        assert_eq!(manifest.slots[0].dna.uid.as_ref(), Some(&uid));
-        assert_eq!(manifest.slots[1].dna.uid.as_ref(), Some(&uid));
+        // - The Create roles have the network seed rewritten.
+        assert_eq!(
+            manifest.roles[0].dna.modifiers.network_seed.as_ref(),
+            Some(&network_seed)
+        );
+        assert_eq!(
+            manifest.roles[1].dna.modifiers.network_seed.as_ref(),
+            Some(&network_seed)
+        );
+        // assert_eq!(
+        //     manifest.roles[3].dna.modifiers.network_seed.as_ref(),
+        //     Some(&network_seed)
+        // );
 
-        // - The others do not.
-        assert_ne!(manifest.slots[2].dna.uid.as_ref(), Some(&uid));
-        assert_ne!(manifest.slots[3].dna.uid.as_ref(), Some(&uid));
+        // // - The others do not.
+        // assert_ne!(
+        //     manifest.roles[2].dna.modifiers.network_seed.as_ref(),
+        //     Some(&network_seed)
+        // );
     }
 }

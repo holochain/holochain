@@ -162,7 +162,7 @@ impl WebsocketSender {
         );
 
         self.tx_to_websocket
-            .send(msg)
+            .send_timeout(msg, std::time::Duration::from_secs(30))
             .await
             .map_err(|_| WebsocketError::Shutdown)?;
 
@@ -195,7 +195,7 @@ impl WebsocketSender {
         let msg = OutgoingMessage::Signal(msg.try_into()?);
 
         self.tx_to_websocket
-            .send(msg)
+            .send_timeout(msg, std::time::Duration::from_secs(30))
             .await
             .map_err(|_| WebsocketError::Shutdown)?;
 
@@ -211,7 +211,7 @@ impl WebsocketSender {
             .send(msg)
             .await
             .map_err(|_| WebsocketError::Shutdown)?;
-        Ok(rx_resp.await.map_err(|_| WebsocketError::Shutdown)?)
+        rx_resp.await.map_err(|_| WebsocketError::Shutdown)
     }
 }
 
@@ -234,7 +234,13 @@ impl Drop for StaleRequest {
             let tx = self.1.clone();
             let id = self.2;
             tokio::spawn(async move {
-                if let Err(e) = tx.send(OutgoingMessage::StaleRequest(id)).await {
+                if let Err(e) = tx
+                    .send_timeout(
+                        OutgoingMessage::StaleRequest(id),
+                        std::time::Duration::from_secs(30),
+                    )
+                    .await
+                {
                     tracing::warn!("Failed to remove stale response on drop {:?}", e);
                 }
                 tracing::trace!("Removed stale response on drop");

@@ -1,33 +1,35 @@
-use arbitrary::Arbitrary;
 use futures::FutureExt;
-use ghost_actor::{GhostControlHandler, GhostResult};
 
 use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
 
 use super::*;
-use crate::fixt::*;
-use fixt::prelude::*;
 
+mod bloom;
 mod common;
-mod handler_builder;
-mod test_local_sync;
+mod ops;
 mod test_two_nodes;
 
 impl ShardedGossipLocal {
+    /// Create an instance suitable for testing
     pub fn test(
         gossip_type: GossipType,
-        evt_sender: EventSender,
+        host: HostApiLegacy,
         inner: ShardedGossipLocalState,
     ) -> Self {
-        // TODO: randomize space
-        let space = Arc::new(KitsuneSpace::new([0; 36].to_vec()));
+        use arbitrary::Arbitrary;
+        let mut u = arbitrary::Unstructured::new(&NOISE);
+        let space = KitsuneSpace::arbitrary(&mut u).unwrap();
+        let space = Arc::new(space);
+        let fetch_pool = FetchPool::new_bitwise_or();
+
         Self {
             gossip_type,
             tuning_params: Default::default(),
             space,
-            evt_sender,
+            host_api: host,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
+            fetch_pool,
         }
     }
 }

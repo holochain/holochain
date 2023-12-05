@@ -2,15 +2,19 @@ use crate::*;
 use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub(crate) struct WireDhtOpData {
+/// Struct for encoding DhtOp as bytes.
+pub struct WireDhtOpData {
+    /// The dht op.
     pub op_data: holochain_types::dht_op::DhtOp,
 }
 
 impl WireDhtOpData {
+    /// Encode as bytes.
     pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
         Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
     }
 
+    /// Decode from bytes.
     pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
         let request: SerializedBytes = UnsafeBytes::from(data).into();
         request.try_into()
@@ -19,22 +23,33 @@ impl WireDhtOpData {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
-pub(crate) enum WireMessage {
+#[allow(missing_docs)]
+pub enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        from_agent: holo_hash::AgentPubKey,
+        signature: Signature,
+        to_agent: AgentPubKey,
+        cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
+        nonce: Box<Nonce256Bits>,
+        expires_at: Timestamp,
     },
-    Publish {
-        request_validation_receipt: bool,
-        dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-    },
-    ValidationReceipt {
+    CallRemoteMulti {
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
+        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
+        cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
-        receipt: Vec<u8>,
+        data: Vec<u8>,
+        nonce: Box<Nonce256Bits>,
+        expires_at: Timestamp,
+    },
+    ValidationReceipts {
+        receipts: ValidationReceiptBundle,
     },
     Get {
         dht_hash: holo_hash::AnyDhtHash,
@@ -48,16 +63,28 @@ pub(crate) enum WireMessage {
         link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
+    CountLinks {
+        query: WireLinkQuery,
+    },
     GetAgentActivity {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
     },
-    GetValidationPackage {
-        header_hash: HeaderHash,
+    MustGetAgentActivity {
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    },
+    CountersigningSessionNegotiation {
+        message: event::CountersigningSessionNegotiationMessage,
+    },
+    PublishCountersign {
+        flag: bool,
+        op: DhtOp,
     },
 }
 
+#[allow(missing_docs)]
 impl WireMessage {
     pub fn encode(&self) -> Result<Vec<u8>, SerializedBytesError> {
         holochain_serialized_bytes::encode(&self)
@@ -67,36 +94,61 @@ impl WireMessage {
         holochain_serialized_bytes::decode(&data)
     }
 
+    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
+        Self::PublishCountersign { flag, op }
+    }
+
+    /// For an outgoing remote call.
+    #[allow(clippy::too_many_arguments)]
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: Option<CapSecret>,
+        from_agent: holo_hash::AgentPubKey,
+        signature: Signature,
+        to_agent: holo_hash::AgentPubKey,
+        cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,
-            cap,
+            from_agent,
+            to_agent,
+            signature,
+            cap_secret,
             data: payload.into_vec(),
+            nonce: Box::new(nonce),
+            expires_at,
         }
     }
 
-    pub fn publish(
-        request_validation_receipt: bool,
-        dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    #[allow(clippy::too_many_arguments)]
+    pub fn call_remote_multi(
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
+        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
+        cap_secret: Option<CapSecret>,
+        payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> WireMessage {
-        Self::Publish {
-            request_validation_receipt,
-            dht_hash,
-            ops,
+        Self::CallRemoteMulti {
+            zome_name,
+            fn_name,
+            from_agent,
+            to_agents,
+            cap_secret,
+            data: payload.into_vec(),
+            nonce: Box::new(nonce),
+            expires_at,
         }
     }
 
-    pub fn validation_receipt(receipt: SerializedBytes) -> WireMessage {
-        Self::ValidationReceipt {
-            receipt: UnsafeBytes::from(receipt).into(),
-        }
+    pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
+        Self::ValidationReceipts { receipts }
     }
 
     pub fn get(dht_hash: holo_hash::AnyDhtHash, options: event::GetOptions) -> WireMessage {
@@ -114,6 +166,10 @@ impl WireMessage {
         Self::GetLinks { link_key, options }
     }
 
+    pub fn count_links(query: WireLinkQuery) -> WireMessage {
+        Self::CountLinks { query }
+    }
+
     pub fn get_agent_activity(
         agent: AgentPubKey,
         query: ChainQueryFilter,
@@ -125,7 +181,17 @@ impl WireMessage {
             options,
         }
     }
-    pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
-        Self::GetValidationPackage { header_hash }
+
+    pub fn must_get_agent_activity(
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> WireMessage {
+        Self::MustGetAgentActivity { agent, filter }
+    }
+
+    pub fn countersigning_session_negotiation(
+        message: event::CountersigningSessionNegotiationMessage,
+    ) -> WireMessage {
+        Self::CountersigningSessionNegotiation { message }
     }
 }

@@ -12,7 +12,7 @@ struct ResponseMessage(pub String);
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    observability::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
 
     let (listener_handle, mut listener_stream) = WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:12345"),

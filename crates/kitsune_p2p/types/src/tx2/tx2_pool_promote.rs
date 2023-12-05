@@ -3,6 +3,8 @@
 #![allow(clippy::too_many_arguments)]
 //! Promote a tx2 transport adapter to a tx2 transport frontend.
 
+const INTERNAL_ERR: u32 = 500;
+
 use crate::tx2::tx2_adapter::*;
 use crate::tx2::tx2_pool::*;
 use crate::tx2::tx2_utils::*;
@@ -103,15 +105,14 @@ async fn in_chan_recv_logic(
 
                         let reason = format!("{:?}", e);
 
-                        // TODO - standardize codes?
-                        con_item.close(500, &reason).await;
+                        con_item.close(INTERNAL_ERR, &reason).await;
 
                         // exit the loop
                         return;
                     }
                     Ok(c) => c,
                 };
-                tracing::debug!(?local_cert, ?peer_cert, "accepted incoming channel");
+                tracing::trace!(?local_cert, ?peer_cert, "accepted incoming channel");
                 loop {
                     let r = chan.read(tuning_params.implicit_timeout()).await;
 
@@ -126,8 +127,7 @@ async fn in_chan_recv_logic(
 
                             let reason = format!("{:?}", e);
 
-                            // TODO - standardize codes?
-                            con_item.close(500, &reason).await;
+                            con_item.close(INTERNAL_ERR, &reason).await;
 
                             // exit the loop
                             break;
@@ -183,8 +183,7 @@ async fn in_chan_recv_logic(
 
                     let reason = format!("{:?}", e);
 
-                    // TODO - standardize codes?
-                    con_item.close(500, &reason).await;
+                    con_item.close(INTERNAL_ERR, &reason).await;
 
                     // exit the loop
                     break;
@@ -197,15 +196,21 @@ async fn in_chan_recv_logic(
                 writer,
             });
 
-            tracing::debug!(?local_cert, ?peer_cert, "established outgoing channel");
+            tracing::trace!(?local_cert, ?peer_cert, "established outgoing channel");
         }
         tracing::debug!(?local_cert, ?peer_cert, "channel create loop end");
     };
 
-    // We can ignore errors, as they only happen on shutdown of the endpoint.
-    let _ = futures::future::join(recv_fut, write_fut).await;
+    tokio::select! {
+        _ = recv_fut => {
+            con_item.close(INTERNAL_ERR, "recv_fut closed").await;
+        }
+        _ = write_fut => {
+            con_item.close(INTERNAL_ERR, "write_fut closed").await;
+        }
+    }
 
-    tracing::debug!(?local_cert, ?peer_cert, "channel logic end");
+    tracing::info!(?local_cert, ?peer_cert, "channel logic end");
 
     Ok(())
 }
@@ -313,8 +318,8 @@ impl AsConHnd for ConItem {
 
             if let Err(e) = logic().await {
                 let reason = format!("{:?}", e);
-                // TODO - standardize codes?
-                this.close(500, &reason).await;
+                tracing::warn!(?e, "Closing writer");
+                this.close(INTERNAL_ERR, &reason).await;
                 return Err(e);
             }
 
@@ -372,7 +377,7 @@ impl ConItem {
                 logic_hnd: i.logic_hnd.clone(),
                 item: con_item,
             };
-            i.pend_cons.remove(&url);
+            i.pend_cons.remove(url);
             i.cons.insert(url.clone(), con_item.clone());
             Ok((i.logic_hnd.clone(), con_item))
         })?;
@@ -441,7 +446,7 @@ impl ConItem {
         remote: TxUrl,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Self>> {
-        timeout.mix(async move {
+        timeout.mix("ConItem::inner_con_inner", async move {
             let permit = con_limit
                 .acquire_owned()
                 .await
@@ -609,32 +614,9 @@ impl AsEpHnd for PromoteEpHnd {
     }
 
     fn close(&self, code: u32, reason: &str) -> BoxFuture<'static, ()> {
-        if let Ok((cons, ep_close_fut, logic_hnd)) = self.0.share_mut(|i, c| {
-            let local_cert = i.sub_ep.local_cert();
-
-            tracing::warn!(
-                ?local_cert,
-                %code,
-                %reason,
-                "closing endpoint (pool)",
-            );
-
-            *c = true;
-            i.con_limit.close();
-            let cons = i.cons.iter().map(|(_, c)| c.clone()).collect::<Vec<_>>();
-            let ep_close_fut = i.sub_ep.close(code, reason);
-            Ok((cons, ep_close_fut, i.logic_hnd.clone()))
-        }) {
-            let reason = reason.to_string();
-            async move {
-                futures::future::join_all(cons.into_iter().map(|c| c.close(code, &reason))).await;
-                ep_close_fut.await;
-                let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
-                logic_hnd.close();
-            }
-            .boxed()
-        } else {
-            async move {}.boxed()
+        match self.0.share_mut(|i, _| Ok(i.sub_ep.close(code, reason))) {
+            Ok(fut) => fut,
+            Err(_) => async move {}.boxed(),
         }
     }
 
@@ -658,6 +640,40 @@ impl AsEpHnd for PromoteEpHnd {
             Ok(con)
         }
         .boxed()
+    }
+}
+
+fn close_promote_ep_hnd(
+    inner: &Share<PromoteEpInner>,
+    code: u32,
+    reason: &str,
+) -> BoxFuture<'static, ()> {
+    if let Ok((cons, ep_close_fut, logic_hnd)) = inner.share_mut(|i, c| {
+        let local_cert = i.sub_ep.local_cert();
+
+        tracing::warn!(
+            ?local_cert,
+            %code,
+            %reason,
+            "closing endpoint (pool)",
+        );
+
+        *c = true;
+        i.con_limit.close();
+        let cons = i.cons.values().cloned().collect::<Vec<_>>();
+        let ep_close_fut = i.sub_ep.close(code, reason);
+        Ok((cons, ep_close_fut, i.logic_hnd.clone()))
+    }) {
+        let reason = reason.to_string();
+        async move {
+            futures::future::join_all(cons.into_iter().map(|c| c.close(code, &reason))).await;
+            ep_close_fut.await;
+            let _ = logic_hnd.emit(EpEvent::EndpointClosed).await;
+            logic_hnd.close();
+        }
+        .boxed()
+    } else {
+        async move {}.boxed()
     }
 }
 
@@ -747,6 +763,8 @@ async fn con_recv_logic(
         .await;
 
     tracing::warn!(?local_cert, "connection recv stream closed!");
+
+    close_promote_ep_hnd(inner, INTERNAL_ERR, "listener closed").await;
 }
 
 impl PromoteEp {
@@ -817,11 +835,11 @@ impl AsEpFactory for PromoteFactory {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<Ep>> {
         let tuning_params = self.tuning_params.clone();
-        let max_cons = tuning_params.tx2_pool_max_connection_count as usize;
+        let max_cons = tuning_params.tx2_pool_max_connection_count;
         let con_limit = Arc::new(Semaphore::new(max_cons));
         let pair_fut = self.adapter.bind(bind_spec, timeout);
         timeout
-            .mix(async move {
+            .mix("PromoteFactory::bind", async move {
                 let pair = pair_fut.await?;
                 let ep = PromoteEp::new(tuning_params, max_cons, con_limit, pair).await?;
                 let ep: Ep = Box::new(ep);
@@ -848,7 +866,7 @@ mod tests {
         // as old connections complete, new ones will be accepted
         let fact = tx2_pool_promote(fact, Default::default());
 
-        let mut tgt = fact.bind("none:".into(), t).await.unwrap();
+        let mut tgt = fact.bind("none:".try_into().unwrap(), t).await.unwrap();
         let tgt_hnd = tgt.handle().clone();
         let tgt_addr = tgt_hnd.local_addr().unwrap();
 
@@ -872,7 +890,7 @@ mod tests {
 
         let mut all_fut = Vec::new();
         for _ in 0..COUNT {
-            let ep_fut = fact.bind("none:".into(), t);
+            let ep_fut = fact.bind("none:".try_into().unwrap(), t);
             let w_send = w_send.clone();
             let tgt_addr = tgt_addr.clone();
             all_fut.push(async move {

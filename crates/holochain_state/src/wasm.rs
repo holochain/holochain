@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holo_hash::WasmHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
@@ -5,7 +7,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 
 use crate::mutations;
-use crate::prelude::from_blob;
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
 
@@ -18,13 +19,18 @@ pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<Dn
             },
             |row| {
                 let hash: WasmHash = row.get("hash")?;
-                let wasm = row.get("blob")?;
+                let wasm: Vec<u8> = row.get("blob")?;
                 Ok((hash, wasm))
             },
         )
         .optional()?;
     match item {
-        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(from_blob(wasm)?, hash))),
+        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(
+            DnaWasm {
+                code: Arc::new(wasm.into_boxed_slice()),
+            },
+            hash,
+        ))),
         None => Ok(None),
     }
 }
@@ -46,17 +52,15 @@ pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::HasHash;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
-        use holochain_sqlite::prelude::*;
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = crate::test_utils::test_wasm_env();
+        let db = crate::test_utils::test_wasm_db();
 
         // a wasm
         let wasm =
@@ -64,17 +68,24 @@ mod tests {
                 .await;
 
         // Put wasm
-        env.conn()?
-            .with_commit_sync(|txn| put(txn, wasm.clone()))
-            .unwrap();
-        fresh_reader_test!(env, |txn| {
+        db.write_async({
+            let put_wasm = wasm.clone();
+
+            move |txn| put(txn, put_wasm.clone())
+        })
+        .await
+        .unwrap();
+        db.read_async(move |txn| -> DatabaseResult<()> {
             assert!(contains(&txn, &wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
             let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
 
             // assert the round trip
             assert_eq!(ret, wasm);
-        });
+
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }

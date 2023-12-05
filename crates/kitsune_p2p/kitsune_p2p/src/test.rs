@@ -1,3 +1,4 @@
+/*
 #[cfg(test)]
 mod tests {
     use crate::test_util::*;
@@ -8,9 +9,10 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_transport_coms() {
-        observability::test_run().ok();
-        observability::metrics::init();
+        holochain_trace::test_run().ok();
+        holochain_trace::metrics::init();
         let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
 
         let space = harness.add_space().await.unwrap();
@@ -21,12 +23,12 @@ mod tests {
         harness.magic_peer_info_exchange().await.unwrap();
 
         let r1 = p2p1
-            .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec(), None)
+            .rpc_single(space.clone(), a1.clone(), b"m1".to_vec(), None)
             .await
             .unwrap();
         let s = std::time::Instant::now();
         let r2 = match p2p2
-            .rpc_single(space.clone(), a1, a2, b"m2".to_vec(), None)
+            .rpc_single(space.clone(), a2, b"m2".to_vec(), None)
             .await
         {
             Err(_) => {
@@ -41,45 +43,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore] // david.b disabled while we're full sync, not actually making
-              //         get requests
-    async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
-        let (harness, _evt) = spawn_test_harness_mem().await?;
-
-        let space = harness.add_space().await?;
-        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
-        let (a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
-        let (a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
-
-        // needed until we have some way of bootstrapping
-        harness.magic_peer_info_exchange().await?;
-
-        let mut input = actor::RpcMulti::new(
-            &Default::default(),
-            space,
-            a1.clone(),
-            TestVal::test_val(),
-            b"test-multi-request".to_vec(),
-        );
-        input.max_remote_agent_count = 5;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(200);
-        let res = p2p1.rpc_multi(input).await.unwrap();
-
-        assert_eq!(3, res.len());
-        for r in res {
-            let data = String::from_utf8_lossy(&r.response);
-            assert_eq!("echo: test-multi-request", &data);
-            assert!(r.agent == a1 || r.agent == a2 || r.agent == a3);
-        }
-
-        harness.ghost_actor_shutdown().await?;
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, evt) = spawn_test_harness_mem().await?;
         let mut recv = evt.receive();
@@ -103,12 +69,13 @@ mod tests {
             return Ok(());
         }
 
-        panic!("Failed to receive agent_info_signed");
+        panic!("Failed to receive agent_info_signed")
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -135,8 +102,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
         let space = harness.add_space().await?;
@@ -144,11 +112,9 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
-        let res = p2p
-            .rpc_single(space, a2, a1, b"hello".to_vec(), None)
-            .await?;
+        let res = p2p.rpc_single(space, a1, b"hello".to_vec(), None).await?;
         assert_eq!(b"echo: hello".to_vec(), res);
 
         harness.ghost_actor_shutdown().await?;
@@ -156,8 +122,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -166,24 +133,23 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
         let a3: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a3.clone()).await?;
+        p2p.join(space.clone(), a3.clone(), None).await?;
 
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
         input.max_remote_agent_count = 2;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(20);
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(2000);
         let res = p2p.rpc_multi(input).await.unwrap();
 
         harness.ghost_actor_shutdown().await?;
 
-        assert_eq!(3, res.len());
+        assert_eq!(1, res.len());
         for r in res {
             let data = String::from_utf8_lossy(&r.response);
             assert_eq!("echo: test-multi-request", &data);
@@ -194,8 +160,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -205,12 +172,11 @@ mod tests {
         let mut input = actor::RpcMulti::new(
             &Default::default(),
             space,
-            a1.clone(),
             TestVal::test_val(),
             b"test-multi-request".to_vec(),
         );
         input.max_remote_agent_count = 1;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(20);
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(2000);
         let res = p2p.rpc_multi(input).await.unwrap();
 
         assert_eq!(1, res.len());
@@ -225,8 +191,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -235,7 +202,7 @@ mod tests {
         // TODO when networking works, just add_*_agent again...
         // but for now, we need the two agents to be on the same node:
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         let op1 = harness
             .inject_gossip_data(a1.clone(), "agent-1-data".to_string())
@@ -264,8 +231,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_peer_data_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -279,7 +247,7 @@ mod tests {
         assert_eq!(num_agent_info, 1);
 
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
-        p2p.join(space.clone(), a2.clone()).await?;
+        p2p.join(space.clone(), a2.clone(), None).await?;
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
@@ -296,8 +264,9 @@ mod tests {
 
     /// Test that we can gossip across a in memory transport layer.
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_gossip_transport() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
 
         harness.add_space().await?;
@@ -360,4 +329,59 @@ mod tests {
         harness.ghost_actor_shutdown().await?;
         Ok(())
     }
+
+    /// Test that we can publish agent info.
+    #[tokio::test(flavor = "multi_thread")]
+    // @freesig Can anyone think of a better way to do this?
+    #[ignore = "Need a better way then waiting 6 minutes to test this"]
+    async fn test_publish_agent_info() {
+        holochain_trace::test_run().ok();
+
+        let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
+
+        harness.add_space().await.unwrap();
+
+        // - Add the first agent
+        let (a1, _) = harness.add_publish_only_agent("one".into()).await.unwrap();
+
+        let peer_data = harness
+            .dump_local_peer_data(dbg!(a1.clone()))
+            .await
+            .unwrap();
+        let a1_peer_info = peer_data[&a1].clone();
+        // - Add the second agent
+        let (a2, _) = harness.add_publish_only_agent("two".into()).await.unwrap();
+
+        // - Add the second agent
+        let (a3, _) = harness
+            .add_publish_only_agent("three".into())
+            .await
+            .unwrap();
+
+        harness
+            .inject_peer_info(a3.clone(), a1_peer_info.clone())
+            .await
+            .unwrap();
+
+        // There's no way to trigger a publishing of peer data without waiting
+        // for > five minutes.
+        tokio::time::sleep(std::time::Duration::from_secs(6 * 60)).await;
+
+        let a1_peers = harness.dump_local_peer_data(a1.clone()).await.unwrap();
+        let a2_peers = harness.dump_local_peer_data(a2.clone()).await.unwrap();
+        let a3_peers = harness.dump_local_peer_data(a3.clone()).await.unwrap();
+
+        // a1 and a2 have each others peer info.
+        assert!(a1_peers.get(&a3).is_some());
+        assert!(a3_peers.get(&a1).is_some());
+
+        // a2 doesn't have anyone's info and no one has a2's info.
+        assert!(a1_peers.get(&a2).is_none());
+        assert!(a3_peers.get(&a2).is_none());
+        assert!(a2_peers.get(&a1).is_none());
+        assert!(a2_peers.get(&a3).is_none());
+
+        harness.ghost_actor_shutdown().await.unwrap();
+    }
 }
+*/

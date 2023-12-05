@@ -5,9 +5,12 @@ use rusqlite::Connection;
 use crate::db::DbKind;
 
 /// Enumeration of all databases needed by Holochain
-pub(crate) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> rusqlite::Result<()> {
+pub(crate) fn initialize_database(conn: &mut Connection, db_kind: DbKind) -> rusqlite::Result<()> {
     match db_kind {
-        DbKind::Cell(_) => {
+        DbKind::Dht(_) => {
+            crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
+        }
+        DbKind::Authored(_) => {
             crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
         }
         DbKind::Conductor => {
@@ -24,6 +27,10 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: &DbKind) -> ru
         }
         DbKind::Cache(_) => {
             crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
+        }
+        #[cfg(feature = "test_utils")]
+        DbKind::Test(_) => {
+            // Nothing to do
         }
     }
     Ok(())

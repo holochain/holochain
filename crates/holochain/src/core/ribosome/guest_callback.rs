@@ -4,8 +4,6 @@ pub mod init;
 pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
-pub mod validate_link;
-pub mod validation_package;
 use super::HostContext;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::FnComponents;
@@ -13,7 +11,6 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
-use holochain_zome_types::ExternIO;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     host_context: HostContext,
@@ -106,7 +103,7 @@ mod tests {
             .expect_zomes()
             .times(1)
             .in_sequence(&mut sequence)
-            .return_const(ZomesToInvoke::All);
+            .return_const(ZomesToInvoke::AllIntegrity);
 
         ribosome
             // this should happen inside the CallIterator constructor

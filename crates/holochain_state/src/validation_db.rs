@@ -3,7 +3,7 @@
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 
-/// The status of a [DhtOp] in limbo
+/// The status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in limbo
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ValidationLimboStatus {
     /// Is awaiting to be system validated

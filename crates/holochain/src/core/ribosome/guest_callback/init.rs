@@ -1,11 +1,13 @@
+use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holo_hash::AnyDhtHash;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -24,8 +26,16 @@ impl InitInvocation {
 #[derive(Clone, Constructor)]
 pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
-    pub keystore: KeystoreSender,
-    pub network: HolochainP2pCell,
+    pub keystore: MetaLairClient,
+    pub network: HolochainP2pDna,
+    pub signal_tx: SignalBroadcaster,
+    pub call_zome_handle: CellConductorReadHandle,
+}
+
+impl std::fmt::Debug for InitHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InitHostAccess").finish()
+    }
 }
 
 impl From<InitHostAccess> for HostContext {
@@ -50,6 +60,9 @@ impl Invocation for InitInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(())
     }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
+    }
 }
 
 impl TryFrom<InitInvocation> for ExternIO {
@@ -70,9 +83,8 @@ pub enum InitResult {
     Fail(ZomeName, String),
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
-    /// Vec<EntryHash> is the list of all missing dependency addresses
-    // TODO: MD: this is probably unnecessary
-    UnresolvedDependencies(ZomeName, Vec<AnyDhtHash>),
+    /// `Vec<EntryHash>` is the list of all missing dependency addresses
+    UnresolvedDependencies(ZomeName, UnresolvedDependencies),
 }
 
 impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
@@ -85,7 +97,7 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
                 // unresolved deps overrides pass but not fail
                 InitCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Fail(_, _) => acc,
-                    _ => Self::UnresolvedDependencies(zome_name, ud.into_iter().collect()),
+                    _ => Self::UnresolvedDependencies(zome_name, ud),
                 },
                 // passing callback allows the acc to carry forward
                 InitCallbackResult::Pass => acc,
@@ -103,8 +115,6 @@ mod test {
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternIO;
 
     #[test]
     fn init_callback_result_fold() {
@@ -114,7 +124,7 @@ mod test {
         let result_ud = || {
             InitResult::UnresolvedDependencies(
                 ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
-                vec![],
+                UnresolvedDependencies::Hashes(vec![]),
             )
         };
         let result_fail = || {
@@ -133,7 +143,7 @@ mod test {
         let cb_ud = || {
             (
                 ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
-                InitCallbackResult::UnresolvedDependencies(vec![]),
+                InitCallbackResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(vec![])),
             )
         };
         let cb_fail = || {
@@ -157,7 +167,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {
@@ -214,13 +224,24 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::InitResult;
+    use crate::conductor::api::error::ConductorApiResult;
+    use crate::conductor::conductor::CellStatus;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
+    use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
+    use holo_hash::ActionHash;
+    use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
+    use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::prelude::*;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
@@ -278,6 +299,90 @@ mod slow_tests {
         assert_eq!(
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn conductor_will_not_accept_zome_calls_before_the_network_is_initialised() {
+        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
+            random_network_seed(),
+            vec![TestWasm::Create],
+            SerializedBytes::default(),
+        )
+        .await;
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
+
+        let cloned = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: app.installed_app_id().clone(),
+                role_name: dna_file.dna_hash().to_string().clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
+                membrane_proof: None,
+                name: Some("cloned".to_string()),
+            })
+            .await
+            .unwrap();
+
+        let enable_or_disable_payload = DisableCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
+        };
+        conductor
+            .disable_clone_cell(&enable_or_disable_payload)
+            .await
+            .unwrap();
+
+        let zome: SweetZome = SweetZome::new(
+            cloned.cell_id.clone(),
+            TestWasm::Create.coordinator_zome_name(),
+        );
+
+        // Run the cell enable in parallel. If we wait for it then we shouldn't see the error we're looking for
+        let conductor_handle = conductor.raw_handle().clone();
+        let payload = enable_or_disable_payload.clone();
+        tokio::spawn(async move {
+            conductor_handle.enable_clone_cell(&payload).await.unwrap();
+        });
+
+        let mut had_successful_zome_call = false;
+        for _ in 0..30 {
+            let create_post_result: ConductorApiResult<ActionHash> = conductor
+                .call_fallible(
+                    &zome,
+                    "create_post",
+                    Post(format!("clone message").to_string()),
+                )
+                .await;
+
+            match create_post_result {
+                Err(crate::conductor::api::error::ConductorApiError::ConductorError(
+                    crate::conductor::error::ConductorError::CellNetworkNotReady(
+                        CellStatus::Joining,
+                    )
+                    | crate::conductor::error::ConductorError::CellDisabled(_),
+                )) => {
+                    // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
+                }
+                Ok(_) => {
+                    had_successful_zome_call = true;
+
+                    // Stop trying after the first successful zome call
+                    break;
+                }
+                Err(e) => {
+                    panic!("Other types of error are not expected {:?}", e);
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+
+        assert!(
+            had_successful_zome_call,
+            "Should have seen a clone cell join the network and allow calls"
         );
     }
 }

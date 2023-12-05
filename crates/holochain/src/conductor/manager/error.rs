@@ -8,10 +8,13 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum TaskManagerError {
     #[error("Conductor has exited due to an unrecoverable error in a managed task {0}")]
-    Unrecoverable(ManagedTaskError),
+    Unrecoverable(Box<ManagedTaskError>),
 
     #[error("Task manager failed to start")]
     TaskManagerFailedToStart,
+
+    #[error(transparent)]
+    Join(#[from] tokio::task::JoinError),
 
     #[error("Task manager encountered an internal error: {0}")]
     Internal(Box<dyn std::error::Error + Send + Sync>),
@@ -32,7 +35,7 @@ pub type TaskManagerResult = Result<(), TaskManagerError>;
 #[derive(Error, Debug)]
 pub enum ManagedTaskError {
     #[error(transparent)]
-    Conductor(#[from] ConductorError),
+    Conductor(#[from] Box<ConductorError>),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -53,7 +56,7 @@ impl ManagedTaskError {
         #[allow(clippy::match_like_matches_macro)]
         match self {
             Io(_) | Join(_) | Recv(_) => false,
-            Conductor(err) => match err {
+            Conductor(err) => match **err {
                 C::ShuttingDown => true,
                 // TODO: identify all recoverable cases
                 _ => false,

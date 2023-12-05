@@ -5,7 +5,7 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::EntryDefBufferKey;
-use holochain_zome_types::EntryDef;
+use holochain_zome_types::prelude::*;
 
 use crate::mutations;
 use crate::prelude::from_blob;
@@ -53,6 +53,7 @@ pub fn get(txn: &Transaction<'_>, key: EntryDefBufferKey) -> StateQueryResult<Op
     }
 }
 
+#[allow(clippy::let_and_return)] // required to drop temporary
 pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let mut stmt = txn.prepare(
         "
@@ -85,7 +86,7 @@ pub fn contains(txn: &Transaction<'_>, key: EntryDefBufferKey) -> StateQueryResu
 pub fn put(
     txn: &mut Transaction,
     key: EntryDefBufferKey,
-    entry_def: EntryDef,
+    entry_def: &EntryDef,
 ) -> StateMutationResult<()> {
     let key: EntryDefStoreKey = key.into();
     mutations::insert_entry_def(txn, key, entry_def)

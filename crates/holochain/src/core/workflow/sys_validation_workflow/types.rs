@@ -2,11 +2,9 @@ use super::*;
 
 #[derive(Debug)]
 /// The outcome of sys validation
-pub(super) enum Outcome {
+pub(crate) enum Outcome {
     /// Moves to app validation
     Accepted,
-    /// Moves straight to integration
-    SkipAppValidation,
     /// Stays in limbo because another DhtOp
     /// dependency needs to be validated first
     AwaitingOpDep(AnyDhtHash),

@@ -1,55 +1,38 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
+use crate::conductor::manager::TaskManagerClient;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
-use tokio::task::JoinHandle;
+use holochain_types::db_cache::DhtDbQueryCache;
+
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, conductor_handle, stop, trigger_receipt, cell_network))]
+#[instrument(skip(env, trigger_receipt, tm, network, dht_query_cache))]
 pub fn spawn_integrate_dht_ops_consumer(
-    env: EnvWrite,
-    conductor_handle: ConductorHandle,
-    cell_id: CellId,
-    mut stop: sync::broadcast::Receiver<()>,
+    dna_hash: Arc<DnaHash>,
+    env: DbWrite<DbKindDht>,
+    dht_query_cache: DhtDbQueryCache,
+    tm: TaskManagerClient,
     trigger_receipt: TriggerSender,
-    cell_network: HolochainP2pCell,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
-        loop {
-            // Wait for next job
-            if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
-                tracing::warn!(
-                    "Cell is shutting down: stopping integrate_dht_ops_workflow queue consumer."
-                );
-                break;
-            }
+    network: HolochainP2pDna,
+) -> TriggerSender {
+    let (tx, rx) = TriggerSender::new();
 
-            // Run the workflow
-            match integrate_dht_ops_workflow(
+    super::queue_consumer_dna_bound(
+        "integrate_dht_ops_consumer",
+        dna_hash,
+        tm,
+        (tx.clone(), rx),
+        move || {
+            integrate_dht_ops_workflow(
                 env.clone(),
+                dht_query_cache.clone(),
                 trigger_receipt.clone(),
-                cell_network.clone(),
+                network.clone(),
             )
-            .await
-            {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        cell_id.clone(),
-                        err,
-                        "integrate_dht_ops failure",
-                    )
-                    .await?
-                }
-                _ => (),
-            };
-        }
-        Ok(())
-    });
-    (tx, handle)
+        },
+    );
+
+    tx
 }

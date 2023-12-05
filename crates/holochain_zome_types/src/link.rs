@@ -1,55 +1,10 @@
-use crate::element::SignedHeaderHashed;
-use holo_hash::HeaderHash;
+use crate::prelude::*;
+use holo_hash::{ActionHash, AgentPubKey};
+use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
-/// Opaque tag for the link applied at the app layer, used to differentiate
-/// between different semantics and validation rules for different links
-#[derive(
-    Debug,
-    PartialOrd,
-    Ord,
-    Clone,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
-    SerializedBytes,
-)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct LinkTag(#[serde(with = "serde_bytes")] pub Vec<u8>);
-
-impl LinkTag {
-    /// New tag from bytes
-    pub fn new<T>(t: T) -> Self
-    where
-        T: Into<Vec<u8>>,
-    {
-        Self(t.into())
-    }
-
-    pub fn into_inner(self) -> Vec<u8> {
-        self.0
-    }
-}
-
-impl From<Vec<u8>> for LinkTag {
-    fn from(b: Vec<u8>) -> Self {
-        Self(b)
-    }
-}
-
-impl From<()> for LinkTag {
-    fn from(_: ()) -> Self {
-        Self(Vec::new())
-    }
-}
-
-impl AsRef<Vec<u8>> for LinkTag {
-    fn as_ref(&self) -> &Vec<u8> {
-        &self.0
-    }
-}
+pub use holochain_integrity_types::link::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(
     Debug,
@@ -64,78 +19,94 @@ impl AsRef<Vec<u8>> for LinkTag {
     SerializedBytes,
 )]
 pub struct Link {
-    /// The [Entry] being linked to
-    pub target: holo_hash::EntryHash,
+    /// The author of this link
+    pub author: holo_hash::AgentPubKey,
+    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked from
+    pub base: holo_hash::AnyLinkableHash,
+    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked to
+    pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
-    pub timestamp: crate::Timestamp,
+    pub timestamp: Timestamp,
+    /// The [`ZomeIndex`] for where this link is defined.
+    pub zome_index: ZomeIndex,
+    /// The [`LinkType`] for this link.
+    pub link_type: LinkType,
     /// A tag used to find this link
     pub tag: LinkTag,
-    /// The hash of this link's create header
-    pub create_link_hash: HeaderHash,
+    /// The hash of this link's create action
+    pub create_link_hash: ActionHash,
 }
 
 /// Zome IO inner type for link creation.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct CreateLinkInput {
-    pub base_address: holo_hash::EntryHash,
-    pub target_address: holo_hash::EntryHash,
+    pub base_address: holo_hash::AnyLinkableHash,
+    pub target_address: holo_hash::AnyLinkableHash,
+    pub zome_index: ZomeIndex,
+    pub link_type: LinkType,
     pub tag: LinkTag,
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
 impl CreateLinkInput {
     pub fn new(
-        base_address: holo_hash::EntryHash,
-        target_address: holo_hash::EntryHash,
+        base_address: holo_hash::AnyLinkableHash,
+        target_address: holo_hash::AnyLinkableHash,
+        zome_index: ZomeIndex,
+        link_type: LinkType,
         tag: LinkTag,
+        chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
             base_address,
             target_address,
+            zome_index,
+            link_type,
             tag,
+            chain_top_ordering,
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct DeleteLinkInput {
+    /// Address of the link being deleted.
+    pub address: holo_hash::ActionHash,
+    /// Chain top ordering rules for writes.
+    pub chain_top_ordering: ChainTopOrdering,
+}
+
+impl DeleteLinkInput {
+    pub fn new(address: holo_hash::ActionHash, chain_top_ordering: ChainTopOrdering) -> Self {
+        Self {
+            address,
+            chain_top_ordering,
         }
     }
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
-    pub base_address: holo_hash::EntryHash,
-    pub tag_prefix: Option<crate::link::LinkTag>,
+    /// The base to get links from.
+    pub base_address: holo_hash::AnyLinkableHash,
+
+    /// The link types to include in this get.
+    pub link_type: LinkTypeFilter,
+
+    /// The tag prefix to filter by.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
-impl GetLinksInput {
-    pub fn new(
-        base_address: holo_hash::EntryHash,
-        tag_prefix: Option<crate::link::LinkTag>,
-    ) -> Self {
-        Self {
-            base_address,
-            tag_prefix,
-        }
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
-pub struct Links(Vec<Link>);
-
-impl From<Vec<Link>> for Links {
-    fn from(v: Vec<Link>) -> Self {
-        Self(v)
-    }
-}
-
-impl From<Links> for Vec<Link> {
-    fn from(links: Links) -> Self {
-        links.0
-    }
-}
-
-impl Links {
-    pub fn into_inner(self) -> Vec<Link> {
-        self.into()
-    }
-}
-
-type CreateLinkWithDeleteLinks = Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>;
+type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// CreateLinks with and DeleteLinks on them
 /// `[CreateLink, [DeleteLink]]`
@@ -156,12 +127,5 @@ impl From<LinkDetails> for CreateLinkWithDeleteLinks {
 impl LinkDetails {
     pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
-    }
-}
-
-#[cfg(feature = "full")]
-impl rusqlite::ToSql for LinkTag {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        Ok(rusqlite::types::ToSqlOutput::Borrowed((&self.0[..]).into()))
     }
 }

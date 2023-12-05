@@ -37,7 +37,7 @@ fixturator!(
     String::from(EMPTY_STR),
     {
         let mut rng = crate::rng();
-        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN, UNPREDICTABLE_MAX_LEN);
+        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN..UNPREDICTABLE_MAX_LEN);
         let vec: Vec<char> = (0..len).map(|_| rng.gen()).collect();
         let string: String = vec.iter().collect();
         string

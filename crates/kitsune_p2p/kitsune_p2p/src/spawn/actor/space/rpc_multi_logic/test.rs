@@ -2,6 +2,7 @@ use super::*;
 
 use kitsune_p2p_types::tx2::tx2_adapter::test_utils::*;
 use kitsune_p2p_types::tx2::tx2_adapter::*;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use once_cell::sync::Lazy;
 
@@ -77,38 +78,37 @@ async fn build_ep_hnd(config: Arc<KitsuneP2pConfig>, m: MockBindAdapt) -> Tx2EpH
 
 #[tokio::test]
 async fn test_rpc_multi_logic_mocked() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // allow fake timing during test
     tokio::time::pause();
 
     let space = Arc::new(KitsuneSpace(vec![0; 36]));
-    let this_addr = url2::url2!("fake://");
 
     // build our "SpaceInternal" sender
     let mut m = MockSpaceInternalHandler::new();
     // just make is_agent_local always return false
     m.expect_handle_is_agent_local()
-        .returning(|_| Ok(async move { Ok(false) }.boxed().into()));
+        .returning(|_| ok_fut(Ok(false)));
     let i_s = build_space_internal(m).await;
 
     // build our "KitsuneP2pEvent" sender
     let mut m = MockKitsuneP2pEventHandler::new();
     let start = tokio::time::Instant::now();
     // don't return any infos to start, then return 4 to test our loops
-    m.expect_handle_query_agent_info_signed_near_basis()
-        .returning(move |_, _, _| {
-            println!("QUERY: {}", start.elapsed().as_secs_f64());
-            let mut out = Vec::new();
-            if start.elapsed().as_secs_f64() > 1.0 {
-                out.push(A1.clone());
-                out.push(A2.clone());
-                out.push(A3.clone());
-                out.push(A4.clone());
-            }
-            Ok(async move { Ok(out) }.boxed().into())
-        });
+    m.expect_handle_query_agents().returning(move |_| {
+        let mut out = Vec::new();
+        if start.elapsed().as_secs_f64() > 1.0 {
+            out.push(A1.clone());
+            out.push(A2.clone());
+            out.push(A3.clone());
+            out.push(A4.clone());
+        }
+        ok_fut(Ok(out))
+    });
+
     let evt_sender = build_event_handler(m).await;
+    let host_api = HostStub::new();
 
     let config = Arc::new(KitsuneP2pConfig::default());
 
@@ -156,7 +156,6 @@ async fn test_rpc_multi_logic_mocked() {
                                 let resp = match wire {
                                     wire::Wire::Call(wire::Call {
                                         space: _,
-                                        from_agent: _,
                                         to_agent: _,
                                         data,
                                     }) => {
@@ -232,24 +231,35 @@ async fn test_rpc_multi_logic_mocked() {
     });
     let ep_hnd = build_ep_hnd(config.clone(), m).await;
 
+    let metrics = MetricsSync::default();
+    let metric_exchange = MetricExchangeSync::spawn(
+        space.clone(),
+        config.tuning_params.clone(),
+        host_api.clone(),
+        metrics.clone(),
+    );
+
     // build up the ro_inner that discover calls expect
     let ro_inner = Arc::new(SpaceReadOnlyInner {
         space: space.clone(),
-        this_addr,
         i_s,
         evt_sender,
+        host_api,
         ep_hnd,
+        parallel_notify_permit: Arc::new(tokio::sync::Semaphore::new(
+            config.tuning_params.concurrent_limit_per_thread,
+        )),
         config,
+        metrics,
+        metric_exchange,
     });
 
-    let agent = Arc::new(KitsuneAgent(vec![0; 36]));
     let basis = Arc::new(KitsuneBasis(vec![0; 36]));
 
     // excercise the rpc multi logic
     let res = handle_rpc_multi(
         actor::RpcMulti {
             space,
-            from_agent: agent.clone(),
             basis,
             payload: b"test".to_vec(),
             max_remote_agent_count: 3,

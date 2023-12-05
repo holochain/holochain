@@ -5,9 +5,8 @@ use warp::Filter;
 
 pub(crate) fn clear(
     store: Store,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = impl warp::Reply + Sized, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::header::exact("content-type", "application/octet"))
         .and(warp::header::exact("X-Op", "clear"))
         .and(with_store(store))
         .and_then(clear_info)
@@ -23,12 +22,14 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use fixt::prelude::*;
-    use kitsune_p2p::{agent_store::AgentInfoSigned, fixt::*, KitsuneSpace};
+    use ::fixt::prelude::*;
+    use kitsune_p2p::{agent_store::AgentInfoSigned, KitsuneSpace};
+    use kitsune_p2p_bin_data::fixt::*;
+    use kitsune_p2p_types::fixt::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_clear() {
-        let store = Store::new();
+        let store = Store::new(vec![]);
 
         let filter = super::clear(store.clone());
         let space: Arc<KitsuneSpace> = Arc::new(fixt!(KitsuneSpace));

@@ -3,7 +3,7 @@ use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::conductor::{api::error::ConductorApiError, error::ConductorError};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use crate::core::SourceChainError;
 use holochain_cascade::error::CascadeError;
 use holochain_p2p::HolochainP2pError;
@@ -25,9 +25,11 @@ pub enum CellError {
     #[error("Genesis failed: {0}")]
     Genesis(Box<ConductorApiError>),
     #[error(transparent)]
-    HeaderError(#[from] HeaderError),
+    ActionError(#[from] ActionError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
+    #[error("The cell with id {0} is disabled.")]
+    CellDisabled(CellId),
     #[error(
         "The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}"
     )]
@@ -53,6 +55,12 @@ pub enum CellError {
     InitTimeout,
     #[error("Failed to get or create the cache for this dna {0:?}")]
     FailedToCreateCache(Box<ConductorError>),
+    #[error("Failed to get or create the authored db for this dna {0:?}")]
+    FailedToCreateAuthoredDb(Box<ConductorError>),
+    #[error("Failed to get or create the DHT db for this dna {0:?}")]
+    FailedToCreateDhtDb(Box<ConductorError>),
+    #[error("Failed to get or create the dna space {0:?}")]
+    FailedToCreateDnaSpace(Box<ConductorError>),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
     #[error(transparent)]
@@ -69,6 +77,8 @@ pub enum CellError {
     StateQueryError(#[from] holochain_state::query::StateQueryError),
     #[error(transparent)]
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+    #[error(transparent)]
+    OneErr(#[from] one_err::OneErr),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

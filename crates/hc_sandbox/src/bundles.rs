@@ -1,4 +1,5 @@
-//! Helpers for working with dna files.
+//! Helpers for working with DNA files.
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -6,7 +7,7 @@ use anyhow::bail;
 use anyhow::ensure;
 use walkdir::WalkDir;
 
-/// Parse a list of dnas.
+/// Parse a list of DNAs.
 /// If paths are directories then each directory
 /// will be searched for the first file that matches
 /// `*.dna`.
@@ -16,7 +17,7 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     }
     for dna in dnas.iter_mut() {
         if dna.is_dir() {
-            let file_path = search_for_dna(&dna)?;
+            let file_path = search_for_dna(dna)?;
             *dna = file_path;
         }
         ensure!(
@@ -30,10 +31,10 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     Ok(dnas)
 }
 
-/// Parse a happ bundle.
+/// Parse a hApp bundle.
 /// If paths are directories then each directory
 /// will be searched for the first file that matches
-/// `*.dna`.
+/// `*.happ`.
 pub fn parse_happ(happ: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     let mut happ = happ.unwrap_or(std::env::current_dir()?);
     if happ.is_dir() {

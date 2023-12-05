@@ -69,7 +69,8 @@ pub(crate) type RxFromWebsocket = tokio_stream::wrappers::ReceiverStream<Incomin
 #[derive(Debug)]
 /// When dropped both to / from socket tasks are shutdown.
 pub struct PairShutdown {
-    close_from_socket: Trigger,
+    /// This is here for it's drop impl so it's not actually dead code.
+    _close_from_socket: Trigger,
     close_to_socket: TxToWebsocket,
 }
 
@@ -146,7 +147,7 @@ impl Websocket {
         let (close_from_socket, pair_shutdown) = Valve::new();
         let pair_shutdown_handle = PairShutdown {
             close_to_socket: tx_to_websocket.clone(),
-            close_from_socket,
+            _close_from_socket: close_from_socket,
         };
         // Only shutdown if both trigger arcs are dropped
         let pair_shutdown_handle = Arc::new(pair_shutdown_handle);
@@ -154,7 +155,7 @@ impl Websocket {
         // ---- LISTENER SHUTDOWN ---- //
 
         // Shutdown the receiver stream if the listener is dropped
-        // TODO: Should this shutdown immediately or gracefully. Currently it is immediately.
+        // TODO: Should this shutdown immediately or gracefully? Currently it is immediately.
         let rx_from_websocket = listener_shutdown.wrap(rx_from_websocket_stream);
 
         // Run the to and from external socket tasks.
@@ -455,7 +456,10 @@ impl Websocket {
 
                         // Forward the incoming message to the WebsocketReceiver.
                         if from_websocket
-                            .send(IncomingMessage::Msg(msg, resp))
+                            .send_timeout(
+                                IncomingMessage::Msg(msg, resp),
+                                std::time::Duration::from_secs(30),
+                            )
                             .await
                             .is_err()
                         {
@@ -487,7 +491,13 @@ impl Websocket {
                     }
                     tungstenite::Message::Ping(data) => {
                         // Received a ping, immediately respond with a pong.
-                        send_response.send(OutgoingMessage::Pong(data)).await.ok();
+                        send_response
+                            .send_timeout(
+                                OutgoingMessage::Pong(data),
+                                std::time::Duration::from_secs(30),
+                            )
+                            .await
+                            .ok();
                         Task::cont()
                     }
                     m => {
@@ -533,7 +543,7 @@ impl Websocket {
 
                     // Send the response to the to_socket task
                     send_response
-                        .send(msg)
+                        .send_timeout(msg, std::time::Duration::from_secs(10))
                         .await
                         .map_err(|_| WebsocketError::FailedToSendResp)?;
                     // Response sent, don't send cancel.
@@ -773,7 +783,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_response() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (handle, mut listener) = WebsocketListener::bind_with_handle(
             url2!("ws://127.0.0.1:0"),
             Arc::new(WebsocketConfig::default()),

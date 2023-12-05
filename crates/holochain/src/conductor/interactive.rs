@@ -100,11 +100,9 @@ fn save_default_config_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
 mod tests {
     use super::save_default_config_yaml;
     use crate::conductor::config::ConductorConfig;
-    use tempdir::TempDir;
-
     #[test]
     fn test_save_default_config() {
-        let tmp = TempDir::new("test").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("config.yaml");
         save_default_config_yaml(&config_path).unwrap();
         let config = ConductorConfig::load_yaml(config_path.as_ref()).unwrap();

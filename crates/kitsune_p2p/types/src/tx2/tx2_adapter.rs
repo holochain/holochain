@@ -10,7 +10,7 @@ use std::sync::atomic;
 static UNIQ: atomic::AtomicUsize = atomic::AtomicUsize::new(1);
 
 /// Opaque identifier, allows Eq/Hash through trait-object types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
 pub struct Uniq(usize);
 
 impl Default for Uniq {
@@ -119,6 +119,9 @@ pub type EndpointFut = BoxFuture<'static, KitsuneResult<Endpoint>>;
 pub trait BindAdapt: 'static + Send + Sync + Unpin {
     /// Bind a local endpoint, given a url spec.
     fn bind(&self, url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut;
+
+    /// Get the local certificate digest.
+    fn local_cert(&self) -> Tx2Cert;
 }
 
 /// Tx backend endpoint binding factory type.
@@ -244,7 +247,7 @@ pub mod test_utils {
 
             let t = KitsuneTimeout::from_millis(100);
 
-            let (ep, mut con_recv) = f.bind("test://none".into(), t).await.unwrap();
+            let (ep, mut con_recv) = f.bind("test://none".try_into().unwrap(), t).await.unwrap();
 
             let (con, mut chan_recv) = con_recv.next().await.unwrap().await.unwrap();
 
@@ -258,7 +261,10 @@ pub mod test_utils {
             buf.extend_from_slice(b"test");
             chan_send.write(0.into(), buf, t).await.unwrap();
 
-            let (con, mut chan_recv) = ep.connect("test://test".into(), t).await.unwrap();
+            let (con, mut chan_recv) = ep
+                .connect("test://test".try_into().unwrap(), t)
+                .await
+                .unwrap();
 
             let mut chan_recv = chan_recv.next().await.unwrap().await.unwrap();
 

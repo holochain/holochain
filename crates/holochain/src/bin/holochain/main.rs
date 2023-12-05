@@ -5,8 +5,9 @@ use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
+use holochain_trace::Output;
 use holochain_util::tokio_helper;
-use observability::Output;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
@@ -38,6 +39,14 @@ struct Opt {
     )]
     config_path: Option<PathBuf>,
 
+    /// Instead of the normal "interactive" method of passphrase
+    /// retreival, read the passphrase from stdin. Be careful
+    /// how you make use of this, as it could be less secure,
+    /// for example, make sure it is not saved in your
+    /// `~/.bash_history`.
+    #[structopt(short = "p", long)]
+    pub piped: bool,
+
     #[structopt(
         short = "i",
         long,
@@ -45,6 +54,12 @@ struct Opt {
     useful when running a conductor for the first time"
     )]
     interactive: bool,
+
+    #[structopt(
+        long,
+        help = "Display version information such as git revision and HDK version"
+    )]
+    build_info: bool,
 }
 
 fn main() {
@@ -59,13 +74,28 @@ async fn async_main() {
     human_panic::setup_panic!();
 
     let opt = Opt::from_args();
-    observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
-    debug!("observability initialized");
+
+    if opt.build_info {
+        println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
+
+    let config = get_conductor_config(&opt);
+
+    if let Some(t) = &config.tracing_override {
+        std::env::set_var("CUSTOM_FILTER", t);
+    }
+
+    holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
+    debug!("holochain_trace initialized");
+
+    holochain_metrics::HolochainMetricsConfig::new(config.environment_path.as_ref())
+        .init()
+        .await;
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
-    let conductor =
-        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
+    let conductor = conductor_handle_from_config(&opt, config).await;
 
     info!("Conductor successfully initialized.");
 
@@ -80,29 +110,23 @@ async fn async_main() {
     #[cfg(unix)]
     let _ = notify(true, &[NotifyState::Ready]);
 
-    // Await on the main JoinHandle, keeping the process alive until all
-    // Conductor activity has ceased
-    let result = conductor
-        .take_shutdown_handle()
+    // wait for a unix signal or ctrl-c instruction to
+    // shutdown holochain
+    tokio::signal::ctrl_c()
         .await
-        .expect("The shutdown handle has already been taken.")
-        .await;
-
-    handle_shutdown(result);
-
-    // TODO: on SIGINT/SIGKILL, kill the conductor:
-    // conductor.kill().await
+        .unwrap_or_else(|e| tracing::error!("Could not handle termination signal: {:?}", e));
+    tracing::info!("Gracefully shutting down conductor...");
+    let shutdown_result = conductor.shutdown().await;
+    handle_shutdown(shutdown_result);
 }
 
-async fn conductor_handle_from_config_path(
-    config_path: Option<PathBuf>,
-    interactive: bool,
-) -> ConductorHandle {
+fn get_conductor_config(opt: &Opt) -> ConductorConfig {
+    let config_path = opt.config_path.clone();
     let config_path_default = config_path.is_none();
     let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
     debug!("config_path: {}", config_path);
 
-    let config: ConductorConfig = if interactive {
+    let config: ConductorConfig = if opt.interactive {
         // Load config, offer to create default config if missing
         interactive::load_config_or_prompt_for_default(config_path)
             .expect("Could not load conductor config")
@@ -114,11 +138,27 @@ async fn conductor_handle_from_config_path(
         load_config(&config_path, config_path_default)
     };
 
+    config
+}
+
+async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> ConductorHandle {
+    // read the passphrase to prepare for usage
+    let passphrase = match &config.keystore {
+        KeystoreConfig::DangerTestKeystore => None,
+        KeystoreConfig::LairServer { .. } | KeystoreConfig::LairServerInProc { .. } => {
+            if opt.piped {
+                holochain_util::pw::pw_set_piped(true);
+            }
+
+            Some(holochain_util::pw::pw_get().unwrap())
+        }
+    };
+
     // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
     let env_path = PathBuf::from(config.environment_path.clone());
     if !env_path.is_dir() {
-        let result = if interactive {
+        let result = if opt.interactive {
             interactive::prompt_for_database_dir(&env_path)
         } else {
             std::fs::create_dir_all(&env_path)
@@ -133,11 +173,18 @@ async fn conductor_handle_from_config_path(
     }
 
     // Initialize the Conductor
-    Conductor::builder()
+    match Conductor::builder()
         .config(config)
+        .passphrase(passphrase)
         .build()
         .await
-        .expect("Could not initialize Conductor from configuration")
+    {
+        Err(err) => panic!(
+            "Could not initialize Conductor from configuration: {:?}",
+            err
+        ),
+        Ok(res) => res,
+    }
 }
 
 /// Load config, throw friendly error on failure
