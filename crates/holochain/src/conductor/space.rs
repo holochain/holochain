@@ -658,7 +658,10 @@ impl Spaces {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 // Note this is not an error because only a validation receipt is proof of a publish.
-                None => return Ok(()),
+                None => {
+                    tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
+                    return Ok(());
+                }
             };
             incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }

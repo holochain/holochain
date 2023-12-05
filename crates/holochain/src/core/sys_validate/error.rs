@@ -133,8 +133,6 @@ pub enum ValidationOutcome {
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was {0:?}")]
     NotNewEntry(Action),
-    #[error("The dependency {0:?} is not held")]
-    NotHoldingDep(AnyDhtHash),
     #[error("The PreflightResponse signature was not valid {0:?}")]
     PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
@@ -154,9 +152,6 @@ pub enum ValidationOutcome {
 }
 
 impl ValidationOutcome {
-    pub fn not_holding<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
-        Self::NotHoldingDep(h.clone().into())
-    }
     pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
         Self::DepMissingFromDht(h.clone().into())
     }
@@ -217,8 +212,6 @@ pub enum PrevActionErrorKind {
     InvalidRootOriginTime,
     #[error("Previous action sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
-    #[error("Previous action was missing from the metadata store")]
-    MissingMeta(ActionHash),
     #[error("Action is not the first, so needs previous action")]
     MissingPrev,
     #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]

@@ -2,7 +2,9 @@
 
 use super::*;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
+use crate::core::workflow::sys_validation_workflow::validation_deps::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
+use parking_lot::Mutex;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
@@ -19,6 +21,8 @@ pub fn spawn_sys_validation_consumer(
     let workspace = Arc::new(workspace);
     let space = Arc::new(space);
 
+    let current_validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
+
     super::queue_consumer_dna_bound(
         "sys_validation_consumer",
         space.dna_hash.clone(),
@@ -27,7 +31,7 @@ pub fn spawn_sys_validation_consumer(
         move || {
             sys_validation_workflow(
                 workspace.clone(),
-                space.clone(),
+                current_validation_dependencies.clone(),
                 trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),
