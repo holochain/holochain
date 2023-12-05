@@ -2,7 +2,7 @@ use holo_hash::ActionHash;
 use holochain::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 
-// Intended to keep https://github.com/holochain/holochain/issues/2541 fixed.
+// Intended to keep https://github.com/holochain/holochain/issues/2868 fixed.
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_with_no_entry_types_does_not_prevent_deletes() {
     holochain_trace::test_run().unwrap();
@@ -27,7 +27,7 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
         .await;
 }
 
-// Intended to keep https://github.com/holochain/holochain/issues/2541 fixed.
+// Intended to keep https://github.com/holochain/holochain/issues/2868 fixed.
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_with_no_link_types_does_not_prevent_delete_links() {
     holochain_trace::test_run().unwrap();
