@@ -7,6 +7,8 @@ use holochain_zome_types::{
 use std::collections::{HashMap, HashSet};
 
 /// A collection of validation dependencies for the current set of DHT ops requiring validation.
+/// This is used as an in-memory cache of dependency info, held across all validation workflow calls,
+/// to minimize the amount of network and database calls needed to check if dependencies have been satisfied
 pub struct ValidationDependencies {
     /// The state of each dependency, keyed by its hash.
     states: HashMap<ActionHash, ValidationDependencyState>,
