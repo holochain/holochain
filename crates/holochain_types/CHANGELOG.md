@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGE**: A `DnaManifest` and all its sub-fields will now reject unknown fields when deserialized. This will make it harder to provide an invalid DNA manifest to Holochain without realising. For example, coordinator zomes not appearing in your installed hApp because their field was indented to the wrong place. This is not a breaking change for valid manifests but Holochain will now reject more invalid manifests.
+
 ## 0.3.0-beta-dev.23
 
 ## 0.3.0-beta-dev.22
