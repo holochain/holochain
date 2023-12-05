@@ -608,7 +608,7 @@ async fn concurrent_install_dna() {
 
     static NUM_DNA: u8 = 50;
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
-    static REQ_TIMEOUT_MS: u64 = 60000;
+    static REQ_TIMEOUT_MS: u64 = 15000;
 
     holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
@@ -629,8 +629,6 @@ async fn concurrent_install_dna() {
 
     let before = std::time::Instant::now();
 
-    dbg!("foo");
-
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
         let mut client = client.clone();
@@ -646,7 +644,7 @@ async fn concurrent_install_dna() {
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            println!("[{}] Agent pub key generated", i);
+            // println!("[{}] Agent pub key generated", i);
 
             let _dna_hash = register_and_install_dna_named(
                 &mut client,
@@ -660,10 +658,10 @@ async fn concurrent_install_dna() {
             )
             .await;
 
-            println!(
-                "[{}] installed dna with hash {} and name {}",
-                i, _dna_hash, name
-            );
+            // println!(
+            //     "[{}] installed dna with hash {} and name {}",
+            //     i, _dna_hash, name
+            // );
         })
     }))
     .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
