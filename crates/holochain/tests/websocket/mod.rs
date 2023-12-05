@@ -627,7 +627,7 @@ async fn concurrent_install_dna() {
 
     let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
-    let before = std::time::Instant::now();
+    // let before = std::time::Instant::now();
 
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
