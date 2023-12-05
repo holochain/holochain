@@ -33,7 +33,6 @@ members = [
     "migrate_agent_pass",
     "multiple_calls",
     "must_get",
-    "no_types",
     "post_commit_success",
     "post_commit_volley",
     "query",
