@@ -19,7 +19,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
-static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(20_000);
+static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 #[async_trait::async_trait]
