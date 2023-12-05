@@ -131,16 +131,3 @@ pub async fn fake_unique_record(
         entry,
     ))
 }
-
-/// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> MetaLairClient {
-    tokio_helper::block_on(
-        async move {
-            holochain_keystore::test_keystore::spawn_test_keystore()
-                .await
-                .unwrap()
-        },
-        std::time::Duration::from_secs(1),
-    )
-    .expect("timeout elapsed")
-}

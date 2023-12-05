@@ -2,8 +2,11 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use crate::chain_lock::is_chain_locked;
+use crate::chain_lock::is_lock_expired;
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
+use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -16,65 +19,18 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
-use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
-use holochain_state_types::{SourceChainJsonDump, SourceChainJsonRecord};
-use holochain_types::chc::ChcError;
-use holochain_types::db::DbRead;
-use holochain_types::db::DbWrite;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::dht_op::produce_op_lights_from_iter;
-use holochain_types::dht_op::produce_op_lights_from_records;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::dht_op::OpOrder;
-use holochain_types::dht_op::UniqueForm;
-use holochain_types::prelude::AddRecordPayload;
-use holochain_types::record::SignedActionHashedExt;
+use holochain_state_types::SourceChainJsonRecord;
 use holochain_types::sql::AsSql;
-use holochain_zome_types::action;
-use holochain_zome_types::query::ChainQueryFilterRange;
-use holochain_zome_types::Action;
-use holochain_zome_types::ActionBuilder;
-use holochain_zome_types::ActionBuilderCommon;
-use holochain_zome_types::ActionExt;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ActionType;
-use holochain_zome_types::ActionUnweighed;
-use holochain_zome_types::CapAccess;
-use holochain_zome_types::CapGrant;
-use holochain_zome_types::CapSecret;
-use holochain_zome_types::CellId;
-use holochain_zome_types::ChainQueryFilter;
-use holochain_zome_types::ChainTopOrdering;
-use holochain_zome_types::CounterSigningAgentState;
-use holochain_zome_types::CounterSigningSessionData;
-use holochain_zome_types::Entry;
-use holochain_zome_types::EntryRateWeight;
-use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::GrantedFunction;
-use holochain_zome_types::MembraneProof;
-use holochain_zome_types::PreflightRequest;
-use holochain_zome_types::QueryFilter;
-use holochain_zome_types::Record;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
-use holochain_zome_types::Timestamp;
 
-use crate::chain_lock::is_chain_locked;
-use crate::chain_lock::is_lock_expired;
 use crate::prelude::*;
-use crate::query::chain_head::ChainHeadQuery;
-use crate::scratch::Scratch;
-use crate::scratch::SyncScratch;
+use crate::source_chain;
 use holo_hash::EntryHash;
-use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
 use holochain_sqlite::rusqlite;
-use holochain_zome_types::EntryType;
 
 mod error;
 
@@ -639,57 +595,61 @@ where
                 move |txn| -> Result<_, DatabaseError> {
                     // closure to process resulting rows from query
                     let query_row_fn = |row: &Row| {
-                        from_blob::<Entry>(row.get("blob")?).map_err(|err| {
-                            holochain_sqlite::rusqlite::Error::InvalidColumnType(
-                                0,
-                                err.to_string(),
-                                holochain_sqlite::rusqlite::types::Type::Blob,
-                            )
-                        })
+                        from_blob::<Entry>(row.get("blob")?)
+                            .and_then(|entry| {
+                                entry.as_cap_grant().ok_or_else(|| {
+                                    crate::query::StateQueryError::SerializedBytesError(
+                                        SerializedBytesError::Deserialize(
+                                            "could not deserialize cap grant from entry"
+                                                .to_string(),
+                                        ),
+                                    )
+                                })
+                            })
+                            .map_err(|err| {
+                                holochain_sqlite::rusqlite::Error::InvalidColumnType(
+                                    0,
+                                    err.to_string(),
+                                    holochain_sqlite::rusqlite::types::Type::Blob,
+                                )
+                            })
                     };
-                    // prepare sql statement depending on provided cap secret
-                    // and query for one cap grant
-                    //
-                    // query row is called inside the two arms instead of once
-                    // afterwards because of difficulty passing around params
-                    // between scopes
-                    let maybe_entry = if let Some(cap_secret) = &check_secret {
-                        // cap grant for cap secret must exist
-                        // that has not been updated or deleted
+
+                    // query cap grants depending on whether cap secret provided or not
+                    let cap_grants = if let Some(cap_secret) = &check_secret {
                         let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
                             DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
                                 err.to_string(),
                             ))
                         })?;
-                        txn.query_row(
-                            SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET,
-                            params![cap_secret_blob, author],
-                            query_row_fn,
-                        )
-                        .optional()?
+
+                        // cap grant for cap secret must exist
+                        // that has not been updated or deleted
+                        let mut stmt = txn.prepare(SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET)?;
+                        let rows = stmt.query(params![cap_secret_blob, author])?;
+                        let cap_grant: Vec<CapGrant> = rows.map(query_row_fn).collect()?;
+                        cap_grant
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
-                        txn.query_row(
-                            SELECT_VALID_UNRESTRICTED_CAP_GRANT,
-                            params![CapAccess::Unrestricted.as_sql(), author],
-                            query_row_fn,
-                        )
-                        .optional()?
+                        let mut stmt = txn.prepare(SELECT_VALID_UNRESTRICTED_CAP_GRANT)?;
+                        let rows = stmt.query(params![CapAccess::Unrestricted.as_sql(), author])?;
+                        let cap_grants: Vec<CapGrant> = rows.map(query_row_fn).collect()?;
+                        cap_grants
                     };
-
-                    let maybe_cap_grant = maybe_entry.and_then(|entry| entry.as_cap_grant());
-                    Ok(maybe_cap_grant)
+                    // loop over all found cap grants and check if one of them
+                    // is valid for assignee and function
+                    for cap_grant in cap_grants {
+                        if cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref())
+                        {
+                            return Ok(Some(cap_grant));
+                        }
+                    }
+                    Ok(None)
                 }
             })
             .await?;
-
-        // check if assignees and functions are granted
-        Ok(maybe_cap_grant.and_then(|cap_grant| {
-            cap_grant
-                .is_valid(&check_function, &check_agent, check_secret.as_ref())
-                .then_some(cap_grant)
-        }))
+        Ok(maybe_cap_grant)
     }
 
     /// Query Actions in the source chain.
@@ -950,7 +910,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLight, DhtOpHash, OpOrder, Timestamp, Dependency)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, Dependency)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -962,7 +922,7 @@ fn build_ops_from_actions(
         // &ActionHash, &Action, EntryHash are needed to produce the ops.
         let entry_hash = shh.action().entry_hash().cloned();
         let item = (shh.as_hash(), shh.action(), entry_hash);
-        let ops_inner = produce_op_lights_from_iter(vec![item].into_iter())?;
+        let ops_inner = produce_op_lites_from_iter(vec![item].into_iter())?;
 
         // Break apart the SignedActionHashed.
         let (action, sig) = shh.into_inner();
@@ -979,7 +939,7 @@ fn build_ops_from_actions(
             // Put the action back by value.
             let dependency = get_dependency(op_type, &action);
             h = Some(action);
-            // Collect the DhtOpLight, DhtOpHash and OpOrder.
+            // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));
         }
 
@@ -1024,7 +984,7 @@ pub async fn genesis(
     membrane_proof: Option<MembraneProof>,
     chc: Option<ChcImpl>,
 ) -> SourceChainResult<()> {
-    let dna_action = Action::Dna(action::Dna {
+    let dna_action = Action::Dna(Dna {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         hash: dna_hash,
@@ -1033,11 +993,11 @@ pub async fn genesis(
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
     let dna_record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_records(vec![&dna_record])?;
+    let dna_ops = produce_op_lites_from_records(vec![&dna_record])?;
     let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
-    let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
+    let agent_validation_action = Action::AgentValidationPkg(AgentValidationPkg {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         action_seq: 1,
@@ -1049,16 +1009,16 @@ pub async fn genesis(
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
     let agent_validation_record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_records(vec![&agent_validation_record])?;
+    let avh_ops = produce_op_lites_from_records(vec![&agent_validation_record])?;
     let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
-    let agent_action = Action::Create(action::Create {
+    let agent_action = Action::Create(Create {
         author: agent_pubkey.clone(),
         timestamp: Timestamp::now(),
         action_seq: 2,
         prev_action: avh_addr,
-        entry_type: action::EntryType::AgentPubKey,
+        entry_type: EntryType::AgentPubKey,
         entry_hash: agent_pubkey.clone().into(),
         // AgentPubKey is weightless
         weight: Default::default(),
@@ -1066,7 +1026,7 @@ pub async fn genesis(
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
     let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lights_from_records(vec![&agent_record])?;
+    let agent_ops = produce_op_lites_from_records(vec![&agent_record])?;
     let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
@@ -1114,7 +1074,7 @@ pub async fn genesis(
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
-    ops: Vec<DhtOpLight>,
+    ops: Vec<DhtOpLite>,
     entry: Option<Entry>,
 ) -> StateMutationResult<Vec<DhtOpHash>> {
     let (action, signature) = shh.into_inner();
@@ -1198,7 +1158,7 @@ pub fn current_countersigning_session(
 }
 
 #[cfg(test)]
-async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
+async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
     vault: holochain_types::db::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
@@ -1228,7 +1188,7 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     let action = ActionHashed::from_content_sync(action);
     let action = SignedActionHashed::sign(keystore, action).await?;
     let record = Record::new(action, maybe_entry);
-    let ops = produce_op_lights_from_records(vec![&record])?;
+    let ops = produce_op_lites_from_records(vec![&record])?;
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
@@ -1341,14 +1301,14 @@ impl From<SourceChain> for SourceChainRead {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holochain_keystore::test_keystore;
     use holochain_p2p::MockHolochainP2pDnaT;
-    use holochain_zome_types::prelude::*;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
@@ -1596,7 +1556,7 @@ pub mod tests {
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
-        let access = CapAccess::from(secret.unwrap());
+        let secret_access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
         mock.expect_chc().return_const(None);
@@ -1607,7 +1567,7 @@ pub mod tests {
         let mut fns = BTreeSet::new();
         fns.insert(function.clone());
         let functions = GrantedFunctions::Listed(fns);
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
+        let grant = ZomeCallCapGrant::new("tag".into(), secret_access.clone(), functions.clone());
         let mut agents = AgentPubKeyFixturator::new(Predictable);
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
@@ -1779,8 +1739,8 @@ pub mod tests {
 
         // Two source chains of the same DNA on the same conductor share DB tables.
         // That could lead to cap grants looked up by their secret alone being
-        // returned for any agent on the conductor.
-        // in this case for alice trying to access carol's chain
+        // returned for any agent on the conductor,in this case for alice trying
+        // to access carol's chain
         {
             source_chain::genesis(
                 db.clone(),
@@ -1908,8 +1868,8 @@ pub mod tests {
         // Two source chains of the same DNA on the same conductor share DB tables.
         // That could lead to cap grants looked up by being unrestricted alone
         // being returned for any agent on the conductor.
-        // in this case carol should not get an unrestricted cap grant for
-        // bob's chain
+        // In this case carol should not get an unrestricted cap grant for
+        // bob's chain.
         {
             {
                 source_chain::genesis(
@@ -1968,6 +1928,75 @@ pub mod tests {
                 .await?,
             None
         );
+
+        // Create two unrestricted cap grants in alice's chain to make sure
+        // that all of them are considered when checking grant validity
+        // instead of only the first cap grant found.
+
+        // first unrestricted cap grant with irrelevant zome and fn
+        let some_zome_name: ZomeName = "some_zome".into();
+        let some_fn_name: FunctionName = "some_fn".into();
+        let mut granted_fns = BTreeSet::new();
+        granted_fns.insert((some_zome_name.clone(), some_fn_name.clone()));
+        let first_unrestricted_grant = ZomeCallCapGrant::new(
+            "unrestricted_1".into(),
+            CapAccess::Unrestricted,
+            GrantedFunctions::Listed(granted_fns),
+        );
+
+        // second unrestricted cap grant with the actually granted zome and fn
+        let granted_zome_name: ZomeName = "granted_zome".into();
+        let granted_fn_name: FunctionName = "granted_fn".into();
+        let mut granted_fns = BTreeSet::new();
+        granted_fns.insert((granted_zome_name.clone(), granted_fn_name.clone()));
+        let second_unrestricted_grant = ZomeCallCapGrant::new(
+            "unrestricted_2".into(),
+            CapAccess::Unrestricted,
+            GrantedFunctions::Listed(granted_fns),
+        );
+
+        {
+            let chain = SourceChain::new(
+                db.clone().into(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
+
+            // commit first grant to alice's chain
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(first_unrestricted_grant.clone()))
+                    .into_inner();
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let _ = chain
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
+
+            // commit second grant to alice's chain
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(second_unrestricted_grant.clone()))
+                    .into_inner();
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let _ = chain
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
+
+            chain.flush(&mock).await.unwrap();
+        }
+
+        let actual_cap_grant = chain
+            .valid_cap_grant((granted_zome_name, granted_fn_name), bob, None)
+            .await
+            .unwrap();
+        assert_eq!(actual_cap_grant, Some(second_unrestricted_grant.into()));
 
         Ok(())
     }

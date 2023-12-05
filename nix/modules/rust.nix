@@ -53,6 +53,8 @@
             overlays = [
               inputs.rust-overlay.overlays.default
 
+              (final: prev: { })
+
               (final: prev: {
                 rustToolchain =
                   (prev.rust-bin."${track}"."${version}".minimal.override ({
@@ -63,7 +65,6 @@
                 cargo = final.rustToolchain;
               })
 
-              (final: prev: { })
             ];
           };
 

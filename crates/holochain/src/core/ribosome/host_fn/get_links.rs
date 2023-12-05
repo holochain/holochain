@@ -8,6 +8,7 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 #[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
@@ -156,9 +157,9 @@ pub mod slow_tests {
             .await;
 
         let expect = Path::from(vec![
-            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
-            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
-            hdk::hash_path::path::Component::from("bar".as_bytes().to_vec()),
+            hdk::prelude::Component::new(hdi::hash_path::anchor::ROOT.to_vec()),
+            hdk::prelude::Component::from("foo".as_bytes().to_vec()),
+            hdk::prelude::Component::from("bar".as_bytes().to_vec()),
         ]);
         assert_eq!(
             anchor_address_one,
@@ -175,9 +176,9 @@ pub mod slow_tests {
             .await;
 
         let expect = Path::from(vec![
-            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
-            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
-            hdk::hash_path::path::Component::from("baz".as_bytes().to_vec()),
+            hdk::prelude::Component::new(hdi::hash_path::anchor::ROOT.to_vec()),
+            hdk::prelude::Component::from("foo".as_bytes().to_vec()),
+            hdk::prelude::Component::from("baz".as_bytes().to_vec()),
         ]);
         assert_eq!(
             anchor_address_two,
@@ -189,8 +190,8 @@ pub mod slow_tests {
             .await;
 
         let expect = Path::from(vec![
-            hdk::hash_path::path::Component::new(hdk::hash_path::anchor::ROOT.to_vec()),
-            hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
+            hdk::prelude::Component::new(hdi::hash_path::anchor::ROOT.to_vec()),
+            hdk::prelude::Component::from("foo".as_bytes().to_vec()),
         ]);
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1);
@@ -275,10 +276,6 @@ pub mod slow_tests {
         let hash_path_b: holo_hash::AnyLinkableHash =
             conductor.call(&alice, "get_path_hash", "b").await;
 
-        const LINK_TYPE: ScopedLinkType = ScopedLinkType {
-            zome_index: ZomeIndex(0),
-            zome_type: LinkType(0),
-        };
         let forward_link_0 = forward_links.get(0).unwrap();
         assert_eq!(forward_link_0.base, hash_path_a);
         assert_eq!(forward_link_0.target, hash_path_b);

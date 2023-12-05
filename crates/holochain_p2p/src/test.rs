@@ -231,13 +231,12 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holochain_keystore::test_keystore;
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
     use crate::HolochainP2pSender;
-    use holochain_types::prelude::AgentPubKeyExt;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
-    use holochain_zome_types::ValidationStatus;
+    use holochain_types::prelude::*;
     use kitsune_p2p::*;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::tls::TlsConfig;
@@ -322,10 +321,10 @@ mod tests {
                     cell_id: CellId::new(dna.clone(), a2.clone()),
                     zome_name: zome_name.clone(),
                     fn_name: fn_name.clone(),
-                    cap_secret: cap_secret,
+                    cap_secret,
                     payload: payload.clone(),
-                    nonce: nonce,
-                    expires_at: expires_at,
+                    nonce,
+                    expires_at,
                 }
                 .data_to_sign()
                 .unwrap(),

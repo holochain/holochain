@@ -68,7 +68,7 @@ pub async fn publish_dht_ops_workflow(
                 // If we get a routing error it means the space hasn't started yet and we should try publishing again.
                 if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
                     // TODO if this doesn't change what is the loop terminate condition?
-                    complete = WorkComplete::Incomplete;
+                    complete = WorkComplete::Incomplete(None);
                 }
                 warn!(failed_to_send_publish = ?e);
             }
@@ -139,9 +139,9 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_state::mutations;
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
-    use holochain_types::prelude::*;
     use std::collections::HashMap;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;
@@ -350,7 +350,7 @@ mod tests {
 
                 // Create test db
                 let test_db = test_authored_db();
-                let keystore = holochain_state::test_utils::test_keystore();
+                let keystore = holochain_keystore::test_keystore();
                 let dht_db = test_dht_db();
                 let db = test_db.to_db();
 

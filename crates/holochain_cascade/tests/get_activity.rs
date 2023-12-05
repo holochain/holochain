@@ -7,15 +7,8 @@ use holochain_cascade::CascadeImpl;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::prelude::test_cache_db;
-use holochain_state::prelude::test_dht_db;
-use holochain_state::scratch::Scratch;
-use holochain_types::activity::*;
-use holochain_types::chain::MustGetAgentActivityResponse;
+use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::ChainFilter;
-use holochain_zome_types::ChainQueryFilter;
-use holochain_zome_types::ChainStatus;
 use test_case::test_case;
 
 #[tokio::test(flavor = "multi_thread")]

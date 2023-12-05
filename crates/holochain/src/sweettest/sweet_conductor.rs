@@ -214,9 +214,13 @@ impl SweetConductor {
 
         tracing::info!(?config);
 
-        let handle =
-            Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
-                .await;
+        let handle = Self::handle_from_existing(
+            &dir,
+            keystore.unwrap_or_else(holochain_keystore::test_keystore),
+            &config,
+            &[],
+        )
+        .await;
         Self::new(handle, dir, config, rendezvous).await
     }
 
@@ -505,6 +509,17 @@ impl SweetConductor {
         websocket_client_by_port(port).await.unwrap()
     }
 
+    /// Create a new app interface and get a websocket client which can send requests
+    /// to it.
+    pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+        let port = self
+            .raw_handle()
+            .add_app_interface(either::Either::Left(0))
+            .await
+            .expect("Couldn't create app interface");
+        websocket_client_by_port(port).await.unwrap()
+    }
+
     /// Shutdown this conductor.
     /// This will wait for the conductor to shutdown but
     /// keep the inner state to restart it.
@@ -606,6 +621,21 @@ impl SweetConductor {
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Drop the specified agent keys from each conductor's peer table
+    pub async fn forget_peer_info(
+        conductors: impl IntoIterator<Item = &Self>,
+        agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
+    ) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+
+        crate::conductor::p2p_agent_store::forget_peer_info(all, agents_to_forget).await;
     }
 
     /// Let each conductor know about each others' agents so they can do networking

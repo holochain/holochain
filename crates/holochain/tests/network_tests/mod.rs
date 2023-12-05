@@ -596,8 +596,8 @@ async fn integrate_to_integrated<C: MetadataBufT<IntegratedPrefix>>(
     record_store: &RecordBuf<IntegratedPrefix>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
-    // Produce the light directly
-    for op in produce_op_lights_from_records(vec![record])? {
+    // Produce the lite op directly
+    for op in produce_op_lites_from_records(vec![record])? {
         // we don't integrate record data, because it is already in our vault.
         integrate_single_metadata(op, record_store, meta_store)?
     }

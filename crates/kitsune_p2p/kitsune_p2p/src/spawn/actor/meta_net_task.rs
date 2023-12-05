@@ -20,6 +20,7 @@ use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tracing::Instrument;
 
 pub struct MetaNetTask {
     host: HostApiLegacy,
@@ -81,6 +82,9 @@ impl MetaNetTask {
 
         tokio::task::spawn({
             let tuning_params = self.config.tuning_params.clone();
+            let span =
+                tracing::error_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
+            let span_outer = span.clone();
             async move {
                 let ep_evt = self
                     .ep_evt
@@ -88,13 +92,14 @@ impl MetaNetTask {
                     .expect("There should always be an ep_evt");
 
                 let this = Arc::new(self);
+                let span = span.clone();
 
                 let ep_evt_run = ep_evt.for_each_concurrent(
                     tuning_params.concurrent_limit_per_thread,
                     move |event| {
                         let this = this.clone();
                         let shutdown_notify = shutdown_notify_send.clone();
-
+                        let span = span.clone();
                         async move {
                             if let Err(MetaNetTaskError::RequiredChannelClosed) = match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
@@ -118,6 +123,7 @@ impl MetaNetTask {
                                 shutdown_notify.notify_one();
                             }
                         }
+                        .instrument(span)
                     },
                 );
 
@@ -137,6 +143,7 @@ impl MetaNetTask {
                 );
                 is_finished.fetch_or(true, Ordering::SeqCst)
             }
+            .instrument(span_outer)
         });
     }
 

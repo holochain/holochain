@@ -43,6 +43,9 @@ pub mod zome_types;
 #[cfg(feature = "fixturators")]
 pub mod fixt;
 
+#[cfg(feature = "fuzzing")]
+pub mod facts;
+
 #[cfg(feature = "test_utils")]
 pub mod inline_zome;
 #[cfg(feature = "test_utils")]

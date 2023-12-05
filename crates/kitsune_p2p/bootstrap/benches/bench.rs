@@ -5,14 +5,16 @@ use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::url2::url2;
 use kitsune_p2p::fixt::*;
-use kitsune_p2p::KitsuneP2pResult;
 use kitsune_p2p::KitsuneSpace;
+use kitsune_p2p_bootstrap::error::BootstrapClientError;
+use kitsune_p2p_bootstrap::error::BootstrapClientResult;
 use kitsune_p2p_types::bootstrap::RandomLimit;
 use kitsune_p2p_types::bootstrap::RandomQuery;
+use kitsune_p2p_types::fixt::UrlListFixturator;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
 
@@ -98,7 +100,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     op: &str,
     input: I,
     client: &reqwest::Client,
-) -> KitsuneP2pResult<Option<O>> {
+) -> BootstrapClientResult<Option<O>> {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
     let res = client
@@ -113,7 +115,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
             &mut res.bytes().await?.as_ref(),
         )?))
     } else {
-        Err(kitsune_p2p::KitsuneP2pError::Bootstrap(
+        Err(BootstrapClientError::Bootstrap(
             res.text().await?.into_boxed_str(),
         ))
     }

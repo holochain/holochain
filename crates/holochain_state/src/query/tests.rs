@@ -9,7 +9,7 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::{action::NewEntryAction, dht_op::DhtOp};
 use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 
 use super::link::*;
 use super::live_entry::*;
@@ -217,7 +217,7 @@ async fn insert_op_equivalence() {
     .unwrap();
     insert_op_lite(
         &mut txn1,
-        &op.to_light(),
+        &op.to_lite(),
         op.as_hash(),
         &op_order,
         &create_action.timestamp,

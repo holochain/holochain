@@ -115,8 +115,6 @@ mod test {
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternIO;
 
     #[test]
     fn init_callback_result_fold() {

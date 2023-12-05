@@ -126,7 +126,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_records_local() {
         let mut g = random_generator();
-        let keystore = test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         let agent = fake_agent_pubkey_1();
         let chc = Arc::new(ChcLocal::new(keystore.clone(), agent.clone()));
 
