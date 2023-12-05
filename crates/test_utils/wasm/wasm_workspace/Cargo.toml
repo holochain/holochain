@@ -20,6 +20,7 @@ members = [
     "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
+    "genesis_self_check_requires_properties",
     "hash_path",
     "hdk_extern",
     "init_fail",
