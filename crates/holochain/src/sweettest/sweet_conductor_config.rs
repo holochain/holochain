@@ -23,6 +23,9 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
+            tuning_params: Some(ConductorTuningParams {
+                sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
+            }),
             ..Default::default()
         }
         .into()
