@@ -672,11 +672,11 @@ async fn concurrent_install_dna() {
         r.unwrap();
     }
 
-    println!(
-        "installed {} dna in {:?}",
-        NUM_CONCURRENT_INSTALLS,
-        before.elapsed()
-    );
+    // println!(
+    //     "installed {} dna in {:?}",
+    //     NUM_DNA,
+    //     before.elapsed()
+    // );
 }
 
 #[tokio::test(flavor = "multi_thread")]
