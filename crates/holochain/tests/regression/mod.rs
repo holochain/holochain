@@ -20,10 +20,20 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
         .unwrap()
         .into_tuple();
 
-    let created: ActionHash = conductor.call(&cell.zome(TestWasm::Crd.coordinator_zome_name()), "create", ()).await;
+    let created: ActionHash = conductor
+        .call(
+            &cell.zome(TestWasm::Crd.coordinator_zome_name()),
+            "create",
+            (),
+        )
+        .await;
 
     let _: ActionHash = conductor
-        .call(&cell.zome(TestWasm::Crd.coordinator_zome_name()), "delete_via_hash", created)
+        .call(
+            &cell.zome(TestWasm::Crd.coordinator_zome_name()),
+            "delete_via_hash",
+            created,
+        )
         .await;
 }
 
@@ -47,9 +57,19 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
         .unwrap()
         .into_tuple();
 
-    let created: ActionHash = conductor.call(&cell.zome(TestWasm::Link.coordinator_zome_name()), "create_link", ()).await;
+    let created: ActionHash = conductor
+        .call(
+            &cell.zome(TestWasm::Link.coordinator_zome_name()),
+            "create_link",
+            (),
+        )
+        .await;
 
     let _: ActionHash = conductor
-        .call(&cell.zome(TestWasm::Link.coordinator_zome_name()), "delete_link", created)
+        .call(
+            &cell.zome(TestWasm::Link.coordinator_zome_name()),
+            "delete_link",
+            created,
+        )
         .await;
 }
