@@ -12,7 +12,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/dht", default-features = false }
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.5", path = "../kitsune_p2p/timestamp" }
 kitsune_p2p_block = { version = "^0.3.0-beta-dev.11", path = "../kitsune_p2p/block" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/bin_data" }
