@@ -33,6 +33,7 @@ pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
+use super::cell::error::CellResult;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
@@ -343,10 +344,7 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
-            let state = self.get_state().await?;
-
             self.clone().initialize_deepkey(None).await?;
-
             self.clone().add_admin_interfaces(admin_configs).await?;
             self.clone().startup_app_interfaces().await?;
 
@@ -2081,15 +2079,24 @@ mod service_impls {
     use super::*;
 
     impl Conductor {
+        /// Access the current conductor services
+        pub fn services(&self) -> ConductorServices {
+            self.services.share_ref(|s| s.clone())
+        }
+
         pub(crate) async fn initialize_deepkey(
             self: Arc<Self>,
             dna: Option<DnaFile>,
         ) -> ConductorResult<()> {
             let cell_id = if let Some(dna) = dna {
                 let dna_hash = dna.dna_hash().clone();
-                todo!("install cell which is not part of any app");
                 let agent = self.keystore().new_sign_keypair_random().await?;
                 let cell_id = CellId::new(dna_hash, agent);
+
+                self.register_dna(dna).await?;
+                todo!("set up cells, via genesis?");
+                // genesis_cells(self.clone(), vec![(cell_id.clone(), None)]).await?;
+
                 let cell_id_2 = cell_id.clone();
                 self.update_state(move |mut state| {
                     state.conductor_services.deepkey = Some(cell_id_2);
@@ -2665,6 +2672,18 @@ impl Conductor {
         Ok(())
     }
 
+    async fn create_cell(
+        self: Arc<Self>,
+        cell_id: CellId,
+    ) -> CellResult<(Cell, InitialQueueTriggers)> {
+        let chc = self.chc(self.keystore().clone(), &cell_id);
+        let space = self.get_or_create_space(cell_id.dna_hash())?;
+
+        let holochain_p2p_cell = self.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
+
+        Ok(Cell::create(cell_id.clone(), self, space, holochain_p2p_cell).await?)
+    }
+
     /// Attempt to create all necessary Cells which have not already been created
     /// and added to the conductor, namely the cells which are referenced by
     /// Running apps. If there are no cells to create, this function does nothing.
@@ -2709,21 +2728,9 @@ impl Conductor {
             .share_ref(|c| c.keys().cloned().collect());
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
-            let handle = self.clone();
-            let chc = handle.chc(self.keystore().clone(), cell_id);
-            async move {
-                let holochain_p2p_cell =
-                    handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
-
-                let space = handle
-                    .get_or_create_space(cell_id.dna_hash())
-                    .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
-                    .map_err(|err| (cell_id.clone(), err))?;
-
-                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
-                    .await
-                    .map_err(|err| (cell_id.clone(), err))
-            }
+            self.clone()
+                .create_cell(cell_id.clone())
+                .map_err(|err| (cell_id.clone(), err.into()))
         });
 
         // Join on all apps and return a list of

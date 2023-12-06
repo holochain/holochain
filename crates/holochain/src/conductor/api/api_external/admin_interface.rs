@@ -294,7 +294,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             InitializeDeepkey { deepkey_dna } => {
                 self.conductor_handle
                     .clone()
-                    .initialize_deepkey(deepkey_dna)
+                    .initialize_deepkey(Some(deepkey_dna))
                     .await?;
                 Ok(AdminResponse::Ok)
             }

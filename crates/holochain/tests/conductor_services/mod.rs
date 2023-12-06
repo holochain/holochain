@@ -22,11 +22,16 @@ async fn initialize_deepkey() {
                 .await
                 .unwrap();
         let (deepkey_dna, _) = deepkey_dna.into_dna_file(Default::default()).await.unwrap();
-        admin_api
+        let response = admin_api
             .handle_admin_request(AdminRequest::InitializeDeepkey { deepkey_dna })
             .await;
+        dbg!(&response);
+        assert!(matches!(response, AdminResponse::Ok));
     }
 
+    assert!(conductor.services().dpki.is_some());
+
+    // Install app
     {
         let (app_dna_file, _, _) =
             SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
