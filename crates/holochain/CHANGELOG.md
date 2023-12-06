@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+- Fix an issue where app validation for StoreRecord ops with a Delete or DeleteLink action were always passed to all zomes. These ops are now only passed to the zome which defined the entry type of the op that is being deleted. [#3107](https://github.com/holochain/holochain/pull/3107)
+
 - Refactor: Remove shadowing glob re-exports that were shadowing other exports.
 
 

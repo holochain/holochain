@@ -48,6 +48,7 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
+    "validate_reject_app_types",
     "whoami",
     "zome_info",
 ]

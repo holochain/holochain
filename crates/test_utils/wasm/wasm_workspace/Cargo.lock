@@ -2988,6 +2988,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_validate_reject_app_types"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_validate_valid"
 version = "0.0.1"
 dependencies = [
