@@ -76,6 +76,10 @@ pub struct ConductorConfig {
     /// that this value matches the one in KitsuneP2pConfig!
     #[serde(default)]
     pub tracing_scope: Option<String>,
+
+    /// Tuning parameters to adjust the behaviour of the conductor.
+    #[serde(default)]
+    pub tuning_params: Option<ConductorTuningParams>,
 }
 
 /// Helper function to load a config from a YAML string.
@@ -104,6 +108,43 @@ impl ConductorConfig {
             .as_ref()
             .map(|c| c.tuning_params.clone())
             .unwrap_or_default()
+    }
+
+    /// Get the conductor tuning params for this config (default if not set)
+    pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
+        self.tuning_params.clone().unwrap_or_default()
+    }
+}
+
+/// Tuning parameters to adjust the behaviour of the conductor.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ConductorTuningParams {
+    /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
+    /// Default: 10 seconds
+    pub sys_validation_retry_delay: Option<std::time::Duration>,
+}
+
+impl ConductorTuningParams {
+    /// Create a new [`ConductorTuningParams`] with all values missing, which will cause the defaults to be used.
+    pub fn new() -> Self {
+        Self {
+            sys_validation_retry_delay: None,
+        }
+    }
+
+    /// Get the current value of `sys_validation_retry_delay` or its default value.
+    pub fn sys_validation_retry_delay(&self) -> std::time::Duration {
+        self.sys_validation_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(10))
+    }
+}
+
+impl Default for ConductorTuningParams {
+    fn default() -> Self {
+        let empty = Self::new();
+        Self {
+            sys_validation_retry_delay: Some(empty.sys_validation_retry_delay()),
+        }
     }
 }
 
@@ -155,6 +196,7 @@ mod tests {
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
+                tuning_params: None,
             }
         );
     }
@@ -238,6 +280,7 @@ mod tests {
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
+                tuning_params: None,
             }
         );
     }
@@ -268,6 +311,7 @@ mod tests {
                 tracing_scope: None,
                 #[cfg(feature = "chc")]
                 chc_url: None,
+                tuning_params: None,
             }
         );
     }

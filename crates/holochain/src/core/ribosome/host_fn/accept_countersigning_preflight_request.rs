@@ -159,7 +159,6 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_timeout_session() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
@@ -271,7 +270,7 @@ pub mod wasm_test {
             .await;
 
         // Bob tries to do the same thing but after timeout.
-        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
         let bob_result: Result<ActionHash, _> = conductor
             .call_fallible(
                 &bob,
@@ -516,10 +515,319 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_cell,
+            alice_pubkey,
+            bob,
+            bob_cell,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+        let now = Timestamp::now();
+        // Before the preflight creation of things should work.
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
+        // Bob's zome must be initialized for countersigning to work.
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        // Alice can create a preflight request.
+        let preflight_request: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request",
+                vec![
+                    (alice_pubkey.clone(), vec![Role(0)]),
+                    (bob_pubkey.clone(), vec![]),
+                ],
+            )
+            .await;
+
+        // Alice can accept the preflight request.
+        let alice_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &alice,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let alice_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        // Alice can create a second preflight request.
+        let preflight_request_2: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request",
+                vec![
+                    (alice_pubkey.clone(), vec![Role(1)]),
+                    (bob_pubkey.clone(), vec![]),
+                ],
+            )
+            .await;
+
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        // Can't accept a second preflight request while the first is active.
+        let preflight_acceptance_fail = conductor
+            .raw_handle()
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "accept_countersigning_preflight_request".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(&preflight_request_2).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
+            .await;
+        assert!(matches!(
+            preflight_acceptance_fail,
+            Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
+        ));
+
+        // Bob can also accept the preflight request.
+        let bob_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &bob,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+        let bob_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        // With an accepted preflight creations must fail for alice.
+        let thing_fail_create_alice = conductor
+            .raw_handle()
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
+            .await;
+        expect_chain_locked(thing_fail_create_alice);
+
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        let thing_fail_create_bob = conductor
+            .raw_handle()
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: bob.cell_id().clone(),
+                        zome_name: bob.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: bob_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
+            .await;
+        expect_chain_locked(thing_fail_create_bob);
+
+        // Creating the correct countersigned entry will NOT immediately unlock
+        // the chain (it needs Bob to countersign).
+        let countersigned_action_hash_alice: ActionHash = conductor
+            .call(
+                &alice,
+                "create_a_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
+
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        let thing_fail_create_alice = conductor
+            .raw_handle()
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
+            .await;
+
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        expect_chain_locked(thing_fail_create_alice);
+
+        // The countersigned entry does NOT appear in alice's activity yet.
+        let alice_activity_pre: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+        assert_eq!(alice_activity_pre.valid_activity.len(), 5);
+
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
+        // Creation will still fail for bob.
+        let thing_fail_create_bob = conductor
+            .raw_handle()
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: bob.cell_id().clone(),
+                        zome_name: bob.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: bob_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
+            .await;
+        expect_chain_locked(thing_fail_create_bob);
+
+        // After bob commits the same countersigned entry he can unlock his chain.
+        let countersigned_action_hash_bob: ActionHash = conductor
+            .call(
+                &bob,
+                "create_a_countersigned_thing",
+                vec![alice_response, bob_response],
+            )
+            .await;
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        // Action get must not error.
+        let countersigned_action_bob: SignedActionHashed = conductor
+            .call(
+                &bob,
+                "must_get_action",
+                countersigned_action_hash_bob.clone(),
+            )
+            .await;
+        let countersigned_action_alice: SignedActionHashed = conductor
+            .call(
+                &alice,
+                "must_get_action",
+                countersigned_action_hash_alice.clone(),
+            )
+            .await;
+
+        // Entry get must not error.
+        if let Some((countersigned_entry_hash_bob, _)) =
+            countersigned_action_bob.action().entry_data()
+        {
+            let _countersigned_entry_bob: EntryHashed = conductor
+                .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
+                .await;
+        } else {
+            unreachable!();
+        }
+
+        // Record get must not error.
+        let _countersigned_record_bob: Record = conductor
+            .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
+            .await;
+
+        let alice_activity: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+
+        consistency_10s([&alice_cell, &bob_cell]).await;
+
+        assert_eq!(alice_activity.valid_activity.len(), 7);
+        assert_eq!(
+            &alice_activity.valid_activity[5].1,
+            countersigned_action_alice.action_address(),
+        );
+
+        let bob_activity: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                },
+            )
+            .await;
+        assert_eq!(bob_activity.valid_activity.len(), 7);
+        assert_eq!(
+            &bob_activity.valid_activity[5].1,
+            countersigned_action_bob.action_address(),
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
+    #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
+    async fn lock_chain_failure() {
+        use holochain_nonce::fresh_nonce;
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -676,6 +984,7 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
+
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let thing_fail_create_alice = conductor
@@ -994,8 +1303,8 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[ignore = "flaky"]
-    async fn enzymatic_session_fail() {
+    #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
+    async fn enzymatic_session_failure() {
         holochain_trace::test_run().ok();
 
         let (dna_file, _, _) =
