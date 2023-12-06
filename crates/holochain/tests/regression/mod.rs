@@ -20,7 +20,7 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
         .unwrap()
         .into_tuple();
 
-    let created: ActionHash = conductor.call(&cell.zome("crd"), "create", ()).await;
+    let created: ActionHash = conductor.call(&cell.zome(TestWasm::Crd.coordinator_zome_name()), "create", ()).await;
 
     let _: ActionHash = conductor
         .call(&cell.zome("crd"), "delete_via_hash", created)
