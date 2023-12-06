@@ -2750,6 +2750,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_genesis_self_check_requires_properties"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
 name = "test_wasm_genesis_self_check_valid"
 version = "0.0.1"
 dependencies = [

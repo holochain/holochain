@@ -979,6 +979,7 @@ impl Cell {
             conductor_handle,
             signal_tx,
             cell_id: self.id.clone(),
+            integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
@@ -1036,6 +1037,12 @@ impl Cell {
 
     pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
         &self.space.cache_db
+    }
+
+    pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {
+        self.queue_triggers
+            .integrate_dht_ops
+            .trigger(&"notify_authored_ops_moved_to_limbo");
     }
 
     #[cfg(any(test, feature = "test_utils"))]
