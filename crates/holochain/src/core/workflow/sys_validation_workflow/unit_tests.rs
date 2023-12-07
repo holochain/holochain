@@ -23,6 +23,7 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::DbWrite;
 use holochain_state::mutations::StateMutationResult;
+use holochain_state::test_utils::test_keystore;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
@@ -37,7 +38,6 @@ use holochain_zome_types::Action;
 use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
-use holochain_state::test_utils::test_keystore;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {

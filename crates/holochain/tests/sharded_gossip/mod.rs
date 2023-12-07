@@ -281,15 +281,13 @@ async fn test_zero_arc_no_gossip_4way() {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous()
-                .set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous()
-                .set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous().set_tuning_params(tuning)
         },
     ];
 
