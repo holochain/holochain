@@ -124,7 +124,7 @@ mod tests {
                     agents: agents.clone(),
                     signal,
                 };
-                tracing::debug!("sending signal to {:?}", agents);
+                tracing::debug!("sending remote signal to {:?}", agents);
                 api.send_remote_signal(signal)?;
                 Ok(())
             })
