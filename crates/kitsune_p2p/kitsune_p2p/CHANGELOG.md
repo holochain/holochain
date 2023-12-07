@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Fixed spammy "Recorded initiate|accept with current round already set" warning. [#3060](https://github.com/holochain/holochain/pull/3060)
 
-- Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity. [\#2974](https://github.com/holochain/holochain/pull/2974)
 
 ## 0.2.3
 
