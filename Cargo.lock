@@ -3186,6 +3186,7 @@ dependencies = [
  "num-traits",
  "num_cpus",
  "once_cell",
+ "opentelemetry_api",
  "page_size",
  "parking_lot 0.10.2",
  "pretty_assertions 0.7.2",
@@ -5261,6 +5262,22 @@ dependencies = [
  "openssl-src",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "opentelemetry_api"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a81f725323db1b1206ca3da8bb19874bbd3f57c3bcd59471bfb04525b265b9b"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "indexmap 1.9.3",
+ "js-sys",
+ "once_cell",
+ "pin-project-lite",
+ "thiserror",
+ "urlencoding",
 ]
 
 [[package]]

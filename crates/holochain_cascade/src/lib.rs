@@ -63,7 +63,6 @@ use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 use mutations::insert_action;
 use mutations::insert_entry;
 use mutations::insert_op_lite;
-use tracing::*;
 
 pub mod authority;
 pub mod error;
