@@ -26,8 +26,8 @@
 //! - InfluxDB as a pre-existing system process.
 //!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_EXTERNAL=1`
 //!   - Configure via environment variables:
-//!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST=[my influxdb url]`
-//!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET=[my influxdb bucket name]`
+//!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST=[my influxdb url]` where a default InfluxDB install will need `http://localhost:8086` and otherwise can be found by running `influx config` in a terminal.
+//!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET=[my influxdb bucket name]` but it's simplest to use `influxive` if you plan to import the provided dashboards.
 //!     - `HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN=[my influxdb auth token]`
 //!   - Metrics will be set up to report to this already running InfluxDB.
 //!
@@ -93,11 +93,21 @@
 //! | `tx5.conn.data.recv` | `u64_observable_counter` | `By` | Bytes received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.send.message.count` | `u64_observable_counter` | | Message count sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.recv.message.count` | `u64_observable_counter` | | Message count received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
+//! | `hc.conductor.p2p_event.duration`  | `f64_histogram` | `s` | The time spent processing a p2p event. |- `dna_hash`: The DNA hash that this event is being sent on behalf of. |
+//! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
+//! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
+//! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
+//! | `hc.db.pool.utilization` | `f64_gauge` | | The utilisation of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
+//! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 
 #[cfg(feature = "influxive")]
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
 #[cfg(feature = "influxive")]
 const DASH_TX5: &[u8] = include_bytes!("dashboards/tx5.json");
+#[cfg(feature = "influxive")]
+const DASH_DATABASE: &[u8] = include_bytes!("dashboards/database.json");
+#[cfg(feature = "influxive")]
+const DASH_CONDUCTOR: &[u8] = include_bytes!("dashboards/conductor.json");
 
 /// Configuration for holochain metrics.
 pub enum HolochainMetricsConfig {
@@ -266,10 +276,16 @@ impl HolochainMetricsConfig {
                     // only initialize dashboards if the db is new
                     if cur.contains("\"dashboards\": []") {
                         if let Err(err) = influxive.apply(DASH_NETWORK_STATS).await {
-                            tracing::warn!(?err, "failed to initialize dashboard");
+                            tracing::warn!(?err, "failed to initialize network stats dashboard");
                         }
                         if let Err(err) = influxive.apply(DASH_TX5).await {
-                            tracing::warn!(?err, "failed to initialize dashboard");
+                            tracing::warn!(?err, "failed to initialize tx5 dashboard");
+                        }
+                        if let Err(err) = influxive.apply(DASH_DATABASE).await {
+                            tracing::warn!(?err, "failed to initialize database dashboard");
+                        }
+                        if let Err(err) = influxive.apply(DASH_CONDUCTOR).await {
+                            tracing::warn!(?err, "failed to initialize conductor dashboard");
                         }
                     }
                 }

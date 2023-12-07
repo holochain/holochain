@@ -5,6 +5,7 @@ mod conn;
 mod databases;
 mod guard;
 mod kind;
+mod metrics;
 mod pool;
 
 #[cfg(test)]
