@@ -20,6 +20,7 @@ pub use crate::op::*;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use hdk_derive;
+pub use hdk_derive::dna_properties;
 pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_defs_conversions;
 pub use hdk_derive::hdk_entry_helper;
