@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use holo_hash::DnaHash;
 
-use super::DnaFile;
+use crate::prelude::DnaFile;
 
 /// A store of DnaFiles which can be accessed by DnaHash.
 pub trait DnaStore {

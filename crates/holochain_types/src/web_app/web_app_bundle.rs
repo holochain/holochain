@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use holochain_app::AppBundle;
 use mr_bundle::{error::MrBundleResult, ResourceBytes};
 
 use super::WebAppManifest;

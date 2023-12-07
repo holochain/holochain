@@ -2,7 +2,7 @@
 //! Binary `hc-dna` command executable.
 
 use clap::{Parser, Subcommand};
-use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
+use holochain_types::prelude::*;
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
 use mr_bundle::{Location, Manifest};

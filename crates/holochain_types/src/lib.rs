@@ -23,7 +23,6 @@ pub mod combinators;
 pub mod db;
 pub mod db_cache;
 pub mod dht_op;
-pub mod dna;
 pub mod entry;
 pub mod link;
 mod macros;
@@ -39,6 +38,8 @@ pub mod validation_receipt;
 pub mod wasmer_types;
 pub mod web_app;
 pub mod zome_types;
+
+pub use holochain_dna_types as dna;
 
 #[cfg(feature = "fixturators")]
 pub mod fixt;

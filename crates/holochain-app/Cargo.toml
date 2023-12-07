@@ -1,0 +1,58 @@
+[package]
+name = "holochain-app"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+holochain_dna_types = { path = "../holochain_dna_types" }
+holochain_zome_types = { path = "../holochain_zome_types" }
+
+anyhow = "*"
+async-trait = "*"
+derive_builder = "*"
+derive_more = "*"
+futures = "*"
+itertools = "*"
+mockall = "*"
+must_future = "*"
+serde = "*"
+serde_yaml = "*"
+tracing = "*"
+tokio = "*"
+
+# TODO: remove
+thiserror = "*"
+
+# bundling
+holo_hash = { path = "../holo_hash" }
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.2"}
+
+
+arbitrary = { version = "*", optional = true }
+proptest = { version = "*", optional = true }
+proptest-derive = { version = "*", optional = true }
+
+[dev-dependencies]
+holochain-app = { path = ".", features = ["test_utils", "fuzzing"] }
+
+holochain_trace = "*"
+matches = "*"
+maplit = "*"
+
+fixt = { path = "../fixt" }
+
+
+[features]
+
+test_utils = [
+    "holochain_dna_types/test_utils",
+]
+
+fuzzing = [
+    "arbitrary",
+    "proptest",
+    "proptest-derive",
+    "holochain_dna_types/fuzzing",
+]

@@ -42,7 +42,7 @@ impl SweetDnaFile {
     where
         I: Into<IntegrityZome>,
         C: Into<CoordinatorZome>,
-        D: Into<wasm::DnaWasm>,
+        D: Into<DnaWasm>,
     {
         let integrity_zomes: Vec<IntegrityZome> =
             integrity_zomes.into_iter().map(Into::into).collect();
@@ -84,7 +84,7 @@ impl SweetDnaFile {
     where
         I: Into<IntegrityZome>,
         C: Into<CoordinatorZome>,
-        D: Into<wasm::DnaWasm>,
+        D: Into<DnaWasm>,
     {
         Self::from_zomes(
             random_network_seed(),
@@ -103,9 +103,7 @@ impl SweetDnaFile {
         properties: SerializedBytes,
     ) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)
     where
-        W: Into<TestWasmPair<IntegrityZome, CoordinatorZome>>
-            + Into<TestWasmPair<wasm::DnaWasm>>
-            + Clone,
+        W: Into<TestWasmPair<IntegrityZome, CoordinatorZome>> + Into<TestWasmPair<DnaWasm>> + Clone,
     {
         let (integrity_zomes, coordinator_zomes) = wasms
             .clone()
@@ -146,9 +144,7 @@ impl SweetDnaFile {
         test_wasms: Vec<W>,
     ) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)
     where
-        W: Into<TestWasmPair<IntegrityZome, CoordinatorZome>>
-            + Into<TestWasmPair<wasm::DnaWasm>>
-            + Clone,
+        W: Into<TestWasmPair<IntegrityZome, CoordinatorZome>> + Into<TestWasmPair<DnaWasm>> + Clone,
     {
         let (dna, integrity_zomes, coordinator_zomes) = Self::from_test_wasms(
             random_network_seed(),
@@ -187,7 +183,7 @@ impl SweetDnaFile {
                 .map(|(n, z)| (n.into(), z.into()))
                 .collect(),
             coordinator_zomes,
-            Vec::<wasm::DnaWasm>::with_capacity(0),
+            Vec::<DnaWasm>::with_capacity(0),
             SerializedBytes::default(),
         )
         .await

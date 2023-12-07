@@ -16,7 +16,7 @@ pub enum HcBundleError {
 
     /// DnaError
     #[error("DNA error: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] holochain_types::prelude::DnaError),
 
     /// MrBundleError
     #[error(transparent)]

@@ -1,9 +1,9 @@
-use super::error::DnaError;
 use crate::prelude::*;
 use holo_hash::*;
-use holochain_zome_types::prelude::*;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+
+use crate::wasm;
 
 #[cfg(test)]
 mod test;

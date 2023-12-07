@@ -214,6 +214,12 @@ async fn mk_dna(
     SweetDnaFile::unique_from_inline_zomes(zomes.into()).await
 }
 
+/// This function is called in places where it will be necessary to rework that
+/// area after use_existing has been implemented
+pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
+) {
+}
+
 /// A function that sets up a SweetApp, used in several tests in this module
 async fn common_genesis_test_app(
     conductor: &mut SweetConductor,
@@ -231,7 +237,8 @@ async fn common_genesis_test_app(
     // no other app could be possibly referencing it, but just in case we have some kind of complex
     // behavior like installing two apps which reference each others' Cells at the same time,
     // we need to be aware of this distinction.
-    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution();
+    we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
+    );
 
     // Create one DNA which always works, and another from a zome that gets passed in
     let (dna_hardcoded, _, _) = mk_dna(("hardcoded", hardcoded_zome)).await;

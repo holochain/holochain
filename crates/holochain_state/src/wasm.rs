@@ -53,7 +53,6 @@ pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()
 mod tests {
     use super::*;
     use holochain_sqlite::prelude::DatabaseResult;
-    use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {

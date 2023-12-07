@@ -25,6 +25,7 @@ getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.3.0-beta-dev.13", path = "../holo_hash", features = ["full"] }
+holochain-app = { version = "0.1", path = "../holochain-app" }
 holochain_cascade = { version = "^0.3.0-beta-dev.26", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.3.0-beta-dev.26", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "../holochain_keystore", default-features = false }
@@ -41,7 +42,7 @@ holochain_nonce = { version = "^0.3.0-beta-dev.22", path = "../holochain_nonce" 
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive" }
 holochain-services = { version = "^0.1.0", path = "../holochain-services" }
 human-panic = "1.0.3"
-itertools = { version = "0.10" }
+itertools = { version = "0.12" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.22", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
 kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/bin_data" }

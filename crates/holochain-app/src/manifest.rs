@@ -36,23 +36,26 @@
 //! - a DNA descriptor, [`AppRoleDnaManifest`], which describes where to find the DNA,
 //!   the acceptable range of versions, and the cloning limitations.
 
-use holochain_zome_types::prelude::*;
+use holochain_dna_types::prelude::*;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
 pub(crate) mod app_manifest_v1;
-pub mod app_manifest_validated;
+mod app_manifest_validated;
 mod current;
-mod error;
 
 pub use app_manifest_v1::{AppRoleDnaManifest, CellProvisioning};
+pub use app_manifest_validated::*;
 pub use current::*;
-pub use error::*;
 
-use self::{app_manifest_validated::AppManifestValidated, error::AppManifestResult};
+/// Alias
+pub type AppManifestError = anyhow::Error;
+/// Alias
+pub type AppManifestResult<T> = Result<T, AppManifestError>;
+
 use app_manifest_v1::AppManifestV1;
 
-use super::InstalledCell;
+use crate::InstalledCell;
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
@@ -148,7 +151,7 @@ mod tests {
 
     use mr_bundle::Manifest;
 
-    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppRoleManifest};
+    use super::*;
 
     #[test]
     /// Replicate this test for any new version of the manifest that gets created

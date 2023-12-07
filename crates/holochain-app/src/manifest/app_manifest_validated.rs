@@ -5,21 +5,20 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+use super::*;
+
 use holo_hash::DnaHashB64;
 
-use super::error::{AppManifestError, AppManifestResult};
-use crate::app::app_manifest::current::DnaLocation;
-use crate::prelude::*;
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppManifestValidated {
     /// Name of the App. This may be used as the installed_app_id.
-    pub(in crate::app) name: String,
+    pub(crate) name: String,
 
     /// The role descriptions that make up this app.
-    pub(in crate::app) roles: HashMap<RoleName, AppRoleManifestValidated>,
+    pub(crate) roles: HashMap<RoleName, AppRoleManifestValidated>,
 }
 
 impl AppManifestValidated {
@@ -27,16 +26,16 @@ impl AppManifestValidated {
     ///
     /// NB: never make this struct's fields public. This constructor should be
     /// the only way to instantiate this type.
-    pub(in crate::app) fn new(
+    pub(crate) fn new(
         name: String,
         roles: HashMap<RoleName, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
         for (role_name, role) in roles.iter() {
             if let AppRoleManifestValidated::CloneOnly { clone_limit, .. } = role {
                 if *clone_limit == 0 {
-                    return Err(AppManifestError::InvalidStrategyCloneOnly(
-                        role_name.to_owned(),
-                    ));
+                    anyhow::bail!(
+                        "Invalid manifest for app role '{role_name}': Using strategy 'clone-only' with clone_limit == 0 is pointless"
+                    );
                 }
             }
         }

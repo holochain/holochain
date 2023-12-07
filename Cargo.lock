@@ -516,18 +516,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "automap"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b99d887f4066f8a1b4a713a8121fab07ff543863ac86177ebdee6b5cb18acf12"
-dependencies = [
- "cfg-if 1.0.0",
- "derive_more",
- "serde",
- "shrinkwraprs",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2731,7 +2719,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -2774,6 +2762,7 @@ dependencies = [
  "hdk",
  "holo_hash",
  "holochain",
+ "holochain-app",
  "holochain-services",
  "holochain_cascade",
  "holochain_conductor_api",
@@ -2797,7 +2786,7 @@ dependencies = [
  "human-panic",
  "indoc 1.0.9",
  "isotest",
- "itertools 0.10.5",
+ "itertools 0.12.0",
  "kitsune_p2p",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
@@ -2859,6 +2848,37 @@ dependencies = [
  "uuid 0.7.4",
  "wasmer",
  "wasmer-middlewares",
+]
+
+[[package]]
+name = "holochain-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "async-trait",
+ "derive_builder",
+ "derive_more",
+ "fixt",
+ "futures",
+ "holo_hash",
+ "holochain-app",
+ "holochain_dna_types",
+ "holochain_trace 0.2.3",
+ "holochain_zome_types",
+ "itertools 0.11.0",
+ "maplit",
+ "matches",
+ "mockall",
+ "mr_bundle",
+ "must_future",
+ "proptest",
+ "proptest-derive 0.3.0",
+ "serde",
+ "serde_yaml",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3052,6 +3072,71 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_dna_types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "async-trait",
+ "backtrace",
+ "base64 0.13.1",
+ "cfg-if 0.1.10",
+ "chrono",
+ "contrafact",
+ "derive_builder",
+ "derive_more",
+ "either",
+ "fixt",
+ "flate2",
+ "futures",
+ "getrandom 0.2.10",
+ "holo_hash",
+ "holochain_dna_types",
+ "holochain_keystore",
+ "holochain_nonce",
+ "holochain_serialized_bytes",
+ "holochain_sqlite",
+ "holochain_trace 0.3.0-beta-dev.2",
+ "holochain_util",
+ "holochain_wasmer_host",
+ "holochain_zome_types",
+ "isotest",
+ "itertools 0.12.0",
+ "kitsune_p2p_dht",
+ "lazy_static",
+ "maplit",
+ "matches",
+ "mockall",
+ "mr_bundle",
+ "must_future",
+ "nanoid 0.3.0",
+ "one_err",
+ "parking_lot 0.10.2",
+ "pretty_assertions",
+ "proptest",
+ "proptest-derive 0.4.0",
+ "rand 0.8.5",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_bytes",
+ "serde_derive",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "shrinkwraprs",
+ "strum 0.18.0",
+ "strum_macros 0.18.0",
+ "tempfile",
+ "test-case 2.2.2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "wasmer",
+ "wasmer-middlewares",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.3.0-beta-dev.16"
 dependencies = [
@@ -3065,7 +3150,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3313,6 +3398,24 @@ dependencies = [
 
 [[package]]
 name = "holochain_trace"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1b4651853c4f3bb44a3f1c5ffd41f2d7f29e03db98d5153161ee5f1a9131739"
+dependencies = [
+ "chrono",
+ "derive_more",
+ "inferno",
+ "once_cell",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "tracing-core",
+ "tracing-serde",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "holochain_trace"
 version = "0.3.0-beta-dev.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79123f87eed68619077d1730d58745bb365f1073de732211149fd88a879a98de"
@@ -3358,7 +3461,6 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "async-trait",
- "automap",
  "backtrace",
  "base64 0.13.1",
  "cfg-if 0.1.10",
@@ -3372,6 +3474,8 @@ dependencies = [
  "futures",
  "getrandom 0.2.10",
  "holo_hash",
+ "holochain-app",
+ "holochain_dna_types",
  "holochain_keystore",
  "holochain_nonce",
  "holochain_serialized_bytes",
@@ -3382,7 +3486,7 @@ dependencies = [
  "holochain_wasmer_host",
  "holochain_zome_types",
  "isotest",
- "itertools 0.10.5",
+ "itertools 0.12.0",
  "kitsune_p2p_dht",
  "lazy_static",
  "maplit",
@@ -3395,7 +3499,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3546,7 +3650,7 @@ dependencies = [
  "once_cell",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4045,6 +4149,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4116,7 +4229,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.6",
  "governor",
  "holochain_trace 0.3.0-beta-dev.2",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "kitsune_p2p",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
@@ -4138,7 +4251,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.7.3",
  "rand 0.8.5",
  "serde",
@@ -4166,7 +4279,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -4242,7 +4355,7 @@ dependencies = [
  "once_cell",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "serde",
  "statrs",
@@ -4265,7 +4378,7 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4288,7 +4401,7 @@ dependencies = [
  "linked-hash-map",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "serde",
  "test-case 1.2.3",
@@ -4380,7 +4493,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rmp-serde 0.15.5",
  "rustls",
  "serde",

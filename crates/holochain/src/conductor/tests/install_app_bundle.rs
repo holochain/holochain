@@ -60,9 +60,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .install_app_bundle(make_payload(agent.clone(), 0).await)
             .await
             .unwrap_err(),
-        ConductorError::AppBundleError(AppBundleError::AppManifestError(
-            AppManifestError::InvalidStrategyCloneOnly(_)
-        ))
+        ConductorError::AppBundleError(_)
     );
 
     {

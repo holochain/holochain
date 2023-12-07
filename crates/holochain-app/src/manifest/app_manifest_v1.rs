@@ -12,9 +12,8 @@
 
 use super::{
     app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
-    error::{AppManifestError, AppManifestResult},
+    AppManifestResult,
 };
-use crate::prelude::{RoleName, YamlProperties};
 use holo_hash::DnaHashB64;
 use holochain_zome_types::prelude::*;
 use std::collections::HashMap;
@@ -257,15 +256,15 @@ impl AppManifestV1 {
     }
 
     fn require<T>(maybe: Option<T>, context: &str) -> AppManifestResult<T> {
-        maybe.ok_or_else(|| AppManifestError::MissingField(context.to_owned()))
+        maybe.ok_or_else(|| anyhow::anyhow!("Missing required field in app manifest: {context}"))
     }
 }
 
 #[cfg(test)]
 pub mod tests {
+    use crate::AppManifest;
+
     use super::*;
-    use crate::app::app_manifest::AppManifest;
-    use crate::prelude::*;
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 

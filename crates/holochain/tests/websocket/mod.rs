@@ -94,7 +94,7 @@ how_many: 42
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
     tmp_dna.modifiers.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
+    let dna = DnaFile::new(tmp_dna, tmp_wasm).await;
 
     assert_ne!(&original_dna_hash, dna.dna_hash());
 

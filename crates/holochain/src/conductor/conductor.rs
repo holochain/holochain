@@ -702,7 +702,7 @@ mod dna_impls {
         pub(crate) async fn put_wasm_code(
             &self,
             dna: DnaDefHashed,
-            code: impl Iterator<Item = wasm::DnaWasm>,
+            code: impl Iterator<Item = DnaWasm>,
             zome_defs: Vec<(EntryDefBufferKey, EntryDef)>,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             // TODO: PERF: This loop might be slow
@@ -1360,7 +1360,10 @@ mod app_impls {
             } = payload;
 
             let bundle = {
-                let original_bundle = source.resolve().await?;
+                let original_bundle = source
+                    .resolve()
+                    .await
+                    .map_err(ConductorError::AppBundleError)?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();
                     manifest.set_network_seed(network_seed);
@@ -1380,7 +1383,8 @@ mod app_impls {
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
-                .await?;
+                .await
+                .map_err(ConductorError::AppBundleError)?;
 
             let cells_to_create = ops.cells_to_create();
 
@@ -2338,7 +2342,7 @@ mod misc_impls {
             &self,
             hash: &DnaHash,
             coordinator_zomes: CoordinatorZomes,
-            wasms: Vec<wasm::DnaWasm>,
+            wasms: Vec<DnaWasm>,
         ) -> ConductorResult<()> {
             // Note this isn't really concurrent safe. It would be a race condition to update the
             // same dna concurrently.

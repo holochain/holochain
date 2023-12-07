@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use holochain_zome_types::prelude::*;
 
 /// Key for the [EntryDef] buffer
 #[derive(

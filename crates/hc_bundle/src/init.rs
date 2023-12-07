@@ -1,10 +1,7 @@
 use std::io::Write;
 use std::{io, path::PathBuf};
 
-use holochain_types::prelude::{
-    AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
-    Timestamp,
-};
+use holochain_types::prelude::*;
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {

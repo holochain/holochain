@@ -10,7 +10,6 @@ use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
 use mr_bundle::Bundle;
 

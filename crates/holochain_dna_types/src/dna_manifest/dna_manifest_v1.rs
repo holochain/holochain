@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::prelude::*;
 use holo_hash::*;
+use holochain_zome_types::prelude::*;
 // use holochain_zome_types::prelude::*;
 use serde_with::serde_as;
 

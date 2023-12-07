@@ -1,6 +1,5 @@
 //! Some common testing helpers.
 
-use crate::dna::wasm::DnaWasm;
 use crate::prelude::*;
 use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
@@ -53,7 +52,7 @@ pub fn fake_dna_zomes_named(
     tokio_helper::block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
-            let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
+            let wasm = DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
             dna.integrity_zomes.push((
                 zome_name,

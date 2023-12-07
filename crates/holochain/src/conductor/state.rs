@@ -42,6 +42,9 @@ pub struct ConductorState {
     pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
+/// Alias, TODO remove
+pub type InstalledAppMap = HashMap<holochain_app::AppId, holochain_app::InstalledApp>;
+
 /// A unique identifier used to refer to an App Interface internally.
 #[derive(Clone, Deserialize, Serialize, Debug, Hash, PartialEq, Eq)]
 pub struct AppInterfaceId {
@@ -115,7 +118,7 @@ impl ConductorState {
     pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
         self.installed_apps.iter().filter_map(|(id, app)| {
             if *app.status() == AppStatus::Running {
-                let running = RunningApp::from(app.as_ref().clone());
+                let running = RunningApp::from((**app).clone());
                 Some((id, running))
             } else {
                 None
@@ -169,7 +172,8 @@ impl ConductorState {
             return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
         }
         let stopped_app = StoppedApp::new_fresh(app);
-        self.installed_apps.insert(stopped_app.clone().into());
+        self.installed_apps
+            .insert(stopped_app.id().clone(), stopped_app.clone().into());
         Ok(stopped_app)
     }
 

@@ -1,12 +1,6 @@
 [package]
-name = "holochain_types"
-version = "0.3.0-beta-dev.23"
-description = "Holochain common types"
-license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
-documentation = "https://docs.rs/holochain_types"
-readme = "README.md"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+name = "holochain_dna_types"
+version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -27,7 +21,6 @@ futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
 holo_hash = { version = "^0.3.0-beta-dev.13", path = "../holo_hash", features = ["encoding"] }
-holochain_dna_types = { path = "../holochain_dna_types", version = "0.1.0" }
 holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "../holochain_keystore" }
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
@@ -63,7 +56,6 @@ tracing = "0.1.26"
 wasmer = "4.2.2"
 wasmer-middlewares = "4.2.2"
 
-holochain-app = { path = "../holochain-app" }
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
@@ -74,7 +66,7 @@ proptest-derive = { version = "0", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
-holochain_types = { path = ".", features = ["test_utils", "fuzzing"]}
+holochain_dna_types = { path = ".", features = ["test_utils", "fuzzing"]}
 
 arbitrary = "1.0"
 isotest = { version = "0" }
@@ -95,7 +87,6 @@ test_utils = [
   "fuzzing",
   "isotest",
   "holochain_keystore/test_utils",
-  "holochain_dna_types/test_utils",
   "holochain_zome_types/test_utils",
 ]
 
@@ -105,7 +96,6 @@ fuzzing = [
   "proptest",
   "proptest-derive",
   "holo_hash/fuzzing",
-  "holochain_dna_types/fuzzing",
   "holochain_zome_types/fuzzing",
   "mr_bundle/fuzzing",
 ]
@@ -115,7 +105,6 @@ sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_keystore/sqlite-encrypted",
   "holochain_sqlite/sqlite-encrypted",
-  "holochain_dna_types/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
   "kitsune_p2p_dht/sqlite-encrypted",
 ]
@@ -124,7 +113,6 @@ sqlite = [
   "holo_hash/sqlite",
   "holochain_keystore/sqlite",
   "holochain_sqlite/sqlite",
-  "holochain_dna_types/sqlite",
   "holochain_zome_types/sqlite",
   "kitsune_p2p_dht/sqlite",
 ]

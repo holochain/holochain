@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::prelude::*;
+use crate::wasm::DnaWasm;
 use futures::StreamExt;
 use holo_hash::*;
 use mr_bundle::{Location, ResourceBytes};

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+
 use std::{collections::HashSet, path::PathBuf};
 mod dna_manifest_v1;
 
@@ -20,9 +21,7 @@ pub enum DnaManifest {
     V1(DnaManifestV1),
 }
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::Deref)]
 #[serde(try_from = "DnaManifest")]
 /// A dna manifest that has been successfully validated.
 pub struct ValidatedDnaManifest(pub DnaManifest);

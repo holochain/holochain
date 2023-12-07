@@ -2,11 +2,10 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 use mr_bundle::Manifest;
 
+use crate::dna_bundle::hash_bytes;
+use crate::dna_manifest::CoordinatorManifest;
 use crate::prelude::DnaResult;
 use crate::prelude::DnaWasm;
-
-use super::hash_bytes;
-use super::CoordinatorManifest;
 
 #[derive(
     Debug,

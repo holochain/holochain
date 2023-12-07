@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
-use crate::prelude::*;
+use crate::ported::*;
+use holochain_zome_types::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -26,6 +27,6 @@ pub enum AppError {
     RoleNameMissing(RoleName),
 
     #[error("Tried to install app '{0}' which contains duplicate role names. The following role names have duplicates: {1:?}")]
-    DuplicateRoleNames(InstalledAppId, Vec<RoleName>),
+    DuplicateRoleNames(AppId, Vec<RoleName>),
 }
 pub type AppResult<T> = Result<T, AppError>;

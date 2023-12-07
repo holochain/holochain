@@ -8,7 +8,6 @@ pub use crate::wasm::*;
 pub use crate::workspace::*;
 
 pub use holochain_sqlite::prelude::*;
-pub use holochain_state_types::prelude::*;
 pub use holochain_types::prelude::*;
 
 #[cfg(any(test, feature = "test_utils"))]

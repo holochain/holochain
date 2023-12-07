@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use super::*;
+use crate::prelude::*;
+use crate::wasm::DnaWasm;
+use holochain_zome_types::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_update_coordinators() {

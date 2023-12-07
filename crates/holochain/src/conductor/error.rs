@@ -21,7 +21,7 @@ pub enum ConductorError {
     AppError(#[from] AppError),
 
     #[error(transparent)]
-    AppBundleError(#[from] AppBundleError),
+    AppBundleError(anyhow::Error),
 
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
@@ -66,7 +66,7 @@ pub enum ConductorError {
     ZomeError(#[from] holochain_zome_types::zome::ZomeError),
 
     #[error("DnaError: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] holochain_types::prelude::DnaError),
 
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),

@@ -6,10 +6,9 @@ pub use holochain::prelude::*;
 use holochain::conductor::config::ConductorConfig;
 pub use rand;
 use rand::distributions::Standard;
-use rand::prelude::Distribution;
+use rand::prelude::*;
 pub use rand::rngs::StdRng;
 pub use rand::Rng;
-use rand::*;
 
 mod terminal;
 pub use terminal::*;

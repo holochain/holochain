@@ -22,6 +22,7 @@ use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
+use holochain_state_types::SourceChainJsonDump;
 use holochain_state_types::SourceChainJsonRecord;
 use holochain_types::sql::AsSql;
 

@@ -62,7 +62,7 @@ pub enum ConductorApiError {
 
     /// DnaError
     #[error("DnaError: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] holochain_types::prelude::DnaError),
 
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
@@ -78,7 +78,7 @@ pub enum ConductorApiError {
 
     /// App error
     #[error(transparent)]
-    AppError(#[from] AppError),
+    AppError(#[from] holochain_app::AppError),
 
     /// Error in the Interface
     #[error("An error occurred in the interface: {0:?}")]
@@ -88,7 +88,7 @@ pub enum ConductorApiError {
     SourceChainError(#[from] SourceChainError),
 
     #[error(transparent)]
-    AppBundleError(#[from] AppBundleError),
+    AppBundleError(anyhow::Error),
 
     #[error(transparent)]
     MrBundleError(#[from] MrBundleError),
