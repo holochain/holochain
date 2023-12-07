@@ -74,7 +74,8 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
+
     const NUM_CONDUCTORS: usize = 3;
 
     let config = SweetConductorConfig::rendezvous();

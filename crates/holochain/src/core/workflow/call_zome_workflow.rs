@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
@@ -100,8 +102,8 @@ where
                             }
                         }
                         None => {
-                            trigger_publish_dht_ops.trigger(&"trigger_publish_dht_ops");
-                            trigger_integrate_dht_ops.trigger(&"trigger_integrate_dht_ops");
+                            trigger_publish_dht_ops.trigger(&"call_zome_workflow");
+                            trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
                 }
@@ -226,6 +228,7 @@ where
         )),
     }
 }
+
 /// Run validation inline and wait for the result.
 pub async fn inline_validation<Ribosome>(
     workspace: SourceChainWorkspace,
@@ -236,8 +239,10 @@ pub async fn inline_validation<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
-    let cascade =
-        holochain_cascade::CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+    let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
+        &workspace,
+        network.clone(),
+    ));
 
     let to_app_validate = {
         // collect all the records we need to validate in wasm
@@ -245,7 +250,7 @@ where
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            sys_validate_record(&record, &cascade)
+            sys_validate_record(&record, cascade.clone())
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
@@ -259,7 +264,8 @@ where
 
     for mut chain_record in to_app_validate {
         for op_type in action_to_op_types(chain_record.action()) {
-            let op = app_validation_workflow::record_to_op(chain_record, op_type, &cascade).await;
+            let op =
+                app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
             let (op, omitted_entry) = match op {
                 Ok(op) => op,

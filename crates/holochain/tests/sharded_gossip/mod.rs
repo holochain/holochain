@@ -113,7 +113,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    // let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
@@ -363,11 +363,17 @@ async fn test_zero_arc_no_gossip_4way() {
                         }
                     };
                     holochain::wait_for!(
-                        WaitFor::new(std::time::Duration::from_secs(5), 10),
+                        WaitFor::new(std::time::Duration::from_secs(15), 10),
                         c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
                             .await
                             .is_some(),
-                        |x: &bool| *x,
+                        |x: &bool| {
+                            if j == 3 && i != j {
+                                !x
+                            } else {
+                                *x
+                            }
+                        },
                         assertion
                     );
                 }

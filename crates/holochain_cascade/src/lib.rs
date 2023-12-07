@@ -91,6 +91,7 @@ macro_rules! some_or_return {
 }
 
 /// Marks whether data came from a local store or another node on the network
+#[derive(Debug, Clone)]
 pub enum CascadeSource {
     /// Data came from a local store
     Local,
@@ -157,7 +158,7 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pDnaT + Clone>(
+    pub fn with_network<N: HolochainP2pDnaT>(
         self,
         network: N,
         cache_db: DbWrite<DbKindCache>,

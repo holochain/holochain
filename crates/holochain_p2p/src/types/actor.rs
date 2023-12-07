@@ -243,6 +243,8 @@ impl Default for GetActivityOptions {
     }
 }
 
+type MaybeDnaHash = Option<DnaHash>;
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pSender struct allows controlling the HolochainP2p
     /// actor instance.
@@ -363,7 +365,7 @@ ghost_actor::ghost_chan! {
 
         /// Dump network metrics.
         fn dump_network_metrics(
-            dna_hash: Option<DnaHash>,
+            dna_hash: MaybeDnaHash,
         ) -> String;
 
         /// Dump network stats.

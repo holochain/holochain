@@ -68,11 +68,6 @@ pub struct ConductorConfig {
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
-    //
-    //
-    // Which signals to emit
-    // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
-    // pub signals: SignalConfig,
 }
 
 /// Helper function to load a config from a YAML string.

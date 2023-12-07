@@ -160,10 +160,11 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
                 authored_db.clone().into(),
-                dht_db.clone().into(),
+                dht_db.clone(),
                 dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
+                std::time::Duration::from_secs(5),
             ),
             space.clone(),
             conductor.clone(),

@@ -3087,6 +3087,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.6",
  "holo_hash",
  "holochain_keystore",
+ "holochain_p2p",
  "holochain_serialized_bytes 0.0.51",
  "holochain_trace",
  "holochain_types",

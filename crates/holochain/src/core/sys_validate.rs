@@ -5,20 +5,15 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
-use holochain_cascade::Cascade;
-use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
-use holochain_zome_types::countersigning::CounterSigningSessionData;
-use std::convert::TryInto;
 use std::sync::Arc;
 
 pub use error::*;
 pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
-pub use holochain_zome_types::ActionHashed;
-pub use holochain_zome_types::Timestamp;
+pub use holochain_zome_types::prelude::*;
 
 #[allow(missing_docs)]
 mod error;
@@ -169,6 +164,8 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
         if is_dna && !has_prev {
             Ok(())
         } else {
+            // Note that the implementation of the action types and `prev_action` should prevent this being hit
+            // but this is useful as a defensive check.
             Err(PrevActionErrorKind::InvalidRoot)
         }
     } else {
@@ -374,7 +371,7 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
 }
 
 /// Check the actions entry hash matches the hash of the entry
-pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
+pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
     if *hash == EntryHash::with_data_sync(entry) {
         Ok(())
     } else {
@@ -422,18 +419,26 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 /// Check a Update's entry type is the same for
 /// original and new entry.
 pub fn check_update_reference(
-    eu: &Update,
+    update: &Update,
     original_entry_action: &NewEntryActionRef<'_>,
 ) -> SysValidationResult<()> {
-    if eu.entry_type == *original_entry_action.entry_type() {
-        Ok(())
-    } else {
-        Err(ValidationOutcome::UpdateTypeMismatch(
+    if update.entry_type != *original_entry_action.entry_type() {
+        return Err(ValidationOutcome::UpdateTypeMismatch(
             original_entry_action.entry_type().clone(),
-            eu.entry_type.clone(),
+            update.entry_type.clone(),
         )
-        .into())
+        .into());
     }
+
+    if update.original_entry_address != *original_entry_action.entry_hash() {
+        return Err(ValidationOutcome::UpdateHashMismatch(
+            original_entry_action.entry_hash().clone(),
+            update.original_entry_address.clone(),
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 /// Validate a chain of actions with an optional starting point.
@@ -501,148 +506,24 @@ fn check_prev_action_chain<A: ChainItem>(
     }
 }
 
-/// If we are not holding this action then
-/// retrieve it and send it as a RegisterAddLink DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_register_add_link<F>(
-    hash: &ActionHash,
-    cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender
-            .send_register_add_link(record)
-            .await?;
-    }
-    Ok(())
-}
+/// Allows DhtOps to be sent to some receiver
+#[async_trait::async_trait]
+#[cfg_attr(test, mockall::automock)]
+pub trait DhtOpSender {
+    /// Sends an op
+    async fn send_op(&self, op: DhtOp) -> SysValidationResult<()>;
 
-/// If we are not holding this action then
-/// retrieve it and send it as a RegisterAgentActivity DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_register_agent_activity<F>(
-    hash: &ActionHash,
-    cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender
-            .send_register_agent_activity(record)
-            .await?;
-    }
-    Ok(())
-}
+    /// Send a StoreRecord DhtOp
+    async fn send_store_record(&self, record: Record) -> SysValidationResult<()>;
 
-/// If we are not holding this action then
-/// retrieve it and send it as a StoreEntry DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_store_entry<F>(
-    hash: &ActionHash,
-    cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender.send_store_entry(record).await?;
-    }
-    Ok(())
-}
+    /// Send a StoreEntry DhtOp
+    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()>;
 
-/// If we are not holding this entry then
-/// retrieve any record at this EntryHash
-/// and send it as a StoreEntry DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Note this is different to check_and_hold_store_entry
-/// because it gets the Record via an EntryHash which
-/// means it will be any Record.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_any_store_entry<F>(
-    hash: &EntryHash,
-    cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender.send_store_entry(record).await?;
-    }
-    Ok(())
-}
+    /// Send a RegisterAddLink DhtOp
+    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()>;
 
-/// If we are not holding this action then
-/// retrieve it and send it as a StoreRecord DhtOp
-/// to our incoming_dht_ops_workflow.
-///
-/// Apply a checks callback to the Record.
-///
-/// Additionally sys validation will be triggered to
-/// run again if we weren't holding it.
-pub async fn check_and_hold_store_record<F>(
-    hash: &ActionHash,
-    cascade: &impl Cascade,
-    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
-    f: F,
-) -> SysValidationResult<()>
-where
-    F: FnOnce(&Record) -> SysValidationResult<()>,
-{
-    let source = check_and_hold(hash, cascade).await?;
-    f(source.as_ref())?;
-    if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
-        (incoming_dht_ops_sender, source)
-    {
-        incoming_dht_ops_sender.send_store_record(record).await?;
-    }
-    Ok(())
+    /// Send a RegisterAgentActivity DhtOp
+    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()>;
 }
 
 /// Allows you to send an op to the
@@ -655,84 +536,47 @@ pub struct IncomingDhtOpSender {
     sys_validation_trigger: TriggerSender,
 }
 
-impl IncomingDhtOpSender {
-    /// Sends the op to the incoming workflow
-    async fn send_op(
-        self,
-        record: Record,
-        make_op: fn(Record) -> Option<DhtOp>,
-    ) -> SysValidationResult<()> {
-        if let Some(op) = make_op(record) {
-            let ops = vec![op];
-            incoming_dht_ops_workflow(
-                self.space.as_ref().clone(),
-                self.sys_validation_trigger,
-                ops,
-                false,
-            )
-            .await
-            .map_err(Box::new)?;
-        }
-        Ok(())
+#[async_trait::async_trait]
+impl DhtOpSender for IncomingDhtOpSender {
+    async fn send_op(&self, op: DhtOp) -> SysValidationResult<()> {
+        let ops = vec![op];
+        Ok(incoming_dht_ops_workflow(
+            self.space.as_ref().clone(),
+            self.sys_validation_trigger.clone(),
+            ops,
+            false,
+        )
+        .await
+        .map_err(Box::new)?)
     }
 
-    async fn send_store_record(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_store_record).await
+    async fn send_store_record(&self, record: Record) -> SysValidationResult<()> {
+        self.send_op(make_store_record(record)).await
     }
 
-    async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+    async fn send_store_entry(&self, record: Record) -> SysValidationResult<()> {
         // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
         if is_public_entry {
-            self.send_op(record, make_store_entry).await?;
+            if let Some(op) = make_store_entry(record) {
+                self.send_op(op).await?;
+            }
         }
         Ok(())
     }
 
-    async fn send_register_add_link(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_register_add_link).await
-    }
-
-    async fn send_register_agent_activity(self, record: Record) -> SysValidationResult<()> {
-        self.send_op(record, make_register_agent_activity).await
-    }
-}
-
-/// Where the record was found.
-enum Source {
-    /// Locally because we are holding it or
-    /// because we will be soon
-    Local(Record),
-    /// On the network.
-    /// This means we aren't holding it so
-    /// we should add it to our incoming ops
-    Network(Record),
-}
-
-impl AsRef<Record> for Source {
-    fn as_ref(&self) -> &Record {
-        match self {
-            Source::Local(el) | Source::Network(el) => el,
+    async fn send_register_add_link(&self, record: Record) -> SysValidationResult<()> {
+        if let Some(op) = make_register_add_link(record) {
+            self.send_op(op).await?;
         }
-    }
-}
 
-/// Check if we are holding a dependency and
-/// run a check callback on the it.
-/// This function also returns where the dependency
-/// was found so you can decide whether or not to add
-/// it to the incoming ops.
-async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
-    hash: &I,
-    cascade: &impl Cascade,
-) -> SysValidationResult<Source> {
-    let hash: AnyDhtHash = hash.clone().into();
-    match cascade.retrieve(hash.clone(), Default::default()).await? {
-        Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),
-        Some((el, CascadeSource::Network)) => Ok(Source::Network(el.privatized().0)),
-        None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
+        Ok(())
+    }
+
+    async fn send_register_agent_activity(&self, record: Record) -> SysValidationResult<()> {
+        self.send_op(make_register_agent_activity(record)).await
     }
 }
 
@@ -743,15 +587,14 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_store_record(record: Record) -> Option<DhtOp> {
+fn make_store_record(record: Record) -> DhtOp {
     // Extract the data
     let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
     // Create the op
-    let op = DhtOp::StoreRecord(signature, action, record_entry);
-    Some(op)
+    DhtOp::StoreRecord(signature, action, record_entry)
 }
 
 /// Make a StoreEntry DhtOp from a Record.
@@ -801,17 +644,17 @@ fn make_register_add_link(record: Record) -> Option<DhtOp> {
 /// Because adding ops to incoming limbo while we are checking them
 /// is only faster then waiting for them through gossip we don't care enough
 /// to return an error.
-fn make_register_agent_activity(record: Record) -> Option<DhtOp> {
+fn make_register_agent_activity(record: Record) -> DhtOp {
     // Extract the data
     let (shh, _) = record.into_inner();
     let (action, signature) = shh.into_inner();
 
+    // TODO something seems to have changed here, should this not be able to fail?
     // If the action is the wrong type exit early
     let action = action.into_content();
 
     // Create the op
-    let op = DhtOp::RegisterAgentActivity(signature, action);
-    Some(op)
+    DhtOp::RegisterAgentActivity(signature, action)
 }
 
 #[cfg(test)]
