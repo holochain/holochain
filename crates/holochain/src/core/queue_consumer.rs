@@ -164,10 +164,7 @@ pub async fn spawn_queue_consumer_tasks(
                 dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
-                conductor
-                    .get_config()
-                    .conductor_tuning_params()
-                    .sys_validation_retry_delay(),
+                std::time::Duration::from_secs(5),
             ),
             space.clone(),
             conductor.clone(),

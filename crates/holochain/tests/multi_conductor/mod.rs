@@ -4,7 +4,6 @@ use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::consistency_10s;
-use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
 use unwrap_to::unwrap_to;
@@ -35,10 +34,6 @@ async fn test_publish() -> anyhow::Result<()> {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = Some(network);
-    config.tuning_params = Some(ConductorTuningParams {
-        sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
-        ..Default::default()
-    });
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
@@ -83,11 +78,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::rendezvous().tune_conductor(|config| {
-        // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
-        // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
-        config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
-    });
+    let config = SweetConductorConfig::rendezvous();
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 

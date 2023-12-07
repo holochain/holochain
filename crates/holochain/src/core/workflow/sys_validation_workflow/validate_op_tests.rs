@@ -5,7 +5,6 @@ use super::retrieve_previous_actions_for_ops;
 use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
-use crate::core::workflow::WorkflowResult;
 use crate::prelude::Action;
 use crate::prelude::ActionHashFixturator;
 use crate::prelude::ActionHashed;
@@ -35,9 +34,6 @@ use holo_hash::HoloHash;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_serialized_bytes::prelude::SerializedBytes;
-use holochain_state::prelude::AppEntryBytes;
-use holochain_state::prelude::CreateFixturator;
-use holochain_state::prelude::SignatureFixturator;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::SignedActionHashedExt;
 use holochain_types::EntryHashed;
@@ -46,6 +42,11 @@ use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
+use holochain_state::test_utils::test_keystore;
+use crate::core::workflow::sys_validation_workflow::WorkflowResult;
+use crate::prelude::SignatureFixturator;
+use crate::prelude::CreateFixturator;
+use crate::prelude::AppEntryBytes;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -992,7 +993,7 @@ async fn validate_store_entry_update_changes_entry_type() {
 async fn crash_case() {
     holochain_trace::test_run().unwrap();
 
-    let keystore = holochain_keystore::test_keystore();
+    let keystore = test_keystore();
 
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
@@ -1062,7 +1063,7 @@ impl TestCase {
     async fn new() -> Self {
         let dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
 
-        let keystore = holochain_keystore::test_keystore();
+        let keystore = test_keystore();
         let agent = keystore.new_sign_keypair_random().await.unwrap();
 
         TestCase {

@@ -37,6 +37,7 @@ use holochain_zome_types::Action;
 use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
+use holochain_state::test_utils::test_keystore;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {
@@ -263,7 +264,7 @@ impl TestCase {
 
         let test_space = TestSpace::new(dna_hash.hash.clone());
 
-        let keystore = holochain_keystore::test_keystore();
+        let keystore = test_keystore();
         let agent = keystore.new_sign_keypair_random().await.unwrap().into();
 
         Self {
