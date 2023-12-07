@@ -1,4 +1,49 @@
-//! The workflow and queue consumer for sys validation
+//! ### The sys validation workflow
+//! 
+//! This workflow runs against all [`Action`]s that are going into the DHT database. Either coming from the authored database or from other nodes on the network.
+//! 
+//! The purpose of the workflow is to make fundamental checks on the integrity of the data being put into the DHT. This ensures that invalid data is not served 
+//! to other nodes on the network. It also saves hApp developers from having to write these checks themselves since they set the minimum standards that all data
+//! should meet regardless of the requirements of a given hApp.
+//! 
+//! The workflow operates on [`DhtOp`]s which combine [`Action`]s give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on 
+//! sys validation having performed are:
+//! - For a [`DhtOp::StoreRecord`]
+//!    - Run the [store record checks](#store-record-checks).
+//!    - If the [`Entry`] is an [`Entry::CounterSign`] then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
+//!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
+//!    - Run the [store entry checks](#store-entry-checks).
+//! - For a [`DhtOp::StoreEntry`]
+//!    - If the [`Entry`] is an [`Entry::CounterSign`] then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op is accepted.
+//!    - Run the [store entry checks](#store-entry-checks).
+//!    - Run the [store record checks](#store-record-checks).
+//! - For a [`DhtOp::RegisterAgentActivity`]
+//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//!    - If the [`Action`] is a [`Action::Dna`] then check 
+//!    - Run the [store record checks](#store-record-checks).
+//! - For a [`DhtOp::RegisterUpdatedContent`]
+//!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//! - For a [`DhtOp::RegisterUpdatedRecord`]
+//! 
+//! #### Store record checks
+//! 
+//! These checks are run when storing a new action for a [`DhtOp`].
+//! 
+//! - Checks that the author of the current action is the same as the author of the previous action.
+//! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
+//! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
+//! - Checks that every [`Action::Create`] or [`Action::Update`] was preceeded by a [`Action::AgentValidationPkg`].
+//! 
+//! #### Store entry checks
+//! 
+//! These checks are run when storing an entry that is included as part of a [`DhtOp`].
+//! 
+//! - The entry type specified in the [`Action`] must match the entry type specified in the [`Entry`].
+//! - The entry hash specified in the [`Action`] must match the entry hash specified in the [`Entry`], which will be hashed as part of the check to obtain a value that is trusted.
+//! - The size of the [`Entry`] must be less than or equal to the maximum size that is accepted for this entry type. This is specified in the constant [`MAX_ENTRY_SIZE`].
+//! - If the [`Action`] is an [`Action::Update`] then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//! - If the [`Entry`] is an [`Entry::CounterSign`] then the pre-flight response signatures are checked.
+//! 
 
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
@@ -41,6 +86,7 @@ mod unit_tests;
 #[cfg(test)]
 mod validate_op_tests;
 
+/// The sys validation worfklow. It is described in the module level documentation.
 #[instrument(skip(
     workspace,
     current_validation_dependencies,
