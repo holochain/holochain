@@ -4,6 +4,7 @@ use crate::*;
 use ::lair_keystore::server::StandaloneServer;
 use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
 use lair_keystore_api::prelude::*;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 
@@ -16,11 +17,12 @@ pub async fn spawn_lair_keystore(
 }
 
 /// Spawn an in-process keystore backed by lair_keystore.
+/// @param config_path - path to the lair config yaml file
 pub async fn spawn_lair_keystore_in_proc(
-    config_path: std::path::PathBuf,
+    config_path: &PathBuf,
     passphrase: sodoken::BufRead,
 ) -> LairResult<MetaLairClient> {
-    let config = get_config(&config_path, passphrase.clone()).await?;
+    let config = get_config(config_path, passphrase.clone()).await?;
     let connection_url = config.connection_url.clone();
 
     // rather than using the in-proc server directly,
@@ -37,7 +39,7 @@ pub async fn spawn_lair_keystore_in_proc(
 }
 
 async fn get_config(
-    config_path: &std::path::Path,
+    config_path: &PathBuf,
     passphrase: sodoken::BufRead,
 ) -> LairResult<LairServerConfig> {
     match read_config(config_path).await {
@@ -46,7 +48,7 @@ async fn get_config(
     }
 }
 
-async fn read_config(config_path: &std::path::Path) -> LairResult<LairServerConfig> {
+async fn read_config(config_path: &PathBuf) -> LairResult<LairServerConfig> {
     let bytes = tokio::fs::read(config_path).await?;
 
     let config = LairServerConfigInner::from_bytes(&bytes)?;

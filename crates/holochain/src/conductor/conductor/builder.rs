@@ -2,8 +2,10 @@ use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
+use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
@@ -24,7 +26,7 @@ pub struct ConductorBuilder {
 }
 
 impl ConductorBuilder {
-    /// Default ConductorBuilder
+    /// Default ConductorBuilder.
     pub fn new() -> Self {
         Self::default()
     }
@@ -46,6 +48,12 @@ impl ConductorBuilder {
     /// Set up the builder to skip printing setup
     pub fn no_print_setup(mut self) -> Self {
         self.no_print_setup = true;
+        self
+    }
+
+    /// Set the data root path for the conductor that will be built.
+    pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
+        self.config.data_root_path = Some(data_root_path);
         self
     }
 
@@ -84,14 +92,22 @@ impl ConductorBuilder {
                 }
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
-                    let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
-                        let mut p: std::path::PathBuf = self.config.environment_path.clone().into();
-                        p.push("keystore");
-                        p
-                    });
-                    keystore_config_path.push("lair-keystore-config.yaml");
+
+                    let keystore_root_path: KeystorePath = match lair_root {
+                        Some(lair_root) => lair_root.clone(),
+                        None => self
+                            .config
+                            .data_root_path
+                            .as_ref()
+                            .ok_or(ConductorError::NoDataRootPath)?
+                            .clone()
+                            .try_into()?,
+                    };
+                    let keystore_config_path = keystore_root_path
+                        .as_ref()
+                        .join("lair-keystore-config.yaml");
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await?
+                    spawn_lair_keystore_in_proc(&keystore_config_path, passphrase).await?
                 }
             }
         };
@@ -318,15 +334,10 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    pub async fn test(
-        mut self,
-        env_path: &std::path::Path,
-        extra_dnas: &[DnaFile],
-    ) -> ConductorResult<ConductorHandle> {
+    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
-        self.config.environment_path = env_path.to_path_buf().into();
 
         let spaces = Spaces::new(&self.config)?;
         let tag = spaces.get_state().await?.tag().clone();

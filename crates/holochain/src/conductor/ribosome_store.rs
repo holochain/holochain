@@ -3,7 +3,7 @@ use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
 use tracing::*;
 
-use crate::core::ribosome::{error::RibosomeResult, real_ribosome::RealRibosome, RibosomeT};
+use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
 
 #[derive(Default, Debug)]
 pub struct RibosomeStore {
@@ -17,14 +17,6 @@ impl RibosomeStore {
             ribosomes: HashMap::new(),
             entry_defs: HashMap::new(),
         })
-    }
-
-    #[instrument]
-    pub fn add_dna(&mut self, dna: DnaFile) -> RibosomeResult<()> {
-        let hash = dna.dna_hash().clone();
-        let ribosome = RealRibosome::new(dna)?;
-        self.ribosomes.insert(hash, ribosome);
-        Ok(())
     }
 
     pub fn add_ribosome(&mut self, ribosome: RealRibosome) {
@@ -51,7 +43,7 @@ impl RibosomeStore {
     }
 
     // TODO: use Arc, eliminate cloning
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.ribosomes.get(hash).map(|r| r.dna_file().clone())
     }
