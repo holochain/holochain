@@ -118,7 +118,7 @@ pub(super) fn initialize_connection(
         }
         let _keyval = std::str::from_utf8(&hex).unwrap();
         // conn.pragma_update(None, "key", &keyval)?;
-        conn.pragma_update(None, "key", &FAKE_KEY)?;
+        conn.pragma_update(None, "key", FAKE_KEY)?;
     }
 
     // this is recommended to always be off:
