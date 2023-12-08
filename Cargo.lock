@@ -2863,6 +2863,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain-app",
+ "holochain-cell",
  "holochain_dna_types",
  "holochain_trace 0.2.3",
  "holochain_zome_types",
@@ -2877,6 +2878,34 @@ dependencies = [
  "serde",
  "serde_yaml",
  "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "holochain-cell"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "async-trait",
+ "derive_builder",
+ "derive_more",
+ "fixt",
+ "futures",
+ "holochain-cell",
+ "holochain_dna_types",
+ "holochain_trace 0.2.3",
+ "holochain_zome_types",
+ "itertools 0.8.2",
+ "maplit",
+ "matches",
+ "mockall",
+ "must_future",
+ "proptest",
+ "proptest-derive 0.3.0",
+ "serde",
+ "serde_yaml",
  "tokio",
  "tracing",
 ]

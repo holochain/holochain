@@ -128,7 +128,7 @@ impl ConductorState {
     /// Iterate over only the "running" apps
     pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
         self.installed_apps.iter().filter_map(|(id, app)| {
-            if *app.status() == AppStatus::Running {
+            if *app.status() == OrganStatus::Running {
                 let running = RunningApp::from((**app).clone());
                 Some((id, running))
             } else {
@@ -194,8 +194,8 @@ impl ConductorState {
     pub fn transition_app_status(
         &mut self,
         id: &InstalledAppId,
-        transition: AppStatusTransition,
-    ) -> ConductorResult<(&InstalledApp, AppStatusFx)> {
+        transition: OrganStatusTransition,
+    ) -> ConductorResult<(&InstalledApp, OrganStatusFx)> {
         let app = self
             .installed_apps
             .get_mut(id)

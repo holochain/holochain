@@ -15,8 +15,10 @@ pub use app_store_service::*;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 
+/// Something which knows how to call a zome
+// TODO: move/consolidate somewhere else, this is more of a proof-of-concept
 #[async_trait::async_trait]
-pub trait CellRunner: Send + Sync + 'static {
+pub trait ZomeCaller: Send + Sync + 'static {
     async fn call_zome(
         &self,
         provenance: &AgentPubKey,
@@ -40,7 +42,7 @@ pub struct ConductorServices {
 impl ConductorServices {
     /// Construct services from the default built-in implementations
     pub fn builtin(
-        runner: Arc<impl CellRunner>,
+        runner: Arc<impl ZomeCaller>,
         keystore: MetaLairClient,
         cell_ids: ConductorServiceCells,
     ) -> Self {

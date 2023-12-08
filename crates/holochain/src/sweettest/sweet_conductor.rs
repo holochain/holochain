@@ -286,7 +286,7 @@ impl SweetConductor {
     pub async fn disable_app(
         &self,
         id: InstalledAppId,
-        reason: DisabledAppReason,
+        reason: DisabledOrganReason,
     ) -> ConductorResult<InstalledApp> {
         self.raw_handle().disable_app(id, reason).await
     }
@@ -300,7 +300,7 @@ impl SweetConductor {
     pub async fn pause_app(
         &self,
         id: InstalledAppId,
-        reason: PausedAppReason,
+        reason: PausedOrganReason,
     ) -> ConductorResult<InstalledApp> {
         self.raw_handle().pause_app(id, reason).await
     }

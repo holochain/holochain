@@ -415,27 +415,27 @@ impl AppInfo {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case")]
 pub enum AppInfoStatus {
-    Paused { reason: PausedAppReason },
-    Disabled { reason: DisabledAppReason },
+    Paused { reason: PausedOrganReason },
+    Disabled { reason: DisabledOrganReason },
     Running,
 }
 
-impl From<AppStatus> for AppInfoStatus {
-    fn from(i: AppStatus) -> Self {
+impl From<OrganStatus> for AppInfoStatus {
+    fn from(i: OrganStatus) -> Self {
         match i {
-            AppStatus::Running => AppInfoStatus::Running,
-            AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
-            AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
+            OrganStatus::Running => AppInfoStatus::Running,
+            OrganStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
+            OrganStatus::Paused(reason) => AppInfoStatus::Paused { reason },
         }
     }
 }
 
-impl From<AppInfoStatus> for AppStatus {
+impl From<AppInfoStatus> for OrganStatus {
     fn from(i: AppInfoStatus) -> Self {
         match i {
-            AppInfoStatus::Running => AppStatus::Running,
-            AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
-            AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+            AppInfoStatus::Running => OrganStatus::Running,
+            AppInfoStatus::Disabled { reason } => OrganStatus::Disabled(reason),
+            AppInfoStatus::Paused { reason } => OrganStatus::Paused(reason),
         }
     }
 }
@@ -503,21 +503,22 @@ fn status_serialization() {
     use serde_json;
 
     let status: AppInfoStatus =
-        AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
+        OrganStatus::Disabled(DisabledOrganReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
         "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: AppInfoStatus = AppStatus::Paused(PausedAppReason::Error("because".into())).into();
+    let status: AppInfoStatus =
+        OrganStatus::Paused(PausedOrganReason::Error("because".into())).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),
         "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
     );
 
-    let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
+    let status: AppInfoStatus = OrganStatus::Disabled(DisabledOrganReason::User).into();
 
     assert_eq!(
         serde_json::to_string(&status).unwrap(),

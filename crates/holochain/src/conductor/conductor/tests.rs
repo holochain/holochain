@@ -117,10 +117,10 @@ async fn app_ids_are_unique() {
 
     //- it doesn't matter whether the app is active or inactive
     let (_, delta) = conductor
-        .transition_app_status("id".to_string(), AppStatusTransition::Enable)
+        .transition_app_status("id".to_string(), OrganStatusTransition::Enable)
         .await
         .unwrap();
-    assert_eq!(delta, AppStatusFx::SpinUp);
+    assert_eq!(delta, OrganStatusFx::SpinUp);
     assert_matches!(
         conductor.add_disabled_app_to_db(app.clone().into()).await,
         Err(ConductorError::AppAlreadyInstalled(id))
@@ -575,7 +575,7 @@ async fn test_enable_disable_enable_app() {
         .unwrap();
 
     conductor
-        .disable_app("app".to_string(), DisabledAppReason::User)
+        .disable_app("app".to_string(), DisabledOrganReason::User)
         .await
         .unwrap();
 
@@ -593,7 +593,7 @@ async fn test_enable_disable_enable_app() {
     assert_matches!(
         inactive_apps[0].status,
         AppInfoStatus::Disabled {
-            reason: DisabledAppReason::User
+            reason: DisabledOrganReason::User
         }
     );
 
@@ -937,7 +937,10 @@ async fn test_app_status_states() {
     // RUNNING -pause-> PAUSED
 
     conductor
-        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
+        .pause_app(
+            "app".to_string(),
+            PausedOrganReason::Error("because".into()),
+        )
         .await
         .unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
@@ -950,7 +953,7 @@ async fn test_app_status_states() {
     // RUNNING  --disable->  DISABLED
 
     conductor
-        .disable_app("app".to_string(), DisabledAppReason::User)
+        .disable_app("app".to_string(), DisabledOrganReason::User)
         .await
         .unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
@@ -963,7 +966,10 @@ async fn test_app_status_states() {
     // DISABLED  --pause->  DISABLED
 
     conductor
-        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
+        .pause_app(
+            "app".to_string(),
+            PausedOrganReason::Error("because".into()),
+        )
         .await
         .unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
@@ -976,7 +982,10 @@ async fn test_app_status_states() {
     // RUNNING  --pause->  PAUSED
 
     conductor
-        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
+        .pause_app(
+            "app".to_string(),
+            PausedOrganReason::Error("because".into()),
+        )
         .await
         .unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
@@ -996,9 +1005,9 @@ async fn test_app_status_states_multi_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_and_app_status_reconciliation() {
     holochain_trace::test_run().ok();
-    use AppStatusFx::*;
-    use AppStatusKind::*;
     use CellStatus::*;
+    use OrganStatusFx::*;
+    use OrganStatusKind::*;
     let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new(), 0));
     let dnas = [
         mk_dna(mk_zome()).await.0,
@@ -1014,7 +1023,7 @@ async fn test_cell_and_app_status_reconciliation() {
 
     let check = || async {
         (
-            AppStatusKind::from(AppStatus::from(
+            OrganStatusKind::from(OrganStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
             conductor.running_cell_ids(Some(Joined)).len(),
@@ -1066,7 +1075,7 @@ async fn test_cell_and_app_status_reconciliation() {
 
     // - Disabling the app causes all cells to be removed
     conductor
-        .disable_app(app_id.clone(), DisabledAppReason::User)
+        .disable_app(app_id.clone(), DisabledOrganReason::User)
         .await
         .unwrap();
     assert_eq!(check().await, (Disabled, 0, 0));
@@ -1097,13 +1106,13 @@ async fn test_app_status_filters() {
     conductor
         .pause_app(
             "paused".to_string(),
-            PausedAppReason::Error("because".into()),
+            PausedOrganReason::Error("because".into()),
         )
         .await
         .unwrap();
 
     conductor
-        .disable_app("disabled".to_string(), DisabledAppReason::User)
+        .disable_app("disabled".to_string(), DisabledOrganReason::User)
         .await
         .unwrap();
 

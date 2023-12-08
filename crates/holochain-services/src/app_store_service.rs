@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use holochain_types::prelude::*;
 
-use crate::CellRunner;
+use crate::ZomeCaller;
 
 /// Interface for the AppStore service
 #[async_trait::async_trait]
@@ -30,13 +30,13 @@ pub enum AppHash {}
 
 /// The built-in implementation of the app store service, which runs a DNA
 pub struct AppStoreBuiltin {
-    _runner: Arc<dyn CellRunner>,
+    _runner: Arc<dyn ZomeCaller>,
     _cell_id: CellId,
 }
 
 impl AppStoreBuiltin {
     /// Constructor
-    pub fn new(runner: Arc<impl CellRunner>, cell_id: CellId) -> Arc<Self> {
+    pub fn new(runner: Arc<impl ZomeCaller>, cell_id: CellId) -> Arc<Self> {
         Arc::new(Self {
             _runner: runner,
             _cell_id: cell_id,

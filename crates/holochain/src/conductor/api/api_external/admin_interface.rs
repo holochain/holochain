@@ -215,7 +215,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Disable app
                 self.conductor_handle
                     .clone()
-                    .disable_app(installed_app_id, DisabledAppReason::User)
+                    .disable_app(installed_app_id, DisabledOrganReason::User)
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }

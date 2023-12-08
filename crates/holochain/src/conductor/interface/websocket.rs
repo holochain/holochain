@@ -685,7 +685,7 @@ pub mod test {
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
-                assert_eq!(*app.status(), AppStatus::Running);
+                assert_eq!(*app.status(), OrganStatus::Running);
                 app
             })
             .unwrap()
@@ -736,7 +736,7 @@ pub mod test {
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .map(|app| {
-                assert_matches!(*app.status(), AppStatus::Disabled(_));
+                assert_matches!(*app.status(), OrganStatus::Disabled(_));
                 app
             })
             .unwrap()

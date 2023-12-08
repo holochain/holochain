@@ -3,7 +3,7 @@ use std::sync::Arc;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 
-use crate::CellRunner;
+use crate::ZomeCaller;
 
 /// Interface for the DPKI service
 #[async_trait::async_trait]
@@ -66,7 +66,7 @@ pub trait DpkiServiceExt: DpkiService {
 /// The built-in implementation of the DPKI service contract, which runs a DNA
 #[derive(derive_more::Constructor)]
 pub struct DeepkeyBuiltin {
-    runner: Arc<dyn CellRunner>,
+    runner: Arc<dyn ZomeCaller>,
     keystore: MetaLairClient,
     cell_id: CellId,
 }

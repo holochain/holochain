@@ -365,7 +365,8 @@ mod startup_shutdown_impls {
             // be spun up
             let _ = self.start_paused_apps().await?;
 
-            self.process_app_status_fx(AppStatusFx::SpinUp, None).await
+            self.process_app_status_fx(OrganStatusFx::SpinUp, None)
+                .await
         }
     }
 }
@@ -665,24 +666,24 @@ mod dna_impls {
         }
 
         /// Restart every paused app
-        pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
+        pub(crate) async fn start_paused_apps(&self) -> ConductorResult<OrganStatusFx> {
             let (_, delta) = self
                 .update_state_prime(|mut state| {
                     let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
                     if !ids.is_empty() {
                         tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
                     }
-                    let deltas: Vec<AppStatusFx> = ids
+                    let deltas: Vec<OrganStatusFx> = ids
                         .into_iter()
                         .map(|id| {
                             state
-                                .transition_app_status(&id, AppStatusTransition::Start)
+                                .transition_app_status(&id, OrganStatusTransition::Start)
                                 .map(second)
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     let delta = deltas
                         .into_iter()
-                        .fold(AppStatusFx::default(), AppStatusFx::combine);
+                        .fold(OrganStatusFx::default(), OrganStatusFx::combine);
                     Ok((state, delta))
                 })
                 .await?;
@@ -1446,7 +1447,7 @@ mod app_impls {
 
             // Remove cells which may now be dangling due to the removed app
             self_clone
-                .process_app_status_fx(AppStatusFx::SpinDown, None)
+                .process_app_status_fx(OrganStatusFx::SpinDown, None)
                 .await?;
             Ok(())
         }
@@ -1792,7 +1793,7 @@ mod app_status_impls {
             app_id: InstalledAppId,
         ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
             let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Enable)
+                .transition_app_status(app_id.clone(), OrganStatusTransition::Enable)
                 .await?;
             let errors = self
                 .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
@@ -1805,10 +1806,10 @@ mod app_status_impls {
         pub async fn disable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
-            reason: DisabledAppReason,
+            reason: DisabledOrganReason,
         ) -> ConductorResult<InstalledApp> {
             let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Disable(reason))
+                .transition_app_status(app_id.clone(), OrganStatusTransition::Disable(reason))
                 .await?;
             self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
                 .await?;
@@ -1822,7 +1823,7 @@ mod app_status_impls {
             app_id: InstalledAppId,
         ) -> ConductorResult<InstalledApp> {
             let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Start)
+                .transition_app_status(app_id.clone(), OrganStatusTransition::Start)
                 .await?;
             self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
                 .await?;
@@ -1848,8 +1849,8 @@ mod app_status_impls {
         pub(crate) async fn transition_app_status(
             &self,
             app_id: InstalledAppId,
-            transition: AppStatusTransition,
-        ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
+            transition: OrganStatusTransition,
+        ) -> ConductorResult<(InstalledApp, OrganStatusFx)> {
             Ok(self
                 .update_state_prime(move |mut state| {
                     let (app, delta) = state.transition_app_status(&app_id, transition)?.clone();
@@ -1866,10 +1867,10 @@ mod app_status_impls {
         pub async fn pause_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
-            reason: PausedAppReason,
+            reason: PausedOrganReason,
         ) -> ConductorResult<InstalledApp> {
             let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Pause(reason))
+                .transition_app_status(app_id.clone(), OrganStatusTransition::Pause(reason))
                 .await?;
             self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
                 .await?;
@@ -1987,9 +1988,9 @@ mod app_status_impls {
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
-        ) -> ConductorResult<AppStatusFx> {
-            use AppStatus::*;
-            use AppStatusTransition::*;
+        ) -> ConductorResult<OrganStatusFx> {
+            use OrganStatus::*;
+            use OrganStatusTransition::*;
 
             // NOTE: this is checking all *live* cells, meaning all cells
             // which have fully joined the network. This could lead to a race condition
@@ -2029,16 +2030,16 @@ mod app_status_impls {
                                         if missing.iter().any(|c| retry_cell_ids.contains(c)) {
                                             // The spin up needs to be tried again for this app
                                             warn!(msg = "Some cells did not start", ?app, ?missing);
-                                            AppStatusFx::SpinUp
+                                            OrganStatusFx::SpinUp
                                         } else {
-                                            let reason = PausedAppReason::Error(format!(
+                                            let reason = PausedOrganReason::Error(format!(
                                                 "Some cells are missing / not able to run: {:#?}",
                                                 missing
                                             ));
                                             app.status.transition(Pause(reason))
                                         }
                                     } else {
-                                        AppStatusFx::NoChange
+                                        OrganStatusFx::NoChange
                                     }
                                 }
                                 Paused(_) => {
@@ -2046,16 +2047,16 @@ mod app_status_impls {
                                     if app.required_cells().all(|id| cell_ids.contains(id)) {
                                         app.status.transition(Start)
                                     } else {
-                                        AppStatusFx::NoChange
+                                        OrganStatusFx::NoChange
                                     }
                                 }
                                 Disabled(_) => {
                                     // Disabled status should never automatically change.
-                                    AppStatusFx::NoChange
+                                    OrganStatusFx::NoChange
                                 }
                             }
                         })
-                        .fold(AppStatusFx::default(), AppStatusFx::combine);
+                        .fold(OrganStatusFx::default(), OrganStatusFx::combine);
                     Ok((state, delta))
                 })
                 .await?;
@@ -2676,10 +2677,10 @@ impl Conductor {
     /// Deal with the side effects of an app status state transition
     async fn process_app_status_fx(
         self: Arc<Self>,
-        delta: AppStatusFx,
+        delta: OrganStatusFx,
         app_ids: Option<HashSet<InstalledAppId>>,
     ) -> ConductorResult<CellStartupErrors> {
-        use AppStatusFx::*;
+        use OrganStatusFx::*;
         let mut last = (delta, vec![]);
         loop {
             tracing::debug!(msg = "Processing app status delta", delta = ?last.0);

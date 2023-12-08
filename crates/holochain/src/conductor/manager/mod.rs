@@ -136,7 +136,7 @@ pub fn spawn_task_outcome_handler(
                                 .clone()
                                 .disable_app(
                                     app_id.to_string(),
-                                    DisabledAppReason::Error(error.to_string()),
+                                    DisabledOrganReason::Error(error.to_string()),
                                 )
                                 .await
                                 .map_err(TaskManagerError::internal)?;
@@ -192,7 +192,7 @@ pub fn spawn_task_outcome_handler(
                                 .clone()
                                 .disable_app(
                                     app_id.to_string(),
-                                    DisabledAppReason::Error(error.to_string()),
+                                    DisabledOrganReason::Error(error.to_string()),
                                 )
                                 .await
                                 .map_err(TaskManagerError::internal)?;

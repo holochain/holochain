@@ -31,6 +31,7 @@ members = [
   "crates/holochain_secure_primitive",
 
   "crates/holochain-app",
+  "crates/holochain-cell",
   # "crates/holochain-dna-bundle",
   "crates/holochain-services",
 

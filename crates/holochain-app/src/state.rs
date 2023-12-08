@@ -25,8 +25,8 @@ pub trait AppState {
     fn transition_app_status(
         &mut self,
         id: &AppId,
-        transition: AppStatusTransition,
-    ) -> Result<(&InstalledApp, AppStatusFx), Self::Error>;
+        transition: OrganStatusTransition,
+    ) -> Result<(&InstalledApp, OrganStatusFx), Self::Error>;
 }
 
 /// A collection of apps which can be filtered in various ways
@@ -47,7 +47,7 @@ impl Apps {
     /// Iterate over only the "running" apps
     pub fn running_apps(&self) -> impl Iterator<Item = (&AppId, RunningApp)> {
         self.0.iter().filter_map(|(id, app)| {
-            if *app.status() == AppStatus::Running {
+            if *app.status() == OrganStatus::Running {
                 let running = RunningApp::from((**app).clone());
                 Some((id, running))
             } else {
