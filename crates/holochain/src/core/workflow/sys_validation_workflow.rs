@@ -1,14 +1,14 @@
 //! ### The sys validation workflow
-//! 
+//!
 //! This workflow runs against all [`Action`]s that are going into the DHT database. Either coming from the authored database or from other nodes on the network.
-//! 
-//! The purpose of the workflow is to make fundamental checks on the integrity of the data being put into the DHT. This ensures that invalid data is not served 
+//!
+//! The purpose of the workflow is to make fundamental checks on the integrity of the data being put into the DHT. This ensures that invalid data is not served
 //! to other nodes on the network. It also saves hApp developers from having to write these checks themselves since they set the minimum standards that all data
 //! should meet regardless of the requirements of a given hApp.
-//! 
+//!
 //! #### Validation checks
-//! 
-//! The workflow operates on [`DhtOp`]s which combine [`Action`]s give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on 
+//!
+//! The workflow operates on [`DhtOp`]s which combine [`Action`]s give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on
 //! sys validation having performed are:
 //! - For a [`DhtOp::StoreRecord`]
 //!    - Run the [store record checks](#store-record-checks).
@@ -37,9 +37,9 @@
 //!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
 //! - For a [`DhtOp::RegisterRemoveLink`]
 //!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally.
-//! 
+//!
 //! ##### Store record checks
-//! 
+//!
 //! These checks are run when storing a new action for a [`DhtOp`].
 //!
 //! - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
@@ -47,24 +47,24 @@
 //! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
 //! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
 //! - Checks that every [`Action::Create`] or [`Action::Update`] was preceeded by a [`Action::AgentValidationPkg`].
-//! 
+//!
 //! ##### Store entry checks
-//! 
+//!
 //! These checks are run when storing an entry that is included as part of a [`DhtOp`].
-//! 
+//!
 //! - The entry type specified in the [`Action`] must match the entry type specified in the [`Entry`].
 //! - The entry hash specified in the [`Action`] must match the entry hash specified in the [`Entry`], which will be hashed as part of the check to obtain a value that is trusted.
 //! - The size of the [`Entry`] must be less than or equal to the maximum size that is accepted for this entry type. This is specified in the constant [`MAX_ENTRY_SIZE`].
 //! - If the [`Action`] is an [`Action::Update`] then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //! - If the [`Entry`] is an [`Entry::CounterSign`] then the pre-flight response signatures are checked.
-//! 
+//!
 //! #### Workflow description
-//! 
+//!
 //! - The workflow starts by fetching all the ops that need to be validated from the database. The ops are processed as follows:
 //!     - It then sorts the ops by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
 //!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
 //!     - The [validation checks](#validation-checks) are run for each op.
-//!     - For any ops that passed valdiation, they will be marked as ready for app validation in the database. 
+//!     - For any ops that passed valdiation, they will be marked as ready for app validation in the database.
 //!     - For any ops which were rejected will be marked rejected in the database.
 //! - If any ops passed validation then app validation will be triggered.
 //! - For actions that were not found locally, the workflow will then attempt to fetch them from the network.
