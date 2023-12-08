@@ -629,7 +629,7 @@ async fn validate_valid_store_entry_with_no_entry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_store_entry_with_entry_with_wrong_entry_type() {
+async fn validate_store_record_with_entry_having_wrong_entry_type() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
@@ -673,7 +673,7 @@ async fn validate_store_entry_with_entry_with_wrong_entry_type() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_store_entry_with_entry_with_wrong_entry_hash() {
+async fn validate_store_record_with_entry_having_wrong_entry_hash() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
@@ -731,7 +731,7 @@ async fn validate_store_entry_with_entry_with_wrong_entry_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_store_entry_with_large_entry() {
+async fn validate_store_record_with_large_entry() {
     holochain_trace::test_run().unwrap();
 
     use holochain_serialized_bytes::prelude::*;
@@ -792,7 +792,7 @@ async fn validate_store_entry_with_large_entry() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_valid_store_entry_update() {
+async fn validate_valid_store_record_update() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
@@ -862,7 +862,7 @@ async fn validate_valid_store_entry_update() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_store_entry_update_prev_which_is_not_updateable() {
+async fn validate_store_record_update_prev_which_is_not_updateable() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
@@ -916,7 +916,7 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_store_entry_update_changes_entry_type() {
+async fn validate_store_record_update_changes_entry_type() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
@@ -974,6 +974,50 @@ async fn validate_store_entry_update_changes_entry_type() {
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Rejected),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_with_entry_having_wrong_entry_type() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.prev_action = previous_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::AgentPubKey; // Claiming to be a public key but is actually an app entry
+    create_action.entry_hash = entry_hash.as_hash().clone();
+    let op = DhtOp::StoreEntry(
+        fixt!(Signature),
+        holochain_types::action::NewEntryAction::Create(create_action),
+        app_entry,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
         .with_op(op)
         .run()
         .await
