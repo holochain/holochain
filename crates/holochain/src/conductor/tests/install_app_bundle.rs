@@ -1,6 +1,8 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::conductor::api::error::ConductorApiError;
+use crate::prelude::AppError;
+use crate::prelude::YamlProperties;
 use crate::{conductor::error::ConductorError, sweettest::*};
 use fixt::prelude::strum_macros;
 use holo_hash::{AgentPubKey, DnaHash};
