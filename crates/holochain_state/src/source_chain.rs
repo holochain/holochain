@@ -1159,7 +1159,7 @@ pub fn current_countersigning_session(
 
 #[cfg(test)]
 async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
-    vault: holochain_types::db::DbWrite<DbKindAuthored>,
+    vault: holochain_types::prelude::DbWrite<DbKindAuthored>,
     keystore: &MetaLairClient,
     author: Arc<AgentPubKey>,
     action_builder: B,

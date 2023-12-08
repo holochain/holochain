@@ -1,7 +1,8 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::db::DbSyncStrategy;
+use crate::conductor::process::ERROR_CODE;
+use holochain_types::prelude::DbSyncStrategy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -12,10 +13,11 @@ mod dpki_config;
 #[allow(missing_docs)]
 mod error;
 mod keystore_config;
+/// Defines subdirectories of the config directory.
 pub mod paths;
+pub mod process;
 //mod logger_config;
 //mod signal_config;
-pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -25,17 +27,21 @@ pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
 
+use crate::config::conductor::paths::DataRootPath;
+
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
     pub tracing_override: Option<String>,
 
-    /// The path to the database for this conductor;
-    /// if omitted, chooses a default path.
-    pub environment_path: DatabaseRootPath,
+    /// The path to the data root for this conductor;
+    /// This can be `None` while building up the config programatically but MUST
+    /// be set by the time the config is used to build a conductor.
+    /// The database and compiled wasm directories are derived from this path.
+    pub data_root_path: Option<DataRootPath>,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -110,6 +116,23 @@ impl ConductorConfig {
             .unwrap_or_default()
     }
 
+    /// Get the data directory for this config or say something nice and die.
+    pub fn data_root_path_or_die(&self) -> DataRootPath {
+        match &self.data_root_path {
+            Some(path) => path.clone(),
+            None => {
+                println!(
+                    "
+                    The conductor config does not contain a data_root_path. Please check and fix the
+                    config file. Details:
+
+                        Missing field `data_root_path`",
+                );
+                std::process::exit(ERROR_CODE);
+            }
+        }
+    }
+
     /// Get the conductor tuning params for this config (default if not set)
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
@@ -177,7 +200,7 @@ mod tests {
     #[test]
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
 
     keystore:
       type: danger_test_keystore
@@ -187,7 +210,7 @@ mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
@@ -206,7 +229,7 @@ mod tests {
         holochain_trace::test_run().ok();
 
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
     signing_service_uri: ws://localhost:9001
     encryption_service_uri: ws://localhost:9002
     decryption_service_uri: ws://localhost:9003
@@ -266,7 +289,7 @@ mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
@@ -288,7 +311,7 @@ mod tests {
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
     keystore_path: /path/to/keystore
 
     keystore:
@@ -300,7 +323,7 @@ mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: None,
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {

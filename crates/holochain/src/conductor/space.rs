@@ -19,7 +19,8 @@ use crate::core::{
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_conductor_api::conductor::paths::DatabasesRootPath;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
@@ -44,6 +45,7 @@ use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::{agent_info::AgentInfoSigned, config::KitsuneP2pConfig};
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
+use std::path::PathBuf;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -55,7 +57,7 @@ mod tests;
 /// installed on this conductor.
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    pub(crate) db_dir: Arc<DatabaseRootPath>,
+    pub(crate) db_dir: Arc<DatabasesRootPath>,
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
@@ -125,7 +127,11 @@ pub struct TestSpace {
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
-        let root_db_dir = config.environment_path.clone();
+        let root_db_dir: DatabasesRootPath = config
+            .data_root_path
+            .clone()
+            .ok_or(ConductorError::NoDataRootPath)?
+            .try_into()?;
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
@@ -673,7 +679,7 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
-        root_db_dir: &DatabaseRootPath,
+        root_db_dir: &PathBuf,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
@@ -793,7 +799,7 @@ impl TestSpaces {
             .tempdir()
             .unwrap();
         let spaces = Spaces::new(&ConductorConfig {
-            environment_path: temp_dir.path().to_path_buf().into(),
+            data_root_path: Some(temp_dir.path().to_path_buf().into()),
             ..Default::default()
         })
         .unwrap();
