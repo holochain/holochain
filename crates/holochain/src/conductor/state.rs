@@ -36,14 +36,25 @@ pub struct ConductorState {
     tag: ConductorStateTag,
     /// Apps that have been installed, regardless of status.
     #[serde(default)]
-    installed_apps: InstalledAppMap,
+    installed_apps: InstalledApps,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
-/// Alias, TODO remove
-pub type InstalledAppMap = HashMap<holochain_app::AppId, holochain_app::InstalledApp>;
+/// The map of all installed apps
+#[derive(
+    Clone,
+    Deserialize,
+    Serialize,
+    Default,
+    Debug,
+    SerializedBytes,
+    derive_more::Deref,
+    derive_more::DerefMut,
+)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct InstalledApps(HashMap<holochain_app::AppId, holochain_app::InstalledApp>);
 
 /// A unique identifier used to refer to an App Interface internally.
 #[derive(Clone, Deserialize, Serialize, Debug, Hash, PartialEq, Eq)]
@@ -89,14 +100,14 @@ impl ConductorState {
     }
 
     /// Immutable access to the inner collection of all apps
-    pub fn installed_apps(&self) -> &InstalledAppMap {
+    pub fn installed_apps(&self) -> &InstalledApps {
         &self.installed_apps
     }
 
     /// Mutable access to the inner collection of all apps
     // #[cfg(test)]
     #[deprecated = "Bare mutable access isn't the best idea"]
-    pub fn installed_apps_mut(&mut self) -> &mut InstalledAppMap {
+    pub fn installed_apps_mut(&mut self) -> &mut InstalledApps {
         &mut self.installed_apps
     }
 
