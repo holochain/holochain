@@ -6,6 +6,8 @@
 //! to other nodes on the network. It also saves hApp developers from having to write these checks themselves since they set the minimum standards that all data
 //! should meet regardless of the requirements of a given hApp.
 //! 
+//! #### Validation checks
+//! 
 //! The workflow operates on [`DhtOp`]s which combine [`Action`]s give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on 
 //! sys validation having performed are:
 //! - For a [`DhtOp::StoreRecord`]
@@ -19,22 +21,34 @@
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterAgentActivity`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
-//!    - If the [`Action`] is a [`Action::Dna`] then check 
+//!    - If the [`Action`] is a [`Action::Dna`] then check the contained DNA hash matches the DNA hash that sys validation is being run for.
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterUpdatedContent`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//!    - If there is an [`Entry`] then the [store entry checks](#store-entry-checks) are run.
 //! - For a [`DhtOp::RegisterUpdatedRecord`]
+//!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//!    - If there is an [`Entry`] then the [store entry checks](#store-entry-checks) are run.
+//! - For a [`DhtOp::RegisterDeletedBy`]
+//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
+//! - For a [`DhtOp::RegisterDeletedEntryAction`]
+//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
+//! - For a [`DhtOp::RegisterAddLink`]
+//!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
+//! - For a [`DhtOp::RegisterRemoveLink`]
+//!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally.
 //! 
-//! #### Store record checks
+//! ##### Store record checks
 //! 
 //! These checks are run when storing a new action for a [`DhtOp`].
-//! 
+//!
+//! - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //! - Checks that the author of the current action is the same as the author of the previous action.
 //! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
 //! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
 //! - Checks that every [`Action::Create`] or [`Action::Update`] was preceeded by a [`Action::AgentValidationPkg`].
 //! 
-//! #### Store entry checks
+//! ##### Store entry checks
 //! 
 //! These checks are run when storing an entry that is included as part of a [`DhtOp`].
 //! 
@@ -44,6 +58,20 @@
 //! - If the [`Action`] is an [`Action::Update`] then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //! - If the [`Entry`] is an [`Entry::CounterSign`] then the pre-flight response signatures are checked.
 //! 
+//! #### Workflow description
+//! 
+//! - The workflow starts by fetching all the ops that need to be validated from the database. The ops are processed as follows:
+//!     - It then sorts the ops by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
+//!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
+//!     - The [validation checks](#validation-checks) are run for each op.
+//!     - For any ops that passed valdiation, they will be marked as ready for app validation in the database. 
+//!     - For any ops which were rejected will be marked rejected in the database.
+//! - If any ops passed validation then app validation will be triggered.
+//! - For actions that were not found locally, the workflow will then attempt to fetch them from the network.
+//! - If any actions that were missing are found on the network, then sys validation is re-triggered to see if the newly fetched actions allow any outstanding ops to pass validation.
+//! - If fewer actions were fetched from the network than the of actions that were missing then the workflow will sleep for a short time before re-triggering itself.
+//! - Once all ops have an outcome, the workflow is complete and will wait to be triggered again by new incoming ops.
+//!
 
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
