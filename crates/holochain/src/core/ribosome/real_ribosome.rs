@@ -1152,13 +1152,57 @@ pub mod wasm_test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetLocalRendezvous;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use std::time::Duration;
+
+    #[tokio::test(flavor = "multi_thread")]
+    // guard to assure that zome call responses are not increasing
+    // disproportionally
+    // makes a call to a zome without an init fn
+    async fn zome_call_response_time_guard() {
+        holochain_trace::test_run().ok();
+        let mut conductor = SweetConductor::from_config_rendezvous(
+            SweetConductorConfig::rendezvous(true),
+            SweetLocalRendezvous::new().await,
+        )
+        .await;
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo]).await;
+        let app = conductor.setup_app("", [&dna]).await.unwrap();
+        let zome = app.cells()[0].zome(TestWasm::AgentInfo.coordinator_zome_name());
+
+        let zome_call_response_on_time = tokio::select! {
+            _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {false}
+        };
+        assert_eq!(
+            zome_call_response_on_time, true,
+            "first zome call did not complete in 10 sec"
+        );
+        let zome_call_response_on_time = tokio::select! {
+            _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
+            _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
+        };
+        assert_eq!(
+            zome_call_response_on_time, true,
+            "cached zome call did not complete in 10 ms"
+        );
+        let zome_call_response_on_time = tokio::select! {
+            _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
+            _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
+        };
+        assert_eq!(
+            zome_call_response_on_time, true,
+            "second cached zome call did not complete in 10 ms"
+        );
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
