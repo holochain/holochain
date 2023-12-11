@@ -44,6 +44,7 @@ use holochain_types::EntryHashed;
 use holochain_zome_types::prelude::AgentValidationPkg;
 use holochain_zome_types::prelude::EntryVisibility;
 use holochain_zome_types::record::Record;
+use holochain_zome_types::record::RecordEntry;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
 
@@ -699,7 +700,7 @@ async fn validate_avp_op_not_followed_by_create() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_valid_store_entry_with_no_entry() {
+async fn validate_valid_store_record_with_no_entry() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
@@ -737,6 +738,59 @@ async fn validate_valid_store_entry_with_no_entry() {
         "Expected Accepted but actual outcome was {:?}",
         outcome
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_record_leaks_entry() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.prev_action = previous_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Private, // Private so should not have entry data
+    });
+    let op = DhtOp::StoreRecord(
+        fixt!(Signature),
+        Action::Create(create_action),
+        holochain_zome_types::record::RecordEntry::Present(Entry::App(fixt!(AppEntryBytes))), // but go ahead and provide the entry data anyway
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert_eq!(
+                "Private entry data should never be included in any op other than StoreEntry.", reason,
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1270,6 +1324,403 @@ async fn validate_store_entry_with_large_entry() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_store_entry_update() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_update_action = fixt!(Create);
+    to_update_action.author = test_case.agent.clone().into();
+    to_update_action.timestamp = Timestamp::now();
+    to_update_action.action_seq = 5;
+    to_update_action.prev_action = fixt!(ActionHash);
+    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    to_update_action.entry_hash = fixt!(EntryHash);
+    let to_update_signed_action = test_case
+        .sign_action(Action::Create(to_update_action))
+        .await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut update_action = fixt!(Update);
+    update_action.author = previous_action.action().author().clone();
+    update_action.action_seq = previous_action.action().action_seq() + 1;
+    update_action.prev_action = previous_action.as_hash().clone();
+    update_action.timestamp = Timestamp::now().into();
+    update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    update_action.entry_hash = entry_hash.as_hash().clone();
+    update_action.original_entry_address = to_update_signed_action
+        .action()
+        .entry_hash()
+        .unwrap()
+        .clone();
+    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let op = DhtOp::StoreEntry(
+        fixt!(Signature),
+        holochain_types::action::NewEntryAction::Update(update_action),
+        app_entry,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Accepted),
+        "Expected Accepted but actual outcome was {:?}",
+        outcome
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_update_prev_which_is_not_updateable() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_update_action = fixt!(Dna);
+    to_update_action.author = test_case.agent.clone().into();
+    let to_update_signed_action = test_case.sign_action(Action::Dna(to_update_action)).await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let signed_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut update_action = fixt!(Update);
+    update_action.author = signed_action.action().author().clone();
+    update_action.action_seq = signed_action.action().action_seq() + 1;
+    update_action.prev_action = signed_action.as_hash().clone();
+    update_action.timestamp = Timestamp::now().into();
+    update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    update_action.entry_hash = entry_hash.as_hash().clone();
+    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let op = DhtOp::StoreEntry(
+        fixt!(Signature),
+        holochain_types::action::NewEntryAction::Update(update_action),
+        app_entry,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome,
+    );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("The action was expected to be a new entry action but was Dna"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_update_changes_entry_type() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_update_action = fixt!(Create);
+    to_update_action.author = test_case.agent.clone().into();
+    to_update_action.timestamp = Timestamp::now();
+    to_update_action.action_seq = 5;
+    to_update_action.prev_action = fixt!(ActionHash);
+    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    to_update_action.entry_hash = fixt!(EntryHash);
+    let to_update_signed_action = test_case
+        .sign_action(Action::Create(to_update_action))
+        .await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let signed_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut update_action = fixt!(Update);
+    update_action.author = signed_action.action().author().clone();
+    update_action.action_seq = signed_action.action().action_seq() + 1;
+    update_action.prev_action = signed_action.as_hash().clone();
+    update_action.timestamp = Timestamp::now().into();
+    // Different entry type defined here
+    update_action.entry_type = EntryType::App(AppEntryDef::new(
+        10.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    update_action.entry_hash = entry_hash.as_hash().clone();
+    update_action.original_entry_address = to_update_signed_action
+        .action()
+        .entry_hash()
+        .unwrap()
+        .clone();
+    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let op = DhtOp::StoreEntry(
+        fixt!(Signature),
+        holochain_types::action::NewEntryAction::Update(update_action),
+        app_entry,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(Outcome::Rejected("Update original: App(AppEntryDef { entry_index: EntryDefIndex(0), zome_index: ZomeIndex(0), visibility: Public }) doesn't match new: App(AppEntryDef { entry_index: EntryDefIndex(10), zome_index: ZomeIndex(0), visibility: Public })".to_string()), outcome, "Expected Rejected but actual outcome was {:?}", outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_register_updated_content() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_update_action = fixt!(Create);
+    to_update_action.author = test_case.agent.clone().into();
+    to_update_action.timestamp = Timestamp::now();
+    to_update_action.action_seq = 5;
+    to_update_action.prev_action = fixt!(ActionHash);
+    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    to_update_action.entry_hash = fixt!(EntryHash);
+    let to_update_signed_action = test_case
+        .sign_action(Action::Create(to_update_action))
+        .await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut update_action = fixt!(Update);
+    update_action.timestamp = Timestamp::now().into();
+    update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
+    update_action.entry_hash = entry_hash.as_hash().clone();
+    update_action.original_entry_address = to_update_signed_action
+        .action()
+        .entry_hash()
+        .unwrap()
+        .clone();
+    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let op = DhtOp::RegisterUpdatedContent(
+        fixt!(Signature),
+        update_action,
+        RecordEntry::Present(app_entry),
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(Outcome::Accepted, outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_register_updated_content_missing_updates_ref() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Needed to set up mocking but not actually referenced
+    let mut dummy_prev_action = fixt!(Create);
+    dummy_prev_action.author = test_case.agent.clone().into();
+    let dummy_prev_action = test_case
+        .sign_action(Action::Create(dummy_prev_action))
+        .await;
+
+    let mut mismatched_action_hash = fixt!(ActionHash);
+    loop {
+        if dummy_prev_action.as_hash() != &mismatched_action_hash {
+            break;
+        }
+        mismatched_action_hash = fixt!(ActionHash);
+    }
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let mut update_action: holochain_zome_types::prelude::Update = fixt!(Update);
+    update_action.timestamp = Timestamp::now().into();
+    update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    update_action.original_action_address = mismatched_action_hash;
+    let op = DhtOp::RegisterUpdatedContent(
+        fixt!(Signature),
+        update_action,
+        RecordEntry::Present(app_entry),
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![dummy_prev_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_register_updated_record() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_update_action = fixt!(Create);
+    to_update_action.author = test_case.agent.clone().into();
+    to_update_action.timestamp = Timestamp::now();
+    to_update_action.action_seq = 5;
+    to_update_action.prev_action = fixt!(ActionHash);
+    to_update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    to_update_action.entry_hash = fixt!(EntryHash);
+    let to_update_signed_action = test_case
+        .sign_action(Action::Create(to_update_action))
+        .await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut update_action = fixt!(Update);
+    update_action.timestamp = Timestamp::now().into();
+    update_action.entry_type = to_update_signed_action.hashed.entry_type().unwrap().clone();
+    update_action.entry_hash = entry_hash.as_hash().clone();
+    update_action.original_entry_address = to_update_signed_action
+        .action()
+        .entry_hash()
+        .unwrap()
+        .clone();
+    update_action.original_action_address = to_update_signed_action.as_hash().clone();
+    let op = DhtOp::RegisterUpdatedRecord(
+        fixt!(Signature),
+        update_action,
+        RecordEntry::Present(app_entry),
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(Outcome::Accepted, outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_register_updated_record_missing_updates_ref() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Needed to set up mocking but not actually referenced
+    let mut dummy_prev_action = fixt!(Create);
+    dummy_prev_action.author = test_case.agent.clone().into();
+    let dummy_prev_action = test_case
+        .sign_action(Action::Create(dummy_prev_action))
+        .await;
+
+    let mut mismatched_action_hash = fixt!(ActionHash);
+    loop {
+        if dummy_prev_action.as_hash() != &mismatched_action_hash {
+            break;
+        }
+        mismatched_action_hash = fixt!(ActionHash);
+    }
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let mut update_action: holochain_zome_types::prelude::Update = fixt!(Update);
+    update_action.timestamp = Timestamp::now().into();
+    update_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    update_action.original_action_address = mismatched_action_hash;
+    let op = DhtOp::RegisterUpdatedRecord(
+        fixt!(Signature),
+        update_action,
+        RecordEntry::Present(app_entry),
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![dummy_prev_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+}
+
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO fix this test"]
@@ -1396,12 +1847,9 @@ impl TestCase {
             .times(previous_actions.len())
             .returning({
                 let previous_actions = previous_actions.clone();
-                move |hash, _| {
-                    let action = previous_actions
-                        .get(&hash.try_into().unwrap())
-                        .unwrap()
-                        .clone();
-                    async move { Ok(Some((action, CascadeSource::Local))) }.boxed()
+                move |hash, _| match previous_actions.get(&hash.try_into().unwrap()).cloned() {
+                    Some(action) => async move { Ok(Some((action, CascadeSource::Local))) }.boxed(),
+                    None => async move { Ok(None) }.boxed(),
                 }
             });
 

@@ -795,11 +795,11 @@ fn register_updated_content(
 }
 
 fn register_updated_record(
-    entry_update: &Update,
+    record_update: &Update,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let original_action_address = &entry_update.original_action_address;
+    let original_action_address = &record_update.original_action_address;
 
     let mut validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
@@ -809,7 +809,7 @@ fn register_updated_record(
             ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
         })?;
 
-    update_check(entry_update, original_action)
+    update_check(record_update, original_action)
 }
 
 fn register_deleted_by(
