@@ -19,7 +19,7 @@ name = "hc-dna"
 path = "src/bin/hc-dna.rs"
 
 [dependencies]
-holochain_wasmer_host = "=0.0.84"
+holochain_wasmer_host = "=0.0.90"
 futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = [ "derive" ] }
