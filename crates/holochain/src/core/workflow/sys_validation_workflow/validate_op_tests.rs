@@ -47,6 +47,7 @@ use holochain_zome_types::record::Record;
 use holochain_zome_types::record::RecordEntry;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
+use crate::prelude::DeleteFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -1719,6 +1720,120 @@ async fn validate_register_updated_record_missing_updates_ref() {
         .unwrap();
 
     assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_register_deleted_by() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_delete_action = fixt!(Create);
+    to_delete_action.author = test_case.agent.clone().into();
+    to_delete_action.timestamp = Timestamp::now();
+    to_delete_action.action_seq = 5;
+    to_delete_action.prev_action = fixt!(ActionHash);
+    to_delete_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    to_delete_action.entry_hash = fixt!(EntryHash);
+    let to_delete_signed_action = test_case
+        .sign_action(Action::Create(to_delete_action))
+        .await;
+
+    // Op to validate
+    let mut delete_action = fixt!(Delete);
+    delete_action.timestamp = Timestamp::now().into();
+    delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
+    let op = DhtOp::RegisterDeletedBy(
+        fixt!(Signature),
+        delete_action,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(Outcome::Accepted, outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_register_deleted_by_with_missing_deletes_ref() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Dummy action to set up the mock, won't be referenced
+    let mut dummy_action = fixt!(Create);
+    dummy_action.author = test_case.agent.clone().into();
+    let dummy_action = test_case
+        .sign_action(Action::Create(dummy_action))
+        .await;
+
+    // Op to validate
+    let mut delete_action = fixt!(Delete);
+    delete_action.timestamp = Timestamp::now().into();
+    let op = DhtOp::RegisterDeletedBy(
+        fixt!(Signature),
+        delete_action,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![dummy_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_register_deleted_by_wrong_delete_target() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Action to be updated
+    let mut to_delete_action = fixt!(Dna); // Cannot delete a DNA action
+    to_delete_action.author = test_case.agent.clone().into();
+    let to_delete_signed_action = test_case
+        .sign_action(Action::Dna(to_delete_action))
+        .await;
+
+    // Op to validate
+    let mut delete_action = fixt!(Delete);
+    delete_action.timestamp = Timestamp::now().into();
+    delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
+    let op = DhtOp::RegisterDeletedBy(
+        fixt!(Signature),
+        delete_action,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("The action was expected to be a new entry action but was Dna"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
