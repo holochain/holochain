@@ -2101,6 +2101,47 @@ async fn validate_remove_link_missing_link_add_ref() {
     assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_remove_link_with_wrong_target_type() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut action = fixt!(Update);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    let previous_action = test_case.sign_action(Action::Update(action)).await;
+
+    // Op to validate
+    let mut delete_link_action = fixt!(DeleteLink);
+    delete_link_action.timestamp = Timestamp::now().into();
+    delete_link_action.link_add_address = previous_action.as_hash().clone();
+    let op = DhtOp::RegisterRemoveLink(
+        fixt!(Signature),
+        delete_link_action,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("was expected to be a link add action"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO fix this test"]

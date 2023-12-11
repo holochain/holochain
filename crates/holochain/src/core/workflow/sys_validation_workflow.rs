@@ -861,12 +861,15 @@ fn register_delete_link(
 
     // Just require that this link exists, don't need to check anything else about it here
     let mut validation_dependencies = validation_dependencies.lock();
-    validation_dependencies
+    let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
 
-    Ok(())
+    match add_link_action {
+        Action::CreateLink(_) => Ok(()),
+        _ => Err(ValidationOutcome::NotCreateLink(add_link_action.to_hash()).into()),
+    }
 }
 
 fn update_check(entry_update: &Update, original_action: &Action) -> SysValidationResult<()> {
