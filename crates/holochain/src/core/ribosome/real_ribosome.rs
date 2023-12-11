@@ -52,8 +52,8 @@ use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::remote_signal::remote_signal;
 use crate::core::ribosome::host_fn::schedule::schedule;
+use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
@@ -707,7 +707,7 @@ impl RealRibosome {
                 must_get_agent_activity,
             )
             .with_host_function(&mut ns, "__hc__query_1", query)
-            .with_host_function(&mut ns, "__hc__remote_signal_1", remote_signal)
+            .with_host_function(&mut ns, "__hc__send_remote_signal_1", send_remote_signal)
             .with_host_function(&mut ns, "__hc__call_1", call)
             .with_host_function(&mut ns, "__hc__create_1", create)
             .with_host_function(&mut ns, "__hc__emit_signal_1", emit_signal)
@@ -1257,8 +1257,8 @@ pub mod wasm_test {
                 "__hc__must_get_valid_record_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
-                "__hc__remote_signal_1",
                 "__hc__schedule_1",
+                "__hc__send_remote_signal_1",
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
                 "__hc__sleep_1",
