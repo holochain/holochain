@@ -14,6 +14,8 @@ use crate::prelude::AgentValidationPkgFixturator;
 use crate::prelude::AppEntryBytesFixturator;
 use crate::prelude::AppEntryDef;
 use crate::prelude::CreateLinkFixturator;
+use crate::prelude::DeleteFixturator;
+use crate::prelude::DeleteLinkFixturator;
 use crate::prelude::DhtOp;
 use crate::prelude::DnaDef;
 use crate::prelude::DnaDefHashed;
@@ -47,8 +49,6 @@ use holochain_zome_types::record::Record;
 use holochain_zome_types::record::RecordEntry;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
-use crate::prelude::DeleteFixturator;
-use crate::prelude::DeleteLinkFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -788,7 +788,8 @@ async fn validate_store_record_leaks_entry() {
     match outcome {
         Outcome::Rejected(reason) => {
             assert_eq!(
-                "Private entry data should never be included in any op other than StoreEntry.", reason,
+                "Private entry data should never be included in any op other than StoreEntry.",
+                reason,
             );
         }
         _ => unreachable!(),
@@ -1622,7 +1623,11 @@ async fn validate_register_updated_content_missing_updates_ref() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::MissingDhtDep(_)),
+        "Expected MissingDhtDep but actual outcome was {:?}",
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1720,7 +1725,11 @@ async fn validate_register_updated_record_missing_updates_ref() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::MissingDhtDep(_)),
+        "Expected MissingDhtDep but actual outcome was {:?}",
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1749,10 +1758,7 @@ async fn validate_valid_register_deleted_by() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = DhtOp::RegisterDeletedBy(
-        fixt!(Signature),
-        delete_action,
-    );
+    let op = DhtOp::RegisterDeletedBy(fixt!(Signature), delete_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1773,9 +1779,7 @@ async fn validate_valid_register_deleted_by_with_missing_deletes_ref() {
     // Dummy action to set up the mock, won't be referenced
     let mut dummy_action = fixt!(Create);
     dummy_action.author = test_case.agent.clone().into();
-    let dummy_action = test_case
-        .sign_action(Action::Create(dummy_action))
-        .await;
+    let dummy_action = test_case.sign_action(Action::Create(dummy_action)).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -1789,10 +1793,7 @@ async fn validate_valid_register_deleted_by_with_missing_deletes_ref() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = mismatched_action_hash;
-    let op = DhtOp::RegisterDeletedBy(
-        fixt!(Signature),
-        delete_action,
-    );
+    let op = DhtOp::RegisterDeletedBy(fixt!(Signature), delete_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1801,7 +1802,11 @@ async fn validate_valid_register_deleted_by_with_missing_deletes_ref() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::MissingDhtDep(_)),
+        "Expected MissingDhtDep but actual outcome was {:?}",
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1813,18 +1818,13 @@ async fn validate_register_deleted_by_wrong_delete_target() {
     // Action to be updated
     let mut to_delete_action = fixt!(Dna); // Cannot delete a DNA action
     to_delete_action.author = test_case.agent.clone().into();
-    let to_delete_signed_action = test_case
-        .sign_action(Action::Dna(to_delete_action))
-        .await;
+    let to_delete_signed_action = test_case.sign_action(Action::Dna(to_delete_action)).await;
 
     // Op to validate
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = DhtOp::RegisterDeletedBy(
-        fixt!(Signature),
-        delete_action,
-    );
+    let op = DhtOp::RegisterDeletedBy(fixt!(Signature), delete_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1833,7 +1833,11 @@ async fn validate_register_deleted_by_wrong_delete_target() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
     match outcome {
         Outcome::Rejected(reason) => {
             assert!(
@@ -1872,10 +1876,7 @@ async fn validate_valid_register_deleted_entry_action() {
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = DhtOp::RegisterDeletedEntryAction(
-        fixt!(Signature),
-        delete_action,
-    );
+    let op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1896,9 +1897,7 @@ async fn validate_valid_register_deleted_entry_action_with_missing_deletes_ref()
     // Dummy action to set up the mock, won't be referenced
     let mut dummy_action = fixt!(Create);
     dummy_action.author = test_case.agent.clone().into();
-    let dummy_action = test_case
-        .sign_action(Action::Create(dummy_action))
-        .await;
+    let dummy_action = test_case.sign_action(Action::Create(dummy_action)).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -1912,10 +1911,7 @@ async fn validate_valid_register_deleted_entry_action_with_missing_deletes_ref()
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = mismatched_action_hash;
-    let op = DhtOp::RegisterDeletedEntryAction(
-        fixt!(Signature),
-        delete_action,
-    );
+    let op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -1924,7 +1920,11 @@ async fn validate_valid_register_deleted_entry_action_with_missing_deletes_ref()
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::MissingDhtDep(_)),
+        "Expected MissingDhtDep but actual outcome was {:?}",
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1936,18 +1936,13 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
     // Action to be updated
     let mut to_delete_action = fixt!(Dna); // Cannot delete a DNA action
     to_delete_action.author = test_case.agent.clone().into();
-    let to_delete_signed_action = test_case
-        .sign_action(Action::Dna(to_delete_action))
-        .await;
+    let to_delete_signed_action = test_case.sign_action(Action::Dna(to_delete_action)).await;
 
     // Op to validate
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
     delete_action.deletes_address = to_delete_signed_action.as_hash().clone();
-    let op = DhtOp::RegisterDeletedEntryAction(
-        fixt!(Signature),
-        delete_action,
-    );
+    let op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
@@ -1956,7 +1951,11 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
     match outcome {
         Outcome::Rejected(reason) => {
             assert!(
@@ -1979,18 +1978,11 @@ async fn validate_valid_add_link() {
     let mut create_link_action = fixt!(CreateLink);
     create_link_action.tag = "hello".as_bytes().to_vec().into();
     create_link_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAddLink(
-        fixt!(Signature),
-        create_link_action,
-    );
+    let op = DhtOp::RegisterAddLink(fixt!(Signature), create_link_action);
 
-    // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked. 
+    // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
-    let outcome = test_case
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(Outcome::Accepted, outcome);
 }
@@ -2005,20 +1997,17 @@ async fn validate_add_link_tag_too_large() {
     let mut create_link_action = fixt!(CreateLink);
     create_link_action.tag = vec![0; 2_000].into();
     create_link_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAddLink(
-        fixt!(Signature),
-        create_link_action,
-    );
+    let op = DhtOp::RegisterAddLink(fixt!(Signature), create_link_action);
 
-    // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked. 
+    // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked.
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
-    let outcome = test_case
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
-    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
     match outcome {
         Outcome::Rejected(reason) => {
             assert!(
@@ -2047,10 +2036,7 @@ async fn validate_valid_remove_link() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now().into();
     delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = DhtOp::RegisterRemoveLink(
-        fixt!(Signature),
-        delete_link_action,
-    );
+    let op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2072,7 +2058,9 @@ async fn validate_remove_link_missing_link_add_ref() {
     let mut dummy_action = fixt!(CreateLink);
     dummy_action.author = test_case.agent.clone().into();
     dummy_action.timestamp = Timestamp::now();
-    let dummy_action = test_case.sign_action(Action::CreateLink(dummy_action)).await;
+    let dummy_action = test_case
+        .sign_action(Action::CreateLink(dummy_action))
+        .await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
     loop {
@@ -2086,10 +2074,7 @@ async fn validate_remove_link_missing_link_add_ref() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now().into();
     delete_link_action.link_add_address = mismatched_action_hash;
-    let op = DhtOp::RegisterRemoveLink(
-        fixt!(Signature),
-        delete_link_action,
-    );
+    let op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![dummy_action])
@@ -2098,7 +2083,11 @@ async fn validate_remove_link_missing_link_add_ref() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::MissingDhtDep(_)),
+        "Expected MissingDhtDep but actual outcome was {:?}",
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -2117,10 +2106,7 @@ async fn validate_remove_link_with_wrong_target_type() {
     let mut delete_link_action = fixt!(DeleteLink);
     delete_link_action.timestamp = Timestamp::now().into();
     delete_link_action.link_add_address = previous_action.as_hash().clone();
-    let op = DhtOp::RegisterRemoveLink(
-        fixt!(Signature),
-        delete_link_action,
-    );
+    let op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -2129,7 +2115,11 @@ async fn validate_remove_link_with_wrong_target_type() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
     match outcome {
         Outcome::Rejected(reason) => {
             assert!(
