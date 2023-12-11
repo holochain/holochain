@@ -1,6 +1,7 @@
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasmer_common::*;
+use holochain_wasmer_common::WasmError;
+use holochain_wasmer_common::WasmErrorInner;
 
 #[derive(Clone, Serialize, Deserialize, SerializedBytes, Debug)]
 pub enum MigrateAgent {
