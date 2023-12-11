@@ -48,6 +48,7 @@ use holochain_zome_types::record::RecordEntry;
 use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
 use crate::prelude::DeleteFixturator;
+use crate::prelude::DeleteLinkFixturator;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -1776,9 +1777,18 @@ async fn validate_valid_register_deleted_by_with_missing_deletes_ref() {
         .sign_action(Action::Create(dummy_action))
         .await;
 
+    let mut mismatched_action_hash = fixt!(ActionHash);
+    loop {
+        if dummy_action.as_hash() != &mismatched_action_hash {
+            break;
+        }
+        mismatched_action_hash = fixt!(ActionHash);
+    }
+
     // Op to validate
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
+    delete_action.deletes_address = mismatched_action_hash;
     let op = DhtOp::RegisterDeletedBy(
         fixt!(Signature),
         delete_action,
@@ -1890,9 +1900,18 @@ async fn validate_valid_register_deleted_entry_action_with_missing_deletes_ref()
         .sign_action(Action::Create(dummy_action))
         .await;
 
+    let mut mismatched_action_hash = fixt!(ActionHash);
+    loop {
+        if dummy_action.as_hash() != &mismatched_action_hash {
+            break;
+        }
+        mismatched_action_hash = fixt!(ActionHash);
+    }
+
     // Op to validate
     let mut delete_action = fixt!(Delete);
     delete_action.timestamp = Timestamp::now().into();
+    delete_action.deletes_address = mismatched_action_hash;
     let op = DhtOp::RegisterDeletedEntryAction(
         fixt!(Signature),
         delete_action,
@@ -1948,6 +1967,138 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
         }
         _ => unreachable!(),
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_add_link() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Op to validate
+    let mut create_link_action = fixt!(CreateLink);
+    create_link_action.tag = "hello".as_bytes().to_vec().into();
+    create_link_action.timestamp = Timestamp::now().into();
+    let op = DhtOp::RegisterAddLink(
+        fixt!(Signature),
+        create_link_action,
+    );
+
+    // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked. 
+    // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
+    let outcome = test_case
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(Outcome::Accepted, outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_add_link_tag_too_large() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Op to validate
+    let mut create_link_action = fixt!(CreateLink);
+    create_link_action.tag = vec![0; 2_000].into();
+    create_link_action.timestamp = Timestamp::now().into();
+    let op = DhtOp::RegisterAddLink(
+        fixt!(Signature),
+        create_link_action,
+    );
+
+    // Note that no mocking is configured so the base and target addressed for the link aren't not going to be checked. 
+    // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
+    let outcome = test_case
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::Rejected(_)), "Expected Rejected but actual outcome was {:?}", outcome);
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("The link tag size 2000 was larger than the MAX_TAG_SIZE 1000"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_remove_link() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut action = fixt!(CreateLink);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    let previous_action = test_case.sign_action(Action::CreateLink(action)).await;
+
+    // Op to validate
+    let mut delete_link_action = fixt!(DeleteLink);
+    delete_link_action.timestamp = Timestamp::now().into();
+    delete_link_action.link_add_address = previous_action.as_hash().clone();
+    let op = DhtOp::RegisterRemoveLink(
+        fixt!(Signature),
+        delete_link_action,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(Outcome::Accepted, outcome);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_remove_link_missing_link_add_ref() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut dummy_action = fixt!(CreateLink);
+    dummy_action.author = test_case.agent.clone().into();
+    dummy_action.timestamp = Timestamp::now();
+    let dummy_action = test_case.sign_action(Action::CreateLink(dummy_action)).await;
+
+    let mut mismatched_action_hash = fixt!(ActionHash);
+    loop {
+        if dummy_action.as_hash() != &mismatched_action_hash {
+            break;
+        }
+        mismatched_action_hash = fixt!(ActionHash);
+    }
+
+    // Op to validate
+    let mut delete_link_action = fixt!(DeleteLink);
+    delete_link_action.timestamp = Timestamp::now().into();
+    delete_link_action.link_add_address = mismatched_action_hash;
+    let op = DhtOp::RegisterRemoveLink(
+        fixt!(Signature),
+        delete_link_action,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![dummy_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, Outcome::MissingDhtDep(_)), "Expected MissingDhtDep but actual outcome was {:?}", outcome);
 }
 
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
