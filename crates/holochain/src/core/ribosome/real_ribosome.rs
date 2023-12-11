@@ -1159,9 +1159,43 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
+    use holochain_types::wasmer_types::cranelift;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasmer_host::module::SerializedModuleCache;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn cache_test() {
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo]).await;
+        // let ribosome = RealRibosome::new(dna_file, None).unwrap();
+        let zome_name = TestWasm::AgentInfo.coordinator_zome_name();
+
+        let start = Instant::now();
+        let mut key = [0; 32];
+        let wasm_zome_hash = dna_file.dna().get_wasm_zome_hash(&zome_name).unwrap();
+        let bytes = wasm_zome_hash.get_raw_32();
+        key.copy_from_slice(bytes);
+        let elapsed = Instant::now() - start;
+        println!("cache key {key:?} getting took {elapsed:?}");
+        let wasm = dna_file.get_wasm_for_zome(&zome_name).unwrap().code();
+
+        let mut smc = SerializedModuleCache::default_with_cranelift(cranelift);
+        let start = Instant::now();
+        let r = smc.get(key, &wasm).unwrap();
+        let elapsed = Instant::now() - start;
+        println!("cache key {key:?} with result {r:?} getting took {elapsed:?}");
+
+        let start = Instant::now();
+        let r = smc.get(key, &wasm).unwrap();
+        let elapsed = Instant::now() - start;
+        println!("cache key {key:?} with result {r:?} getting took {elapsed:?}");
+
+        let start = Instant::now();
+        let r = smc.get(key, &wasm).unwrap();
+        println!("cache key {key:?} with result {r:?} getting took {elapsed:?}");
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that zome call responses are not increasing
