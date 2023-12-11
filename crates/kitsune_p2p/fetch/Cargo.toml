@@ -34,7 +34,7 @@ holochain_trace = { version = "^0.2.3", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"
 test-case = "1.2"
 tokio = { version = "1.27", features = [ "full", "test-util" ] }
-arbitrary = "1"
+arbitrary = { version = "1", features = ["derive"] }
 rand = "0.8.5"
 
 [features]
