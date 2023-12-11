@@ -937,7 +937,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "hdi"
-version = "0.3.3"
+version = "0.3.4-rc.0"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "getrandom",
  "hdi",
@@ -971,7 +971,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1033,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "arbitrary",
  "derive_builder",
@@ -1086,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "hdk",
  "serde",
@@ -1135,7 +1135,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -1297,7 +1297,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -1307,7 +1307,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.2.3"
+version = "0.2.4-rc.0"
 dependencies = [
  "colored",
  "derivative",
