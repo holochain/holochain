@@ -94,10 +94,20 @@ async fn validate_dna_op_mismatched_dna_hash() {
     let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_),),
         "Expected Rejected but actual outcome was {:?}",
         outcome
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("The DNA does not belong in this space!"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -119,12 +129,23 @@ async fn validate_dna_op_before_origin_time() {
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
-    // TODO this test assertion would be better if it was asserting the actual reason
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
         outcome
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains(
+                    "Root of source chain must have a timestamp greater than the Dna's origin_time"
+                ),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -153,7 +174,21 @@ async fn non_dna_op_as_first_action() {
         .await
         .unwrap();
 
-    assert!(matches!(outcome, Outcome::Rejected));
+    assert!(
+        matches!(outcome, Outcome::Rejected(_)),
+        "Expected Rejected but actual outcome was {:?}",
+        outcome
+    );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("Root of source chain must be Dna"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -353,10 +388,22 @@ async fn validate_create_op_author_mismatch_with_prev() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
         outcome
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains(
+                    "The previous action's author does not match the current action's author"
+                ),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -392,10 +439,22 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains(
+                    "The previous action's timestamp is not before the current action's timestamp"
+                ),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -431,10 +490,22 @@ async fn validate_create_op_with_timestamp_before_prev() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains(
+                    "The previous action's timestamp is not before the current action's timestamp"
+                ),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -467,10 +538,20 @@ async fn validate_create_op_seq_number_decrements() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("Previous action sequence number 10 != (9 - 1)"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -503,10 +584,20 @@ async fn validate_create_op_seq_number_reused() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("Previous action sequence number 10 != (10 - 1)"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -541,10 +632,20 @@ async fn validate_create_op_not_preceeded_by_avp() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("It is invalid for these two actions to be paired with each other"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -581,10 +682,20 @@ async fn validate_avp_op_not_followed_by_create() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("It is invalid for these two actions to be paired with each other"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -635,12 +746,16 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut action = fixt!(Create);
-    action.author = test_case.agent.clone().into();
-    action.timestamp = Timestamp::now();
-    action.action_seq = 10;
-    action.prev_action = fixt!(ActionHash);
-    let previous_action = test_case.sign_action(Action::Create(action)).await;
+    let action = AgentValidationPkg {
+        author: test_case.agent.clone().into(),
+        timestamp: Timestamp::now(),
+        action_seq: 1,
+        prev_action: fixt!(ActionHash),
+        membrane_proof: None,
+    };
+    let previous_action = test_case
+        .sign_action(Action::AgentValidationPkg(action))
+        .await;
 
     // Op to validate
     let app_entry = Entry::App(fixt!(AppEntryBytes));
@@ -665,10 +780,9 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected),
-        "Expected Rejected but actual outcome was {:?}",
-        outcome
+    assert_eq!(
+        Outcome::Rejected("The entry has a different type to the action's entry type".to_string()),
+        outcome,
     );
 }
 
@@ -723,10 +837,9 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected),
-        "Expected Rejected but actual outcome was {:?}",
-        outcome
+    assert_eq!(
+        Outcome::Rejected("The entry has a different hash to the action's entry hash".to_string()),
+        outcome,
     );
 }
 
@@ -784,10 +897,11 @@ async fn validate_store_record_with_large_entry() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected),
-        "Expected Rejected but actual outcome was {:?}",
-        outcome
+    assert_eq!(
+        Outcome::Rejected(
+            "The entry size 5000011 was larger than the MAX_ENTRY_SIZE 4000000".to_string()
+        ),
+        outcome,
     );
 }
 
@@ -909,10 +1023,20 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::Rejected),
+        matches!(outcome, Outcome::Rejected(_)),
         "Expected Rejected but actual outcome was {:?}",
-        outcome
+        outcome,
     );
+    match outcome {
+        Outcome::Rejected(reason) => {
+            assert!(
+                reason.contains("The action was expected to be a new entry action but was Dna"),
+                "Reason message does not match [{}]",
+                reason
+            );
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -979,11 +1103,7 @@ async fn validate_store_record_update_changes_entry_type() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected),
-        "Expected Rejected but actual outcome was {:?}",
-        outcome
-    );
+    assert_eq!(Outcome::Rejected("Update original: App(AppEntryDef { entry_index: EntryDefIndex(0), zome_index: ZomeIndex(0), visibility: Public }) doesn't match new: App(AppEntryDef { entry_index: EntryDefIndex(10), zome_index: ZomeIndex(0), visibility: Public })".to_string()), outcome, "Expected Rejected but actual outcome was {:?}", outcome);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1023,10 +1143,130 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected),
+    assert_eq!(
+        Outcome::Rejected("The entry has a different type to the action's entry type".to_string()),
+        outcome,
         "Expected Rejected but actual outcome was {:?}",
         outcome
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
+    holochain_trace::test_run().unwrap();
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let app_entry = Entry::App(fixt!(AppEntryBytes));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.prev_action = previous_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    create_action.entry_hash = entry_hash.as_hash().clone();
+
+    let mut mismatched_entry = Entry::App(fixt!(AppEntryBytes));
+    loop {
+        if mismatched_entry != app_entry {
+            break;
+        }
+        mismatched_entry = Entry::App(fixt!(AppEntryBytes));
+    }
+
+    let op = DhtOp::StoreEntry(
+        fixt!(Signature),
+        holochain_types::action::NewEntryAction::Create(create_action),
+        // Create some new data which will have a different hash
+        mismatched_entry,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        Outcome::Rejected("The entry has a different hash to the action's entry hash".to_string()),
+        outcome,
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_store_entry_with_large_entry() {
+    holochain_trace::test_run().unwrap();
+
+    use holochain_serialized_bytes::prelude::*;
+    use serde::{Deserialize, Serialize};
+    #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+    struct TestLargeEntry {
+        data: Vec<u8>,
+    }
+
+    let mut test_case = TestCase::new().await;
+
+    // Previous action
+    let mut action = fixt!(Create);
+    action.author = test_case.agent.clone().into();
+    action.timestamp = Timestamp::now();
+    action.action_seq = 10;
+    action.prev_action = fixt!(ActionHash);
+    let previous_action = test_case.sign_action(Action::Create(action)).await;
+
+    // Op to validate
+    let app_entry = Entry::App(AppEntryBytes(
+        TestLargeEntry {
+            data: vec![0; 5_000_000],
+        }
+        .try_into()
+        .unwrap(),
+    ));
+    let entry_hash = EntryHashed::from_content_sync(app_entry.clone());
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.action().author().clone();
+    create_action.action_seq = previous_action.action().action_seq() + 1;
+    create_action.prev_action = previous_action.as_hash().clone();
+    create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef::new(
+        0.into(),
+        0.into(),
+        EntryVisibility::Public,
+    ));
+    create_action.entry_hash = entry_hash.as_hash().clone();
+    let op = DhtOp::StoreEntry(
+        fixt!(Signature),
+        holochain_types::action::NewEntryAction::Create(create_action),
+        app_entry,
+    );
+
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        Outcome::Rejected(
+            "The entry size 5000011 was larger than the MAX_ENTRY_SIZE 4000000".to_string()
+        ),
+        outcome,
     );
 }
 

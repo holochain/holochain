@@ -209,7 +209,7 @@ async fn sys_validation_workflow_inner(
                         let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
-                    Outcome::Rejected => {
+                    Outcome::Rejected(_) => {
                         summary.rejected += 1;
                         if let Dependency::Null = dependency {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -440,7 +440,7 @@ pub(crate) async fn validate_op(
                 }
             }
             let outcome = handle_failed(&e);
-            if let Outcome::Rejected = outcome {
+            if let Outcome::Rejected(_) = outcome {
                 warn!(msg = "DhtOp was rejected during system validation.", ?op, error = ?e, error_msg = %e)
             }
             Ok(outcome)
@@ -459,26 +459,8 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::Counterfeit(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
-        ValidationOutcome::ActionNotInCounterSigningSession(_, _) => Rejected,
         ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
-        ValidationOutcome::EntryDefId(_) => Rejected,
-        ValidationOutcome::EntryHash => Rejected,
-        ValidationOutcome::EntryTooLarge(_) => Rejected,
-        ValidationOutcome::EntryTypeMismatch => Rejected,
-        ValidationOutcome::EntryVisibility(_) => Rejected,
-        ValidationOutcome::TagTooLarge(_) => Rejected,
-        ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
-        ValidationOutcome::NotCreateLink(_) => Rejected,
-        ValidationOutcome::NotNewEntry(_) => Rejected,
-        ValidationOutcome::PrevActionError(_) => Rejected,
-        ValidationOutcome::PrivateEntryLeaked => Rejected,
-        ValidationOutcome::PreflightResponseSignature(_) => Rejected,
-        ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
-        ValidationOutcome::UpdateHashMismatch(_, _) => Rejected,
-        ValidationOutcome::VerifySignature(_, _) => Rejected,
-        ValidationOutcome::WrongDna(_, _) => Rejected,
-        ValidationOutcome::ZomeIndex(_) => Rejected,
-        ValidationOutcome::CounterSigningError(_) => Rejected,
+        reason => Rejected(reason.to_string()),
     }
 }
 
