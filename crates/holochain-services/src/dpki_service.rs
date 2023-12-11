@@ -5,6 +5,11 @@ use holochain_types::prelude::*;
 
 use crate::CellRunner;
 
+/// This magic string, when used as the installed app id, denotes that the app
+/// is not actually an app, but the DPKI service! This is now a reserved app id,
+/// and is used to distinguish the DPKI service from other apps.
+pub const DPKI_APP_ID: &'static str = "DPKI";
+
 /// Interface for the DPKI service
 #[async_trait::async_trait]
 #[mockall::automock]
