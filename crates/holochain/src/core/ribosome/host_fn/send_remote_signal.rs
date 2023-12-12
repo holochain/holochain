@@ -19,7 +19,7 @@ use tracing::Instrument;
 use wasmer::RuntimeError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
-pub fn remote_signal(
+pub fn send_remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: RemoteSignal,
@@ -81,7 +81,7 @@ pub fn remote_signal(
                     }
 
                     if let Err(e) = network
-                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
+                        .send_remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);
@@ -95,7 +95,7 @@ pub fn remote_signal(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "remote_signal".into(),
+                "send_remote_signal".into(),
             )
             .to_string(),
         ))
@@ -124,8 +124,8 @@ mod tests {
                     agents: agents.clone(),
                     signal,
                 };
-                tracing::debug!("sending signal to {:?}", agents);
-                api.remote_signal(signal)?;
+                tracing::debug!("sending remote signal to {:?}", agents);
+                api.send_remote_signal(signal)?;
                 Ok(())
             })
             .function("recv_remote_signal", move |api, signal: ExternIO| {
