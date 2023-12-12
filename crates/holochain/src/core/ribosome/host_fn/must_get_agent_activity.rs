@@ -126,11 +126,6 @@ pub mod test {
         use std::{collections::HashMap, sync::Arc};
 
         pub(crate) mod shared_values {
-            use std::{
-                f32::consts::E,
-                sync::{Condvar, Mutex},
-            };
-
             use serde::{Deserialize, Serialize};
 
             use super::*;
@@ -142,8 +137,10 @@ pub mod test {
 
             #[derive(Clone, Default)]
             pub(crate) struct LocalV1 {
-                notification: Arc<HashMap<String, Arc<Condvar>>>,
-                data: HashMap<String, Arc<Mutex<Option<String>>>>,
+                data: Arc<tokio::sync::Mutex<HashMap<String, String>>>,
+                notification: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Notify>>>>,
+                // notification: Arc<HashMap<String, Arc<Condvar>>>,
+                // data: HashMap<String, Arc<Mutex<Option<String>>>>,
             }
 
             #[derive(Clone)]
@@ -178,74 +175,79 @@ pub mod test {
                 }
 
                 /// Gets the `value` for `key`; waits for it to become available if necessary.
-                pub(crate) fn get<T: for<'a> Deserialize<'a>>(&mut self, key: &str) -> Fallible<T> {
+                pub(crate) async fn get<T: for<'a> Deserialize<'a>>(
+                    &mut self,
+                    key: &str,
+                ) -> Fallible<T> {
                     match self {
                         SharedValues::LocalV1(localv1) => {
-                            let mut maybe_value = localv1
-                                .data
-                                .entry(key.to_string())
-                                .or_default()
-                                .lock()
-                                .expect("mutex poisened");
+                            loop {
+                                {
+                                    let data_guard = localv1.data.lock().await;
 
-                            while maybe_value.is_none() {
-                                dbg!("waiting for signal on {}", key);
-                                maybe_value = localv1
-                                    .notification
-                                    .entry(key.to_string())
-                                    .or_default()
-                                    .wait(maybe_value)
-                                    .expect("mutex poisoned");
-                            }
-                            dbg!("got signal on {}", key);
+                                    if let Some(value) = data_guard.get(key) {
+                                        return Ok(serde_json::from_str(value)?);
+                                    }
 
-                            if let Some(value) = &*maybe_value {
-                                Ok(serde_json::from_str(value)?)
-                            } else {
-                                unreachable!();
+                                    // get the notifier while still holding the data lock.
+                                    // this prevents a race between getting the notifier and a writer just writing something and sending notifications for it
+                                    localv1
+                                        .notification
+                                        .lock()
+                                        .await
+                                        .entry(key.to_string())
+                                        .or_default()
+                                        .clone()
+                                }
+                                .notified()
+                                .await
                             }
                         }
                         SharedValues::RemoteV1(_) => unimplemented!(),
                     }
                 }
 
-                /// Puts the `value` for `key` and sends it to a receiver if there is one waiting for it.
-                pub(crate) fn put<T: Serialize + for<'a> Deserialize<'a>>(
+                /// Puts the `value` for `key` and notifies any waiters if there are any.
+                pub(crate) async fn put<T: Serialize + for<'a> Deserialize<'a>>(
                     &mut self,
                     key: String,
                     value: T,
                 ) -> Fallible<Option<T>> {
                     match self {
                         SharedValues::LocalV1(localv1) => {
-                            dbg!("putting in value for {}", &key);
+                            let mut data_guard = localv1.data.lock().await;
 
-                            let mut maybe_value = localv1
-                                .data
-                                .entry(key.clone())
-                                .or_default()
-                                .lock()
-                                .expect("mutex poisoned");
-
-                            let maybe_previous_value = if let Some(previous_value) = &*maybe_value {
-                                serde_json::from_str(previous_value.as_str())?
+                            let maybe_previous = if let Some(previous_serialized) =
+                                data_guard.insert(key.clone(), serde_json::to_string(&value)?)
+                            {
+                                Some(serde_json::from_str(&previous_serialized)?)
                             } else {
                                 None
                             };
 
-                            *maybe_value = Some(serde_json::to_string(&value)?);
-
-                            if let Some(condvar) = localv1.notification.get(&key) {
-                                dbg!("notifying waiters on {}", &key);
-                                condvar.notify_all();
-                            } else {
-                                dbg!("no waiters for {}", &key);
+                            if let Some(notifier) = localv1.notification.lock().await.get(&key) {
+                                notifier.notify_waiters();
                             }
 
-                            Ok(maybe_previous_value)
+                            Ok(maybe_previous)
                         }
                         SharedValues::RemoteV1(_) => unimplemented!(),
                     }
                 }
+            }
+
+            #[tokio::test]
+            async fn shared_values_localv1_sequential_put_get() {
+                let mut values = SharedValues::LocalV1(LocalV1::default());
+
+                let prefix = "something".to_string();
+                let s = "we expect this back".to_string();
+
+                values.put(prefix.clone(), s.clone()).await.unwrap();
+
+                let got: String = values.get(&prefix).await.unwrap();
+
+                assert_eq!(s, got);
             }
         }
     }
@@ -259,7 +261,7 @@ pub mod test {
     static C_KEY: &str = "C";
     static D_KEY: &str = "D";
     static BOB_AGENT_PUBKEY_KEY: &str = "bobagentpubkey";
-    
+
     /// Test that validation can get the currently-being-validated agent's
     /// activity.
     #[tokio::test(flavor = "multi_thread")]
@@ -299,36 +301,41 @@ pub mod test {
         conductor: Arc<SweetConductor>,
         mut shared_values: SharedValues,
     ) -> Fallible<()> {
-        shared_values.put(
-            BOB_AGENT_PUBKEY_KEY.to_string(),
-            bob.cell_id().agent_pubkey().clone(),
-        )?;
+        shared_values
+            .put(
+                BOB_AGENT_PUBKEY_KEY.to_string(),
+                bob.cell_id().agent_pubkey().clone(),
+            )
+            .await?;
 
         shared_values
             .put(
                 A_KEY.to_string(),
                 conductor
-                    .call::<_, ActionHash, _>(&bob, "commit_something", Something(vec![1]))
+                    .call::<_, ActionHash>(&bob, "commit_something", Something(vec![1]))
                     .await,
             )
+            .await
             .unwrap();
 
         shared_values
             .put(
                 B_KEY.to_string(),
                 conductor
-                    .call::<_, ActionHash, _>(&bob, "commit_something", Something(vec![2]))
+                    .call::<_, ActionHash>(&bob, "commit_something", Something(vec![2]))
                     .await,
             )
+            .await
             .unwrap();
 
         shared_values
             .put(
                 C_KEY.to_string(),
                 conductor
-                    .call::<_, ActionHash, _>(&bob, "commit_something", Something(vec![3]))
+                    .call::<_, ActionHash>(&bob, "commit_something", Something(vec![3]))
                     .await,
             )
+            .await
             .unwrap();
 
         for i in 3..30 {
@@ -341,7 +348,7 @@ pub mod test {
             .call(&bob, "commit_something", Something(vec![21]))
             .await;
 
-        shared_values.put(D_KEY.to_string(), d).unwrap();
+        shared_values.put(D_KEY.to_string(), d).await.unwrap();
 
         Ok(())
     }
@@ -351,11 +358,12 @@ pub mod test {
         conductor: Arc<SweetConductor>,
         mut shared_values: SharedValues,
     ) -> Fallible<()> {
-        let bob_agent_pubkey: ActionHash = shared_values.get(&BOB_AGENT_PUBKEY_KEY.to_string())?;
+        let bob_agent_pubkey: ActionHash =
+            shared_values.get(&BOB_AGENT_PUBKEY_KEY.to_string()).await?;
 
-        let a: ActionHash = shared_values.get(&A_KEY.to_string())?;
-        let b: ActionHash = shared_values.get(&B_KEY.to_string())?;
-        let c: ActionHash = shared_values.get(&C_KEY.to_string())?;
+        let a: ActionHash = shared_values.get(&A_KEY.to_string()).await?;
+        let b: ActionHash = shared_values.get(&B_KEY.to_string()).await?;
+        let c: ActionHash = shared_values.get(&C_KEY.to_string()).await?;
 
         let filter = ChainFilter::new(a.clone());
 
@@ -387,7 +395,7 @@ pub mod test {
             )
             .await;
 
-        let d: ActionHash = shared_values.get(&D_KEY.to_string())?;
+        let d: ActionHash = shared_values.get(&D_KEY.to_string()).await?;
 
         let _: ActionHash = conductor
             .call(
