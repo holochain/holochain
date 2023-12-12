@@ -107,9 +107,7 @@ impl LegacyHostStub {
                             .boxed()
                             .into()))
                         }
-                        KitsuneP2pEvent::QueryPeerDensity {
-                            ..
-                        } => {}
+                        KitsuneP2pEvent::QueryPeerDensity { .. } => {}
                         KitsuneP2pEvent::Notify {
                             space,
                             to_agent,
