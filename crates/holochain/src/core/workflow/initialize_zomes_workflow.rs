@@ -3,6 +3,7 @@ use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
+use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
@@ -25,6 +26,7 @@ where
     pub conductor_handle: ConductorHandle,
     pub signal_tx: SignalBroadcaster,
     pub cell_id: CellId,
+    pub integrate_dht_ops_trigger: TriggerSender,
 }
 
 impl<Ribosome> InitializeZomesWorkflowArgs<Ribosome>
@@ -48,6 +50,7 @@ where
 {
     let conductor_handle = args.conductor_handle.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
+    let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
@@ -69,6 +72,9 @@ where
             coordinators,
         )
         .await?;
+
+        // Any ops that were moved to the dht_db as part of the flush but had dependencies will need to be integrated.
+        integrate_dht_ops_trigger.trigger(&"initialize_zomes_workflow");
     }
     Ok(result)
 }
@@ -88,6 +94,7 @@ where
         conductor_handle,
         signal_tx,
         cell_id,
+        ..
     } = args;
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
@@ -108,6 +115,7 @@ where
     // FIXME: For some reason if we don't spawn here
     // this future never gets polled again.
     let ws = workspace.clone();
+
     tokio::task::spawn(async move {
         ws.source_chain()
             .put(
@@ -126,7 +134,7 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::sync::Arc;
 
     use super::*;
@@ -138,19 +146,13 @@ pub mod tests {
     use crate::sweettest::*;
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
-    use fixt::Unpredictable;
+    use holochain_keystore::test_keystore;
     use holochain_p2p::HolochainP2pDnaFixturator;
-    use holochain_state::prelude::test_authored_db;
-    use holochain_state::prelude::test_cache_db;
-    use holochain_state::prelude::test_dht_db;
-    use holochain_state::prelude::SourceChain;
+    use holochain_state::prelude::*;
     use holochain_state::test_utils::test_db_dir;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::inline_zome::InlineZomeSet;
-    use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fake_agent_pubkey_1;
-    use holochain_zome_types::Action;
     use matches::assert_matches;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
@@ -207,12 +209,19 @@ pub mod tests {
             .return_const(dna_def_hashed.clone());
 
         let db_dir = test_db_dir();
-        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let conductor_handle = Conductor::builder()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
+        let integrate_dht_ops_trigger = TriggerSender::new();
+
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             conductor_handle,
             signal_tx: SignalBroadcaster::noop(),
             cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
+            integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
         };
         let keystore = fixt!(MetaLairClient);
         let network = fixt!(HolochainP2pDna);

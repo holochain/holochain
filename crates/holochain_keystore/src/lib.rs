@@ -14,7 +14,7 @@
 //! #[tokio::main(flavor = "multi_thread")]
 //! async fn main() {
 //!     tokio::task::spawn(async move {
-//!         let keystore = test_keystore::spawn_test_keystore().await.unwrap();
+//!         let keystore = holochain_keystore::spawn_test_keystore().await.unwrap();
 //!         let agent_pubkey = AgentPubKey::new_random(&keystore).await.unwrap();
 //!
 //!         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -40,9 +40,15 @@ pub use meta_lair_client::*;
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
 
-pub mod crude_mock_keystore;
 pub mod lair_keystore;
-pub mod test_keystore;
+
+pub mod paths;
+
+mod test_keystore;
+pub use test_keystore::*;
+
+#[cfg(feature = "test_utils")]
+pub mod crude_mock_keystore;
 
 /// Construct a simple in-memory in-process keystore.
 pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {

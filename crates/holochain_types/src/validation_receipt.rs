@@ -5,7 +5,7 @@ use futures::{Stream, StreamExt, TryStreamExt};
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::ValidationStatus;
+use holochain_zome_types::prelude::*;
 use std::vec::IntoIter;
 
 /// Validation receipt content - to be signed.
@@ -122,7 +122,7 @@ impl IntoIterator for ValidationReceiptBundle {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use crate::validation_receipt::try_stream_of_results;
 
     #[tokio::test]

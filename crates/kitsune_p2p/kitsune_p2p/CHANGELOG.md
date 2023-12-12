@@ -7,6 +7,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.23
+
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity. [\#2974](https://github.com/holochain/holochain/pull/2974)
+
+## 0.3.0-beta-dev.22
+
+- Update to a tx5 version that includes go code that is statically linked for all platform that support it. Windows and Android will remain dynamically linked. [\#2967](https://github.com/holochain/holochain/pull/2967)
+- Change the license from Apache-2.0 to CAL-1.0.
+- Fixed spammy “Recorded initiate|accept with current round already set” warning. [\#3060](https://github.com/holochain/holochain/pull/3060)
+
+## 0.3.0-beta-dev.21
+
+- There were some places where parsing an invalid URL would crash kitsune. This is now fixed. [\#2689](https://github.com/holochain/holochain/pull/2689)
+
+## 0.3.0-beta-dev.20
+
+- Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
+- Adjust bootstrap max\_delay from 60 minutes -\> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
 ## 0.3.0-beta-dev.17
 
 - Add additional configuration options to network\_tuning for setting the allowed ephemeral port range for tx5 connections: tx5\_min\_ephemeral\_udp\_port and tx5\_max\_ephemeral\_udp\_port

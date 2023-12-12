@@ -6,15 +6,15 @@ use contrafact::Fact;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_keystore::test_keystore;
 use holochain_p2p::dht::hash::RegionHash;
 use holochain_p2p::dht::prelude::Dimension;
 use holochain_p2p::dht::region::RegionData;
 use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_p2p::dht_arc::DhtArcSet;
-use holochain_types::dht_op::facts::valid_dht_op;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+use holochain_types::facts::valid_dht_op;
 use holochain_types::prelude::*;
-use holochain_zome_types::{DnaDef, DnaDefHashed};
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
 
@@ -39,10 +39,10 @@ async fn test_region_queries() {
     let mut g = random_generator();
 
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let path = temp_dir.path().to_path_buf();
+    let data_root_path = temp_dir.path().to_path_buf().into();
 
     let spaces = Spaces::new(&ConductorConfig {
-        environment_path: path.into(),
+        data_root_path: Some(data_root_path),
         ..Default::default()
     })
     .unwrap();

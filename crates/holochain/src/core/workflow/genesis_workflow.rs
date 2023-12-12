@@ -176,12 +176,13 @@ impl GenesisWorkspace {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApiT;
     use crate::conductor::conductor::{mock_app_store, mock_dpki, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
+    use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_trace;

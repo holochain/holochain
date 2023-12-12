@@ -381,10 +381,13 @@ async fn create_test_data(
     tuning.gossip_strategy = "none".to_string();
     tuning.disable_publish = true;
 
+    // This is gonna get dropped at the end of this fn.
+    let tmpdir = tempfile::TempDir::new().unwrap();
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network: Some(network),
+        data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
@@ -413,7 +416,7 @@ async fn create_test_data(
         eprintln!("Calling {}", i);
         let e = entries.take(approx_num_ops_held).collect::<Vec<_>>();
         conductor
-            .call::<_, (), _>(&cell.zome("zome1"), "create_many", e)
+            .call::<_, ()>(&cell.zome("zome1"), "create_many", e)
             .await;
     }
     let mut authored = HashMap::new();

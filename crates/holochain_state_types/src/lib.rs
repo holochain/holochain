@@ -17,3 +17,7 @@ pub struct SourceChainJsonRecord {
     pub action: Action,
     pub entry: Option<Entry>,
 }
+
+pub mod prelude {
+    pub use crate::*;
+}

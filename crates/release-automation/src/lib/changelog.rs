@@ -1264,7 +1264,14 @@ mod tests {
 
         let result = sanitize(std::fs::read_to_string(workspace_changelog.path()).unwrap());
 
-        let expected = example_workspace_1_aggregated_changelog();
+        let expected = example_workspace_1_aggregated_changelog(
+            workspace
+                .members()
+                .unwrap()
+                .iter()
+                .map(|c| c.name())
+                .collect(),
+        );
 
         assert_eq!(
             result,

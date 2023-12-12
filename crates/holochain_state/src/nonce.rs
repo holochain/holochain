@@ -7,7 +7,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DbKindConductor;
-use holochain_zome_types::Timestamp;
+use holochain_zome_types::prelude::Timestamp;
 use std::time::Duration;
 
 pub const WITNESSABLE_EXPIRY_DURATION: Duration = Duration::from_secs(60 * 50);

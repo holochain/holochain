@@ -52,7 +52,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use kitsune_p2p_bin_data::fixt::*;
     use kitsune_p2p_types::fixt::*;
 

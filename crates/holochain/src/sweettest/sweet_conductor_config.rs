@@ -1,8 +1,14 @@
 use std::sync::Arc;
 
 use crate::sweettest::SweetRendezvous;
-use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
-use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+use holochain_conductor_api::{
+    conductor::{ConductorConfig, ConductorTuningParams},
+    AdminInterfaceConfig, InterfaceDriver,
+};
+use kitsune_p2p_types::{
+    config::{KitsuneP2pConfig, TransportConfig},
+    dependencies::lair_keystore_api::dependencies::nanoid::nanoid,
+};
 
 /// Wrapper around ConductorConfig with some helpful builder methods
 #[derive(
@@ -23,6 +29,9 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
+            tuning_params: Some(ConductorTuningParams {
+                sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
+            }),
             ..Default::default()
         }
         .into()
@@ -60,17 +69,20 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        KitsuneP2pConfig::default().into()
+        let config: Self = KitsuneP2pConfig::default().into();
+        config.random_scope()
     }
 
     /// Rendezvous config for SweetConductors
-    pub fn rendezvous() -> Self {
+    pub fn rendezvous(bootstrap: bool) -> Self {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
 
         let mut network = KitsuneP2pConfig::default();
-        network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+        if bootstrap {
+            network.bootstrap_service = Some(url2::url2!("rendezvous:"));
+        }
 
         /*#[cfg(not(feature = "tx5"))]
         {
@@ -120,6 +132,24 @@ impl SweetConductorConfig {
             .expect("failed to tune network")
             .tuning_params = Arc::new(tuning_params);
         self
+    }
+
+    /// Apply a function to the conductor's tuning parameters to customise them.
+    pub fn tune_conductor(mut self, f: impl FnOnce(&mut ConductorTuningParams)) -> Self {
+        if let Some(ref mut params) = self.0.tuning_params {
+            f(params);
+        }
+        self
+    }
+
+    /// Set the tracing scope to a new random value
+    pub fn random_scope(&self) -> Self {
+        let scope = nanoid!();
+        let mut this = self.clone();
+        let network = this.network.get_or_insert_with(Default::default);
+        network.tracing_scope = Some(scope.clone());
+        this.tracing_scope = Some(scope);
+        this
     }
 
     /// Completely disable networking

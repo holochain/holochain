@@ -13,6 +13,7 @@ edition = "2021"
 anyhow = "*"
 arbitrary = { version = "1.0" }
 holochain = { path = "../holochain", features = ["sweetest", "hdk"] }
+kitsune_p2p = { path = "../kitsune_p2p/kitsune_p2p" }
 human-repr = "1"
 rand = "0.8"
 tracing = "0.1"

@@ -71,7 +71,7 @@ pub enum WorkflowError {
     HolochainP2pError(#[from] HolochainP2pError),
 
     #[error(transparent)]
-    HoloHashError(#[from] holo_hash::error::HoloHashError),
+    HoloHashError(#[from] holo_hash::HoloHashError),
 
     #[error(transparent)]
     InterfaceError(#[from] crate::conductor::interface::error::InterfaceError),
@@ -80,7 +80,7 @@ pub enum WorkflowError {
     DhtOpError(#[from] DhtOpError),
 
     #[error(transparent)]
-    DbCacheError(#[from] holochain_types::db_cache::error::DbCacheError),
+    DbCacheError(#[from] holochain_types::db_cache::DbCacheError),
 
     #[error(transparent)]
     SysValidationError(#[from] SysValidationError),
@@ -101,7 +101,7 @@ pub enum WorkflowError {
     SystemTimeError(#[from] std::time::SystemTimeError),
 
     #[error(transparent)]
-    TimestampError(#[from] holochain_zome_types::TimestampError),
+    TimestampError(#[from] holochain_zome_types::prelude::TimestampError),
 
     #[error("RecvError")]
     RecvError,

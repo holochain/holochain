@@ -14,7 +14,7 @@ fn agent_info(_: ()) -> ExternResult<AgentInfo> {
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]

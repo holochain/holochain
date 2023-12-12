@@ -239,20 +239,18 @@ pub mod test {
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
+    use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_state::prelude::test_db_dir;
+    use holochain_state::prelude::*;
     use holochain_trace;
-    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestZomes;
     use holochain_websocket::Respond;
-    use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
@@ -273,7 +271,11 @@ pub mod test {
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
-        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let conductor_handle = Conductor::builder()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         (Arc::new(db_dir), conductor_handle)
     }
 
@@ -283,7 +285,8 @@ pub mod test {
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
-            .test(db_dir.path(), &[])
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
             .await
             .unwrap();
 

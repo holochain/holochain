@@ -19,7 +19,8 @@ use crate::core::{
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_conductor_api::conductor::paths::DatabasesRootPath;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
@@ -36,23 +37,15 @@ use holochain_sqlite::prelude::{
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
     mutations,
-    prelude::{from_blob, StateQueryResult},
+    prelude::*,
     query::{map_sql_dht_op_common, StateQueryError},
-    source_chain::{SourceChain, SourceChainResult},
 };
-use holochain_types::prelude::CellId;
-use holochain_types::{
-    db_cache::DhtDbQueryCache,
-    dht_op::{DhtOp, DhtOpType},
-};
-use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTargetId;
-use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::{agent_info::AgentInfoSigned, config::KitsuneP2pConfig};
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
+use std::path::PathBuf;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -64,7 +57,7 @@ mod tests;
 /// installed on this conductor.
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    pub(crate) db_dir: Arc<DatabaseRootPath>,
+    pub(crate) db_dir: Arc<DatabasesRootPath>,
     pub(crate) db_sync_strategy: DbSyncStrategy,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
@@ -134,7 +127,11 @@ pub struct TestSpace {
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
-        let root_db_dir = config.environment_path.clone();
+        let root_db_dir: DatabasesRootPath = config
+            .data_root_path
+            .clone()
+            .ok_or(ConductorError::NoDataRootPath)?
+            .try_into()?;
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
@@ -625,20 +622,20 @@ impl Spaces {
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        use futures::StreamExt;
-        let ops = futures::stream::iter(ops.into_iter().map(|op| {
-            let hash = DhtOpHash::with_data_sync(&op);
-            (hash, op)
-        }))
-        .collect()
-        .await;
-
         // If this is a countersigning session then
         // send it to the countersigning workflow otherwise
         // send it to the incoming ops workflow.
         if countersigning_session {
+            use futures::StreamExt;
+            let ops = futures::stream::iter(ops.into_iter().map(|op| {
+                let hash = DhtOpHash::with_data_sync(&op);
+                (hash, op)
+            }))
+            .collect()
+            .await;
+
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
                     space.countersigning_workspace.clone(),
@@ -661,7 +658,10 @@ impl Spaces {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 // Note this is not an error because only a validation receipt is proof of a publish.
-                None => return Ok(()),
+                None => {
+                    tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
+                    return Ok(());
+                }
             };
             incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }
@@ -679,7 +679,7 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
-        root_db_dir: &DatabaseRootPath,
+        root_db_dir: &PathBuf,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
@@ -799,7 +799,7 @@ impl TestSpaces {
             .tempdir()
             .unwrap();
         let spaces = Spaces::new(&ConductorConfig {
-            environment_path: temp_dir.path().to_path_buf().into(),
+            data_root_path: Some(temp_dir.path().to_path_buf().into()),
             ..Default::default()
         })
         .unwrap();

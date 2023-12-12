@@ -19,8 +19,8 @@
 //! and the examples.
 
 use std::path::Path;
-use std::path::PathBuf;
 
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{AdminRequest, AdminResponse};
 use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
@@ -77,7 +77,7 @@ impl CmdRunner {
     /// Create a command runner from a sandbox path.
     /// This expects holochain to be on the path.
     pub async fn from_sandbox(
-        sandbox_path: PathBuf,
+        sandbox_path: ConfigRootPath,
     ) -> anyhow::Result<(Self, tokio::process::Child)> {
         Self::from_sandbox_with_bin_path(Path::new(Self::HOLOCHAIN_PATH), sandbox_path).await
     }
@@ -86,7 +86,7 @@ impl CmdRunner {
     /// set the path to the holochain binary.
     pub async fn from_sandbox_with_bin_path(
         holochain_bin_path: &Path,
-        sandbox_path: PathBuf,
+        sandbox_path: ConfigRootPath,
     ) -> anyhow::Result<(Self, tokio::process::Child)> {
         let conductor = run::run_async(holochain_bin_path, sandbox_path, None, Output::Log).await?;
         let cmd = CmdRunner::try_new(conductor.0).await?;

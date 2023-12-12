@@ -42,7 +42,6 @@ use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;
@@ -261,7 +260,7 @@ impl Cell {
         match lives {
             // Cannot proceed if we don't know what to run.
             Err(e) => {
-                error!("{}", e.to_string());
+                error!("error calling scheduled fn: {:?}", e);
             }
             Ok(lives) => {
                 let mut tasks = vec![];
@@ -271,7 +270,10 @@ impl Cell {
                     let payload = match ExternIO::encode(schedule) {
                         Ok(payload) => payload,
                         Err(e) => {
-                            error!("{}", e.to_string());
+                            error!(
+                                "error encoding scheduled fn: {:?} error: {:?}",
+                                scheduled_fn, e
+                            );
                             continue;
                         }
                     };
@@ -279,7 +281,10 @@ impl Cell {
                     let (nonce, expires_at) = match fresh_nonce(now) {
                         Ok(v) => v,
                         Err(e) => {
-                            error!("{}", e.to_string());
+                            error!(
+                                "error creating nonce for fn: {:?} error: {:?}",
+                                scheduled_fn, e
+                            );
                             continue;
                         }
                     };
@@ -304,7 +309,7 @@ impl Cell {
                             {
                                 Ok(zome_call) => zome_call,
                                 Err(e) => {
-                                    error!("{}", e.to_string());
+                                    error!("scheduled zome call error in try_from_unsigned_zome_call: {:?}", e);
                                     continue;
                                 }
                             },
@@ -330,7 +335,7 @@ impl Cell {
                                             continue;
                                         }
                                         Err(e) => {
-                                            error!("{}", e.to_string());
+                                            error!("scheduled zome call error in ExternIO::decode: {:?}", e);
                                             continue;
                                         }
                                     };
@@ -344,11 +349,11 @@ impl Cell {
                                         Some(next_schedule),
                                         now,
                                     ) {
-                                        error!("{}", e.to_string());
+                                        error!("scheduled zome call error in schedule_fn: {:?}", e);
                                         continue;
                                     }
                                 }
-                                errorish => error!("{:?}", errorish),
+                                errorish => error!("scheduled zome call error: {:?}", errorish),
                             }
                         }
                         Result::<(), DatabaseError>::Ok(())
@@ -784,27 +789,42 @@ impl Cell {
                 crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
             );
 
-            self.space
+            let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
+
+            let receipt_count = self
+                .space
                 .dht_db
-                .write_async(move |txn| {
-                    // Get the current count for this dhtop.
-                    let receipt_count: usize = txn.query_row(
-                        "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
-                        named_params! {
-                            ":op_hash": receipt.receipt.dht_op_hash,
-                        },
-                        |row| row.get(0),
-                    )?;
+                .write_async({
+                    let receipt_op_hash = receipt_op_hash.clone();
+                    move |txn| -> StateMutationResult<usize> {
+                        // Add the new receipts to the db
+                        add_if_unique(txn, receipt)?;
 
-                    // If we have enough receipts then set receipts to complete.
-                    if receipt_count >= required_validation_count as usize {
-                        set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
+                        // Get the current count for this DhtOp.
+                        let receipt_count: usize = txn.query_row(
+                            "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
+                            named_params! {
+                                ":op_hash": receipt_op_hash,
+                            },
+                            |row| row.get(0),
+                        )?;
+
+                        Ok(receipt_count)
                     }
-
-                    // Add to receipts db
-                    validation_receipts::add_if_unique(txn, receipt)
                 })
                 .await?;
+
+            // If we have enough receipts then set receipts to complete.
+            if receipt_count >= required_validation_count as usize {
+                // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
+                // whether to republish the op for more validation receipts.
+                self.space
+                    .authored_db
+                    .write_async(move |txn| -> StateMutationResult<()> {
+                        set_receipts_complete(txn, &receipt_op_hash, true)
+                    })
+                    .await?;
+            }
         }
 
         Ok(())
@@ -959,6 +979,7 @@ impl Cell {
             conductor_handle,
             signal_tx,
             cell_id: self.id.clone(),
+            integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
@@ -1016,6 +1037,12 @@ impl Cell {
 
     pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
         &self.space.cache_db
+    }
+
+    pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {
+        self.queue_triggers
+            .integrate_dht_ops
+            .trigger(&"notify_authored_ops_moved_to_limbo");
     }
 
     #[cfg(any(test, feature = "test_utils"))]

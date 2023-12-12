@@ -6,6 +6,7 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn block_agent(
     _ribosome: Arc<impl RibosomeT>,
@@ -43,7 +44,7 @@ mod test {
     use crate::sweettest::SweetConductorBatch;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::{consistency_10s};
+    use crate::test_utils::consistency_10s;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;
@@ -102,6 +103,8 @@ mod test {
             tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
             tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
             tune.gossip_round_timeout_ms = 3000;
+        }).tune_conductor(|c| {
+            c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
         });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
         let apps = conductors

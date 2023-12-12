@@ -131,7 +131,7 @@ impl ConductorTestData {
         }
 
         let (_app_api, handle) = setup_app_inner(
-            envs.path(),
+            envs.path().to_path_buf().into(),
             vec![("test_app", cells)],
             dna_files.clone(),
             Some(network_config),

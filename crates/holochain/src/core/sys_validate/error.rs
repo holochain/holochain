@@ -6,7 +6,7 @@ use super::MAX_ENTRY_SIZE;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use crate::from_sub_error;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
@@ -109,7 +109,7 @@ pub enum ValidationOutcome {
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The app entry def {0:?} entry def id was out of range")]
+    #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
@@ -120,7 +120,7 @@ pub enum ValidationOutcome {
     EntryTooLarge(usize),
     #[error("The entry has a different type to the action's entry type")]
     EntryTypeMismatch,
-    #[error("The app entry def {0:?} visibility didn't match the zome")]
+    #[error("The visibility for {0:?} didn't match the zome")]
     EntryVisibility(AppEntryDef),
     #[error(
         "The link tag size {0} was larger than the MAX_TAG_SIZE {}",
@@ -129,34 +129,29 @@ pub enum ValidationOutcome {
     TagTooLarge(usize),
     #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]
     MalformedDhtOp(Box<Action>, DhtOpType, String),
-    #[error("The action {0:?} was expected to be a link add action")]
+    #[error("The action with {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
-    #[error("The action was expected to be a new entry action but was a {0:?}")]
+    #[error("The action was expected to be a new entry action but was {0:?}")]
     NotNewEntry(Action),
-    #[error("The dependency {0:?} is not held")]
-    NotHoldingDep(AnyDhtHash),
     #[error("The PreflightResponse signature was not valid {0:?}")]
     PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
     PrevActionError(#[from] PrevActionError),
     #[error("Private entry data should never be included in any op other than StoreEntry.")]
     PrivateEntryLeaked,
-    #[error(
-        "The DNA does not belong in this space! Action DNA hash: {0:?}, expected DNA hash: {1:?}"
-    )]
+    #[error("The DNA does not belong in this space! Action has {0:?}, expected {1:?}")]
     WrongDna(DnaHash, DnaHash),
-    #[error("Update original EntryType: {0:?} doesn't match new EntryType {1:?}")]
+    #[error("Update original: {0:?} doesn't match new: {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
+    #[error("Update original {0:?} doesn't match the {1:?} in the update")]
+    UpdateHashMismatch(EntryHash, EntryHash),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
     VerifySignature(Signature, Action),
-    #[error("The app entry def {0:?} zome index was out of range")]
+    #[error("The zome index for {0:?} was out of range")]
     ZomeIndex(AppEntryDef),
 }
 
 impl ValidationOutcome {
-    pub fn not_holding<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
-        Self::NotHoldingDep(h.clone().into())
-    }
     pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
         Self::DepMissingFromDht(h.clone().into())
     }
@@ -217,8 +212,6 @@ pub enum PrevActionErrorKind {
     InvalidRootOriginTime,
     #[error("Previous action sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
-    #[error("Previous action was missing from the metadata store")]
-    MissingMeta(ActionHash),
     #[error("Action is not the first, so needs previous action")]
     MissingPrev,
     #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]

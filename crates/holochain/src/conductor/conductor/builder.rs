@@ -1,8 +1,11 @@
 use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
+use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
+use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
@@ -23,7 +26,7 @@ pub struct ConductorBuilder {
 }
 
 impl ConductorBuilder {
-    /// Default ConductorBuilder
+    /// Default ConductorBuilder.
     pub fn new() -> Self {
         Self::default()
     }
@@ -45,6 +48,12 @@ impl ConductorBuilder {
     /// Set up the builder to skip printing setup
     pub fn no_print_setup(mut self) -> Self {
         self.no_print_setup = true;
+        self
+    }
+
+    /// Set the data root path for the conductor that will be built.
+    pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
+        self.config.data_root_path = Some(data_root_path);
         self
     }
 
@@ -73,7 +82,9 @@ impl ConductorBuilder {
                 }
             };
             match &self.config.keystore {
-                KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                KeystoreConfig::DangerTestKeystore => {
+                    holochain_keystore::spawn_test_keystore().await?
+                }
                 KeystoreConfig::LairServer { connection_url } => {
                     warn_no_encryption();
                     let passphrase = get_passphrase()?;
@@ -81,14 +92,22 @@ impl ConductorBuilder {
                 }
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
-                    let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
-                        let mut p: std::path::PathBuf = self.config.environment_path.clone().into();
-                        p.push("keystore");
-                        p
-                    });
-                    keystore_config_path.push("lair-keystore-config.yaml");
+
+                    let keystore_root_path: KeystorePath = match lair_root {
+                        Some(lair_root) => lair_root.clone(),
+                        None => self
+                            .config
+                            .data_root_path
+                            .as_ref()
+                            .ok_or(ConductorError::NoDataRootPath)?
+                            .clone()
+                            .try_into()?,
+                    };
+                    let keystore_config_path = keystore_root_path
+                        .as_ref()
+                        .join("lair-keystore-config.yaml");
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await?
+                    spawn_lair_keystore_in_proc(&keystore_config_path, passphrase).await?
                 }
             }
         };
@@ -190,11 +209,14 @@ impl ConductorBuilder {
         conductor_handle: ConductorHandle,
         receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         stop: StopReceiver,
+        duration_metric: PostCommitDurationMetric,
     ) {
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
         stop.fuse_with(receiver_stream)
             .for_each_concurrent(POST_COMMIT_CONCURRENT_LIMIT, move |post_commit_args| {
+                let start = Instant::now();
                 let conductor_handle = conductor_handle.clone();
+                let duration_metric = duration_metric.clone();
                 async move {
                     let PostCommitArgs {
                         host_access,
@@ -217,6 +239,20 @@ impl ConductorBuilder {
                             tracing::error!(?e);
                         }
                     }
+
+                    duration_metric.record(
+                        start.elapsed().as_secs_f64(),
+                        &[
+                            opentelemetry_api::KeyValue::new(
+                                "dna_hash",
+                                format!("{:?}", cell_id.dna_hash()),
+                            ),
+                            opentelemetry_api::KeyValue::new(
+                                "agent",
+                                format!("{:?}", cell_id.agent_pubkey()),
+                            ),
+                        ],
+                    );
                 }
             })
             .await;
@@ -239,8 +275,15 @@ impl ConductorBuilder {
 
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
+        let post_commit_duration_metric = create_post_commit_duration_metric();
         tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
-            Self::spawn_post_commit(conductor2, post_commit_receiver, stop).map(Ok)
+            Self::spawn_post_commit(
+                conductor2,
+                post_commit_receiver,
+                stop,
+                post_commit_duration_metric,
+            )
+            .map(Ok)
         });
 
         let configs = conductor_config.admin_interfaces.unwrap_or_default();
@@ -291,15 +334,10 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    pub async fn test(
-        mut self,
-        env_path: &std::path::Path,
-        extra_dnas: &[DnaFile],
-    ) -> ConductorResult<ConductorHandle> {
+    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
-            .unwrap_or_else(holochain_types::prelude::test_keystore);
-        self.config.environment_path = env_path.to_path_buf().into();
+            .unwrap_or_else(holochain_keystore::test_keystore);
 
         let spaces = Spaces::new(&self.config)?;
         let tag = spaces.get_state().await?.tag().clone();

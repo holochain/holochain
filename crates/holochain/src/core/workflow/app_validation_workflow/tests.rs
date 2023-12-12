@@ -18,6 +18,7 @@ use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::test_utils::test_db_dir;
@@ -28,8 +29,6 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasmPair;
 use holochain_wasm_test_utils::TestZomes;
-use holochain_zome_types::Entry;
-use holochain_zome_types::ValidationStatus;
 use matches::assert_matches;
 use rusqlite::named_params;
 use rusqlite::Transaction;
@@ -260,7 +259,12 @@ async fn check_app_entry_def_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();
-    let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+    let data_root_dir: DataRootPath = db_dir.path().to_path_buf().into();
+    let conductor_handle = Conductor::builder()
+        .with_data_root_path(data_root_dir)
+        .test(&[])
+        .await
+        .unwrap();
 
     // ## Dna is missing
     let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
@@ -405,7 +409,7 @@ fn limbo_is_empty(txn: &Transaction) -> bool {
     !not_empty
 }
 
-fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
+fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(
         "
         SELECT DhtOp.type, Action.hash, Action.blob
@@ -420,10 +424,10 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
         let op_type: DhtOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
+        Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
     })
     .unwrap()
-    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .collect::<StateQueryResult<Vec<DhtOpLite>>>()
     .unwrap()
 }
 

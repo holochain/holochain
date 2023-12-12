@@ -287,6 +287,11 @@ pub mod tuning_params_struct {
         /// The default value of `2` causes the delay to grow quickly up to the max time of 1 hour.
         /// For testing consider using `1` to prevent the delay from growing.
         bootstrap_check_delay_backoff_multiplier: u32 = 2,
+
+        /// Set the bootstrap fetch maximum backoff time.
+        /// The default value is 60 * 5 s = five minutes.
+        /// The minimum value is 60 s = one minute.
+        bootstrap_max_delay_s: u32 = 60 * 5,
     }
 
     impl KitsuneP2pTuningParams {
@@ -365,6 +370,11 @@ pub struct KitsuneP2pConfig {
 
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
+
+    /// All tracing logs from kitsune tasks will be instrumented to contain this string,
+    /// so that logs from multiple instances in the same process can be disambiguated.
+    #[serde(default)]
+    pub tracing_scope: Option<String>,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -374,6 +384,7 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
+            tracing_scope: None,
         }
     }
 }
@@ -382,7 +393,7 @@ impl Default for KitsuneP2pConfig {
 fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
     match bind_to {
         Some(bind_to) => bind_to.clone().into(),
-        None => "kitsune-quic://0.0.0.0:0".into(),
+        None => TxUrl::from_str_panicking("kitsune-quic://0.0.0.0:0"),
     }
 }
 

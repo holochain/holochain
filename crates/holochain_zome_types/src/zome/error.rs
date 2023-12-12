@@ -1,4 +1,4 @@
-use crate::ZomeName;
+use crate::prelude::*;
 
 /// Anything that can go wrong while calling a HostFnApi method
 #[derive(thiserror::Error, Debug)]

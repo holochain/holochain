@@ -21,7 +21,8 @@
 //! committing changes to the associated Workspace and triggering other
 //! workflows.
 
-pub mod error;
+mod error;
+pub use error::*;
 
 pub mod app_validation_workflow;
 pub mod call_zome_workflow;
