@@ -49,7 +49,7 @@ async fn authored_test() {
         .get_cell_triggers(&alice_call_data.cell_id)
         .await
         .unwrap();
-    triggers.publish_dht_ops.trigger(&"");
+    triggers.integrate_dht_ops.trigger(&"authored_test");
 
     // Alice commits the entry
     alice_call_data
@@ -78,7 +78,7 @@ async fn authored_test() {
         .unwrap();
 
     // Integration should have 3 ops in it.
-    // Plus another 14 for genesis.
+    // Plus another 14 (2x7) for genesis.
     // Init is not run because we aren't calling the zome.
     let expected_count = 3 + 14;
 

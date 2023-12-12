@@ -1,9 +1,11 @@
 use super::sys_validation_workflow;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
+use super::ValidationDependencies;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
 use crate::prelude::AgentPubKeyFixturator;
 use crate::prelude::AgentValidationPkgFixturator;
 use crate::prelude::CreateFixturator;
@@ -32,6 +34,7 @@ use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
+use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -52,11 +55,6 @@ async fn validate_op_with_no_dependency() {
         .save_op_to_db(test_case.dht_db_handle(), op)
         .await
         .unwrap();
-
-    let mut network = MockHolochainP2pDnaT::new();
-    network
-        .expect_clone()
-        .return_once(move || MockHolochainP2pDnaT::new());
 
     test_case.run().await;
 
@@ -150,6 +148,8 @@ async fn validate_op_with_dependency_not_held() {
 
     test_case.with_network_behaviour(network).run().await;
 
+    test_case.check_trigger_and_rerun().await;
+
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.contains(&op_hash));
 
@@ -197,11 +197,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.is_empty());
 
-    // TODO Why trigger app validation if no new work was done by sys validation? App validation might need to be triggered for another reason
-    //      but is there a good reason for sys validation to just kick it off?
-    // test_case.expect_app_validation_not_triggered().await;
-
-    test_case.expect_app_validation_triggered().await;
+    test_case.expect_app_validation_not_triggered().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -245,11 +241,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.is_empty());
 
-    // TODO Why trigger app validation if no new work was done by sys validation? App validation might need to be triggered for another reason
-    //      but is there a good reason for sys validation to just kick it off?
-    // test_case.expect_app_validation_not_triggered().await;
-
-    test_case.expect_app_validation_triggered().await;
+    test_case.expect_app_validation_not_triggered().await;
 }
 
 struct TestCase {
@@ -258,6 +250,7 @@ struct TestCase {
     test_space: TestSpace,
     keystore: MetaLairClient,
     agent: AgentPubKey,
+    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
@@ -279,6 +272,7 @@ impl TestCase {
             test_space,
             keystore,
             agent,
+            current_validation_dependencies: Arc::new(Mutex::new(Default::default())),
             app_validation_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,
@@ -329,34 +323,42 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
-    async fn run(&mut self) {
-        // TODO So this struct is just here to follow the 'workspace' pattern? The Space gets passed to the workflow anyway and most of the fields are shared.
-        //      Maybe just moving the Space to the workspace is enough to tidy this up?
+    async fn run(&mut self) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
             self.test_space.space.authored_db.clone().into(),
             self.test_space.space.dht_db.clone().into(),
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone().into(),
             Arc::new(self.dna_def.clone()),
+            std::time::Duration::from_secs(10),
         );
 
-        let mut network = MockHolochainP2pDnaT::new();
-        // This can't be copied so if you want to call the run twice you would need to reset the network behaviour!
         let actual_network = self
             .actual_network
             .take()
             .unwrap_or_else(|| MockHolochainP2pDnaT::new());
-        network.expect_clone().return_once(move || actual_network);
 
         sys_validation_workflow(
             Arc::new(workspace),
-            Arc::new(self.test_space.space.clone()),
+            self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
             self.self_trigger.0.clone(),
-            network,
+            actual_network,
         )
         .await
+        .unwrap()
+    }
+
+    async fn check_trigger_and_rerun(&mut self) -> WorkComplete {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            self.self_trigger.1.listen(),
+        )
+        .await
+        .unwrap()
         .unwrap();
+
+        self.run().await
     }
 
     /// This provides a quick and reliable way to check that ops have been sys validated
@@ -379,8 +381,6 @@ impl TestCase {
         .unwrap();
     }
 
-    // TODO The app validation workflow is unconditionally triggered
-    #[allow(unused)]
     async fn expect_app_validation_not_triggered(&mut self) {
         assert!(tokio::time::timeout(
             std::time::Duration::from_millis(1),

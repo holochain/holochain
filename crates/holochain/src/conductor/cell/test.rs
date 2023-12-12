@@ -4,6 +4,7 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::*;
 use holochain_zome_types::action;
 
@@ -26,14 +27,16 @@ async fn test_cell_handle_publish() {
     let holochain_p2p_cell = test_network.dna_network();
 
     let db_dir = test_db_dir();
+    let data_root_path: DataRootPath = db_dir.path().to_path_buf().into();
     let handle = Conductor::builder()
         .with_keystore(keystore.clone())
-        .test(db_dir.path(), &[])
+        .with_data_root_path(data_root_path.clone())
+        .test(&[])
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
 
-    let ribosome = RealRibosome::new(dna_file).unwrap();
+    let ribosome = RealRibosome::new(dna_file, Some(data_root_path)).unwrap();
 
     super::Cell::genesis(
         cell_id.clone(),

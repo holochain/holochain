@@ -1,0 +1,23 @@
+[package]
+name = "test_wasm_genesis_self_check_requires_properties"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+name = "test_wasm_genesis_self_check_requires_properties"
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_genesis_self_check_requires_properties"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { workspace = true }
+serde_yaml = "0.9"
+hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }
+
+[features]
+default = []
+mock = ["hdk/mock"]
