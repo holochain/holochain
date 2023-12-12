@@ -342,7 +342,10 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         holochain_trace::test_run().ok();
         let env_dir = test_db_dir();
-        let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
+        let handle = Conductor::builder()
+            .with_data_root_path(env_dir.path().to_path_buf().into())
+            .test(&[])
+            .await?;
 
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let network_seed = Uuid::new_v4();

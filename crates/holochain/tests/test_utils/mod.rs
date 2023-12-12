@@ -4,6 +4,7 @@ use anyhow::Result;
 use arbitrary::Arbitrary;
 use ed25519_dalek::{Keypair, Signer};
 use holochain::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
@@ -292,7 +293,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stdout) = stdout {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                trace!("holochain bin stdout: {}", line);
+                trace!("holochain bin stdout: {}", &line);
                 tx = tx
                     .take()
                     .and_then(|tx| match check_line_for_admin_port(&line) {
@@ -309,7 +310,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stderr) = stderr {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                trace!("holochain bin stderr: {}", line);
+                trace!("holochain bin stderr: {}", &line);
             }
         }
     });
@@ -331,12 +332,12 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
-pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
+pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }]),
-        environment_path: environment_path.into(),
+        data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
     }

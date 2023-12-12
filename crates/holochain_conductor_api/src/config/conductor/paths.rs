@@ -1,95 +1,126 @@
-//! Defines default paths for various resources
-
-use derive_more::AsRef;
-use derive_more::Display;
-use derive_more::From;
-use derive_more::FromStr;
-use derive_more::Into;
-use std::path::Path;
+pub use holochain_keystore::paths::*;
 use std::path::PathBuf;
 
-const QUALIFIER: &str = "org";
-const ORGANIZATION: &str = "holochain";
-const APPLICATION: &str = "holochain";
-const KEYS_DIRECTORY: &str = "keys";
-const DATABASES_DIRECTORY: &str = "databases";
-const CONFIG_FILENAME: &str = "conductor-config.yml";
+/// Subdirectory of the data directory where the conductor stores its
+/// databases.
+pub const DATABASES_DIRECTORY: &str = "databases";
 
-/// Newtype for the database path. Has a Default.
+/// Subdirectory of the data directory where the conductor stores its
+/// compiled wasm.
+pub const WASM_DIRECTORY: &str = "wasm";
+
+/// Name of the file that conductor config is written to.
+pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
+
+/// Newtype to make sure we never accidentaly use or not use the config path.
+/// Intentionally has no default value.
 #[derive(
-    Clone,
-    From,
-    Into,
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
     Debug,
     PartialEq,
-    AsRef,
-    FromStr,
-    Display,
     serde::Serialize,
     serde::Deserialize,
+    Clone,
 )]
-#[display(fmt = "{}", "_0.display()")]
-pub struct DatabaseRootPath(PathBuf);
-impl Default for DatabaseRootPath {
-    fn default() -> Self {
-        Self(data_root().join(PathBuf::from(DATABASES_DIRECTORY)))
+pub struct ConfigRootPath(PathBuf);
+
+impl ConfigRootPath {
+    /// Create a new config root path from a data path.
+    /// This is useful for when you want to use the same path for both.
+    pub fn is_also_data_root_path(&self) -> DataRootPath {
+        self.0.clone().into()
     }
 }
 
-impl<'a> From<&'a Path> for DatabaseRootPath {
-    fn from(p: &'a Path) -> Self {
-        p.to_owned().into()
-    }
-}
-
-/// Returns the project root builder for holochain directories.
-fn project_root() -> Option<directories::ProjectDirs> {
-    directories::ProjectDirs::from(QUALIFIER, ORGANIZATION, APPLICATION)
-}
-
-/// Returns the path to the root config directory for all of Holochain.
-/// If we can get a user directory it will be an XDG compliant path
-/// like "/home/peter/.config/holochain".
-/// If it can't get a user directory it will default to "/etc/holochain".
-pub fn config_root() -> PathBuf {
-    project_root()
-        .map(|dirs| dirs.config_dir().to_owned())
-        .unwrap_or_else(|| PathBuf::from("/etc").join(APPLICATION))
-}
-
-/// Returns the path to the root data directory for all of Holochain.
-/// If we can get a user directory it will be an XDG compliant path
-/// like "/home/peter/.local/share/holochain".
-/// If it can't get a user directory it will default to "/etc/holochain".
-pub fn data_root() -> PathBuf {
-    project_root()
-        .map(|dirs| dirs.data_dir().to_owned())
-        .unwrap_or_else(|| PathBuf::from("/etc").join(APPLICATION))
-}
-
-/// Returns the path to where agent keys are stored and looked for by default.
-/// Something like "~/.config/holochain/keys".
-pub fn keys_directory() -> PathBuf {
-    config_root().join(KEYS_DIRECTORY)
-}
-
-/// Newtype for the Conductor Config file path. Has a Default.
+/// Newtype to make sure we never accidentaly use or not use the config file
+/// path.
+/// Intentionally has no default value.
 #[derive(
-    Clone,
-    From,
-    Into,
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
     Debug,
     PartialEq,
-    AsRef,
-    FromStr,
-    Display,
     serde::Serialize,
     serde::Deserialize,
+    Clone,
 )]
-#[display(fmt = "{}", "_0.display()")]
 pub struct ConfigFilePath(PathBuf);
-impl Default for ConfigFilePath {
-    fn default() -> Self {
-        Self(config_root().join(PathBuf::from(CONFIG_FILENAME)))
+
+impl From<ConfigRootPath> for ConfigFilePath {
+    fn from(config_path: ConfigRootPath) -> Self {
+        Self::from(config_path.0.join(CONDUCTOR_CONFIG))
+    }
+}
+
+/// Newtype to make sure we never accidentaly use or not use the data path.
+/// Intentionally has no default value.
+#[derive(
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
+pub struct DataRootPath(PathBuf);
+
+impl TryFrom<DataRootPath> for KeystorePath {
+    type Error = std::io::Error;
+    fn try_from(data_root_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_root_path.0.join(KEYSTORE_DIRECTORY);
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
+        Ok(Self::from(path))
+    }
+}
+
+/// Newtype to make sure we never accidentaly use or not use the databases path.
+/// Intentionally has no default value.
+#[derive(
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
+pub struct DatabasesRootPath(PathBuf);
+
+impl TryFrom<DataRootPath> for DatabasesRootPath {
+    type Error = std::io::Error;
+    fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_path.0.join(DATABASES_DIRECTORY);
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
+        Ok(Self::from(path))
+    }
+}
+
+/// Newtype to make sure we never accidentaly use or not use the wasm path.
+/// Intentionally has no default value.
+#[derive(
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
+pub struct WasmRootPath(PathBuf);
+
+impl TryFrom<DataRootPath> for WasmRootPath {
+    type Error = std::io::Error;
+    fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_path.0.join(WASM_DIRECTORY);
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
+        Ok(Self::from(path))
     }
 }

@@ -49,7 +49,6 @@ use super::manager::TaskManagerResult;
 use super::p2p_agent_store;
 use super::p2p_agent_store::P2pBatch;
 use super::p2p_agent_store::*;
-use super::paths::DatabaseRootPath;
 use super::ribosome_store::RibosomeStore;
 use super::space::Space;
 use super::space::Spaces;
@@ -110,6 +109,7 @@ use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Instant;
@@ -245,7 +245,7 @@ pub struct Conductor {
 }
 
 impl Conductor {
-    /// Create a conductor builder
+    /// Create a conductor builder.
     pub fn builder() -> ConductorBuilder {
         ConductorBuilder::new()
     }
@@ -614,7 +614,7 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file)?;
+                let ribosome = RealRibosome::new(dna_file, self.config.data_root_path.clone())?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -622,7 +622,7 @@ mod dna_impls {
         }
 
         /// Get the root environment directory.
-        pub fn root_db_dir(&self) -> &DatabaseRootPath {
+        pub fn root_db_dir(&self) -> &PathBuf {
             &self.spaces.db_dir
         }
 
@@ -736,7 +736,7 @@ mod dna_impls {
 
         /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-            let ribosome = RealRibosome::new(dna)?;
+            let ribosome = RealRibosome::new(dna, self.config.data_root_path.clone())?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
             self.register_dna_entry_defs(entry_defs);
             self.add_ribosome_to_store(ribosome);
