@@ -11,9 +11,7 @@ pub struct TestHost {
 
 impl TestHost {
     pub fn new(agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>) -> Self {
-        Self {
-            agent_store,
-        }
+        Self { agent_store }
     }
 }
 
@@ -39,12 +37,20 @@ impl KitsuneHost for TestHost {
         &self,
         input: kitsune_p2p::event::GetAgentInfoSignedEvt,
     ) -> kitsune_p2p::KitsuneHostResult<Option<AgentInfoSigned>> {
-        let res = self.agent_store.read().iter().find(|p| p.agent == input.agent).cloned();
+        let res = self
+            .agent_store
+            .read()
+            .iter()
+            .find(|p| p.agent == input.agent)
+            .cloned();
 
         async move { Ok(res) }.boxed().into()
     }
 
-    fn remove_agent_info_signed(&self, _input: kitsune_p2p::event::GetAgentInfoSignedEvt) -> kitsune_p2p::KitsuneHostResult<bool> {
+    fn remove_agent_info_signed(
+        &self,
+        _input: kitsune_p2p::event::GetAgentInfoSignedEvt,
+    ) -> kitsune_p2p::KitsuneHostResult<bool> {
         todo!()
     }
 
@@ -90,11 +96,17 @@ impl KitsuneHost for TestHost {
         todo!()
     }
 
-    fn get_topology(&self, _space: Arc<kitsune_p2p_bin_data::KitsuneSpace>) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::dht::prelude::Topology> {
+    fn get_topology(
+        &self,
+        _space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
+    ) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::dht::prelude::Topology> {
         todo!()
     }
 
-    fn op_hash(&self, _op_data: kitsune_p2p_types::KOpData) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::KOpHash> {
+    fn op_hash(
+        &self,
+        _op_data: kitsune_p2p_types::KOpData,
+    ) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::KOpHash> {
         todo!()
     }
 }

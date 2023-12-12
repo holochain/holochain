@@ -62,18 +62,28 @@ async fn test_two_nodes_on_same_host_rpc_single() {
 
     let resp = tokio::time::timeout(std::time::Duration::from_secs(10), async move {
         loop {
-            match sender_a.rpc_single(space.clone(), agent_b.clone(), "Hello from agent a".as_bytes().to_vec(), Some(std::time::Duration::from_secs(10).as_millis() as u64)).await {
+            match sender_a
+                .rpc_single(
+                    space.clone(),
+                    agent_b.clone(),
+                    "Hello from agent a".as_bytes().to_vec(),
+                    Some(std::time::Duration::from_secs(10).as_millis() as u64),
+                )
+                .await
+            {
                 Ok(resp) => {
                     return resp;
-                },
+                }
                 Err(e) => {
                     println!("Error sending rpc: {:?}", e);
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
             }
         }
-    }).await.unwrap();
-    
+    })
+    .await
+    .unwrap();
+
     // Assumes that the KitsuneP2pEvent::Call handler echoes the request
     assert_eq!("Hello from agent a".as_bytes().to_vec(), resp);
 }

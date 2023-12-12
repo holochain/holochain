@@ -24,7 +24,10 @@ pub struct TestLegacyHost {
 }
 
 impl TestLegacyHost {
-    pub async fn start(agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>, receivers: Vec<Receiver<KitsuneP2pEvent>>) -> Self {
+    pub async fn start(
+        agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
+        receivers: Vec<Receiver<KitsuneP2pEvent>>,
+    ) -> Self {
         let keystore = test_keystore();
 
         let handle = tokio::task::spawn({
@@ -83,7 +86,9 @@ impl TestLegacyHost {
 
                             respond.respond(Ok(async move { Ok(view) }.boxed().into()))
                         }
-                        KitsuneP2pEvent::Call { respond, payload, .. } => {
+                        KitsuneP2pEvent::Call {
+                            respond, payload, ..
+                        } => {
                             // Echo the request payload
                             respond.respond(Ok(async move { Ok(payload) }.boxed().into()))
                         }
