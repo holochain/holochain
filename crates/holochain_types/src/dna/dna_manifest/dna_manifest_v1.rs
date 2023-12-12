@@ -70,7 +70,7 @@ use serde_with::serde_as;
     derive_more::Constructor,
     derive_builder::Builder,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct DnaManifestV1 {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
@@ -108,7 +108,7 @@ impl DnaManifestV1 {
     derive_more::Constructor,
     derive_builder::Builder,
 )]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 /// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
     /// A network seed for uniquifying this DNA. See [`DnaDef`].
@@ -130,7 +130,7 @@ pub struct IntegrityManifest {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 /// Coordinator zomes.
 pub struct CoordinatorManifest {
     /// Coordinator zomes to install with this dna.
@@ -139,7 +139,7 @@ pub struct CoordinatorManifest {
 
 /// Manifest for an individual Zome
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ZomeManifest {
     /// Just a friendly name, no semantic meaning.
     pub name: ZomeName,
@@ -165,7 +165,7 @@ pub struct ZomeManifest {
 /// Manifest for integrity zomes that another zome
 /// depends on.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ZomeDependency {
     /// The name of the integrity zome this zome depends on.
     pub name: ZomeName,

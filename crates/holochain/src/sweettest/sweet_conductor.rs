@@ -148,7 +148,36 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    /// and a metrics initialization.
+    pub async fn create_with_defaults_and_metrics<C, R>(
+        config: C,
+        keystore: Option<MetaLairClient>,
+        rendezvous: Option<R>,
+        with_metrics: bool,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous> + Clone,
+    {
         let rendezvous = rendezvous.map(|r| r.into());
+        let dir = TestDir::new(test_db_dir());
+
+        assert!(
+            dir.read_dir().unwrap().next().is_none(),
+            "Test dir not empty - {:?}",
+            dir.to_path_buf()
+        );
+
+        if with_metrics {
+            #[cfg(feature = "metrics_influxive")]
+            holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
+                .init()
+                .await;
+        }
 
         let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.into().into_conductor_config(&*r).await
@@ -157,12 +186,7 @@ impl SweetConductor {
         };
 
         tracing::info!(?config);
-        let dir = TestDir::new(test_db_dir());
-        assert!(
-            dir.read_dir().unwrap().next().is_none(),
-            "Test dir not empty - {:?}",
-            dir.to_path_buf()
-        );
+
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
                 .await;

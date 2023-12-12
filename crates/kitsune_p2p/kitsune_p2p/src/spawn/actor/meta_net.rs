@@ -37,6 +37,7 @@ use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
+use opentelemetry_api::metrics::Histogram;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -189,6 +190,47 @@ pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
 type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;
 
+struct MetricSendGuard {
+    rem_id: tx5::Id,
+    is_error: bool,
+    byte_count: u64,
+    start_time: std::time::Instant,
+}
+
+impl MetricSendGuard {
+    pub fn new(rem_id: tx5::Id, byte_count: u64) -> Self {
+        Self {
+            rem_id,
+            is_error: true,
+            byte_count,
+            start_time: std::time::Instant::now(),
+        }
+    }
+
+    pub fn set_is_error(&mut self, is_error: bool) {
+        self.is_error = is_error;
+    }
+}
+
+impl Drop for MetricSendGuard {
+    fn drop(&mut self) {
+        crate::metrics::METRIC_MSG_OUT_BYTE.record(
+            self.byte_count,
+            &[
+                opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is_error", self.is_error),
+            ],
+        );
+        crate::metrics::METRIC_MSG_OUT_TIME.record(
+            self.start_time.elapsed().as_secs_f64(),
+            &[
+                opentelemetry_api::KeyValue::new("remote_id", self.rem_id.to_string()),
+                opentelemetry_api::KeyValue::new("is_error", self.is_error),
+            ],
+        );
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
@@ -323,9 +365,16 @@ impl MetaNetCon {
                             let wrap = WireWrap::notify(msg_id, WireData(wire));
 
                             let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+
+                            let mut metric_guard =
+                                MetricSendGuard::new(rem_url.id().unwrap(), data.len() as u64);
+
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
+
+                            metric_guard.set_is_error(false);
+
                             return Ok(());
                         }
                     }
@@ -393,10 +442,17 @@ impl MetaNetCon {
                             let wrap = WireWrap::request(msg_id, WireData(wire));
                             let data = wrap.encode_vec().map_err(KitsuneError::other)?;
 
+                            let mut metric_guard =
+                                MetricSendGuard::new(rem_url.id().unwrap(), data.len() as u64);
+
                             ep.send(rem_url.clone(), data.as_slice())
                                 .await
                                 .map_err(KitsuneError::other)?;
-                            return r.await.map_err(|_| KitsuneError::other("timeout"));
+
+                            let resp = r.await.map_err(|_| KitsuneError::other("timeout"))?;
+
+                            metric_guard.set_is_error(false);
+                            return Ok(resp);
                         }
                     }
 

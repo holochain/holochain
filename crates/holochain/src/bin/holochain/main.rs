@@ -89,6 +89,10 @@ async fn async_main() {
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 
+    holochain_metrics::HolochainMetricsConfig::new(config.environment_path.as_ref())
+        .init()
+        .await;
+
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
     let conductor = conductor_handle_from_config(&opt, config).await;

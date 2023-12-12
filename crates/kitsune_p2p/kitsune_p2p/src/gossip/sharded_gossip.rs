@@ -377,7 +377,9 @@ impl ShardedGossip {
             let cert = outgoing.0.clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
                 self.gossip.remove_state(&cert, true)?;
-                tracing::error!(
+
+                // TODO: track all connection attempts, if all of them fail within a certain period of time, then log as error
+                tracing::warn!(
                     "Gossip failed to send outgoing message because of: {:?}",
                     err
                 );
@@ -562,7 +564,15 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
-                    tracing::error!("Tgt expired {:?}", cert);
+                    tracing::warn!(
+                        "Peer node timed out its gossip round. Cert: {:?}, Local agents: {:?}, Remote agents: {:?}",
+                        cert,
+                        self.local_agents,
+                        remote_agent_list
+                            .iter()
+                            .map(|i| i.agent())
+                            .collect::<Vec<_>>()
+                    );
                     {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, true);

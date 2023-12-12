@@ -30,7 +30,7 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use derive_more::Display;
 use futures::future::Either;
@@ -64,6 +64,7 @@ use countersigning_consumer::*;
 #[cfg(test)]
 mod tests;
 
+use super::metrics::create_workflow_duration_metric;
 use super::workflow::app_validation_workflow::AppValidationWorkspace;
 use super::workflow::error::{WorkflowError, WorkflowResult};
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
@@ -159,10 +160,11 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
                 authored_db.clone().into(),
-                dht_db.clone().into(),
+                dht_db.clone(),
                 dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
+                std::time::Duration::from_secs(5),
             ),
             space.clone(),
             conductor.clone(),
@@ -353,6 +355,7 @@ impl InitialQueueTriggers {
         self.validation_receipt.trigger(&"init");
     }
 }
+
 /// The means of nudging a queue consumer to tell it to look for more work
 #[derive(Clone)]
 pub struct TriggerSender {
@@ -653,13 +656,17 @@ async fn queue_consumer_main_task_impl<
     Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
 >(
     name: String,
+    dna_hash: Arc<DnaHash>,
+    agent: Option<AgentPubKey>,
     (tx, rx): (TriggerSender, TriggerReceiver),
     stop: StopReceiver,
     mut fut: impl 'static + Send + FnMut() -> Fut,
 ) -> ManagedTaskResult {
     let mut triggers = trigger_stream(rx, stop);
+    let duration_metric = create_workflow_duration_metric(name.clone(), dna_hash, agent);
     loop {
         if let Some(()) = triggers.next().await {
+            let start = Instant::now();
             match fut().await {
                 Ok(WorkComplete::Incomplete(delay)) => {
                     tracing::info!("Work incomplete, re-triggering workflow.");
@@ -672,6 +679,8 @@ async fn queue_consumer_main_task_impl<
                 Err(err) => handle_workflow_error(&name, err)?,
                 _ => (),
             }
+
+            duration_metric.record(start.elapsed().as_secs_f64(), &[]);
         } else {
             tracing::info!("Cell is shutting down: stopping queue consumer '{}'", name);
             break;
@@ -687,9 +696,12 @@ fn queue_consumer_dna_bound<Fut: 'static + Send + Future<Output = WorkflowResult
     (tx, rx): (TriggerSender, TriggerReceiver),
     fut: impl 'static + Send + FnMut() -> Fut,
 ) {
-    let name_string = name.to_string();
-    tm.add_dna_task_critical(name, dna_hash, move |stop| {
-        queue_consumer_main_task_impl(name_string, (tx, rx), stop, fut)
+    let workflow_name = name.to_string();
+    let task_dna_hash = dna_hash.clone();
+    tm.add_dna_task_critical(name, dna_hash, {
+        move |stop| {
+            queue_consumer_main_task_impl(workflow_name, task_dna_hash, None, (tx, rx), stop, fut)
+        }
     });
 }
 
@@ -702,9 +714,20 @@ fn queue_consumer_cell_bound<
     (tx, rx): (TriggerSender, TriggerReceiver),
     fut: impl 'static + Send + FnMut() -> Fut,
 ) {
-    let name_string = name.to_string();
-    tm.add_cell_task_critical(name, cell_id, move |stop| {
-        queue_consumer_main_task_impl(name_string, (tx, rx), stop, fut)
+    let workflow_name = name.to_string();
+    let dna_hash = cell_id.dna_hash().clone();
+    let agent = cell_id.agent_pubkey().clone();
+    tm.add_cell_task_critical(name, cell_id, {
+        move |stop| {
+            queue_consumer_main_task_impl(
+                workflow_name,
+                Arc::new(dna_hash),
+                Some(agent),
+                (tx, rx),
+                stop,
+                fut,
+            )
+        }
     });
 }
 

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.2.4-rc.0
+
+- Remove access to `Timestamp::now()` which comes from `kitsune_p2p_timestamp` and was not supposed to be available in WASM. It would always panic in WASM calls so it should be safe to assume that nobody was actually using this in real apps. If you were trying to and this breaks your hApp then please consider using `sys_time` from the HDK instead which is safe to use for getting the current time.
+
 ## 0.2.3
 
 ## 0.2.3-rc.1
