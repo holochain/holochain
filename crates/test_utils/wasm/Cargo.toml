@@ -17,9 +17,8 @@ default = []
 build = []
 only_check = []
 
-
 [dependencies]
-holochain_types = { path = "../../holochain_types", version = "^0.2.3"}
+holochain_types = { path = "../../holochain_types", version = "^0.2.3", default-features = false}
 strum = "0.18.0"
 strum_macros = "0.18.0"
 holochain_util = { version = "^0.2.3", path = "../../holochain_util" }

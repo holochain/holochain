@@ -30,7 +30,7 @@ holochain_conductor_api = { version = "^0.2.3", path = "../holochain_conductor_a
 holochain_keystore = { version = "^0.2.3", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.2.3", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.2.3", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = { version = "=0.0.53", default-features = false, features = [] }
 holochain_state = { version = "^0.2.3", path = "../holochain_state" }
 holochain_types = { version = "^0.2.3", path = "../holochain_types" }
 holochain_util = { version = "^0.2.3", path = "../holochain_util", features = [ "pw" ] }

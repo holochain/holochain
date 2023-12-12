@@ -1,8 +1,8 @@
 //! These types manage the consumption and configuration of the `wasmer` library
 //! in terms of middleware (metering), Target, Module, and Store.
 
-use holochain_wasmer_host::prelude::{
-    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Dylib, Module, Store, Target,
+use wasmer::{
+    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target,
     Triple,
 };
 use std::str::FromStr;
@@ -47,16 +47,12 @@ pub fn build_ios_module(wasm: &[u8]) -> Result<Module, CompileError> {
         "Found wasm and was instructed to serialize it for ios in wasmer format, doing so now..."
     );
     let compiler_config = cranelift();
-    let ios_target = wasmer_ios_target();
-    let engine = Dylib::new(compiler_config).target(ios_target).engine();
-    let store = Store::new(&engine);
+    let store = Store::new(compiler_config);
     Module::from_binary(&store, wasm)
 }
 
 /// Generate a headless Dylib Store suitable for iOS.
 /// Useful for re-building an iOS Module from a preserialized WASM Module.
 pub fn ios_dylib_headless_store() -> Store {
-    let ios_target = wasmer_ios_target();
-    let engine = Dylib::headless().target(ios_target).engine();
-    Store::new(&engine)
+    Store::default()
 }
