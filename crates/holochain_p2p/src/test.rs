@@ -271,7 +271,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
-            kitsune_p2p::HostStub::new(),
+            kitsune_p2p::LegacyHostStub::new(),
         )
         .await
         .unwrap();
@@ -353,7 +353,7 @@ mod tests {
         let (p2p, mut evt): (HolochainP2pRef, _) = spawn_holochain_p2p(
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
-            kitsune_p2p::HostStub::new(),
+            kitsune_p2p::LegacyHostStub::new(),
         )
         .await
         .unwrap();
@@ -418,7 +418,7 @@ mod tests {
         let host_list = Arc::new(Mutex::new(Vec::new()));
         let test_host = {
             let host_list = host_list.clone();
-            HostStub::with_check_op_data(Box::new(move |space, list, ctx| {
+            LegacyHostStub::with_check_op_data(Box::new(move |space, list, ctx| {
                 host_list
                     .lock()
                     .unwrap()
@@ -513,7 +513,7 @@ mod tests {
         params.default_rpc_multi_remote_request_grace_ms = 100;
         let mut config = KitsuneP2pConfig::default();
         config.tuning_params = Arc::new(params);
-        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
+        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::LegacyHostStub::new())
             .await
             .unwrap();
 
@@ -610,7 +610,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p(
             config,
             TlsConfig::new_ephemeral().await.unwrap(),
-            kitsune_p2p::HostStub::new(),
+            kitsune_p2p::LegacyHostStub::new(),
         )
         .await
         .unwrap();
