@@ -1307,7 +1307,6 @@ mod app_impls {
     use super::*;
 
     impl Conductor {
-        #[cfg(feature = "test_utils")]
         // FIXME: can rewrite now in terms of `get_install_app_payload_from_dnas`
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
