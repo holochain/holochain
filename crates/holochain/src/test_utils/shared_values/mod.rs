@@ -270,89 +270,58 @@ mod tests {
         };
     }
 
-    struct SharedValuesLocalv1AgentlikeCase {
-        num_agents: usize,
-    }
-
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct AgentDummyInfo {
         id: Uuid,
     }
 
-    // #[test_case(SharedValuesLocalv1AgentlikeCase { num_agents: 2 })]
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn shared_values_localv1_agent_discovery(// case: SharedValuesLocalv1AgentlikeCase
-    ) {
-        let mut values = SharedValues::LocalV1(LocalV1::default());
+    #[tokio::test(flavor = "multi_thread")]
+    async fn shared_values_localv1_simulate_agent_discovery() {
+        let values = SharedValues::LocalV1(LocalV1::default());
 
+        const PREFIX: &str = "agent_";
+
+        let required_agents = 2;
         let num_agents = 2;
 
+        let get_handle = {
+            let mut values = values.clone();
+            tokio::spawn(async move {
+                tokio::select! {
+                    _ = async {
+                        let all_agents: HashMap<_, AgentDummyInfo> = values.get_pattern(PREFIX, false, Some(num_agents)).await.unwrap();
+                        assert!(required_agents <= all_agents.len());
+                        assert!(all_agents.len() <= num_agents);
+                        eprintln!("{} agents {all_agents:#?}", all_agents.len());
+                    } => { }
+                    _ = tokio::time::sleep(Duration::from_millis(50)) => { panic!("not enough agents"); }
+                }
+            })
+        };
+
+        let mut handles = vec![get_handle];
         for _ in 0..num_agents {
             let mut values = values.clone();
 
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 let agent_dummy_info = AgentDummyInfo {
                     id: uuid::Uuid::new_v4(),
                 };
                 values
-                    .put(format!("agent_{}", &agent_dummy_info.id), agent_dummy_info)
+                    .put(
+                        format!("{PREFIX}{}", &agent_dummy_info.id),
+                        agent_dummy_info,
+                    )
                     .await
                     .unwrap();
             });
+            handles.push(handle);
         }
 
-        tokio::select! {
-            _ = async {
-                let all_agents: HashMap<_, AgentDummyInfo> = values.get_pattern("agent_", false, Some(num_agents)).await.unwrap();
-                assert_eq!(all_agents.len(), num_agents);
-                eprintln!("all agents {all_agents:#?}");
-            } => {
-            }
-            _ = tokio::time::sleep(Duration::from_millis(50)) => {
-                panic!("not enough agents");
-            }
-        };
-
-        // let prefix = "something".to_string();
-        // let s = "we expect this back".to_string();
-
-        // let handle = {
-        //     let prefix = prefix.clone();
-        //     let s = s.clone();
-        //     let mut values = values.clone();
-
-        //     tokio::spawn({
-        //         async move {
-        //             let got: String = values.get(&prefix).await.unwrap();
-        //             assert_eq!(s, got);
-
-        //             got
-        //         }
-        //     })
-        // };
-
-        // // make sure the getter really comes first
-        // tokio::select! {
-        //     _ = async {
-        //         loop {
-        //             let num = values.num_waiters().await;
-        //             match num {
-        //                 0 => tokio::time::sleep(Duration::from_millis(100)).await,
-        //                 1 => break,
-        //                 _ => panic!("saw more than one waiter"),
-        //             };
-        //         }
-        //     } => {
-        //     }
-        //     _ = tokio::time::sleep(Duration::from_secs(1)) => {
-        //         panic!("didn't see a waiter");
-        //     }
-        // };
-
-        // values.put(prefix, s).await.unwrap();
-
-        // if let Err(e) = handle.await {
-        //     panic!("{:#?}", e);
-        // };
+        for handle in handles {
+            if let Err(e) = handle.await {
+                panic!("{:#?}", e);
+            };
+        }
     }
 }
