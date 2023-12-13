@@ -4,16 +4,13 @@
 
 use anyhow::{bail, Result as Fallible};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{collections::HashMap, sync::Arc};
-use std::{
-    sync::atomic::{AtomicUsize, Ordering},
-    time::Duration,
-};
 
-static TEST_SHARED_VALUES_TYPE: &str = "TEST_SHARED_VALUES_TYPE";
-static TEST_SHARED_VALUES_TYPE_LOCALV1: &str = "localv1";
-static TEST_SHARED_VALUES_TYPE_REMOTEV1: &str = "remotev1";
-static TEST_SHARED_VALUES_REMOTEV1_URL: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
+const TEST_SHARED_VALUES_TYPE: &str = "TEST_SHARED_VALUES_TYPE";
+const TEST_SHARED_VALUES_TYPE_LOCALV1: &str = "localv1";
+const TEST_SHARED_VALUES_TYPE_REMOTEV1: &str = "remotev1";
+const TEST_SHARED_VALUES_REMOTEV1_URL: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
 
 /// Local implementation using a guarded HashMap as its datastore.
 #[derive(Clone, Default)]
@@ -47,22 +44,25 @@ impl SharedValues {
         let bus_type = std::env::var(TEST_SHARED_VALUES_TYPE)
             .unwrap_or(TEST_SHARED_VALUES_TYPE_LOCALV1.to_string());
 
-        if &bus_type == TEST_SHARED_VALUES_TYPE_LOCALV1 {
-            Ok(Self::LocalV1(LocalV1::default()))
-        } else if &bus_type == TEST_SHARED_VALUES_TYPE_REMOTEV1 {
-            let url_string = std::env::var(TEST_SHARED_VALUES_REMOTEV1_URL)?;
-            let url = url2::Url2::try_parse(url_string)?;
+        match bus_type.as_str() {
+            TEST_SHARED_VALUES_TYPE_LOCALV1 => Ok(Self::LocalV1(LocalV1::default())),
+            TEST_SHARED_VALUES_TYPE_REMOTEV1 => {
+                let url_string = std::env::var(TEST_SHARED_VALUES_REMOTEV1_URL)?;
+                let url = url2::Url2::try_parse(url_string)?;
 
-            let (sender, receiver) =
-                holochain_websocket::connect(url.clone(), Default::default()).await?;
+                let (sender, receiver) =
+                    holochain_websocket::connect(url.clone(), Default::default()).await?;
 
-            Ok(Self::RemoteV1(RemoteV1 {
-                url,
-                sender: Arc::new(sender),
-                receiver: Arc::new(receiver),
-            }))
-        } else {
-            bail!("unknown message bus type: {bus_type}")
+                Ok(Self::RemoteV1(RemoteV1 {
+                    url,
+                    sender: Arc::new(sender),
+                    receiver: Arc::new(receiver),
+                }))
+            }
+
+            bus_type => {
+                bail!("unknown message bus type: {bus_type}")
+            }
         }
     }
 
@@ -140,49 +140,56 @@ impl SharedValues {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn shared_values_localv1_concurrent() {
-    let mut values = SharedValues::LocalV1(LocalV1::default());
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
 
-    let prefix = "something".to_string();
-    let s = "we expect this back".to_string();
+    use super::*;
 
-    let handle = {
-        let prefix = prefix.clone();
-        let s = s.clone();
-        let mut values = values.clone();
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_localv1_concurrent() {
+        let mut values = SharedValues::LocalV1(LocalV1::default());
 
-        tokio::spawn({
-            async move {
-                let got: String = values.get(&prefix).await.unwrap();
-                assert_eq!(s, got);
+        let prefix = "something".to_string();
+        let s = "we expect this back".to_string();
 
-                got
+        let handle = {
+            let prefix = prefix.clone();
+            let s = s.clone();
+            let mut values = values.clone();
+
+            tokio::spawn({
+                async move {
+                    let got: String = values.get(&prefix).await.unwrap();
+                    assert_eq!(s, got);
+
+                    got
+                }
+            })
+        };
+
+        // make sure the getter really comes first
+        tokio::select! {
+            _ = async {
+                loop {
+                    let num = values.num_waiters().await;
+                    match num {
+                        0 => tokio::time::sleep(Duration::from_millis(100)).await,
+                        1 => break,
+                        _ => panic!("saw more than one waiter"),
+                    };
+                }
+            } => {
             }
-        })
-    };
-
-    // make sure the getter really comes first
-    tokio::select! {
-        _ = async {
-            loop {
-                let num = values.num_waiters().await;
-                match num {
-                    0 => tokio::time::sleep(Duration::from_millis(100)).await,
-                    1 => break,
-                    _ => panic!("saw more than one waiter"),
-                };
+            _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                panic!("didn't see a waiter");
             }
-        } => {
-        }
-        _ = tokio::time::sleep(Duration::from_secs(1)) => {
-            panic!("didn't see a waiter");
-        }
-    };
+        };
 
-    values.put(prefix, s).await.unwrap();
+        values.put(prefix, s).await.unwrap();
 
-    if let Err(e) = handle.await {
-        panic!("{:#?}", e);
-    };
+        if let Err(e) = handle.await {
+            panic!("{:#?}", e);
+        };
+    }
 }
