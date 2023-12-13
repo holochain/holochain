@@ -74,9 +74,7 @@ pub async fn start_signal_srv() -> (SocketAddr, AbortHandle) {
     config.demo = false;
     let (sig_driver, addr_list, _err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
 
-    let abort_handle = tokio::spawn(async move {
-        sig_driver.await;
-    })
+    let abort_handle = tokio::spawn(sig_driver)
     .abort_handle();
 
     (addr_list.first().unwrap().clone(), abort_handle)

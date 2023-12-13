@@ -5,16 +5,14 @@ use fixt::prelude::*;
 use kitsune_p2p::fixt::KitsuneAgentFixturator;
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p::HostStub;
+use std::sync::Arc;
+use kitsune_p2p::actor::KitsuneP2pSender;
 
 // Test that two nodes can discover each other and connect. This checks that peer discovery
 // works and that networking works well enough for a request reply.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_two_nodes_on_same_host_rpc_single() {
-    use std::sync::Arc;
-
-    use kitsune_p2p::actor::KitsuneP2pSender;
-
     holochain_trace::test_run().unwrap();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
@@ -76,7 +74,7 @@ async fn test_two_nodes_on_same_host_rpc_single() {
                 }
                 Err(e) => {
                     println!("Error sending rpc: {:?}", e);
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
             }
         }
