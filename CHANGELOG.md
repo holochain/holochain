@@ -14,6 +14,85 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20231213.003542
+
+## [hcterm-0.3.0-beta-dev.4](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_cli-0.3.0-beta-dev.28](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain-0.3.0-beta-dev.28](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.28)
+
+- Fix an issue where app validation for StoreRecord ops with a Delete or DeleteLink action were always passed to all zomes. These ops are now only passed to the zome which defined the entry type of the op that is being deleted. [\#3107](https://github.com/holochain/holochain/pull/3107)
+- Wasmer bumped from 4.2.2 to 4.2.4 [\#3025](https://github.com/holochain/holochain/pull/3025)
+- Compiled wasms are now persisted to the file system so no longer need to be recompiled on subsequent loads [\#3025](https://github.com/holochain/holochain/pull/3025)
+- **BREAKING CHANGE** Several changes to the file system [\#3025](https://github.com/holochain/holochain/pull/3025):
+  - The environment path in config file is now called `data_root_path`
+  - The `data_root_path` is no longer optional so MUST be specified in config
+  - Interactive mode is no longer supported, so paths MUST be provided in config
+  - The database is in a `databases` subdirectory of the `data_root_path`
+  - The keystore now consistently uses a `ks` directory, was previously inconsistent between `ks` and `keystore`
+  - The compiled wasm cache now exists and puts artifacts in the `wasm` subdirectory of the `data_root_path`
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.26](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.16](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.16)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.28](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain\_cascade-0.3.0-beta-dev.28](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.28](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.23](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.26](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [hdk-0.3.0-beta-dev.23](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.23)
+
+- **BREAKING CHANGE** Rename `remote_signal` to `send_remote_signal` to match the grammar of other HDK functions. [\#3113](https://github.com/holochain/holochain/pull/3113)
+
+- Remove access to `Timestamp::now()` which comes from `kitsune_p2p_timestamp` and was not supposed to be available in WASM. It would always panic in WASM calls so it should be safe to assume that nobody was actually using this in real apps. If you were trying to and this breaks your hApp then please consider using `sys_time` from the HDK instead which is safe to use for getting the current time.
+
+## [holochain\_state-0.3.0-beta-dev.27](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [hdi-0.4.0-beta-dev.19](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.19)
+
+## [holochain\_p2p-0.3.0-beta-dev.27](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain\_state\_types-0.3.0-beta-dev.25](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [hdk\_derive-0.3.0-beta-dev.18](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.18)
+
+## [holochain\_types-0.3.0-beta-dev.25](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_keystore-0.3.0-beta-dev.20](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.20)
+
+## [holochain\_sqlite-0.3.0-beta-dev.25](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.19](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [kitsune\_p2p-0.3.0-beta-dev.24](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.18](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.18)
+
+## [kitsune\_p2p\_block-0.3.0-beta-dev.12](crates/kitsune_p2p_block/CHANGELOG.md#0.3.0-beta-dev.12)
+
+## [kitsune\_p2p\_bootstrap\_client-0.3.0-beta-dev.21](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.17](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.15](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [holo\_hash-0.3.0-beta-dev.15](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.15](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.15)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.15](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.15](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.15)
+
+## [kitsune\_p2p\_dht-0.3.0-beta-dev.11](crates/kitsune_p2p_dht/CHANGELOG.md#0.3.0-beta-dev.11)
+
 # 20231206.112234
 
 ## [hcterm-0.3.0-beta-dev.3](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.3)
