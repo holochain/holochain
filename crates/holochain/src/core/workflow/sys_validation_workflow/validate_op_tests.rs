@@ -1771,7 +1771,7 @@ async fn validate_valid_register_deleted_by() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_valid_register_deleted_by_with_missing_deletes_ref() {
+async fn validate_register_deleted_by_with_missing_deletes_ref() {
     holochain_trace::test_run().unwrap();
 
     let mut test_case = TestCase::new().await;
