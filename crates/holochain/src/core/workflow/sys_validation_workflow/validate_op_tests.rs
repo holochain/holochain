@@ -6,6 +6,8 @@ use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
 use crate::core::workflow::WorkflowResult;
+use crate::core::PrevActionErrorKind;
+use crate::core::ValidationOutcome;
 use crate::prelude::Action;
 use crate::prelude::ActionHashFixturator;
 use crate::prelude::ActionHashed;
@@ -90,27 +92,22 @@ async fn validate_dna_op_mismatched_dna_hash() {
         author: test_case.agent.clone().into(),
         timestamp: Timestamp::now().into(),
         // Will not match the space hash from the test_case
-        hash: mismatched_dna_hash,
+        hash: mismatched_dna_hash.clone(),
     };
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_),),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::WrongDna(
+                mismatched_dna_hash.into(),
+                test_case.dna_def_hash().hash.clone().into(),
+            )
+            .to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("The DNA does not belong in this space!"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -128,27 +125,23 @@ async fn validate_dna_op_before_origin_time() {
         timestamp: Timestamp::now().into(),
         hash: test_case.dna_def_hash().hash,
     };
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action.clone()));
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::InvalidRootOriginTime,
+                    Action::Dna(dna_action)
+                )
+                    .into()
+            )
+            .to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains(
-                    "Root of source chain must have a timestamp greater than the Dna's origin_time"
-                ),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -168,7 +161,7 @@ async fn non_dna_op_as_first_action() {
     let mut create = fixt!(Create);
     create.prev_action = previous_action.as_hash().clone();
     create.action_seq = 0; // Not valid, a DNA should always be first
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone()));
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -177,21 +170,15 @@ async fn non_dna_op_as_first_action() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (PrevActionErrorKind::InvalidRoot, Action::Create(create)).into()
+            )
+            .to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("Root of source chain must be Dna"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -377,11 +364,11 @@ async fn validate_create_op_author_mismatch_with_prev() {
 
     // Op to validate
     let mut create_action = fixt!(Create);
-    create_action.author = mismatched_author;
+    create_action.author = mismatched_author.clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -390,23 +377,22 @@ async fn validate_create_op_author_mismatch_with_prev() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::Author(
+                        test_case.agent.clone().into(),
+                        mismatched_author.clone().into(),
+                    ),
+                    Action::Create(create_action),
+                )
+                    .into(),
+            )
+            .to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains(
-                    "The previous action's author does not match the current action's author"
-                ),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -431,8 +417,8 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = common_timestamp.into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    create_action.timestamp = common_timestamp.clone().into();
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -441,23 +427,19 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::Timestamp(common_timestamp.clone(), common_timestamp),
+                    Action::Create(create_action),
+                )
+                    .into(),
+            )
+            .to_string()
+        ),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains(
-                    "The previous action's timestamp is not before the current action's timestamp"
-                ),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -472,7 +454,9 @@ async fn validate_create_op_with_timestamp_before_prev() {
     validation_package_action.action_seq = 10;
     validation_package_action.timestamp = Timestamp::now().into();
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(validation_package_action))
+        .sign_action(Action::AgentValidationPkg(
+            validation_package_action.clone(),
+        ))
         .await;
 
     // Op to validate
@@ -483,7 +467,7 @@ async fn validate_create_op_with_timestamp_before_prev() {
     create_action.timestamp = (Timestamp::now() - std::time::Duration::from_secs(10))
         .unwrap()
         .into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -492,23 +476,22 @@ async fn validate_create_op_with_timestamp_before_prev() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::Timestamp(
+                        validation_package_action.timestamp.clone(),
+                        create_action.timestamp.clone(),
+                    ),
+                    Action::Create(create_action),
+                )
+                    .into(),
+            )
+            .to_string()
+        ),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains(
-                    "The previous action's timestamp is not before the current action's timestamp"
-                ),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -531,7 +514,7 @@ async fn validate_create_op_seq_number_decrements() {
     create_action.action_seq = 9; // Should be 11, has gone down instead of up
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -540,21 +523,19 @@ async fn validate_create_op_seq_number_decrements() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::InvalidSeq(9, 10),
+                    Action::Create(create_action),
+                )
+                    .into(),
+            )
+            .to_string()
+        ),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("Previous action sequence number 10 != (9 - 1)"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -577,7 +558,7 @@ async fn validate_create_op_seq_number_reused() {
     create_action.action_seq = 10; // Should be 11, but has been re-used
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
         .expect_retrieve_records_from_cascade(vec![previous_action])
@@ -586,21 +567,19 @@ async fn validate_create_op_seq_number_reused() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::PrevActionError(
+                (
+                    PrevActionErrorKind::InvalidSeq(10, 10),
+                    Action::Create(create_action),
+                )
+                    .into(),
+            )
+            .to_string()
+        ),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("Previous action sequence number 10 != (10 - 1)"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -625,30 +604,32 @@ async fn validate_create_op_not_preceeded_by_avp() {
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
     create_action.entry_type = EntryType::AgentPubKey;
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(ValidationOutcome::PrevActionError(
+            (
+                PrevActionErrorKind::InvalidSuccessor(
+                    "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg".to_string(),
+                    Box::new((
+                        previous_action.action().clone(),
+                        Action::Create(create_action.clone()),
+                    )),
+                ),
+                Action::Create(create_action),
+            )
+                .into(),
+        )
+        .to_string()),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("It is invalid for these two actions to be paired with each other"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -675,30 +656,35 @@ async fn validate_avp_op_not_followed_by_create() {
     create_link_action.action_seq = previous_action.action().action_seq() + 1;
     create_link_action.prev_action = previous_action.as_hash().clone();
     create_link_action.timestamp = Timestamp::now().into();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::CreateLink(create_link_action));
+    let op = DhtOp::RegisterAgentActivity(
+        fixt!(Signature),
+        Action::CreateLink(create_link_action.clone()),
+    );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(ValidationOutcome::PrevActionError(
+            (
+                PrevActionErrorKind::InvalidSuccessor(
+                    "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey".to_string(),
+                    Box::new((
+                        previous_action.action().clone(),
+                        Action::CreateLink(create_link_action.clone()),
+                    )),
+                ),
+                Action::CreateLink(create_link_action),
+            )
+                .into(),
+        )
+        .to_string()),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("It is invalid for these two actions to be paired with each other"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -780,20 +766,10 @@ async fn validate_store_record_leaks_entry() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(ValidationOutcome::PrivateEntryLeaked.to_string()),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert_eq!(
-                "Private entry data should never be included in any op other than StoreEntry.",
-                reason,
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -838,7 +814,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
         .unwrap();
 
     assert_eq!(
-        Outcome::Rejected("The entry has a different type to the action's entry type".to_string()),
+        Outcome::Rejected(ValidationOutcome::EntryTypeMismatch.to_string()),
         outcome,
     );
 }
@@ -895,7 +871,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
         .unwrap();
 
     assert_eq!(
-        Outcome::Rejected("The entry has a different hash to the action's entry hash".to_string()),
+        Outcome::Rejected(ValidationOutcome::EntryHash.to_string()),
         outcome,
     );
 }
@@ -955,9 +931,7 @@ async fn validate_store_record_with_large_entry() {
         .unwrap();
 
     assert_eq!(
-        Outcome::Rejected(
-            "The entry size 5000011 was larger than the MAX_ENTRY_SIZE 4000000".to_string()
-        ),
+        Outcome::Rejected(ValidationOutcome::EntryTooLarge(5_000_011).to_string()),
         outcome,
     );
 }
@@ -1073,27 +1047,18 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
-        outcome,
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotNewEntry(to_update_signed_action.action().clone()).to_string()
+        ),
+        outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("The action was expected to be a new entry action but was Dna"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1115,7 +1080,7 @@ async fn validate_store_record_update_changes_entry_type() {
     ));
     to_update_action.entry_hash = fixt!(EntryHash);
     let to_update_signed_action = test_case
-        .sign_action(Action::Create(to_update_action))
+        .sign_action(Action::Create(to_update_action.clone()))
         .await;
 
     // Previous action
@@ -1149,7 +1114,7 @@ async fn validate_store_record_update_changes_entry_type() {
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
     let op = DhtOp::StoreRecord(
         fixt!(Signature),
-        Action::Update(update_action),
+        Action::Update(update_action.clone()),
         holochain_zome_types::record::RecordEntry::Present(app_entry),
     );
 
@@ -1160,7 +1125,16 @@ async fn validate_store_record_update_changes_entry_type() {
         .await
         .unwrap();
 
-    assert_eq!(Outcome::Rejected("Update original: App(AppEntryDef { entry_index: EntryDefIndex(0), zome_index: ZomeIndex(0), visibility: Public }) doesn't match new: App(AppEntryDef { entry_index: EntryDefIndex(10), zome_index: ZomeIndex(0), visibility: Public })".to_string()), outcome, "Expected Rejected but actual outcome was {:?}", outcome);
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::UpdateTypeMismatch(
+                to_update_action.entry_type,
+                update_action.entry_type
+            )
+            .to_string()
+        ),
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1201,10 +1175,8 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
         .unwrap();
 
     assert_eq!(
-        Outcome::Rejected("The entry has a different type to the action's entry type".to_string()),
+        Outcome::Rejected(ValidationOutcome::EntryTypeMismatch.to_string()),
         outcome,
-        "Expected Rejected but actual outcome was {:?}",
-        outcome
     );
 }
 
@@ -1260,7 +1232,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
         .unwrap();
 
     assert_eq!(
-        Outcome::Rejected("The entry has a different hash to the action's entry hash".to_string()),
+        Outcome::Rejected(ValidationOutcome::EntryHash.to_string()),
         outcome,
     );
 }
@@ -1320,9 +1292,7 @@ async fn validate_store_entry_with_large_entry() {
         .unwrap();
 
     assert_eq!(
-        Outcome::Rejected(
-            "The entry size 5000011 was larger than the MAX_ENTRY_SIZE 4000000".to_string()
-        ),
+        Outcome::Rejected(ValidationOutcome::EntryTooLarge(5_000_011).to_string()),
         outcome,
     );
 }
@@ -1390,11 +1360,7 @@ async fn validate_valid_store_entry_update() {
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {:?}",
-        outcome
-    );
+    assert_eq!(Outcome::Accepted, outcome,);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1438,27 +1404,18 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotNewEntry(to_update_signed_action.action().clone()).to_string()
+        ),
         outcome,
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("The action was expected to be a new entry action but was Dna"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1514,18 +1471,31 @@ async fn validate_store_entry_update_changes_entry_type() {
     update_action.original_action_address = to_update_signed_action.as_hash().clone();
     let op = DhtOp::StoreEntry(
         fixt!(Signature),
-        holochain_types::action::NewEntryAction::Update(update_action),
+        holochain_types::action::NewEntryAction::Update(update_action.clone()),
         app_entry,
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert_eq!(Outcome::Rejected("Update original: App(AppEntryDef { entry_index: EntryDefIndex(0), zome_index: ZomeIndex(0), visibility: Public }) doesn't match new: App(AppEntryDef { entry_index: EntryDefIndex(10), zome_index: ZomeIndex(0), visibility: Public })".to_string()), outcome, "Expected Rejected but actual outcome was {:?}", outcome);
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::UpdateTypeMismatch(
+                to_update_signed_action
+                    .action()
+                    .entry_type()
+                    .unwrap()
+                    .clone(),
+                update_action.entry_type
+            )
+            .to_string()
+        ),
+        outcome
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1827,27 +1797,18 @@ async fn validate_register_deleted_by_wrong_delete_target() {
     let op = DhtOp::RegisterDeletedBy(fixt!(Signature), delete_action);
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotNewEntry(to_delete_signed_action.action().clone()).to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("The action was expected to be a new entry action but was Dna"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1945,27 +1906,18 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
     let op = DhtOp::RegisterDeletedEntryAction(fixt!(Signature), delete_action);
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_delete_signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_delete_signed_action.clone()])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotNewEntry(to_delete_signed_action.action().clone()).to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("The action was expected to be a new entry action but was Dna"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -2003,21 +1955,10 @@ async fn validate_add_link_tag_too_large() {
     // This is intentional as the validation isn't meant to check them but not very obvious from this test, hence the comment!
     let outcome = test_case.with_op(op).run().await.unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(ValidationOutcome::TagTooLarge(2_000).to_string()),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("The link tag size 2000 was larger than the MAX_TAG_SIZE 1000"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -2109,27 +2050,18 @@ async fn validate_remove_link_with_wrong_target_type() {
     let op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link_action);
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
+        .expect_retrieve_records_from_cascade(vec![previous_action.clone()])
         .with_op(op)
         .run()
         .await
         .unwrap();
 
-    assert!(
-        matches!(outcome, Outcome::Rejected(_)),
-        "Expected Rejected but actual outcome was {:?}",
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotCreateLink(previous_action.as_hash().clone()).to_string()
+        ),
         outcome
     );
-    match outcome {
-        Outcome::Rejected(reason) => {
-            assert!(
-                reason.contains("was expected to be a link add action"),
-                "Reason message does not match [{}]",
-                reason
-            );
-        }
-        _ => unreachable!(),
-    }
 }
 
 // TODO this hits code which claims to be unreachable. Clearly it isn't so investigate the code path.
