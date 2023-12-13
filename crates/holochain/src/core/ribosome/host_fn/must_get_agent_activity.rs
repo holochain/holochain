@@ -109,26 +109,13 @@ pub fn must_get_agent_activity(
 
 #[cfg(test)]
 pub mod test {
-    use std::sync::Arc;
-
-    use crate::{
-        core::ribosome::wasm_test::RibosomeTestFixture,
-        sweettest::{SweetConductor, SweetZome},
-        test_utils::shared_values::SharedValues,
-    };
-    use anyhow::Result as Fallible;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     /// Mimics inside the must_get wasm.
     #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, PartialEq)]
     struct Something(#[serde(with = "serde_bytes")] Vec<u8>);
-
-    static A_KEY: &str = "A";
-    static B_KEY: &str = "B";
-    static C_KEY: &str = "C";
-    static D_KEY: &str = "D";
-    static BOB_AGENT_PUBKEY_KEY: &str = "bobagentpubkey";
 
     /// Test that validation can get the currently-being-validated agent's
     /// activity.
@@ -164,74 +151,27 @@ pub mod test {
             .await;
     }
 
-    async fn bob_fn(
-        bob: SweetZome,
-        conductor: Arc<SweetConductor>,
-        mut shared_values: SharedValues,
-    ) -> Fallible<()> {
-        shared_values
-            .put(
-                BOB_AGENT_PUBKEY_KEY.to_string(),
-                bob.cell_id().agent_pubkey().clone(),
-            )
-            .await?;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ribosome_must_get_agent_activity() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
 
-        shared_values
-            .put(
-                A_KEY.to_string(),
-                conductor
-                    .call::<_, ActionHash>(&bob, "commit_something", Something(vec![1]))
-                    .await,
-            )
-            .await
-            .unwrap();
-
-        shared_values
-            .put(
-                B_KEY.to_string(),
-                conductor
-                    .call::<_, ActionHash>(&bob, "commit_something", Something(vec![2]))
-                    .await,
-            )
-            .await
-            .unwrap();
-
-        shared_values
-            .put(
-                C_KEY.to_string(),
-                conductor
-                    .call::<_, ActionHash>(&bob, "commit_something", Something(vec![3]))
-                    .await,
-            )
-            .await
-            .unwrap();
-
-        for i in 3..30 {
-            let _: ActionHash = conductor
-                .call(&bob, "commit_something", Something(vec![i]))
-                .await;
-        }
-
-        let d: ActionHash = conductor
-            .call(&bob, "commit_something", Something(vec![21]))
+        let a: ActionHash = conductor
+            .call(&bob, "commit_something", Something(vec![1]))
             .await;
 
-        shared_values.put(D_KEY.to_string(), d).await.unwrap();
+        let b: ActionHash = conductor
+            .call(&bob, "commit_something", Something(vec![2]))
+            .await;
 
-        Ok(())
-    }
-
-    async fn alice_fn(
-        alice: SweetZome,
-        conductor: Arc<SweetConductor>,
-        mut shared_values: SharedValues,
-    ) -> Fallible<()> {
-        let bob_agent_pubkey: ActionHash =
-            shared_values.get(&BOB_AGENT_PUBKEY_KEY.to_string()).await?;
-
-        let a: ActionHash = shared_values.get(&A_KEY.to_string()).await?;
-        let b: ActionHash = shared_values.get(&B_KEY.to_string()).await?;
-        let c: ActionHash = shared_values.get(&C_KEY.to_string()).await?;
+        let c: ActionHash = conductor
+            .call(&bob, "commit_something", Something(vec![3]))
+            .await;
 
         let filter = ChainFilter::new(a.clone());
 
@@ -239,7 +179,7 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain",
-                (bob_agent_pubkey.clone(), filter.clone()),
+                (bob.cell_id().agent_pubkey().clone(), filter.clone()),
             )
             .await;
 
@@ -259,17 +199,25 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain_recursive",
-                (bob_agent_pubkey.clone(), c.clone()),
+                (bob.cell_id().agent_pubkey().clone(), c.clone()),
             )
             .await;
 
-        let d: ActionHash = shared_values.get(&D_KEY.to_string()).await?;
+        for i in 3..30 {
+            let _: ActionHash = conductor
+                .call(&bob, "commit_something", Something(vec![i]))
+                .await;
+        }
+
+        let d: ActionHash = conductor
+            .call(&bob, "commit_something", Something(vec![21]))
+            .await;
 
         let _: ActionHash = conductor
             .call(
                 &alice,
                 "commit_require_agents_chain_recursive",
-                (bob_agent_pubkey.clone(), d.clone()),
+                (bob.cell_id().agent_pubkey().clone(), d.clone()),
             )
             .await;
 
@@ -279,7 +227,7 @@ pub mod test {
             .call(
                 &alice,
                 "call_must_get_agent_activity",
-                (bob_agent_pubkey.clone(), filter.clone()),
+                (bob.cell_id().agent_pubkey().clone(), filter.clone()),
             )
             .await;
 
@@ -288,69 +236,6 @@ pub mod test {
                 .map(|op| op.action.hashed.hash)
                 .collect::<Vec<_>>(),
             vec![c, b, a]
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_must_get_agent_activity() {
-        holochain_trace::test_run().ok();
-        let RibosomeTestFixture {
-            conductor,
-            alice,
-            bob,
-            ..
-        } = RibosomeTestFixture::new(TestWasm::MustGet).await;
-
-        let conductor = Arc::new(conductor);
-        let shared_values = SharedValues::new_from_env().await.unwrap();
-
-        let mut handles = vec![];
-
-        // TODO: introduce an env var that specifies a different conductor config
-        // TODO: introduce an env var that chooses to selects only one agent to run
-
-        // for (zome, closure) in [(bob, Box::new(bob_fn)), (alice, Box::new(alice_fn))]
-        //     as [(_, Box<fn(_, _, _) -> _>); 2]
-        // {
-        //     let conductor = Arc::clone(&conductor);
-        //     let shared_values = shared_values.clone();
-        //     handles.push(std::thread::spawn(move || {
-        //         holochain_util::tokio_helper::block_forever_on(closure(
-        //             zome,
-        //             conductor,
-        //             shared_values,
-        //         ))
-        //     }));
-        // }
-
-        {
-            let conductor = Arc::clone(&conductor);
-            let shared_values = shared_values.clone();
-            handles.push(std::thread::spawn(move || {
-                holochain_util::tokio_helper::block_forever_on(bob_fn(
-                    bob,
-                    conductor,
-                    shared_values,
-                ))
-            }));
-        }
-
-        {
-            let conductor = Arc::clone(&conductor);
-            let shared_values = shared_values.clone();
-            handles.push(std::thread::spawn(move || {
-                holochain_util::tokio_helper::block_forever_on(alice_fn(
-                    alice,
-                    conductor,
-                    shared_values,
-                ))
-            }));
-        }
-
-        for handle in handles {
-            let _ = handle.join().unwrap();
-        }
+        )
     }
 }
