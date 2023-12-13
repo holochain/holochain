@@ -22,7 +22,15 @@ pub struct LocalV1 {
 
 /// Remote implementation using Websockets for data passing.
 #[derive(Clone)]
-pub struct RemoteV1 {
+pub struct RemoteV1Client {
+    url: url2::Url2,
+    sender: Arc<holochain_websocket::WebsocketSender>,
+    receiver: Arc<holochain_websocket::WebsocketReceiver>,
+}
+
+/// Remote implementation using Websockets for data passing.
+#[derive(Clone)]
+pub struct RemoteV1Server {
     url: url2::Url2,
     sender: Arc<holochain_websocket::WebsocketSender>,
     receiver: Arc<holochain_websocket::WebsocketReceiver>,
@@ -31,7 +39,7 @@ pub struct RemoteV1 {
 #[derive(Clone)]
 pub enum SharedValues {
     LocalV1(LocalV1),
-    RemoteV1(RemoteV1),
+    RemoteV1Client(RemoteV1Client),
 }
 
 impl SharedValues {
@@ -53,7 +61,7 @@ impl SharedValues {
                 let (sender, receiver) =
                     holochain_websocket::connect(url.clone(), Default::default()).await?;
 
-                Ok(Self::RemoteV1(RemoteV1 {
+                Ok(Self::RemoteV1Client(RemoteV1Client {
                     url,
                     sender: Arc::new(sender),
                     receiver: Arc::new(receiver),
@@ -77,7 +85,11 @@ impl SharedValues {
     }
 
     /// Gets the `value` for `key`; waits for it to become available if necessary.
-    pub async fn get<T: for<'a> Deserialize<'a>>(&mut self, key: &str) -> Fallible<T> {
+    pub async fn get<T: for<'a> Deserialize<'a>>(
+        &mut self,
+        key: &str,
+        mut ignore_existing: bool,
+    ) -> Fallible<T> {
         match self {
             SharedValues::LocalV1(localv1) => {
                 loop {
@@ -86,8 +98,10 @@ impl SharedValues {
                                 {
                                     let data_guard = localv1.data.lock().await;
 
-                                    if let Some(value) = data_guard.get(key) {
-                                        return Ok(serde_json::from_str(value)?);
+                                    if !ignore_existing {
+                                        if let Some(value) = data_guard.get(key) {
+                                            return Ok(serde_json::from_str(value)?);
+                                        }
                                     }
 
                                     // get the notifier while still holding the data lock.
@@ -103,11 +117,66 @@ impl SharedValues {
                                 };
 
                     notifier.notified().await;
+                    ignore_existing = false;
 
                     localv1.num_waiters.fetch_sub(1, Ordering::SeqCst);
                 }
             }
-            SharedValues::RemoteV1(_) => unimplemented!(),
+            SharedValues::RemoteV1Client(_) => unimplemented!(),
+        }
+    }
+
+    /// Gets all values that have a matching key prefix; waits for `min_results` to become available if specified.
+    pub async fn get_pattern<T: for<'a> Deserialize<'a>>(
+        &mut self,
+        pattern: &str,
+        mut ignore_existing: bool,
+        maybe_min_results: Option<usize>,
+    ) -> Fallible<HashMap<String, T>> {
+        match self {
+            SharedValues::LocalV1(localv1) => {
+                loop {
+                    let notifier =
+                                // new scope so data_guard gets dropped before waiting for a notification
+                                {
+                                    let data_guard = localv1.data.lock().await;
+
+
+                                    if !ignore_existing {
+                                        let mut results: HashMap<String, T>  = Default::default();
+
+                                        for (key, value) in data_guard.iter() {
+                                            if key.matches(pattern).count() > 0 {
+                                                results.insert(key.to_string(), serde_json::from_str(&value)?);
+                                            }
+                                        }
+
+                                        if let Some(min_results) = maybe_min_results {
+                                            if results.len() >= min_results {
+                                                return Ok(results);
+                                            }
+                                        }
+                                    }
+
+                                    // get the notifier while still holding the data lock.
+                                    // this prevents a race between getting the notifier and a writer just writing something and sending notifications for it
+                                    localv1.num_waiters.fetch_add(1, Ordering::SeqCst);
+                                    localv1
+                                        .notification
+                                        .lock()
+                                        .await
+                                        .entry(pattern.to_string())
+                                        .or_default()
+                                        .clone()
+                                };
+
+                    notifier.notified().await;
+                    ignore_existing = false;
+
+                    localv1.num_waiters.fetch_sub(1, Ordering::SeqCst);
+                }
+            }
+            SharedValues::RemoteV1Client(_) => unimplemented!(),
         }
     }
 
@@ -129,13 +198,18 @@ impl SharedValues {
                     None
                 };
 
-                if let Some(notifier) = localv1.notification.lock().await.get(&key) {
-                    notifier.notify_waiters();
+                for (pattern, notifier) in localv1.notification.lock().await.iter() {
+                    if key.matches(pattern).count() > 0 {
+                        eprintln!("{key} matched by {pattern}");
+                        notifier.notify_waiters();
+                    } else {
+                        eprintln!("{key} not matched by {pattern}");
+                    }
                 }
 
                 Ok(maybe_previous)
             }
-            SharedValues::RemoteV1(_) => unimplemented!(),
+            SharedValues::RemoteV1Client(_) => unimplemented!(),
         }
     }
 }
@@ -143,6 +217,8 @@ impl SharedValues {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+
+    use uuid::Uuid;
 
     use super::*;
 
@@ -160,7 +236,8 @@ mod tests {
 
             tokio::spawn({
                 async move {
-                    let got: String = values.get(&prefix).await.unwrap();
+                    let got: String = values.get(&prefix, true).await.unwrap();
+                    eprintln!("got {got}");
                     assert_eq!(s, got);
 
                     got
@@ -174,14 +251,14 @@ mod tests {
                 loop {
                     let num = values.num_waiters().await;
                     match num {
-                        0 => tokio::time::sleep(Duration::from_millis(100)).await,
-                        1 => break,
+                        0 => tokio::time::sleep(Duration::from_millis(10)).await,
+                        1 => { eprintln!("saw a getter!"); break },
                         _ => panic!("saw more than one waiter"),
                     };
                 }
             } => {
             }
-            _ = tokio::time::sleep(Duration::from_secs(1)) => {
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {
                 panic!("didn't see a waiter");
             }
         };
@@ -191,5 +268,91 @@ mod tests {
         if let Err(e) = handle.await {
             panic!("{:#?}", e);
         };
+    }
+
+    struct SharedValuesLocalv1AgentlikeCase {
+        num_agents: usize,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct AgentDummyInfo {
+        id: Uuid,
+    }
+
+    // #[test_case(SharedValuesLocalv1AgentlikeCase { num_agents: 2 })]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_localv1_agent_discovery(// case: SharedValuesLocalv1AgentlikeCase
+    ) {
+        let mut values = SharedValues::LocalV1(LocalV1::default());
+
+        let num_agents = 2;
+
+        for _ in 0..num_agents {
+            let mut values = values.clone();
+
+            tokio::spawn(async move {
+                let agent_dummy_info = AgentDummyInfo {
+                    id: uuid::Uuid::new_v4(),
+                };
+                values
+                    .put(format!("agent_{}", &agent_dummy_info.id), agent_dummy_info)
+                    .await
+                    .unwrap();
+            });
+        }
+
+        tokio::select! {
+            _ = async {
+                let all_agents: HashMap<_, AgentDummyInfo> = values.get_pattern("agent_", false, Some(num_agents)).await.unwrap();
+                assert_eq!(all_agents.len(), num_agents);
+                eprintln!("all agents {all_agents:#?}");
+            } => {
+            }
+            _ = tokio::time::sleep(Duration::from_millis(50)) => {
+                panic!("not enough agents");
+            }
+        };
+
+        // let prefix = "something".to_string();
+        // let s = "we expect this back".to_string();
+
+        // let handle = {
+        //     let prefix = prefix.clone();
+        //     let s = s.clone();
+        //     let mut values = values.clone();
+
+        //     tokio::spawn({
+        //         async move {
+        //             let got: String = values.get(&prefix).await.unwrap();
+        //             assert_eq!(s, got);
+
+        //             got
+        //         }
+        //     })
+        // };
+
+        // // make sure the getter really comes first
+        // tokio::select! {
+        //     _ = async {
+        //         loop {
+        //             let num = values.num_waiters().await;
+        //             match num {
+        //                 0 => tokio::time::sleep(Duration::from_millis(100)).await,
+        //                 1 => break,
+        //                 _ => panic!("saw more than one waiter"),
+        //             };
+        //         }
+        //     } => {
+        //     }
+        //     _ = tokio::time::sleep(Duration::from_secs(1)) => {
+        //         panic!("didn't see a waiter");
+        //     }
+        // };
+
+        // values.put(prefix, s).await.unwrap();
+
+        // if let Err(e) = handle.await {
+        //     panic!("{:#?}", e);
+        // };
     }
 }
