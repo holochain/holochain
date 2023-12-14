@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Sys validation will now validate that a DeleteLink points to an action which is a CreateLink through the `link_add_address` of the delete.
+
 ## 0.2.4
 
 ## 0.2.4-rc.0

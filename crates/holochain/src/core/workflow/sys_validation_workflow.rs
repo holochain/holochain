@@ -237,7 +237,7 @@ async fn sys_validation_workflow_inner(
                         let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
-                    Outcome::Rejected => {
+                    Outcome::Rejected(_) => {
                         summary.rejected += 1;
                         if let Dependency::Null = dependency {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -468,7 +468,7 @@ pub(crate) async fn validate_op(
                 }
             }
             let outcome = handle_failed(&e);
-            if let Outcome::Rejected = outcome {
+            if let Outcome::Rejected(_) = outcome {
                 warn!(msg = "DhtOp was rejected during system validation.", ?op, error = ?e, error_msg = %e)
             }
             Ok(outcome)
@@ -487,26 +487,8 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::Counterfeit(_, _) => {
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
-        ValidationOutcome::ActionNotInCounterSigningSession(_, _) => Rejected,
         ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
-        ValidationOutcome::EntryDefId(_) => Rejected,
-        ValidationOutcome::EntryHash => Rejected,
-        ValidationOutcome::EntryTooLarge(_) => Rejected,
-        ValidationOutcome::EntryTypeMismatch => Rejected,
-        ValidationOutcome::EntryVisibility(_) => Rejected,
-        ValidationOutcome::TagTooLarge(_) => Rejected,
-        ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
-        ValidationOutcome::NotCreateLink(_) => Rejected,
-        ValidationOutcome::NotNewEntry(_) => Rejected,
-        ValidationOutcome::PrevActionError(_) => Rejected,
-        ValidationOutcome::PrivateEntryLeaked => Rejected,
-        ValidationOutcome::PreflightResponseSignature(_) => Rejected,
-        ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
-        ValidationOutcome::UpdateHashMismatch(_, _) => Rejected,
-        ValidationOutcome::VerifySignature(_, _) => Rejected,
-        ValidationOutcome::WrongDna(_, _) => Rejected,
-        ValidationOutcome::ZomeIndex(_) => Rejected,
-        ValidationOutcome::CounterSigningError(_) => Rejected,
+        reason => Rejected(reason.to_string()),
     }
 }
 
@@ -841,11 +823,11 @@ fn register_updated_content(
 }
 
 fn register_updated_record(
-    entry_update: &Update,
+    record_update: &Update,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let original_action_address = &entry_update.original_action_address;
+    let original_action_address = &record_update.original_action_address;
 
     let mut validation_dependencies = validation_dependencies.lock();
     let original_action = validation_dependencies
@@ -855,7 +837,7 @@ fn register_updated_record(
             ValidationOutcome::DepMissingFromDht(original_action_address.clone().into())
         })?;
 
-    update_check(entry_update, original_action)
+    update_check(record_update, original_action)
 }
 
 fn register_deleted_by(
@@ -907,12 +889,15 @@ fn register_delete_link(
 
     // Just require that this link exists, don't need to check anything else about it here
     let mut validation_dependencies = validation_dependencies.lock();
-    validation_dependencies
+    let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())
         .ok_or_else(|| ValidationOutcome::DepMissingFromDht(link_add_address.clone().into()))?;
 
-    Ok(())
+    match add_link_action {
+        Action::CreateLink(_) => Ok(()),
+        _ => Err(ValidationOutcome::NotCreateLink(add_link_action.to_hash()).into()),
+    }
 }
 
 fn update_check(entry_update: &Update, original_action: &Action) -> SysValidationResult<()> {
