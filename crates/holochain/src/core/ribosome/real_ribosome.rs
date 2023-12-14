@@ -79,6 +79,9 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::module::InstanceWithStore;
+use holochain_wasmer_host::module::ModuleCache;
+use holochain_wasmer_host::module::ModuleWithStore;
 use holochain_wasmer_host::module::SerializedModuleCache;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
@@ -90,7 +93,6 @@ use wasmer::Instance;
 use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
-use wasmer::Type;
 // This is here because there were errors about different crate versions
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::RwLock;
@@ -101,8 +103,6 @@ use holochain_conductor_api::conductor::paths::WasmRootPath;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::module::InstanceCache;
-use holochain_wasmer_host::module::InstanceWithStore;
-use holochain_wasmer_host::module::ModuleWithStore;
 use holochain_wasmer_host::module::PlruKeyMap;
 use holochain_wasmer_host::plru::MicroCache;
 use holochain_wasmer_host::prelude::*;
@@ -112,6 +112,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -129,8 +130,14 @@ pub struct RealRibosome {
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
+    /// Cache for wasm modules read from file system.
     pub serialized_module_cache: Arc<RwLock<SerializedModuleCache>>,
 
+    /// Cache for deserialized versions of wasm modules read from file system.
+    pub module_cache: Arc<RwLock<ModuleCache>>,
+
+    /// Cache for redundant callable wasm module instances. This cache warms up
+    /// according to the number of concurrent requests.
     pub instance_cache: Arc<RwLock<InstanceCache>>,
 }
 
@@ -207,14 +214,20 @@ impl HostFnBuilder {
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
-/// Map from an instance to it's context for a call.
+// Map from a context key to a call context. Call contexts are passed to host
+// fn calls for execution.
 static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
 
+// Counter used in two ways:
+// 1. to add to the instance cache key as a unique index, allowing for
+// redundant instances of the same combination of DNA and zome
+// 2. store and look up zome call contexts, which are passed to host fn calls,
+// in the context map
 static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
-/// Create a key for the instance cache.
-/// It will be [WasmHash..DnaHash..context_key] all as bytes.
-fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64) -> [u8; 32] {
+// Create a key for the instance cache.
+// Format: [WasmHash..DnaHash..context_key] as bytes.
+fn get_instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64) -> [u8; 32] {
     let mut bits = [0u8; 32];
     for (i, byte) in wasm_hash
         .get_raw_32()
@@ -233,7 +246,7 @@ fn instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64
 }
 
 /// Get the context key back from the end of the instance cache key.
-fn context_key_from_key(key: &[u8; 32]) -> u64 {
+fn get_context_key_from_instance_cache_key(key: &[u8; 32]) -> u64 {
     let mut bits = [0u8; 8];
     for (a, b) in key[24..].iter().zip(bits.iter_mut()) {
         *b = *a;
@@ -266,6 +279,7 @@ impl RealRibosome {
                 cranelift,
                 maybe_fs_dir,
             })),
+            module_cache: Arc::new(RwLock::new(ModuleCache::default())),
             instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         };
 
@@ -365,6 +379,7 @@ impl RealRibosome {
                 cranelift,
                 maybe_fs_dir: None,
             })),
+            module_cache: Arc::new(RwLock::new(ModuleCache::default())),
             instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         }
     }
@@ -384,16 +399,34 @@ impl RealRibosome {
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<ModuleWithStore>> {
-        Ok(self.serialized_module_cache.write().get(
-            self.wasm_cache_key(zome_name)?,
-            &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-        )?)
+        use holochain_wasmer_host::module::PlruCache;
+
+        let cache_key = self.get_module_cache_key(zome_name)?;
+
+        let mut module_cache = self.module_cache.write();
+        if let Some(module_with_store) = module_cache.get_item(&cache_key) {
+            tracing::error!("found a module in the module cache");
+            return Ok(module_with_store);
+        }
+
+        let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
+        let start = Instant::now();
+        let module_with_store = self
+            .serialized_module_cache
+            .write()
+            .get(cache_key.clone(), wasm)?;
+        let elapsed = Instant::now() - start;
+        tracing::error!("runtime compiled module zome {zome_name:?} from cache took {elapsed:?}");
+
+        module_cache.put_item(cache_key, module_with_store.clone());
+
+        Ok(module_with_store)
     }
 
-    pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
-        // TODO: make this actually the hash of the wasm once we can do that
-        // watch out for cache misses in the tests that make things slooow if you change this!
-        // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
+    // Create a key for a module cache.
+    // Format: [WasmHash] as bytes
+    // watch out for cache misses in the tests that make things slooow if you change this!
+    pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
         let mut key = [0; 32];
         let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
@@ -413,7 +446,7 @@ impl RealRibosome {
         {
             CONTEXT_MAP.lock().remove(&context_key);
         }
-        let key = instance_cache_key(
+        let key = get_instance_cache_key(
             &self
                 .dna_file
                 .dna()
@@ -422,6 +455,7 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             context_key,
         );
+        tracing::error!("putting key {key:?} in instance cache");
         self.instance_cache
             .write()
             .put_item(key, instance_with_store);
@@ -434,6 +468,11 @@ impl RealRibosome {
         zome: &Zome<ZomeDef>,
         context_key: u64,
     ) -> RibosomeResult<Arc<InstanceWithStore>> {
+        tracing::error!(
+            "building an instance for zome {:?} context_key {:?}",
+            zome.zome_name(),
+            context_key
+        );
         let module_with_store = match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
                 if let Some(path) = wasm_zome.preserialized_path.as_ref() {
@@ -519,8 +558,13 @@ impl RealRibosome {
     ) -> RibosomeResult<(Arc<InstanceWithStore>, u64)> {
         use holochain_wasmer_host::module::PlruCache;
 
+        tracing::error!(
+            "getting instance with store for zome {:?} fn {:?}",
+            call_context.zome.name,
+            call_context.function_name
+        );
         // Get the start of the possible keys.
-        let key_start = instance_cache_key(
+        let key_start = get_instance_cache_key(
             &self
                 .dna_file
                 .dna()
@@ -530,7 +574,7 @@ impl RealRibosome {
             0,
         );
         // Get the end of the possible keys.
-        let key_end = instance_cache_key(
+        let key_end = get_instance_cache_key(
             &self
                 .dna_file
                 .dna()
@@ -539,19 +583,27 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );
-        let mut lock = self.instance_cache.write();
+        // tracing::error!("key_start {:?}", key_start);
+        // tracing::error!("key_end {:?}", key_end);
+        let mut instance_cache_lock = self.instance_cache.write();
         // Get the first available key.
-        let key = lock
+        // tracing::error!("instance cache right now is {:?}", instance_cache_lock.cache());
+        let key = instance_cache_lock
             .cache()
             .range(key_start..key_end)
             .next()
             .map(|(k, _)| k)
             .cloned();
+        tracing::error!(
+            "zome {:?} fn {:?} key hit {key:?}",
+            call_context.zome.name,
+            call_context.function_name
+        );
         // Check if we got a key hit.
         if let Some(key) = key {
             // If we did then remove that instance.
-            if let Some(instance) = lock.remove_item(&key) {
-                let context_key = context_key_from_key(&key);
+            if let Some(instance) = instance_cache_lock.remove_item(&key) {
+                let context_key = get_context_key_from_instance_cache_key(&key);
                 // We have an instance hit.
                 // Update the context.
                 {
@@ -565,6 +617,7 @@ impl RealRibosome {
         }
         // We didn't get an instance hit so create a new key.
         let context_key = Self::next_context_key();
+        // Fallback to creating the instance.
         let instance_with_store =
             self.build_instance_with_store(&call_context.zome, context_key)?;
 
@@ -574,7 +627,7 @@ impl RealRibosome {
                 .lock()
                 .insert(context_key, Arc::new(call_context));
         }
-        // Fallback to creating the instance.
+
         Ok((instance_with_store, context_key))
     }
 
@@ -732,105 +785,88 @@ impl RealRibosome {
 
     pub fn do_wasm_call_for_module<I: Invocation>(
         &self,
-        call_context: CallContext,
         invocation: &I,
         zome: &Zome,
-        to_call: &FunctionName,
-        module: Arc<Module>,
-    ) -> Result<Option<ExternIO>, RibosomeError> {
-        if module.info().exports.contains_key(to_call.as_ref()) {
-            // there is a callback to_call and it is implemented in the wasm
-            // it is important to fully instantiate this (e.g. don't try to use the module above)
-            // because it builds guards against memory leaks and handles imports correctly
-            let (instance_with_store, context_key) = self.instance_with_store(call_context)?;
-
-            let result: Result<ExternIO, RuntimeError>;
-            {
-                let instance = instance_with_store.instance.clone();
-                let mut store_lock = instance_with_store.store.lock();
-                let mut store_mut = store_lock.as_store_mut();
-                result = holochain_wasmer_host::guest::call(
-                    &mut store_mut,
-                    instance,
-                    to_call.as_ref(),
-                    // be aware of this clone!
-                    // the whole invocation is cloned!
-                    // @todo - is this a problem for large payloads like entries?
-                    invocation.to_owned().host_input()?,
-                );
-            }
-
-            // a bit of typefu to avoid cloning the result.
-            let (can_cache, result) = match result {
-                Err(runtime_error) => {
-                    // This will bubble up and be logged later but capture zome/function that was called while the context is available
-                    tracing::error!(?runtime_error, ?zome, ?to_call);
-                    match runtime_error.downcast::<WasmError>() {
-                        Ok(wasm_error) => {
-                            (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
-                        }
-                        Err(result) => (false, Err(result)),
-                    }
-                }
-                result => (true, result),
-            };
-
-            // Cache this instance.
-            if can_cache {
-                self.cache_instance(context_key, instance_with_store, zome.zome_name())?;
-            }
-
-            Ok(Some(result?))
-        } else {
-            // the func doesn't exist
-            // the callback is not implemented
-            Ok(None)
+        fn_name: &FunctionName,
+        instance_with_store: Arc<InstanceWithStore>,
+        context_key: u64,
+    ) -> Result<ExternIO, RibosomeError> {
+        let fn_name = fn_name.clone();
+        let result: Result<ExternIO, RuntimeError>;
+        {
+            let instance = instance_with_store.instance.clone();
+            let mut store_lock = instance_with_store.store.lock();
+            let mut store_mut = store_lock.as_store_mut();
+            result = holochain_wasmer_host::guest::call(
+                &mut store_mut,
+                instance,
+                fn_name.as_ref(),
+                // be aware of this clone!
+                // the whole invocation is cloned!
+                // @todo - is this a problem for large payloads like entries?
+                invocation.to_owned().host_input()?,
+            );
         }
+
+        // a bit of typefu to avoid cloning the result.
+        let (can_cache, result) = match result {
+            Err(runtime_error) => {
+                // This will bubble up and be logged later but capture zome/function that was called while the context is available
+                tracing::error!(?runtime_error, ?zome, ?fn_name);
+                match runtime_error.downcast::<WasmError>() {
+                    Ok(wasm_error) => (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into())),
+                    Err(result) => (false, Err(result)),
+                }
+            }
+            result => (true, result),
+        };
+
+        // Cache this instance.
+        tracing::error!("can cache {can_cache}");
+        if can_cache {
+            self.cache_instance(context_key, instance_with_store, zome.zome_name())?;
+        }
+
+        Ok(result?)
     }
 
     pub fn get_const_fn_for_wasm(
         &self,
         call_context: CallContext,
         name: &str,
-        module: Arc<Module>,
     ) -> Result<Option<i32>, RibosomeError> {
-        // Check if the wasm has a function that matches this type.
-        if module.exports().functions().any(|f| {
-            f.name() == name && f.ty().params().is_empty() && f.ty().results() == [Type::I32]
-        }) {
-            let (instance_with_store, context_key) = self.instance_with_store(call_context)?;
+        let (instance_with_store, context_key) = self.instance_with_store(call_context)?;
 
-            let result;
-            {
-                let mut store_lock = instance_with_store.store.lock();
-                let mut store_mut = store_lock.as_store_mut();
-                // Call the function as a native function.
-                result = instance_with_store
-                    .instance
-                    .exports
-                    .get_typed_function::<(), i32>(&store_mut, name)
-                    .ok()
-                    .map_or(Ok(None), |func| Ok(Some(func.call(&mut store_mut)?)))
-                    .map_err(|e: RuntimeError| {
-                        RibosomeError::WasmRuntimeError(
-                            wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
-                        )
-                    })?;
-            }
-
-            // Remove the blank context.
-            CONTEXT_MAP.lock().remove(&context_key);
-
-            Ok(result)
-        } else {
-            // the func doesn't exist
-            // the callback is not implemented
-            Ok(None)
+        let result;
+        {
+            let mut store_lock = instance_with_store.store.lock();
+            let mut store_mut = store_lock.as_store_mut();
+            // Call the function as a native function.
+            result = instance_with_store
+                .instance
+                .exports
+                .get_typed_function::<(), i32>(&store_mut, name)
+                .ok()
+                .map_or(Ok(None), |func| Ok(Some(func.call(&mut store_mut)?)))
+                .map_err(|e: RuntimeError| {
+                    RibosomeError::WasmRuntimeError(
+                        wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                    )
+                })?;
         }
+
+        // Remove the blank context.
+        CONTEXT_MAP.lock().remove(&context_key);
+
+        Ok(result)
     }
 
-    pub fn get_extern_fns_for_wasm(&self, module: Arc<Module>) -> Vec<FunctionName> {
-        let mut extern_fns: Vec<FunctionName> = module
+    pub fn get_extern_fns_for_wasm(
+        &self,
+        module_with_store: Arc<ModuleWithStore>,
+    ) -> Vec<FunctionName> {
+        let mut extern_fns: Vec<FunctionName> = module_with_store
+            .module
             .info()
             .exports
             .iter()
@@ -947,13 +983,12 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module_with_store =
-                            if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                                self.precompiled_module(path)?
-                            } else {
-                                self.runtime_compiled_module(zome.zome_name())?
-                            };
-                        self.get_extern_fns_for_wasm(module_with_store.module.clone())
+                        let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                            self.precompiled_module(path)?
+                        } else {
+                            self.runtime_compiled_module(zome.zome_name())?
+                        };
+                        self.get_extern_fns_for_wasm(module.clone())
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
                 }
@@ -969,36 +1004,44 @@ impl RibosomeT for RealRibosome {
         host_context: HostContext,
         invocation: &I,
         zome: &Zome,
-        to_call: &FunctionName,
+        fn_name: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let call_context = CallContext {
             zome: zome.clone(),
-            function_name: to_call.clone(),
+            function_name: fn_name.clone(),
             host_context,
             auth: invocation.auth(),
         };
 
         match zome.zome_def() {
-            ZomeDef::Wasm(wasm_zome) => {
-                let module_with_store = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    self.precompiled_module(path)?
+            ZomeDef::Wasm(_) => {
+                let (instance_with_store, context_key) =
+                    self.instance_with_store(call_context.clone())?;
+
+                if instance_with_store
+                    .instance
+                    .exports
+                    .contains(fn_name.as_ref())
+                {
+                    self.do_wasm_call_for_module::<I>(
+                        invocation,
+                        zome,
+                        fn_name,
+                        instance_with_store,
+                        context_key,
+                    )
+                    .map(Some)
                 } else {
-                    self.runtime_compiled_module(zome.zome_name())?
-                };
-                self.do_wasm_call_for_module::<I>(
-                    call_context,
-                    invocation,
-                    zome,
-                    to_call,
-                    module_with_store.module.clone(),
-                )
+                    // the callback fn does not exist
+                    Ok(None)
+                }
             }
             ZomeDef::Inline {
                 inline_zome: zome, ..
             } => {
                 let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                let result = zome.0.maybe_call(Box::new(api), to_call, input)?;
+                let result = zome.0.maybe_call(Box::new(api), fn_name, input)?;
                 Ok(result)
             }
         }
@@ -1014,13 +1057,13 @@ impl RibosomeT for RealRibosome {
         };
 
         match zome.zome_def() {
-            ZomeDef::Wasm(wasm_zome) => {
-                let module_with_store = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    self.precompiled_module(path)?
-                } else {
-                    self.runtime_compiled_module(zome.zome_name())?
-                };
-                self.get_const_fn_for_wasm(call_context, name, module_with_store.module.clone())
+            ZomeDef::Wasm(_) => {
+                // let module_with_store = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                //     self.precompiled_module(path)?
+                // } else {
+                //     self.runtime_compiled_module(zome.zome_name())?
+                // };
+                self.get_const_fn_for_wasm(call_context, name)
             }
             ZomeDef::Inline {
                 inline_zome: zome, ..
@@ -1149,8 +1192,12 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use super::RealRibosome;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::core::ribosome::ZomeCall;
+    use crate::core::ribosome::{
+        real_ribosome::get_instance_cache_key, CallContext, HostContext, Invocation, ZomeCall,
+    };
+    use crate::fixt::{ZomeCallHostAccessFixturator, ZomeCallInvocationFixturator};
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
@@ -1159,48 +1206,113 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
-    use holochain_types::wasmer_types::cranelift;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_wasmer_host::module::SerializedModuleCache;
+    use holochain_wasmer_host::module::PlruCache;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn cache_test() {
-        let (dna_file, _, _) =
-            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo]).await;
-        // let ribosome = RealRibosome::new(dna_file, None).unwrap();
-        let zome_name = TestWasm::AgentInfo.coordinator_zome_name();
+    async fn module_and_instance_cache() {
+        holochain_trace::test_run().ok();
+        let wasm = TestWasm::AgentInfo;
+        let zome = wasm.coordinator_zome();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![wasm]).await;
+        let wasm_hash = dna_file.dna().get_wasm_zome_hash(&zome.name).unwrap();
+        let dna_hash = dna_file.dna_hash().clone();
+        let invocation = fixt!(ZomeCallInvocation);
+        let host_context = HostContext::ZomeCall(fixt!(ZomeCallHostAccess));
+        let ribosome = RealRibosome::new(dna_file, None).unwrap();
 
-        let start = Instant::now();
-        let mut key = [0; 32];
-        let wasm_zome_hash = dna_file.dna().get_wasm_zome_hash(&zome_name).unwrap();
-        let bytes = wasm_zome_hash.get_raw_32();
-        key.copy_from_slice(bytes);
-        let elapsed = Instant::now() - start;
-        println!("cache key {key:?} getting took {elapsed:?}");
-        let wasm = dna_file.get_wasm_for_zome(&zome_name).unwrap().code();
+        // module cache will not be empty because instantiating the ribosome
+        // populates it with the integrity wasm when numer of entry and link
+        // types are counted
+        {
+            let integrity_module_key = ribosome
+                .get_module_cache_key(&wasm.integrity_zome_name())
+                .unwrap();
+            let module_cache = ribosome.module_cache.read();
+            let cached_module = module_cache.cache().get(&integrity_module_key);
+            assert!(
+                cached_module.is_some(),
+                "module cache should contain cached module"
+            );
+        }
 
-        let mut smc = SerializedModuleCache::default_with_cranelift(cranelift);
-        let start = Instant::now();
-        let r = smc.get(key, &wasm).unwrap();
-        let elapsed = Instant::now() - start;
-        println!("cache key {key:?} with result {r:?} getting took {elapsed:?}");
+        // instance cache should be empty
+        {
+            let instance_cache = ribosome.instance_cache.read();
+            assert!(
+                instance_cache.cache().is_empty(),
+                "instance cache should be empty but contains items with keys {:?}",
+                instance_cache.cache().keys()
+            );
+        }
 
-        let start = Instant::now();
-        let r = smc.get(key, &wasm).unwrap();
-        let elapsed = Instant::now() - start;
-        println!("cache key {key:?} with result {r:?} getting took {elapsed:?}");
+        // create an instance with store for the test zome
+        let call_context = CallContext {
+            auth: invocation.auth(),
+            host_context,
+            zome: zome.clone(),
+            function_name: "call_info".into(),
+        };
+        let (instance_with_store, context_key) =
+            ribosome.instance_with_store(call_context.clone()).unwrap();
+        {
+            let instance_cache_lock = ribosome.instance_cache.read();
+            assert!(
+                instance_cache_lock.cache().is_empty(),
+                "instance cache should be empty after instantiating a module but contains items with keys {:?}",
+                instance_cache_lock.cache().keys()
+            );
+        }
 
-        let start = Instant::now();
-        let r = smc.get(key, &wasm).unwrap();
-        println!("cache key {key:?} with result {r:?} getting took {elapsed:?}");
+        // cache instance
+        ribosome
+            .cache_instance(context_key, instance_with_store.clone(), &zome.name)
+            .unwrap();
+        let instance_cache_key = get_instance_cache_key(&wasm_hash, &dna_hash, context_key);
+
+        // check if cache contains instance under cache key
+        {
+            let instance_cache_lock = ribosome.instance_cache.read();
+            assert_eq!(
+                instance_cache_lock
+                    .cache()
+                    .contains_key(&instance_cache_key),
+                true,
+                "instance cache should contain cached instance stored under context key",
+            );
+        }
+
+        // check if cached instance matches the previously cached instance
+        {
+            let cached_instance = ribosome
+                .instance_cache
+                .write()
+                .get_item(&instance_cache_key)
+                .expect("instance cache should contain cached instance stored under context key");
+            assert_eq!(
+                cached_instance.instance, instance_with_store.instance,
+                "instance from cache should match the previously cached instance"
+            );
+        }
+
+        // getting an instance with store for the same call context should
+        // take the instance from cache
+        let _ = ribosome.instance_with_store(call_context.clone()).unwrap();
+        {
+            let instance_cache_lock = ribosome.instance_cache.read();
+            assert!(
+                instance_cache_lock.cache().is_empty(),
+                "instance cache should be empty but contains items with keys {:?}",
+                instance_cache_lock.cache().keys()
+            );
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that zome call responses are not increasing
     // disproportionally
-    // makes a call to a zome without an init fn
     async fn zome_call_response_time_guard() {
         holochain_trace::test_run().ok();
         let mut conductor = SweetConductor::from_config_rendezvous(
@@ -1229,7 +1341,7 @@ pub mod wasm_test {
             "cached zome call did not complete in 10 ms"
         );
         let zome_call_response_on_time = tokio::select! {
-            _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
+                            _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
             _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
         };
         assert_eq!(
