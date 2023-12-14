@@ -3,7 +3,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
-use holochain_integrity_types::dna_modifiers::DnaModifiersBuilder;
+use holochain_integrity_types::DnaModifiersBuilder;
 
 #[cfg(feature = "full-dna-def")]
 use crate::zome::ZomeError;
