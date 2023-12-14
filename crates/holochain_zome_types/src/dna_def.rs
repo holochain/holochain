@@ -3,7 +3,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
-use holochain_integrity_types::info::DnaModifiersBuilder;
+use holochain_integrity_types::dna_modifiers::DnaModifiersBuilder;
 
 #[cfg(feature = "full-dna-def")]
 use crate::zome::ZomeError;
@@ -43,6 +43,10 @@ pub struct DnaDef {
     /// computation.
     pub modifiers: DnaModifiers,
 
+    // /// Parameters defined by the conductor into which this DNA is installed.
+    // /// These specify various constraints on network compatibility based on the
+    // /// runtime environment. These do affect the DNA hash.
+    // pub runtime: DnaRuntime,
     /// A vector of zomes associated with your DNA.
     pub integrity_zomes: IntegrityZomes,
 
