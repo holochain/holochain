@@ -9,6 +9,6 @@ pub(crate) enum Outcome {
     /// be found currently on the DHT.
     /// Note this is not proof it doesn't exist.
     MissingDhtDep(AnyDhtHash),
-    /// Moves to integration with status rejected
-    Rejected,
+    /// Moves to integration with status rejected, with an informational reason
+    Rejected(String),
 }
