@@ -236,11 +236,12 @@ pub async fn register_and_install_dna_named(
         properties,
         ..Default::default()
     };
+    let runtime = DnaRuntime::fake();
 
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let (_dna, dna_hash) = dna_bundle1
-        .into_dna_file(mods.clone().serialized().unwrap())
+        .into_dna_file(mods.clone().serialized().unwrap(), runtime)
         .await
         .unwrap();
 

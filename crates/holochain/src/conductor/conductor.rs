@@ -2467,6 +2467,11 @@ mod accessor_impls {
             &self.config
         }
 
+        /// Construct the DnaRuntime given the current setup
+        pub fn get_dna_runtime(&self) -> DnaRuntime {
+            todo!()
+        }
+
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()

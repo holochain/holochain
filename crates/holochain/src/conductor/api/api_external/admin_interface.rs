@@ -98,7 +98,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                             .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
-                        let runtime = todo!("get from conductor");
+                        let runtime = self.conductor_handle.get_dna_runtime();
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
                         let (dna_file, _original_hash) =
@@ -106,7 +106,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let runtime = todo!("get from conductor");
+                        let runtime = self.conductor_handle.get_dna_runtime();
                         let (dna_file, _original_hash) =
                             bundle.into_dna_file(modifiers, runtime).await?;
                         dna_file
