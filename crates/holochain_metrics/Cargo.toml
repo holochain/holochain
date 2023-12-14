@@ -1,6 +1,6 @@
 [package]
 name = "holochain_metrics"
-version = "0.2.4-rc.0"
+version = "0.2.4"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "metrics helpers"
