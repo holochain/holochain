@@ -1341,6 +1341,8 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
+            let runtime = DnaRuntime::fake();
+
             let InstallAppPayload {
                 source,
                 agent_key,
@@ -1370,7 +1372,7 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, runtime)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -2536,6 +2538,11 @@ mod accessor_impls {
         /// Get the conductor config
         pub fn get_config(&self) -> &ConductorConfig {
             &self.config
+        }
+
+        /// Construct the DnaRuntime given the current setup
+        pub fn get_dna_runtime(&self) -> DnaRuntime {
+            todo!()
         }
 
         /// Get a TaskManagerClient
