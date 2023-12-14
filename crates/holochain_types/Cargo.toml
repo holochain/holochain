@@ -32,7 +32,7 @@ holochain_keystore = { version = "^0.3.0-beta-dev.19", path = "../holochain_keys
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.24"}
-holochain_wasmer_host = "=0.0.90"
+holochain_wasmer_host = "=0.0.91"
 holochain_util = { version = "^0.3.0-beta-dev.2", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.18", features = ["full"] }
 itertools = { version = "0.10" }
