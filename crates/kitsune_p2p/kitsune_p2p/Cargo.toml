@@ -49,8 +49,8 @@ url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.3.0-beta-dev.0"}
 
 # fuzzing
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
-contrafact = { version = "0.2.0-rc.1", optional = true }
+arbitrary = { workspace = true, optional = true }
+contrafact = { workspace = true, optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 

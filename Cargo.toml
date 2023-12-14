@@ -1,4 +1,3 @@
-resolver = "2"
 
 [workspace]
 members = [
@@ -62,16 +61,41 @@ exclude = ["crates/release-automation"]
 
 [workspace.dependencies]
 anyhow = "1.0"
+arbitrary = {version = "1.0", features = ["derive"]}
 async-trait = "0.1"
+contrafact = "0.2.0-rc.1"
 derive_more = "0.99"
+diff = "0.1"
 futures = "0.3"
+holochain_serialized_bytes = "=0.0.53"
+holochain_wasmer_host = "=0.0.91"
 mockall = "0.11"
 must_future = "0.1"
 serde = "1.0"
 thiserror = "1.0"
 
-holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
-holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
+holo_hash = { version = "^0.3.0-beta-dev.14", path = "crates/holo_hash" }
+holochain_cascade = { version = "^0.3.0-beta-dev.27", path = "crates/holochain_cascade" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.27", path = "crates/holochain_conductor_api" }
+holochain_keystore = { version = "^0.3.0-beta-dev.19", path = "crates/holochain_keystore", default-features = false }
+holochain_p2p = { version = "^0.3.0-beta-dev.26", path = "crates/holochain_p2p" }
+holochain_sqlite = { version = "^0.3.0-beta-dev.24", path = "crates/holochain_sqlite" }
+holochain_state = { version = "^0.3.0-beta-dev.26", path = "crates/holochain_state" }
+holochain_types = { version = "^0.3.0-beta-dev.24", path = "crates/holochain_types" }
+holochain_util = { version = "^0.3.0-beta-dev.2", path = "crates/holochain_util" }
+holochain_websocket = { version = "^0.3.0-beta-dev.5", path = "crates/holochain_websocket" }
+holochain_zome_types = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_zome_types" }
+holochain_nonce = { version = "^0.3.0-beta-dev.22", path = "crates/holochain_nonce" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "crates/holochain_secure_primitive" }
+holochain_test_wasm_common = { version = "^0.3.0-beta-dev.22", path = "crates/test_utils/wasm_common"  }
+holochain-services = { version = "^0.1.0", path = "crates/holochain-services" }
+
+kitsune_p2p = { version = "^0.3.0-beta-dev.23", path = "crates/kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.14", path = "crates/kitsune_p2p/bootstrap" }
+kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.20", path = "crates/kitsune_p2p/bootstrap_client" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.10", path = "crates/kitsune_p2p/bin_data" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.14", path = "crates/kitsune_p2p/types" }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.11", path = "crates/kitsune_p2p/block" }
 
 
 [profile.fast-test]

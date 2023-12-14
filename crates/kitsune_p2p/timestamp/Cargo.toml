@@ -20,7 +20,7 @@ chrono = { version = "0.4.22", default-features = false, features = ["clock", "s
 rusqlite = { version = "0.29", optional = true }
 
 # Dependencies only needed for testing by downstream crates.
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
+arbitrary = { workspace = true, optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
@@ -29,7 +29,7 @@ rand = { version = "0.8", optional = true }
 
 
 [dev-dependencies]
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = { workspace = true }
 serde_yaml = "0.9"
 
 [features]

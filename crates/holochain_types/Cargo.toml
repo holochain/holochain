@@ -30,9 +30,9 @@ one_err = "0.0.8"
 holo_hash = { version = "^0.3.0-beta-dev.14", path = "../holo_hash", features = ["encoding"] }
 holochain_keystore = { version = "^0.3.0-beta-dev.19", path = "../holochain_keystore" }
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = { workspace = true }
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.24"}
-holochain_wasmer_host = "=0.0.91"
+holochain_wasmer_host = { workspace = true }
 holochain_util = { version = "^0.3.0-beta-dev.2", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.18", features = ["full"] }
 itertools = { version = "0.10" }
@@ -69,7 +69,7 @@ proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
 # contrafact
-contrafact = { version = "0.2.0-rc.1", optional = true }
+contrafact = { workspace = true, optional = true }
 
 [dev-dependencies]
 holochain_types = { path = ".", features = ["test_utils", "fuzzing"]}

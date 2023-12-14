@@ -15,7 +15,7 @@ kitsune_p2p_types = { version = "^0.3.0-beta-dev.14", path = "../kitsune_p2p/typ
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/bin_data" }
 holo_hash = { version = "^0.3.0-beta-dev.14", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.3.0-beta-dev.24", path = "../holochain_state_types" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = { workspace = true }
 holochain_types = { version = "^0.3.0-beta-dev.24", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.18", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = [ "derive" ] }

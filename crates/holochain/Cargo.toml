@@ -24,29 +24,29 @@ futures = "0.3.1"
 getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
-holo_hash = { version = "^0.3.0-beta-dev.14", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "^0.3.0-beta-dev.27", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.3.0-beta-dev.27", path = "../holochain_conductor_api" }
-holochain_keystore = { version = "^0.3.0-beta-dev.19", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.3.0-beta-dev.26", path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.3.0-beta-dev.24", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_state = { version = "^0.3.0-beta-dev.26", path = "../holochain_state" }
-holochain_types = { version = "^0.3.0-beta-dev.24", path = "../holochain_types" }
-holochain_util = { version = "^0.3.0-beta-dev.2", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.91"
-holochain_websocket = { version = "^0.3.0-beta-dev.5", path = "../holochain_websocket" }
-holochain_zome_types = { version = "^0.3.0-beta-dev.18", path = "../holochain_zome_types", features = ["full"] }
-holochain_nonce = { version = "^0.3.0-beta-dev.22", path = "../holochain_nonce" }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive" }
-holochain-services = { version = "^0.1.0", path = "../holochain-services" }
+holo_hash = { workspace = true, features = ["full"]  }
+holochain_cascade = { workspace = true }
+holochain_conductor_api = { workspace = true }
+holochain_keystore = { workspace = true }
+holochain_p2p = { workspace = true }
+holochain_sqlite = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+holochain_state = { workspace = true }
+holochain_types = { workspace = true }
+holochain_util = { workspace = true, features = [ "pw" ] }
+holochain_wasmer_host = { workspace = true }
+holochain_websocket = { workspace = true }
+holochain_zome_types = { workspace = true, features = ["full"] }
+holochain_nonce = { workspace = true }
+holochain_secure_primitive = { workspace = true }
+holochain-services = { workspace = true }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
-kitsune_p2p = { version = "^0.3.0-beta-dev.23", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
-kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/bootstrap_client" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.10", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.14", path = "../kitsune_p2p/types" }
-kitsune_p2p_block = { version = "^0.3.0-beta-dev.11", path = "../kitsune_p2p/block" }
+kitsune_p2p = { workspace = true, default-features = false }
+kitsune_p2p_bootstrap_client = { workspace = true }
+kitsune_p2p_bin_data = { workspace = true }
+kitsune_p2p_types = { workspace = true }
+kitsune_p2p_block = { workspace = true }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
 mr_bundle = { version = "^0.3.0-beta-dev.2", path = "../mr_bundle" }
@@ -95,16 +95,17 @@ wasmer-middlewares = "=4.2.4"
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 
 # Dependencies for test_utils
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
-contrafact = {version = "0.2.0-rc.1", optional = true }
-diff = {version = "0.1", optional = true }
+arbitrary = { workspace = true, optional = true }
+contrafact = {workspace = true, optional = true }
+diff = { workspace = true, optional = true }
 hdk = { version = "^0.3.0-beta-dev.22", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
-holochain_test_wasm_common = { version = "^0.3.0-beta-dev.22", path = "../test_utils/wasm_common", optional = true  }
-kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.14", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 tx5-go-pion-turn = { version = "=0.0.5-alpha", optional = true }
 tx5-signal-srv = { version = "=0.0.5-alpha", optional = true }
+
+holochain_test_wasm_common = { workspace = true, optional = true  }
+kitsune_p2p_bootstrap = { workspace = true, optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
