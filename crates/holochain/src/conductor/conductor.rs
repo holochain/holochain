@@ -2542,7 +2542,14 @@ mod accessor_impls {
 
         /// Construct the DnaRuntime given the current setup
         pub fn get_dna_runtime(&self) -> DnaRuntime {
-            todo!()
+            DnaRuntime {
+                networking_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
+                dpki_hash: self
+                    .services()
+                    .dpki
+                    .as_ref()
+                    .map(|c| c.cell_id().dna_hash().clone().into()),
+            }
         }
 
         /// Get a TaskManagerClient

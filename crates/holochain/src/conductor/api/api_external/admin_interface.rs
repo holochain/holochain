@@ -296,6 +296,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.storage_info().await?,
             )),
             InitializeDeepkey { deepkey_dna } => {
+                let runtime = self.conductor_handle.get_dna_runtime();
+                let (deepkey_dna, _) = deepkey_dna
+                    .into_dna_file(Default::default(), runtime)
+                    .await?;
                 self.conductor_handle
                     .clone()
                     .initialize_deepkey(Some(deepkey_dna))
