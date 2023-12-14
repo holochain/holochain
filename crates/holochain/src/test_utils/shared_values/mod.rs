@@ -3,9 +3,12 @@
 //! This module implements value sharing for out-of-band communication between test agents.
 
 use anyhow::{bail, Result as Fallible};
+use futures::StreamExt;
+use holochain_websocket::{WebsocketConfig, WebsocketListener};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{collections::BTreeMap, sync::Arc};
+use tokio::task::JoinHandle;
 
 const TEST_SHARED_VALUES_TYPE: &str = "TEST_SHARED_VALUES_TYPE";
 const TEST_SHARED_VALUES_TYPE_LOCALV1: &str = "localv1";
@@ -30,12 +33,110 @@ pub struct RemoteV1Client {
     receiver: Arc<holochain_websocket::WebsocketReceiver>,
 }
 
-/// Remote implementation using Websockets for data passing.
-#[derive(Clone)]
-pub struct RemoteV1Server {
-    url: url2::Url2,
-    sender: Arc<holochain_websocket::WebsocketSender>,
-    receiver: Arc<holochain_websocket::WebsocketReceiver>,
+pub mod remote_v1_server {
+    use super::*;
+
+    // TODO: this is only used to import the proc macro `SerializedBytes`. figure out how to import that selectively
+    use crate::prelude::*;
+
+    /// Remote implementation using Websockets for data passing.
+    #[derive(Clone)]
+    pub struct RemoteV1Server {
+        localv1: Arc<LocalV1>,
+
+        local_addr: url2::Url2,
+
+        server_handle: Arc<JoinHandle<()>>,
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
+    pub enum Message {
+        Test(String),
+    }
+
+    impl RemoteV1Server {
+        /// Creates a new server and starts it immediately.
+        pub async fn new(bind_socket: Option<&str>) -> Fallible<Self> {
+            let localv1 = LocalV1::default();
+
+            let original_url = url2::Url2::try_parse(bind_socket.unwrap_or("ws://127.0.0.1:0"))?;
+
+            let mut server = WebsocketListener::bind(
+                original_url.clone(),
+                std::sync::Arc::new(WebsocketConfig::default()),
+            )
+            .await?;
+
+            let local_addr = server.local_addr().clone();
+
+            let server_handle = tokio::task::spawn(async move {
+                // Handle new connections
+                Self::remotev1server_inner(&mut server)
+                    .await
+                    .expect("server failed");
+            });
+
+            Ok(Self {
+                localv1: Arc::new(localv1),
+
+                local_addr,
+                server_handle: Arc::new(server_handle),
+            })
+        }
+
+        async fn remotev1server_inner(server: &mut WebsocketListener) -> Fallible<()> {
+            while let Some(Ok((_send, mut recv))) = server.next().await {
+                tokio::task::spawn(async move {
+                    // Receive a message and echo it back
+                    if let Some((msg, resp)) = recv.next().await {
+                        // Deserialize the message
+                        let msg: Message = msg.try_into().unwrap();
+
+                        match msg {
+                            Message::Test(s) => {
+                                // If this message is a request then we can respond
+                                if resp.is_request() {
+                                    let msg = Message::Test(format!("echo: {}", s));
+                                    resp.respond(msg.try_into().unwrap()).await.unwrap();
+                                }
+                            }
+
+                            _ => todo!(),
+                        }
+                    }
+                });
+            }
+
+            Ok(())
+        }
+
+        pub fn url(&self) -> Fallible<url2::Url2> {
+            Ok(url2::Url2::try_parse(format!(
+                "ws://{}",
+                self.local_addr.as_str()
+            ))?)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn shared_values_remotev1_server_basic() {
+            todo!();
+
+            // // Connect the client to the server
+            // let (mut send, _recv) = connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+            //     .await
+            //     .unwrap();
+
+            // let msg = TestMessage("test".to_string());
+            // // Make a request and get the echoed response
+            // let rsp: TestMessage = send.request(msg).await.unwrap();
+
+            // assert_eq!("echo: test", &rsp.0,);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -82,7 +183,7 @@ impl SharedValues {
                 num_waiters.load(Ordering::SeqCst)
             }
 
-            _ => unimplemented!(),
+            _ => todo!(),
         }
     }
 
