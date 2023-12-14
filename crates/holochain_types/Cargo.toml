@@ -20,7 +20,7 @@ base64 = "0.13"
 cfg-if = "0.1"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_builder = "0.9.0"
-derive_more = "0.99.3"
+derive_more = { workspace = true }
 either = "1.5"
 fixt = { path = "../fixt", version = "^0.3.0-beta-dev.0"}
 flate2 = "1.0.14"
