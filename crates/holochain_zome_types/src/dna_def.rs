@@ -43,10 +43,11 @@ pub struct DnaDef {
     /// computation.
     pub modifiers: DnaModifiers,
 
-    // /// Parameters defined by the conductor into which this DNA is installed.
-    // /// These specify various constraints on network compatibility based on the
-    // /// runtime environment. These do affect the DNA hash.
-    // pub runtime: DnaRuntime,
+    /// Parameters defined by the conductor into which this DNA is installed.
+    /// These specify various constraints on network compatibility based on the
+    /// runtime environment. These do affect the DNA hash.
+    pub runtime: DnaRuntime,
+
     /// A vector of zomes associated with your DNA.
     pub integrity_zomes: IntegrityZomes,
 

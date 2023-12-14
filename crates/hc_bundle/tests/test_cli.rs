@@ -87,16 +87,20 @@ async fn test_packed_hash_consistency() {
 
 #[tokio::test]
 async fn test_integrity() {
-    let pack_dna = |path| async move {
-        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
-        let cmd = cmd.args(["pack", path]);
-        cmd.assert().success();
-        let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
-        let original_dna = read_dna(&dna_path).unwrap();
-        original_dna
-            .into_dna_file(DnaModifiersOpt::none())
-            .await
-            .unwrap()
+    let runtime = DnaRuntime::fake();
+    let pack_dna = move |path| {
+        let runtime = runtime.clone();
+        async move {
+            let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+            let cmd = cmd.args(["pack", path]);
+            cmd.assert().success();
+            let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
+            let original_dna = read_dna(&dna_path).unwrap();
+            original_dna
+                .into_dna_file(DnaModifiersOpt::none(), runtime.clone())
+                .await
+                .unwrap()
+        }
     };
     let (integrity_dna, integrity_dna_hash) = pack_dna("tests/fixtures/my-app/dnas/dna3").await;
     let (coordinator_dna, coordinator_dna_hash) = pack_dna("tests/fixtures/my-app/dnas/dna4").await;
@@ -158,6 +162,9 @@ async fn test_integrity() {
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 async fn test_multi_integrity() {
+    let runtime = DnaRuntime::fake();
+    let runtime_clone = runtime.clone();
+
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", path]);
@@ -165,7 +172,7 @@ async fn test_multi_integrity() {
         let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
         original_dna
-            .into_dna_file(DnaModifiersOpt::none())
+            .into_dna_file(DnaModifiersOpt::none(), runtime_clone.clone())
             .await
             .unwrap()
     };
@@ -193,6 +200,7 @@ async fn test_multi_integrity() {
             origin_time,
             quantum_time: Duration::from_secs(5 * 60),
         },
+        runtime,
         integrity_zomes: vec![
             (
                 "zome1".into(),
