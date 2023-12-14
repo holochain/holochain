@@ -20,7 +20,7 @@ base64 = "0.13"
 cfg-if = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_builder = "0.9.0"
-derive_more = "0.99.3"
+derive_more = { workspace = true }
 either = "1.5"
 fixt = { path = "../fixt", version = "^0.3.0-beta-dev.0"}
 flate2 = "1.0.14"
@@ -32,7 +32,7 @@ holochain_keystore = { version = "^0.3.0-beta-dev.19", path = "../holochain_keys
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.24"}
-holochain_wasmer_host = "=0.0.90"
+holochain_wasmer_host = "=0.0.91"
 holochain_util = { version = "^0.3.0-beta-dev.2", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.18", features = ["full"] }
 itertools = { version = "0.10" }
