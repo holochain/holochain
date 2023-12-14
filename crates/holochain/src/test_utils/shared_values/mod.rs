@@ -84,48 +84,6 @@ impl SharedValues {
         }
     }
 
-    /// Gets the `value` for `key`; waits for it to become available if necessary.
-    pub async fn get<T: for<'a> Deserialize<'a>>(
-        &mut self,
-        key: &str,
-        mut ignore_existing: bool,
-    ) -> Fallible<T> {
-        match self {
-            SharedValues::LocalV1(localv1) => {
-                loop {
-                    let notifier =
-                                // new scope so data_guard gets dropped before waiting for a notification
-                                {
-                                    let data_guard = localv1.data.lock().await;
-
-                                    if !ignore_existing {
-                                        if let Some(value) = data_guard.get(key) {
-                                            return Ok(serde_json::from_str(value)?);
-                                        }
-                                    }
-
-                                    // get the notifier while still holding the data lock.
-                                    // this prevents a race between getting the notifier and a writer just writing something and sending notifications for it
-                                    localv1.num_waiters.fetch_add(1, Ordering::SeqCst);
-                                    localv1
-                                        .notification
-                                        .lock()
-                                        .await
-                                        .entry(key.to_string())
-                                        .or_default()
-                                        .clone()
-                                };
-
-                    notifier.notified().await;
-                    ignore_existing = false;
-
-                    localv1.num_waiters.fetch_sub(1, Ordering::SeqCst);
-                }
-            }
-            SharedValues::RemoteV1Client(_) => unimplemented!(),
-        }
-    }
-
     /// Gets all values that have a matching key prefix; waits for `min_results` to become available if specified.
     pub async fn get_pattern<T: for<'a> Deserialize<'a>>(
         &mut self,
@@ -136,41 +94,43 @@ impl SharedValues {
         match self {
             SharedValues::LocalV1(localv1) => {
                 loop {
-                    let notifier =
-                                // new scope so data_guard gets dropped before waiting for a notification
-                                {
-                                    let data_guard = localv1.data.lock().await;
+                    let (notifier, notification);
 
+                    // new scope so data_guard gets dropped before waiting for a notification
+                    {
+                        let data_guard = localv1.data.lock().await;
 
-                                    if !ignore_existing {
-                                        let mut results: HashMap<String, T>  = Default::default();
+                        if !ignore_existing {
+                            let mut results: HashMap<String, T> = Default::default();
 
-                                        for (key, value) in data_guard.iter() {
-                                            if key.matches(pattern).count() > 0 {
-                                                results.insert(key.to_string(), serde_json::from_str(&value)?);
-                                            }
-                                        }
+                            for (key, value) in data_guard.iter() {
+                                if key.matches(pattern).count() > 0 {
+                                    results.insert(key.to_string(), serde_json::from_str(&value)?);
+                                }
+                            }
 
-                                        if let Some(min_results) = maybe_min_results {
-                                            if results.len() >= min_results {
-                                                return Ok(results);
-                                            }
-                                        }
-                                    }
+                            if let Some(min_results) = maybe_min_results {
+                                if results.len() >= min_results {
+                                    return Ok(results);
+                                }
+                            }
+                        }
 
-                                    // get the notifier while still holding the data lock.
-                                    // this prevents a race between getting the notifier and a writer just writing something and sending notifications for it
-                                    localv1.num_waiters.fetch_add(1, Ordering::SeqCst);
-                                    localv1
-                                        .notification
-                                        .lock()
-                                        .await
-                                        .entry(pattern.to_string())
-                                        .or_default()
-                                        .clone()
-                                };
+                        // get the notifier and start waiting on it while still holding the data_guard.
+                        // this prevents a race between getting the notifier and a writer just writing something and sending notifications for it
+                        localv1.num_waiters.fetch_add(1, Ordering::SeqCst);
+                        notifier = localv1
+                            .notification
+                            .lock()
+                            .await
+                            .entry(pattern.to_string())
+                            .or_default()
+                            .clone();
 
-                    notifier.notified().await;
+                        notification = notifier.notified();
+                    };
+
+                    notification.await;
                     ignore_existing = false;
 
                     localv1.num_waiters.fetch_sub(1, Ordering::SeqCst);
@@ -236,7 +196,13 @@ mod tests {
 
             tokio::spawn({
                 async move {
-                    let got: String = values.get(&prefix, true).await.unwrap();
+                    let got: String = values
+                        .get_pattern(&prefix, true, Some(1))
+                        .await
+                        .unwrap()
+                        .into_values()
+                        .nth(0)
+                        .unwrap();
                     eprintln!("got {got}");
                     assert_eq!(s, got);
 
