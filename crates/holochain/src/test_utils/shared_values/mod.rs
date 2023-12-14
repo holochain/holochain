@@ -5,19 +5,21 @@
 use anyhow::{bail, Result as Fallible};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 const TEST_SHARED_VALUES_TYPE: &str = "TEST_SHARED_VALUES_TYPE";
 const TEST_SHARED_VALUES_TYPE_LOCALV1: &str = "localv1";
 const TEST_SHARED_VALUES_TYPE_REMOTEV1: &str = "remotev1";
 const TEST_SHARED_VALUES_REMOTEV1_URL: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
 
-/// Local implementation using a guarded HashMap as its datastore.
+pub type Results<T> = BTreeMap<String, T>;
+
+/// Local implementation using a guarded BTreeMap as its datastore.
 #[derive(Clone, Default)]
 pub struct LocalV1 {
     num_waiters: Arc<AtomicUsize>,
-    data: Arc<tokio::sync::Mutex<HashMap<String, String>>>,
-    notification: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Notify>>>>,
+    data: Arc<tokio::sync::Mutex<BTreeMap<String, String>>>,
+    notification: Arc<tokio::sync::Mutex<BTreeMap<String, Arc<tokio::sync::Notify>>>>,
 }
 
 /// Remote implementation using Websockets for data passing.
@@ -85,12 +87,17 @@ impl SharedValues {
     }
 
     /// Gets all values that have a matching key prefix; waits for `min_results` to become available if specified.
-    pub async fn get_pattern<T: for<'a> Deserialize<'a>>(
+    /// `wait_until` lets the caller decide under which conditions to accept the result, or otherwise keep waiting.
+    ///
+    /// Please look at the tests for usage examples.
+    pub async fn get_pattern<T: for<'a> Deserialize<'a>, F>(
         &mut self,
         pattern: &str,
-        mut ignore_existing: bool,
-        maybe_min_results: Option<usize>,
-    ) -> Fallible<HashMap<String, T>> {
+        mut maybe_wait_until: Option<F>,
+    ) -> Fallible<Results<T>>
+    where
+        F: FnMut(&Results<T>) -> bool,
+    {
         match self {
             SharedValues::LocalV1(localv1) => {
                 loop {
@@ -100,20 +107,19 @@ impl SharedValues {
                     {
                         let data_guard = localv1.data.lock().await;
 
-                        if !ignore_existing {
-                            let mut results: HashMap<String, T> = Default::default();
+                        let mut results: Results<T> = Default::default();
 
-                            for (key, value) in data_guard.iter() {
-                                if key.matches(pattern).count() > 0 {
-                                    results.insert(key.to_string(), serde_json::from_str(&value)?);
-                                }
+                        for (key, value) in data_guard.iter() {
+                            if key.matches(pattern).count() > 0 {
+                                results.insert(key.to_string(), serde_json::from_str(&value)?);
                             }
+                        }
 
-                            if let Some(min_results) = maybe_min_results {
-                                if results.len() >= min_results {
-                                    return Ok(results);
-                                }
-                            }
+                        if maybe_wait_until
+                            .as_mut()
+                            .map_or(true, |ref mut wait_until| wait_until(&results))
+                        {
+                            return Ok(results);
                         }
 
                         // get the notifier and start waiting on it while still holding the data_guard.
@@ -131,7 +137,6 @@ impl SharedValues {
                     };
 
                     notification.await;
-                    ignore_existing = false;
 
                     localv1.num_waiters.fetch_sub(1, Ordering::SeqCst);
                 }
@@ -197,7 +202,7 @@ mod tests {
             tokio::spawn({
                 async move {
                     let got: String = values
-                        .get_pattern(&prefix, true, Some(1))
+                        .get_pattern(&prefix, Some(|results: &Results<_>| results.len() > 0))
                         .await
                         .unwrap()
                         .into_values()
@@ -255,7 +260,7 @@ mod tests {
             tokio::spawn(async move {
                 tokio::select! {
                     _ = async {
-                        let all_agents: HashMap<_, AgentDummyInfo> = values.get_pattern(PREFIX, false, Some(num_agents)).await.unwrap();
+                        let all_agents: Results<AgentDummyInfo> = values.get_pattern(PREFIX, Some(|results: &Results<_>| results.len() >= num_agents)).await.unwrap();
                         assert!(required_agents <= all_agents.len());
                         assert!(all_agents.len() <= num_agents);
                         eprintln!("{} agents {all_agents:#?}", all_agents.len());
