@@ -316,68 +316,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn agent_centric_remote_signals() -> anyhow::Result<()> {
-    holochain_trace::test_run().ok();
-    const NUM_CONDUCTORS: usize = 2;
-
-    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
-
-    // MAYBE: write helper for agents across conductors
-    let all_agents: Vec<HoloHash<hash_type::Agent>> =
-        future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
-
-    // Check that there are no duplicate agents
-    assert_eq!(
-        all_agents.len(),
-        all_agents
-            .clone()
-            .into_iter()
-            .collect::<std::collections::HashSet<_>>()
-            .len()
-    );
-
-    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
-        .await
-        .0;
-
-    let apps = conductors
-        .setup_app_for_zipped_agents("app", &all_agents, &[dna_file])
-        .await
-        .unwrap();
-
-    conductors.exchange_peer_info().await;
-
-    let cells = apps.cells_flattened();
-
-    let mut rxs = Vec::new();
-    for h in conductors.iter() {
-        rxs.extend(h.signal_broadcaster().subscribe_separately())
-    }
-
-    let signal = fixt!(ExternIo);
-
-    let _: () = conductors[0]
-        .call(
-            &cells[0].zome(TestWasm::EmitSignal),
-            "signal_others",
-            RemoteSignal {
-                signal: signal.clone(),
-                agents: all_agents,
-            },
-        )
-        .await;
-
-    tokio::time::timeout(Duration::from_secs(60), async move {
-        let signal = AppSignal::new(signal);
-        for mut rx in rxs {
-            let r = rx.recv().await;
-            // Each handle should recv a signal
-            assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
-        }
-    })
-    .await
-    .unwrap();
-
-    Ok(())
+    todo!("rewrite remote_signals with agent centricity");
 }
 
 #[tokio::test(flavor = "multi_thread")]
