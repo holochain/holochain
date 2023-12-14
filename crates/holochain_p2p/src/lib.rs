@@ -64,7 +64,7 @@ pub trait HolochainP2pDnaT: Send + Sync {
     /// This is a fire-and-forget operation, a best effort will be made
     /// to forward the signal, but if the conductor network is overworked
     /// it may decide not to deliver some of the signals.
-    async fn remote_signal(
+    async fn send_remote_signal(
         &self,
         from_agent: AgentPubKey,
         to_agent_list: Vec<(Signature, AgentPubKey)>,
@@ -195,7 +195,7 @@ mockall::mock! {
             expires_at: Timestamp,
         ) -> actor::HolochainP2pResult<SerializedBytes>;
         #[allow(clippy::too_many_arguments)]
-        async fn remote_signal(
+        async fn send_remote_signal(
             &self,
             from_agent: AgentPubKey,
             to_agent_list: Vec<(Signature, AgentPubKey)>,
@@ -349,7 +349,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// This is a fire-and-forget operation, a best effort will be made
     /// to forward the signal, but if the conductor network is overworked
     /// it may decide not to deliver some of the signals.
-    async fn remote_signal(
+    async fn send_remote_signal(
         &self,
         from_agent: AgentPubKey,
         to_agent_list: Vec<(Signature, AgentPubKey)>,
@@ -361,7 +361,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .remote_signal(
+            .send_remote_signal(
                 (*self.dna_hash).clone(),
                 from_agent,
                 to_agent_list,

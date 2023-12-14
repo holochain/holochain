@@ -44,7 +44,7 @@ async fn call_admin() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(port, environment_path);
+    let config = create_config(port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let uuid = uuid::Uuid::new_v4();
@@ -114,7 +114,7 @@ async fn call_zome() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -324,7 +324,7 @@ async fn emit_signals() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
+    let config = create_config(admin_port, environment_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -432,7 +432,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     holochain_trace::test_run().ok();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
+    let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let (mut client, _) = websocket_client(&conductor_handle).await?;
 
@@ -458,7 +458,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
+    let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
@@ -497,7 +497,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
+    let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
@@ -553,7 +553,7 @@ async fn connection_limit_is_respected() {
 
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
-    let config = create_config(0, environment_path);
+    let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
@@ -618,8 +618,8 @@ async fn concurrent_install_dna() {
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
-    let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path);
+    let data_root_path = path.clone();
+    let config = create_config(admin_port, data_root_path.into());
     let config_path = write_config(path, &config);
 
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
@@ -627,7 +627,7 @@ async fn concurrent_install_dna() {
 
     let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
-    //let before = std::time::Instant::now();
+    // let before = std::time::Instant::now();
 
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
@@ -644,7 +644,7 @@ async fn concurrent_install_dna() {
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            //println!("[{}] Agent pub key generated", i);
+            // println!("[{}] Agent pub key generated", i);
 
             let _dna_hash = register_and_install_dna_named(
                 &mut client,
@@ -658,10 +658,10 @@ async fn concurrent_install_dna() {
             )
             .await;
 
-            //println!(
-            //    "[{}] installed dna with hash {} and name {}",
-            //    i, _dna_hash, name
-            //);
+            // println!(
+            //     "[{}] installed dna with hash {} and name {}",
+            //     i, _dna_hash, name
+            // );
         })
     }))
     .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
@@ -672,11 +672,11 @@ async fn concurrent_install_dna() {
         r.unwrap();
     }
 
-    //println!(
-    //    "installed {} dna in {:?}",
-    //    NUM_CONCURRENT_INSTALLS,
-    //    before.elapsed()
-    //);
+    // println!(
+    //     "installed {} dna in {:?}",
+    //     NUM_DNA,
+    //     before.elapsed()
+    // );
 }
 
 #[tokio::test(flavor = "multi_thread")]

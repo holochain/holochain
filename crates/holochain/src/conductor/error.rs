@@ -132,6 +132,12 @@ pub enum ConductorError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("The conductor has no data directory.")]
+    NoDataRootPath,
+
+    #[error("The conductor has no config directory.")]
+    NoConfigPath,
 }
 
 impl ConductorError {

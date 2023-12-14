@@ -25,6 +25,11 @@ tracing-subscriber = { version = "0.3.16", optional = true }
 [dev-dependencies]
 tempfile = "3.5.0"
 
+# When building for the WASM target, we need to configure getrandom
+# to use the host system for the source of crypto-secure randomness.
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+
 # Special config for when we're in build_wasm mode
 [target.'cfg(build_wasm)'.build-dependencies]
 flate2 = "1.0.25"
