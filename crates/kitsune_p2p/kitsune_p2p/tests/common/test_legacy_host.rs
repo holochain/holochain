@@ -96,6 +96,11 @@ impl TestLegacyHost {
                             // TODO nothing to send yet
                             respond.respond(Ok(async move { Ok(None) }.boxed().into()))
                         }
+                        KitsuneP2pEvent::FetchOpData { respond, input, .. } => {
+                            // TODO nothing to send yet
+                            tracing::info!("Handling request for ops: {:?}", input.query);
+                            respond.respond(Ok(async move { Ok(vec![]) }.boxed().into()))
+                        }
                         KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                             let mut key = [0; 32];
                             key.copy_from_slice(&input.agent.0.as_slice());

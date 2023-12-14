@@ -172,6 +172,8 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch the holo dht location for this hash
+    /// This is the last 4 bytes of the hash, reversed into a 32 bit integer. So the 4th from last byte in the hash becomes
+    /// the low byte and the last byte in the hash becomes the high byte.
     pub fn get_loc(&self) -> DhtLocation {
         DhtLocation::new(bytes_to_loc(
             &self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..],
