@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-derive_more = "0.99"
+derive_more = { workspace = true }
 holochain_trace = "0.3.0-beta-dev.1"
 parking_lot = "0.10"
 petgraph = "0.6"
