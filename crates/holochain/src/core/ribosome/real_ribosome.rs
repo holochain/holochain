@@ -587,8 +587,8 @@ impl RealRibosome {
                 origin_time: Timestamp(0),
                 quantum_time: Default::default(),
             },
-            runtime: DnaRuntime {
-                networking_version: 0,
+            network_params: DnaNetworkParams {
+                protocol_version: 0,
                 dpki_hash: None,
             },
             integrity_zomes: Default::default(),

@@ -87,9 +87,9 @@ async fn test_packed_hash_consistency() {
 
 #[tokio::test]
 async fn test_integrity() {
-    let runtime = DnaRuntime::fake();
+    let network_params = DnaNetworkParams::fake();
     let pack_dna = move |path| {
-        let runtime = runtime.clone();
+        let network_params = network_params.clone();
         async move {
             let mut cmd = Command::cargo_bin("hc-dna").unwrap();
             let cmd = cmd.args(["pack", path]);
@@ -97,7 +97,7 @@ async fn test_integrity() {
             let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
             let original_dna = read_dna(&dna_path).unwrap();
             original_dna
-                .into_dna_file(DnaModifiersOpt::none(), runtime.clone())
+                .into_dna_file(DnaModifiersOpt::none(), network_params.clone())
                 .await
                 .unwrap()
         }
@@ -162,8 +162,8 @@ async fn test_integrity() {
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 async fn test_multi_integrity() {
-    let runtime = DnaRuntime::fake();
-    let runtime_clone = runtime.clone();
+    let network_params = DnaNetworkParams::fake();
+    let network_params_clone = network_params.clone();
 
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
@@ -172,7 +172,7 @@ async fn test_multi_integrity() {
         let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
         original_dna
-            .into_dna_file(DnaModifiersOpt::none(), runtime_clone.clone())
+            .into_dna_file(DnaModifiersOpt::none(), network_params_clone.clone())
             .await
             .unwrap()
     };
@@ -200,7 +200,7 @@ async fn test_multi_integrity() {
             origin_time,
             quantum_time: Duration::from_secs(5 * 60),
         },
-        runtime,
+        network_params,
         integrity_zomes: vec![
             (
                 "zome1".into(),

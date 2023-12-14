@@ -39,11 +39,11 @@ impl DnaBundle {
     pub async fn into_dna_file(
         self,
         modifiers: DnaModifiersOpt,
-        runtime: DnaRuntime,
+        network_params: DnaNetworkParams,
     ) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) =
-            self.to_dna_def(integrity, coordinator, modifiers, runtime)?;
+            self.to_dna_def(integrity, coordinator, modifiers, network_params)?;
 
         Ok((
             DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
@@ -117,7 +117,7 @@ impl DnaBundle {
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
         modifiers: DnaModifiersOpt,
-        runtime: DnaRuntime,
+        network_params: DnaNetworkParams,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
@@ -131,7 +131,7 @@ impl DnaBundle {
                         origin_time: manifest.integrity.origin_time.into(),
                         quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
                     },
-                    runtime: runtime.clone(),
+                    network_params: network_params.clone(),
                     integrity_zomes,
                     coordinator_zomes,
                 };
@@ -265,7 +265,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {
-        let runtime = DnaRuntime::fake();
+        let network_params = DnaNetworkParams::fake();
 
         let path1 = PathBuf::from("1");
         let path2 = PathBuf::from("2");
@@ -309,7 +309,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(DnaModifiersOpt::none(), runtime.clone()).await,
+            bad_bundle.into_dna_file(DnaModifiersOpt::none(), network_params.clone()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
@@ -323,7 +323,7 @@ mod tests {
         .unwrap()
         .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(DnaModifiersOpt::none(), runtime.clone())
+            .into_dna_file(DnaModifiersOpt::none(), network_params.clone())
             .await
             .unwrap()
             .0;
@@ -343,7 +343,7 @@ mod tests {
                     .with_properties(properties.clone())
                     .serialized()
                     .unwrap(),
-                runtime.clone(),
+                network_params.clone(),
             )
             .await
             .unwrap()

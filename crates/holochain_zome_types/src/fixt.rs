@@ -736,8 +736,8 @@ fixturator!(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        runtime: DnaRuntime {
-            networking_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+        network_params: DnaNetworkParams {
+            protocol_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
             dpki_hash: Some(DnaHashB64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
@@ -762,8 +762,8 @@ fixturator!(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        runtime: DnaRuntime {
-            networking_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+        network_params: DnaNetworkParams {
+            protocol_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
             dpki_hash: Some(DnaHashB64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
@@ -788,8 +788,8 @@ fixturator!(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        runtime: DnaRuntime {
-            networking_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
+        network_params: DnaNetworkParams {
+            protocol_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
             dpki_hash: Some(DnaHashB64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())

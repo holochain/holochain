@@ -37,8 +37,8 @@ pub fn fake_dna_zomes_named(
     name: &str,
     zomes: Vec<(ZomeName, DnaWasm)>,
 ) -> DnaFile {
-    let runtime = DnaRuntime {
-        networking_version: 42,
+    let network_params = DnaNetworkParams {
+        protocol_version: 42,
         dpki_hash: None,
     };
     let mut dna = DnaDef {
@@ -51,7 +51,7 @@ pub fn fake_dna_zomes_named(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        runtime,
+        network_params,
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
     };

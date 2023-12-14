@@ -165,10 +165,10 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct DnaRuntime {
+pub struct DnaNetworkParams {
     /// A version number which represents network protocol compatibility.
     /// This is set by kitsune and bumped whenever a breaking protocol change is made.
-    pub networking_version: u32,
+    pub protocol_version: u32,
 
     /// DPKI is fundamental to the workings of agent key management and validation.
     /// Two conductors with different DPKI networks cannot validate each other's agent keys,
@@ -182,11 +182,11 @@ pub struct DnaRuntime {
 }
 
 #[cfg(feature = "test_utils")]
-impl DnaRuntime {
+impl DnaNetworkParams {
     /// Get a fake value for testing
     pub fn fake() -> Self {
-        DnaRuntime {
-            networking_version: 42,
+        DnaNetworkParams {
+            protocol_version: 42,
             dpki_hash: None,
         }
     }
