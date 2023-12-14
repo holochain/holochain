@@ -9,11 +9,11 @@ use syn::parse::Result;
 use syn::punctuated::Punctuated;
 
 mod dna_properties;
-mod entry_def_registration;
-mod entry_defs;
-mod entry_defs_conversions;
-mod entry_defs_name_registration;
 mod entry_helper;
+mod entry_type_registration;
+mod entry_types;
+mod entry_types_conversions;
+mod entry_types_name_registration;
 mod entry_zomes;
 mod link_types;
 mod link_zomes;
@@ -190,9 +190,9 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_error]
-#[proc_macro_derive(EntryDefRegistration, attributes(entry_def))]
-pub fn derive_entry_def_registration(input: TokenStream) -> TokenStream {
-    entry_def_registration::derive(input)
+#[proc_macro_derive(EntryDefRegistration, attributes(entry_type))]
+pub fn derive_entry_type_registration(input: TokenStream) -> TokenStream {
+    entry_type_registration::derive(input)
 }
 
 #[proc_macro_error]
@@ -229,7 +229,7 @@ pub fn derive_to_unit_enum(input: TokenStream) -> TokenStream {
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_entry_types(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    entry_defs::build(attrs, code)
+    entry_types::build(attrs, code)
 }
 
 /// Implements all the required types needed for a `LinkTypes` enum.
@@ -248,13 +248,13 @@ pub fn hdk_to_coordinates(attrs: TokenStream, code: TokenStream) -> TokenStream 
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_entry_types_name_registration(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    entry_defs_name_registration::build(attrs, code)
+    entry_types_name_registration::build(attrs, code)
 }
 
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hdk_entry_types_conversions(attrs: TokenStream, code: TokenStream) -> TokenStream {
-    entry_defs_conversions::build(attrs, code)
+    entry_types_conversions::build(attrs, code)
 }
 
 #[proc_macro_error]
