@@ -64,7 +64,7 @@
 //!     - Ops are sorted by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
 //!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
 //!     - The [validation checks](#validation-checks) are run for each op.
-//!     - For any ops that passed valdiation, they will be marked as ready for app validation in the database.
+//!     - For any ops that passed validation, they will be marked as ready for app validation in the database.
 //!     - For any ops which were rejected will be marked rejected in the database.
 //! - If any ops passed validation then app validation will be triggered.
 //! - For actions that were not found locally, the workflow will then attempt to fetch them from the network.
