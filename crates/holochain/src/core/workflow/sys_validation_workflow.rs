@@ -1,6 +1,6 @@
 //! ### The sys validation workflow
 //!
-//! This workflow runs against all [`Action`]s that are going into the DHT database. Either coming from the authored database or from other nodes on the network.
+//! This workflow runs against all [`Action`]s that are going into the DHT database, either coming from the authored database or from other nodes on the network.
 //!
 //! The purpose of the workflow is to make fundamental checks on the integrity of the data being put into the DHT. This ensures that invalid data is not served
 //! to other nodes on the network. It also saves hApp developers from having to write these checks themselves since they set the minimum standards that all data
