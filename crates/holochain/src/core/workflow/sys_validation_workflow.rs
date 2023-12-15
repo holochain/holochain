@@ -12,7 +12,7 @@
 //! sys validation having performed are:
 //! - For a [`DhtOp::StoreRecord`]
 //!    - Run the [store record checks](#store-record-checks).
-//!    - If the [`Entry`] is an [`Entry::CounterSign`] then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
+//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
 //!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
 //!    - Run the [store entry checks](#store-entry-checks).
 //! - For a [`DhtOp::StoreEntry`]
