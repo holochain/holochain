@@ -671,7 +671,7 @@ async fn queue_consumer_main_task_impl<
             let start = Instant::now();
             match fut().await {
                 Ok(WorkComplete::Incomplete(delay)) => {
-                    tracing::trace!("Work incomplete, re-triggering workflow - {}.", name);
+                    tracing::debug!("Work incomplete, re-triggering workflow - {}.", name);
                     if let Some(dly) = delay {
                         tracing::debug!("Sleeping for {} ms before re-triggering - {}.", dly.as_millis(), name);
                         tokio::time::sleep(dly).await;
