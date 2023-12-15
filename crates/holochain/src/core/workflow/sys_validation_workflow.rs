@@ -69,7 +69,7 @@
 //! - If any ops passed validation, then app validation will be triggered.
 //! - For actions that were not found locally, the workflow will then attempt to fetch them from the network.
 //! - If any actions that were missing are found on the network, then sys validation is re-triggered to see if the newly fetched actions allow any outstanding ops to pass validation.
-//! - If fewer actions were fetched from the network than the of actions that were missing then the workflow will sleep for a short time before re-triggering itself.
+//! - If fewer actions were fetched from the network than there were actions missing, then the workflow will sleep for a short time before re-triggering itself.
 //! - Once all ops have an outcome, the workflow is complete and will wait to be triggered again by new incoming ops.
 //!
 
