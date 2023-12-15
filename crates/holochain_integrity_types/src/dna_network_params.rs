@@ -38,7 +38,7 @@ impl DnaNetworkParams {
     /// Get a fake value for testing
     pub fn fake() -> Self {
         DnaNetworkParams {
-            protocol_version: 42,
+            protocol_version: 0xFA73, // 64115
             dpki_hash: None,
         }
     }
