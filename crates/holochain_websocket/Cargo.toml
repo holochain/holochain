@@ -24,7 +24,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
 tracing = "0.1"
 tracing-futures = "0.2"
-tungstenite = "0.12"
+tungstenite = "0.20"
 url2 = "0.0.6"
 
 [dev-dependencies]
