@@ -25,7 +25,7 @@
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterUpdatedContent`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
-//!    - If there is an [`Entry`] then the [store entry checks](#store-entry-checks) are run.
+//!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
 //! - For a [`DhtOp::RegisterUpdatedRecord`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
 //!    - If there is an [`Entry`] then the [store entry checks](#store-entry-checks) are run.
