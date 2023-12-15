@@ -128,7 +128,7 @@ assert_cmd = "1.0.1"
 clap = "4.0"
 contrafact = "0.2.0-rc.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
-ed25519-dalek = "1"
+ed25519-dalek = "2"
 indoc = "1.0"
 isotest = "0"
 maplit = "1"
