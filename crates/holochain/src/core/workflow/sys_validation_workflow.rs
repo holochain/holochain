@@ -36,7 +36,8 @@
 //! - For a [`DhtOp::RegisterAddLink`]
 //!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
 //! - For a [`DhtOp::RegisterRemoveLink`]
-//!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally.
+//!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also 
+//!     be a [`Action::CreateLink`].
 //!
 //! ##### Store record checks
 //!
