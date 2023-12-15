@@ -8,7 +8,7 @@
 //!
 //! #### Validation checks
 //!
-//! The workflow operates on [`DhtOp`]s which combine [`Action`]s give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on
+//! The workflow operates on [`DhtOp`]s which combine [`Action`]s, give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on
 //! sys validation having performed are:
 //! - For a [`DhtOp::StoreRecord`]
 //!    - Run the [store record checks](#store-record-checks).
