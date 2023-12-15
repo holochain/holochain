@@ -61,7 +61,7 @@
 //! #### Workflow description
 //!
 //! - The workflow starts by fetching all the ops that need to be validated from the database. The ops are processed as follows:
-//!     - It then sorts the ops by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
+//!     - Ops are sorted by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
 //!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
 //!     - The [validation checks](#validation-checks) are run for each op.
 //!     - For any ops that passed valdiation, they will be marked as ready for app validation in the database.
