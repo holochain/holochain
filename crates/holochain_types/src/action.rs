@@ -13,7 +13,6 @@ use conversions::WrongActionError;
 use derive_more::From;
 use holo_hash::EntryHash;
 use holochain_zome_types::op::EntryCreationAction;
-use holochain_zome_types::prelude::*;
 
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,

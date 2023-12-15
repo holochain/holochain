@@ -30,6 +30,7 @@ members = [
   "crates/holochain_metrics",
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
+  "crates/holochain-services",
 
   "crates/hc",
   "crates/hc_bundle",
@@ -60,7 +61,17 @@ members = [
 exclude = ["crates/release-automation"]
 
 [workspace.dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
 derive_more = "0.99"
+futures = "0.3"
+mockall = "0.11"
+must_future = "0.1"
+serde = "1.0"
+thiserror = "1.0"
+
+holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
+holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
 
 
 [profile.fast-test]
