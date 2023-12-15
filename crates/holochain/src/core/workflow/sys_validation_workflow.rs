@@ -1,6 +1,6 @@
 //! ### The sys validation workflow
 //!
-//! This workflow runs against all [`Action`]s that are going into the DHT database, either coming from the authored database or from other nodes on the network.
+//! This workflow runs against all [`DhtOp`]s that are in the DHT database, either coming from the authored database or from other nodes on the network via gossip and publishing.
 //!
 //! The purpose of the workflow is to make fundamental checks on the integrity of the data being put into the DHT. This ensures that invalid data is not served
 //! to other nodes on the network. It also saves hApp developers from having to write these checks themselves since they set the minimum standards that all data
@@ -8,8 +8,8 @@
 //!
 //! #### Validation checks
 //!
-//! The workflow operates on [`DhtOp`]s which combine [`Action`]s, give context to [`Action`]s and carry [`Entry`]s where relevant. Checks that you can rely on
-//! sys validation having performed are:
+//! The workflow operates on [`DhtOp`]s which are roughly equivalent to [`Record`]s but catered to the needs of a specific type of Authority.
+//! Checks that you can rely on sys validation having performed are:
 //! - For a [`DhtOp::StoreRecord`]
 //!    - Run the [store record checks](#store-record-checks).
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
