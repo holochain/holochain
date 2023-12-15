@@ -46,7 +46,7 @@
 //! - Checks that the author of the current action is the same as the author of the previous action.
 //! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
 //! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
-//! - Checks that every [`Action::Create`] or [`Action::Update`] was preceeded by a [`Action::AgentValidationPkg`].
+//! - Checks that every [`Action::Create`] or [`Action::Update`] of an `AgentPubKey` is preceded by an [`Action::AgentValidationPkg`].
 //!
 //! ##### Store entry checks
 //!
