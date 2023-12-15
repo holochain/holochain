@@ -65,7 +65,7 @@
 //!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
 //!     - The [validation checks](#validation-checks) are run for each op.
 //!     - For any ops that passed validation, they will be marked as ready for app validation in the database.
-//!     - For any ops which were rejected will be marked rejected in the database.
+//!     - Any ops which were rejected will be marked rejected in the database.
 //! - If any ops passed validation then app validation will be triggered.
 //! - For actions that were not found locally, the workflow will then attempt to fetch them from the network.
 //! - If any actions that were missing are found on the network, then sys validation is re-triggered to see if the newly fetched actions allow any outstanding ops to pass validation.
