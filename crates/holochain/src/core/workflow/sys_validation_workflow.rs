@@ -21,7 +21,7 @@
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterAgentActivity`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
-//!    - If the [`Action`] is a [`Action::Dna`] then check the contained DNA hash matches the DNA hash that sys validation is being run for.
+//!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
 //!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterUpdatedContent`]
 //!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
