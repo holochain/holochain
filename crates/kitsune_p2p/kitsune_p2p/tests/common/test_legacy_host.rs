@@ -1,7 +1,7 @@
 use futures::{channel::mpsc::Receiver, FutureExt, StreamExt};
 use itertools::Itertools;
 use kitsune_p2p::event::{FetchOpDataEvtQuery, KitsuneP2pEvent};
-use kitsune_p2p_bin_data::{KOp, KitsuneAgent, KitsuneOpData, KitsuneSignature, KitsuneOpHash};
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -9,9 +9,9 @@ use kitsune_p2p_types::{
         arq::LocalStorageConfig,
         spacetime::{Dimension, Topology},
         ArqStrat, PeerStrat,
-    }, dht_arc::{DhtArcSet, DhtArc, DhtArcRange},
+    }, dht_arc::DhtArcRange,
 };
-use std::{borrow::Borrow, collections::HashSet, sync::Arc, intrinsics::unreachable};
+use std::{collections::HashSet, sync::Arc};
 
 use super::{test_keystore, TestHostOp};
 
@@ -95,8 +95,6 @@ impl TestLegacyHost {
                             respond.respond(Ok(async move { Ok(payload) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
-                            // TODO nothing to send yet
-
                             let op_store = op_store.read();
                             let selected_ops: Vec<TestHostOp> = op_store.iter().filter(|op| {
                                 if op.space() != input.space {
@@ -136,9 +134,12 @@ impl TestLegacyHost {
                                 let low_time = selected_ops.first().unwrap().authored_at();
                                 let high_time = selected_ops.last().unwrap().authored_at();
 
-                                respond.respond(Ok(async move { Ok(Some(selected_ops.into_iter().map(|op| op.kitsune_hash()))) }.boxed().into()))
+                                respond.respond(Ok(async move { Ok(Some(
+                                    (selected_ops.into_iter().map(|op| Arc::new(op.kitsune_hash())).collect(), low_time..=high_time)
+                                )) }.boxed().into()))
+                            } else {
+                                respond.respond(Ok(async move { Ok(None) }.boxed().into()))
                             }
-                            
                         }
                         KitsuneP2pEvent::FetchOpData { respond, input, .. } => {
                             let result = match input.query {
