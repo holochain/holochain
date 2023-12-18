@@ -3,7 +3,7 @@
 use holo_hash::DnaHashB64;
 use holochain_serialized_bytes::prelude::*;
 
-/// Extra parameters that determine the DNA hash.
+/// Extra parameters that contribute to determining the DNA hash.
 /// They are set by the conductor at install time and cannot be specified
 /// by the DNA developer.
 /// They represent different aspects of networking compability.
@@ -28,8 +28,9 @@ pub struct DnaNetworkParams {
     /// of network compatibility.
     ///
     /// Note that conductors with no DPKI service installed will be able to talk to conductors
-    /// with a DPKI service installed, but not vice versa, so we don't both supporting that
-    /// kind of one-way communication.
+    /// with a DPKI service installed on the same network, but not vice versa,
+    /// so we still ensure that both cases result in a different DNA hash so that we don't have
+    /// to consider that kind of one-way communication.
     pub dpki_hash: Option<DnaHashB64>,
 }
 
