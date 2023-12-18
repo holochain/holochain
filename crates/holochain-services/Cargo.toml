@@ -6,7 +6,7 @@ license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_services"
 readme = "README.md"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
@@ -27,6 +27,4 @@ arbitrary = { version = "*", optional = true }
 [features]
 test_utils = ["fuzzing"]
 
-fuzzing = [
-    "arbitrary"
-]
+fuzzing = ["arbitrary"]
