@@ -76,6 +76,7 @@ impl DnaDef {
             .integrity_zomes(integrity)
             .coordinator_zomes(coordinator)
             .random_network_seed()
+            .network_params(DnaNetworkParams::fake())
             .build()
             .unwrap()
     }
