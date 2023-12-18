@@ -1,21 +1,25 @@
 //! Mock host data for Kitsune to work with in tests. This is needed to create reasonably realistic tests that can exercise a range of Kitsune behaviour.
-//! 
+//!
 
-use kitsune_p2p_bin_data::{KitsuneOpHash, KitsuneBinType};
 use fixt::prelude::*;
+use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneOpHash, KitsuneSpace};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht_arc::DhtLocation;
+use std::sync::Arc;
+use kitsune_p2p_types::KSpace;
 
 #[derive(Debug, Clone)]
 pub struct TestHostOp {
+    space: KitsuneSpace,
     hash: KitsuneOpHash,
     authored_at: Timestamp,
     size: u32,
 }
 
 impl TestHostOp {
-    pub fn new() -> Self {
+    pub fn new(space: KitsuneSpace) -> Self {
         Self {
+            space,
             hash: generated_hash(),
             authored_at: Timestamp::now(),
             size: fixt!(u32),
@@ -25,6 +29,14 @@ impl TestHostOp {
     pub fn with_hash(mut self, hash: KitsuneOpHash) -> Self {
         self.hash = corrected_locaion_hash(hash);
         self
+    }
+
+    pub fn space(&self) -> KSpace {
+        Arc::new(self.space.clone())
+    }
+
+    pub fn kitsune_hash(&self) -> KitsuneOpHash {
+        self.hash.clone()
     }
 
     pub fn hash(&self) -> [u8; 32] {

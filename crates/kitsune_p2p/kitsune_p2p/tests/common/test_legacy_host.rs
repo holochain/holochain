@@ -1,6 +1,7 @@
 use futures::{channel::mpsc::Receiver, FutureExt, StreamExt};
-use kitsune_p2p::event::KitsuneP2pEvent;
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature};
+use itertools::Itertools;
+use kitsune_p2p::event::{FetchOpDataEvtQuery, KitsuneP2pEvent};
+use kitsune_p2p_bin_data::{KOp, KitsuneAgent, KitsuneOpData, KitsuneSignature, KitsuneOpHash};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -8,11 +9,11 @@ use kitsune_p2p_types::{
         arq::LocalStorageConfig,
         spacetime::{Dimension, Topology},
         ArqStrat, PeerStrat,
-    },
+    }, dht_arc::{DhtArcSet, DhtArc, DhtArcRange},
 };
-use std::{collections::HashSet, sync::Arc};
+use std::{borrow::Borrow, collections::HashSet, sync::Arc, intrinsics::unreachable};
 
-use super::test_keystore;
+use super::{test_keystore, TestHostOp};
 
 pub struct TestLegacyHost {
     _handle: tokio::task::JoinHandle<()>,
@@ -26,6 +27,7 @@ pub struct TestLegacyHost {
 impl TestLegacyHost {
     pub async fn start(
         agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
+        op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
         receivers: Vec<Receiver<KitsuneP2pEvent>>,
     ) -> Self {
         let keystore = test_keystore();
@@ -92,14 +94,82 @@ impl TestLegacyHost {
                             // Echo the request payload
                             respond.respond(Ok(async move { Ok(payload) }.boxed().into()))
                         }
-                        KitsuneP2pEvent::QueryOpHashes { respond, .. } => {
+                        KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
                             // TODO nothing to send yet
-                            respond.respond(Ok(async move { Ok(None) }.boxed().into()))
+
+                            let op_store = op_store.read();
+                            let selected_ops: Vec<TestHostOp> = op_store.iter().filter(|op| {
+                                if op.space() != input.space {
+                                    return false;
+                                }
+
+                                if op.authored_at() < input.window.start && op.authored_at() > input.window.end {
+                                    return false;
+                                }
+
+                                let intervals = input.arc_set.intervals();
+                                if let Some(DhtArcRange::Full) = intervals.first() {
+
+                                } else {
+                                    let mut in_any = false;
+                                    for interval in intervals {
+                                        match interval {
+                                            DhtArcRange::Bounded(lower, upper) => {
+                                                if lower < op.location() && op.location() < upper {
+                                                    in_any = true;
+                                                    break;
+                                                }
+                                            }
+                                            _ => unreachable!("Invalid input to host query for op hashes")
+                                        }
+                                    }
+
+                                    if !in_any {
+                                        return false;
+                                    }
+                                }
+
+                                true
+                            }).take(input.max_ops).sorted_by_key(|op| op.authored_at()).cloned().collect();
+
+                            if selected_ops.len() > 0 {
+                                let low_time = selected_ops.first().unwrap().authored_at();
+                                let high_time = selected_ops.last().unwrap().authored_at();
+
+                                respond.respond(Ok(async move { Ok(Some(selected_ops.into_iter().map(|op| op.kitsune_hash()))) }.boxed().into()))
+                            }
+                            
                         }
                         KitsuneP2pEvent::FetchOpData { respond, input, .. } => {
-                            // TODO nothing to send yet
-                            tracing::info!("Handling request for ops: {:?}", input.query);
-                            respond.respond(Ok(async move { Ok(vec![]) }.boxed().into()))
+                            let result = match input.query {
+                                FetchOpDataEvtQuery::Hashes { op_hash_list, .. } => {
+                                    let search_hashes =
+                                        op_hash_list.into_iter().collect::<HashSet<_>>();
+                                        let op_store = op_store.read();
+                                    let matched_host_data = op_store.iter().filter(|op| {
+                                        op.space() == input.space
+                                            && search_hashes.contains(&op.kitsune_hash())
+                                    });
+
+                                    matched_host_data
+                                        .map(|h| {
+                                            (
+                                                Arc::new(h.kitsune_hash()),
+                                                KitsuneOpData::new(
+                                                    std::iter::repeat(0)
+                                                        .take(h.size() as usize)
+                                                        .collect(),
+                                                ),
+                                            )
+                                        })
+                                        .collect()
+                                }
+                                _ => {
+                                    unimplemented!("Only know how to handle Hashes variant");
+                                }
+                            };
+
+                            respond.respond(Ok(async move { Ok(result) }.boxed().into()))
                         }
                         KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                             let mut key = [0; 32];

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::data::TestHostOp;
 use futures::FutureExt;
 use kitsune_p2p::{KitsuneHost, KitsuneP2pResult};
 use kitsune_p2p_timestamp::Timestamp;
@@ -7,12 +8,13 @@ use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     dht::{
         arq::ArqSet,
+        hash::RegionHash,
+        region::RegionData,
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::{Dimension, TelescopingTimes, Topology},
-        ArqStrat, region::RegionData, hash::RegionHash,
+        ArqStrat,
     },
 };
-use super::data::TestHostOp;
 
 #[derive(Debug, Clone)]
 pub struct TestHost {
@@ -21,8 +23,14 @@ pub struct TestHost {
 }
 
 impl TestHost {
-    pub fn new(agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>, op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>) -> Self {
-        Self { agent_store, op_store }
+    pub fn new(
+        agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
+        op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
+    ) -> Self {
+        Self {
+            agent_store,
+            op_store,
+        }
     }
 }
 
@@ -86,47 +94,58 @@ impl KitsuneHost for TestHost {
                 ArqSet::from_dht_arc_set_exact(&topology, &ArqStrat::default(), &dht_arc_set)
                     .ok_or_else(|| -> KitsuneP2pResult<()> {
                         Err("Could not create arc set".into())
-                }).unwrap();
+                    })
+                    .unwrap();
 
             let times = TelescopingTimes::historical(&topology);
             let coords = RegionCoordSetLtcs::new(times, arq_set);
 
-            let region_set: RegionSetLtcs<RegionData> = coords.into_region_set(|(_, coords)| -> KitsuneP2pResult<RegionData> {
-                let bounds = coords.to_bounds(&topology);
-                let (x0, x1) = bounds.x;
-                let (t0, t1) = bounds.t;
+            let region_set: RegionSetLtcs<RegionData> = coords
+                .into_region_set(|(_, coords)| -> KitsuneP2pResult<RegionData> {
+                    let bounds = coords.to_bounds(&topology);
+                    let (x0, x1) = bounds.x;
+                    let (t0, t1) = bounds.t;
 
-                Ok(self.op_store.read().iter().filter(|op| {
-                    let loc = op.location();
-                    let time = op.authored_at();
-                    if x0 <= x1 {
-                        if loc < x0 || loc > x1 {
-                            return false;
-                        }
-                    } else {
-                        if loc > x0 && loc < x1 {
-                            return false;
-                        }
-                    }
-                    
-                    time >= t0 && time <= t1
-                }).fold(RegionData {
-                    hash: RegionHash::from_vec(vec![0; 32]).unwrap(),
-                    size: 0,
-                    count: 0,
-                }, |acc, op| {
-                    let mut current_hash = acc.hash.to_vec();
-                    let op_hash = op.hash();
-                    for i in 0..32 {
-                        current_hash[i] ^= op_hash[i];
-                    }
-                    RegionData {
-                        hash: RegionHash::from_vec(current_hash.to_vec()).unwrap(),
-                        size: acc.size + op.size(),
-                        count: acc.count + 1,
-                    }
-                }))
-            }).unwrap();
+                    Ok(self
+                        .op_store
+                        .read()
+                        .iter()
+                        .filter(|op| {
+                            let loc = op.location();
+                            let time = op.authored_at();
+                            if x0 <= x1 {
+                                if loc < x0 || loc > x1 {
+                                    return false;
+                                }
+                            } else {
+                                if loc > x0 && loc < x1 {
+                                    return false;
+                                }
+                            }
+
+                            time >= t0 && time <= t1
+                        })
+                        .fold(
+                            RegionData {
+                                hash: RegionHash::from_vec(vec![0; 32]).unwrap(),
+                                size: 0,
+                                count: 0,
+                            },
+                            |acc, op| {
+                                let mut current_hash = acc.hash.to_vec();
+                                let op_hash = op.hash();
+                                for i in 0..32 {
+                                    current_hash[i] ^= op_hash[i];
+                                }
+                                RegionData {
+                                    hash: RegionHash::from_vec(current_hash.to_vec()).unwrap(),
+                                    size: acc.size + op.size(),
+                                    count: acc.count + 1,
+                                }
+                            },
+                        ))
+                })
+                .unwrap();
 
             Ok(region_set)
         }

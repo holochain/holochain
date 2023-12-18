@@ -47,7 +47,7 @@ async fn test_two_nodes_on_same_host_rpc_single() {
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub = TestLegacyHost::start(agent_store, vec![receiver_a, receiver_b]).await;
+    let legacy_host_stub = TestLegacyHost::start(agent_store, op_store.clone(), vec![receiver_a, receiver_b]).await;
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = Arc::new(legacy_host_stub.create_agent().await);
@@ -119,7 +119,7 @@ async fn test_two_nodes_publish_and_fetch() {
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub_a = TestLegacyHost::start(agent_store.clone(), vec![receiver_a]).await;
+    let legacy_host_stub_a = TestLegacyHost::start(agent_store.clone(), op_store.clone(), vec![receiver_a]).await;
 
     let host_api_b = Arc::new(TestHost::new(agent_store.clone(), op_store.clone()));
     let mut harness_b = KitsuneTestHarness::try_new(host_api_b)
@@ -133,7 +133,7 @@ async fn test_two_nodes_publish_and_fetch() {
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub_b = TestLegacyHost::start(agent_store.clone(), vec![receiver_b]).await;
+    let legacy_host_stub_b = TestLegacyHost::start(agent_store.clone(), op_store.clone(), vec![receiver_b]).await;
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = Arc::new(legacy_host_stub_a.create_agent().await);
