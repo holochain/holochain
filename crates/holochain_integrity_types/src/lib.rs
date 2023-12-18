@@ -16,7 +16,6 @@ pub mod capability;
 pub mod chain;
 pub mod countersigning;
 mod dna_modifiers;
-mod dna_network_params;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
