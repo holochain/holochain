@@ -20,7 +20,7 @@ async fn publish_termination() {
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
-        SweetConductorConfig::rendezvous(),
+        SweetConductorConfig::rendezvous(true),
     )
     .await;
 

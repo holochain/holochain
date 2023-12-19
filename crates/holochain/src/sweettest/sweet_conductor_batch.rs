@@ -61,7 +61,8 @@ impl SweetConductorBatch {
         num: usize,
         config: C,
     ) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat(config).take(num)).await
+        let config = config.into();
+        Self::from_configs(std::iter::repeat_with(|| config.random_scope()).take(num)).await
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -70,9 +71,10 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig> + Clone,
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
+        let config = config.into();
         Self::new(
             future::join_all(
-                std::iter::repeat(config)
+                std::iter::repeat_with(|| config.random_scope())
                     .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
@@ -191,6 +193,11 @@ impl SweetConductorBatch {
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
         SweetConductor::exchange_peer_info(&self.0).await
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
+        SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
     }
 
     /// Let each conductor know about each others' agents so they can do networking

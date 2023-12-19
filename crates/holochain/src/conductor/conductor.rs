@@ -278,13 +278,14 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
+            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
-                task_manager: TaskManagerClient::new(outcome_sender),
+                task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
                 // Must be initialized later, since it requires an Arc<Conductor>
                 outcomes_task: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),

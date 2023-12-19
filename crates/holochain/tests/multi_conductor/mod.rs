@@ -78,7 +78,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::rendezvous();
+    let config = SweetConductorConfig::rendezvous(true);
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
