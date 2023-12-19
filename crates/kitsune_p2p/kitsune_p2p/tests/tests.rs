@@ -2,11 +2,11 @@ mod common;
 
 use common::*;
 use fixt::prelude::*;
+use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::fixt::KitsuneAgentFixturator;
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p::HostStub;
 use std::sync::Arc;
-use kitsune_p2p::actor::KitsuneP2pSender;
 
 // Test that two nodes can discover each other and connect. This checks that peer discovery
 // works and that networking works well enough for a request reply.
