@@ -399,8 +399,6 @@ impl RealRibosome {
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<ModuleWithStore>> {
-        use holochain_wasmer_host::module::PlruCache;
-
         let cache_key = self.get_module_cache_key(zome_name)?;
 
         let mut module_cache = self.module_cache.write();
