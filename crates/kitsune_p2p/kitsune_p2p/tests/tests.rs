@@ -26,13 +26,13 @@ async fn test_two_nodes_on_same_host_rpc_single() {
     let agent_store = Arc::new(parking_lot::RwLock::new(Vec::new()));
     let op_store = Arc::new(parking_lot::RwLock::new(Vec::new()));
     let host_api = Arc::new(TestHost::new(agent_store.clone(), op_store.clone()));
-    let mut harness_a = KitsuneTestHarness::try_new(host_api.clone())
+    let mut harness_a = KitsuneTestHarness::try_new("host_a", host_api.clone())
         .await
         .expect("Failed to setup test harness")
         .configure_tx5_network(signal_url)
         .use_bootstrap_server(bootstrap_addr);
 
-    let mut harness_b = KitsuneTestHarness::try_new(host_api)
+    let mut harness_b = KitsuneTestHarness::try_new("host_b", host_api)
         .await
         .expect("Failed to setup test harness")
         .configure_tx5_network(signal_url)
@@ -95,8 +95,8 @@ async fn test_two_nodes_on_same_host_rpc_single() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_two_nodes_publish_and_fetch() {
     use kitsune_p2p::actor::BroadcastData;
-    use kitsune_p2p_bin_data::{KitsuneBasis, KitsuneOpHash};
-    use kitsune_p2p_fetch::{FetchContext, RoughSized};
+    use kitsune_p2p_bin_data::KitsuneBasis;
+    use kitsune_p2p_fetch::FetchContext;
     use kitsune_p2p_types::KitsuneTimeout;
 
     holochain_trace::test_run().unwrap();
@@ -104,36 +104,49 @@ async fn test_two_nodes_publish_and_fetch() {
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
-    let agent_store = Arc::new(parking_lot::RwLock::new(Vec::new()));
-    let op_store = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let agent_store_a = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let op_store_a = Arc::new(parking_lot::RwLock::new(Vec::new()));
 
-    let host_api_a = Arc::new(TestHost::new(agent_store.clone(), op_store.clone()));
-    let mut harness_a = KitsuneTestHarness::try_new(host_api_a.clone())
+    let host_api_a = Arc::new(TestHost::new(agent_store_a.clone(), op_store_a.clone()));
+    let mut harness_a = KitsuneTestHarness::try_new("host_a", host_api_a.clone())
         .await
         .expect("Failed to setup test harness")
         .configure_tx5_network(signal_url)
-        .use_bootstrap_server(bootstrap_addr);
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
 
     let (sender_a, receiver_a) = harness_a
         .spawn()
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub_a = TestLegacyHost::start(agent_store.clone(), op_store.clone(), vec![receiver_a]).await;
+    let legacy_host_stub_a = TestLegacyHost::start(agent_store_a.clone(), op_store_a.clone(), vec![receiver_a]).await;
 
-    let host_api_b = Arc::new(TestHost::new(agent_store.clone(), op_store.clone()));
-    let mut harness_b = KitsuneTestHarness::try_new(host_api_b)
+    let agent_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let op_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
+
+    let host_api_b = Arc::new(TestHost::new(agent_store_b.clone(), op_store_b.clone()));
+    let mut harness_b = KitsuneTestHarness::try_new("host_b", host_api_b)
         .await
         .expect("Failed to setup test harness")
         .configure_tx5_network(signal_url)
-        .use_bootstrap_server(bootstrap_addr);
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
 
     let (sender_b, receiver_b) = harness_b
         .spawn()
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub_b = TestLegacyHost::start(agent_store.clone(), op_store.clone(), vec![receiver_b]).await;
+    let legacy_host_stub_b = TestLegacyHost::start(agent_store_b.clone(), op_store_b.clone(), vec![receiver_b]).await;
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = Arc::new(legacy_host_stub_a.create_agent().await);
@@ -157,7 +170,11 @@ async fn test_two_nodes_publish_and_fetch() {
     // TODO This requires host code, does it make sense to construct valid values here?
     let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
 
-    let op_hash = RoughSized::new(Arc::new(KitsuneOpHash::new(vec![0; 36])), Some(100.into()));
+    op_store_a.write().push(TestHostOp::new(space.clone().into()));
+    let test_data = op_store_a.read().last().unwrap().clone();
+
+    tracing::info!("Publishing test data: {:?}", test_data);
+
     sender_a
         .broadcast(
             space.clone(),
@@ -165,14 +182,16 @@ async fn test_two_nodes_publish_and_fetch() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
-                op_hash_list: vec![op_hash],
+                op_hash_list: vec![test_data.into()],
                 context: FetchContext::default(),
             },
         )
         .await
         .unwrap();
 
-    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+    tracing::info!("B's op store {:?}", op_store_b.read());
 }
 
 async fn wait_for_connected(
@@ -218,13 +237,13 @@ async fn test_two_nodes_on_same_host_deadlock() {
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
 
     let host_api = HostStub::new();
-    let mut harness_a = KitsuneTestHarness::try_new(host_api.clone())
+    let mut harness_a = KitsuneTestHarness::try_new("host_a", host_api.clone())
         .await
         .expect("Failed to setup test harness")
         .configure_tx5_network(signal_url)
         .use_bootstrap_server(bootstrap_addr);
 
-    let mut harness_b = KitsuneTestHarness::try_new(host_api)
+    let mut harness_b = KitsuneTestHarness::try_new("host_b", host_api)
         .await
         .expect("Failed to setup test harness")
         .configure_tx5_network(signal_url)

@@ -1,6 +1,6 @@
 use futures::{channel::mpsc::Receiver, FutureExt, StreamExt};
 use itertools::Itertools;
-use kitsune_p2p::event::{FetchOpDataEvtQuery, KitsuneP2pEvent};
+use kitsune_p2p::event::{FetchOpDataEvtQuery, KitsuneP2pEvent, full_time_window};
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
@@ -47,13 +47,95 @@ impl TestLegacyHost {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryAgents { respond, input, .. } => {
+                            let kitsune_p2p::event::QueryAgentsEvt {
+                                space,
+                                agents,
+                                window,
+                                arc_set,
+                                near_basis,
+                                limit,
+                            } = input;
+
                             let store = agent_store.read();
-                            let agents = store
-                                .iter()
-                                .filter(|p| p.space == input.space)
-                                .cloned()
-                                .collect::<Vec<_>>();
-                            respond.respond(Ok(async move { Ok(agents) }.boxed().into()))
+                   
+                            let agents = match (agents, window, arc_set, near_basis, limit) {
+                                // Handle as a "near basis" query.
+                                (None, None, None, Some(basis), Some(limit)) => {
+                                    let mut out: Vec<(u32, &AgentInfoSigned)> = store
+                                        .iter()
+                                        .filter_map(|v| {
+                                            if v.is_active() {
+                                                Some((v.storage_arc.dist(basis.as_u32()), v))
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .collect();
+
+                                    out.sort_by(|a, b| a.0.cmp(&b.0));
+
+                                    out
+                                        .into_iter()
+                                        .take(limit as usize)
+                                        .map(|(_, v)| v.clone())
+                                        .collect()
+                                }
+                
+                                // Handle as a "gossip agents" query.
+                                (_agents, window, Some(arc_set), None, None) => {
+                                    let window = window.unwrap_or_else(full_time_window);
+                                    let since_ms = window.start.as_millis().max(0) as u64;
+                                    let until_ms = window.end.as_millis().max(0) as u64;
+                                    
+                                    store.iter().filter_map(|info| {
+                                        if !info.is_active() {
+                                            return None;
+                                        }
+                        
+                                        if info.signed_at_ms < since_ms {
+                                            return None;
+                                        }
+                        
+                                        if info.signed_at_ms > until_ms {
+                                            return None;
+                                        }
+                        
+                                        let interval = DhtArcRange::from(info.storage_arc);
+                                        if !arc_set.overlap(&interval.into()) {
+                                            return None;
+                                        }
+                        
+                                        Some(info.clone())
+                                    })
+                                    .collect()
+                                }
+                
+                                // Otherwise, do a simple agent query with optional agent filter
+                                (agents, None, None, None, None) => {
+                                    match agents {
+                                        Some(agents) => store
+                                            .iter()
+                                            .filter(|p| {
+                                                p.space == space
+                                                    && agents.contains(&p.agent)
+                                            })
+                                            .cloned()
+                                            .collect::<Vec<_>>(),
+                                        None => store.iter().cloned().collect(),
+                                    }
+                                }
+                
+                                // If none of the above match, we have no implementation for such a query
+                                // and must fail
+                                tuple => unimplemented!(
+                                    "Holochain cannot interpret the QueryAgentsEvt data as given: {:?}",
+                                    tuple
+                                ),
+                            };
+
+                            respond.respond(Ok(async move {
+                                Ok(agents)
+                            }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryPeerDensity {
                             respond,
@@ -93,6 +175,15 @@ impl TestLegacyHost {
                         } => {
                             // Echo the request payload
                             respond.respond(Ok(async move { Ok(payload) }.boxed().into()))
+                        }
+                        KitsuneP2pEvent::ReceiveOps { respond, ops, .. } => {
+                            tracing::info!("Got given some ops {:?}", ops); // TODO this should be getting triggered, why isn't it?
+
+                            let mut op_store = op_store.write();
+                            for op in ops {
+                                op_store.push(op.into());
+                            }
+                            respond.respond(Ok(async move { Ok(()) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
                             let op_store = op_store.read();
@@ -156,11 +247,7 @@ impl TestLegacyHost {
                                         .map(|h| {
                                             (
                                                 Arc::new(h.kitsune_hash()),
-                                                KitsuneOpData::new(
-                                                    std::iter::repeat(0)
-                                                        .take(h.size() as usize)
-                                                        .collect(),
-                                                ),
+                                                h.clone().into(),
                                             )
                                         })
                                         .collect()

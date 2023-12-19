@@ -121,6 +121,7 @@ fn next_remote_node(
         }
     });
 
+    // TODO these aren't metrics if they're a forcing mechanism for triggering gossip etc. Some naming/code cleanup work needed here.
     let forced_initiate = metrics.read().forced_initiate();
 
     remote_nodes

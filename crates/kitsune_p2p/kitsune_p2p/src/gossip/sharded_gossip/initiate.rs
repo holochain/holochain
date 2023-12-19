@@ -19,6 +19,7 @@ impl ShardedGossipLocal {
             i.round_map.current_rounds();
             Ok((has_target, i.local_agents.clone()))
         })?;
+
         // There's already a target so there's nothing to do.
         if has_target {
             return Ok(None);
@@ -72,6 +73,7 @@ impl ShardedGossipLocal {
         } else {
             None
         };
+        
         Ok(maybe_gossip)
     }
 

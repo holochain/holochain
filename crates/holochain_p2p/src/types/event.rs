@@ -150,10 +150,14 @@ ghost_actor::ghost_chan! {
         /// We need to store signed agent info.
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
 
-        /// We need to get previously stored agent info.
+        /// Get all stored agent infos. If agents is None, get all agents. Otherwise agents is treated as a positive filter to include
+        /// only the specified agents if they are found in the store.
+        // TODO Neither the dna_hash or the kitsune_space are being used. The kitsune_space is forwarded then ignored.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.
+        // TODO The `agents` filter is not actually applied, is that intentional or does Kitsune rely on that behaviour?
+        // TODO Neither the dna_hash or the kitsune_space are being used. The kitsune_space is forwarded then ignored.
         fn query_gossip_agents(
             dna_hash: DnaHash,
             agents: Option<Vec<AgentPubKey>>,
@@ -164,6 +168,7 @@ ghost_actor::ghost_chan! {
         ) -> Vec<AgentInfoSigned>;
 
         /// query agent info in order of closeness to a basis location.
+        // TODO Neither the dna_hash or the kitsune_space are being used. The kitsune_space is forwarded then ignored.
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].

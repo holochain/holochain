@@ -2,27 +2,28 @@
 //!
 
 use fixt::prelude::*;
-use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneOpHash, KitsuneSpace};
+use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneOpHash, KitsuneOpData, KOp};
+use kitsune_p2p_fetch::RoughSized;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::dht_arc::DhtLocation;
-use std::sync::Arc;
+use kitsune_p2p_types::{dht_arc::DhtLocation, KOpHash};
 use kitsune_p2p_types::KSpace;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TestHostOp {
-    space: KitsuneSpace,
+    space: KSpace,
     hash: KitsuneOpHash,
     authored_at: Timestamp,
     size: u32,
 }
 
 impl TestHostOp {
-    pub fn new(space: KitsuneSpace) -> Self {
+    pub fn new(space: KSpace) -> Self {
         Self {
             space,
             hash: generated_hash(),
             authored_at: Timestamp::now(),
-            size: fixt!(u32),
+            size: fixt!(u8) as u32 + 1, // +1 because we don't want this to be 0
         }
     }
 
@@ -32,7 +33,7 @@ impl TestHostOp {
     }
 
     pub fn space(&self) -> KSpace {
-        Arc::new(self.space.clone())
+        self.space.clone()
     }
 
     pub fn kitsune_hash(&self) -> KitsuneOpHash {
@@ -54,6 +55,26 @@ impl TestHostOp {
 
     pub fn size(&self) -> u32 {
         self.size
+    }
+}
+
+impl Into<RoughSized<KOpHash>> for TestHostOp {
+    fn into(self) -> RoughSized<KOpHash> {
+        RoughSized::new(self.kitsune_hash().into(), Some(36.into()))
+    }
+}
+
+impl Into<KOp> for TestHostOp {
+    fn into(self) -> KOp {
+        let str = serde_json::to_string(&self).unwrap();
+        KitsuneOpData::new(str.into_bytes())
+    }
+}
+
+impl From<KOp> for TestHostOp {
+    fn from(op: KOp) -> Self {
+        let str = String::from_utf8(op.0.clone()).unwrap();
+        serde_json::from_str(&str).unwrap()
     }
 }
 
