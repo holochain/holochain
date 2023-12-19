@@ -751,12 +751,19 @@ async fn update_single_agent_info(
             }
         }
         NetworkType::QuicBootstrap => {
-            kitsune_p2p_bootstrap_client::put(
+            match kitsune_p2p_bootstrap_client::put(
                 bootstrap_service.clone(),
                 agent_info_signed.clone(),
                 bootstrap_net,
             )
-            .await?;
+            .await {
+                Ok(_) => {
+                    tracing::debug!("Successfully publish agent info to the bootstrap service");
+                }
+                Err(err) => {
+                    tracing::warn!(?err, "Failed to publish agent info to the bootstrap service, will try again later");
+                }
+            }
         }
     }
     Ok(agent_info_signed)
