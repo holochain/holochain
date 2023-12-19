@@ -11,7 +11,7 @@ use ghost_actor::{GhostControlHandler, GhostHandler};
 use kitsune_p2p_fetch::{FetchContext, FetchKey, FetchSource};
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::KOpHash;
-use parking_lot::lock_api::RwLock;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -20,7 +20,7 @@ use std::sync::Arc;
 pub struct InternalStub {
     fetch_calls: Vec<(FetchKey, KSpace, FetchSource)>,
     pub incoming_publish_calls: Arc<
-        parking_lot::RwLock<
+        RwLock<
             Vec<(
                 KSpace,
                 crate::spawn::actor::KAgent,
@@ -32,7 +32,7 @@ pub struct InternalStub {
         >,
     >,
     pub incoming_delegate_broadcast_calls: Arc<
-        parking_lot::RwLock<
+        RwLock<
             Vec<(
                 crate::spawn::actor::KSpace,
                 crate::spawn::actor::KBasis,
@@ -44,7 +44,7 @@ pub struct InternalStub {
         >,
     >,
     pub incoming_gossip_calls: Arc<
-        parking_lot::RwLock<
+        RwLock<
             Vec<(
                 crate::spawn::actor::KSpace,
                 MetaNetCon,
@@ -54,7 +54,7 @@ pub struct InternalStub {
             )>,
         >,
     >,
-    pub connections: Arc<parking_lot::RwLock<HashMap<String, MetaNetCon>>>,
+    pub connections: Arc<RwLock<HashMap<String, MetaNetCon>>>,
     pub respond_with_error_count: Arc<AtomicUsize>,
     pub respond_with_error: Arc<AtomicBool>,
 }

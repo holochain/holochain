@@ -15,7 +15,7 @@ use std::time::Duration;
 use tokio::task::AbortHandle;
 use tokio::time::error::Elapsed;
 
-pub struct HostStub {
+pub struct LegacyHostStub {
     pub respond_with_error: Arc<AtomicBool>,
     pub respond_with_error_count: Arc<AtomicUsize>,
 
@@ -28,7 +28,7 @@ pub struct HostStub {
     abort_handle: AbortHandle,
 }
 
-impl HostStub {
+impl LegacyHostStub {
     pub fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
         let (mut sender, receiver) = channel(10);
 
@@ -107,6 +107,7 @@ impl HostStub {
                             .boxed()
                             .into()))
                         }
+                        KitsuneP2pEvent::QueryPeerDensity { .. } => {}
                         KitsuneP2pEvent::Notify {
                             space,
                             to_agent,
@@ -189,7 +190,7 @@ impl HostStub {
             }
         });
 
-        HostStub {
+        LegacyHostStub {
             respond_with_error,
             respond_with_error_count,
             put_agent_info_signed_calls,

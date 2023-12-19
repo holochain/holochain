@@ -4,7 +4,6 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use ::fixt::*;
 use holo_hash::EntryHash;
-use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet};

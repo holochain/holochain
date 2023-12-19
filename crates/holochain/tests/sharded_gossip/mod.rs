@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
-use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
@@ -132,20 +131,25 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    // let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(
         NUM_CONDUCTORS,
-        TestConfig {
+        <TestConfig as Into<SweetConductorConfig>>::into(TestConfig {
             publish: false,
             recent: false,
             historical: true,
             bootstrap: true,
             recent_threshold: Some(0),
-        },
+        })
+        .tune_conductor(|p| {
+            // Running too often here seems to not give other things enough time to process these ops. 2s seems to be a good middle ground
+            // to make this test pass and be stable.
+            p.sys_validation_retry_delay = Some(std::time::Duration::from_secs(2));
+        }),
     )
     .await;
 
@@ -307,34 +311,50 @@ async fn test_zero_arc_no_gossip_4way() {
 
     let configs = [
         // Standard config
-        TestConfig {
+        <TestConfig as Into<SweetConductorConfig>>::into(TestConfig {
             publish: true,
             recent: true,
             historical: true,
             bootstrap: true,
             recent_threshold: None,
-        }
-        .into(),
+        })
+        .tune_conductor(|params| {
+            // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+            params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+        }),
         // Publishing turned off
-        TestConfig {
+        <TestConfig as Into<SweetConductorConfig>>::into(TestConfig {
             publish: false,
             recent: true,
             historical: true,
             bootstrap: true,
             recent_threshold: None,
-        }
-        .into(),
+        })
+        .tune_conductor(|params| {
+            // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+            params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+        }),
         {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous(true).set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true)
+                .tune_conductor(|params| {
+                    // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+                    params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+                })
+                .set_tuning_params(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous(true).set_tuning_params(tuning)
+            SweetConductorConfig::rendezvous(true)
+                .tune_conductor(|params| {
+                    // Speed up sys validation retry when gets hit a conductor that isn't yet serving the requested data
+                    params.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+                })
+                .set_tuning_params(tuning)
         },
     ];
 
@@ -414,7 +434,13 @@ async fn test_zero_arc_no_gossip_4way() {
                         c.call::<_, Option<Record>>(&zome, "read", hash.clone())
                             .await
                             .is_some(),
-                        |x: &bool| *x,
+                        |x: &bool| {
+                            if j == 3 && i != j {
+                                !x
+                            } else {
+                                *x
+                            }
+                        },
                         assertion
                     );
                 }

@@ -11,6 +11,7 @@ members = [
     "crd",
     "crud",
     "debug",
+    "dna_properties",
     "emit_signal",
     "entry_defs",
     "hash_entry",
@@ -19,6 +20,7 @@ members = [
     "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
+    "genesis_self_check_requires_properties",
     "hc-stress-test-integrity",
     "hc-stress-test-coordinator",
     "hash_path",
@@ -48,6 +50,7 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
+    "validate_reject_app_types",
     "whoami",
     "zome_info",
 ]
@@ -56,6 +59,7 @@ members = [
 opt-level = "z"
 
 [workspace.dependencies]
+derive_more = "0.99"
 serde = "1.0"
 hdi = { path = "../../../hdi" }
 hdk = { path = "../../../hdk" }

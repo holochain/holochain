@@ -34,12 +34,12 @@ static BAD_CLOSE: AtomicU64 = AtomicU64::new(0);
 #[tokio::test(flavor = "multi_thread")]
 pub async fn websocket_stress() {
     let tmp_dir = TempDir::new().unwrap();
-    let environment_path = tmp_dir.path().to_path_buf();
+    let data_root_path = tmp_dir.path().to_path_buf();
     let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port: 0 },
         }]),
-        environment_path: environment_path.into(),
+        data_root_path: Some(data_root_path.into()),
         keystore: KeystoreConfig::DangerTestKeystore,
         ..Default::default()
     };

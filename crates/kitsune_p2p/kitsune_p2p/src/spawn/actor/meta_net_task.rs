@@ -576,8 +576,8 @@ mod tests {
     use crate::dht_arc::DhtLocation;
     use crate::spawn::actor::fetch::FetchResponseConfig;
     use crate::spawn::actor::meta_net_task::MetaNetTask;
-    use crate::spawn::actor::test_util::HostStub as HostReceiverStub;
     use crate::spawn::actor::test_util::InternalStub;
+    use crate::spawn::actor::test_util::LegacyHostStub as HostReceiverStub;
     use crate::spawn::actor::Internal;
     use crate::spawn::meta_net::{MetaNetCon, MetaNetConTest, MetaNetEvt};
     use crate::test_util::data::mk_agent_info;
