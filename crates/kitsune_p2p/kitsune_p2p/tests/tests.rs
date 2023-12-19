@@ -173,8 +173,6 @@ async fn test_two_nodes_publish_and_fetch() {
     op_store_a.write().push(TestHostOp::new(space.clone().into()));
     let test_data = op_store_a.read().last().unwrap().clone();
 
-    tracing::info!("Publishing test data: {:?}", test_data);
-
     sender_a
         .broadcast(
             space.clone(),
@@ -189,9 +187,18 @@ async fn test_two_nodes_publish_and_fetch() {
         .await
         .unwrap();
 
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(60), {
+        let op_store_b = op_store_b.clone();
+        async move {
+        loop {
+            if !op_store_b.read().is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }}).await.unwrap();
 
-    tracing::info!("B's op store {:?}", op_store_b.read());
+    assert_eq!(1, op_store_b.read().len());
 }
 
 async fn wait_for_connected(

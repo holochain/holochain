@@ -1,7 +1,7 @@
 use futures::{channel::mpsc::Receiver, FutureExt, StreamExt};
 use itertools::Itertools;
 use kitsune_p2p::event::{FetchOpDataEvtQuery, KitsuneP2pEvent, full_time_window};
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature};
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use kitsune_p2p::{
     actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
 };
-use kitsune_p2p_types::{config::{KitsuneP2pConfig, KitsuneP2pTuningParams, tuning_params_struct}, tls::TlsConfig};
+use kitsune_p2p_types::{config::{KitsuneP2pConfig, tuning_params_struct}, tls::TlsConfig};
 use tokio::task::AbortHandle;
 
 pub struct KitsuneTestHarness {
