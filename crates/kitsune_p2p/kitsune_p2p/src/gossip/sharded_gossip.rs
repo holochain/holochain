@@ -924,8 +924,6 @@ impl ShardedGossipLocal {
                     .await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
-                tracing::info!("Got agents via gossip from {:?}", peer_cert);
-
                 if let Some(state) = self.get_state(&peer_cert)? {
                     let filter = decode_bloom_filter(&filter);
                     self.incoming_agents(state, filter).await?

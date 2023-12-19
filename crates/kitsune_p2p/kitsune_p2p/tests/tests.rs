@@ -208,9 +208,10 @@ async fn two_nodes_publish_and_fetch() {
     assert_eq!(1, op_store_b.read().len());
 }
 
+// This is expected to test that agent info is broadcast to current peers when a new agent joins
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-async fn two_nodes_gossip_agent_info() {
+async fn two_nodes_broadcast_agent_info() {
     holochain_trace::test_run().unwrap();
 
     let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
@@ -290,6 +291,110 @@ async fn two_nodes_gossip_agent_info() {
     sender_a.join(space.clone(), agent_c.clone(), None, None).await.unwrap();
     let agent_d = Arc::new(legacy_host_stub_a.create_agent().await);
     sender_a.join(space.clone(), agent_d.clone(), None, None).await.unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(60), {
+        let agent_store_b = agent_store_b.clone();
+        async move {
+            loop {
+                if agent_store_b.read().len() == 4 {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(4, agent_store_b.read().len());
+}
+
+// This is expected to test that agent info is gossiped to a new peer when it finds one peer who knows
+// about peers that are unkown to the new peer.
+#[cfg(feature = "tx5")]
+#[tokio::test(flavor = "multi_thread")]
+async fn two_nodes_gossip_agent_info() {
+    holochain_trace::test_run().unwrap();
+
+    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    let agent_store_a = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let op_store_a = Arc::new(parking_lot::RwLock::new(Vec::new()));
+
+    let host_api_a = Arc::new(TestHost::new(agent_store_a.clone(), op_store_a.clone()));
+    let mut harness_a = KitsuneTestHarness::try_new("host_a", host_api_a.clone())
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
+
+    let (sender_a, receiver_a) = harness_a
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let legacy_host_stub_a =
+        TestLegacyHost::start(agent_store_a.clone(), op_store_a.clone(), vec![receiver_a]).await;
+
+    let space = Arc::new(fixt!(KitsuneSpace));
+
+    let agent_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let op_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
+
+    let host_api_b = Arc::new(TestHost::new(agent_store_b.clone(), op_store_b.clone()));
+    let mut harness_b = KitsuneTestHarness::try_new("host_b", host_api_b)
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
+
+    let (sender_b, receiver_b) = harness_b
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let legacy_host_stub_b =
+        TestLegacyHost::start(agent_store_b.clone(), op_store_b.clone(), vec![receiver_b]).await;
+
+    let agent_a = Arc::new(legacy_host_stub_a.create_agent().await);
+    sender_a
+        .join(space.clone(), agent_a.clone(), None, None)
+        .await
+        .unwrap();
+
+    let agent_a_info = agent_store_a.read().first().unwrap().clone();
+
+    let agent_c = Arc::new(legacy_host_stub_a.create_agent().await);
+    sender_a.join(space.clone(), agent_c.clone(), None, None).await.unwrap();
+    let agent_d = Arc::new(legacy_host_stub_a.create_agent().await);
+    sender_a.join(space.clone(), agent_d.clone(), None, None).await.unwrap();
+
+    // Kill the bootstrap server so the new agent can't find anyone that way
+    bootstrap_handle.abort();
+
+    let agent_b = Arc::new(legacy_host_stub_b.create_agent().await);
+    sender_b
+        .join(space.clone(), agent_b.clone(), None, None)
+        .await
+        .unwrap();
+
+    // Add agent_a to agent_b's store so these two nodes can gossip
+    agent_store_b.write().push(agent_a_info);
+
+    // Wait for the nodes to discover each other
+    wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
+    wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
 
     tokio::time::timeout(std::time::Duration::from_secs(60), {
         let agent_store_b = agent_store_b.clone();
