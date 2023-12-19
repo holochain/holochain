@@ -3,6 +3,7 @@ mod common;
 use common::*;
 use fixt::prelude::*;
 use ghost_actor::GhostSender;
+use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::actor::KitsuneP2p;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::fixt::KitsuneAgentFixturator;
@@ -10,14 +11,17 @@ use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p::HostStub;
 use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p_bin_data::KitsuneAgent;
+use kitsune_p2p_bin_data::KitsuneBasis;
 use kitsune_p2p_bin_data::KitsuneSpace;
+use kitsune_p2p_fetch::FetchContext;
+use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 
 // Test that two nodes can discover each other and connect. This checks that peer discovery
 // works and that networking works well enough for a request reply.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-async fn test_two_nodes_on_same_host_rpc_single() {
+async fn two_nodes_on_same_host_rpc_single() {
     holochain_trace::test_run().unwrap();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
@@ -47,7 +51,8 @@ async fn test_two_nodes_on_same_host_rpc_single() {
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub = TestLegacyHost::start(agent_store, op_store.clone(), vec![receiver_a, receiver_b]).await;
+    let legacy_host_stub =
+        TestLegacyHost::start(agent_store, op_store.clone(), vec![receiver_a, receiver_b]).await;
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = Arc::new(legacy_host_stub.create_agent().await);
@@ -93,12 +98,7 @@ async fn test_two_nodes_on_same_host_rpc_single() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-async fn test_two_nodes_publish_and_fetch() {
-    use kitsune_p2p::actor::BroadcastData;
-    use kitsune_p2p_bin_data::KitsuneBasis;
-    use kitsune_p2p_fetch::FetchContext;
-    use kitsune_p2p_types::KitsuneTimeout;
-
+async fn two_nodes_publish_and_fetch() {
     holochain_trace::test_run().unwrap();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
@@ -124,7 +124,8 @@ async fn test_two_nodes_publish_and_fetch() {
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub_a = TestLegacyHost::start(agent_store_a.clone(), op_store_a.clone(), vec![receiver_a]).await;
+    let legacy_host_stub_a =
+        TestLegacyHost::start(agent_store_a.clone(), op_store_a.clone(), vec![receiver_a]).await;
 
     let agent_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
     let op_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
@@ -146,7 +147,8 @@ async fn test_two_nodes_publish_and_fetch() {
         .await
         .expect("should be able to spawn node");
 
-    let legacy_host_stub_b = TestLegacyHost::start(agent_store_b.clone(), op_store_b.clone(), vec![receiver_b]).await;
+    let legacy_host_stub_b =
+        TestLegacyHost::start(agent_store_b.clone(), op_store_b.clone(), vec![receiver_b]).await;
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = Arc::new(legacy_host_stub_a.create_agent().await);
@@ -170,7 +172,9 @@ async fn test_two_nodes_publish_and_fetch() {
     // TODO This requires host code, does it make sense to construct valid values here?
     let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
 
-    op_store_a.write().push(TestHostOp::new(space.clone().into()));
+    op_store_a
+        .write()
+        .push(TestHostOp::new(space.clone().into()));
     let test_data = op_store_a.read().last().unwrap().clone();
 
     sender_a
@@ -190,13 +194,16 @@ async fn test_two_nodes_publish_and_fetch() {
     tokio::time::timeout(std::time::Duration::from_secs(60), {
         let op_store_b = op_store_b.clone();
         async move {
-        loop {
-            if !op_store_b.read().is_empty() {
-                break;
+            loop {
+                if !op_store_b.read().is_empty() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-    }}).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert_eq!(1, op_store_b.read().len());
 }

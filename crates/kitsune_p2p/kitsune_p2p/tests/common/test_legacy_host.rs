@@ -1,6 +1,6 @@
 use futures::{channel::mpsc::Receiver, FutureExt, StreamExt};
 use itertools::Itertools;
-use kitsune_p2p::event::{FetchOpDataEvtQuery, KitsuneP2pEvent, full_time_window};
+use kitsune_p2p::event::{full_time_window, FetchOpDataEvtQuery, KitsuneP2pEvent};
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
@@ -9,7 +9,8 @@ use kitsune_p2p_types::{
         arq::LocalStorageConfig,
         spacetime::{Dimension, Topology},
         ArqStrat, PeerStrat,
-    }, dht_arc::DhtArcRange,
+    },
+    dht_arc::DhtArcRange,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -57,7 +58,7 @@ impl TestLegacyHost {
                             } = input;
 
                             let store = agent_store.read();
-                   
+
                             let agents = match (agents, window, arc_set, near_basis, limit) {
                                 // Handle as a "near basis" query.
                                 (None, None, None, Some(basis), Some(limit)) => {
@@ -80,36 +81,36 @@ impl TestLegacyHost {
                                         .map(|(_, v)| v.clone())
                                         .collect()
                                 }
-                
+
                                 // Handle as a "gossip agents" query.
                                 (_agents, window, Some(arc_set), None, None) => {
                                     let window = window.unwrap_or_else(full_time_window);
                                     let since_ms = window.start.as_millis().max(0) as u64;
                                     let until_ms = window.end.as_millis().max(0) as u64;
-                                    
+
                                     store.iter().filter_map(|info| {
                                         if !info.is_active() {
                                             return None;
                                         }
-                        
+
                                         if info.signed_at_ms < since_ms {
                                             return None;
                                         }
-                        
+
                                         if info.signed_at_ms > until_ms {
                                             return None;
                                         }
-                        
+
                                         let interval = DhtArcRange::from(info.storage_arc);
                                         if !arc_set.overlap(&interval.into()) {
                                             return None;
                                         }
-                        
+
                                         Some(info.clone())
                                     })
                                     .collect()
                                 }
-                
+
                                 // Otherwise, do a simple agent query with optional agent filter
                                 (agents, None, None, None, None) => {
                                     match agents {
@@ -124,7 +125,7 @@ impl TestLegacyHost {
                                         None => store.iter().cloned().collect(),
                                     }
                                 }
-                
+
                                 // If none of the above match, we have no implementation for such a query
                                 // and must fail
                                 tuple => unimplemented!(
@@ -133,9 +134,7 @@ impl TestLegacyHost {
                                 ),
                             };
 
-                            respond.respond(Ok(async move {
-                                Ok(agents)
-                            }.boxed().into()))
+                            respond.respond(Ok(async move { Ok(agents) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryPeerDensity {
                             respond,
@@ -187,47 +186,66 @@ impl TestLegacyHost {
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
                             let op_store = op_store.read();
-                            let selected_ops: Vec<TestHostOp> = op_store.iter().filter(|op| {
-                                if op.space() != input.space {
-                                    return false;
-                                }
+                            let selected_ops: Vec<TestHostOp> = op_store
+                                .iter()
+                                .filter(|op| {
+                                    if op.space() != input.space {
+                                        return false;
+                                    }
 
-                                if op.authored_at() < input.window.start && op.authored_at() > input.window.end {
-                                    return false;
-                                }
+                                    if op.authored_at() < input.window.start
+                                        && op.authored_at() > input.window.end
+                                    {
+                                        return false;
+                                    }
 
-                                let intervals = input.arc_set.intervals();
-                                if let Some(DhtArcRange::Full) = intervals.first() {
-
-                                } else {
-                                    let mut in_any = false;
-                                    for interval in intervals {
-                                        match interval {
-                                            DhtArcRange::Bounded(lower, upper) => {
-                                                if lower < op.location() && op.location() < upper {
-                                                    in_any = true;
-                                                    break;
+                                    let intervals = input.arc_set.intervals();
+                                    if let Some(DhtArcRange::Full) = intervals.first() {
+                                    } else {
+                                        let mut in_any = false;
+                                        for interval in intervals {
+                                            match interval {
+                                                DhtArcRange::Bounded(lower, upper) => {
+                                                    if lower < op.location()
+                                                        && op.location() < upper
+                                                    {
+                                                        in_any = true;
+                                                        break;
+                                                    }
                                                 }
+                                                _ => unreachable!(
+                                                    "Invalid input to host query for op hashes"
+                                                ),
                                             }
-                                            _ => unreachable!("Invalid input to host query for op hashes")
+                                        }
+
+                                        if !in_any {
+                                            return false;
                                         }
                                     }
 
-                                    if !in_any {
-                                        return false;
-                                    }
-                                }
-
-                                true
-                            }).take(input.max_ops).sorted_by_key(|op| op.authored_at()).cloned().collect();
+                                    true
+                                })
+                                .take(input.max_ops)
+                                .sorted_by_key(|op| op.authored_at())
+                                .cloned()
+                                .collect();
 
                             if selected_ops.len() > 0 {
                                 let low_time = selected_ops.first().unwrap().authored_at();
                                 let high_time = selected_ops.last().unwrap().authored_at();
 
-                                respond.respond(Ok(async move { Ok(Some(
-                                    (selected_ops.into_iter().map(|op| Arc::new(op.kitsune_hash())).collect(), low_time..=high_time)
-                                )) }.boxed().into()))
+                                respond.respond(Ok(async move {
+                                    Ok(Some((
+                                        selected_ops
+                                            .into_iter()
+                                            .map(|op| Arc::new(op.kitsune_hash()))
+                                            .collect(),
+                                        low_time..=high_time,
+                                    )))
+                                }
+                                .boxed()
+                                .into()))
                             } else {
                                 respond.respond(Ok(async move { Ok(None) }.boxed().into()))
                             }
@@ -237,19 +255,14 @@ impl TestLegacyHost {
                                 FetchOpDataEvtQuery::Hashes { op_hash_list, .. } => {
                                     let search_hashes =
                                         op_hash_list.into_iter().collect::<HashSet<_>>();
-                                        let op_store = op_store.read();
+                                    let op_store = op_store.read();
                                     let matched_host_data = op_store.iter().filter(|op| {
                                         op.space() == input.space
                                             && search_hashes.contains(&op.kitsune_hash())
                                     });
 
                                     matched_host_data
-                                        .map(|h| {
-                                            (
-                                                Arc::new(h.kitsune_hash()),
-                                                h.clone().into(),
-                                            )
-                                        })
+                                        .map(|h| (Arc::new(h.kitsune_hash()), h.clone().into()))
                                         .collect()
                                 }
                                 _ => {

@@ -73,7 +73,7 @@ impl ShardedGossipLocal {
         } else {
             None
         };
-        
+
         Ok(maybe_gossip)
     }
 

@@ -2,11 +2,11 @@
 //!
 
 use fixt::prelude::*;
-use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneOpHash, KitsuneOpData, KOp};
+use kitsune_p2p_bin_data::{KOp, KitsuneBinType, KitsuneOpData, KitsuneOpHash};
 use kitsune_p2p_fetch::RoughSized;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::{dht_arc::DhtLocation, KOpHash};
 use kitsune_p2p_types::KSpace;
+use kitsune_p2p_types::{dht_arc::DhtLocation, KOpHash};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

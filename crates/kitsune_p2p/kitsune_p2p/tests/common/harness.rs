@@ -3,7 +3,10 @@ use std::net::SocketAddr;
 use kitsune_p2p::{
     actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
 };
-use kitsune_p2p_types::{config::{KitsuneP2pConfig, tuning_params_struct}, tls::TlsConfig};
+use kitsune_p2p_types::{
+    config::{tuning_params_struct, KitsuneP2pConfig},
+    tls::TlsConfig,
+};
 use tokio::task::AbortHandle;
 
 pub struct KitsuneTestHarness {
@@ -40,9 +43,12 @@ impl KitsuneTestHarness {
         self
     }
 
-    pub fn update_tuning_params(mut self, f: impl Fn(
-        tuning_params_struct::KitsuneP2pTuningParams,
-    ) -> tuning_params_struct::KitsuneP2pTuningParams,) -> Self {
+    pub fn update_tuning_params(
+        mut self,
+        f: impl Fn(
+            tuning_params_struct::KitsuneP2pTuningParams,
+        ) -> tuning_params_struct::KitsuneP2pTuningParams,
+    ) -> Self {
         let new_config: KitsuneP2pConfig = self.config.tune(f);
         self.config = new_config;
         self

@@ -200,6 +200,8 @@ impl KitsuneHost for TestHost {
         op_data: kitsune_p2p_types::KOpData,
     ) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::KOpHash> {
         let op: TestHostOp = op_data.into();
-        async move { Ok(Arc::new(op.kitsune_hash())) }.boxed().into()
+        async move { Ok(Arc::new(op.kitsune_hash())) }
+            .boxed()
+            .into()
     }
 }
