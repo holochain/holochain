@@ -254,7 +254,6 @@ impl aitia::Fact for Event {
                         .into()
                     })
                     .collect();
-
                 Some(Dep::any_named("Received hash from authority", others))
             }
 
