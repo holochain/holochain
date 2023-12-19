@@ -19,7 +19,6 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
-use error::AppValidationResult;
 pub use error::*;
 use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
@@ -122,8 +121,8 @@ async fn app_validation_workflow_inner(
                 });
 
                 // Validate this op
-                let cascade = workspace.full_cascade(network.clone());
-                let r = match dhtop_to_op(op, &cascade).await {
+                let cascade = Arc::new(workspace.full_cascade(network.clone()));
+                let r = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
                         validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
                     }
@@ -284,7 +283,7 @@ async fn app_validation_workflow_inner(
 pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
-    cascade: &impl Cascade,
+    cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
 
@@ -349,7 +348,7 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<Op> {
+async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
@@ -502,7 +501,8 @@ where
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
-            store_record_zomes_to_invoke(record.action(), ribosome)?
+            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
         }
         Op::StoreEntry(StoreEntry {
             action:
@@ -645,12 +645,33 @@ fn create_link_zomes_to_invoke(
 }
 
 /// Get the zomes to invoke for an [`Op::StoreRecord`].
-fn store_record_zomes_to_invoke(
+async fn store_record_zomes_to_invoke(
     action: &Action,
     ribosome: &impl RibosomeT,
+    cascade: &(impl Cascade + Send + Sync),
 ) -> AppValidationOutcome<ZomesToInvoke> {
+    // For deletes there is no entry type to check, so we get the previous action to see if that
+    // was a create or a delete for an app entry type.
+    let action = match action {
+        Action::Delete(Delete {
+            deletes_address, ..
+        })
+        | Action::DeleteLink(DeleteLink {
+            link_add_address: deletes_address,
+            ..
+        }) => {
+            let (deletes_action, _) = cascade
+                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+                .await?
+                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
+
+            deletes_action.action().clone()
+        }
+        _ => action.clone(),
+    };
+
     match action {
-        Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
+        Action::CreateLink(create_link) => create_link_zomes_to_invoke(&create_link, ribosome),
         Action::Create(Create {
             entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
@@ -659,7 +680,7 @@ fn store_record_zomes_to_invoke(
             entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
         }) => {
-            let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
+            let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
                 Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))

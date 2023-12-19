@@ -3,7 +3,7 @@
 #![deny(missing_docs)]
 
 mod aliases;
-pub mod error;
+mod error;
 mod has_hash;
 mod hash;
 pub mod hash_type;

@@ -271,7 +271,11 @@ pub mod test {
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
-        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let conductor_handle = Conductor::builder()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         (Arc::new(db_dir), conductor_handle)
     }
 
@@ -281,7 +285,8 @@ pub mod test {
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
-            .test(db_dir.path(), &[])
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
             .await
             .unwrap();
 

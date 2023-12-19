@@ -216,10 +216,13 @@ impl SweetConductor {
             ));
         }
 
+        if config.data_root_path.is_none() {
+            config.data_root_path = Some(dir.as_ref().to_path_buf().into());
+        }
+
         tracing::info!(?config);
 
         let handle = Self::handle_from_existing(
-            &dir,
             keystore.unwrap_or_else(holochain_keystore::test_keystore),
             &config,
             &[],
@@ -232,13 +235,16 @@ impl SweetConductor {
     pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
-        let handle = builder.test(&db_dir, &[]).await.unwrap();
+        let handle = builder
+            .with_data_root_path(db_dir.as_ref().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         Self::new(handle, db_dir, Arc::new(config), None).await
     }
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        db_dir: &Path,
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
@@ -249,7 +255,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test(db_dir, extra_dnas)
+            .test(extra_dnas)
             .await
             .unwrap()
     }
@@ -560,9 +566,15 @@ impl SweetConductor {
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
+            // There's a db dir in the sweet conductor and the config, that are
+            // supposed to be the same. Let's assert that they are.
+            assert_eq!(
+                Some(self.db_dir.as_ref().to_path_buf().into()),
+                self.config.data_root_path,
+                "SweetConductor db_dir and config.data_root_path are not the same",
+            );
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
-                    &self.db_dir,
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),

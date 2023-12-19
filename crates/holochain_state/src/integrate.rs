@@ -116,6 +116,9 @@ fn insert_locally_validated_op(
     } else {
         set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     }
+
+    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
+    // Set the stage to awaiting integration.
     if matches!(op_type, DhtOpType::RegisterAgentActivity) {
         Ok(Some(op))
     } else {

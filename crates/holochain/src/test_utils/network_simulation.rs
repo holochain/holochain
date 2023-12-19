@@ -381,10 +381,13 @@ async fn create_test_data(
     tuning.gossip_strategy = "none".to_string();
     tuning.disable_publish = true;
 
+    // This is gonna get dropped at the end of this fn.
+    let tmpdir = tempfile::TempDir::new().unwrap();
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network,
+        data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;

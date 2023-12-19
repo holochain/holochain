@@ -1062,7 +1062,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
 
     /// Dispatch an outgoing signal.
     #[tracing::instrument(skip(self), level = "trace")]
-    fn handle_remote_signal(
+    fn handle_send_remote_signal(
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,

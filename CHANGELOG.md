@@ -14,6 +14,113 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20231206.112234
+
+## [hcterm-0.3.0-beta-dev.3](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.3)
+
+## [holochain\_cli-0.3.0-beta-dev.27](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain-0.3.0-beta-dev.27](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.27)
+
+- Refactor: Remove shadowing glob re-exports that were shadowing other exports.
+
+- Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
+
+- Major refactor of the sys validation workflow to improve reliability and performance:
+  
+  - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
+  - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
+  - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
+  - Performance: In-memory caching for sys validation dependencies. When we have to wait to validate an op because it has a missing dependency, any other actions required by that op will be held in memory rather than being refetched from the database. This has a fairly small memory footprint because actions are relatively small but saves repeatedly hitting the cascade for the same data if it takes a bit of time to find a dependency on the network.
+
+- **BREAKING* CHANGE*: The `ConductorConfig` has been updated to add a new option for configuring conductor behaviour. This should be compatible with existing conductor config YAML files but if you are creating the struct directly then you will need to include the new field. Currently this just has one setting which controls how fast the sys validation workflow will retry network gets for missing dependencies. It’s likely this option will change in the near future.
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.25](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.27](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain\_cascade-0.3.0-beta-dev.27](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.27](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.27)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.22](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.25](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [hdk-0.3.0-beta-dev.22](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.22)
+
+## [holochain\_state-0.3.0-beta-dev.26](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.26)
+
+- Fix: Maximum one unrestricted cap grant was looked up from the source chain to authorize a remote call. Now all unrestricted cap grants are checked for validity.
+
+## [hdi-0.4.0-beta-dev.18](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.18)
+
+## [holochain\_p2p-0.3.0-beta-dev.26](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_state\_types-0.3.0-beta-dev.24](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [hdk\_derive-0.3.0-beta-dev.17](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.17)
+
+- Added a macro `#![dna_properties]` which when applied to a struct, exposes a function `try_from_dna_properties()` on that struct
+
+## [holochain\_types-0.3.0-beta-dev.24](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.24)
+
+- **BREAKING CHANGE**: A `DnaManifest` and all its sub-fields will now reject unknown fields when deserialized. This will make it harder to provide an invalid DNA manifest to Holochain without realising. For example, coordinator zomes not appearing in your installed hApp because their field was indented to the wrong place. This is not a breaking change for valid manifests but Holochain will now reject more invalid manifests.
+
+## [holochain\_keystore-0.3.0-beta-dev.19](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.19)
+
+## [holochain\_sqlite-0.3.0-beta-dev.24](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.18](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.18)
+
+- **BREAKING CHANGE:** Export error types directly `inline_zome::*` instead of `inline_zome::error::*`.
+
+## [kitsune\_p2p-0.3.0-beta-dev.23](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.23)
+
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity. [\#2974](https://github.com/holochain/holochain/pull/2974)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.17](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.17)
+
+## [holo\_hash-0.3.0-beta-dev.14](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.14)
+
+- **BREAKING CHANGE:** Export error types directly `holo_hash::HoloHashError` instead of path `holo_hash::error::HoloHashError`.
+
+# 20231129.004341
+
+## [hcterm-0.3.0-beta-dev.2](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.2)
+
+## [holochain\_cli-0.3.0-beta-dev.26](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain-0.3.0-beta-dev.26](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.24](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.26](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_cascade-0.3.0-beta-dev.26](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.26](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.21](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.21)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.24](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [hdk-0.3.0-beta-dev.21](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.21)
+
+- Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor. [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## [holochain\_state-0.3.0-beta-dev.25](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [hdi-0.4.0-beta-dev.17](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.17)
+
+- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## [holochain\_p2p-0.3.0-beta-dev.25](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_types-0.3.0-beta-dev.23](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.23)
+
+## [holochain\_sqlite-0.3.0-beta-dev.23](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.23)
+
 # 20231122.004553
 
 ## [hcterm-0.3.0-beta-dev.1](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.1)

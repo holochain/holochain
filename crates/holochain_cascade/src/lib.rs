@@ -92,6 +92,7 @@ macro_rules! some_or_return {
 }
 
 /// Marks whether data came from a local store or another node on the network
+#[derive(Debug, Clone)]
 pub enum CascadeSource {
     /// Data came from a local store
     Local,

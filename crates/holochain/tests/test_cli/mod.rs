@@ -45,5 +45,5 @@ fn invalid_config_error_is_friendly() {
         .stdout(predicate::str::is_match("[Pp]lease").unwrap());
     cmd.assert()
         .append_context("reason", "output contains the wrong reason for error")
-        .stdout(predicate::str::contains("missing field"));
+        .stdout(predicate::str::is_match("[Mm]issing field").unwrap());
 }

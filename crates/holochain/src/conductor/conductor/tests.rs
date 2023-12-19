@@ -35,7 +35,7 @@ async fn can_update_state() {
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
         ConductorConfig {
-            environment_path: db_dir.path().to_path_buf().into(),
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
             ..Default::default()
         }
         .into(),
@@ -89,7 +89,7 @@ async fn app_ids_are_unique() {
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
         ConductorConfig {
-            environment_path: db_dir.path().to_path_buf().into(),
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
             ..Default::default()
         }
         .into(),
@@ -155,7 +155,8 @@ async fn can_set_fake_state() {
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())
-        .test(db_dir.path(), &[])
+        .with_data_root_path(db_dir.path().to_path_buf().into())
+        .test(&[])
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
@@ -369,9 +370,12 @@ async fn test_signing_error_during_genesis() {
     let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
 
     let db_dir = test_db_dir();
-    let config = ConductorConfig::default();
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..Default::default()
+    };
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
+        SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
         db_dir.into(),
         config.into(),
         None,

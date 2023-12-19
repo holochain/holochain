@@ -1,8 +1,8 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
-const STANDARD_TIMEOUT_MILLIS: u64 = 15000;
-const FAST_TIMEOUT_MILLIS: u64 = 1300;
+const STANDARD_TIMEOUT_MILLIS: u64 = 30000;
+const FAST_TIMEOUT_MILLIS: u64 = 10000;
 
 #[hdk_extern]
 fn create_a_thing(_: ()) -> ExternResult<ActionHash> {

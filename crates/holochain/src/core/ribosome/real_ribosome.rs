@@ -52,8 +52,8 @@ use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::remote_signal::remote_signal;
 use crate::core::ribosome::host_fn::schedule::schedule;
+use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
@@ -93,15 +93,21 @@ use wasmer::Store;
 use wasmer::Type;
 // This is here because there were errors about different crate versions
 // without it.
-use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
+use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::RwLock;
 
+use crate::conductor::paths::DataRootPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
+use holochain_conductor_api::conductor::paths::WasmRootPath;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
+use holochain_wasmer_host::module::InstanceCache;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleWithStore;
+use holochain_wasmer_host::module::PlruKeyMap;
+use holochain_wasmer_host::plru::MicroCache;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -110,7 +116,6 @@ use std::sync::Arc;
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
-
 pub struct RealRibosome {
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
@@ -123,6 +128,10 @@ pub struct RealRibosome {
 
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
+
+    pub serialized_module_cache: Arc<RwLock<SerializedModuleCache>>,
+
+    pub instance_cache: Arc<RwLock<InstanceCache>>,
 }
 
 struct HostFnBuilder {
@@ -235,12 +244,29 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
+    pub fn new(
+        dna_file: DnaFile,
+        maybe_data_root_path: Option<DataRootPath>,
+    ) -> RibosomeResult<Self> {
+        let maybe_fs_dir = match maybe_data_root_path {
+            Some(data_root_path) => {
+                Some(WasmRootPath::try_from(data_root_path)?.as_ref().to_owned())
+            }
+            None => None,
+        };
         // Create an empty ribosome.
-        let ribosome = Self {
+        let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            serialized_module_cache: Arc::new(RwLock::new(SerializedModuleCache {
+                plru: MicroCache::default(),
+                key_map: PlruKeyMap::default(),
+                cache: BTreeMap::default(),
+                cranelift,
+                maybe_fs_dir,
+            })),
+            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         };
 
         // Collect the number of entry and link types
@@ -278,7 +304,7 @@ impl RealRibosome {
         // Create the global zome types from the totals.
         let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
 
-        let zome_types = Arc::new(map?);
+        ribosome.zome_types = Arc::new(map?);
 
         // Create a map of integrity zome names to ZomeIndexes.
         let integrity_zomes: HashMap<_, _> = ribosome
@@ -291,7 +317,7 @@ impl RealRibosome {
             .ok_or(ZomeTypesError::ZomeIndexOverflow)?;
 
         // Collect the dependencies for each zome.
-        let zome_dependencies = ribosome
+        ribosome.zome_dependencies = ribosome
             .dna_def()
             .all_zomes()
             .map(|(zome_name, def)| {
@@ -320,13 +346,10 @@ impl RealRibosome {
 
                 Ok((zome_name.clone(), dependencies))
             })
-            .collect::<RibosomeResult<HashMap<_, _>>>()?;
+            .collect::<RibosomeResult<HashMap<_, _>>>()?
+            .into();
 
-        Ok(Self {
-            dna_file: ribosome.dna_file,
-            zome_types,
-            zome_dependencies: Arc::new(zome_dependencies),
-        })
+        Ok(ribosome)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
@@ -335,6 +358,14 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
+            serialized_module_cache: Arc::new(RwLock::new(SerializedModuleCache {
+                plru: MicroCache::default(),
+                key_map: PlruKeyMap::default(),
+                cache: BTreeMap::default(),
+                cranelift,
+                maybe_fs_dir: None,
+            })),
+            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         }
     }
 
@@ -353,22 +384,10 @@ impl RealRibosome {
         &self,
         zome_name: &ZomeName,
     ) -> RibosomeResult<Arc<ModuleWithStore>> {
-        match holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.get() {
-            Some(cache) => Ok(cache.write().get(
-                self.wasm_cache_key(zome_name)?,
-                &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
-            )?),
-            None => {
-                // This can stampede but we don't really care. Just ignore any errors
-                // as the initialization is always the same.
-                let _ = holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE.set(RwLock::new(
-                    SerializedModuleCache::default_with_cranelift(cranelift),
-                ));
-                // This will recurse at most once because the only condition of recursion
-                // is if the cache is empty, which we just set above.
-                self.runtime_compiled_module(zome_name)
-            }
-        }
+        Ok(self.serialized_module_cache.write().get(
+            self.wasm_cache_key(zome_name)?,
+            &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+        )?)
     }
 
     pub fn wasm_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
@@ -403,7 +422,7 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             context_key,
         );
-        holochain_wasmer_host::module::INSTANCE_CACHE
+        self.instance_cache
             .write()
             .put_item(key, instance_with_store);
 
@@ -520,7 +539,7 @@ impl RealRibosome {
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );
-        let mut lock = holochain_wasmer_host::module::INSTANCE_CACHE.write();
+        let mut lock = self.instance_cache.write();
         // Get the first available key.
         let key = lock
             .cache()
@@ -572,7 +591,7 @@ impl RealRibosome {
             coordinator_zomes: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
-        let empty_ribosome = RealRibosome::new(empty_dna_file)?;
+        let empty_ribosome = RealRibosome::new(empty_dna_file, None)?;
         let context_key = RealRibosome::next_context_key();
         let mut store = Store::default();
         // We just leave this Env uninitialized as default because we never make it
@@ -688,7 +707,7 @@ impl RealRibosome {
                 must_get_agent_activity,
             )
             .with_host_function(&mut ns, "__hc__query_1", query)
-            .with_host_function(&mut ns, "__hc__remote_signal_1", remote_signal)
+            .with_host_function(&mut ns, "__hc__send_remote_signal_1", send_remote_signal)
             .with_host_function(&mut ns, "__hc__call_1", call)
             .with_host_function(&mut ns, "__hc__create_1", create)
             .with_host_function(&mut ns, "__hc__emit_signal_1", emit_signal)
@@ -1238,8 +1257,8 @@ pub mod wasm_test {
                 "__hc__must_get_valid_record_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
-                "__hc__remote_signal_1",
                 "__hc__schedule_1",
+                "__hc__send_remote_signal_1",
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
                 "__hc__sleep_1",

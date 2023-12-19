@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::{SweetCell, SweetLocalRendezvous};
@@ -7,6 +5,7 @@ use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -18,12 +17,17 @@ impl SweetConductorBatch {
     pub fn new(conductors: Vec<SweetConductor>) -> Self {
         let paths: HashSet<PathBuf> = conductors
             .iter()
-            .map(|c| c.config.environment_path.clone().into())
+            .filter_map(|c| {
+                c.config
+                    .data_root_path
+                    .as_ref()
+                    .map(|data_path| data_path.as_ref().clone())
+            })
             .collect();
         assert_eq!(
             conductors.len(),
             paths.len(),
-            "Some conductors in a SweetConductorBatch share the same database path!"
+            "Some conductors in a SweetConductorBatch share the same data path (or don't have a path)!"
         );
         Self(conductors)
     }

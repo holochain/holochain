@@ -25,7 +25,6 @@ pub mod config;
 pub mod entry_def_store;
 #[allow(missing_docs)]
 pub mod error;
-pub mod interactive;
 pub mod interface;
 pub mod kitsune_host_impl;
 pub mod manager;
