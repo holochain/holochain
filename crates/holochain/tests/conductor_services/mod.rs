@@ -9,6 +9,7 @@ pub use holochain_conductor_api::*;
 use holochain_types::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "can't be written without real deepkey.dna"]
 async fn initialize_deepkey() {
     holochain_trace::test_run().ok();
 
