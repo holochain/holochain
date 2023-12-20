@@ -50,6 +50,8 @@ async fn ser_regression_test() {
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
+            network_params: DnaNetworkParams::fake(),
+
             integrity_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .integrity
                 .into_inner()],

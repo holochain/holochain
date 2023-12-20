@@ -22,7 +22,6 @@ async fn initialize_deepkey() {
             DnaBundle::read_from_file(&PathBuf::from("./tests/conductor_services/deepkey.dna"))
                 .await
                 .unwrap();
-        let (deepkey_dna, _) = deepkey_dna.into_dna_file(Default::default()).await.unwrap();
         let response = admin_api
             .handle_admin_request(AdminRequest::InitializeDeepkey { deepkey_dna })
             .await;

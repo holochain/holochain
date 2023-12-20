@@ -52,7 +52,8 @@ async fn test_update_coordinators() {
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .modifiers(dna_modifiers.build().unwrap());
+        .modifiers(dna_modifiers.build().unwrap())
+        .network_params(DnaNetworkParams::fake());
     let dna_def = dna_def.build().unwrap();
     let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone()).await;
 
@@ -253,7 +254,8 @@ async fn test_update_coordinators_checks_deps() {
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .modifiers(dna_modifiers.build().unwrap());
+        .modifiers(dna_modifiers.build().unwrap())
+        .network_params(DnaNetworkParams::fake());
     let dna_def = dna_def.build().unwrap();
     let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone()).await;
 

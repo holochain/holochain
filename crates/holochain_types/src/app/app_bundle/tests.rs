@@ -39,6 +39,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
 async fn provisioning_1_create() {
     holochain_trace::test_run().ok();
     let agent = fixt!(AgentPubKey);
+    let network_params = DnaNetworkParams::fake();
     let modifiers = DnaModifiersOpt {
         properties: Some(app_manifest_properties_fixture()),
         network_seed: Some("network_seed".into()),
@@ -61,6 +62,7 @@ async fn provisioning_1_create() {
             &std::collections::HashMap::new(),
             agent.clone(),
             Default::default(),
+            network_params,
         )
         .await
         .unwrap();

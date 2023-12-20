@@ -1341,6 +1341,8 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
+            let network_params = self.get_dna_network_params();
+
             let InstallAppPayload {
                 source,
                 agent_key,
@@ -1370,7 +1372,12 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                .resolve_cells(
+                    &local_dnas,
+                    agent_key.clone(),
+                    membrane_proofs,
+                    network_params,
+                )
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -2536,6 +2543,18 @@ mod accessor_impls {
         /// Get the conductor config
         pub fn get_config(&self) -> &ConductorConfig {
             &self.config
+        }
+
+        /// Construct the DnaRuntime given the current setup
+        pub fn get_dna_network_params(&self) -> DnaNetworkParams {
+            DnaNetworkParams {
+                protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
+                dpki_hash: self
+                    .services()
+                    .dpki
+                    .as_ref()
+                    .map(|c| c.cell_id().dna_hash().clone().into()),
+            }
         }
 
         /// Get a TaskManagerClient

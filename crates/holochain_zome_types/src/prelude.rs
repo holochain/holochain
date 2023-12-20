@@ -12,6 +12,7 @@ pub use crate::chain::*;
 pub use crate::countersigning::*;
 pub use crate::crdt::*;
 pub use crate::dna_def::*;
+pub use crate::dna_network_params::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
