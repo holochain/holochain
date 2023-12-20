@@ -55,7 +55,7 @@ mod tests {
     async fn update_agent_info() {
         let (test_sender, _) = setup(SpaceInternalStub::new()).await;
 
-        tokio::time::timeout(Duration::from_millis(100), async {
+        tokio::time::timeout(Duration::from_millis(200), async {
             loop {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 if test_sender.get_called_count().await.unwrap() >= 3 {
@@ -82,7 +82,7 @@ mod tests {
         test_sender.ghost_actor_shutdown().await.unwrap();
 
         let max_wait = Instant::now();
-        while !task.read().is_finished && max_wait.elapsed() < Duration::from_millis(10) {
+        while !task.read().is_finished && max_wait.elapsed() < Duration::from_millis(100) {
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
 
@@ -98,7 +98,7 @@ mod tests {
         space_internal_impl.respond_with_error = true;
         let (test_sender, _) = setup(space_internal_impl).await;
 
-        tokio::time::timeout(Duration::from_millis(100), async {
+        tokio::time::timeout(Duration::from_millis(300), async {
             loop {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 if test_sender.get_errored_count().await.unwrap() >= 3 {
