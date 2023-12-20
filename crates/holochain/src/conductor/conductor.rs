@@ -2561,8 +2561,8 @@ impl holochain_services::CellRunner for Conductor {
             holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
         let call_unsigned = ZomeCallUnsigned {
             cell_id,
-            zome_name: zome_name.into(),
-            fn_name: fn_name.into(),
+            zome_name,
+            fn_name,
             cap_secret,
             provenance: provenance.clone(),
             payload,
@@ -2721,7 +2721,7 @@ impl Conductor {
 
         let holochain_p2p_cell = self.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
 
-        Ok(Cell::create(cell_id.clone(), self, space, holochain_p2p_cell).await?)
+        Cell::create(cell_id.clone(), self, space, holochain_p2p_cell).await
     }
 
     /// Attempt to create all necessary Cells which have not already been created
@@ -2770,7 +2770,7 @@ impl Conductor {
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             self.clone()
                 .create_cell(cell_id.clone())
-                .map_err(|err| (cell_id.clone(), err.into()))
+                .map_err(|err| (cell_id.clone(), err))
         });
 
         // Join on all apps and return a list of
