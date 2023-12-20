@@ -112,6 +112,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use opentelemetry_api::metrics::Counter;
+use opentelemetry_api::global::meter_with_version;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -132,6 +134,8 @@ pub struct RealRibosome {
     pub serialized_module_cache: Arc<RwLock<SerializedModuleCache>>,
 
     pub instance_cache: Arc<RwLock<InstanceCache>>,
+
+    pub usage_meter: Arc<Counter<u64>>
 }
 
 struct HostFnBuilder {
@@ -243,6 +247,18 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 }
 
 impl RealRibosome {
+    pub fn standard_usage_meter() -> Arc<Counter<u64>> {
+        meter_with_version(
+            "hc.ribosome.wasm",
+            Some("0"),
+            None::<&'static str>,
+            Some(vec![]),
+        )
+        .u64_counter("hc.ribosome.wasm.usage")
+        .with_description("The metered usage of a wasm ribosome.")
+        .init().into()
+    }
+
     /// Create a new instance
     pub fn new(
         dna_file: DnaFile,
@@ -267,6 +283,7 @@ impl RealRibosome {
                 maybe_fs_dir,
             })),
             instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
+            usage_meter: Self::standard_usage_meter(),
         };
 
         // Collect the number of entry and link types
@@ -366,6 +383,7 @@ impl RealRibosome {
                 maybe_fs_dir: None,
             })),
             instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
+            usage_meter: Self::standard_usage_meter(),
         }
     }
 
