@@ -82,29 +82,26 @@ impl<'c, F: Fact> TraversalOutcome<'c, F> {
     pub fn report(&self) -> Option<String> {
         match self {
             TraversalOutcome::Success => None,
-            TraversalOutcome::DependencyNotMet => Some(format!("aitia dependency not met given the context")) ,
+            TraversalOutcome::DependencyNotMet => Some("aitia dependency not met given the context".to_string()) ,
             TraversalOutcome::IncorrectModel(deps) => Some(format!("Target fact was true, but some dependency checks failed. Your model may be incorrect. Failed checks: {deps:?}")) ,
         }
     }
 
     pub fn from_traversal(tr: &'c Traversal<'c, F>) -> Self {
-        match tr {
-            Traversal {
-                root_check_passed,
-                terminals,
-                ..
-            } => {
-                if *root_check_passed {
-                    if terminals.is_empty() {
-                        // All is well
-                        TraversalOutcome::Success
-                    } else {
-                        TraversalOutcome::IncorrectModel(terminals)
-                    }
-                } else {
-                    TraversalOutcome::DependencyNotMet
-                }
+        let Traversal {
+            root_check_passed,
+            terminals,
+            ..
+        } = tr;
+        if *root_check_passed {
+            if terminals.is_empty() {
+                // All is well
+                TraversalOutcome::Success
+            } else {
+                TraversalOutcome::IncorrectModel(terminals)
             }
+        } else {
+            TraversalOutcome::DependencyNotMet
         }
     }
 }

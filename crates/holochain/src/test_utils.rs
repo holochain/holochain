@@ -586,13 +586,12 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
             .iter()
             .map(DhtOpHash::with_data_sync)
             .flat_map(|hash| {
-                node_ids.iter().map(move |node_id| {
-                    let fact = hc_sleuth::Event::Integrated {
+                node_ids
+                    .iter()
+                    .map(move |node_id| hc_sleuth::Event::Integrated {
                         by: node_id.clone(),
                         op: hash.clone(),
-                    };
-                    fact
-                })
+                    })
             })
         {
             let tr = fact.clone().traverse(&ctx);

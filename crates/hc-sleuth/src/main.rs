@@ -20,9 +20,8 @@ fn main() {
         HcSleuth::Query {
             op_hash: _,
             node: _,
-            log_paths,
+            log_paths: _,
         } => {
-            dbg!(log_paths);
             unimplemented!("command-line query not yet implemented")
         }
     }

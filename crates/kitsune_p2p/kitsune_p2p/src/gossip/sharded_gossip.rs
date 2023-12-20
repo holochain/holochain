@@ -299,17 +299,14 @@ impl ShardedGossip {
         // actually sending the gossip.
         con.notify(&wire, timeout).await?;
 
-        match gossip {
-            ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished: _ }) => {
-                for hash in ops.iter() {
-                    self.gossip.host_api.handle_op_hash_transmitted(
-                        &self.gossip.space,
-                        hash,
-                        TransferMethod::Gossip,
-                    );
-                }
+        if let ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished: _ }) = gossip {
+            for hash in ops.iter() {
+                self.gossip.host_api.handle_op_hash_transmitted(
+                    &self.gossip.space,
+                    hash,
+                    TransferMethod::Gossip,
+                );
             }
-            _ => {}
         }
 
         Ok(())

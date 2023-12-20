@@ -256,7 +256,8 @@ fn traverse_fact<F: Fact>(
 /// with paths terminating at a transition point.
 ///
 /// Terminal facts are returned separately.
-pub fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
+#[allow(clippy::type_complexity)]
+fn prune_traversal<'a, 'b: 'a, T: Fact + Eq + Hash>(
     table: &'a TraversalMap<T>,
     start: &'b Dep<T>,
 ) -> (HashMap<&'a Dep<T>, &'a [Dep<T>]>, Vec<&'a Dep<T>>) {

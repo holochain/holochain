@@ -14,7 +14,7 @@ pub trait Fact: FactTraits {
         format!("{:?}", self)
     }
 
-    fn traverse<'c>(self, ctx: &'c Self::Context) -> TraversalResult<'c, Self> {
+    fn traverse(self, ctx: &Self::Context) -> TraversalResult<'_, Self> {
         crate::traversal::traverse(self, ctx)
     }
 }

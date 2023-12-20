@@ -68,6 +68,7 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
     num_attempts: usize,
     delay: Duration,
 ) {
+    #[allow(clippy::type_complexity)]
     let all_cell_dbs: Vec<(
         SleuthId,
         AgentPubKey,
