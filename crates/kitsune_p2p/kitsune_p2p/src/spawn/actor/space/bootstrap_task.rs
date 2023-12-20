@@ -180,7 +180,7 @@ mod tests {
         SpaceInternalHandler, SpaceInternalHandlerResult, VecMXM, WireConHnd,
     };
     use crate::spawn::actor::MetaNetCon;
-    use crate::spawn::test_util::HostStub;
+    use crate::spawn::test_util::LegacyHostStub;
     use crate::types::actor::BroadcastData;
     use crate::wire::Wire;
     use crate::KitsuneP2pResult;
@@ -505,7 +505,7 @@ mod tests {
         bootstrap_every_other_call_fails: bool,
     ) -> (
         GhostSender<SpaceInternal>,
-        HostStub,
+        LegacyHostStub,
         Arc<RwLock<BootstrapTask>>,
     ) {
         let builder = GhostActorBuilder::new();
@@ -539,7 +539,7 @@ mod tests {
             delay_multiplier,
         );
 
-        let host_stub = HostStub::start(host_receiver);
+        let host_stub = LegacyHostStub::start(host_receiver);
 
         (internal_sender, host_stub, task)
     }
