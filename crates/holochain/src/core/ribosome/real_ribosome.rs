@@ -107,13 +107,16 @@ use holochain_wasmer_host::module::PlruKeyMap;
 use holochain_wasmer_host::plru::MicroCache;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
+use opentelemetry_api::global::meter_with_version;
+use opentelemetry_api::metrics::Counter;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use opentelemetry_api::metrics::Counter;
-use opentelemetry_api::global::meter_with_version;
+use wasmer_middlewares::metering::get_remaining_points;
+use wasmer_middlewares::metering::set_remaining_points;
+use wasmer_middlewares::metering::MeteringPoints;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -135,7 +138,7 @@ pub struct RealRibosome {
 
     pub instance_cache: Arc<RwLock<InstanceCache>>,
 
-    pub usage_meter: Arc<Counter<u64>>
+    pub usage_meter: Arc<Counter<u64>>,
 }
 
 struct HostFnBuilder {
@@ -256,7 +259,8 @@ impl RealRibosome {
         )
         .u64_counter("hc.ribosome.wasm.usage")
         .with_description("The metered usage of a wasm ribosome.")
-        .init().into()
+        .init()
+        .into()
     }
 
     /// Create a new instance
@@ -752,7 +756,6 @@ impl RealRibosome {
         &self,
         call_context: CallContext,
         invocation: &I,
-        zome: &Zome,
         to_call: &FunctionName,
         module: Arc<Module>,
     ) -> Result<Option<ExternIO>, RibosomeError> {
@@ -760,21 +763,53 @@ impl RealRibosome {
             // there is a callback to_call and it is implemented in the wasm
             // it is important to fully instantiate this (e.g. don't try to use the module above)
             // because it builds guards against memory leaks and handles imports correctly
-            let (instance_with_store, context_key) = self.instance_with_store(call_context)?;
+            let (instance_with_store, context_key) =
+                self.instance_with_store(call_context.clone())?;
 
             let result: Result<ExternIO, RuntimeError>;
             {
                 let instance = instance_with_store.instance.clone();
                 let mut store_lock = instance_with_store.store.lock();
                 let mut store_mut = store_lock.as_store_mut();
+                set_remaining_points(&mut store_mut, instance.as_ref(), WASM_METERING_LIMIT);
                 result = holochain_wasmer_host::guest::call(
                     &mut store_mut,
-                    instance,
+                    instance.clone(),
                     to_call.as_ref(),
                     // be aware of this clone!
                     // the whole invocation is cloned!
                     // @todo - is this a problem for large payloads like entries?
                     invocation.to_owned().host_input()?,
+                );
+                let points_used = match get_remaining_points(&mut store_mut, instance.as_ref()) {
+                    MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
+                    MeteringPoints::Exhausted => WASM_METERING_LIMIT,
+                };
+                self.usage_meter.add(
+                    points_used,
+                    &[
+                        opentelemetry_api::KeyValue::new(
+                            "dna",
+                            self.dna_file.dna().hash.to_string(),
+                        ),
+                        opentelemetry_api::KeyValue::new(
+                            "zome",
+                            call_context.zome().zome_name().to_string(),
+                        ),
+                        opentelemetry_api::KeyValue::new("fn", to_call.to_string()),
+                        opentelemetry_api::KeyValue::new(
+                            "chain",
+                            call_context
+                                .host_context
+                                .workspace()
+                                .source_chain()
+                                .as_ref()
+                                .expect("No source chain on this workspace.")
+                                .agent_pubkey()
+                                .clone()
+                                .to_string(),
+                        ),
+                    ],
                 );
             }
 
@@ -782,7 +817,7 @@ impl RealRibosome {
             let (can_cache, result) = match result {
                 Err(runtime_error) => {
                     // This will bubble up and be logged later but capture zome/function that was called while the context is available
-                    tracing::error!(?runtime_error, ?zome, ?to_call);
+                    tracing::error!(?runtime_error, ?call_context.zome, ?to_call);
                     match runtime_error.downcast::<WasmError>() {
                         Ok(wasm_error) => {
                             (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
@@ -795,7 +830,11 @@ impl RealRibosome {
 
             // Cache this instance.
             if can_cache {
-                self.cache_instance(context_key, instance_with_store, zome.zome_name())?;
+                self.cache_instance(
+                    context_key,
+                    instance_with_store,
+                    call_context.zome().zome_name(),
+                )?;
             }
 
             Ok(Some(result?))
@@ -1006,7 +1045,6 @@ impl RibosomeT for RealRibosome {
                 self.do_wasm_call_for_module::<I>(
                     call_context,
                     invocation,
-                    zome,
                     to_call,
                     module_with_store.module.clone(),
                 )
