@@ -2,6 +2,10 @@
 
 //! This module implements value sharing for out-of-band communication between test agents.
 
+/*
+ * TODO: rewrite all the tests to use the same logic for testing all trait impls
+ */
+
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::Result as Fallible;
@@ -23,6 +27,7 @@ pub(crate) trait SharedValues: DynClone + Sync + Send {
         min_data: usize,
         maybe_wait_timeout: Option<Duration>,
     ) -> Fallible<Data<String>>;
+    fn num_waiters_t(&self) -> Fallible<usize>;
 }
 dyn_clone::clone_trait_object!(SharedValues);
 
@@ -107,7 +112,7 @@ pub(crate) mod local_v1 {
             }
         }
 
-        pub async fn num_waiters(&self) -> usize {
+        pub fn num_waiters(&self) -> usize {
             self.num_waiters.load(Ordering::SeqCst)
         }
 
@@ -161,6 +166,9 @@ pub(crate) mod local_v1 {
                 }
             }
         }
+        fn num_waiters_t(&self) -> Fallible<usize> {
+            Ok(self.num_waiters())
+        }
     }
 
     #[cfg(test)]
@@ -174,8 +182,10 @@ pub(crate) mod local_v1 {
 
         #[tokio::test]
         // #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-        async fn shared_values_localv1_concurrent() {
-            let mut values = LocalV1::default();
+        async fn shared_values_localv1_get_waits() {
+            let mut values = Box::new(LocalV1::default()) as Box<dyn SharedValues>;
+
+            const EXPECTED_NUM_WAITERS: usize = 1;
 
             let prefix = "something".to_string();
             let s = "we expect this back".to_string();
@@ -188,7 +198,7 @@ pub(crate) mod local_v1 {
                 tokio::spawn({
                     async move {
                         let got: String = values
-                            .get_pattern(&prefix, |(_, results)| results.len() > 0)
+                            .get_pattern_t(prefix.clone(), EXPECTED_NUM_WAITERS, None)
                             .await
                             .unwrap()
                             .into_values()
@@ -206,21 +216,20 @@ pub(crate) mod local_v1 {
             tokio::select! {
                 _ = async {
                     loop {
-                        let num = values.num_waiters().await;
+                        let num = values.num_waiters_t().unwrap();
                         match num {
                             0 => tokio::time::sleep(Duration::from_millis(10)).await,
-                            1 => { eprintln!("saw a getter!"); break },
+                            EXPECTED_NUM_WAITERS => { eprintln!("saw a getter!"); break },
                             _ => panic!("saw more than one waiter"),
                         };
                     }
-                } => {
-                }
+                } => { }
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {
                     panic!("didn't see a waiter");
                 }
             };
 
-            values.put(prefix, s).await.unwrap();
+            values.put_t(prefix, s).await.unwrap();
 
             if let Err(e) = handle.await {
                 panic!("{:#?}", e);
@@ -501,6 +510,10 @@ pub(crate) mod remote_v1 {
         //         anyhow::bail!("timeout")
         //     }
         // }
+
+        fn num_waiters_t(&self) -> Fallible<usize> {
+            todo!()
+        }
     }
     #[cfg(test)]
     mod tests {
