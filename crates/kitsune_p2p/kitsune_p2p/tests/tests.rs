@@ -17,6 +17,18 @@ use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 
+/* Tests to add
+- Same as for gossip but with a historical op
+- Three nodes, delegated publish does not reflect
+- Restart a node during gossip and check that it will recover
+- Agent leave, but is that implemented fully?
+- Overloaded, return busy to new peers. Can that be observed? and how can i test that?
+- Test with more ops to force batching
+- Can round timeout be tested? Would need a way to shut down during a round then to ensure that the node with its round open can start a new gossip round with another node
+- Enough large ops to hit the throttle limit, check how that behaves
+- All agents leave a space, check the space gets cleaned up correctly
+*/
+
 // Test that two nodes can discover each other and connect. This checks that peer discovery
 // works and that networking works well enough for a request reply.
 #[cfg(feature = "tx5")]
