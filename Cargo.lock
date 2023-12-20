@@ -2609,28 +2609,13 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ded13e388a81713db6919cd750e6113acf2fe5afbaedf8aff79780ec4fc47425"
-dependencies = [
- "futures",
- "one_err",
- "rmp-serde 1.1.2",
- "rmpv",
- "serde",
- "serde_bytes",
- "sodoken",
-]
-
-[[package]]
-name = "hc_seed_bundle"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "397f372672597305f39af2b2abf389a077077489bc4f412e7ed574214c268208"
 dependencies = [
  "futures",
  "one_err",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rmpv",
  "serde",
  "serde_bytes",
@@ -3080,7 +3065,7 @@ dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_types",
  "matches",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde_derive",
  "serde_json",
@@ -3239,7 +3224,7 @@ dependencies = [
  "holochain_serialized_bytes_derive",
  "proptest",
  "proptest-derive 0.3.0",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_bytes",
@@ -3307,7 +3292,7 @@ dependencies = [
  "r2d2",
  "r2d2_sqlite_neonphog",
  "rand 0.8.5",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rusqlite",
  "scheduled-thread-pool",
  "serde",
@@ -4459,13 +4444,13 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
- "lair_keystore_api 0.4.0",
+ "lair_keystore_api",
  "mockall",
  "once_cell",
  "parking_lot 0.12.1",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rmp-serde 0.15.5",
  "rustls",
  "serde",
@@ -4495,7 +4480,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e71d9d2e55c66921ef9f39fbd393e2430d64f7ac6e83784ff2c777ec8142ec7"
 dependencies = [
- "lair_keystore_api 0.4.0",
+ "lair_keystore_api",
  "pretty_assertions",
  "rpassword 7.3.1",
  "rusqlite",
@@ -4507,40 +4492,13 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5829f25d0eab6309ae4307aa645f123a64e568a41ec17c358dcbd65dec207e10"
-dependencies = [
- "base64 0.13.1",
- "dunce",
- "hc_seed_bundle 0.1.7",
- "lru",
- "nanoid 0.4.0",
- "once_cell",
- "parking_lot 0.12.1",
- "rcgen",
- "serde",
- "serde_json",
- "serde_yaml",
- "time",
- "tokio",
- "toml 0.5.11",
- "toml 0.7.8",
- "tracing",
- "url 2.5.0",
- "winapi 0.3.9",
- "zeroize",
-]
-
-[[package]]
-name = "lair_keystore_api"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af33456610975b9138a8a8b2051fdeab69743f63d32adbb3f47d5fb8ce329663"
 dependencies = [
  "base64 0.13.1",
  "dunce",
- "hc_seed_bundle 0.2.0",
+ "hc_seed_bundle",
  "lru",
  "nanoid 0.4.0",
  "once_cell",
@@ -4989,7 +4947,7 @@ dependencies = [
  "proptest",
  "proptest-derive 0.3.0",
  "reqwest",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -6672,17 +6630,6 @@ name = "rmp-serde"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "723ecff9ad04f4ad92fe1c8ca6c20d2196d9286e9c60727c4cb5511629260e9d"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
-]
-
-[[package]]
-name = "rmp-serde"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bffea85eea980d8a74453e5d02a8d93028f3c34725de143085a844ebe953258a"
 dependencies = [
  "byteorder",
  "rmp",
@@ -8403,9 +8350,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19f91696fd3614f0fca86fa4f42e4639472eaa6adfb7f5d0bb0b630f824f6591"
+checksum = "bd134f3accf5bb9027cf69de1fef04728d9459e22fecf520a18623bc13831f49"
 dependencies = [
  "bytes",
  "futures",
@@ -8419,7 +8366,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.6-alpha",
  "tx5-go-pion",
  "tx5-signal",
  "url 2.5.0",
@@ -8444,10 +8391,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "tx5-go-pion"
-version = "0.0.5-alpha"
+name = "tx5-core"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1ace6ad58b7f2376f2cb15223c7191dae485fe9be96176c69823252e509b0ad"
+checksum = "d04199b3ea6873836b444fda70982bb5566a64b13ae9cebed64d0faac7d25892"
+dependencies = [
+ "base64 0.13.1",
+ "dirs 5.0.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "tempfile",
+ "tracing",
+ "url 2.5.0",
+]
+
+[[package]]
+name = "tx5-go-pion"
+version = "0.0.6-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aec1c77232fe9307aa37749545c1722d54abc0a19b745cb6b0c4033f33042673"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
@@ -8459,9 +8424,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf5d2ffe9dfcb9c458bd761927120df70ae7f00bc96c5c7515912947ac48dec9"
+checksum = "f914c7e4724adc3061f12e449d36cefb1b476a07ca77da601bda645e8c3e58e5"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8472,7 +8437,7 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.8",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.6-alpha",
  "zip",
 ]
 
@@ -8490,18 +8455,18 @@ dependencies = [
  "sha2 0.10.8",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.5-alpha",
  "zip",
 ]
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14bdea8228e5a9760d2a40ea15ce91432358d97866ba070d05a5896a6dffa762"
+checksum = "9324b127b0b0d63a723c4fd2d09b9d5491686878b02b1ccfbe61b898b045845c"
 dependencies = [
  "futures",
- "lair_keystore_api 0.3.0",
+ "lair_keystore_api",
  "once_cell",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -8518,7 +8483,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.18.0",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.6-alpha",
  "url 2.5.0",
  "webpki-roots 0.23.1",
 ]
@@ -8540,7 +8505,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "tx5-core",
+ "tx5-core 0.0.5-alpha",
  "warp",
 ]
 
