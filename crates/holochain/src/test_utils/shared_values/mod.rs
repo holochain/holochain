@@ -2,8 +2,34 @@
 
 //! This module implements value sharing for out-of-band communication between test agents.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
+
+use anyhow::Result as Fallible;
+use async_trait::async_trait;
+use dyn_clone::DynClone;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
 pub type Data<T> = BTreeMap<String, T>;
+
+// type WaitUntilFn = dyn Fn(&'_ Data<String>) -> BoxFuture<'_, bool>;
+
+#[async_trait]
+pub(crate) trait SharedValues: DynClone + Sync + Send {
+    async fn put_t(&mut self, key: String, value: String) -> Fallible<Option<String>>;
+    async fn get_pattern_t(
+        &mut self,
+        pattern: String,
+        min_data: usize,
+        maybe_wait_timeout: Option<Duration>,
+    ) -> Fallible<Data<String>>;
+}
+dyn_clone::clone_trait_object!(SharedValues);
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct AgentDummyInfo {
+    id: Uuid,
+}
 
 pub(crate) mod local_v1 {
     use anyhow::Result as Fallible;
@@ -13,7 +39,7 @@ pub(crate) mod local_v1 {
         Arc,
     };
 
-    use super::Data;
+    use super::*;
 
     /// Local implementation using a guarded BTreeMap as its datastore.
     #[derive(Clone, Default)]
@@ -108,16 +134,46 @@ pub(crate) mod local_v1 {
         }
     }
 
+    #[async_trait]
+    impl SharedValues for LocalV1 {
+        async fn put_t(&mut self, key: String, value: String) -> Fallible<Option<String>> {
+            self.put(key, value).await
+        }
+
+        async fn get_pattern_t(
+            &mut self,
+            pattern: String,
+            min_data: usize,
+            maybe_wait_timeout: Option<Duration>,
+        ) -> Fallible<Data<String>> {
+            tokio::select! {
+                data = self.get_pattern(pattern.as_str(), |(_previous_data, data)| { data.len() >= min_data }) => Ok(data?),
+                _ = {
+                    let duration = if let Some(wait_timeout) =  maybe_wait_timeout {
+                        wait_timeout
+                    } else {
+                        std::time::Duration::MAX
+                    };
+
+                    tokio::time::sleep(duration)
+                }  => {
+                    anyhow::bail!("timeout")
+                }
+            }
+        }
+    }
+
     #[cfg(test)]
     mod tests {
-        use std::time::Duration;
-
         use serde::{Deserialize, Serialize};
+        use std::time::Duration;
         use uuid::Uuid;
 
+        use super::super::*;
         use super::*;
 
-        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        #[tokio::test]
+        // #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
         async fn shared_values_localv1_concurrent() {
             let mut values = LocalV1::default();
 
@@ -171,14 +227,9 @@ pub(crate) mod local_v1 {
             };
         }
 
-        #[derive(Debug, Serialize, Deserialize, Clone)]
-        struct AgentDummyInfo {
-            id: Uuid,
-        }
-
         #[tokio::test(flavor = "multi_thread")]
         async fn shared_values_localv1_simulate_agent_discovery() {
-            let values = LocalV1::default();
+            let values: Box<dyn SharedValues + Sync> = Box::new(LocalV1::default());
 
             const PREFIX: &str = "agent_";
 
@@ -190,7 +241,7 @@ pub(crate) mod local_v1 {
                 tokio::spawn(async move {
                     tokio::select! {
                         _ = async {
-                            let all_agents: Data<AgentDummyInfo> = values.get_pattern(PREFIX, |(_, results)| results.len() >= num_agents)
+                            let all_agents: Data<AgentDummyInfo> = values.get_pattern_t(PREFIX.to_string(), required_agents, None)
                                 .await
                                 .unwrap()
                                 .into_iter()
@@ -215,7 +266,7 @@ pub(crate) mod local_v1 {
                         id: uuid::Uuid::new_v4(),
                     };
                     values
-                        .put(
+                        .put_t(
                             format!("{PREFIX}{}", &agent_dummy_info.id),
                             serde_json::to_string(&agent_dummy_info).unwrap(),
                         )
@@ -235,10 +286,12 @@ pub(crate) mod local_v1 {
 }
 
 pub(crate) mod remote_v1 {
-    use anyhow::Result as Fallible;
+    use anyhow::{bail, Result as Fallible};
+    use async_trait::async_trait;
     use futures::StreamExt;
     use serde::{Deserialize, Serialize};
     use std::sync::Arc;
+    use std::time::Duration;
     use tokio::task::JoinHandle;
 
     use holochain_websocket::{WebsocketConfig, WebsocketListener};
@@ -247,7 +300,7 @@ pub(crate) mod remote_v1 {
     use crate::prelude::*;
 
     use super::local_v1::LocalV1;
-    use super::Data;
+    use super::{Data, SharedValues};
 
     pub const SHARED_VALUES_REMOTEV1_URL_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
     pub const SHARED_VALUES_REMOTEV1_URL_DEFAULT: &str = "ws://127.0.0.1:0";
@@ -263,8 +316,15 @@ pub(crate) mod remote_v1 {
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
     pub enum RequestMessage {
         Test(String),
-        Put { key: String, value: String },
-        Get { pattern: String },
+        Put {
+            key: String,
+            value: String,
+        },
+        Get {
+            pattern: String,
+            min_data: usize,
+            maybe_timeout: Option<Duration>,
+        },
     }
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
@@ -328,12 +388,16 @@ pub(crate) mod remote_v1 {
                             RequestMessage::Put { key, value } => ResponseMessage::Put(
                                 localv1.put(key, value).await.map_err(|e| e.to_string()),
                             ),
-                            RequestMessage::Get { pattern } => ResponseMessage::Get(
-                                localv1.get_pattern(&pattern, |_| true).await.map_err(|e| {
-                                    tracing::error!("{}", e);
-                                    e.to_string()
-                                }),
-                            ),
+                            RequestMessage::Get {
+                                pattern,
+                                min_data,
+                                maybe_timeout,
+                            } => {
+                                // TODO
+                                let data = Default::default();
+
+                                ResponseMessage::Get(Ok(data))
+                            }
                         };
 
                         let response: SerializedBytes = match response_msg.clone().try_into() {
@@ -405,8 +469,45 @@ pub(crate) mod remote_v1 {
         }
     }
 
+    #[async_trait]
+    impl SharedValues for RemoteV1Client {
+        async fn put_t(&mut self, key: String, value: String) -> Fallible<Option<String>> {
+            match self.request(RequestMessage::Put { key, value }).await? {
+                ResponseMessage::Put(result) => result.map_err(|s| anyhow::anyhow!(s)),
+                other => bail!("got wrong response type {other:#?}"),
+            }
+        }
+
+        async fn get_pattern_t(
+            &mut self,
+            pattern: String,
+            min_data: usize,
+            maybe_wait_timeout: Option<Duration>,
+        ) -> Fallible<Data<String>> {
+            todo!();
+
+            // tokio::select! {
+            //     data = self.get_pattern(pattern.as_str(), |(_previous_data, data)| { data.len() >= min_data }) => Ok(data?),
+            //     _ = {
+            //         let duration = if let Some(wait_timeout) =  maybe_wait_timeout {
+            //             wait_timeout
+            //         } else {
+            //             std::time::Duration::MAX
+            //         };
+
+            //         tokio::time::sleep(duration)
+            //     }  => todo!(),
+        }
+        //         anyhow::bail!("timeout")
+        //     }
+        // }
+    }
     #[cfg(test)]
     mod tests {
+        use std::time::Duration;
+
+        use crate::test_utils::shared_values::AgentDummyInfo;
+
         use super::*;
 
         #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -435,7 +536,7 @@ pub(crate) mod remote_v1 {
         }
 
         #[tokio::test]
-        async fn shared_values_remote_v1_client_basic() {
+        async fn shared_values_remote_v1_basic() {
             let server = RemoteV1Server::new(None).await.unwrap();
 
             let client = RemoteV1Client::new(server.url(), None).await.unwrap();
@@ -449,5 +550,60 @@ pub(crate) mod remote_v1 {
 
             assert_eq!(s, r);
         }
+
+        // #[tokio::test(flavor = "multi_thread")]
+        // async fn shared_values_remotev1_simulate_agent_discovery() {
+        //     const PREFIX: &str = "agent_";
+
+        //     let required_agents = 2;
+        //     let num_agents_required = 2;
+        //     let num_agents_spawned = num_agents_required * 10;
+
+        //     let server = RemoteV1Server::new(None).await.unwrap();
+        //     let url = server.url();
+
+        //     let agent_fn = || async move {
+        //         let values = RemoteV1Client::new(url, None).await;
+
+        //         let agent_dummy_info = AgentDummyInfo {
+        //             id: uuid::Uuid::new_v4(),
+        //         };
+        //         values
+        //             .put(
+        //                 format!("{PREFIX}{}", &agent_dummy_info.id),
+        //                 serde_json::to_string(&agent_dummy_info).unwrap(),
+        //             )
+        //             .await
+        //             .unwrap();
+
+        //         // TODO: wait with a timeout until num_agents have been registered
+        //         let handle = {
+        //             let mut values = values.clone();
+        //             tokio::spawn(async move {
+        //                 tokio::select! {
+        //                     _ = async {
+        //                         let all_agents: Data<AgentDummyInfo> = values.get_pattern(PREFIX, |(_, results)| results.len() >= num_agents_required)
+        //                             .await
+        //                             .unwrap()
+        //                             .into_iter()
+        //                             .map(|(key, value)| Ok((key, serde_json::from_str(&value)?)))
+        //                             .collect::<Fallible<_>>()
+        //                             .unwrap();
+        //                         assert!(required_agents <= all_agents.len());
+        //                         assert!(all_agents.len() <= num_agents_required);
+        //                         eprintln!("{} agents {all_agents:#?}", all_agents.len());
+        //                     } => { }
+        //                     _ = tokio::time::sleep(Duration::from_millis(50)) => { panic!("not enough agents"); }
+        //                 }
+        //             })
+        //         };
+
+        //         if let Err(e) = handle.await {
+        //             panic!("{:#?}", e);
+        //         };
+
+        //         // this concludes a checkpoint, possibly providing data, that holochain specific logic can rely on
+        //     };
+        // }
     }
 }
