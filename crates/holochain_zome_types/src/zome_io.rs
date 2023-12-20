@@ -231,6 +231,13 @@ pub enum ZomeCallResponse {
     /// A countersigning session has failed to start.
     CountersigningSession(String),
 }
+
+impl std::fmt::Display for ZomeCallResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self))
+    }
+}
+
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]

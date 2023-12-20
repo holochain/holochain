@@ -18,7 +18,7 @@ automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
 base64 = "0.13"
 cfg-if = "0.1"
-chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_builder = "0.9.0"
 derive_more = { workspace = true }
 either = "1.5"

@@ -12,7 +12,6 @@ pub use dpki_service::*;
 mod app_store_service;
 pub use app_store_service::*;
 
-use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 
 #[async_trait::async_trait]
@@ -29,34 +28,25 @@ pub trait CellRunner: Send + Sync + 'static {
 }
 
 /// The set of all Conductor Services available to the conductor
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ConductorServices {
     /// The DPKI service
-    pub dpki: Arc<dyn DpkiService>,
+    pub dpki: Option<Arc<dyn DpkiService>>,
     /// The AppStore service
-    pub app_store: Arc<dyn AppStoreService>,
+    pub app_store: Option<Arc<dyn AppStoreService>>,
 }
 
 impl ConductorServices {
-    /// Construct services from the default built-in implementations
-    pub fn builtin(
-        runner: Arc<impl CellRunner>,
-        keystore: MetaLairClient,
-        cell_ids: ConductorServiceCells,
-    ) -> Self {
-        Self {
-            dpki: Arc::new(DeepkeyBuiltin::new(runner.clone(), keystore, cell_ids.dpki)),
-            app_store: AppStoreBuiltin::new(runner, cell_ids.app_store),
-        }
-    }
-
     /// Get the list of any CellIds which may be protected due to being in use by ConductorServices
     pub fn protected_cell_ids(&self) -> HashSet<&CellId> {
-        self.dpki
-            .cell_ids()
-            .union(&self.app_store.cell_ids())
-            .copied()
-            .collect()
+        let dpki_cells = self.dpki.as_ref().map(|d| d.cell_ids()).unwrap_or_default();
+        let app_store_cells = self
+            .app_store
+            .as_ref()
+            .map(|d| d.cell_ids())
+            .unwrap_or_default();
+
+        dpki_cells.union(&app_store_cells).copied().collect()
     }
 }
 

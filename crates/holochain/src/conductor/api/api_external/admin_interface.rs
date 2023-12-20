@@ -291,6 +291,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
+            InitializeDeepkey { deepkey_dna } => {
+                self.conductor_handle
+                    .clone()
+                    .initialize_deepkey(Some(deepkey_dna))
+                    .await?;
+                Ok(AdminResponse::Ok)
+            }
         }
     }
 }
