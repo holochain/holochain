@@ -72,7 +72,7 @@ pretty_assertions = "1.4.0"
 test-case = "1.0.0"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
-tx5-signal-srv = "=0.0.5-alpha"
+tx5-signal-srv = "=0.0.6-alpha"
 ed25519-dalek = "1"
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
