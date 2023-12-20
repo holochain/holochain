@@ -51,6 +51,20 @@ impl KeyState {
     }
 }
 
+/// Mirrors the output type of the "key_state" zome function in deepkey
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum KeyState {
+    NotFound,
+    Invalidated(SignedActionHashed),
+    Valid(SignedActionHashed),
+}
+
+impl KeyState {
+    pub fn is_valid(&self) -> bool {
+        matches!(self, KeyState::Valid(_))
+    }
+}
+
 /// The errors which can be produced by DPKI
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
@@ -156,6 +170,11 @@ pub fn mock_dpki() -> MockDpkiService {
         let action = action.clone();
         async move { Ok(KeyState::Valid(action)) }.boxed()
     });
+<<<<<<< HEAD
     dpki.expect_cell_id().return_const(fake_cell_id(0));
+=======
+    dpki.expect_cell_ids()
+        .return_const(std::collections::HashSet::new());
+>>>>>>> dpki-integration
     dpki
 }
