@@ -11,6 +11,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_services::DpkiService;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
@@ -184,7 +185,13 @@ async fn sys_validation_workflow_inner(
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
-        let r = validate_op(&op, &dna_def, current_validation_dependencies.clone()).await;
+        let r = validate_op(
+            &op,
+            &dna_def,
+            current_validation_dependencies.clone(),
+            workspace.dpki.clone(),
+        )
+        .await;
 
         match r {
             Ok(outcome) => validation_outcomes.push((op_hash, outcome, dependency)),
@@ -414,8 +421,9 @@ pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: Option<Arc<dyn DpkiService>>,
 ) -> WorkflowResult<Outcome> {
-    match validate_op_inner(op, dna_def, validation_dependencies).await {
+    match validate_op_inner(op, dna_def, validation_dependencies, dpki).await {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -494,8 +502,12 @@ async fn validate_op_inner(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    dpki: Option<Arc<dyn DpkiService>>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
+    if let Some(dpki) = dpki {
+        check_dpki_agent_validity(op, dpki).await?;
+    }
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
             store_record(action, validation_dependencies.clone())?;
@@ -890,6 +902,7 @@ pub struct SysValidationWorkspace {
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
     sys_validation_retry_delay: Duration,
+    dpki: Option<Arc<dyn DpkiService>>,
 }
 
 impl SysValidationWorkspace {
@@ -899,6 +912,7 @@ impl SysValidationWorkspace {
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
+        dpki: Option<Arc<dyn DpkiService>>,
         sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {
@@ -908,6 +922,7 @@ impl SysValidationWorkspace {
             dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
+            dpki,
             sys_validation_retry_delay,
         }
     }
