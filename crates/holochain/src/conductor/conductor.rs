@@ -128,9 +128,7 @@ mod chc;
 
 pub use chc::*;
 
-mod conductor_services;
-
-pub use conductor_services::*;
+pub use holochain_services::*;
 
 pub use accessor_impls::*;
 pub use app_impls::*;

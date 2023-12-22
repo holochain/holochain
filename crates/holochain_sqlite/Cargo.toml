@@ -14,7 +14,7 @@ anyhow = "1.0.26"
 # pinned here with = to fix a compilation issue in a dependent crate.
 # feel free to drop the = if it causes problems in the future.
 chashmap = "=2.2.0"
-derive_more = "0.99.3"
+derive_more = { workspace = true }
 fallible-iterator = "0.2.0"
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.15"}

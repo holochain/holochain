@@ -12,7 +12,7 @@ edition = "2021"
 
 
 [dependencies]
-derive_more = "0.99"
+derive_more = { workspace = true }
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.5", path = "../timestamp"}
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.15", path = "../types" }
 serde = { version = "1.0", features = [ "derive" ] }
