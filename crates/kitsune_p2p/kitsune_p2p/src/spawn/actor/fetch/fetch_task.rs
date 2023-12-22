@@ -41,6 +41,7 @@ impl FetchTask {
                             }
                         }
 
+                        tracing::info!("Sending fetch request while pool has size {}", fetch_pool.len());
                         if let Err(err) = internal_sender.fetch(key, space, source).await {
                             match err {
                                 KitsuneP2pError::GhostError(GhostError::Disconnected) => {

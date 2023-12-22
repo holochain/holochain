@@ -225,8 +225,8 @@ async fn two_nodes_publish_and_fetch() {
 async fn two_nodes_publish_and_fetch_batches() {
     holochain_trace::test_run().unwrap();
 
-//     let num_ops = 30_000;
-let num_ops = 10_000;
+    // let num_ops = 30_000;
+    let num_ops = 10_000;
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;

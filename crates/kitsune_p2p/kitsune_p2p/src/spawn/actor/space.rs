@@ -471,6 +471,7 @@ impl SpaceInternalHandler for Space {
 
         let just_hashes = op_hash_list.iter().map(|s| s.data()).collect();
 
+        let tracing_scope = self.config.tracing_scope.clone();
         Ok(async move {
             let have_data_list = match ro_inner
                 .host_api
@@ -506,6 +507,9 @@ impl SpaceInternalHandler for Space {
                     }
                     continue;
                 } else {
+                    if tracing_scope == Some("host_a".to_string()) {
+                        tracing::info!("Handling incoming publish for {:?}", op_hash);
+                    }
                     // Add this hash to our fetch queue.
                     ro_inner.fetch_pool.push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
