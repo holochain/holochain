@@ -220,6 +220,135 @@ async fn two_nodes_publish_and_fetch() {
     assert_eq!(1, op_store_b.read().len());
 }
 
+#[cfg(feature = "tx5")]
+#[tokio::test(flavor = "multi_thread")]
+async fn two_nodes_publish_and_fetch_batches() {
+    holochain_trace::test_run().unwrap();
+
+//     let num_ops = 30_000;
+let num_ops = 10_000;
+
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    let agent_store_a = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let op_store_a = Arc::new(parking_lot::RwLock::new(Vec::new()));
+
+    // TODO This requires host code, does it make sense to construct valid values here?
+    let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
+    let space = Arc::new(fixt!(KitsuneSpace));
+
+    {
+        for _ in 0..num_ops {
+            op_store_a
+                .write()
+                .push(TestHostOp::new(space.clone().into()));
+        }
+    }
+
+    let host_api_a = Arc::new(TestHost::new(agent_store_a.clone(), op_store_a.clone()));
+    let mut harness_a = KitsuneTestHarness::try_new("host_a", host_api_a.clone())
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
+
+    let (sender_a, receiver_a) = harness_a
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let legacy_host_stub_a =
+        TestLegacyHost::start(agent_store_a.clone(), op_store_a.clone(), vec![receiver_a]).await;
+
+    let agent_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
+    let op_store_b = Arc::new(parking_lot::RwLock::new(Vec::new()));
+
+    let host_api_b = Arc::new(TestHost::new(agent_store_b.clone(), op_store_b.clone()));
+    let mut harness_b = KitsuneTestHarness::try_new("host_b", host_api_b)
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
+
+    let (sender_b, receiver_b) = harness_b
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let legacy_host_stub_b =
+        TestLegacyHost::start(agent_store_b.clone(), op_store_b.clone(), vec![receiver_b]).await;
+
+    let agent_a = Arc::new(legacy_host_stub_a.create_agent().await);
+
+    sender_a
+        .join(space.clone(), agent_a.clone(), None, None)
+        .await
+        .unwrap();
+
+    let agent_b = Arc::new(legacy_host_stub_b.create_agent().await);
+
+    sender_b
+        .join(space.clone(), agent_b.clone(), None, None)
+        .await
+        .unwrap();
+
+    // Wait for the nodes to discover each other before publishing
+    wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
+    wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
+
+    sender_a
+        .broadcast(
+            space.clone(),
+            basis,
+            KitsuneTimeout::from_millis(5_000),
+            BroadcastData::Publish {
+                source: agent_a.clone(),
+                op_hash_list: op_store_a.read().iter().map(|o| o.clone().into()).collect(),
+                context: FetchContext::default(),
+            },
+        )
+        .await
+        .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(60), {
+        let op_store_b = op_store_b.clone();
+        async move {
+            loop {
+                if op_store_b.read().len() == num_ops {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(num_ops, op_store_b.read().len());
+
+    let events = legacy_host_stub_a.drain_events().await.into_iter().filter_map(|e| match e {
+        RecordedKitsuneP2pEvent::ReceiveOps { ops, .. } => Some(ops),
+        _ => None,
+    }).collect::<Vec<_>>();
+
+    // Must have been received in batches, not all at once
+    assert!(events.len() > 1);
+
+    // The total of receieved ops must be the same as the total published. This prevents the test from quietly receiving duplicates.
+    assert_eq!(num_ops, events.into_iter().flatten().count());
+}
+
 // This is expected to test that agent info is broadcast to current peers when a new agent joins
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]

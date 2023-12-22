@@ -13,7 +13,7 @@ use std::{collections::HashSet, sync::Arc};
 /// Gather a list of op-hashes from our implementor that meet criteria.
 /// Also get the start and end times for ops within a time window
 /// up to a maximum number.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -28,7 +28,7 @@ pub struct QueryOpHashesEvt {
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -37,7 +37,7 @@ pub struct FetchOpDataEvt {
 }
 
 /// Multiple ways to fetch op data
-#[derive(Debug, derive_more::From)]
+#[derive(Debug, derive_more::From, Clone)]
 pub enum FetchOpDataEvtQuery {
     /// Fetch all ops with the hashes specified
     Hashes {
@@ -53,7 +53,7 @@ pub enum FetchOpDataEvtQuery {
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignNetworkDataEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -83,7 +83,7 @@ pub struct GetAgentInfoSignedEvt {
 }
 
 /// Get agent info which satisfies a query.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryAgentsEvt {
     /// The "space" context.
     pub space: KSpace,
