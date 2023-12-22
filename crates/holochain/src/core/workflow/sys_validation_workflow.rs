@@ -11,14 +11,14 @@
 //! The workflow operates on [`DhtOp`]s which are roughly equivalent to [`Record`]s but catered to the needs of a specific type of Authority.
 //! Checks that you can rely on sys validation having performed are:
 //! - For a [`DhtOp::StoreRecord`]
-//!    - Run the [store record checks](#store-record-checks).
+//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
 //!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
 //!    - Run the [store entry checks](#store-entry-checks).
 //! - For a [`DhtOp::StoreEntry`]
 //!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op is accepted.
+//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - Run the [store entry checks](#store-entry-checks).
-//!    - Run the [store record checks](#store-record-checks).
 //! - For a [`DhtOp::RegisterAgentActivity`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
@@ -423,9 +423,6 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                         _ => vec![],
                     };
 
-                    if let Some(prev_action) = action.prev_action() {
-                        actions.push(prev_action.as_hash().clone());
-                    }
                     if let Action::Update(update) = action {
                         actions.push(update.original_action_address.clone());
                     }
@@ -449,14 +446,8 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                         _ => vec![],
                     };
 
-                    match action {
-                        NewEntryAction::Create(create) => {
-                            actions.push(create.prev_action.as_hash().clone());
-                        }
-                        NewEntryAction::Update(update) => {
-                            actions.push(update.prev_action.as_hash().clone());
-                            actions.push(update.original_action_address.clone());
-                        }
+                    if let NewEntryAction::Update(update) = action {
+                        actions.push(update.original_action_address.clone());
                     }
                     Some(actions)
                 }
@@ -585,7 +576,7 @@ async fn validate_op_inner(
     check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
-            store_record(action, validation_dependencies.clone())?;
+            check_prev_action(action)?;
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = entry {
@@ -635,10 +626,8 @@ async fn validate_op_inner(
                 }
             }
 
-            store_entry((action).into(), entry, validation_dependencies.clone()).await?;
-
-            let action = action.clone().into();
-            store_record(&action, validation_dependencies)
+            check_prev_action(&action.clone().into())?;
+            store_entry(action.into(), entry, validation_dependencies.clone()).await
         }
         DhtOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, validation_dependencies.clone(), dna_def)?;

@@ -779,12 +779,7 @@ async fn validate_valid_store_record_with_no_entry() {
         holochain_zome_types::record::RecordEntry::NotStored,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert!(
         matches!(outcome, Outcome::Accepted),
@@ -829,12 +824,7 @@ async fn validate_store_record_leaks_entry() {
         holochain_zome_types::record::RecordEntry::Present(Entry::App(fixt!(AppEntryBytes))), // but go ahead and provide the entry data anyway
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::PrivateEntryLeaked.to_string()),
@@ -876,12 +866,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
         holochain_zome_types::record::RecordEntry::Present(app_entry),
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTypeMismatch.to_string()),
@@ -938,12 +923,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
         holochain_zome_types::record::RecordEntry::Present(mismatched_entry),
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryHash.to_string()),
@@ -1003,12 +983,7 @@ async fn validate_store_record_with_large_entry() {
         holochain_zome_types::record::RecordEntry::Present(app_entry),
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTooLarge(5_000_011).to_string()),
@@ -1078,7 +1053,7 @@ async fn validate_valid_store_record_update() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, previous_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
         .with_op(op)
         .run()
         .await
@@ -1137,7 +1112,7 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
         .with_op(op)
         .run()
         .await
@@ -1214,7 +1189,7 @@ async fn validate_store_record_update_changes_entry_type() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
         .with_op(op)
         .run()
         .await
@@ -1267,12 +1242,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
         app_entry,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTypeMismatch.to_string()),
@@ -1329,12 +1299,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
         mismatched_entry,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryHash.to_string()),
@@ -1394,12 +1359,7 @@ async fn validate_store_entry_with_large_entry() {
         app_entry,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTooLarge(5_000_011).to_string()),
@@ -1469,7 +1429,7 @@ async fn validate_valid_store_entry_update() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, previous_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
         .with_op(op)
         .run()
         .await
@@ -1524,7 +1484,7 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
         .with_op(op)
         .run()
         .await
@@ -1601,7 +1561,7 @@ async fn validate_store_entry_update_changes_entry_type() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
         .with_op(op)
         .run()
         .await
