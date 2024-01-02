@@ -2832,6 +2832,7 @@ dependencies = [
  "hdk",
  "holo_hash",
  "holochain",
+ "holochain-services",
  "holochain_cascade",
  "holochain_conductor_api",
  "holochain_keystore",
@@ -2840,7 +2841,6 @@ dependencies = [
  "holochain_p2p",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
- "holochain_services",
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
@@ -2917,6 +2917,22 @@ dependencies = [
  "uuid 0.7.4",
  "wasmer",
  "wasmer-middlewares",
+]
+
+[[package]]
+name = "holochain-services"
+version = "0.2.0-beta-dev.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "derive_more",
+ "futures",
+ "holochain_keystore",
+ "holochain_types",
+ "mockall",
+ "must_future",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -3240,22 +3256,6 @@ checksum = "ec3e0cf02005cbf0f514476d40e02125b26df6d4922d7a2c48a84fc588539d71"
 dependencies = [
  "quote 1.0.33",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "holochain_services"
-version = "0.2.0-beta-dev.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "derive_more",
- "futures",
- "holochain_keystore",
- "holochain_types",
- "mockall",
- "must_future",
- "serde",
- "thiserror",
 ]
 
 [[package]]
