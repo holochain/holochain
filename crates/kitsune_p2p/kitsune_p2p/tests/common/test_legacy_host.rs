@@ -11,14 +11,14 @@ use kitsune_p2p_types::{
         spacetime::{Dimension, Topology},
         ArqStrat, PeerStrat,
     },
-    dht_arc::{DhtArcRange, DhtArc},
+    dht_arc::{DhtArcRange, DhtArc}, KAgent,
 };
 use std::{collections::{HashSet, HashMap}, sync::{Arc, atomic::{AtomicU32, Ordering}}};
 
 use super::{test_keystore, TestHostOp};
 
 pub struct TestLegacyHost {
-    _handle: tokio::task::JoinHandle<()>,
+    handle: Option<tokio::task::JoinHandle<()>>,
     keystore: Arc<
         futures::lock::Mutex<
             kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairClient,
@@ -29,19 +29,33 @@ pub struct TestLegacyHost {
 }
 
 impl TestLegacyHost {
-    pub async fn start(
-        agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
-        op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
-        receivers: Vec<Receiver<KitsuneP2pEvent>>,
-    ) -> Self {
+    pub fn new() -> Self {
         let keystore = test_keystore();
         let events = Arc::new(futures::lock::Mutex::new(Vec::new()));
         let duplicate_ops_received_count = Arc::new(AtomicU32::new(0));
 
+        Self {
+            handle: None,
+            keystore,
+            events,
+            duplicate_ops_received_count,
+        }
+    }
+
+    pub async fn start(
+        &mut self,
+        agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
+        op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
+        receivers: Vec<Receiver<KitsuneP2pEvent>>,
+    ) {
+        if self.handle.is_some() {
+            panic!("TestLegacyHost already started");
+        }
+
         let handle = tokio::task::spawn({
-            let keystore = keystore.clone();
-            let events_record = events.clone();
-            let duplicate_ops_received_count = duplicate_ops_received_count.clone();
+            let keystore = self.keystore.clone();
+            let events_record = self.events.clone();
+            let duplicate_ops_received_count = self.duplicate_ops_received_count.clone();
             async move {
                 let mut receiver = futures::stream::select_all(receivers).fuse();
                 while let Some(evt) = receiver.next().await {
@@ -306,12 +320,7 @@ impl TestLegacyHost {
             }
         });
 
-        Self {
-            _handle: handle,
-            keystore,
-            events,
-            duplicate_ops_received_count,
-        }
+        self.handle = Some(handle);
     }
 
     pub async fn drain_events(&self) -> Vec<RecordedKitsuneP2pEvent> {
@@ -323,11 +332,11 @@ impl TestLegacyHost {
         self.duplicate_ops_received_count.load(Ordering::Acquire)
     }
 
-    pub async fn create_agent(&self) -> KitsuneAgent {
+    pub async fn create_agent(&self) -> KAgent {
         let ks = self.keystore.lock().await;
         let tag = nanoid::nanoid!();
         let info = ks.new_seed(tag.into(), None, false).await.unwrap();
-        KitsuneAgent(info.ed25519_pub_key.0.to_vec())
+        Arc::new(KitsuneAgent(info.ed25519_pub_key.0.to_vec()))
     }
 }
 
