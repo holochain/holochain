@@ -1,3 +1,6 @@
+//! This is just the beginnings of a CLI tool for generating hc-sleuth reports.
+//! It's nowhere near useful, so it's not even built yet.
+
 use std::{path::PathBuf, str::FromStr};
 
 use hc_sleuth::{report, Event};

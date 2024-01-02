@@ -3,11 +3,6 @@ name = "hc-sleuth"
 version = "0.1.0"
 edition = "2021"
 
-
-[[bin]]
-name = "hc-sleuth"
-path = "src/main.rs"
-
 [dependencies]
 anyhow = "1.0"
 aitia = { path = "../aitia" }
@@ -39,3 +34,9 @@ test_utils = [
     "holochain_types/test_utils",
     "kitsune_p2p/test_utils",
 ]
+
+
+# # CLI tool is a work in progress
+# [[bin]]
+# name = "hc-sleuth"
+# path = "src/main.rs"
