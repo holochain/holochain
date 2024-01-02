@@ -13,7 +13,7 @@ use kitsune_p2p_types::{
     },
     dht_arc::{DhtArcRange, DhtArc},
 };
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::{HashSet, HashMap}, sync::{Arc, atomic::{AtomicU32, Ordering}}};
 
 use super::{test_keystore, TestHostOp};
 
@@ -25,6 +25,7 @@ pub struct TestLegacyHost {
         >,
     >,
     events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEvent>>>,
+    duplicate_ops_received_count: Arc<AtomicU32>,
 }
 
 impl TestLegacyHost {
@@ -35,10 +36,12 @@ impl TestLegacyHost {
     ) -> Self {
         let keystore = test_keystore();
         let events = Arc::new(futures::lock::Mutex::new(Vec::new()));
+        let duplicate_ops_received_count = Arc::new(AtomicU32::new(0));
 
         let handle = tokio::task::spawn({
             let keystore = keystore.clone();
             let events_record = events.clone();
+            let duplicate_ops_received_count = duplicate_ops_received_count.clone();
             async move {
                 let mut receiver = futures::stream::select_all(receivers).fuse();
                 while let Some(evt) = receiver.next().await {
@@ -183,6 +186,11 @@ impl TestLegacyHost {
                         KitsuneP2pEvent::ReceiveOps { respond, ops, .. } => {
                             let mut op_store = op_store.write();
                             for op in ops {
+                                let incoming_op: TestHostOp = op.clone().into();
+                                if op_store.iter().any(|existing_op| existing_op.kitsune_hash() == incoming_op.kitsune_hash()) {
+                                    duplicate_ops_received_count.fetch_add(1, Ordering::Acquire);
+                                    continue;
+                                }
                                 op_store.push(op.into());
                             }
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()))
@@ -302,12 +310,17 @@ impl TestLegacyHost {
             _handle: handle,
             keystore,
             events,
+            duplicate_ops_received_count,
         }
     }
 
     pub async fn drain_events(&self) -> Vec<RecordedKitsuneP2pEvent> {
         let mut events = self.events.lock().await;
         std::mem::take(&mut *events)
+    }
+
+    pub fn duplicate_ops_received_count(&self) -> u32 {
+        self.duplicate_ops_received_count.load(Ordering::Acquire)
     }
 
     pub async fn create_agent(&self) -> KitsuneAgent {
@@ -358,6 +371,10 @@ pub enum RecordedKitsuneP2pEvent {
 }
 
 async fn record_event(events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEvent>>>, evt: &KitsuneP2pEvent) {
+    if events.lock().await.len() % 500 == 0 {
+        dump_event_dist(events.clone()).await;
+    }
+    
     let mut events = events.lock().await;
     
     match evt {
@@ -414,4 +431,25 @@ async fn record_event(events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEve
             });
         }
     }
+}
+
+async fn dump_event_dist(events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEvent>>>) {
+    let events = events.lock().await;
+    let mut counts = HashMap::new();
+    for evt in events.iter() {
+        let key = match evt {
+            RecordedKitsuneP2pEvent::PutAgentInfoSigned { .. } => "PutAgentInfoSigned",
+            RecordedKitsuneP2pEvent::QueryAgents { .. } => "QueryAgents",
+            RecordedKitsuneP2pEvent::QueryPeerDensity { .. } => "QueryPeerDensity",
+            RecordedKitsuneP2pEvent::Call { .. } => "Call",
+            RecordedKitsuneP2pEvent::Notify { .. } => "Notify",
+            RecordedKitsuneP2pEvent::ReceiveOps { .. } => "ReceiveOps",
+            RecordedKitsuneP2pEvent::QueryOpHashes { .. } => "QueryOpHashes",
+            RecordedKitsuneP2pEvent::FetchOpData { .. } => "FetchOpData",
+            RecordedKitsuneP2pEvent::SignNetworkData { .. } => "SignNetworkData",
+        };
+        let count = counts.entry(key).or_insert(0);
+        *count += 1;
+    }
+    tracing::info!("Events: {}, dist: {:?}", events.len(), counts);
 }

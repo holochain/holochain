@@ -204,4 +204,19 @@ impl KitsuneHost for TestHost {
             .boxed()
             .into()
     }
+
+    fn check_op_data(
+            &self,
+            space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
+            op_hash_list: Vec<kitsune_p2p_types::KOpHash>,
+            _context: Option<kitsune_p2p_fetch::FetchContext>,
+        ) -> kitsune_p2p::KitsuneHostResult<Vec<bool>> {
+        let res = op_hash_list.iter().map(|op_hash| {
+            self.op_store.read().iter().any(|op| op.space() == space && &Arc::new(op.kitsune_hash()) == op_hash)
+        }).collect();
+
+        async move {
+                Ok(res)
+        }.boxed().into()
+    }
 }

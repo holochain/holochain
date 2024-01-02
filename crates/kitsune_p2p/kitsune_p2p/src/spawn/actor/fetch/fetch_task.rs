@@ -41,7 +41,8 @@ impl FetchTask {
                             }
                         }
 
-                        tracing::info!("Sending fetch request while pool has size {}", fetch_pool.len());
+                        // TODO this line gets hit super often, it would be a lot nicer to batch fetches by source
+                        // tracing::info!("Sending fetch request while pool has size {}", fetch_pool.len());
                         if let Err(err) = internal_sender.fetch(key, space, source).await {
                             match err {
                                 KitsuneP2pError::GhostError(GhostError::Disconnected) => {

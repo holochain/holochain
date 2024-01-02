@@ -53,6 +53,8 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<Batch<TimedBloomFilter>> {
         use futures::TryStreamExt;
 
+        tracing::info!("Generating op bloom for {:?}", search_time_window);
+
         // If the common arc set is empty there's no
         // blooms to generate.
         if common_arc_set.is_empty() {
@@ -141,6 +143,8 @@ impl ShardedGossipLocal {
                 },
             )
             .await?;
+
+        tracing::info!("Have total blooms: {}", total_blooms);
 
         match batch {
             Batch::Complete(data) => Ok(Batch::Complete(data)),

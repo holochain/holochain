@@ -142,6 +142,8 @@ pub struct TimeChunk {
     pub hashes: Vec<Arc<KitsuneOpHash>>,
 }
 
+// TODO Does this code still make sense with the fetch mechanism? and should it be unit tested because from a functional test it
+// seems to produce odd batches.
 /// This query returns a stream of hashes chunked
 /// by time window.
 ///
