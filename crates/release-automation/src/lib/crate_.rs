@@ -306,23 +306,18 @@ pub fn detect_missing_releaseheadings<'a>(
     let crate_headings_toplevel_by_crate = crate_headings_toplevel.into_iter().try_fold(
         LinkedHashMap::<String, LinkedHashSet<String>>::new(),
         |mut acc, cur| -> Fallible<_> {
+            // TODO: use crate names to detect the split instead of the delimiter
+            let (crt, version) = cur.split_once('-').ok_or(anyhow::anyhow!(
+                "could not split '{}' by
+                '-'",
+                cur
+            ))?;
 
-            if let Some(crt) = ws.members()?.iter().find(|crt| cur.starts_with(crt.name().as_str())) {
-                let version = cur
-                    .strip_prefix(crt.name().as_str())
-                    .context("failed to strip crate name from release heading")?
-                    .trim_start_matches('-')
-                    .to_string();
-                
-                acc.entry(crt.name())
-                    .or_insert_with(|| Default::default())
-                    .insert(version.to_string());
-    
-                Ok(acc)
-            } else
-            {
-                bail!("workspace changelog contains a release for crate '{}' that is not present in the workspace", cur);
-            }
+            acc.entry(crt.to_string())
+                .or_insert_with(|| Default::default())
+                .insert(version.to_string());
+
+            Ok(acc)
         },
     )?;
 
