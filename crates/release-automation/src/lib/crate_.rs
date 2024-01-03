@@ -307,7 +307,7 @@ pub fn detect_missing_releaseheadings<'a>(
         LinkedHashMap::<String, LinkedHashSet<String>>::new(),
         |mut acc, cur| -> Fallible<_> {
             // TODO: use crate names to detect the split instead of the delimiter
-            let (crt, version) = cur.rsplit_once('-').ok_or(anyhow::anyhow!(
+            let (crt, version) = cur.split_once('-').ok_or(anyhow::anyhow!(
                 "could not split '{}' by
                 '-'",
                 cur
