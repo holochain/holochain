@@ -68,9 +68,12 @@ impl KitsuneHost for TestHost {
 
     fn remove_agent_info_signed(
         &self,
-        _input: kitsune_p2p::event::GetAgentInfoSignedEvt,
+        input: kitsune_p2p::event::GetAgentInfoSignedEvt,
     ) -> kitsune_p2p::KitsuneHostResult<bool> {
-        todo!()
+        self.agent_store.write().retain(|p| p.agent != input.agent);
+
+        // TODO This boolean return doesn't seem to be documented, what does it mean?
+        async move { Ok(true) }.boxed().into()
     }
 
     fn peer_extrapolated_coverage(

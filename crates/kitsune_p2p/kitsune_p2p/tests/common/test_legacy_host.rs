@@ -219,13 +219,14 @@ impl TestLegacyHost {
                                     }
 
                                     if op.authored_at() < input.window.start
-                                        && op.authored_at() > input.window.end
+                                        || op.authored_at() >= input.window.end
                                     {
                                         return false;
                                     }
 
                                     let intervals = input.arc_set.intervals();
                                     if let Some(DhtArcRange::Full) = intervals.first() {
+                                        // Keep everything
                                     } else {
                                         let mut in_any = false;
                                         for interval in intervals {
@@ -251,8 +252,8 @@ impl TestLegacyHost {
 
                                     true
                                 })
-                                .take(input.max_ops)
                                 .sorted_by_key(|op| op.authored_at())
+                                .take(input.max_ops)
                                 .cloned()
                                 .collect();
 
