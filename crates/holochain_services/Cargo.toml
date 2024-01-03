@@ -1,5 +1,5 @@
 [package]
-name = "holochain-services"
+name = "holochain_services"
 version = "0.2.0-beta-dev.0"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
