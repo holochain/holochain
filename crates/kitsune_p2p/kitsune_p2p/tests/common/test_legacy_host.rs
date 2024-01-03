@@ -210,6 +210,7 @@ impl TestLegacyHost {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
+                            tracing::info!("QueryOpHashes: {:?}", input);
                             let op_store = op_store.read();
                             let selected_ops: Vec<TestHostOp> = op_store
                                 .iter()

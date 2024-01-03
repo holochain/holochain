@@ -6,6 +6,7 @@ use kitsune_p2p_bin_data::{KOp, KitsuneBinType, KitsuneOpData, KitsuneOpHash};
 use kitsune_p2p_fetch::RoughSized;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::KSpace;
+use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 use kitsune_p2p_types::{dht_arc::DhtLocation, KOpHash};
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,12 @@ impl TestHostOp {
             authored_at: Timestamp::now(),
             size: fixt!(u8) as u32 + 1, // +1 because we don't want this to be 0
         }
+    }
+
+    pub fn make_historical(mut self, offset: std::time::Duration) -> Self {
+        assert!(offset > RECENT_THRESHOLD_DEFAULT);
+        self.authored_at = (Timestamp::now() - offset).unwrap();
+        self
     }
 
     // pub fn with_hash(mut self, hash: KitsuneOpHash) -> Self {

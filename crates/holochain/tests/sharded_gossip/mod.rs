@@ -560,6 +560,8 @@ async fn three_way_gossip_recent() {
     three_way_gossip(config.into()).await;
 }
 
+// TODO There is an important gap in this test, the authored timestamps are actually recent. So although historical gossip is the mechanism, there
+//      is actually no verification that old ops will get picked up!
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]

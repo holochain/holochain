@@ -20,11 +20,9 @@ use std::sync::Arc;
 - Same as for gossip but with a historical op
 - Three nodes, delegated publish does not reflect
 - Restart a node during gossip and check that it will recover
-- Agent leave, but is that implemented fully?
 - Overloaded, return busy to new peers. Can that be observed? and how can i test that?
 - Can round timeout be tested? Would need a way to shut down during a round then to ensure that the node with its round open can start a new gossip round with another node
 - Enough large ops to hit the throttle limit, check how that behaves
-- All agents leave a space, check the space gets cleaned up correctly
 */
 
 // Test that two nodes can discover each other and connect. This checks that peer discovery
@@ -296,7 +294,6 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
                 if op_store_b.read().len() >= num_ops {
                     break;
                 }
-                tracing::info!("B has {}/{} ops", op_store_b.read().len(), num_ops);
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         }
@@ -577,14 +574,13 @@ async fn gossip_stops_when_agent_leaves_space() {
     wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
     wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(300), {
+    tokio::time::timeout(std::time::Duration::from_secs(30), {
         let op_store_b = harness_b.op_store();
         async move {
             loop {
                 if op_store_b.read().len() == 1 {
                     break;
                 }
-                tracing::info!("Current op count: {}", op_store_b.read().len());
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
@@ -635,6 +631,85 @@ async fn gossip_stops_when_agent_leaves_space() {
     .unwrap_err(); 
 
     assert!(harness_c.op_store().read().is_empty());
+}
+
+#[cfg(feature = "tx5")]
+#[tokio::test(flavor = "multi_thread")]
+async fn gossip_historical_ops() {
+    holochain_trace::test_run().unwrap();
+
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    let mut harness_a = KitsuneTestHarness::try_new("host_a")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
+
+    let space = Arc::new(fixt!(KitsuneSpace));
+    harness_a.op_store().write().push(TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(30 * 60)));
+    harness_a.op_store().write().push(TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(45 * 60)));
+    harness_a.op_store().write().push(TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(60 * 60)));
+
+    let sender_a = harness_a
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let mut harness_b = KitsuneTestHarness::try_new("host_b")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c
+        });
+
+    let sender_b = harness_b
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let agent_a = harness_a.create_agent().await;
+    sender_a
+        .join(space.clone(), agent_a.clone(), None, None)
+        .await
+        .unwrap();
+
+    let agent_b = harness_b.create_agent().await;
+    sender_b
+        .join(space.clone(), agent_b.clone(), None, None)
+        .await
+        .unwrap();
+
+    // Wait for the nodes to discover each other
+    wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
+    wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(30), {
+        let op_store_b = harness_b.op_store();
+        async move {
+            loop {
+                if op_store_b.read().len() == 3 {
+                    break;
+                }
+                tracing::info!("Waiting for ops to be received {}", op_store_b.read().len());
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(3, harness_b.op_store().read().len());
 }
 
 async fn wait_for_connected(

@@ -74,6 +74,10 @@ impl ShardedGossipLocal {
             None
         };
 
+        if maybe_gossip.is_some() && self.gossip_type == GossipType::Historical {
+            tracing::info!("Will try to initiate historical gossip");
+        }
+
         Ok(maybe_gossip)
     }
 

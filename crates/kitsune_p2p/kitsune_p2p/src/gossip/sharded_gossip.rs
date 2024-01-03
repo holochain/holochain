@@ -761,11 +761,13 @@ impl ShardedGossipLocal {
 
     /// Calculate the time range for a gossip round.
     fn calculate_time_range(&self) -> TimeWindow {
+        tracing::info!("Calculating time range {}", self.gossip_type);
         const NOW: Duration = Duration::from_secs(0);
         let threshold = Duration::from_secs(self.tuning_params.danger_gossip_recent_threshold_secs);
         match self.gossip_type {
             GossipType::Recent => time_range(threshold, NOW),
             GossipType::Historical => {
+                tracing::info!("Calculating historical time range");
                 let one_hour_ago = std::time::UNIX_EPOCH
                     .elapsed()
                     .expect("Your clock is set before unix epoch")
