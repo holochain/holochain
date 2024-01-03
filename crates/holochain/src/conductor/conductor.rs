@@ -1341,7 +1341,7 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
-            let network_params = DnaNetworkParams::fake();
+            let network_params = self.get_dna_network_params();
 
             let InstallAppPayload {
                 source,
@@ -2546,7 +2546,7 @@ mod accessor_impls {
         }
 
         /// Construct the DnaRuntime given the current setup
-        pub fn get_dna_runtime(&self) -> DnaNetworkParams {
+        pub fn get_dna_network_params(&self) -> DnaNetworkParams {
             DnaNetworkParams {
                 protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
                 dpki_hash: self

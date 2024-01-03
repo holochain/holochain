@@ -2120,6 +2120,7 @@ async fn crash_case() {
         &op,
         &dna_def,
         Arc::new(Mutex::new(ValidationDependencies::new())),
+        None,
     )
     .await
     .unwrap();
@@ -2225,6 +2226,7 @@ impl TestCase {
             self.op.as_ref().expect("No op set, invalid test case"),
             &dna_def,
             self.current_validation_dependencies.clone(),
+            None,
         )
         .await
     }
