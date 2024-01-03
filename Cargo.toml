@@ -28,7 +28,7 @@ members = [
   "crates/holochain_metrics",
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
-  "crates/holochain-services",
+  "crates/holochain_services",
 
   "crates/hc",
   "crates/hc_bundle",
