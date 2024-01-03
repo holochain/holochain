@@ -341,7 +341,7 @@ impl TestCase {
 
         // XXX: this isn't quite right, since none of these config settings inform
         // anything else about the TestCase. It's currently only needed for the node_id
-        // as used by hc-sleuth
+        // as used by hc_sleuth
         let config = ConductorConfig::default();
         let config = Arc::new(config);
 

@@ -2586,30 +2586,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc-sleuth"
-version = "0.1.0"
-dependencies = [
- "aitia",
- "anyhow",
- "arbitrary",
- "derive_more",
- "hc-sleuth",
- "holochain_state_types",
- "holochain_trace 0.3.0-beta-dev.3",
- "holochain_types",
- "kitsune_p2p",
- "once_cell",
- "parking_lot 0.10.2",
- "petgraph",
- "pretty_assertions",
- "regex",
- "serde",
- "structopt",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
@@ -2644,6 +2620,30 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sodoken",
+]
+
+[[package]]
+name = "hc_sleuth"
+version = "0.1.0"
+dependencies = [
+ "aitia",
+ "anyhow",
+ "arbitrary",
+ "derive_more",
+ "hc_sleuth",
+ "holochain_state_types",
+ "holochain_trace 0.3.0-beta-dev.3",
+ "holochain_types",
+ "kitsune_p2p",
+ "once_cell",
+ "parking_lot 0.10.2",
+ "petgraph",
+ "pretty_assertions",
+ "regex",
+ "serde",
+ "structopt",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2854,7 +2854,7 @@ dependencies = [
  "get_if_addrs",
  "getrandom 0.2.11",
  "ghost_actor 0.3.0-alpha.6",
- "hc-sleuth",
+ "hc_sleuth",
  "hdk",
  "holo_hash",
  "holochain",
@@ -3211,7 +3211,7 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.6",
- "hc-sleuth",
+ "hc_sleuth",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",
@@ -3353,7 +3353,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "hc-sleuth",
+ "hc_sleuth",
  "holo_hash",
  "holochain_keystore",
  "holochain_nonce",

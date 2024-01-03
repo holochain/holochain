@@ -112,7 +112,7 @@ reqwest = { version = "0.11.2", features = ["json"], optional = true }
 
 # TODO: make optional?
 aitia = { path = "../aitia" }
-hc-sleuth = { path = "../hc-sleuth" }
+hc_sleuth = { path = "../hc_sleuth" }
 
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }

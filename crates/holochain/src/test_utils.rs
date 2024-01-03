@@ -579,7 +579,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     );
 
     if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
-        // If hc-sleuth has been initialized, print a sleuthy report
+        // If hc_sleuth has been initialized, print a sleuthy report
 
         let ctx = s.lock();
         for fact in published

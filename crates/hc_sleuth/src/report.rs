@@ -4,6 +4,6 @@ use super::*;
 
 pub fn report(event: Event, ctx: &Context) {
     if let Some(report) = simple_report(&event.traverse(ctx)) {
-        println!("hc-sleuth simple report:\n{report}");
+        println!("hc_sleuth simple report:\n{report}");
     }
 }
