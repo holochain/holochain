@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
 ## 0.3.0-beta-dev.18
 
 - **BREAKING CHANGE:** Export error types directly `inline_zome::*` instead of `inline_zome::error::*`.
