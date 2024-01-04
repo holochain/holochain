@@ -31,8 +31,8 @@ providing formal reasoning for the benefits of Holochain's agent centric
 approach.
 
 In this second version, we describe Holochain on its own terms by
-providing the highest level view of our approach and our starting
-axioms. At the next level of detail we provide an informal system
+first providing the highest level view of our approach and our starting
+axioms. Then, at the next level of detail we provide an informal system
 description using the metaphor of games. Then we dive into deeper detail
 with a formal system description including the specific context and
 assumptions we come from, the integrity guarantees Holochain offers, and
