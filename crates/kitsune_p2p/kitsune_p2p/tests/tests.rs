@@ -13,12 +13,10 @@ use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_bin_data::KitsuneBasis;
 use kitsune_p2p_bin_data::KitsuneSpace;
 use kitsune_p2p_fetch::FetchContext;
-use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 
 /* Tests to add
-- Same as for gossip but with a historical op
 - Three nodes, delegated publish does not reflect
 - Restart a node during gossip and check that it will recover
 - Overloaded, return busy to new peers. Can that be observed? and how can i test that?

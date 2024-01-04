@@ -3,9 +3,11 @@ use std::{sync::Arc, time::UNIX_EPOCH};
 use super::data::TestHostOp;
 use futures::FutureExt;
 use kitsune_p2p::{KitsuneHost, KitsuneP2pResult};
+use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
+    config::RECENT_THRESHOLD_DEFAULT,
     dht::{
         arq::ArqSet,
         hash::RegionHash,
@@ -13,13 +15,23 @@ use kitsune_p2p_types::{
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::{Dimension, TelescopingTimes, Topology},
         ArqStrat,
-    }, config::RECENT_THRESHOLD_DEFAULT,
+    },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TestHost {
     agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
     op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
+    blocks: Arc<parking_lot::RwLock<Vec<kitsune_p2p_block::Block>>>,
+}
+
+impl std::fmt::Debug for TestHost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TestHost")
+            .field("agent_store", &self.agent_store.read())
+            .field("op_store", &self.op_store.read())
+            .finish()
+    }
 }
 
 impl TestHost {
@@ -30,26 +42,38 @@ impl TestHost {
         Self {
             agent_store,
             op_store,
+            blocks: Arc::new(parking_lot::RwLock::new(vec![])),
         }
     }
 }
 
 impl KitsuneHost for TestHost {
-    fn block(&self, _input: kitsune_p2p_block::Block) -> kitsune_p2p::KitsuneHostResult<()> {
-        todo!()
+    fn block(&self, input: kitsune_p2p_block::Block) -> kitsune_p2p::KitsuneHostResult<()> {
+        self.blocks.write().push(input);
+
+        async move { Ok(()) }.boxed().into()
     }
 
-    fn unblock(&self, _input: kitsune_p2p_block::Block) -> kitsune_p2p::KitsuneHostResult<()> {
-        todo!()
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> kitsune_p2p::KitsuneHostResult<()> {
+        self.blocks.write().retain(|b| b != &input);
+
+        async move { Ok(()) }.boxed().into()
     }
 
     fn is_blocked(
         &self,
-        _input: kitsune_p2p_block::BlockTargetId,
-        _timestamp: kitsune_p2p_types::dht::prelude::Timestamp,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: kitsune_p2p_types::dht::prelude::Timestamp,
     ) -> kitsune_p2p::KitsuneHostResult<bool> {
-        // TODO implement me
-        async move { Ok(false) }.boxed().into()
+        let blocked = self.blocks.read().iter().find(|b| {
+            let target_id: BlockTargetId = b.target().clone().into();
+
+            target_id == input
+                && b.start() <= timestamp
+                && b.end() >= timestamp
+        }).is_some();
+        
+        async move { Ok(blocked) }.boxed().into()
     }
 
     fn get_agent_info_signed(
@@ -81,7 +105,7 @@ impl KitsuneHost for TestHost {
         _space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
         _dht_arc_set: kitsune_p2p_types::dht_arc::DhtArcSet,
     ) -> kitsune_p2p::KitsuneHostResult<Vec<f64>> {
-        // TODO implement me
+        // This is only used for metrics, so just return a dummy value
         async move { Ok(vec![]) }.boxed().into()
     }
 
@@ -106,14 +130,12 @@ impl KitsuneHost for TestHost {
             let region_set: RegionSetLtcs<RegionData> = coords
                 .into_region_set(|(_, coords)| -> KitsuneP2pResult<RegionData> {
                     let bounds = coords.to_bounds(&topology);
-            
+
                     Ok(self
                         .op_store
                         .read()
                         .iter()
-                        .filter(|op| {
-                            op.is_in_bounds(&bounds)
-                        })
+                        .filter(|op| op.is_in_bounds(&bounds))
                         .fold(
                             RegionData {
                                 hash: RegionHash::from_vec(vec![0; 32]).unwrap(),
@@ -159,15 +181,23 @@ impl KitsuneHost for TestHost {
         async move {
             let topology = self.get_topology(space).await?;
             let bounds = region.to_bounds(&topology);
-    
-            Ok(self.op_store.read().iter().filter_map(|op| {
-                if op.is_in_bounds(&bounds) {
-                    Some(op.clone().into())
-                } else {
-                    None
-                }
-            }).collect::<Vec<_>>().into())
-        }.boxed().into()
+
+            Ok(self
+                .op_store
+                .read()
+                .iter()
+                .filter_map(|op| {
+                    if op.is_in_bounds(&bounds) {
+                        Some(op.clone().into())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .into())
+        }
+        .boxed()
+        .into()
     }
 
     fn record_metrics(
@@ -207,17 +237,21 @@ impl KitsuneHost for TestHost {
     }
 
     fn check_op_data(
-            &self,
-            space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-            op_hash_list: Vec<kitsune_p2p_types::KOpHash>,
-            _context: Option<kitsune_p2p_fetch::FetchContext>,
-        ) -> kitsune_p2p::KitsuneHostResult<Vec<bool>> {
-        let res = op_hash_list.iter().map(|op_hash| {
-            self.op_store.read().iter().any(|op| op.space() == space && &Arc::new(op.kitsune_hash()) == op_hash)
-        }).collect();
+        &self,
+        space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
+        op_hash_list: Vec<kitsune_p2p_types::KOpHash>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
+    ) -> kitsune_p2p::KitsuneHostResult<Vec<bool>> {
+        let res = op_hash_list
+            .iter()
+            .map(|op_hash| {
+                self.op_store
+                    .read()
+                    .iter()
+                    .any(|op| op.space() == space && &Arc::new(op.kitsune_hash()) == op_hash)
+            })
+            .collect();
 
-        async move {
-                Ok(res)
-        }.boxed().into()
+        async move { Ok(res) }.boxed().into()
     }
 }

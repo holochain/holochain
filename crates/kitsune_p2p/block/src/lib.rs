@@ -39,6 +39,7 @@ pub enum BlockTarget {
     Ip(std::net::Ipv4Addr, IpBlockReason),
 }
 
+#[derive(Eq, PartialEq)]
 pub enum BlockTargetId {
     Node(NodeId),
     NodeSpace(NodeId, Arc<kitsune_p2p_bin_data::KitsuneSpace>),
