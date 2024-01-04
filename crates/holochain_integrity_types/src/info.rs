@@ -85,6 +85,8 @@ pub struct DnaModifiers {
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
 
+    // TODO Timestamp::now() is a bad default because each install will get a new value and it's actually used to control historical gossip
+    //      So new peers joining a network where origin_time is not set in the DNA will not be able to gossip historical ops.
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
     /// All Action timestamps must come after this time.

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::UNIX_EPOCH};
 
 use super::data::TestHostOp;
 use futures::FutureExt;
@@ -13,7 +13,7 @@ use kitsune_p2p_types::{
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::{Dimension, TelescopingTimes, Topology},
         ArqStrat,
-    },
+    }, config::RECENT_THRESHOLD_DEFAULT,
 };
 
 #[derive(Debug, Clone)]
@@ -106,27 +106,13 @@ impl KitsuneHost for TestHost {
             let region_set: RegionSetLtcs<RegionData> = coords
                 .into_region_set(|(_, coords)| -> KitsuneP2pResult<RegionData> {
                     let bounds = coords.to_bounds(&topology);
-                    let (x0, x1) = bounds.x;
-                    let (t0, t1) = bounds.t;
-
+            
                     Ok(self
                         .op_store
                         .read()
                         .iter()
                         .filter(|op| {
-                            let loc = op.location();
-                            let time = op.authored_at();
-                            if x0 <= x1 {
-                                if loc < x0 || loc > x1 {
-                                    return false;
-                                }
-                            } else {
-                                if loc > x0 && loc < x1 {
-                                    return false;
-                                }
-                            }
-
-                            time >= t0 && time <= t1
+                            op.is_in_bounds(&bounds)
                         })
                         .fold(
                             RegionData {
@@ -167,10 +153,21 @@ impl KitsuneHost for TestHost {
 
     fn query_op_hashes_by_region(
         &self,
-        _space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-        _region: kitsune_p2p_types::dht::prelude::RegionCoords,
+        space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
+        region: kitsune_p2p_types::dht::prelude::RegionCoords,
     ) -> kitsune_p2p::KitsuneHostResult<Vec<kitsune_p2p_fetch::OpHashSized>> {
-        todo!()
+        async move {
+            let topology = self.get_topology(space).await?;
+            let bounds = region.to_bounds(&topology);
+    
+            Ok(self.op_store.read().iter().filter_map(|op| {
+                if op.is_in_bounds(&bounds) {
+                    Some(op.clone().into())
+                } else {
+                    None
+                }
+            }).collect::<Vec<_>>().into())
+        }.boxed().into()
     }
 
     fn record_metrics(
@@ -185,12 +182,13 @@ impl KitsuneHost for TestHost {
         &self,
         _space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
     ) -> kitsune_p2p::KitsuneHostResult<kitsune_p2p_types::dht::prelude::Topology> {
-        let cutoff = std::time::Duration::from_secs(60 * 15);
+        let cutoff = RECENT_THRESHOLD_DEFAULT;
         async move {
             Ok(Topology {
                 space: Dimension::standard_space(),
                 time: Dimension::time(std::time::Duration::from_secs(60 * 5)),
-                time_origin: Timestamp::now(),
+                // TODO Timestamp::now is the default if the happ manifest doesn't set an origin time
+                time_origin: Timestamp::ZERO, // Timestamp::now(),
                 time_cutoff: cutoff,
             })
         }

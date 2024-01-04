@@ -7,6 +7,7 @@ use kitsune_p2p_fetch::RoughSized;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::KSpace;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
+use kitsune_p2p_types::dht::region::RegionBounds;
 use kitsune_p2p_types::{dht_arc::DhtLocation, KOpHash};
 use serde::{Deserialize, Serialize};
 
@@ -62,6 +63,26 @@ impl TestHostOp {
 
     pub fn size(&self) -> u32 {
         self.size
+    }
+
+    pub fn is_in_bounds(&self, bounds: &RegionBounds) -> bool {
+        let loc = self.location();
+        let time = self.authored_at();
+        if bounds.x.0 <= bounds.x.1 {
+            if loc < bounds.x.0 || loc > bounds.x.1 {
+                return false;
+            }
+        } else {
+            if loc > bounds.x.0 && loc < bounds.x.1 {
+                return false;
+            }
+        }
+
+        if time < bounds.t.0 || time > bounds.t.1 {
+            return false;
+        }
+
+        true
     }
 }
 

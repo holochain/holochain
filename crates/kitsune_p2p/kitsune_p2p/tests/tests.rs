@@ -13,6 +13,7 @@ use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_bin_data::KitsuneBasis;
 use kitsune_p2p_bin_data::KitsuneSpace;
 use kitsune_p2p_fetch::FetchContext;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 
@@ -535,7 +536,10 @@ async fn gossip_stops_when_agent_leaves_space() {
         });
 
     let space = Arc::new(fixt!(KitsuneSpace));
-    harness_a.op_store().write().push(TestHostOp::new(space.clone()));
+    harness_a
+        .op_store()
+        .write()
+        .push(TestHostOp::new(space.clone()));
 
     let sender_a = harness_a
         .spawn()
@@ -628,7 +632,7 @@ async fn gossip_stops_when_agent_leaves_space() {
     })
     .await
     // Expect this to time out because there are no agents to gossip with and so C's op store should stay empty
-    .unwrap_err(); 
+    .unwrap_err();
 
     assert!(harness_c.op_store().read().is_empty());
 }
@@ -653,9 +657,15 @@ async fn gossip_historical_ops() {
         });
 
     let space = Arc::new(fixt!(KitsuneSpace));
-    harness_a.op_store().write().push(TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(30 * 60)));
-    harness_a.op_store().write().push(TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(45 * 60)));
-    harness_a.op_store().write().push(TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(60 * 60)));
+    harness_a.op_store().write().push(
+        TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(30 * 60)),
+    );
+    harness_a.op_store().write().push(
+        TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(45 * 60)),
+    );
+    harness_a.op_store().write().push(
+        TestHostOp::new(space.clone()).make_historical(std::time::Duration::from_secs(60 * 60)),
+    );
 
     let sender_a = harness_a
         .spawn()
@@ -701,7 +711,6 @@ async fn gossip_historical_ops() {
                 if op_store_b.read().len() == 3 {
                     break;
                 }
-                tracing::info!("Waiting for ops to be received {}", op_store_b.read().len());
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         }
