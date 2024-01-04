@@ -377,15 +377,15 @@ pub async fn check_dpki_agent_validity(
     op: &DhtOp,
     dpki: Arc<dyn DpkiService>,
 ) -> SysValidationResult<()> {
-    let t = op.action().timestamp();
-    let a = op.action().author().clone();
+    let timestamp = op.action().timestamp();
+    let author = op.action().author().clone();
 
-    match dpki.key_state(a.clone(), t).await? {
+    match dpki.key_state(author.clone(), timestamp).await? {
         KeyState::Valid(_) => Ok(()),
         KeyState::Invalidated(_) => {
-            Err(ValidationOutcome::DpkiAgentInvalid(a.clone(), t.clone()).into())
+            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp.clone()).into())
         }
-        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(a.clone()).into()),
+        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author.clone()).into()),
     }
 }
 
