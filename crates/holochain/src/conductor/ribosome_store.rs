@@ -5,7 +5,7 @@ use tracing::*;
 
 use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct RibosomeStore {
     ribosomes: HashMap<DnaHash, RealRibosome>,
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
@@ -30,12 +30,12 @@ impl RibosomeStore {
         self.ribosomes.extend(ribosomes);
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn list(&self) -> Vec<DnaHash> {
         self.ribosomes.keys().cloned().collect()
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
         self.ribosomes
             .get(hash)
