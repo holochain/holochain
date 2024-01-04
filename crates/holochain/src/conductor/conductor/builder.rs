@@ -78,7 +78,13 @@ impl ConductorBuilder {
                 KeystoreConfig::LairServer { connection_url } => {
                     warn_no_encryption();
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore(connection_url.clone(), passphrase).await?
+                    match spawn_lair_keystore(connection_url.clone(), passphrase).await {
+                        Ok(keystore) => keystore,
+                        Err(err) => {
+                            tracing::error!(?err, "Failed to spawn Lair keystore");
+                            return Err(err.into());
+                        }
+                    }
                 }
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
@@ -89,7 +95,13 @@ impl ConductorBuilder {
                     });
                     keystore_config_path.push("lair-keystore-config.yaml");
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await?
+                    match spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await {
+                        Ok(keystore) => keystore,
+                        Err(err) => {
+                            tracing::error!(?err, "Failed to spawn Lair keystore in process");
+                            return Err(err.into());
+                        }
+                    }
                 }
             }
         };
