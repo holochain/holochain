@@ -11,15 +11,15 @@ use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
-use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
 use rand::Rng;
@@ -355,7 +355,7 @@ async fn create_test_data(
     let rng = rand::thread_rng();
     let mut rand_entry = rng.sample_iter(&Standard);
     let rand_entry = rand_entry.by_ref();
-    let start = std::time::Instant::now();
+
     loop {
         let d: Vec<u8> = rand_entry.take(10).collect();
         let d = UnsafeBytes::from(d);
@@ -375,23 +375,24 @@ async fn create_test_data(
             break;
         }
     }
-    dbg!(bucket_counts);
-    dbg!(start.elapsed());
 
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
     tuning.disable_publish = true;
 
+    // This is gonna get dropped at the end of this fn.
+    let tmpdir = tempfile::TempDir::new().unwrap();
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network: Some(network),
+        data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
     let mut agents = Vec::new();
-    dbg!("generating agents");
+
     for i in 0..num_agents {
         eprintln!("generating agent {}", i);
         let agent = conductor
@@ -402,8 +403,6 @@ async fn create_test_data(
             .unwrap();
         agents.push(agent);
     }
-
-    dbg!("Installing apps");
 
     let apps = conductor
         .setup_app_for_agents("app", &agents, &[dna_file.clone()])
@@ -417,7 +416,7 @@ async fn create_test_data(
         eprintln!("Calling {}", i);
         let e = entries.take(approx_num_ops_held).collect::<Vec<_>>();
         conductor
-            .call::<_, (), _>(&cell.zome("zome1"), "create_many", e)
+            .call::<_, ()>(&cell.zome("zome1"), "create_many", e)
             .await;
     }
     let mut authored = HashMap::new();
@@ -438,9 +437,9 @@ async fn create_test_data(
         authored.insert(Arc::new(cell.agent_pubkey().clone()), hashes);
         ops.extend(data);
     }
-    dbg!("Getting agent info");
+
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
-    dbg!("Done");
+
     GeneratedData {
         integrity_uuid,
         coordinator_uuid,

@@ -2,7 +2,7 @@ use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::sql::ToSqlStatement;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
 
 use super::*;
@@ -290,6 +290,7 @@ fn link_from_action(action: Action) -> StateQueryResult<Link> {
     match action {
         Action::CreateLink(action) => Ok(Link {
             author: action.author,
+            base: action.base_address,
             target: action.target_address,
             timestamp: action.timestamp,
             zome_index: action.zome_index,

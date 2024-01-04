@@ -1,5 +1,4 @@
-use crate::FunctionName;
-use crate::ZomeName;
+use crate::prelude::*;
 use std::time::Duration;
 
 /// Tick the scheduler every this many millis.

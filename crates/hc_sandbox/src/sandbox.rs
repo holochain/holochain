@@ -4,6 +4,7 @@ use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
 
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_types::prelude::InstalledAppId;
 
 use crate::calls::InstallApp;
@@ -20,8 +21,9 @@ pub async fn default_with_network(
     directory: Option<PathBuf>,
     happ: PathBuf,
     app_id: InstalledAppId,
+    network_seed: Option<String>,
     structured: Output,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<ConfigRootPath> {
     let Create {
         network,
         root,
@@ -40,7 +42,7 @@ pub async fn default_with_network(
         app_id: Some(app_id),
         agent_key: None,
         path: happ,
-        network_seed: None,
+        network_seed,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)
@@ -53,8 +55,9 @@ pub async fn default_n(
     create: Create,
     happ: PathBuf,
     app_id: InstalledAppId,
+    network_seed: Option<String>,
     structured: Output,
-) -> anyhow::Result<Vec<PathBuf>> {
+) -> anyhow::Result<Vec<ConfigRootPath>> {
     let num_sandboxes = create.num_sandboxes;
     msg!(
         "Creating {} conductor sandboxes with same settings",
@@ -68,6 +71,7 @@ pub async fn default_n(
             create.directories.get(i).cloned(),
             happ.clone(),
             app_id.clone(),
+            network_seed.clone(),
             structured.clone(),
         )
         .await?;

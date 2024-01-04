@@ -3,11 +3,10 @@ use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
-use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::prelude::{AsP2pStateTxExt, DatabaseResult};
 use holochain_test_wasm_common::AnchorInput;
-use holochain_types::db::AsP2pStateTxExt;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
@@ -45,7 +44,7 @@ async fn signature_smoke_test() {
     let rendezvous = SweetLocalRendezvous::new().await;
 
     let mut network_config = KitsuneP2pConfig::default();
-    network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
+    network_config.transport_pool = vec![TransportConfig::Mem {}];
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
     network_config.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));

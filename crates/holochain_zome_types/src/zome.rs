@@ -6,28 +6,27 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
+use std::path::PathBuf;
+
 pub use holochain_integrity_types::zome::*;
 
 use holochain_serialized_bytes::prelude::*;
 
-pub mod error;
+mod error;
+pub use error::*;
+
 #[cfg(feature = "full-dna-def")]
 pub mod inline_zome;
 
-use error::ZomeResult;
-
 #[cfg(feature = "full-dna-def")]
-use crate::InlineIntegrityZome;
-#[cfg(feature = "full-dna-def")]
-use error::ZomeError;
-use std::path::PathBuf;
+use inline_zome::InlineIntegrityZome;
 #[cfg(feature = "full-dna-def")]
 use std::sync::Arc;
 
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Zome<T = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -137,7 +136,7 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 // TODO: move to `holochain_types`
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
@@ -251,8 +250,8 @@ impl From<InlineIntegrityZome> for IntegrityZomeDef {
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<crate::InlineCoordinatorZome> for ZomeDef {
-    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+impl From<crate::prelude::InlineCoordinatorZome> for ZomeDef {
+    fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
         Self::Inline {
             inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
             dependencies: Default::default(),
@@ -261,8 +260,8 @@ impl From<crate::InlineCoordinatorZome> for ZomeDef {
 }
 
 #[cfg(feature = "full-dna-def")]
-impl From<crate::InlineCoordinatorZome> for CoordinatorZomeDef {
-    fn from(iz: crate::InlineCoordinatorZome) -> Self {
+impl From<crate::prelude::InlineCoordinatorZome> for CoordinatorZomeDef {
+    fn from(iz: crate::prelude::InlineCoordinatorZome) -> Self {
         Self(ZomeDef::Inline {
             inline_zome: inline_zome::DynInlineZome(Arc::new(iz)),
             dependencies: Default::default(),
@@ -320,21 +319,21 @@ impl From<ZomeDef> for CoordinatorZomeDef {
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::Wasm(WasmZome::arbitrary(u)?))
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for IntegrityZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))

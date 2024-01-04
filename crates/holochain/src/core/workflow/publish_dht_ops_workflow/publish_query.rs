@@ -6,18 +6,12 @@ use holo_hash::DhtOpHash;
 use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::ReadAccess;
-use holochain_state::query::prelude::*;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpType;
-use holochain_types::prelude::OpBasis;
-use holochain_zome_types::Entry;
-use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::SignedAction;
+use holochain_state::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 
-use crate::core::workflow::error::WorkflowResult;
+use crate::core::workflow::WorkflowResult;
 
 use super::MIN_PUBLISH_INTERVAL;
 
@@ -108,7 +102,7 @@ where
 }
 
 /// Get the number of ops that might need to publish again in the future.
-pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
+pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> WorkflowResult<usize> {
     let count = txn.query_row(
         "
         SELECT
@@ -117,11 +111,16 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
         JOIN
         DhtOp ON DhtOp.action_hash = Action.hash
         WHERE
-        DhtOp.receipts_complete IS NULL
+        Action.author = :author
+        AND
+        DhtOp.withhold_publish IS NULL
         AND
         (DhtOp.type != :store_entry OR Action.private_entry = 0)
+        AND
+        DhtOp.receipts_complete IS NULL
         ",
         named_params! {
+            ":author": agent,
             ":store_entry": DhtOpType::StoreEntry,
         },
         |row| row.get("num_ops"),
@@ -131,21 +130,12 @@ pub fn num_still_needing_publish(txn: &Transaction) -> WorkflowResult<usize> {
 
 #[cfg(test)]
 mod tests {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::prelude::DatabaseResult;
-    use holochain_state::prelude::insert_op;
-    use holochain_state::prelude::set_last_publish_time;
-    use holochain_state::prelude::set_receipts_complete;
-    use holochain_state::prelude::test_authored_db;
-    use holochain_types::action::NewEntryAction;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_zome_types::fixt::*;
-    use holochain_zome_types::Action;
-    use holochain_zome_types::EntryType;
-    use holochain_zome_types::EntryVisibility;
+    use holochain_state::prelude::*;
 
     use super::*;
 
@@ -156,6 +146,7 @@ mod tests {
         has_required_receipts: bool,
         is_this_agent: bool,
         store_entry: bool,
+        withold_publish: bool,
     }
 
     struct Consistent {
@@ -170,8 +161,10 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         holochain_trace::test_run().ok();
+
+        let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
-        let expected = test_data(&db.to_db().into()).await;
+        let expected = test_data(&db.to_db().into(), agent.clone()).await;
         let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
@@ -181,10 +174,21 @@ mod tests {
                 .collect::<Vec<_>>(),
             expected
                 .results
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|op| op.into_inner().1.to_kitsune())
                 .collect::<Vec<_>>(),
         );
+
+        let num_to_publish = db
+            .to_db()
+            .read_async(|txn| num_still_needing_publish(&txn, agent))
+            .await
+            .unwrap();
+
+        // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
+        // not because those ops may need publishing again in the future if we don't get enough validation receipts.
+        assert_eq!(expected.results.len() + 1, num_to_publish);
     }
 
     async fn create_and_insert_op(
@@ -247,6 +251,9 @@ mod tests {
                 insert_op(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
+                if facts.withold_publish {
+                    set_withhold_publish(txn, &hash).unwrap();
+                }
                 Ok(())
             }
         })
@@ -255,23 +262,23 @@ mod tests {
         state
     }
 
-    async fn test_data(db: &DbWrite<DbKindAuthored>) -> Expected {
+    async fn test_data(db: &DbWrite<DbKindAuthored>, agent: AgentPubKey) -> Expected {
         let mut results = Vec::new();
-        let cd = Consistent {
-            this_agent: fixt!(AgentPubKey),
-        };
+        let cd = Consistent { this_agent: agent };
         // We **do** expect any of these in the results:
         // - Private: false.
         // - WithinMinPeriod: false.
         // - HasRequireReceipts: false.
         // - IsThisAgent: true.
-        // - StoreEntry: true
+        // - StoreEntry: true.
+        // - WitholdPublish: false.
         let facts = Facts {
             private: false,
             within_min_period: false,
             has_required_receipts: false,
             is_this_agent: true,
             store_entry: true,
+            withold_publish: false,
         };
         let op = create_and_insert_op(db, facts, &cd).await;
         results.push(op);
@@ -305,6 +312,11 @@ mod tests {
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
+        create_and_insert_op(db, f, &cd).await;
+
+        // - WitholdPublish: true.
+        let mut f = facts;
+        f.withold_publish = true;
         create_and_insert_op(db, f, &cd).await;
 
         Expected {

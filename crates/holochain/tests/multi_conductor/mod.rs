@@ -4,6 +4,7 @@ use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::consistency_10s;
+use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
 use unwrap_to::unwrap_to;
@@ -21,7 +22,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use std::sync::Arc;
 
     use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
-    use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
 
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
@@ -34,6 +35,10 @@ async fn test_publish() -> anyhow::Result<()> {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = Some(network);
+    config.tuning_params = Some(ConductorTuningParams {
+        sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
+        ..Default::default()
+    });
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
@@ -74,12 +79,17 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
+
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|config| {
+        // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
+        // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
+        config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+    });
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -112,7 +122,11 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // See if we can fetch metric data from bobbo
     let metrics = conductors[1].dump_network_metrics(None).await?;
-    println!("@!@! - metrics: {}", metrics);
+    tracing::info!(target: "TEST", "@!@! - metrics: {metrics}");
+
+    // See if we can fetch network stats from bobbo
+    let stats = conductors[1].dump_network_stats().await?;
+    tracing::info!(target: "TEST", "@!@! - stats: {stats}");
 
     Ok(())
 }
@@ -313,7 +327,7 @@ async fn check_all_gets_for_private_entry(
             .into_iter()
             .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
     );
-    let records = records.into_iter().filter_map(|a| a).collect();
+    let records = records.into_iter().flatten().collect();
     check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))

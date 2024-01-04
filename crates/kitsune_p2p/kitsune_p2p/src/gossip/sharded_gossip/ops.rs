@@ -101,7 +101,7 @@ impl ShardedGossipLocal {
 
     pub(super) async fn queue_incoming_regions(
         &self,
-        peer_cert: &Arc<[u8; 32]>,
+        peer_cert: &NodeCert,
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
@@ -235,7 +235,8 @@ impl ShardedGossipLocal {
         let missing_op_hashes = if missing_hashes.is_empty() {
             Vec::with_capacity(0)
         } else {
-            self.evt_sender
+            self.host_api
+                .legacy
                 .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
                     query: FetchOpDataEvtQuery::Hashes {

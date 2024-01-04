@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 /// being flattened.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 pub enum Location {
     /// Expect file to be part of this bundle
@@ -41,6 +41,22 @@ impl Location {
         } else {
             Ok(self.clone())
         }
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for Location {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    // XXX: this is a bad arbitrary impl, could be derived automatically when
+    // https://github.com/proptest-rs/proptest/pull/362 lands
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        proptest::prelude::any::<String>()
+            .prop_map(|s| Self::Path(s.into()))
+            .boxed()
     }
 }
 

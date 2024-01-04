@@ -1,14 +1,15 @@
+use super::*;
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
-use crate::{HostStub, KitsuneHost};
+use crate::{HostApi, KitsuneHost};
+use ::fixt::prelude::*;
+use kitsune_p2p_bin_data::fixt::*;
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
-use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
+use kitsune_p2p_types::dht::ArqStrat;
 use num_traits::Zero;
-
-use super::*;
 
 #[derive(Debug)]
 pub struct StandardResponsesHostApi {
@@ -204,7 +205,11 @@ pub async fn setup_player(
 ) -> ShardedGossipLocal {
     let (evt_handler, host_api) = standard_responses(agents, with_data).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
+    ShardedGossipLocal::test(
+        GossipType::Historical,
+        HostApiLegacy::new(host_api, evt_sender),
+        state,
+    )
 }
 
 pub async fn setup_standard_player(
@@ -220,7 +225,11 @@ pub async fn setup_empty_player(
 ) -> ShardedGossipLocal {
     let (evt_handler, host_api) = standard_responses(agents, false).await;
     let (evt_sender, _) = spawn_handler(evt_handler).await;
-    ShardedGossipLocal::test(GossipType::Historical, evt_sender, host_api, state)
+    ShardedGossipLocal::test(
+        GossipType::Historical,
+        HostApiLegacy::new(host_api, evt_sender),
+        state,
+    )
 }
 
 pub async fn agents_with_infos(num_agents: usize) -> Vec<(Arc<KitsuneAgent>, AgentInfoSigned)> {

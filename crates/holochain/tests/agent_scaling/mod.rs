@@ -1,14 +1,14 @@
 #![cfg(feature = "test_utils")]
 
-use holochain::sweettest::SweetAgents;
-use holochain::sweettest::SweetConductor;
-use holochain::sweettest::SweetDnaFile;
+use futures::future;
+use futures::FutureExt;
+use hdk::prelude::GetLinksInputBuilder;
+use holochain::sweettest::*;
 use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::inline_zome::BoxApi;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 struct BaseTarget(AnyLinkableHash, AnyLinkableHash);
@@ -29,11 +29,12 @@ fn links_zome() -> InlineIntegrityZome {
         .function(
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
-                Ok(api.get_links(vec![GetLinksInput::new(
+                Ok(api.get_links(vec![GetLinksInputBuilder::try_new(
                     base,
                     InlineZomeSet::dep_link_filter(&api),
-                    None,
-                )])?)
+                )
+                .unwrap()
+                .build()])?)
             },
         )
 }
@@ -184,4 +185,115 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     tracing::debug!("finished all slow fn in {}", all_now.elapsed().as_secs());
 
     Ok(())
+}
+
+/// Check that many agents on the same conductor can all make lots of zome calls at once
+/// without causing extremely ill effects
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
+#[ignore = "performance test meant to be run manually"]
+async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
+    use holochain_conductor_api::{AppRequest, AppResponse, ZomeCall};
+    use std::time::Instant;
+
+    holochain_trace::test_run().ok();
+    const NUM_AGENTS: usize = 30;
+
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
+
+    // Create a Conductor
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
+    let apps = conductor
+        .setup_app_for_agents("app", &agents, &[dna_file])
+        .await
+        .unwrap();
+    let cells = apps.cells_flattened();
+    let zomes: Vec<_> = cells
+        .iter()
+        .map(|c| c.zome(TestWasm::MultipleCalls))
+        .collect();
+    let mut clients: Vec<_> =
+        future::join_all((0..NUM_AGENTS).map(|_| conductor.app_ws_client().map(|(tx, _)| tx)))
+            .await;
+
+    async fn all_call(
+        conductor: &SweetConductor,
+        zomes: &[holochain::sweettest::SweetZome],
+        n: u32,
+    ) {
+        let start = Instant::now();
+        let calls = future::join_all(zomes.iter().map(|zome| {
+            conductor
+                .call::<_, ()>(zome, "create_entry_multiple", n)
+                .map(|r| (r, Instant::now()))
+        }))
+        .await;
+
+        assert_eq!(calls.len(), NUM_AGENTS);
+
+        for (i, (_, time)) in calls.iter().enumerate() {
+            println!("{:>3}: {:?}", i, time.duration_since(start));
+        }
+    }
+
+    async fn call_all_ws(
+        conductor: &SweetConductor,
+        cells: &[SweetCell],
+        clients: &mut [holochain_websocket::WebsocketSender],
+        n: u32,
+    ) {
+        let calls = future::join_all(std::iter::zip(cells, clients.iter_mut()).map(
+            |(cell, client)| async move {
+                let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
+                let cell_id = cell.cell_id().clone();
+                let call = ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: cell_id.clone(),
+                        zome_name: TestWasm::MultipleCalls.into(),
+                        fn_name: "create_entry_multiple".into(),
+                        cap_secret: None,
+                        provenance: cell_id.agent_pubkey().clone(),
+                        payload: ExternIO::encode(n).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap();
+
+                let start = Instant::now();
+                let res: AppResponse = client
+                    .request(AppRequest::CallZome(Box::new(call)))
+                    .await
+                    .unwrap();
+                match res {
+                    AppResponse::ZomeCalled(_) => Instant::now().duration_since(start),
+                    other => panic!("unexpected ws response: {:?}", other),
+                }
+            },
+        ))
+        .await;
+
+        for (i, duration) in calls.iter().enumerate() {
+            println!("{:>3}: {:?}", i, duration);
+        }
+    }
+
+    println!("----------------------");
+    call_all_ws(&conductor, &cells, clients.as_mut_slice(), 10).await;
+    println!("----------------------");
+    call_all_ws(&conductor, &cells, clients.as_mut_slice(), 100).await;
+    println!("----------------------");
+    call_all_ws(&conductor, &cells, clients.as_mut_slice(), 100).await;
+
+    for _ in 0..10 {
+        println!("----------------------");
+        let start = Instant::now();
+        all_call(&conductor, &zomes, 100).await;
+        println!("overall {:?}", Instant::now().duration_since(start));
+    }
 }

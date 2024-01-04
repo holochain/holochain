@@ -7,7 +7,10 @@ use crate::{Create, CreateLink, Delete, Entry, Update};
 /// Input to the `weigh` callback. Includes an "unweighed" action, and Entry
 /// if applicable.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Debug)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum WeighInput {
     /// A Link to be weighed
     Link(CreateLink<()>),
@@ -44,7 +47,10 @@ pub type RateBucketCapacity = u32;
     PartialOrd,
     Ord,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[allow(missing_docs)]
 pub struct RateWeight {
     pub bucket_id: RateBucketId,
@@ -73,7 +79,10 @@ impl Default for RateWeight {
     PartialOrd,
     Ord,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[allow(missing_docs)]
 pub struct EntryRateWeight {
     pub bucket_id: RateBucketId,

@@ -12,7 +12,7 @@ use holochain::{
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
-    core::workflow::error::WorkflowError,
+    core::workflow::WorkflowError,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
@@ -305,7 +305,7 @@ fn simple_validation_zome() -> InlineZomeSet {
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
-            if &s.0 == "" {
+            if s.0.is_empty() {
                 Ok(ValidateResult::Invalid("No empty strings allowed".into()))
             } else {
                 Ok(ValidateResult::Valid)

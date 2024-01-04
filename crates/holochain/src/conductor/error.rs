@@ -2,7 +2,7 @@ use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::conductor::conductor::CellStatus;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
@@ -63,7 +63,7 @@ pub enum ConductorError {
     SubmitTaskError(String),
 
     #[error("ZomeError: {0}")]
-    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+    ZomeError(#[from] holochain_zome_types::zome::ZomeError),
 
     #[error("DnaError: {0}")]
     DnaError(#[from] holochain_types::dna::DnaError),
@@ -79,7 +79,7 @@ pub enum ConductorError {
     InterfaceError(#[from] Box<InterfaceError>),
 
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
-    GenesisFailed { errors: Vec<CellError> },
+    GenesisFailed { errors: Vec<(CellId, CellError)> },
 
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
@@ -132,6 +132,12 @@ pub enum ConductorError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("The conductor has no data directory.")]
+    NoDataRootPath,
+
+    #[error("The conductor has no config directory.")]
+    NoConfigPath,
 }
 
 impl ConductorError {

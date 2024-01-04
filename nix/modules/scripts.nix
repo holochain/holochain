@@ -64,6 +64,75 @@
 
         git commit -m "chore(flakes): update $VERSIONS_DIR"
       '';
+
+      scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''
+        set -xeuo pipefail
+
+        export WORKSPACE_PATH=''${1}
+
+        ${self'.packages.release-automation}/bin/release-automation \
+            --workspace-path=''${WORKSPACE_PATH} \
+            --log-level=debug \
+            crate detect-missing-releaseheadings
+
+        ${self'.packages.release-automation}/bin/release-automation \
+          --workspace-path=''${WORKSPACE_PATH} \
+          --log-level=debug \
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm)$" \
+          release \
+            --no-verify \
+            --force-tag-creation \
+            --force-branch-creation \
+            --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
+            --allowed-semver-increment-modes="!pre_minor beta-dev" \
+            --steps=CreateReleaseBranch,BumpReleaseVersions
+
+        ${self'.packages.release-automation}/bin/release-automation \
+            --workspace-path=''${WORKSPACE_PATH} \
+            --log-level=debug \
+            release \
+              --dry-run \
+              --no-verify \
+              --steps=PublishToCratesIo
+      '';
+
+      scripts-ci-generate-readmes =
+        let
+          pathPrefix = lib.makeBinPath [
+            self'.packages.cargo-rdme
+            pkgs.cargo
+            pkgs.rustc
+            pkgs.gitFull
+          ];
+
+          crates = [
+            "hdi"
+            "hdk"
+            "holochain_keystore"
+            "holochain_state"
+          ];
+        in
+        pkgs.writeShellScriptBin "scripts-ci-generate-readmes" ''
+          set -xeuo pipefail
+
+          export PATH=${pathPrefix}:$PATH
+
+          crates_to_document=(${builtins.concatStringsSep " " crates})
+
+          for crate in "''${crates_to_document[@]}"; do
+            echo 'generating README for crate' "$crate"
+            cargo-rdme -w $crate --intralinks-strip-links --force
+          done
+
+          # have any READMEs been updated?
+          changed_readmes=$(git diff --exit-code --name-only '**README.md' || :)
+          if [[ -n "$changed_readmes" ]]; then
+            echo 'READMEs have been updated, committing changes'
+            ${../../scripts/ci-git-config.sh}
+            git commit -m "docs(crate-level): generate readmes from doc comments" $changed_readmes
+          fi
+        '';
     };
+
   };
 }

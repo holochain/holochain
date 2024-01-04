@@ -4,22 +4,26 @@ use holochain_types::prelude::ChainItem;
 use super::*;
 
 pub(crate) async fn graft_records_onto_source_chain(
-    handle: ConductorHandle,
+    conductor: ConductorHandle,
     cell_id: CellId,
     validate: bool,
     records: Vec<Record>,
 ) -> ConductorApiResult<()> {
+    // Require that the cell is installed.
+    if let err @ Err(ConductorError::CellMissing(_)) = conductor.cell_by_id(&cell_id, false).await {
+        let _ = err?;
+    }
+
     // Get or create the space for this cell.
-    // Note: This doesn't require the cell be installed.
-    let space = handle.get_or_create_space(cell_id.dna_hash())?;
+    let space = conductor.get_or_create_space(cell_id.dna_hash())?;
 
     let chc = None;
-    let network = handle
+    let network = conductor
         .holochain_p2p()
         .to_dna(cell_id.dna_hash().clone(), chc);
 
     let source_chain: SourceChain = space
-        .source_chain(handle.keystore().clone(), cell_id.agent_pubkey().clone())
+        .source_chain(conductor.keystore().clone(), cell_id.agent_pubkey().clone())
         .await?;
 
     let existing = source_chain
@@ -33,15 +37,15 @@ pub(crate) async fn graft_records_onto_source_chain(
     let chain_top = graft.existing_chain_top();
 
     if validate {
-        validate_records(handle.clone(), &cell_id, &chain_top, graft.incoming()).await?;
+        validate_records(conductor.clone(), &cell_id, &chain_top, graft.incoming()).await?;
     }
 
-    // Produce the op lights for each record.
+    // Produce the op lites for each record.
     let data = graft
         .incoming
         .into_iter()
         .map(|el| {
-            let ops = produce_op_lights_from_records(vec![&el])?;
+            let ops = produce_op_lites_from_records(vec![&el])?;
             // Check have the same author as cell.
             let (sah, entry) = el.into_inner();
             if sah.action().author() != cell_id.agent_pubkey() {
@@ -100,7 +104,7 @@ pub(crate) async fn graft_records_onto_source_chain(
 
     // Check which ops need to be integrated.
     // Only integrated if a cell is installed.
-    if handle
+    if conductor
         .running_cell_ids(Some(CellStatus::Joined))
         .contains(&cell_id)
     {
@@ -112,6 +116,12 @@ pub(crate) async fn graft_records_onto_source_chain(
             &space.dht_query_cache,
         )
         .await?;
+
+        // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
+        conductor
+            .cell_by_id(&cell_id, false)
+            .await?
+            .notify_authored_ops_moved_to_limbo();
     }
     Ok(())
 }

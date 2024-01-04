@@ -13,15 +13,14 @@ use conversions::WrongActionError;
 use derive_more::From;
 use holo_hash::EntryHash;
 use holochain_zome_types::op::EntryCreationAction;
-use holochain_zome_types::prelude::*;
-
-#[cfg(feature = "contrafact")]
-pub mod facts;
 
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 /// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
     /// A action which simply creates a new entry
@@ -460,7 +459,6 @@ impl<'a> From<&'a NewEntryAction> for NewEntryActionRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fixt::ActionBuilderCommonFixturator;
     use crate::test_utils::fake_dna_hash;
     use crate::test_utils::fake_entry_hash;
     use ::fixt::prelude::Unpredictable;
@@ -476,6 +474,22 @@ mod tests {
         .into();
         let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
         let res: Action = holochain_serialized_bytes::decode(&bytes).unwrap();
+        assert_eq!(orig, res);
+    }
+
+    #[test]
+    fn test_action_json_roundtrip() {
+        let orig: Action = Dna::from_builder(
+            fake_dna_hash(1),
+            ActionBuilderCommonFixturator::new(Unpredictable)
+                .next()
+                .unwrap(),
+        )
+        .into();
+        let orig = ActionHashed::from_content_sync(orig);
+        let json = serde_json::to_string(&orig).unwrap();
+        dbg!(&json);
+        let res: ActionHashed = serde_json::from_str(&json).unwrap();
         assert_eq!(orig, res);
     }
 

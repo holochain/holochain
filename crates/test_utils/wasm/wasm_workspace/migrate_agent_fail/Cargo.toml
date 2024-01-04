@@ -14,7 +14,7 @@ path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-serde = "1.0"
+serde = { workspace = true }
 hdk = { path = "../../../../hdk" }
 
 [features]

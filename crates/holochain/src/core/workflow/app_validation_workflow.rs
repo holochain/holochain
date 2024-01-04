@@ -2,6 +2,7 @@
 
 use std::convert::TryInto;
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
@@ -18,7 +19,6 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
-use error::AppValidationResult;
 pub use error::*;
 use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
@@ -31,10 +31,6 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
-use holochain_zome_types::op::EntryCreationAction;
-use holochain_zome_types::op::Op;
 use rusqlite::Transaction;
 use std::collections::HashSet;
 use tracing::*;
@@ -93,9 +89,9 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone().into();
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
-    let start_len = sorted_ops.len();
-    tracing::debug!("validating {} ops", start_len);
-    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
+    let num_ops_to_validate = sorted_ops.len();
+    tracing::debug!("validating {num_ops_to_validate} ops");
+    let start = (num_ops_to_validate >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
 
     // Validate all the ops
@@ -112,7 +108,7 @@ async fn app_validation_workflow_inner(
                 let op_type = op.get_type();
                 let action = op.action();
                 let dependency = get_dependency(op_type, &action);
-                let op_light = op.to_light();
+                let op_lite = op.to_lite();
 
                 // If this is agent activity, track it for the cache.
                 let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
@@ -124,14 +120,14 @@ async fn app_validation_workflow_inner(
                 });
 
                 // Validate this op
-                let cascade = workspace.full_cascade(network.clone());
-                let r = match dhtop_to_op(op, &cascade).await {
+                let cascade = Arc::new(workspace.full_cascade(network.clone()));
+                let r = match dhtop_to_op(op, cascade).await {
                     Ok(op) => {
                         validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
                     }
                     Err(e) => Err(e),
                 };
-                (op_hash, dependency, op_light, r, activity)
+                (op_hash, dependency, op_lite, r, activity)
             }
         }
     });
@@ -165,7 +161,7 @@ async fn app_validation_workflow_inner(
     let mut iter =
         tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
 
-    let mut total = 0;
+    let mut ops_validated = 0;
     let mut round_time = start.is_some().then(std::time::Instant::now);
     // Pull in a chunk of results.
     while let Some(chunk) = iter.next().await {
@@ -173,15 +169,15 @@ async fn app_validation_workflow_inner(
             "Committing {} ops",
             chunk.iter().map(|c| c.len()).sum::<usize>()
         );
-        let (t, a, r, activity) = workspace
+        let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
             .dht_db
             .write_async(move |txn| {
-                let mut total = 0;
+                let mut accepted = 0;
                 let mut awaiting = 0;
                 let mut rejected = 0;
                 let mut agent_activity = Vec::new();
                 for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, dependency, op_light, outcome, activity) = outcome;
+                    let (op_hash, dependency, op_lites, outcome, activity) = outcome;
                     // Get the outcome or return the error
                     let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
@@ -201,7 +197,7 @@ async fn app_validation_workflow_inner(
                     }
                     match outcome {
                         Outcome::Accepted => {
-                            total += 1;
+                            accepted += 1;
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
@@ -217,7 +213,7 @@ async fn app_validation_workflow_inner(
                             rejected += 1;
                             tracing::info!(
                                 "Received invalid op. The op author will be blocked.\nOp: {:?}",
-                                op_light
+                                op_lites
                             );
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -227,7 +223,7 @@ async fn app_validation_workflow_inner(
                         }
                     }
                 }
-                WorkflowResult::Ok((total, awaiting, rejected, agent_activity))
+                WorkflowResult::Ok((accepted, awaiting, rejected, agent_activity))
             })
             .await?;
 
@@ -246,31 +242,27 @@ async fn app_validation_workflow_inner(
                     .await?;
             }
         }
-        total += t;
+        ops_validated += accepted_ops;
+        ops_validated += rejected_ops;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
             let round_el = round_time.elapsed();
             *round_time = std::time::Instant::now();
-            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            let avg_ops_ps =
+                ops_validated as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let ops_ps = accepted_ops as f64 / round_el.as_micros() as f64 * 1_000_000.0;
             tracing::warn!(
                 "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
-                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
+                (num_ops_to_validate - ops_validated) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
                 avg_ops_ps,
                 ops_ps
             );
         }
-        tracing::debug!(
-            "{} committed, {} awaiting sys dep, {} rejected. {} committed this round",
-            t,
-            a,
-            r,
-            total
-        );
+        tracing::debug!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
     }
     jh.await?;
-    tracing::debug!("accepted {} ops", total);
-    Ok(if saturated {
-        WorkComplete::Incomplete
+    Ok(if saturated || ops_validated < num_ops_to_validate {
+        // trigger app validation workflow again in 10 seconds
+        WorkComplete::Incomplete(Some(Duration::from_secs(10)))
     } else {
         WorkComplete::Complete
     })
@@ -279,7 +271,7 @@ async fn app_validation_workflow_inner(
 pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
-    cascade: &impl Cascade,
+    cascade: Arc<impl Cascade>,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
 
@@ -312,7 +304,10 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     match op {
         Op::StoreRecord(StoreRecord { mut record }) => {
             if let Some(e) = omitted_entry {
-                *record.as_entry_mut() = RecordEntry::Present(e);
+                // NOTE: this is only possible in this situation because we already removed
+                // this exact entry from this Record earlier. DON'T set entries on records
+                // anywhere else without recomputing hashes and signatures!
+                record.entry = RecordEntry::Present(e);
             }
             record
         }
@@ -341,7 +336,7 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<Op> {
+async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
@@ -353,7 +348,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
             ),
         }),
         DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
-            action: SignedHashed::new(action.into(), signature),
+            action: SignedHashed::new_unchecked(action.into(), signature),
             entry,
         }),
         DhtOp::RegisterAgentActivity(signature, action) => {
@@ -402,7 +397,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                 })
                 .ok_or_else(|| Outcome::awaiting(&update.original_action_address))?;
             Op::RegisterUpdate(RegisterUpdate {
-                update: SignedHashed::new(update, signature),
+                update: SignedHashed::new_unchecked(update, signature),
                 new_entry,
                 original_action,
                 original_entry,
@@ -434,14 +429,14 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                 None
             };
             Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed::new(delete, signature),
+                delete: SignedHashed::new_unchecked(delete, signature),
                 original_action,
                 original_entry,
             })
         }
         DhtOp::RegisterAddLink(signature, create_link) => {
             Op::RegisterCreateLink(RegisterCreateLink {
-                create_link: SignedHashed::new(create_link, signature),
+                create_link: SignedHashed::new_unchecked(create_link, signature),
             })
         }
         DhtOp::RegisterRemoveLink(signature, delete_link) => {
@@ -451,7 +446,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                 .and_then(|(sh, _)| CreateLink::try_from(sh.hashed.content).ok())
                 .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
             Op::RegisterDeleteLink(RegisterDeleteLink {
-                delete_link: SignedHashed::new(delete_link, signature),
+                delete_link: SignedHashed::new_unchecked(delete_link, signature),
                 create_link,
             })
         }
@@ -494,7 +489,8 @@ where
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
-            store_record_zomes_to_invoke(record.action(), ribosome)?
+            let cascade = CascadeImpl::from_workspace_and_network(&workspace, network.clone());
+            store_record_zomes_to_invoke(record.action(), ribosome, &cascade).await?
         }
         Op::StoreEntry(StoreEntry {
             action:
@@ -637,12 +633,33 @@ fn create_link_zomes_to_invoke(
 }
 
 /// Get the zomes to invoke for an [`Op::StoreRecord`].
-fn store_record_zomes_to_invoke(
+async fn store_record_zomes_to_invoke(
     action: &Action,
     ribosome: &impl RibosomeT,
+    cascade: &(impl Cascade + Send + Sync),
 ) -> AppValidationOutcome<ZomesToInvoke> {
+    // For deletes there is no entry type to check, so we get the previous action to see if that
+    // was a create or a delete for an app entry type.
+    let action = match action {
+        Action::Delete(Delete {
+            deletes_address, ..
+        })
+        | Action::DeleteLink(DeleteLink {
+            link_add_address: deletes_address,
+            ..
+        }) => {
+            let (deletes_action, _) = cascade
+                .retrieve_action(deletes_address.clone(), NetworkGetOptions::default())
+                .await?
+                .ok_or_else(|| Outcome::awaiting(deletes_address))?;
+
+            deletes_action.action().clone()
+        }
+        _ => action.clone(),
+    };
+
     match action {
-        Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
+        Action::CreateLink(create_link) => create_link_zomes_to_invoke(&create_link, ribosome),
         Action::Create(Create {
             entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
@@ -651,7 +668,7 @@ fn store_record_zomes_to_invoke(
             entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
         }) => {
-            let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
+            let zome = ribosome.get_integrity_zome(&zome_index).ok_or_else(|| {
                 Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))

@@ -1,6 +1,7 @@
 //! Utilities for dealing with proxy urls.
 
 use crate::*;
+use base64::Engine;
 
 /// Utility for dealing with proxy urls.
 /// Proxy URLs are like super-urls... they need to be able to
@@ -95,7 +96,7 @@ impl ProxyUrl {
     /// Create a new proxy url from a base + tls cert digest.
     pub fn new(base: &str, cert_digest: CertDigest) -> KitsuneResult<Self> {
         let base = url2::try_url2!("{}", base).map_err(KitsuneError::other)?;
-        let tls = base64::encode_config(&cert_digest[..], base64::URL_SAFE_NO_PAD);
+        let tls = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&cert_digest[..]);
         let mut full = url2::url2!("kitsune-proxy://{}", tls);
         {
             let mut path = full
@@ -138,14 +139,15 @@ impl ProxyUrl {
             if let Some(mut i) = self.full.path_segments() {
                 if let Some(_u) = i.next() {
                     if let Some(u) = i.next() {
-                        let digest = base64::decode_config(u, base64::URL_SAFE_NO_PAD).unwrap();
+                        let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(u).unwrap();
                         return CertDigest::from_slice(&digest);
                     }
                 }
             }
         }
-        let digest =
-            base64::decode_config(self.full.host_str().unwrap(), base64::URL_SAFE_NO_PAD).unwrap();
+        let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD
+            .decode(self.full.host_str().unwrap())
+            .unwrap();
         CertDigest::from_slice(&digest)
     }
 
@@ -236,9 +238,11 @@ mod tests {
 
     #[test]
     fn proxy_url_from_base() {
-        let cert_digest = base64::decode_config(TEST_CERT, base64::URL_SAFE_NO_PAD).unwrap();
+        let cert_digest = base64::prelude::BASE64_URL_SAFE_NO_PAD
+            .decode(TEST_CERT)
+            .unwrap();
         let digest = CertDigest::from_slice(&cert_digest);
-        let u = ProxyUrl::new(TEST_BASE, digest.into()).unwrap();
+        let u = ProxyUrl::new(TEST_BASE, digest).unwrap();
         assert_eq!(TEST_FULL, u.as_full_str());
         assert_eq!(TEST_BASE, u.as_base_str());
     }

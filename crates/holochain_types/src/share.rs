@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 /// A clonable thread safe read write lock designed to make it hard to create dead locks
 /// or hold long long lived locks.
+#[derive(Debug)]
 pub struct RwShare<T>(Arc<parking_lot::RwLock<T>>);
 
 impl<T> Clone for RwShare<T> {
@@ -42,7 +43,8 @@ impl<T> RwShare<T> {
             // and try for a further 30 seconds.
             .or_else(|| {
                 tracing::warn!(
-                    "Took over 100ms to get a RwShare reader. Conductor might be over utilized"
+                    "Took over 100ms to get a RwShare({}) reader. Conductor might be over utilized",
+                    std::any::type_name::<T>(),
                 );
                 self.0.try_read_for(std::time::Duration::from_secs(30))
             })
@@ -79,7 +81,8 @@ impl<T> RwShare<T> {
             // If that fails try print an info and try for a further 120 seconds.
             .or_else(|| {
                 tracing::warn!(
-                    "Took over 100ms to get a RwShare writer. Conductor might be over utilized"
+                    "Took over 100ms to get a RwShare({}) writer. Conductor might be over utilized",
+                    std::any::type_name::<T>(),
                 );
                 self.0.try_write_for(std::time::Duration::from_secs(120))
             })

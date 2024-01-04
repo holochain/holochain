@@ -11,10 +11,7 @@ use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
-use holochain_state::prelude::StateMutationResult;
-use holochain_state::prelude::StateQueryResult;
-use holochain_zome_types::CellId;
-use std::collections::HashSet;
+use holochain_state::prelude::*;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -122,6 +119,7 @@ pub async fn get_single_agent_info(
 /// Share all current agent infos known to all provided peer dbs with each other.
 #[cfg(any(test, feature = "test_utils"))]
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
+    use std::collections::HashSet;
     let mut all_infos: HashSet<AgentInfoSigned> = HashSet::new();
 
     for env in envs.iter() {
@@ -138,6 +136,35 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
             .await
             .unwrap();
     }
+}
+
+/// Drop the specified agent keys from each conductor's peer db.
+#[cfg(any(test, feature = "test_utils"))]
+pub async fn forget_peer_info(
+    all_envs: Vec<DbWrite<DbKindP2pAgents>>,
+    agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
+) {
+    use kitsune_p2p_types::KAgent;
+
+    let agents_to_forget: Vec<KAgent> = agents_to_forget
+        .into_iter()
+        .map(|a| a.to_kitsune())
+        .collect();
+
+    futures::future::join_all(all_envs.clone().into_iter().map(move |env| {
+        let agents = agents_to_forget.clone();
+
+        async move {
+            env.write_async(move |txn| {
+                for agent in agents.iter() {
+                    txn.p2p_remove_agent(agent).unwrap();
+                }
+                DatabaseResult::Ok(())
+            })
+            .await
+        }
+    }))
+    .await;
 }
 
 /// Interconnect provided pair of conductors via their peer store databases,
@@ -322,7 +349,7 @@ mod tests {
     use super::*;
     use ::fixt::prelude::*;
     use holochain_state::test_utils::test_p2p_agents_db;
-    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
+    use kitsune_p2p_types::fixt::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {

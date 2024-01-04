@@ -5,9 +5,8 @@ use crate::test_utils::commit_chain;
 use super::*;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_sqlite::db::DbKindDht;
+use holochain_sqlite::prelude::DbKindDht;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::ChainFilter;
 use isotest::Iso;
 use test_case::test_case;
 
@@ -66,7 +65,7 @@ async fn returns_full_sequence_from_filter(
                 },
             )
             .collect(),
-        d @ _ => unreachable!("{:?}", d),
+        d => unreachable!("{:?}", d),
     };
     vec![(agent, data)]
 }

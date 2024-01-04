@@ -1,7 +1,9 @@
 //! The workflow and queue consumer for validation receipt
 
 use super::*;
+use crate::conductor::conductor::CellStatus;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
+use futures::FutureExt;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
@@ -26,7 +28,15 @@ pub fn spawn_validation_receipt_consumer(
                 env.clone(),
                 network.clone(),
                 keystore.clone(),
-                conductor.clone(),
+                conductor.running_cell_ids(Some(CellStatus::Joined)),
+                {
+                    let conductor = conductor.clone();
+                    move |block| {
+                        let conductor = conductor.clone();
+                        // This can be cleaned up when the compiler is smarter - https://github.com/rust-lang/rust/issues/69663
+                        async move { conductor.block(block).await }.boxed()
+                    }
+                },
             )
         },
     );

@@ -9,12 +9,14 @@ const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestIntegrityWasm {
     IntegrityZome,
+    HcStressTestIntegrity,
 }
 
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestCoordinatorWasm {
     CoordinatorZome,
     CoordinatorZomeUpdate,
+    HcStressTestCoordinator,
 }
 
 #[derive(EnumIter, Clone, Copy)]
@@ -28,6 +30,7 @@ pub enum TestWasm {
     Crd,
     Crud,
     Debug,
+    DnaProperties,
     EntryDefs,
     EmitSignal,
     HashEntry,
@@ -36,6 +39,7 @@ pub enum TestWasm {
     GenesisSelfCheckValidV1,
     GenesisSelfCheckInvalid,
     GenesisSelfCheckValid,
+    GenesisSelfCheckRequiresProperties,
     HashPath,
     HdkExtern,
     InitFail,
@@ -62,6 +66,7 @@ pub enum TestWasm {
     ValidateCreateLinkInvalid,
     ValidateValid,
     ValidateCreateLinkValid,
+    ValidateRejectAppTypes,
     WhoAmI,
     ZomeInfo,
 }
@@ -101,6 +106,7 @@ impl From<TestIntegrityWasm> for ZomeName {
     fn from(test_wasm: TestIntegrityWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
             TestIntegrityWasm::IntegrityZome => "integrity_zome",
+            TestIntegrityWasm::HcStressTestIntegrity => "files_integrity",
         })
     }
 }
@@ -110,6 +116,7 @@ impl From<TestCoordinatorWasm> for ZomeName {
         ZomeName::from(match test_wasm {
             TestCoordinatorWasm::CoordinatorZome => "coordinator_zome",
             TestCoordinatorWasm::CoordinatorZomeUpdate => "coordinator_zome_update",
+            TestCoordinatorWasm::HcStressTestCoordinator => "files",
         })
     }
 }
@@ -126,6 +133,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
+            TestWasm::DnaProperties => "dna_properties",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
@@ -134,6 +142,9 @@ impl From<TestWasm> for ZomeName {
             TestWasm::GenesisSelfCheckValidV1 => "genesis_self_check_1",
             TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
             TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
+            TestWasm::GenesisSelfCheckRequiresProperties => {
+                "genesis_self_check_requires_properties"
+            }
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
@@ -160,6 +171,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateCreateLinkInvalid => "validate_link_add_invalid",
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
+            TestWasm::ValidateRejectAppTypes => "validate_reject_app_types",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
         })
@@ -191,6 +203,9 @@ impl From<TestWasm> for PathBuf {
             TestWasm::Crd => "wasm32-unknown-unknown/release/test_wasm_crd.wasm",
             TestWasm::Crud => "wasm32-unknown-unknown/release/test_wasm_crud.wasm",
             TestWasm::Debug => "wasm32-unknown-unknown/release/test_wasm_debug.wasm",
+            TestWasm::DnaProperties => {
+                "wasm32-unknown-unknown/release/test_wasm_dna_properties.wasm"
+            }
             TestWasm::EntryDefs => "wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm",
             TestWasm::EmitSignal => "wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm",
             TestWasm::HashEntry => "wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm",
@@ -206,6 +221,9 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::GenesisSelfCheckValid => {
                 "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_valid.wasm"
+            }
+            TestWasm::GenesisSelfCheckRequiresProperties => {
+                "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_requires_properties.wasm"
             }
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
@@ -256,6 +274,9 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::ValidateCreateLinkValid => {
                 "wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm"
+            }
+            TestWasm::ValidateRejectAppTypes => {
+                "wasm32-unknown-unknown/release/test_wasm_validate_reject_app_types.wasm"
             }
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",
@@ -333,6 +354,9 @@ impl From<TestIntegrityWasm> for PathBuf {
             TestIntegrityWasm::IntegrityZome => {
                 "wasm32-unknown-unknown/release/test_wasm_integrity_zome.wasm"
             }
+            TestIntegrityWasm::HcStressTestIntegrity => {
+                "wasm32-unknown-unknown/release/files_integrity.wasm"
+            }
         })
     }
 }
@@ -345,6 +369,9 @@ impl From<TestCoordinatorWasm> for PathBuf {
             }
             TestCoordinatorWasm::CoordinatorZomeUpdate => {
                 "wasm32-unknown-unknown/release/test_wasm_coordinator_zome_update.wasm"
+            }
+            TestCoordinatorWasm::HcStressTestCoordinator => {
+                "wasm32-unknown-unknown/release/files.wasm"
             }
         })
     }
@@ -441,6 +468,7 @@ impl From<TestCoordinatorWasm> for TestIntegrityWasm {
             TestCoordinatorWasm::CoordinatorZome | TestCoordinatorWasm::CoordinatorZomeUpdate => {
                 Self::IntegrityZome
             }
+            TestCoordinatorWasm::HcStressTestCoordinator => Self::HcStressTestIntegrity,
         }
     }
 }

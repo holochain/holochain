@@ -4,11 +4,8 @@ use std::sync::Arc;
 
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_keystore::MetaLairClient;
-use holochain_types::{
-    chc::{ChainHeadCoordinator, ChcError, ChcResult},
-    prelude::{AddRecordsRequest, ChainHeadCoordinatorExt, EncryptedEntry, GetRecordsRequest},
-};
-use holochain_zome_types::prelude::*;
+use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
+use holochain_types::prelude::*;
 use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation
@@ -23,25 +20,22 @@ impl ChainHeadCoordinator for ChcRemote {
     type Item = SignedActionHashed;
 
     async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
-        let body = serde_json::to_string(&request)
-            .map(|json| json.into_bytes())
-            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response: reqwest::Response = self.client.post("add_records", body).await?;
+        let response: reqwest::Response = self.client.post("add_records", &request).await?;
         let status = response.status().as_u16();
-        let bytes = response.bytes().await.map_err(extract_string)?;
         match status {
             200 => Ok(()),
             409 => {
-                let (seq, hash): (u32, ActionHash) = serde_json::from_slice(&bytes)?;
+                let bytes = response.bytes().await.map_err(extract_string)?;
+                let (seq, hash): (u32, ActionHash) = holochain_serialized_bytes::decode(&bytes)?;
                 Err(ChcError::InvalidChain(seq, hash))
             }
             498 => {
-                let msg: String = serde_json::from_slice(&bytes)?;
-                Err(ChcError::NoRecordsAdded(msg))
+                let bytes = response.bytes().await.map_err(extract_string)?;
+                let seq: u32 = holochain_serialized_bytes::decode(&bytes)?;
+                Err(ChcError::NoRecordsAdded(seq))
             }
             code => {
-                let msg =
-                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+                let msg = response.text().await.map_err(extract_string)?;
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
         }
@@ -51,22 +45,20 @@ impl ChainHeadCoordinator for ChcRemote {
         &self,
         request: GetRecordsRequest,
     ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
-        let body = serde_json::to_string(&request)
-            .map(|json| json.into_bytes())
-            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response = self.client.post("get_record_data", body).await?;
+        let response = self.client.post("get_record_data", &request).await?;
         let status = response.status().as_u16();
-        let bytes = response.bytes().await.map_err(extract_string)?;
         match status {
-            200 => Ok(serde_json::from_slice(&bytes)?),
+            200 => {
+                let bytes = response.bytes().await.map_err(extract_string)?;
+                Ok(holochain_serialized_bytes::decode(&bytes)?)
+            }
             498 => {
                 // The since_hash was not found in the CHC,
                 // so we can interpret this as an empty list of records.
                 Ok(vec![])
             }
             code => {
-                let msg =
-                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+                let msg = response.text().await.map_err(extract_string)?;
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
         }
@@ -110,18 +102,111 @@ impl ChcRemoteClient {
         self.base_url.join(path).expect("invalid URL").to_string()
     }
 
-    async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
+    async fn post<T>(&self, path: &str, body: &T) -> ChcResult<reqwest::Response>
+    where
+        T: serde::Serialize + std::fmt::Debug,
+    {
         let client = reqwest::Client::new();
         let url = self.url(path);
-        client
-            .post(url)
+        let body = holochain_serialized_bytes::encode(body)?;
+        let res: reqwest::Response = client
+            .post(url.clone())
             .body(body)
             .send()
             .await
-            .map_err(extract_string)
+            .map_err(extract_string)?;
+        Ok(res)
     }
 }
 
 fn extract_string(e: reqwest::Error) -> ChcError {
     ChcError::ServiceUnreachable(e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::test_utils::valid_arbitrary_chain;
+    use pretty_assertions::assert_eq;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "this test requires a remote service, so it should only be run manually"]
+    async fn test_add_records_remote() {
+        let keystore = holochain_keystore::test_keystore();
+        let agent = fake_agent_pubkey_1();
+        let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
+        let chc = Arc::new(ChcRemote::new(
+            url::Url::parse("http://127.0.0.1:40845/").unwrap(),
+            // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
+            keystore.clone(),
+            &cell_id,
+        ));
+
+        let mut g = random_generator();
+
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+
+        let t0 = &chain[0..3];
+        let t1 = &chain[3..6];
+        let t2 = &chain[6..9];
+        let t11 = &chain[11..=11];
+
+        let hash = |i: usize| chain[i].action_address().clone();
+
+        // dbg!(t0
+        //     .iter()
+        //     .map(|r| (r.action_address(), r.action().prev_action()))
+        //     .collect::<Vec<_>>());
+
+        // dbg!(&t0, &t1, &t2);
+
+        chc.clone()
+            .add_records(t0.to_vec())
+            .await
+            .map_err(|e| e.to_string()[..1024.min(e.to_string().len())].to_string())
+            .unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
+
+        chc.clone().add_records(t1.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        // last_hash doesn't match
+        assert!(chc.clone().add_records(t0.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t1.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        chc.clone().add_records(t2.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
+
+        assert_eq!(
+            chc.clone().get_record_data(None).await.unwrap(),
+            &chain[0..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
+            &chain[1..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
+            &chain[4..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
+            &chain[8..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(13))).await.unwrap(),
+            &[]
+        );
+    }
 }

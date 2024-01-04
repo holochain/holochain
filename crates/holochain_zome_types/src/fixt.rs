@@ -1,28 +1,12 @@
 //! Fixturators for zome types
 
-use crate::action::*;
-use crate::capability::*;
-use crate::crdt::CrdtType;
-use crate::entry::AppEntryBytes;
-use crate::entry_def::EntryVisibility;
-use crate::link::LinkTag;
-use crate::migrate_agent::MigrateAgent;
 use crate::prelude::*;
-use crate::record::Record;
-use crate::record::SignedActionHashed;
-use crate::signature::Signature;
-use crate::timestamp::Timestamp;
-use crate::validate::RequiredValidationType;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
-use crate::Entry;
 use ::fixt::prelude::*;
-use ::fixt::rng;
+use ::fixt::*;
 use holo_hash::EntryHash;
-use holo_hash::*;
 use holochain_serialized_bytes::prelude::SerializedBytes;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use rand::Rng;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
 

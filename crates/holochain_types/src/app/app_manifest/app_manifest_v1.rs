@@ -1,7 +1,14 @@
 //! App Manifest format, installed_hash 1.
 //!
-//! NB: After stabilization, *do not modify this file*! Create a new installed_hash of
-//! the spec and leave this one alone to maintain backwards compatibility.
+//! **NB: do not modify the types in this file**!
+//! (at least not after this initial schema has been stabilized).
+//! For any modifications, create a new version of the spec and leave this one
+//! alone to maintain backwards compatibility.
+//!
+//! This is the initial version of the App Manifest. Not all functionality is
+//! implemented yet, notably:
+//! - Using existing Cells is not implemented
+//! - Specifying DNA version is not implemented (DNA migration needs to land first)
 
 use super::{
     app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
@@ -9,7 +16,7 @@ use super::{
 };
 use crate::prelude::{RoleName, YamlProperties};
 use holo_hash::DnaHashB64;
-use holochain_zome_types::{DnaModifiersOpt, NetworkSeed};
+use holochain_zome_types::prelude::*;
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema
@@ -17,7 +24,10 @@ use std::collections::HashMap;
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -34,7 +44,10 @@ pub struct AppManifestV1 {
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
     /// - this role,
@@ -64,7 +77,10 @@ impl AppRoleManifest {
 /// The DNA portion of an app role
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct AppRoleDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
@@ -74,7 +90,12 @@ pub struct AppRoleDnaManifest {
     #[serde(flatten)]
     pub location: Option<mr_bundle::Location>,
 
-    /// Optional default modifier values. May be overridden during installation.
+    /// Optional default modifier values.
+    ///
+    /// Overrides any default modifiers specified in the DNA file,
+    /// and may also be overridden during installation.
+    /// A set of modifiers completely overrides previously specified default properties,
+    /// rather than being interpolated into them.
     #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
 
@@ -115,7 +136,10 @@ pub type DnaLocation = mr_bundle::Location;
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
@@ -154,7 +178,7 @@ impl AppManifestV1 {
     // rather than simply updating the manifest. Let's hold off on that until
     // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
-        for mut role in self.roles.iter_mut() {
+        for role in self.roles.iter_mut() {
             // Only update the network seed for roles for which it makes sense to do so
             match role.provisioning.clone().unwrap_or_default() {
                 CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
@@ -221,10 +245,7 @@ impl AppManifestV1 {
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
-                            installed_hash: Self::require(
-                                installed_hash,
-                                "roles.dna.installed_hash",
-                            )?,
+                            installed_hash,
                             modifiers,
                         },
                     };
@@ -248,7 +269,7 @@ pub mod tests {
     use ::fixt::prelude::*;
     use std::path::PathBuf;
 
-    #[cfg(feature = "arbitrary")]
+    #[cfg(feature = "fuzzing")]
     use arbitrary::Arbitrary;
 
     #[derive(serde::Serialize, serde::Deserialize)]

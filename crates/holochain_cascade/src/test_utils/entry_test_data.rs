@@ -1,30 +1,7 @@
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::UnsafeBytes;
-use holochain_types::action::NewEntryAction;
-use holochain_types::action::WireDelete;
-use holochain_types::action::WireNewEntryAction;
-use holochain_types::action::WireUpdateRelationship;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::link::WireCreateLink;
-use holochain_types::link::WireDeleteLink;
-use holochain_types::link::WireLinkKey;
-use holochain_types::prelude::{EntryData, WireLinkQuery};
-use holochain_zome_types::fixt::*;
-use holochain_zome_types::Action;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::AppEntryBytes;
-use holochain_zome_types::Entry;
-use holochain_zome_types::EntryType;
-use holochain_zome_types::EntryVisibility;
-use holochain_zome_types::Judged;
-use holochain_zome_types::Link;
-use holochain_zome_types::LinkTypeFilter;
-use holochain_zome_types::SerializedBytes;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
-use holochain_zome_types::ValidationStatus;
+use holochain_state::prelude::*;
 use std::convert::TryInto;
 
 use ::fixt::prelude::*;
@@ -173,15 +150,22 @@ impl EntryTestData {
             base: create_link.base_address.clone(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: Some(create_link.tag.clone()),
+            after: None,
+            before: None,
+            author: None,
         };
 
         let link = Link {
             author: create_link.author,
+            base: create_link.base_address.clone(),
             target: create_link.target_address.clone(),
             timestamp: create_link.timestamp,
             zome_index: create_link.zome_index,

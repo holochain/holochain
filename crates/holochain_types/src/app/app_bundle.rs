@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+//! An App Bundle is an AppManifest bundled together with DNA bundles.
 
-use self::error::AppBundleResult;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use super::{AppManifest, AppManifestValidated};
 use crate::prelude::*;
@@ -203,7 +203,7 @@ impl AppBundle {
                         role_name,
                         dna_store,
                         &location,
-                        Some(&installed_hash),
+                        installed_hash.as_ref(),
                         modifiers,
                     )
                     .await?;
@@ -294,13 +294,27 @@ impl AppRoleResolution {
     /// Return the IDs of new cells to be created as part of the resolution.
     /// Does not return existing cells to be reused.
     pub fn cells_to_create(&self) -> Vec<(CellId, Option<MembraneProof>)> {
+        let provisioned = self
+            .role_assignments
+            .iter()
+            .filter_map(|role| {
+                if role.1.is_provisioned {
+                    Some(role.1.cell_id().clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<std::collections::HashSet<_>>();
+
         self.dnas_to_register
             .iter()
-            .map(|(dna, proof)| {
-                (
-                    CellId::new(dna.dna_hash().clone(), self.agent.clone()),
-                    proof.clone(),
-                )
+            .filter_map(|(dna, proof)| {
+                let cell_id = CellId::new(dna.dna_hash().clone(), self.agent.clone());
+                if provisioned.contains(&cell_id) {
+                    Some((cell_id, proof.clone()))
+                } else {
+                    None
+                }
             })
             .collect()
     }

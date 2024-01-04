@@ -24,6 +24,14 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Standin until std::io::Error::other is stablized.
+pub fn err_other<E>(error: E) -> std::io::Error
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    std::io::Error::new(std::io::ErrorKind::Other, error.into())
+}
+
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
 
@@ -37,6 +45,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
+    id: [u8; 32],
     handle: Option<SweetConductorHandle>,
     db_dir: TestDir,
     keystore: MetaLairClient,
@@ -46,6 +55,16 @@ pub struct SweetConductor {
     signal_stream: Option<SignalStream>,
     rendezvous: Option<DynSweetRendezvous>,
 }
+
+/// ID based equality is good for SweetConductors so we can track them
+/// independently no matter what kind of mutations/state might eventuate.
+impl PartialEq for SweetConductor {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for SweetConductor {}
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> SweetConductorConfig {
@@ -76,6 +95,11 @@ impl From<(RoleName, DnaFile)> for DnaWithRole {
 }
 
 impl SweetConductor {
+    /// Get the ID of this conductor for manual equality checks.
+    pub fn id(&self) -> [u8; 32] {
+        self.id
+    }
+
     /// Create a SweetConductor from an already-built ConductorHandle and environments
     /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
@@ -102,14 +126,17 @@ impl SweetConductor {
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
         let spaces = Spaces::new(&ConductorConfig {
-            environment_path: env_dir.to_path_buf().into(),
+            data_root_path: Some(env_dir.to_path_buf().into()),
             ..Default::default()
         })
         .unwrap();
 
         let keystore = handle.keystore().clone();
 
+        let mut rng = rand::thread_rng();
+
         Self {
+            id: rng.gen(),
             handle: Some(SweetConductorHandle(handle)),
             db_dir: env_dir,
             keystore,
@@ -148,24 +175,55 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    /// and a metrics initialization.
+    pub async fn create_with_defaults_and_metrics<C, R>(
+        config: C,
+        keystore: Option<MetaLairClient>,
+        rendezvous: Option<R>,
+        with_metrics: bool,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous> + Clone,
+    {
         let rendezvous = rendezvous.map(|r| r.into());
-
-        let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.into().into_conductor_config(&*r).await
-        } else {
-            config.into().into()
-        };
-
-        tracing::info!(?config);
         let dir = TestDir::new(test_db_dir());
+
         assert!(
             dir.read_dir().unwrap().next().is_none(),
             "Test dir not empty - {:?}",
             dir.to_path_buf()
         );
-        let handle =
-            Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
+
+        if with_metrics {
+            #[cfg(feature = "metrics_influxive")]
+            holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
+                .init()
                 .await;
+        }
+
+        let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
+            config.into().into_conductor_config(&*r).await
+        } else {
+            config.into().into()
+        };
+
+        if config.data_root_path.is_none() {
+            config.data_root_path = Some(dir.as_ref().to_path_buf().into());
+        }
+
+        tracing::info!(?config);
+
+        let handle = Self::handle_from_existing(
+            keystore.unwrap_or_else(holochain_keystore::test_keystore),
+            &config,
+            &[],
+        )
+        .await;
         Self::new(handle, dir, config, rendezvous).await
     }
 
@@ -173,13 +231,16 @@ impl SweetConductor {
     pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
-        let handle = builder.test(&db_dir, &[]).await.unwrap();
+        let handle = builder
+            .with_data_root_path(db_dir.as_ref().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
         Self::new(handle, db_dir, config, None).await
     }
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        db_dir: &Path,
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
@@ -188,7 +249,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
-            .test(db_dir, extra_dnas)
+            .test(extra_dnas)
             .await
             .unwrap()
     }
@@ -454,14 +515,38 @@ impl SweetConductor {
         websocket_client_by_port(port).await.unwrap()
     }
 
+    /// Create a new app interface and get a websocket client which can send requests
+    /// to it.
+    pub async fn app_ws_client(&self) -> (WebsocketSender, WebsocketReceiver) {
+        let port = self
+            .raw_handle()
+            .add_app_interface(either::Either::Left(0))
+            .await
+            .expect("Couldn't create app interface");
+        websocket_client_by_port(port).await.unwrap()
+    }
+
     /// Shutdown this conductor.
     /// This will wait for the conductor to shutdown but
     /// keep the inner state to restart it.
     ///
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
+        self.try_shutdown().await.unwrap();
+    }
+
+    /// Shutdown this conductor.
+    /// This will wait for the conductor to shutdown but
+    /// keep the inner state to restart it.
+    ///
+    /// Attempting to use this conductor without starting it up again will cause a panic.
+    pub async fn try_shutdown(&mut self) -> std::io::Result<()> {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown().await.unwrap().unwrap();
+            handle
+                .shutdown()
+                .await
+                .map_err(err_other)?
+                .map_err(err_other)
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -470,9 +555,15 @@ impl SweetConductor {
     /// Start up this conductor if it's not already running.
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
+            // There's a db dir in the sweet conductor and the config, that are
+            // supposed to be the same. Let's assert that they are.
+            assert_eq!(
+                Some(self.db_dir.as_ref().to_path_buf().into()),
+                self.config.data_root_path,
+                "SweetConductor db_dir and config.data_root_path are not the same",
+            );
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
-                    &self.db_dir,
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),
@@ -542,6 +633,21 @@ impl SweetConductor {
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Drop the specified agent keys from each conductor's peer table
+    pub async fn forget_peer_info(
+        conductors: impl IntoIterator<Item = &Self>,
+        agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
+    ) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+
+        crate::conductor::p2p_agent_store::forget_peer_info(all, agents_to_forget).await;
     }
 
     /// Let each conductor know about each others' agents so they can do networking

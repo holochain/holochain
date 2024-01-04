@@ -17,7 +17,7 @@ use tempfile::TempDir;
 pub mod mutations_helpers;
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use holochain_sqlite::error::DatabaseResult;
     use holochain_sqlite::rusqlite::Transaction;
 
@@ -166,21 +166,6 @@ pub fn test_dbs_in(path: impl AsRef<Path>) -> TestDbs {
         .tempdir_in(path)
         .unwrap();
     TestDbs::new(tempdir)
-}
-
-/// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> holochain_keystore::MetaLairClient {
-    tokio_helper::block_on(
-        async move {
-            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
-                .await
-                .unwrap();
-
-            keystore
-        },
-        std::time::Duration::from_secs(1),
-    )
-    .expect("timeout elapsed")
 }
 
 /// A test database in a temp directory
@@ -338,7 +323,7 @@ impl TestDbs {
 
     /// Create all three non-cell environments at once with a test keystore
     pub fn new(tempdir: TempDir) -> Self {
-        Self::with_keystore(tempdir, test_keystore())
+        Self::with_keystore(tempdir, holochain_keystore::test_keystore())
     }
 
     pub fn conductor(&self) -> DbWrite<DbKindConductor> {

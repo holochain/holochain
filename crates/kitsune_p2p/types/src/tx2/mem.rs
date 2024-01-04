@@ -231,15 +231,15 @@ impl Drop for MemEndpointAdaptInner {
 struct MemEndpointAdapt(Mutex<MemEndpointAdaptInner>, Uniq, Tx2Cert);
 
 impl MemEndpointAdapt {
-    pub fn new(c_send: ConSend, id: u64, local_cert: Tx2Cert) -> (Self, Active) {
+    pub fn new(c_send: ConSend, id: u64, local_cert: Tx2Cert) -> KitsuneResult<(Self, Active)> {
         let url = format!("kitsune-mem://{}", id);
         let ep_active = Active::new();
-        (
+        Ok((
             Self(
                 Mutex::new(MemEndpointAdaptInner {
                     id,
                     local_cert: local_cert.clone(),
-                    url: url.into(),
+                    url: TxUrl::try_from(url)?,
                     ep_active: ep_active.clone(),
                     c_send,
                 }),
@@ -247,7 +247,7 @@ impl MemEndpointAdapt {
                 local_cert,
             ),
             ep_active,
-        )
+        ))
     }
 }
 
@@ -329,7 +329,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let oth_con = MemConAdapt::new(
                 Tx2ConDir::Incoming,
-                format!("{}/{}", this_url, con_id).into(),
+                TxUrl::try_from(format!("{}/{}", this_url, con_id))?,
                 local_cert,
                 oth_send,
                 con_active.clone(),
@@ -339,7 +339,7 @@ impl EndpointAdapt for MemEndpointAdapt {
 
             let con = MemConAdapt::new(
                 Tx2ConDir::Outgoing,
-                format!("{}/{}", url, con_id).into(),
+                TxUrl::try_from(format!("{}/{}", url, con_id))?,
                 remote_cert,
                 send,
                 con_active,
@@ -408,7 +408,8 @@ impl BindAdapt for MemBackendAdapt {
             .mix("MemBackendAdapt::bind", async move {
                 let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::SeqCst);
                 let (c_send, c_recv) = t_chan(32);
-                let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone());
+                let (ep, ep_active) =
+                    MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone())?;
                 MEM_ENDPOINTS
                     .lock()
                     .insert(id, (c_send, ep_active.clone(), local_cert));
@@ -457,7 +458,7 @@ mod tests {
                                     return;
                                 }
                             } else {
-                                panic!("unexpected {}", String::from_utf8_lossy(&*buf));
+                                panic!("unexpected {}", String::from_utf8_lossy(&buf));
                             }
                         }
                     })
@@ -476,7 +477,7 @@ mod tests {
     ) -> (TxUrl, Arc<dyn EndpointAdapt>) {
         let t = KitsuneTimeout::from_millis(5000);
 
-        let (ep, con_recv) = f.bind("none:".into(), t).await.unwrap();
+        let (ep, con_recv) = f.bind("none:".try_into().unwrap(), t).await.unwrap();
         let w_send2 = w_send.clone();
         w_send
             .send(metric_task(async move {
@@ -559,8 +560,8 @@ mod tests {
         let t = KitsuneTimeout::from_millis(5000);
 
         let back = MemBackendAdapt::new(MemConfig::default()).await.unwrap();
-        let (ep1, _con_recv1) = back.bind("none:".into(), t).await.unwrap();
-        let (ep2, mut con_recv2) = back.bind("none:".into(), t).await.unwrap();
+        let (ep1, _con_recv1) = back.bind("none:".try_into().unwrap(), t).await.unwrap();
+        let (ep2, mut con_recv2) = back.bind("none:".try_into().unwrap(), t).await.unwrap();
 
         let rt = metric_task(async move {
             let mut all = Vec::new();

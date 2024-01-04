@@ -21,11 +21,12 @@ use holochain_types::{
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };
-use holochain_zome_types::Timestamp;
+use holochain_zome_types::prelude::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
+use kitsune_p2p_types::metrics::MetricRecord;
 use kitsune_p2p_types::{
     config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
 };
@@ -123,7 +124,7 @@ impl KitsuneHost for KitsuneHostImpl {
     fn record_metrics(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
-        records: Vec<kitsune_p2p::event::MetricRecord>,
+        records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()> {
         async move {
             let db = self.spaces.p2p_metrics_db(&DnaHash::from_kitsune(&space))?;

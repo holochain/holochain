@@ -1,4 +1,4 @@
-use crate::CellId;
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
@@ -22,7 +22,7 @@ pub struct BlockAgentInput {
 }
 
 /// Reason why we might want to block a cell.
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
 pub enum CellBlockReason {
     /// We don't know the reason but the happ does.
     #[serde(with = "serde_bytes")]

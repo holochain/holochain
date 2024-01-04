@@ -1,7 +1,7 @@
 # Contained Jobs
 # - vars: processes the input
 # - prepare: imported from ./release-prepare.yml
-# - test: currently unimplemented
+# - test: calls ./holochain-build-and-test.yml
 # - finalize:
 #   - restore repo from cache
 #   - push to the target branch
@@ -12,6 +12,11 @@
 #   - push updated source branch
 #   - create a pull-request towards the source branch
 #   - create a github release
+#
+# involved branches:
+# - the target branch is expected to never change outside of the release workflow, hence the usage of `git merge --ff-only`.
+# - the source branch is the one that developers create changes to; we do use pull-requests for that but that's not part of the release workflow's concern.
+# - the release branch is a temporary branch that is created ad-hoc by the release workflow that contains the version bumps before merging them into the target branch and back into the source branch.
 
 name: release holochain
 
@@ -60,8 +65,6 @@ on:
         required: false
         default: "false"
         type: string
-
-  pull_request: {}
 
 concurrency:
   group: release-${{ github.ref_name }}-${{ github.event_name }}
@@ -183,6 +186,9 @@ jobs:
     uses: ./.github/workflows/holochain-build-and-test.yml
     with:
       repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
+    secrets:
+      GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL: ${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL }}
 
   finalize:
     if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && (needs.prepare.outputs.releasable_crates == 'true' || needs.vars.outputs.skip_prepare_logic == 'true') }}
@@ -190,7 +196,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install nix
         uses: cachix/install-nix-action@v20
       - name: Setup cachix
@@ -245,10 +251,7 @@ jobs:
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
-          # regenerate the nix sources
-          git config --global user.email "devcore@holochain.org"
-          git config --global user.name "Holochain Core Dev Team"
-
+          ./scripts/ci-git-config.sh
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
@@ -368,8 +371,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
           RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
-          LATEST_HOLOCHAIN_TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
-          LATEST_HOLOCHAIN_VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          LATEST_HOLOCHAIN_RELEASE_TAG: ${{ needs.prepare.outputs.latest_holochain_release_tag }}
+          LATEST_HOLOCHAIN_RELEASE_VERSION: ${{ needs.prepare.outputs.latest_holochain_release_version }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
         run: |
           set -eux
@@ -410,8 +413,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
-          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_release_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_release_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
 
@@ -483,8 +486,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
-          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_release_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_release_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"

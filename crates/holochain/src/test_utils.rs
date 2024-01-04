@@ -4,6 +4,7 @@ use crate::conductor::conductor::CellStatus;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
+use crate::conductor::integration_dump;
 use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
@@ -13,10 +14,12 @@ use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
+use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht::prelude::Topology;
 use holochain_p2p::dht::ArqStrat;
@@ -28,7 +31,6 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
@@ -36,12 +38,13 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_types::test_utils::fake_dna_file;
+use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -51,12 +54,16 @@ pub use itertools;
 
 pub mod conductor_setup;
 pub mod consistency;
+pub mod hc_stress_test;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
 
 mod wait_for;
 pub use wait_for::*;
+
+mod big_stack_test;
+pub use big_stack_test::*;
 
 mod generate_records;
 pub use generate_records::*;
@@ -227,7 +234,7 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let mut config = holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default();
+    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::default();
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;
@@ -347,7 +354,8 @@ pub async fn setup_app_in_new_conductor(
     let db_dir = test_db_dir();
 
     let conductor_handle = ConductorBuilder::new()
-        .test(db_dir.path(), &[])
+        .with_data_root_path(db_dir.path().to_path_buf().into())
+        .test(&[])
         .await
         .unwrap();
 
@@ -401,7 +409,8 @@ pub async fn setup_app_with_names(
     dnas: Vec<DnaFile>,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, None).await;
+    let (iface, handle) =
+        setup_app_inner(dir.path().to_path_buf().into(), apps_data, dnas, None).await;
     (dir, iface, handle)
 }
 
@@ -413,26 +422,34 @@ pub async fn setup_app_with_network(
     network: KitsuneP2pConfig,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, Some(network)).await;
+    let (iface, handle) = setup_app_inner(
+        dir.path().to_path_buf().into(),
+        apps_data,
+        dnas,
+        Some(network),
+    )
+    .await;
     (dir, iface, handle)
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    db_dir: &Path,
+    data_root_path: DataRootPath,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
 ) -> (RealAppInterfaceApi, ConductorHandle) {
+    let config = ConductorConfig {
+        data_root_path: Some(data_root_path.clone()),
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket { port: 0 },
+        }]),
+        network,
+        ..Default::default()
+    };
     let conductor_handle = ConductorBuilder::new()
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            network,
-            ..Default::default()
-        })
-        .test(db_dir, &[])
+        .config(config)
+        .test(&[])
         .await
         .unwrap();
 
@@ -484,7 +501,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
 /// If the timeout is reached, print a report including a diff of all published ops
 /// which were not integrated.
-#[tracing::instrument(skip(db))]
+#[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     db: &Db,
     published: &[DhtOp],
@@ -548,13 +565,16 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     let timeout = delay * num_attempts as u32;
 
+    let integration_dump = integration_dump(db).await.unwrap();
+
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n",
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
         timeout.as_millis(),
         num_published,
         num_integrated,
         header,
         unintegrated.join("\n"),
+        integration_dump,
     );
 }
 
@@ -566,17 +586,6 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     num_attempts: usize,
     delay: Duration,
 ) {
-    fn display_op(op: &DhtOp) -> String {
-        format!(
-            "{} {:>3}  {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            // op.to_light().action_hash().clone(),
-            op.get_type(),
-            op.action().action_type(),
-        )
-    }
-
     for i in 0..num_attempts {
         let num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
