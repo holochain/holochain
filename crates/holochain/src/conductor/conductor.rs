@@ -2138,24 +2138,36 @@ mod service_impls {
             Ok(())
         }
 
-        pub(crate) async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
+        pub(crate) async fn install_dpki(
+            self: Arc<Self>,
+            dna: DnaFile,
+            device_seed_lair_tag: String,
+        ) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
             self.register_dna(dna).await?;
 
-            // FIXME: This "device seed" should be derived from the master seed and passed in here,
-            //        not just generated like this. This is a placeholder.
-            let seed_tag = format!("_hc_dpki_device_{}", nanoid::nanoid!());
-            let info = self
+            let entry = self
                 .keystore()
                 .lair_client()
-                .new_seed(seed_tag.clone().into(), None, false)
+                .get_entry(device_seed_lair_tag.clone().into())
                 .await?;
-            let agent = holo_hash::AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
+            let agent = match entry {
+                kitsune_p2p_types::dependencies::lair_keystore_api::lair_store::LairEntryInfo::Seed { tag: _, seed_info } => {
+                    holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec())
+                },
+                other => {
+                    return Err(ConductorError::DpkiError(
+                        DpkiServiceError::Lair(anyhow::anyhow!("Lair entry was expected to be a device seed, but was actually something else: {:?}", other).into()),
+                    ))
+                },
+            };
 
             let cell_id = CellId::new(dna_hash, agent);
             let cell_id_clone = cell_id.clone();
 
-            let cell_data = vec![(InstalledCell::new(cell_id_clone, "DPKI".into()), None)];
+            // Use app ID for role name as well, since this is pretty arbitrary
+            let role_name = DPKI_APP_ID.into();
+            let cell_data = vec![(InstalledCell::new(cell_id_clone, role_name), None)];
             self.clone()
                 .install_app_legacy(DPKI_APP_ID.into(), cell_data)
                 .await?;
@@ -2163,7 +2175,7 @@ mod service_impls {
 
             let installation = DpkiInstallation {
                 cell_id,
-                device_seed_lair_tag: seed_tag,
+                device_seed_lair_tag,
             };
             self.update_state(move |mut state| {
                 state.conductor_services.dpki = Some(installation);

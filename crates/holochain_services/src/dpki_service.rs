@@ -93,10 +93,15 @@ impl<T> DpkiServiceExt for T where T: DpkiService + Sized {}
 /// Data needed to initialize the DPKI service, if installed
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Debug, SerializedBytes)]
 pub struct DpkiInstallation {
-    /// The cell ID used by the DPKI service
+    /// The cell ID used by the DPKI service.
+    ///
+    /// The AgentPubKey of this cell was generated from the DPKI "device seed",
+    /// which is used to derive further seeds and keys for newly installed cells.
+    /// The seed can be referenced in lair via
     pub cell_id: CellId,
-    /// The lair tag used to refer to the device seed which was used to generate the AgentPubKey
-    /// for the DPKI cell
+
+    /// The lair tag used to refer to the "device seed" which was used to generate
+    /// the AgentPubKey for the DPKI cell
     pub device_seed_lair_tag: String,
 }
 
