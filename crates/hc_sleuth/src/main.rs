@@ -1,3 +1,6 @@
+//! This is just the beginnings of a CLI tool for generating hc_sleuth reports.
+//! It's nowhere near useful, so it's not even built yet.
+
 use std::{path::PathBuf, str::FromStr};
 
 use hc_sleuth::{report, Event};
@@ -20,9 +23,8 @@ fn main() {
         HcSleuth::Query {
             op_hash: _,
             node: _,
-            log_paths,
+            log_paths: _,
         } => {
-            dbg!(log_paths);
             unimplemented!("command-line query not yet implemented")
         }
     }
@@ -30,7 +32,7 @@ fn main() {
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "hc-sleuth",
+    name = "hc_sleuth",
     about = "Examine the causal relationships between events in Holochain"
 )]
 pub enum HcSleuth {

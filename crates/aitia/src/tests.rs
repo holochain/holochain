@@ -3,11 +3,10 @@ use std::collections::HashSet;
 use maplit::hashset;
 
 use super::print_simple_report as report;
-use crate::Fact;
 use crate::dep::*;
 use crate::graph::*;
 use crate::traversal::Traversal;
-
+use crate::Fact;
 
 fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec<usize> {
     let start_ix = graph
@@ -19,7 +18,6 @@ fn path_lengths<T: Fact>(graph: &DepGraph<T>, start: Dep<T>, end: Dep<T>) -> Vec
         .map(|c| c.len())
         .collect()
 }
-
 
 impl<'c, T: Fact> Traversal<'c, T> {
     pub fn fail(self) -> Option<(DepGraph<'c, T>, HashSet<Dep<T>>)> {
@@ -77,7 +75,7 @@ mod acyclic_single_path {
 
     impl Fact for Countdown {
         type Context = HashSet<u8>;
-    
+
         fn dep(&self, _: &Self::Context) -> DepResult<Self> {
             Ok(match self.0 {
                 3 => Some(Self(2).into()),
@@ -92,55 +90,59 @@ mod acyclic_single_path {
             ctx.contains(&self.0)
         }
     }
-    
-    #[test_case( 
-        Countdown(3), 
+
+    #[test_case(
+        Countdown(3),
         hashset![3, 2, 1, 0]
         => hashset![3, 2, 1, 0]
         ; "Countdown from 3 with all true returns path from 3 to 0"
     )]
-    #[test_case( 
-        Countdown(3), 
+    #[test_case(
+        Countdown(3),
         hashset![]
         => hashset![3, 2, 1, 0]
         ; "Countdown from 3 with all false returns path from 3 to 0"
     )]
-    #[test_case( 
-        Countdown(2), 
-        hashset!(3) 
+    #[test_case(
+        Countdown(2),
+        hashset!(3)
         => hashset![2, 1, 0]
         ; "Countdown from 2 with 3 being true returns path from 2 to 0"
     )]
-    #[test_case( 
-        Countdown(3), 
-        hashset!(0) 
+    #[test_case(
+        Countdown(3),
+        hashset!(0)
         => hashset![3, 2, 1]
         ; "Countdown from 3 with 0 being true returns path from 3 to 1"
     )]
-    #[test_case( 
-        Countdown(3), 
-        hashset!(1) 
+    #[test_case(
+        Countdown(3),
+        hashset!(1)
         => hashset![3, 2]
         ; "Countdown from 3 with 1 being true returns path from 3 to 2"
     )]
-    #[test_case( 
-        Countdown(1), 
-        hashset!(2) 
+    #[test_case(
+        Countdown(1),
+        hashset!(2)
         => hashset![1, 0]
         ; "Countdown from 1 with 3 being true returns path from 1 to 0"
     )]
     fn single_path(countdown: Countdown, truths: HashSet<u8>) -> HashSet<u8> {
         holochain_trace::test_run().ok().unwrap();
-    
+
         let tr = countdown.traverse(&truths);
         report(&tr);
         let graph = tr.unwrap().graph;
-    
-        let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
-            Dep::Fact(f) => f.0,
-            _ => unreachable!(),
-        }).collect();
-        
+
+        let nodes: HashSet<_> = graph
+            .deps()
+            .into_iter()
+            .map(|c| match c {
+                Dep::Fact(f) => f.0,
+                _ => unreachable!(),
+            })
+            .collect();
+
         let edges = graph.edge_count();
 
         // If the number of edges is one less than the number of nodes, that implies a straight noncyclic path
@@ -176,49 +178,53 @@ mod single_loop {
         }
     }
 
-    #[test_case( 
-        Countdown(3), 
+    #[test_case(
+        Countdown(3),
         hashset![3, 2, 1]
         => (hashset![3, 2, 1], 3)
         ; "Countdown from 3 with all in loop true returns entire loop"
     )]
-    #[test_case( 
-        Countdown(3), 
+    #[test_case(
+        Countdown(3),
         hashset!(0)
         => (hashset![3, 2, 1], 3)
         ; "Countdown from 3 with all in loop false returns entire loop"
-    )]    
-    #[test_case( 
-        Countdown(1), 
+    )]
+    #[test_case(
+        Countdown(1),
         hashset!(0)
         => (hashset![3, 2, 1], 3)
         ; "Countdown from 1 with all in loop false returns entire loop"
     )]
-    #[test_case( 
-        Countdown(1), 
+    #[test_case(
+        Countdown(1),
         hashset!(2)
         => (hashset![1, 3], 1)
         ; "Countdown from 1 with 2 true returns path 1->3"
-    )]    
-    #[test_case( 
-        Countdown(2), 
+    )]
+    #[test_case(
+        Countdown(2),
         hashset!(3)
         => (hashset![2, 1], 1)
         ; "Countdown from 2 with 3 true returns path 2->1"
     )]
     fn single_loop(countdown: Countdown, truths: HashSet<u8>) -> (HashSet<u8>, usize) {
         holochain_trace::test_run().ok().unwrap();
-    
+
         let tr = countdown.traverse(&truths);
         report(&tr);
         let t = tr.unwrap();
         let graph = t.graph;
-    
-        let nodes: HashSet<_> = graph.deps().into_iter().map(|c| match c {
-            Dep::Fact(f) => f.0,
-            _ => unreachable!(),
-        }).collect();
-        
+
+        let nodes: HashSet<_> = graph
+            .deps()
+            .into_iter()
+            .map(|c| match c {
+                Dep::Fact(f) => f.0,
+                _ => unreachable!(),
+            })
+            .collect();
+
         let num_edges = graph.edge_count();
 
         (nodes, num_edges)
@@ -273,7 +279,6 @@ fn branching_any() {
 
 /// Emulating a recipe for a tuna melt sandwich to illustrate functionality of EVERY nodes
 mod recipes {
-
 
     use crate::TraversalOutcome;
 
@@ -361,7 +366,10 @@ mod recipes {
         let tr = item.traverse(&truths);
         report(&tr);
         let (g, _) = tr.unwrap().fail().unwrap();
-        g.leaves().into_iter().map(|c| c.clone().into_fact().unwrap()).collect()
+        g.leaves()
+            .into_iter()
+            .map(|c| c.clone().into_fact().unwrap())
+            .collect()
     }
 
     #[test]
@@ -400,10 +408,9 @@ mod recipes {
             let o = TraversalOutcome::from_traversal(&t);
             assert!(o.report().is_some());
         }
-        
 
         truths.remove(&Mayo);
-        
+
         {
             let tr = TunaMelt.traverse(&truths);
             report(&tr);
@@ -412,8 +419,6 @@ mod recipes {
             let o = TraversalOutcome::from_traversal(&t);
             assert!(o.report().is_some());
         }
-
-
     }
 }
 

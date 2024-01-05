@@ -151,7 +151,7 @@ impl aitia::Fact for Event {
                 format!("[{by}] ReceivedHash({method}): {op:?}")
             }
             Event::Authored { by, op } => {
-                let node = ctx.agent_node(&by).expect("I got lazy");
+                let node = ctx.agent_node(by).expect("I got lazy");
                 let op_hash = op.as_hash();
                 format!("[{node}] Authored: {op_hash}")
             }
@@ -168,7 +168,7 @@ impl aitia::Fact for Event {
         use Event::*;
 
         let mapper = |e: CtxError| DepError {
-            info: e.into(),
+            info: e,
             fact: Some(self.clone()),
         };
 
@@ -254,7 +254,6 @@ impl aitia::Fact for Event {
                         .into()
                     })
                     .collect();
-
                 Some(Dep::any_named("Received hash from authority", others))
             }
 
@@ -280,6 +279,7 @@ impl aitia::Fact for Event {
 impl Event {
     /// The cause which is satisfied by either Integrating this op,
     /// or having authored this op by any of the local agents
+    #[allow(clippy::result_large_err)]
     pub fn authority(ctx: &Context, by: SleuthId, op: OpRef) -> Result<Dep<Self>, DepError<Self>> {
         let integrated = Self::Integrated {
             by: by.clone(),
@@ -289,7 +289,7 @@ impl Event {
         let mut any = vec![integrated];
 
         let mapper = |e: CtxError| DepError {
-            info: e.into(),
+            info: e,
             fact: None,
         };
 
@@ -297,7 +297,7 @@ impl Event {
         let authors = ctx
             .node_agents(&by)
             .map_err(mapper)?
-            .into_iter()
+            .iter()
             .cloned()
             .map(|agent| Self::Authored {
                 by: agent,

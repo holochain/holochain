@@ -1,12 +1,7 @@
 [package]
-name = "hc-sleuth"
+name = "hc_sleuth"
 version = "0.1.0"
 edition = "2021"
-
-
-[[bin]]
-name = "hc-sleuth"
-path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
@@ -28,7 +23,7 @@ structopt = "0.3"
 
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }
-hc-sleuth = { path = ".", features = ["test_utils"]}
+hc_sleuth = { path = ".", features = ["test_utils"]}
 pretty_assertions = "*"
 
 [features]
@@ -39,3 +34,9 @@ test_utils = [
     "holochain_types/test_utils",
     "kitsune_p2p/test_utils",
 ]
+
+
+# # CLI tool is a work in progress
+# [[bin]]
+# name = "hc_sleuth"
+# path = "src/main.rs"

@@ -10,6 +10,7 @@ use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -45,7 +46,8 @@ mod validate_op_tests;
     current_validation_dependencies,
     trigger_app_validation,
     trigger_self,
-    network
+    network,
+    config
 ))]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
@@ -53,11 +55,15 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
     trigger_app_validation: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
+    config: Arc<ConductorConfig>,
 ) -> WorkflowResult<WorkComplete> {
     // Run the actual sys validation using data we have locally
-    let outcome_summary =
-        sys_validation_workflow_inner(workspace.clone(), current_validation_dependencies.clone())
-            .await?;
+    let outcome_summary = sys_validation_workflow_inner(
+        workspace.clone(),
+        current_validation_dependencies.clone(),
+        config,
+    )
+    .await?;
 
     // trigger app validation to process any ops that have been processed so far
     if outcome_summary.accepted > 0 {
@@ -137,10 +143,12 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    config: Arc<ConductorConfig>,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let mut sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
     sorted_ops.sort_by_cached_key(|op| OpOrder::new(op.get_type(), op.timestamp()));
+    let sleuth_id = config.sleuth_id();
 
     // Forget what dependencies are currently in use
     current_validation_dependencies.lock().clear_retained_deps();
@@ -180,7 +188,7 @@ async fn sys_validation_workflow_inner(
 
         // This is an optimization to skip app validation and integration for ops that are
         // rejected and don't have dependencies.
-        let dependency = get_dependency(op_type, &action);
+        let dependency = op_type.sys_validation_dependency(&action);
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
@@ -202,16 +210,20 @@ async fn sys_validation_workflow_inner(
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
-                        put_validation_limbo(txn, &op_hash, ValidationLimboStatus::SysValidated)?;
+                        put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?;
+                        aitia::trace!(&hc_sleuth::Event::SysValidated {
+                            by: sleuth_id.clone(),
+                            op: op_hash
+                        });
                     }
                     Outcome::MissingDhtDep(missing_dep) => {
                         summary.missing += 1;
-                        let status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+                        let status = ValidationStage::AwaitingSysDeps(missing_dep);
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
                     Outcome::Rejected(_) => {
                         summary.rejected += 1;
-                        if let Dependency::Null = dependency {
+                        if dependency.is_none() {
                             put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                         } else {
                             put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -1041,7 +1053,7 @@ impl SysValidationWorkspace {
 fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    status: ValidationStage,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
     Ok(())
@@ -1053,7 +1065,7 @@ fn put_integration_limbo(
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     Ok(())
 }
 
@@ -1065,7 +1077,7 @@ pub fn put_integrated(
     set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationStage::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }

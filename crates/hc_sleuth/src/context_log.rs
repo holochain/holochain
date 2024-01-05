@@ -13,9 +13,7 @@ pub type CtxError = String;
 pub type ContextResult<T> = Result<T, CtxError>;
 
 pub fn init_subscriber() -> ContextSubscriber {
-    let w = SUBSCRIBER
-        .get_or_init(|| ContextSubscriber::default())
-        .clone();
+    let w = SUBSCRIBER.get_or_init(ContextSubscriber::default).clone();
     let ww = w.clone();
     tracing_subscriber::registry()
         .with(holochain_trace::standard_layer(std::io::stderr).unwrap())
@@ -58,7 +56,7 @@ impl Context {
         use aitia::logging::Log;
         let mut la = Self::default();
         let mut line = String::new();
-        while let Ok(_) = r.read_line(&mut line) {
+        while let Ok(_bytes) = r.read_line(&mut line) {
             if let Some(fact) = Self::parse(&line) {
                 la.apply(fact);
             }
@@ -120,7 +118,7 @@ impl Context {
     }
 
     pub fn op_to_action(&self, op: &OpRef) -> ContextResult<OpAction> {
-        Ok(OpAction::from((**self.op_info(op)?).clone())).into()
+        Ok(OpAction::from((**self.op_info(op)?).clone()))
     }
 
     pub fn op_from_action(&self, action: ActionHash, op_type: DhtOpType) -> ContextResult<OpRef> {
