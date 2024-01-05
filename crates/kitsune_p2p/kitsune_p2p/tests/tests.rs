@@ -17,7 +17,6 @@ use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 
 /* Tests to add
-- Three nodes, delegated publish does not reflect
 - Restart a node during gossip and check that it will recover
 - Overloaded, return busy to new peers. Can that be observed? and how can i test that?
 - Can round timeout be tested? Would need a way to shut down during a round then to ensure that the node with its round open can start a new gossip round with another node
@@ -28,7 +27,7 @@ use std::sync::Arc;
 // works and that networking works well enough for a request reply.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-async fn two_nodes_on_same_host_rpc_single() {
+async fn two_agents_on_same_host_rpc_single() {
     holochain_trace::test_run().unwrap();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
@@ -40,37 +39,29 @@ async fn two_nodes_on_same_host_rpc_single() {
         .configure_tx5_network(signal_url)
         .use_bootstrap_server(bootstrap_addr);
 
-    let (sender_a, receiver_a) = harness
-        .spawn_without_legacy_host("host_a".to_string())
+    let sender = harness
+        .spawn()
         .await
         .expect("should be able to spawn node");
-    let (sender_b, receiver_b) = harness
-        .spawn_without_legacy_host("host_b".to_string())
-        .await
-        .expect("should be able to spawn node");
-
-    harness
-        .start_legacy_host(vec![receiver_a, receiver_b])
-        .await;
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = harness.create_agent().await;
 
-    sender_a
+    sender
         .join(space.clone(), agent_a, None, None)
         .await
         .unwrap();
 
     let agent_b = harness.create_agent().await;
 
-    sender_b
+    sender
         .join(space.clone(), agent_b.clone(), None, None)
         .await
         .unwrap();
 
     let resp = tokio::time::timeout(std::time::Duration::from_secs(10), async move {
         loop {
-            match sender_a
+            match sender
                 .rpc_single(
                     space.clone(),
                     agent_b.clone(),

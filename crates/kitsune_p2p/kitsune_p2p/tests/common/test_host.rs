@@ -1,6 +1,5 @@
-use std::{sync::Arc, time::UNIX_EPOCH};
-
 use super::data::TestHostOp;
+use std::sync::Arc;
 use futures::FutureExt;
 use kitsune_p2p::{KitsuneHost, KitsuneP2pResult};
 use kitsune_p2p_block::BlockTargetId;
@@ -15,11 +14,13 @@ use kitsune_p2p_types::{
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::{Dimension, TelescopingTimes, Topology},
         ArqStrat,
-    },
+    }, dependencies::lair_keystore_api::LairClient,
 };
 
 #[derive(Clone)]
 pub struct TestHost {
+    tag: String,
+    keystore: LairClient,
     agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
     op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
     blocks: Arc<parking_lot::RwLock<Vec<kitsune_p2p_block::Block>>>,
@@ -35,11 +36,19 @@ impl std::fmt::Debug for TestHost {
 }
 
 impl TestHost {
-    pub fn new(
+    pub async fn new(
+        keystore: LairClient,
         agent_store: Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>>,
         op_store: Arc<parking_lot::RwLock<Vec<TestHostOp>>>,
     ) -> Self {
+        let tag = nanoid::nanoid!();
+        keystore
+            .new_seed(tag.clone().into(), None, false)
+            .await.expect("Could not register lair seed");
+
         Self {
+            tag,
+            keystore,
             agent_store,
             op_store,
             blocks: Arc::new(parking_lot::RwLock::new(vec![])),
@@ -164,6 +173,7 @@ impl KitsuneHost for TestHost {
         .into()
     }
 
+    // TODO This is never called, can it be removed or is it for future use?
     fn query_size_limited_regions(
         &self,
         _space: Arc<kitsune_p2p_bin_data::KitsuneSpace>,
@@ -253,5 +263,13 @@ impl KitsuneHost for TestHost {
             .collect();
 
         async move { Ok(res) }.boxed().into()
+    }
+
+    fn lair_tag(&self) -> Option<Arc<str>> {
+        Some(self.tag.clone().into())
+    }
+
+    fn lair_client(&self) -> Option<kitsune_p2p_types::dependencies::lair_keystore_api::LairClient> {
+        Some(self.keystore.clone())
     }
 }

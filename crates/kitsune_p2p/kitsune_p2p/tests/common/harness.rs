@@ -10,7 +10,7 @@ use kitsune_p2p_types::{
 };
 use tokio::task::AbortHandle;
 use parking_lot::RwLock;
-use super::{TestHost, TestHostOp, TestLegacyHost, RecordedKitsuneP2pEvent};
+use super::{TestHost, TestHostOp, TestLegacyHost, RecordedKitsuneP2pEvent, test_keystore};
 
 pub struct KitsuneTestHarness {
     name: String,
@@ -24,11 +24,15 @@ pub struct KitsuneTestHarness {
 
 impl KitsuneTestHarness {
     pub async fn try_new(name: &str) -> KitsuneP2pResult<Self> {
+        let keystore = test_keystore();
         let agent_store = Arc::new(RwLock::new(Vec::new()));
         let op_store = Arc::new(RwLock::new(Vec::new()));
     
-        let host_api = Arc::new(TestHost::new(agent_store.clone(), op_store.clone()));
-        let legacy_host_api = TestLegacyHost::new();
+        // Unpack the keystore, since we need to pass it to the host_api
+        let keystore = Arc::try_unwrap(keystore).unwrap().into_inner();
+
+        let host_api = Arc::new(TestHost::new(keystore.clone(), agent_store.clone(), op_store.clone()).await);
+        let legacy_host_api = TestLegacyHost::new(keystore);
         
         Ok(Self {
             name: name.to_string(),

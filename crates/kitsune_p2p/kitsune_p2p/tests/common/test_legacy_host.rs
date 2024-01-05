@@ -11,7 +11,7 @@ use kitsune_p2p_types::{
         spacetime::{Dimension, Topology},
         ArqStrat, PeerStrat,
     },
-    dht_arc::{DhtArcRange, DhtArc}, KAgent,
+    dht_arc::{DhtArcRange, DhtArc}, KAgent, dependencies::lair_keystore_api::LairClient,
 };
 use std::{collections::{HashSet, HashMap}, sync::{Arc, atomic::{AtomicU32, Ordering}}};
 
@@ -19,18 +19,13 @@ use super::{test_keystore, TestHostOp};
 
 pub struct TestLegacyHost {
     handle: Option<tokio::task::JoinHandle<()>>,
-    keystore: Arc<
-        futures::lock::Mutex<
-            kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairClient,
-        >,
-    >,
+    keystore: LairClient,
     events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEvent>>>,
     duplicate_ops_received_count: Arc<AtomicU32>,
 }
 
 impl TestLegacyHost {
-    pub fn new() -> Self {
-        let keystore = test_keystore();
+    pub fn new(keystore: LairClient) -> Self {
         let events = Arc::new(futures::lock::Mutex::new(Vec::new()));
         let duplicate_ops_received_count = Arc::new(AtomicU32::new(0));
 
@@ -303,8 +298,6 @@ impl TestLegacyHost {
                             let mut key = [0; 32];
                             key.copy_from_slice(&input.agent.0.as_slice());
                             let sig = keystore
-                                .lock()
-                                .await
                                 .sign_by_pub_key(
                                     key.into(),
                                     None,
@@ -335,9 +328,8 @@ impl TestLegacyHost {
     }
 
     pub async fn create_agent(&self) -> KAgent {
-        let ks = self.keystore.lock().await;
         let tag = nanoid::nanoid!();
-        let info = ks.new_seed(tag.into(), None, false).await.unwrap();
+        let info = self.keystore.new_seed(tag.into(), None, false).await.unwrap();
         Arc::new(KitsuneAgent(info.ed25519_pub_key.0.to_vec()))
     }
 }
