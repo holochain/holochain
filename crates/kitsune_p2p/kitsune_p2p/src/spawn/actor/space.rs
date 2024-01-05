@@ -507,9 +507,6 @@ impl SpaceInternalHandler for Space {
                     }
                     continue;
                 } else {
-                    if tracing_scope == Some("host_a".to_string()) {
-                        tracing::info!("Handling incoming publish for {:?}", op_hash);
-                    }
                     // Add this hash to our fetch queue.
                     ro_inner.fetch_pool.push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
@@ -531,6 +528,7 @@ impl SpaceInternalHandler for Space {
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.
                     if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
+                        tracing::info!("Scheduling delegate broadcast for data we don't have");
                         ro_inner.clone().publish_pending_delegate(
                             op_hash.data(),
                             PendingDelegate {
@@ -1040,7 +1038,7 @@ impl KitsuneP2pHandler for Space {
             let task_permit = ro_inner
                 .parallel_notify_permit
                 .clone()
-                .acquire_owned()
+                .acquire_owned() // TODO only acquire one regardless of how many nodes we're planning to notify?
                 .await
                 .ok();
             tokio::task::spawn(async move {
@@ -1089,8 +1087,8 @@ impl KitsuneP2pHandler for Space {
 
                 let mut all = Vec::new();
 
-                // determine the total number of nodes we'll be publishing to
-                // we'll make each remote responsible for a subset of delegate
+                // Determine the total number of nodes we'll be publishing to.
+                // We'll make each remote responsible for a subset of delegate
                 // broadcasting by having them apply the formula:
                 // `agent.get_loc() % mod_cnt == mod_idx` -- if true,
                 // they'll be responsible for forwarding the data to that node.
