@@ -2119,6 +2119,8 @@ mod app_status_impls {
 /// Methods related to management of Conductor state
 mod service_impls {
 
+    use holochain_services::derivation_paths::derivation_path_for_dpki_instance;
+
     use super::*;
 
     impl Conductor {
@@ -2138,30 +2140,38 @@ mod service_impls {
             Ok(())
         }
 
-        pub(crate) async fn install_dpki(
-            self: Arc<Self>,
-            dna: DnaFile,
-            device_seed_lair_tag: String,
-        ) -> ConductorResult<()> {
+        pub(crate) async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
             self.register_dna(dna).await?;
 
-            let entry = self
-                .keystore()
-                .lair_client()
-                .get_entry(device_seed_lair_tag.clone().into())
-                .await?;
-            let agent = match entry {
-                kitsune_p2p_types::dependencies::lair_keystore_api::lair_store::LairEntryInfo::Seed { tag: _, seed_info } => {
-                    holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec())
-                },
-                other => {
-                    return Err(ConductorError::DpkiError(
-                        DpkiServiceError::Lair(anyhow::anyhow!("Lair entry was expected to be a device seed, but was actually something else: {:?}", other).into()),
-                    ))
-                },
+            // FIXME: This "device seed" should be derived from the master seed and passed in here,
+            //        not just generated like this. This is a placeholder.
+            let device_seed_lair_tag = {
+                let tag = format!("_hc_dpki_device_{}", nanoid::nanoid!());
+                self.keystore()
+                    .lair_client()
+                    .new_seed(tag.clone().into(), None, false)
+                    .await?;
+                tag
             };
 
+            let (derivation_path, dst_tag) =
+                derivation_path_for_dpki_instance(0, &device_seed_lair_tag);
+            let seed_info = self
+                .keystore()
+                .lair_client()
+                .derive_seed(
+                    device_seed_lair_tag.clone().into(),
+                    None,
+                    dst_tag.into(),
+                    None,
+                    derivation_path,
+                )
+                .await?;
+
+            // The initial agent key is the first derivation from the device seed.
+            // Updated DPKI agent keys are sequential derivations from the same device seed.
+            let agent = holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec());
             let cell_id = CellId::new(dna_hash, agent);
             let cell_id_clone = cell_id.clone();
 

@@ -5,6 +5,8 @@ use holochain_types::prelude::*;
 
 use crate::CellRunner;
 
+pub mod derivation_paths;
+
 /// This magic string, when used as the installed app id, denotes that the app
 /// is not actually an app, but the DPKI service! This is now a reserved app id,
 /// and is used to distinguish the DPKI service from other apps.

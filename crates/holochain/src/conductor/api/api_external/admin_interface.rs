@@ -295,27 +295,18 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
+
+            // FIXME: A "device seed" should be derived from the master seed and passed in here.
+            //        Currently it just gets auto-generated, making re-derivation impossible.
             InitializeDeepkey { deepkey_dna } => {
                 let network_params = self.conductor_handle.get_dna_network_params();
                 let (deepkey_dna, _) = deepkey_dna
                     .into_dna_file(Default::default(), network_params)
                     .await?;
 
-                // FIXME: This "device seed" should be derived from the master seed and passed in here,
-                //        not just generated like this. This is a placeholder.
-                let device_seed_lair_tag = {
-                    let device_seed_lair_tag = format!("_hc_dpki_device_{}", nanoid::nanoid!());
-                    self.conductor_handle
-                        .keystore()
-                        .lair_client()
-                        .new_seed(device_seed_lair_tag.clone().into(), None, false)
-                        .await?;
-                    device_seed_lair_tag
-                };
-
                 self.conductor_handle
                     .clone()
-                    .install_dpki(deepkey_dna, device_seed_lair_tag)
+                    .install_dpki(deepkey_dna)
                     .await?;
                 Ok(AdminResponse::Ok)
             }
