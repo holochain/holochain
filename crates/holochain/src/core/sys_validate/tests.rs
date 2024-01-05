@@ -333,6 +333,7 @@ async fn check_valid_if_dna_test() {
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
+        None,
         std::time::Duration::from_secs(10),
     );
 
