@@ -892,6 +892,147 @@ async fn publish_only_fetches_ops_once() {
     assert_eq!(0, fetch_op_events.len());
 }
 
+#[cfg(feature = "tx5")]
+#[tokio::test(flavor = "multi_thread")]
+async fn delegate_publish() {
+    holochain_trace::test_run().unwrap();
+
+    let (bootstrap_addr, bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    let mut harness_a = KitsuneTestHarness::try_new("host_a")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c.disable_recent_gossip = true;
+            c.disable_historical_gossip = true;
+            c
+        });
+
+    let sender_a = harness_a
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let space = Arc::new(fixt!(KitsuneSpace));
+
+    let agent_a = harness_a.create_agent().await;
+    sender_a
+        .join(space.clone(), agent_a.clone(), None, None)
+        .await
+        .unwrap();
+
+    let mut harness_b = KitsuneTestHarness::try_new("host_b")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c.disable_recent_gossip = true;
+            c.disable_historical_gossip = true;
+            c
+        });
+
+    let sender_b = harness_b
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let agent_b = harness_b.create_agent().await;
+    sender_b
+        .join(space.clone(), agent_b.clone(), None, None)
+        .await
+        .unwrap();
+
+    let mut harness_c = KitsuneTestHarness::try_new("host_c")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c.disable_recent_gossip = true;
+            c.disable_historical_gossip = true;
+            c
+        });
+
+    let sender_c = harness_c
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let agent_c = harness_c.create_agent().await;
+    sender_c
+        .join(space.clone(), agent_c.clone(), None, None)
+        .await
+        .unwrap();
+
+    // Wait for nodes A and B to discover each other
+    wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
+    wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
+
+    // Wait for nodes B and C to discover each other
+    wait_for_connected(sender_b.clone(), agent_c.clone(), space.clone()).await;
+    wait_for_connected(sender_c.clone(), agent_b.clone(), space.clone()).await;
+
+    // Wait for nodes A and C to discover each other
+    wait_for_connected(sender_a.clone(), agent_c.clone(), space.clone()).await;
+    wait_for_connected(sender_c.clone(), agent_a.clone(), space.clone()).await;
+
+    // Stop bootstrapping
+    bootstrap_handle.abort();
+
+    // Make A and C forget about each other. Because gossip is disabled, this should stick.
+    harness_a.agent_store().write().retain(|a| a.agent() != agent_c);
+    harness_c.agent_store().write().retain(|a| a.agent() != agent_a);
+
+    // TODO This requires host code, does it make sense to construct valid values here?
+    let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
+
+    let test_data = TestHostOp::new(space.clone().into());
+    harness_a.op_store().write().push(test_data.clone());
+
+    // Now A should just publish to B. B should delegate publish to C.
+    sender_a
+        .broadcast(
+            space.clone(),
+            basis.clone(),
+            KitsuneTimeout::from_millis(5_000),
+            BroadcastData::Publish {
+                source: agent_a.clone(),
+                op_hash_list: vec![test_data.clone().into()],
+                context: FetchContext::default(),
+            },
+        )
+        .await
+        .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(30), {
+        let op_store_b = harness_b.op_store();
+        let op_store_c = harness_c.op_store();
+        async move {
+            loop {
+                if !op_store_b.read().is_empty() && !op_store_c.read().is_empty() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(1, harness_b.op_store().read().len());
+    assert_eq!(1, harness_c.op_store().read().len());
+}
+
 async fn wait_for_connected(
     sender: GhostSender<KitsuneP2p>,
     to_agent: Arc<KitsuneAgent>,
