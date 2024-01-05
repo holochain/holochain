@@ -5,7 +5,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tracing::info;
 use wasmer::{
-    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target, Triple,
+    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Engine, Module, Store, Target,
+    Triple,
 };
 use wasmer_middlewares::*;
 
@@ -20,14 +21,14 @@ pub const WASM_METERING_LIMIT: u64 = 10_000_000;
 
 /// Generate a Cranelift type (1 of 3 possible types) wasm compiler
 /// with Metering (use limits) in place.
-pub fn cranelift() -> Cranelift {
+pub fn cranelift() -> Engine {
     let cost_function = |_operator: &wasmparser::Operator| -> u64 { 1 };
     // @todo 100 giga-ops is totally arbitrary cutoff so we probably
     // want to make the limit configurable somehow.
     let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
-    let mut cranelift = Cranelift::default();
-    cranelift.canonicalize_nans(true).push_middleware(metering);
-    cranelift
+    let mut compiler = Cranelift::default();
+    compiler.canonicalize_nans(true).push_middleware(metering);
+    Engine::from(compiler)
 }
 
 /// Configuration of a Target for wasmer for iOS
@@ -50,8 +51,8 @@ pub fn build_ios_module(wasm: &[u8]) -> Result<Module, CompileError> {
     Module::from_binary(&store, wasm)
 }
 
-/// Generate a headless Dylib Store suitable for iOS.
+/// Generate a Dylib Engine suitable for iOS.
 /// Useful for re-building an iOS Module from a preserialized WASM Module.
-pub fn ios_dylib_headless_store() -> Store {
-    Store::default()
+pub fn ios_dylib_headless_engine() -> Engine {
+    Engine::default()
 }
