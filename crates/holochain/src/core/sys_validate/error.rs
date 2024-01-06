@@ -1,4 +1,5 @@
 use derive_more::Display;
+use holochain_services::DpkiServiceError;
 use std::convert::TryFrom;
 
 use super::SourceChainError;
@@ -49,6 +50,8 @@ pub enum SysValidationError {
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    DpkiServiceError(#[from] DpkiServiceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error("Expected Entry-based Action, but got: {0:?}")]
@@ -109,6 +112,10 @@ pub enum ValidationOutcome {
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
+    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
+    #[error("The agent {0:?} could not be found in DPKI")]
+    DpkiAgentMissing(AgentPubKey),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
