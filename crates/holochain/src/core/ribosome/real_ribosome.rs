@@ -399,35 +399,6 @@ impl RealRibosome {
         Ok(key)
     }
 
-    pub fn cache_instance(
-        &self,
-        context_key: u64,
-        instance_with_store: Arc<InstanceWithStore>,
-        zome_name: &ZomeName,
-    ) -> RibosomeResult<()> {
-        use holochain_wasmer_host::module::PlruCache;
-
-        // Clear the context as the call is done.
-        {
-            CONTEXT_MAP.lock().remove(&context_key);
-        }
-        let key = get_instance_cache_key(
-            &self
-                .dna_file
-                .dna()
-                .get_wasm_zome_hash(zome_name)
-                .map_err(DnaError::from)?,
-            self.dna_file.dna_hash(),
-            context_key,
-        );
-        tracing::error!("putting key {key:?} in instance cache");
-        self.instance_cache
-            .write()
-            .put_item(key, instance_with_store);
-
-        Ok(())
-    }
-
     pub fn build_instance_with_store(
         &self,
         zome: &Zome<ZomeDef>,
@@ -672,7 +643,7 @@ impl RealRibosome {
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
 
-    pub fn do_wasm_call_for_module<I: Invocation>(
+    pub fn call_wasm_instance<I: Invocation>(
         &self,
         invocation: &I,
         zome: &Zome,
@@ -893,20 +864,26 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let (instance_with_store, _) = self.instance_with_store(call_context.clone())?;
+                let (instance_with_store, context_key) = self.instance_with_store(call_context.clone())?;
 
                 if instance_with_store
                     .instance
                     .exports
                     .contains(fn_name.as_ref())
                 {
-                    self.do_wasm_call_for_module::<I>(
-                        invocation,
-                        zome,
-                        fn_name,
-                        instance_with_store,
-                    )
-                    .map(Some)
+                    let result = self
+                        .call_wasm_instance::<I>(
+                            invocation,
+                            zome,
+                            fn_name,
+                            instance_with_store,
+                        )
+                        .map(Some);
+                    // Clear the context as the call is done.
+                    {
+                        CONTEXT_MAP.lock().remove(&context_key);
+                    }
+                    result
                 } else {
                     // the callback fn does not exist
                     Ok(None)
@@ -933,14 +910,7 @@ impl RibosomeT for RealRibosome {
         };
 
         match zome.zome_def() {
-            ZomeDef::Wasm(_) => {
-                // let module_with_store = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                //     self.precompiled_module(path)?
-                // } else {
-                //     self.runtime_compiled_module(zome.zome_name())?
-                // };
-                self.get_const_fn_for_wasm(call_context, name)
-            }
+            ZomeDef::Wasm(_) => self.get_const_fn_for_wasm(call_context, name),
             ZomeDef::Inline {
                 inline_zome: zome, ..
             } => Ok(zome.0.get_global(name).map(|i| i as i32)),
@@ -1085,105 +1055,6 @@ pub mod wasm_test {
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use std::sync::Arc;
     use std::time::Duration;
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn module_and_instance_cache() {
-        holochain_trace::test_run().ok();
-        let wasm = TestWasm::AgentInfo;
-        let zome = wasm.coordinator_zome();
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![wasm]).await;
-        let wasm_hash = dna_file.dna().get_wasm_zome_hash(&zome.name).unwrap();
-        let dna_hash = dna_file.dna_hash().clone();
-        let invocation = fixt!(ZomeCallInvocation);
-        let host_context = HostContext::ZomeCall(fixt!(ZomeCallHostAccess));
-        let ribosome = RealRibosome::new(dna_file, None).unwrap();
-
-        // module cache will not be empty because instantiating the ribosome
-        // populates it with the integrity wasm when numer of entry and link
-        // types are counted
-        {
-            let integrity_module_key = ribosome
-                .get_module_cache_key(&wasm.integrity_zome_name())
-                .unwrap();
-            let module_cache = ribosome.module_cache.read();
-            let cached_module = module_cache.cache().get(&integrity_module_key);
-            assert!(
-                cached_module.is_some(),
-                "module cache should contain cached module"
-            );
-        }
-
-        // module cache should be empty
-        {
-            let module_cache = ribosome.module_cache.read();
-            assert!(
-                module_cache.cache().is_empty(),
-                "instance cache should be empty but contains items with keys {:?}",
-                module_cache.cache().keys()
-            );
-        }
-
-        // create an instance with store for the test zome
-        // let call_context = CallContext {
-        //     auth: invocation.auth(),
-        //     host_context,
-        //     zome: zome.clone(),
-        //     function_name: "call_info".into(),
-        // };
-        // let (instance_with_store, context_key) =
-        //     ribosome.instance_with_store(call_context.clone()).unwrap();
-        // {
-        //     let instance_cache_lock = ribosome.instance_cache.read();
-        //     assert!(
-        //         instance_cache_lock.cache().is_empty(),
-        //         "instance cache should be empty after instantiating a module but contains items with keys {:?}",
-        //         instance_cache_lock.cache().keys()
-        //     );
-        // }
-
-        // // cache instance
-        // ribosome
-        //     .cache_instance(context_key, instance_with_store.clone(), &zome.name)
-        //     .unwrap();
-        // let instance_cache_key = get_instance_cache_key(&wasm_hash, &dna_hash, context_key);
-
-        // // check if cache contains instance under cache key
-        // {
-        //     let instance_cache_lock = ribosome.instance_cache.read();
-        //     assert_eq!(
-        //         instance_cache_lock
-        //             .cache()
-        //             .contains_key(&instance_cache_key),
-        //         true,
-        //         "instance cache should contain cached instance stored under context key",
-        //     );
-        // }
-
-        // // check if cached instance matches the previously cached instance
-        // {
-        //     let cached_instance = ribosome
-        //         .instance_cache
-        //         .write()
-        //         .get_item(&instance_cache_key)
-        //         .expect("instance cache should contain cached instance stored under context key");
-        //     assert_eq!(
-        //         cached_instance.instance, instance_with_store.instance,
-        //         "instance from cache should match the previously cached instance"
-        //     );
-        // }
-
-        // // getting an instance with store for the same call context should
-        // // take the instance from cache
-        // let _ = ribosome.instance_with_store(call_context.clone()).unwrap();
-        // {
-        //     let instance_cache_lock = ribosome.instance_cache.read();
-        //     assert!(
-        //         instance_cache_lock.cache().is_empty(),
-        //         "instance cache should be empty but contains items with keys {:?}",
-        //         instance_cache_lock.cache().keys()
-        //     );
-        // }
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     // guard to assure that response time to zome calls and concurrent zome calls
