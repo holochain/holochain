@@ -11,13 +11,13 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-aitia = { path = "../aitia" }
+aitia = { version = "0.1.0", path = "../aitia" }
 async-trait = "0.1"
 derive_more = { workspace = true }
 fixt = { path = "../fixt", version = "^0.3.0-beta-dev.0"}
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.6"
-hc_sleuth = { path = "../hc_sleuth" }
+hc_sleuth = { version = "0.1.0", path = "../hc_sleuth" }
 holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash" }
 holochain_keystore = { version = "^0.3.0-beta-dev.21", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.53"
