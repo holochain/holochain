@@ -1,9 +1,8 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use kitsune_p2p::{
-    actor::KitsuneP2p, event::{KitsuneP2pEventReceiver, KitsuneP2pEvent}, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
+    actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
 };
-use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_types::{
     config::{tuning_params_struct, KitsuneP2pConfig},
     tls::TlsConfig, agent_info::AgentInfoSigned, KAgent,

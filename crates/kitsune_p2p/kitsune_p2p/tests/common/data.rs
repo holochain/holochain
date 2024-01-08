@@ -16,7 +16,7 @@ pub struct TestHostOp {
     space: KSpace,
     hash: KitsuneOpHash,
     authored_at: Timestamp,
-    size: u32,
+    sized_content: Vec<u8>,
 }
 
 impl TestHostOp {
@@ -25,13 +25,18 @@ impl TestHostOp {
             space,
             hash: generated_hash(),
             authored_at: Timestamp::now(),
-            size: fixt!(u8) as u32 + 1, // +1 because we don't want this to be 0
+            sized_content: vec![0; (fixt!(u8) as u32 + 1).try_into().unwrap()], // +1 because we don't want this to be 0
         }
     }
 
     pub fn make_historical(mut self, offset: std::time::Duration) -> Self {
         assert!(offset > RECENT_THRESHOLD_DEFAULT);
         self.authored_at = (Timestamp::now() - offset).unwrap();
+        self
+    }
+
+    pub fn sized_5mb(mut self) -> Self {
+        self.sized_content = vec![0; 5_000_000];
         self
     }
 
@@ -62,7 +67,7 @@ impl TestHostOp {
     }
 
     pub fn size(&self) -> u32 {
-        self.size
+        self.sized_content.len() as u32
     }
 
     pub fn is_in_bounds(&self, bounds: &RegionBounds) -> bool {

@@ -15,7 +15,7 @@ use kitsune_p2p_types::{
 };
 use std::{collections::{HashSet, HashMap}, sync::{Arc, atomic::{AtomicU32, Ordering}}};
 
-use super::{test_keystore, TestHostOp};
+use super::TestHostOp;
 
 pub struct TestLegacyHost {
     handle: Option<tokio::task::JoinHandle<()>>,

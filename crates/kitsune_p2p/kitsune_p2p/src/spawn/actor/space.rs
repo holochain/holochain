@@ -476,7 +476,6 @@ impl SpaceInternalHandler for Space {
 
         let just_hashes = op_hash_list.iter().map(|s| s.data()).collect();
 
-        let tracing_scope = self.config.tracing_scope.clone();
         Ok(async move {
             let have_data_list = match ro_inner
                 .host_api

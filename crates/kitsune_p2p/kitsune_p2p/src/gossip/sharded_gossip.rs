@@ -767,8 +767,7 @@ impl ShardedGossipLocal {
         match self.gossip_type {
             GossipType::Recent => time_range(threshold, NOW),
             GossipType::Historical => {
-                unreachable!("this is dead code, it's not on the path from generating op blooms for historical");
-                tracing::info!("Calculating historical time range");
+                // TODO this is dead code, it's not on the path from generating op blooms for historical
                 let one_hour_ago = std::time::UNIX_EPOCH
                     .elapsed()
                     .expect("Your clock is set before unix epoch")

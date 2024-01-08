@@ -1055,6 +1055,91 @@ async fn wait_for_connected(
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+async fn single_large_op_exceeds_gossip_rate_limit() {
+    holochain_trace::test_run().unwrap();
+
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    let space = Arc::new(fixt!(KitsuneSpace));
+
+    let mut harness_a = KitsuneTestHarness::try_new("host_a")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c.gossip_outbound_target_mbps = 1.0;
+            c.gossip_inbound_target_mbps = 1.0;
+            c
+        });
+
+    let sender_a = harness_a
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let agent_a = harness_a.create_agent().await;
+    sender_a
+        .join(space.clone(), agent_a.clone(), None, None)
+        .await
+        .unwrap();
+
+    let mut harness_b = KitsuneTestHarness::try_new("host_b")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(|mut c| {
+            // 3 seconds between gossip rounds, to keep the test fast
+            c.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 3;
+            c.gossip_outbound_target_mbps = 1.0;
+            c.gossip_inbound_target_mbps = 1.0;
+            c
+        });
+
+    let sender_b = harness_b
+        .spawn()
+        .await
+        .expect("should be able to spawn node");
+
+    let agent_b = harness_b.create_agent().await;
+    sender_b
+        .join(space.clone(), agent_b.clone(), None, None)
+        .await
+        .unwrap();
+
+    // Wait for nodes A and B to discover each other
+    wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
+    wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
+
+    harness_a.op_store().write().push(
+        TestHostOp::new(space.clone())
+            .sized_5mb(),
+    );
+
+    tokio::time::timeout(std::time::Duration::from_secs(60), {
+        let op_store_b = harness_b.op_store();
+        async move {
+            loop {
+                if !op_store_b.read().is_empty() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(1, harness_b.op_store().read().len());
+    println!("Op size in bytes: {}", harness_b.op_store().read().first().unwrap().size());
+}
+
+#[cfg(feature = "tx5")]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "This test deadlocks because the event receivers aren't consumed. This should not stall Kitsune"]
 async fn test_two_nodes_on_same_host_deadlock() {
     use std::sync::Arc;
