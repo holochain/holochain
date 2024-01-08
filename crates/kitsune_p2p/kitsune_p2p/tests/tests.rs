@@ -1055,6 +1055,7 @@ async fn wait_for_connected(
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This doesn't really work, the bandwidth limits are only applied to gossip directly and not the fetch mechanism so this test can't work as is"]
 async fn single_large_op_exceeds_gossip_rate_limit() {
     holochain_trace::test_run().unwrap();
 
@@ -1134,8 +1135,9 @@ async fn single_large_op_exceeds_gossip_rate_limit() {
     .await
     .unwrap();
 
+    // TODO the op should get through because of the logic for handling messages larger than the limit. To complete this test we need to send more
+    //      data and actually assert the rate or something like that. 
     assert_eq!(1, harness_b.op_store().read().len());
-    println!("Op size in bytes: {}", harness_b.op_store().read().first().unwrap().size());
 }
 
 #[cfg(feature = "tx5")]
