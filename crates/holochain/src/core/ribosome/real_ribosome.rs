@@ -99,7 +99,6 @@ use crate::core::ribosome::host_fn::count_links::count_links;
 use holochain_conductor_api::conductor::paths::WasmRootPath;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
-use holochain_wasmer_host::module::InstanceCache;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -128,10 +127,6 @@ pub struct RealRibosome {
 
     /// Cache for deserialized versions of wasm modules read from file system.
     pub module_cache: Arc<RwLock<ModuleCache>>,
-
-    /// Cache for redundant callable wasm module instances. This cache warms up
-    /// according to the number of concurrent requests.
-    pub instance_cache: Arc<RwLock<InstanceCache>>,
 }
 
 struct HostFnBuilder {
@@ -210,32 +205,9 @@ type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
 // fn calls for execution.
 static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
 
-// Counter used in two ways:
-// 1. to add to the instance cache key as a unique index, allowing for
-// redundant instances of the same combination of DNA and zome
-// 2. store and look up zome call contexts, which are passed to host fn calls,
-// in the context map
+// Counter used to store and look up zome call contexts, which are passed to
+// host fn calls.
 static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
-
-// Create a key for the instance cache.
-// Format: [WasmHash..DnaHash..context_key] as bytes.
-fn get_instance_cache_key(wasm_hash: &WasmHash, dna_hash: &DnaHash, context_key: u64) -> [u8; 32] {
-    let mut bits = [0u8; 32];
-    for (i, byte) in wasm_hash
-        .get_raw_32()
-        .iter()
-        .zip(dna_hash.get_raw_32().iter())
-        .map(|(a, b)| a ^ b)
-        .take(24)
-        .enumerate()
-    {
-        bits[i] = byte;
-    }
-    for (i, byte) in (24..32).zip(&context_key.to_le_bytes()) {
-        bits[i] = *byte;
-    }
-    bits
-}
 
 impl RealRibosome {
     /// Create a new instance
@@ -258,7 +230,6 @@ impl RealRibosome {
                 SerializedModuleCache::default_with_cranelift(cranelift, maybe_fs_dir),
             )),
             module_cache: Arc::new(RwLock::new(ModuleCache::default())),
-            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         };
 
         // Collect the number of entry and link types
@@ -354,7 +325,6 @@ impl RealRibosome {
                 SerializedModuleCache::default_with_cranelift(cranelift, None),
             )),
             module_cache: Arc::new(RwLock::new(ModuleCache::default())),
-            instance_cache: Arc::new(RwLock::new(InstanceCache::default())),
         }
     }
 
@@ -864,7 +834,8 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let (instance_with_store, context_key) = self.instance_with_store(call_context.clone())?;
+                let (instance_with_store, context_key) =
+                    self.instance_with_store(call_context.clone())?;
 
                 if instance_with_store
                     .instance
@@ -872,12 +843,7 @@ impl RibosomeT for RealRibosome {
                     .contains(fn_name.as_ref())
                 {
                     let result = self
-                        .call_wasm_instance::<I>(
-                            invocation,
-                            zome,
-                            fn_name,
-                            instance_with_store,
-                        )
+                        .call_wasm_instance::<I>(invocation, zome, fn_name, instance_with_store)
                         .map(Some);
                     // Clear the context as the call is done.
                     {
@@ -1038,10 +1004,8 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use super::RealRibosome;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::core::ribosome::{HostContext, ZomeCall};
-    use crate::fixt::{ZomeCallHostAccessFixturator, ZomeCallInvocationFixturator};
+    use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
@@ -1051,7 +1015,6 @@ pub mod wasm_test {
     use holochain_nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_wasmer_host::module::PlruCache;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use std::sync::Arc;
     use std::time::Duration;
