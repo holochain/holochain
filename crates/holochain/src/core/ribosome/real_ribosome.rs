@@ -79,7 +79,9 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::module::{InstanceWithStore, ModuleCache, SerializedModuleCache};
+use holochain_wasmer_host::module::CacheKey;
+use holochain_wasmer_host::module::InstanceWithStore;
+use holochain_wasmer_host::module::ModuleCache;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
 use wasmer::Function;
@@ -122,10 +124,7 @@ pub struct RealRibosome {
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
-    /// Cache for wasm modules read from file system.
-    pub serialized_module_cache: Arc<RwLock<SerializedModuleCache>>,
-
-    /// Cache for deserialized versions of wasm modules read from file system.
+    /// File system and in-memory cache for wasm modules.
     pub module_cache: Arc<RwLock<ModuleCache>>,
 }
 
@@ -226,10 +225,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            serialized_module_cache: Arc::new(RwLock::new(
-                SerializedModuleCache::default_with_cranelift(cranelift, maybe_fs_dir),
-            )),
-            module_cache: Arc::new(RwLock::new(ModuleCache::default())),
+            module_cache: Arc::new(RwLock::new(ModuleCache::new(cranelift, maybe_fs_dir))),
         };
 
         // Collect the number of entry and link types
@@ -321,10 +317,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            serialized_module_cache: Arc::new(RwLock::new(
-                SerializedModuleCache::default_with_cranelift(cranelift, None),
-            )),
-            module_cache: Arc::new(RwLock::new(ModuleCache::default())),
+            module_cache: Arc::new(RwLock::new(ModuleCache::new(cranelift, None))),
         }
     }
 
@@ -337,36 +330,22 @@ impl RealRibosome {
     }
 
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        use holochain_wasmer_host::module::PlruCache;
-
         let cache_key = self.get_module_cache_key(zome_name)?;
-        let mut module_cache = self.module_cache.write();
-        if let Some(module) = module_cache.get_item(&cache_key) {
-            return Ok(module);
-        }
-
-        // no cached deserialized module found; query serialized module cache
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module = self
-            .serialized_module_cache
-            .write()
-            .get(cache_key.clone(), wasm)?;
-
-        // cache newly deserialized module in deserialized module cache
-        module_cache.put_item(cache_key, module.clone());
-
+        let module_cache = self.module_cache.write();
+        let module = module_cache.get(cache_key, wasm)?;
         Ok(module)
     }
 
-    // Create a key for a module cache.
+    // Create a key for module cache.
     // Format: [WasmHash] as bytes
     // watch out for cache misses in the tests that make things slooow if you change this!
-    pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<[u8; 32], DnaError> {
+    pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<CacheKey, DnaError> {
         let mut key = [0; 32];
         let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
-        Ok(key)
+        Ok(key.into())
     }
 
     pub fn build_instance_with_store(
