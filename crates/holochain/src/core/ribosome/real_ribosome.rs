@@ -322,7 +322,7 @@ impl RealRibosome {
     }
 
     pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        let engine = holochain_wasmer_host::module::ios_dylib_headless_engine();
+        let engine = holochain_wasmer_host::module::make_ios_runtime_engine();
         match unsafe { Module::deserialize_from_file(&engine, dylib_path) } {
             Ok(module) => Ok(Arc::new(module)),
             Err(e) => Err(RibosomeError::ModuleDeserializeError(e)),
