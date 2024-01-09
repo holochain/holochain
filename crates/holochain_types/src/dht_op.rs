@@ -214,6 +214,35 @@ pub enum DhtOpType {
     RegisterRemoveLink,
 }
 
+/// A sys validation dependency
+pub type SysValDep = Option<ActionHash>;
+
+impl DhtOpType {
+    /// Calculate the op's sys validation dependency action hash
+    pub fn sys_validation_dependency(&self, action: &Action) -> SysValDep {
+        match self {
+            DhtOpType::StoreRecord | DhtOpType::StoreEntry => None,
+            DhtOpType::RegisterAgentActivity => action
+                .prev_action()
+                .map(|p| Some(p.clone()))
+                .unwrap_or_else(|| None),
+            DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedRecord => match action {
+                Action::Update(update) => Some(update.original_action_address.clone()),
+                _ => None,
+            },
+            DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryAction => match action {
+                Action::Delete(delete) => Some(delete.deletes_address.clone()),
+                _ => None,
+            },
+            DhtOpType::RegisterAddLink => None,
+            DhtOpType::RegisterRemoveLink => match action {
+                Action::DeleteLink(delete_link) => Some(delete_link.link_add_address.clone()),
+                _ => None,
+            },
+        }
+    }
+}
+
 impl ToSql for DhtOpType {
     fn to_sql(
         &self,
@@ -450,6 +479,11 @@ impl DhtOp {
             DhtOp::RegisterRemoveLink(_, h) => h.timestamp,
         }
     }
+
+    /// Calculate the op's sys validation dependency action hash
+    pub fn sys_validation_dependency(&self) -> SysValDep {
+        self.get_type().sys_validation_dependency(&self.action())
+    }
 }
 
 impl PartialOrd for DhtOp {
@@ -582,6 +616,18 @@ impl DhtOpLite {
             }
         };
         Ok(op)
+    }
+
+    /// Get the AnyDhtHash which would be used in a `must_get_*` context.
+    ///
+    /// For instance, `must_get_entry` will use an EntryHash, and requires a
+    /// StoreEntry record to be integrated to succeed. All other must_gets take
+    /// an ActionHash.
+    pub fn fetch_dependency_hash(&self) -> AnyDhtHash {
+        match self {
+            DhtOpLite::StoreEntry(_, entry_hash, _) => entry_hash.clone().into(),
+            other => other.action_hash().clone().into(),
+        }
     }
 }
 

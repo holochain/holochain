@@ -1,8 +1,13 @@
 [package]
 name = "aitia"
 version = "0.1.0"
+description = "Library for making sense of events in terms of causal graphs"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/hc_sleuth"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo" ]
 edition = "2021"
-
 
 [dependencies]
 anyhow = "1.0"

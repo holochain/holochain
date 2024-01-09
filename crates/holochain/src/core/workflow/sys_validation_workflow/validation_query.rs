@@ -101,7 +101,7 @@ mod tests {
     use holo_hash::HasHash;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
-    use holochain_state::validation_db::ValidationLimboStatus;
+    use holochain_state::validation_db::ValidationStage;
     use std::collections::HashSet;
 
     use super::*;
@@ -292,21 +292,20 @@ mod tests {
                     set_validation_stage(
                         txn,
                         &hash,
-                        ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
+                        ValidationStage::AwaitingSysDeps(fixt!(AnyDhtHash)),
                     )
                     .unwrap();
                 } else if facts.sys_validated {
-                    set_validation_stage(txn, &hash, ValidationLimboStatus::SysValidated).unwrap();
+                    set_validation_stage(txn, &hash, ValidationStage::SysValidated).unwrap();
                 } else if facts.awaiting_app_deps {
                     set_validation_stage(
                         txn,
                         &hash,
-                        ValidationLimboStatus::AwaitingAppDeps(vec![fixt!(AnyDhtHash)]),
+                        ValidationStage::AwaitingAppDeps(vec![fixt!(AnyDhtHash)]),
                     )
                     .unwrap();
                 } else if facts.awaiting_integration {
-                    set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
-                        .unwrap();
+                    set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration).unwrap();
                 }
                 txn.execute(
                     "UPDATE DhtOp SET num_validation_attempts = :num_attempts",

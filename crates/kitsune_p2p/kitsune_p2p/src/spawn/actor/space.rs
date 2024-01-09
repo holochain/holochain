@@ -515,7 +515,14 @@ impl SpaceInternalHandler for Space {
                         // TODO - get the author from somewhere
                         author: None,
                         context: Some(context),
+                        transfer_method: TransferMethod::Publish,
                     });
+
+                    ro_inner.host_api.handle_op_hash_received(
+                        &space,
+                        &op_hash,
+                        TransferMethod::Publish,
+                    );
 
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.

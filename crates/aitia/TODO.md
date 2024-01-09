@@ -2,15 +2,17 @@
 
 ### short term
 
-* [ ] Need to make the graph make more sense during a normal failure:
+* [X] ~~*Need to make the graph make more sense during a normal failure:*~~ [2023-11-08]
     - If there are any failures, make the graph show only the paths which lead to true facts
     - Render the true facts differently from the false ones, even if only by showing a little check mark
     - There's probably no point in showing the graph if there are no truths
 * [ ] When the graph terminates in an Any or Every, it would be classy to show the underlying Facts which satisfied it
 
+
 ### mid term
 
-* [ ] Add a "passing" mode where we expect the fact to pass, and we validate the entire tree, and add this to a bunch of unit tests
+* [X] ~~*Add a "passing" mode where we expect the fact to pass, and we validate the entire tree, and add this to a bunch of unit tests*~~ [2023-11-08]
+* [ ] Maybe see entire chains of real events related to a fact. For instance if an op is integrated, see all the times validation was attempted, not just the first.
 
 ### future
 
