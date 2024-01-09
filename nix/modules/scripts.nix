@@ -92,7 +92,6 @@
             --log-level=debug \
             release \
               --dry-run \
-              --no-verify \
               --steps=PublishToCratesIo
       '';
 
