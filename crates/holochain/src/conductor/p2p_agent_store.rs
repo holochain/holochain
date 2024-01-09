@@ -58,29 +58,30 @@ pub async fn p2p_put_all_batch(
             .write_async({
                 let space = space.clone();
                 move |txn| {
-                'batch: for P2pBatch {
-                    peer_data: batch,
-                    result_sender: response,
-                } in batch
-                {
-                    for info in batch {
-                        match p2p_put_single(space.clone(), txn, &info) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                responses.push((Err(e), response));
-                                continue 'batch;
+                    'batch: for P2pBatch {
+                        peer_data: batch,
+                        result_sender: response,
+                    } in batch
+                    {
+                        for info in batch {
+                            match p2p_put_single(space.clone(), txn, &info) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    responses.push((Err(e), response));
+                                    continue 'batch;
+                                }
                             }
                         }
+                        responses.push((Ok(()), response));
                     }
-                    responses.push((Ok(()), response));
+                    tx.send(responses).map_err(|_| {
+                        DatabaseError::Other(anyhow::anyhow!(
+                            "Failed to send response from background thread"
+                        ))
+                    })?;
+                    DatabaseResult::Ok(())
                 }
-                tx.send(responses).map_err(|_| {
-                    DatabaseError::Other(anyhow::anyhow!(
-                        "Failed to send response from background thread"
-                    ))
-                })?;
-                DatabaseResult::Ok(())
-            }})
+            })
             .await;
         let responses = rx.await;
         match result {
@@ -357,8 +358,7 @@ mod tests {
 
         p2p_put(&db, &agent_info_signed).await.unwrap();
 
-        let ret = db.p2p_get_agent(&agent_info_signed.agent).await
-            .unwrap();
+        let ret = db.p2p_get_agent(&agent_info_signed.agent).await.unwrap();
 
         assert_eq!(ret, Some(agent_info_signed));
     }
@@ -370,8 +370,7 @@ mod tests {
         let db = t_db.to_db();
 
         // - Check no data in the store to start
-        let count = db.p2p_count_agents().await
-            .unwrap();
+        let count = db.p2p_count_agents().await.unwrap();
 
         assert_eq!(count, 0);
 

@@ -19,7 +19,7 @@ use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
-use kitsune_p2p_bin_data::{KitsuneSpace, KitsuneBinType};
+use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
@@ -316,7 +316,9 @@ fn get_cached() -> Option<GeneratedData> {
             .ok()
             .flatten()?;
         let ops = get_ops(&mut txn);
-        let peer_data = txn.p2p_list_agents(Arc::new(KitsuneSpace::new(vec![0; 36]))).unwrap();
+        let peer_data = txn
+            .p2p_list_agents(Arc::new(KitsuneSpace::new(vec![0; 36])))
+            .unwrap();
         let authored = txn
             .prepare("SELECT agent, dht_op_hash FROM Authored")
             .unwrap()

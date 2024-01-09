@@ -1744,7 +1744,7 @@ async fn mock_network_sharding() {
                     }
                     *alice_info.lock() = info;
                 }
-                
+
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             }
         }

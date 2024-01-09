@@ -1108,7 +1108,8 @@ mod network_impls {
                     ..
                 } => {
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = db.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                    let res = db
+                        .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
 

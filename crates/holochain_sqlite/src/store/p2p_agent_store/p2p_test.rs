@@ -199,9 +199,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // near
     let tgt = u32::MAX / 2;
-    let near = db.p2p_query_near_basis(tgt, 20)
-        .await
-        .unwrap();
+    let near = db.p2p_query_near_basis(tgt, 20).await.unwrap();
     let mut prev = 0;
     for agent_info_signed in near {
         let loc = agent_info_signed.agent.get_loc();
@@ -245,16 +243,12 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     p2p_prune(&db, vec![]).await.unwrap();
 
     // after prune, make sure all are pruned
-    let all = db.p2p_list_agents()
-        .await
-        .unwrap();
+    let all = db.p2p_list_agents().await.unwrap();
     assert_eq!(0, all.len());
 
     // make sure our specific get also returns None
     println!("after prune_all select all count: {}", all.len());
-    let signed = db.p2p_get_agent(&example_agent)
-        .await
-        .unwrap();
+    let signed = db.p2p_get_agent(&example_agent).await.unwrap();
     assert!(signed.is_none());
 
     // clean up temp dir

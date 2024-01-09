@@ -269,9 +269,7 @@ impl AgentStoreByPath {
             }
         }
 
-        let agent_store = db.read_async(|txn| {
-            AgentStore::new(&txn)
-        }).await?;
+        let agent_store = db.read_async(|txn| AgentStore::new(&txn)).await?;
 
         let mut map = self.map.lock();
         match map.entry(space) {
@@ -279,7 +277,7 @@ impl AgentStoreByPath {
                 // In this case the map was written to by another thread while we weren't holding the lock so discard the AgentStore
                 // we created in favour of the one that was created by the other thread
                 Ok(e.get().clone())
-            },
+            }
             hash_map::Entry::Vacant(e) => {
                 e.insert(agent_store.clone());
                 Ok(agent_store)

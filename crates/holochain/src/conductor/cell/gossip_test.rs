@@ -80,9 +80,7 @@ async fn agent_info_test() {
 
     consistency_10s([&cell_1, &cell_2]).await;
     for p2p_agents_db in p2p_agents_dbs {
-        let len = p2p_agents_db.p2p_count_agents()
-            .await
-            .unwrap();
+        let len = p2p_agents_db.p2p_count_agents().await.unwrap();
         assert_eq!(len, 2);
     }
 }

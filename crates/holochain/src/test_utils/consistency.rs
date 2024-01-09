@@ -581,7 +581,8 @@ async fn check_agents<'iter>(
 ) -> DatabaseResult<impl Iterator<Item = &'iter Arc<KitsuneAgent>> + 'iter> {
     // Poll the peer database for the currently held agents.
     let agents_held: HashSet<_> = p2p_agents_db
-        .p2p_list_agents().await?
+        .p2p_list_agents()
+        .await?
         .into_iter()
         .map(|a| a.agent.clone())
         .collect();
