@@ -225,7 +225,7 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(cranelift, maybe_fs_dir))),
+            module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_fs_dir))),
         };
 
         // Collect the number of entry and link types
@@ -317,12 +317,12 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(cranelift, None))),
+            module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         }
     }
 
     pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        let engine = ios_dylib_headless_engine();
+        let engine = holochain_wasmer_host::module::ios_dylib_headless_engine();
         match unsafe { Module::deserialize_from_file(&engine, dylib_path) } {
             Ok(module) => Ok(Arc::new(module)),
             Err(e) => Err(RibosomeError::ModuleDeserializeError(e)),
