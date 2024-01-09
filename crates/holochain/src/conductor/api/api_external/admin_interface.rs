@@ -98,17 +98,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                             .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
-                        let network_params = self.conductor_handle.get_dna_network_params();
+                        let dna_compat = self.conductor_handle.get_dna_compat();
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
                         let (dna_file, _original_hash) =
-                            bundle.into_dna_file(modifiers, network_params).await?;
+                            bundle.into_dna_file(modifiers, dna_compat).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let network_params = self.conductor_handle.get_dna_network_params();
+                        let dna_compat = self.conductor_handle.get_dna_compat();
                         let (dna_file, _original_hash) =
-                            bundle.into_dna_file(modifiers, network_params).await?;
+                            bundle.into_dna_file(modifiers, dna_compat).await?;
                         dna_file
                     }
                 };
@@ -296,9 +296,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.storage_info().await?,
             )),
             InitializeDeepkey { deepkey_dna } => {
-                let network_params = self.conductor_handle.get_dna_network_params();
+                let dna_compat = self.conductor_handle.get_dna_compat();
                 let (deepkey_dna, _) = deepkey_dna
-                    .into_dna_file(Default::default(), network_params)
+                    .into_dna_file(Default::default(), dna_compat)
                     .await?;
                 self.conductor_handle
                     .clone()
