@@ -464,6 +464,8 @@ impl MetaNetTask {
             wire::Wire::PushOpData(wire::PushOpData { op_data_list }) => {
                 for (space, op_list) in op_data_list {
                     for op in op_list {
+                        // TODO potential for a mismatch here? We are hashing the received op data but trusting the op hash sent by the remote when
+                        //      requesting missing hashes.
                         // hash the op
                         let op_hash = match self.host.op_hash(op.op_data.clone()).await {
                             Ok(op_hash) => op_hash,
@@ -478,7 +480,16 @@ impl MetaNetTask {
                         };
 
                         let key = FetchKey::Op(op_hash.clone());
-                        let fetch_context = self.fetch_pool.remove(&key).and_then(|i| i.context);
+                        let fetch_context = match self.fetch_pool.remove(&key) {
+                            Some(item) => item.context,
+                            None => {
+                                tracing::warn!(
+                                    "Dropping incoming op because the fetch pool did not contain it, this may indicate a hashing mismatch or unsolicited pushes {:?}",
+                                    op
+                                );
+                                continue;
+                            }
+                        };
 
                         // forward the received op
                         if let Err(err) = self
@@ -1797,7 +1808,7 @@ mod tests {
     async fn send_notify_push_op_data() {
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
-        fetch_pool.push(test_req_op(0, None, test_source(2)));
+        fetch_pool.push(test_req_op(1, None, test_source(2)));
         assert_eq!(1, fetch_pool.len());
 
         ep_evt_send
@@ -1844,14 +1855,14 @@ mod tests {
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                                op_data: KitsuneOpData::new(vec![0, 4, 10]),
                                 region: None,
                             }],
                         ),
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 3, 90]),
+                                op_data: KitsuneOpData::new(vec![0, 3, 90]),
                                 region: None,
                             }],
                         ),
@@ -1881,6 +1892,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
+        holochain_trace::test_run().unwrap();
+
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
         host_receiver_stub
@@ -1888,7 +1901,8 @@ mod tests {
             .store(true, Ordering::SeqCst);
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
-        assert_eq!(1, fetch_pool.len());
+        fetch_pool.push(test_req_op(1, None, test_source(3)));
+        assert_eq!(2, fetch_pool.len());
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1899,7 +1913,7 @@ mod tests {
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                                op_data: KitsuneOpData::new(vec![0, 4, 10]),
                                 region: None,
                             }],
                         ),
@@ -1962,7 +1976,7 @@ mod tests {
                     op_data_list: vec![(
                         test_space(1),
                         vec![PushOpItem {
-                            op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                            op_data: KitsuneOpData::new(vec![0, 4, 10]),
                             region: None,
                         }],
                     )],
@@ -1995,7 +2009,7 @@ mod tests {
                     op_data_list: vec![(
                         test_space(1),
                         vec![PushOpItem {
-                            op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                            op_data: KitsuneOpData::new(vec![0, 4, 10]),
                             region: None,
                         }],
                     )],

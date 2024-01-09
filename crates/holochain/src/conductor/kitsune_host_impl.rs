@@ -239,6 +239,7 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
+    // TODO is this unit tested? and what is the result of setting require_receipt for random ops?
     fn check_op_data(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,

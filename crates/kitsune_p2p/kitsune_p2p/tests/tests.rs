@@ -184,13 +184,13 @@ async fn two_nodes_publish_and_fetch() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Takes nearly 5-10 minutes to run locally, that is far too slow for CI. Should it run quicker?"]
+// #[ignore = "Takes nearly 5-10 minutes to run locally, that is far too slow for CI. Should it run quicker?"]
 async fn two_nodes_publish_and_fetch_large_number_of_ops() {
     holochain_trace::test_run().unwrap();
 
     // Must be larger than ShardedGossipLocal::UPPER_HASHES_BOUND, to encourage batching. But I'm wondering if that's even useful because each op is
     // actually send individually.
-    let num_ops = 30_000;
+    let num_ops = 500;
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
