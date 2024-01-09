@@ -112,7 +112,6 @@ impl DnaManifestV1 {
 /// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
     /// A network seed for uniquifying this DNA. See [`DnaDef`].
-    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
     pub network_seed: Option<String>,
 
     /// Any arbitrary application properties can be included in this object.
@@ -122,6 +121,11 @@ pub struct IntegrityManifest {
     /// time windows during gossip.
     /// All Action timestamps must come after this time.
     pub origin_time: HumanTimestamp,
+
+    /// Conductor compatibility parameters. DNAs with different compatibility
+    /// parameters will have different hashes and thus will not be able to communicate
+    /// over the network.
+    pub compatibility: DnaCompat,
 
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.

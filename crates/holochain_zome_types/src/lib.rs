@@ -25,8 +25,8 @@ pub mod chain;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
+mod dna_compat;
 pub mod dna_def;
-mod dna_network_params;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;

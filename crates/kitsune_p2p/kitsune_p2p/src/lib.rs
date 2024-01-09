@@ -56,12 +56,7 @@ pub use spawn::*;
 mod host_api;
 pub use host_api::*;
 
-/// This represents general compatibility between kitsune versions.
-/// Instances are compatible if and only if they share the same protocol version.
-///
-/// If there is a breaking change at any level of the wire protocol, including
-/// changes to serialization, this version should be incremented.
-pub const KITSUNE_PROTOCOL_VERSION: u32 = 0;
+pub use kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION;
 
 #[allow(missing_docs)]
 #[cfg(feature = "test_utils")]
