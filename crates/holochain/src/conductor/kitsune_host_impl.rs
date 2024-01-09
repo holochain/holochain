@@ -18,7 +18,7 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DhtOpHashExt, DnaHashExt, FetchContextExt,
 };
-use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateTxExt};
+use holochain_sqlite::prelude::{AsP2pMetricStoreTxExt, AsP2pStateReadExt, AsP2pStateWriteExt};
 use holochain_types::{
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
@@ -115,8 +115,7 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<f64>> {
         async move {
             let db = self.spaces.p2p_agents_db(&DnaHash::from_kitsune(&space))?;
-            let coverage = db
-                .read_async(move |txn| txn.p2p_extrapolated_coverage(dht_arc_set))
+            let coverage = db.p2p_extrapolated_coverage(dht_arc_set)
                 .await?;
             Ok(coverage)
         }
@@ -159,9 +158,7 @@ impl KitsuneHost for KitsuneHostImpl {
         let dna_hash = DnaHash::from_kitsune(&space);
         let db = self.spaces.p2p_agents_db(&dna_hash);
         async move {
-            Ok(db?
-                .write_async(move |txn| txn.p2p_remove_agent(&agent))
-                .await?)
+            Ok(db?.p2p_remove_agent(&agent).await?)
         }
         .boxed()
         .into()

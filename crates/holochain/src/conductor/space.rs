@@ -30,7 +30,7 @@ use holochain_p2p::{
     event::FetchOpDataQuery,
 };
 use holochain_sqlite::prelude::{
-    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
     DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
     ReadAccess,
 };
@@ -169,9 +169,7 @@ impl Spaces {
         for dna in dnas {
             // @todo join_all for these awaits
             agent_lists.push(
-                self.p2p_agents_db(&dna)?
-                    .read_async(|txn| txn.p2p_list_agents())
-                    .await?,
+                self.p2p_agents_db(&dna)?.p2p_list_agents().await?
             );
         }
 
