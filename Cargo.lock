@@ -3089,7 +3089,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.2.0-beta-dev.0"
+version = "0.2.0-beta-dev.1"
 dependencies = [
  "anyhow",
  "async-trait",
