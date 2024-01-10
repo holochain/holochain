@@ -90,7 +90,7 @@ version = "0.2.0-beta-dev.0"
 dependencies = [
  "anyhow",
  "derive_more",
- "holochain_trace 0.3.0-beta-dev.2",
+ "holochain_trace 0.3.0-beta-dev.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "maplit",
  "parking_lot 0.10.2",
  "petgraph",
@@ -2844,13 +2844,13 @@ dependencies = [
  "holochain",
  "holochain_cascade",
  "holochain_conductor_api",
+ "holochain_conductor_services",
  "holochain_keystore",
  "holochain_metrics",
  "holochain_nonce",
  "holochain_p2p",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
- "holochain_services",
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
@@ -3088,6 +3088,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_conductor_services"
+version = "0.2.0-beta-dev.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "derive_more",
+ "futures",
+ "holochain_keystore",
+ "holochain_types",
+ "mockall",
+ "must_future",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "holochain_diagnostics"
 version = "0.0.1"
 dependencies = [
@@ -3255,22 +3271,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_services"
-version = "0.2.0-beta-dev.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "derive_more",
- "futures",
- "holochain_keystore",
- "holochain_types",
- "mockall",
- "must_future",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "holochain_sqlite"
 version = "0.3.0-beta-dev.27"
 dependencies = [
@@ -3388,24 +3388,6 @@ dependencies = [
 
 [[package]]
 name = "holochain_trace"
-version = "0.3.0-beta-dev.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "572aef66fe319c0b5ff0058e584cd3e3938dc3f7a3ec406f282c71b6d6fa4f42"
-dependencies = [
- "chrono",
- "derive_more",
- "inferno",
- "once_cell",
- "serde_json",
- "thiserror",
- "tracing",
- "tracing-core",
- "tracing-serde",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "holochain_trace"
 version = "0.3.0-beta-dev.4"
 dependencies = [
  "chrono",
@@ -3422,6 +3404,24 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-futures",
+ "tracing-serde",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "holochain_trace"
+version = "0.3.0-beta-dev.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d06e7ed01d69701138e3f34ec00f3e90bfc93e149b37960a1c7fb7aac28d06f"
+dependencies = [
+ "chrono",
+ "derive_more",
+ "inferno",
+ "once_cell",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "tracing-core",
  "tracing-serde",
  "tracing-subscriber",
 ]
