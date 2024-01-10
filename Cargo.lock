@@ -3488,8 +3488,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "wasmer",
- "wasmer-middlewares",
 ]
 
 [[package]]

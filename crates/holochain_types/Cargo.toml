@@ -60,8 +60,6 @@ tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "rt" ] }
 tracing = "0.1.26"
-wasmer = "4.2.2"
-wasmer-middlewares = "4.2.2"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
