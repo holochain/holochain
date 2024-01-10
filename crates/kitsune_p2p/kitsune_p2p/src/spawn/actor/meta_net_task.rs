@@ -464,8 +464,6 @@ impl MetaNetTask {
             wire::Wire::PushOpData(wire::PushOpData { op_data_list }) => {
                 for (space, op_list) in op_data_list {
                     for op in op_list {
-                        // TODO potential for a mismatch here? We are hashing the received op data but trusting the op hash sent by the remote when
-                        //      requesting missing hashes.
                         // hash the op
                         let op_hash = match self.host.op_hash(op.op_data.clone()).await {
                             Ok(op_hash) => op_hash,
