@@ -112,7 +112,7 @@ Initial version
 
 ## [holochain\_cli\_sandbox-0.3.0-beta-dev.29](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.29)
 
-## [holochain\_services-0.2.0-beta-dev.0](crates/holochain_services/CHANGELOG.md#0.2.0-beta-dev.0)
+## [holochain\_conductor\_services-0.2.0-beta-dev.0](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.0)
 
 - Conductor services crate created
 
