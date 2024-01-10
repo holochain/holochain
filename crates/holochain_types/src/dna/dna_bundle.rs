@@ -39,7 +39,7 @@ impl DnaBundle {
     pub async fn into_dna_file(
         self,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompat,
+        dna_compat: DnaCompatParams,
     ) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) =
@@ -117,7 +117,7 @@ impl DnaBundle {
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompat,
+        dna_compat: DnaCompatParams,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
@@ -266,7 +266,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {
-        let dna_compat = DnaCompat::fake();
+        let dna_compat = DnaCompatParams::fake();
 
         let path1 = PathBuf::from("1");
         let path2 = PathBuf::from("2");
@@ -280,7 +280,7 @@ mod tests {
                 network_seed: Some("original network seed".to_string()),
                 properties: Some(serde_yaml::Value::Null.into()),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
-                compatibility: DnaCompat::fake(),
+                compatibility: DnaCompatParams::fake(),
                 zomes: vec![
                     ZomeManifest {
                         name: "zome1".into(),

@@ -37,7 +37,7 @@ pub fn fake_dna_zomes_named(
     name: &str,
     zomes: Vec<(ZomeName, DnaWasm)>,
 ) -> DnaFile {
-    let dna_compat = DnaCompat {
+    let dna_compat = DnaCompatParams {
         protocol_version: 42,
         dpki_hash: None,
     };

@@ -87,7 +87,7 @@ async fn test_packed_hash_consistency() {
 
 #[tokio::test]
 async fn test_integrity() {
-    let dna_compat = DnaCompat::fake();
+    let dna_compat = DnaCompatParams::fake();
     let pack_dna = move |path| {
         let dna_compat = dna_compat.clone();
         async move {
@@ -162,7 +162,7 @@ async fn test_integrity() {
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 async fn test_multi_integrity() {
-    let dna_compat = DnaCompat::fake();
+    let dna_compat = DnaCompatParams::fake();
     let dna_compat_clone = dna_compat.clone();
 
     let pack_dna = |path| async move {

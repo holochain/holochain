@@ -2540,9 +2540,9 @@ mod accessor_impls {
             &self.config
         }
 
-        /// Construct the DnaRuntime given the current setup
-        pub fn get_dna_compat(&self) -> DnaCompat {
-            DnaCompat {
+        /// Construct the DnaCompatParams given the current setup
+        pub fn get_dna_compat(&self) -> DnaCompatParams {
+            DnaCompatParams {
                 protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
                 dpki_hash: self
                     .services()
