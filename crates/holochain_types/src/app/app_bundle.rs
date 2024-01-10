@@ -63,7 +63,7 @@ impl AppBundle {
         dna_store: &impl DnaStore,
         agent: AgentPubKey,
         membrane_proofs: HashMap<RoleName, MembraneProof>,
-        dna_compat: DnaCompat,
+        dna_compat: DnaCompatParams,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
@@ -139,7 +139,7 @@ impl AppBundle {
         dna_store: &impl DnaStore,
         role_name: RoleName,
         role: AppRoleManifestValidated,
-        dna_compat: DnaCompat,
+        dna_compat: DnaCompatParams,
     ) -> AppBundleResult<CellProvisioningOp> {
         Ok(match role {
             AppRoleManifestValidated::Create {
@@ -226,7 +226,7 @@ impl AppBundle {
         location: &mr_bundle::Location,
         installed_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompat,
+        dna_compat: DnaCompatParams,
     ) -> AppBundleResult<DnaFile> {
         let dna_file = if let Some(hash) = installed_hash {
             let (dna_file, original_hash) =
@@ -266,7 +266,7 @@ impl AppBundle {
         &self,
         location: &mr_bundle::Location,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompat,
+        dna_compat: DnaCompatParams,
     ) -> AppBundleResult<(DnaFile, DnaHash)> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();

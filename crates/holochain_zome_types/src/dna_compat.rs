@@ -17,7 +17,7 @@ use holochain_serialized_bytes::prelude::*;
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct DnaCompat {
+pub struct DnaCompatParams {
     /// A version number which represents network protocol compatibility.
     /// This is set by kitsune and bumped whenever a breaking protocol change is made.
     pub protocol_version: u32,
@@ -34,9 +34,9 @@ pub struct DnaCompat {
     pub dpki_hash: Option<DnaHashB64>,
 }
 
-impl Default for DnaCompat {
+impl Default for DnaCompatParams {
     fn default() -> Self {
-        DnaCompat {
+        DnaCompatParams {
             protocol_version: kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION,
             // TODO: define the "current" DPKI hash to be used
             dpki_hash: None,
@@ -45,10 +45,10 @@ impl Default for DnaCompat {
 }
 
 #[cfg(feature = "test_utils")]
-impl DnaCompat {
+impl DnaCompatParams {
     /// Get a fake value for testing
     pub fn fake() -> Self {
-        DnaCompat {
+        DnaCompatParams {
             protocol_version: 0xFA73, // 64115
             dpki_hash: None,
         }

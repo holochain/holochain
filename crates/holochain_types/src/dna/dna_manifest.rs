@@ -51,7 +51,7 @@ impl DnaManifest {
         network_seed: Option<String>,
         properties: Option<YamlProperties>,
         origin_time: HumanTimestamp,
-        compat: DnaCompat,
+        compat: DnaCompatParams,
         integrity_zomes: Vec<ZomeManifest>,
         coordinator_zomes: Vec<ZomeManifest>,
     ) -> Self {
