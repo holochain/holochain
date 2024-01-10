@@ -128,6 +128,15 @@ pub struct RealRibosome {
     pub module_cache: Arc<RwLock<ModuleCache>>,
 }
 
+type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
+// Map from a context key to a call context. Call contexts are passed to host
+// fn calls for execution.
+static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
+
+// Counter used to store and look up zome call contexts, which are passed to
+// host fn calls.
+static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
+
 struct HostFnBuilder {
     store: Arc<Mutex<Store>>,
     function_env: FunctionEnv<Env>,
@@ -198,15 +207,6 @@ impl HostFnBuilder {
         self
     }
 }
-
-type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
-// Map from a context key to a call context. Call contexts are passed to host
-// fn calls for execution.
-static CONTEXT_MAP: ContextMap = Lazy::new(Default::default);
-
-// Counter used to store and look up zome call contexts, which are passed to
-// host fn calls.
-static CONTEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
 impl RealRibosome {
     /// Create a new instance
@@ -421,25 +421,6 @@ impl RealRibosome {
         CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
-    pub fn instance_with_store(
-        &self,
-        call_context: CallContext,
-    ) -> RibosomeResult<(Arc<InstanceWithStore>, u64)> {
-        // create a new key for the context map.
-        let context_key = Self::next_context_key();
-        let instance_with_store =
-            self.build_instance_with_store(&call_context.zome, context_key)?;
-
-        // Update the context.
-        {
-            CONTEXT_MAP
-                .lock()
-                .insert(context_key, Arc::new(call_context));
-        }
-
-        Ok((instance_with_store, context_key))
-    }
-
     pub async fn tooling_imports() -> RibosomeResult<Vec<String>> {
         let empty_dna_def = DnaDef {
             name: Default::default(),
@@ -637,7 +618,17 @@ impl RealRibosome {
         call_context: CallContext,
         name: &str,
     ) -> Result<Option<i32>, RibosomeError> {
-        let (instance_with_store, context_key) = self.instance_with_store(call_context)?;
+        // create a new key for the context map.
+        let context_key = Self::next_context_key();
+        let instance_with_store =
+            self.build_instance_with_store(&call_context.zome, context_key)?;
+
+        // add call context to map for following call
+        {
+            CONTEXT_MAP
+                .lock()
+                .insert(context_key, Arc::new(call_context));
+        }
 
         let result;
         {
@@ -658,7 +649,9 @@ impl RealRibosome {
         }
 
         // Remove the blank context.
-        CONTEXT_MAP.lock().remove(&context_key);
+        {
+            CONTEXT_MAP.lock().remove(&context_key);
+        }
 
         Ok(result)
     }
@@ -796,7 +789,7 @@ impl RibosomeT for RealRibosome {
     }
 
     /// call a function in a zome for an invocation if it exists
-    /// if it does not exist then return Ok(None)
+    /// if it does not exist, then return Ok(None)
     fn maybe_call<I: Invocation>(
         &self,
         host_context: HostContext,
@@ -813,21 +806,30 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let (instance_with_store, context_key) =
-                    self.instance_with_store(call_context.clone())?;
+                let context_key = Self::next_context_key();
+                let instance_with_store = self.build_instance_with_store(zome, context_key)?;
 
                 if instance_with_store
                     .instance
                     .exports
                     .contains(fn_name.as_ref())
                 {
+                    // add call context to map for the following call
+                    {
+                        CONTEXT_MAP
+                            .lock()
+                            .insert(context_key, Arc::new(call_context));
+                    }
+
                     let result = self
                         .call_wasm_instance::<I>(invocation, zome, fn_name, instance_with_store)
                         .map(Some);
-                    // Clear the context as the call is done.
+
+                    // remove context from map after call
                     {
                         CONTEXT_MAP.lock().remove(&context_key);
                     }
+
                     result
                 } else {
                     // the callback fn does not exist
@@ -983,6 +985,7 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::real_ribosome::CONTEXT_MAP;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
@@ -1080,6 +1083,9 @@ pub mod wasm_test {
             });
             futures::future::join_all([zome_call_1, zome_call_2]).await;
         }
+
+        // make sure the context map does not retain items
+        assert_eq!(CONTEXT_MAP.lock().is_empty(), true);
     }
 
     #[tokio::test(flavor = "multi_thread")]
