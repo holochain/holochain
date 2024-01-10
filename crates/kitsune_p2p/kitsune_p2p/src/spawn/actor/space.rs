@@ -532,7 +532,6 @@ impl SpaceInternalHandler for Space {
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.
                     if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
-                        tracing::info!("Scheduling delegate broadcast for data we don't have");
                         ro_inner.clone().publish_pending_delegate(
                             op_hash.data(),
                             PendingDelegate {

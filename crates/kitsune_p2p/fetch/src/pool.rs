@@ -128,6 +128,14 @@ impl FetchPool {
         });
     }
 
+    /// Check if an item is in the fetch pool and what its context is.
+    pub fn check_item(&self, key: &FetchKey) -> (bool, Option<FetchContext>) {
+        self.state.share_ref(|s| match s.queue.get(key) {
+            Some(item) => (true, item.context),
+            None => (false, None),
+        })
+    }
+
     /// When an item has been successfully fetched, we can remove it from the queue.
     pub fn remove(&self, key: &FetchKey) -> Option<FetchPoolItem> {
         self.state.share_mut(|s| {

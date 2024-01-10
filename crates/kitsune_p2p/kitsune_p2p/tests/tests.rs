@@ -190,7 +190,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 
     // Must be larger than ShardedGossipLocal::UPPER_HASHES_BOUND, to encourage batching. But I'm wondering if that's even useful because each op is
     // actually send individually.
-    let num_ops = 500;
+    let num_ops = 30_000;
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
