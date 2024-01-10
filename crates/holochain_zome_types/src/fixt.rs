@@ -736,7 +736,7 @@ fixturator!(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        network_params: DnaNetworkParams {
+        compatibility: DnaCompatParams {
             protocol_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
             dpki_hash: Some(DnaHashB64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
         },
@@ -762,7 +762,7 @@ fixturator!(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        network_params: DnaNetworkParams {
+        compatibility: DnaCompatParams {
             protocol_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
             dpki_hash: Some(DnaHashB64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
         },
@@ -788,7 +788,7 @@ fixturator!(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
-        network_params: DnaNetworkParams {
+        compatibility: DnaCompatParams {
             protocol_version: U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
             dpki_hash: Some(DnaHashB64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()),
         },

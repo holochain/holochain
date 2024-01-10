@@ -1341,7 +1341,7 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
-            let network_params = self.get_dna_network_params();
+            let dna_compat = self.get_dna_compat();
 
             let InstallAppPayload {
                 source,
@@ -1372,12 +1372,7 @@ mod app_impls {
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(
-                    &local_dnas,
-                    agent_key.clone(),
-                    membrane_proofs,
-                    network_params,
-                )
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -2545,9 +2540,9 @@ mod accessor_impls {
             &self.config
         }
 
-        /// Construct the DnaRuntime given the current setup
-        pub fn get_dna_network_params(&self) -> DnaNetworkParams {
-            DnaNetworkParams {
+        /// Construct the DnaCompatParams given the current setup
+        pub fn get_dna_compat(&self) -> DnaCompatParams {
+            DnaCompatParams {
                 protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
                 dpki_hash: self
                     .services()
