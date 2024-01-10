@@ -15,7 +15,7 @@ cfg-if = "0.1"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = { workspace = true }
 either = "1.5"
-holochain_sqlite = { version = "^0.3.0-beta-dev.26", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "^0.3.0-beta-dev.26", path = "../holochain_sqlite", features = ["holochain_util"] }
 holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
 futures = "0.3"
