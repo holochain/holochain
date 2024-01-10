@@ -152,7 +152,7 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 pub type ConductorHandle = Arc<Conductor>;
 
 /// The reason why a cell is waiting to join the network.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PendingJoinReason {
     /// The initial state, no attempt has been made to join the network yet.
     Initial,
@@ -166,7 +166,7 @@ pub enum PendingJoinReason {
 }
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CellStatus {
     /// Kitsune knows about this Cell and it is considered fully "online"
     Joined,
@@ -185,10 +185,17 @@ pub enum CellStatus {
 pub type CellStatusFilter = CellStatus;
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(into = "CellStatus")]
 struct CellItem {
     cell: Arc<Cell>,
     status: CellStatus,
+}
+
+impl From<CellItem> for CellStatus {
+    fn from(item: CellItem) -> Self {
+        item.status
+    }
 }
 
 #[allow(dead_code)]
@@ -2183,6 +2190,8 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
+    use std::sync::atomic::Ordering;
+
     use holochain_zome_types::action::builder;
 
     use super::*;
@@ -2251,6 +2260,39 @@ mod misc_impls {
             let summary = out.to_string();
             let out = (out, summary);
             Ok(serde_json::to_string_pretty(&out)?)
+        }
+
+        /// Create a JSON dump of the conductor's state
+        pub async fn dump_conductor_state(&self) -> ConductorApiResult<String> {
+            #[derive(Serialize, Debug)]
+            pub struct ConductorSerialized {
+                running_cells: HashMap<CellId, CellItem>,
+                shutting_down: bool,
+                admin_websocket_ports: Vec<u16>,
+                app_interfaces: Vec<AppInterfaceId>,
+            }
+
+            #[derive(Serialize, Debug)]
+            struct ConductorDump {
+                conductor: ConductorSerialized,
+                state: ConductorState,
+            }
+
+            let dump = ConductorSerialized {
+                running_cells: self.running_cells.share_ref(|c| c.clone()),
+                shutting_down: self.shutting_down.load(Ordering::SeqCst),
+                admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
+                app_interfaces: self
+                    .app_interfaces
+                    .share_ref(|i| i.clone().keys().cloned().collect()),
+            };
+
+            let out = serde_json::to_string_pretty(&ConductorDump {
+                conductor: dump,
+                state: self.get_state().await?,
+            })?;
+
+            Ok(out)
         }
 
         /// Create a comprehensive structured dump of a cell's state

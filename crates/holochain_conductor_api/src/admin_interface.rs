@@ -192,6 +192,14 @@ pub enum AdminRequest {
         cell_id: Box<CellId>,
     },
 
+    /// Dump the state of the conductor, including the in-memory representation
+    /// and the persisted ConductorState, as JSON.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ConductorStateDumped`]
+    DumpConductorState,
+
     /// Dump the full state of the Cell specified by argument `cell_id`,
     /// including its chain and DHT shard, as a string containing JSON.
     ///
@@ -432,6 +440,11 @@ pub enum AdminResponse {
     ///
     /// Note that this result can be very big, as it's requesting the full database of the cell.
     FullStateDumped(FullStateDump),
+
+    /// The successful response to an [`AdminRequest::DumpConductorState`].
+    ///
+    /// Simply a JSON serialized snapshot of `Conductor` and `ConductorState` from the `holochain` crate.
+    ConductorStateDumped(String),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
     ///

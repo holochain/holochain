@@ -237,6 +237,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
             }
+            DumpConductorState => {
+                let state = self.conductor_handle.dump_conductor_state().await?;
+                Ok(AdminResponse::ConductorStateDumped(state))
+            }
             DumpFullState {
                 cell_id,
                 dht_ops_cursor,
