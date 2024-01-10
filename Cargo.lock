@@ -2985,6 +2985,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_cli_admin"
+version = "0.3.0-beta-dev.28"
+dependencies = [
+ "anyhow",
+ "assert_cmd 1.0.8",
+ "clap 4.4.11",
+ "futures",
+ "holochain_serialized_bytes",
+ "holochain_types",
+ "holochain_util",
+ "holochain_wasmer_host",
+ "jsonschema",
+ "matches",
+ "mr_bundle",
+ "predicates 1.0.8",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "walkdir",
+ "wasmer",
+]
+
+[[package]]
 name = "holochain_cli_bundle"
 version = "0.3.0-beta-dev.28"
 dependencies = [
