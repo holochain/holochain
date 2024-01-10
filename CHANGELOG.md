@@ -32,7 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [holochain\_conductor\_api-0.3.0-beta-dev.30](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.30)
 
-## [holochain\_services-0.2.0-beta-dev.1](crates/holochain_services/CHANGELOG.md#0.2.0-beta-dev.1)
+## [holochain\_conductor\_services-0.2.0-beta-dev.1](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.1)
 
 ## [holochain\_test\_wasm\_common-0.3.0-beta-dev.25](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.25)
 
