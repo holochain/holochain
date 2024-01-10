@@ -321,14 +321,6 @@ impl RealRibosome {
         }
     }
 
-    pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        let engine = holochain_wasmer_host::module::make_ios_runtime_engine();
-        match unsafe { Module::deserialize_from_file(&engine, dylib_path) } {
-            Ok(module) => Ok(Arc::new(module)),
-            Err(e) => Err(RibosomeError::ModuleDeserializeError(e)),
-        }
-    }
-
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
@@ -356,7 +348,7 @@ impl RealRibosome {
         let module = match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
                 if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    self.precompiled_module(path)?
+                    Arc::new(holochain_wasmer_host::module::precompiled_module(path)?)
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
                 }
@@ -775,7 +767,7 @@ impl RibosomeT for RealRibosome {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
                         let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                            self.precompiled_module(path)?
+                            Arc::new(holochain_wasmer_host::module::precompiled_module(path)?)
                         } else {
                             self.runtime_compiled_module(zome.zome_name())?
                         };
