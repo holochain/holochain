@@ -166,7 +166,7 @@ pub struct TimeChunk {
 /// hashes vector.
 ///
 /// This stream is very useful for pulling hash chunks until some limit is reached
-/// where the cursor can be saved an a new hash query can be started in the future
+/// where the cursor can be saved and a new hash query can be started in the future
 /// where the search time window starts from the previous queries cursor.
 pub(super) fn hash_chunks_query(
     host_api: HostApiLegacy,
