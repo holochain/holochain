@@ -344,7 +344,7 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
-            self.clone().initialize_deepkey(None).await?;
+            self.clone().initialize_services().await?;
             self.clone().add_admin_interfaces(admin_configs).await?;
             self.clone().startup_app_interfaces().await?;
 
@@ -2114,6 +2114,8 @@ mod app_status_impls {
 /// Methods related to management of Conductor state
 mod service_impls {
 
+    use holochain_services::derivation_paths::derivation_path_for_dpki_instance;
+
     use super::*;
 
     impl Conductor {
@@ -2122,41 +2124,69 @@ mod service_impls {
             self.services.share_ref(|s| s.clone())
         }
 
-        pub(crate) async fn initialize_deepkey(
-            self: Arc<Self>,
-            dna: Option<DnaFile>,
-        ) -> ConductorResult<()> {
-            let cell_id = if let Some(dna) = dna {
-                let dna_hash = dna.dna_hash().clone();
-                self.register_dna(dna).await?;
-
-                let agent = self.keystore().new_sign_keypair_random().await?;
-                let cell_id = CellId::new(dna_hash, agent);
-                let cell_id_2 = cell_id.clone();
-
-                let cell_data = vec![(InstalledCell::new(cell_id.clone(), "DPKI".into()), None)];
-                self.clone()
-                    .install_app_legacy(DPKI_APP_ID.into(), cell_data)
-                    .await?;
-                self.clone().enable_app(DPKI_APP_ID.into()).await?;
-
-                self.update_state(move |mut state| {
-                    state.conductor_services.deepkey = Some(cell_id_2);
-                    Ok(state)
-                })
-                .await?;
-                Some(cell_id)
-            } else {
-                self.get_state().await?.conductor_services.deepkey
-            };
-
-            if let Some(cell_id) = cell_id {
+        pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
+            if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.services.share_mut(|s| {
-                    let deepkey =
-                        DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), cell_id);
-                    s.dpki = Some(Arc::new(deepkey));
+                    let dpki =
+                        DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), installation);
+                    s.dpki = Some(Arc::new(dpki));
                 });
             }
+            Ok(())
+        }
+
+        pub(crate) async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
+            let dna_hash = dna.dna_hash().clone();
+            self.register_dna(dna).await?;
+
+            // FIXME: This "device seed" should be derived from the master seed and passed in here,
+            //        not just generated like this. This is a placeholder.
+            let device_seed_lair_tag = {
+                let tag = format!("_hc_dpki_device_{}", nanoid::nanoid!());
+                self.keystore()
+                    .lair_client()
+                    .new_seed(tag.clone().into(), None, false)
+                    .await?;
+                tag
+            };
+
+            let (derivation_path, dst_tag) =
+                derivation_path_for_dpki_instance(0, &device_seed_lair_tag);
+            let seed_info = self
+                .keystore()
+                .lair_client()
+                .derive_seed(
+                    device_seed_lair_tag.clone().into(),
+                    None,
+                    dst_tag.into(),
+                    None,
+                    derivation_path,
+                )
+                .await?;
+
+            // The initial agent key is the first derivation from the device seed.
+            // Updated DPKI agent keys are sequential derivations from the same device seed.
+            let agent = holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec());
+            let cell_id = CellId::new(dna_hash, agent);
+            let cell_id_clone = cell_id.clone();
+
+            // Use app ID for role name as well, since this is pretty arbitrary
+            let role_name = DPKI_APP_ID.into();
+            let cell_data = vec![(InstalledCell::new(cell_id_clone, role_name), None)];
+            self.clone()
+                .install_app_legacy(DPKI_APP_ID.into(), cell_data)
+                .await?;
+            self.clone().enable_app(DPKI_APP_ID.into()).await?;
+
+            let installation = DpkiInstallation {
+                cell_id,
+                device_seed_lair_tag,
+            };
+            self.update_state(move |mut state| {
+                state.conductor_services.dpki = Some(installation);
+                Ok(state)
+            })
+            .await?;
 
             Ok(())
         }

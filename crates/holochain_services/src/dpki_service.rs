@@ -5,6 +5,8 @@ use holochain_types::prelude::*;
 
 use crate::CellRunner;
 
+pub mod derivation_paths;
+
 /// This magic string, when used as the installed app id, denotes that the app
 /// is not actually an app, but the DPKI service! This is now a reserved app id,
 /// and is used to distinguish the DPKI service from other apps.
@@ -59,6 +61,8 @@ pub enum DpkiServiceError {
     ZomeCallFailed(anyhow::Error),
     #[error(transparent)]
     Serialization(#[from] SerializedBytesError),
+    #[error("Error talking to lair keystore: {0}")]
+    Lair(anyhow::Error),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
@@ -88,12 +92,27 @@ pub trait DpkiServiceExt: DpkiService {
 }
 impl<T> DpkiServiceExt for T where T: DpkiService + Sized {}
 
+/// Data needed to initialize the DPKI service, if installed
+#[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Debug, SerializedBytes)]
+pub struct DpkiInstallation {
+    /// The cell ID used by the DPKI service.
+    ///
+    /// The AgentPubKey of this cell was generated from the DPKI "device seed",
+    /// which is used to derive further seeds and keys for newly installed cells.
+    /// The seed can be referenced in lair via
+    pub cell_id: CellId,
+
+    /// The lair tag used to refer to the "device seed" which was used to generate
+    /// the AgentPubKey for the DPKI cell
+    pub device_seed_lair_tag: String,
+}
+
 /// The built-in implementation of the DPKI service contract, which runs a DNA
 #[derive(derive_more::Constructor)]
 pub struct DeepkeyBuiltin {
     runner: Arc<dyn CellRunner>,
     keystore: MetaLairClient,
-    cell_id: CellId,
+    installation: DpkiInstallation,
 }
 
 #[allow(unreachable_code)]
@@ -107,7 +126,7 @@ impl DpkiService for DeepkeyBuiltin {
         timestamp: Timestamp,
     ) -> DpkiServiceResult<KeyState> {
         let keystore = self.keystore.clone();
-        let cell_id = self.cell_id.clone();
+        let cell_id = self.installation.cell_id.clone();
         let agent_anchor = key.get_raw_32();
         let zome_name: ZomeName = "deepkey".into();
         let fn_name: FunctionName = "key_state".into();
@@ -139,7 +158,7 @@ impl DpkiService for DeepkeyBuiltin {
     }
 
     fn cell_id(&self) -> &CellId {
-        &self.cell_id
+        &self.installation.cell_id
     }
 }
 
