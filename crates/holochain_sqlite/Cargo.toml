@@ -33,7 +33,7 @@ num_cpus = "1.13.0"
 parking_lot = "0.10"
 r2d2 = "0.8"
 r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
-rmp-serde = "0.15"
+rmp-serde = { workspace = true }
 scheduled-thread-pool = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
