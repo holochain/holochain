@@ -31,7 +31,6 @@ members = [
   "crates/holochain_conductor_services",
 
   "crates/hc",
-  "crates/hc_admin",
   "crates/hc_bundle",
   "crates/hc_sandbox",
   "crates/hc_sleuth",
