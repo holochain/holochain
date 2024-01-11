@@ -19,7 +19,6 @@ pub fn test_key_op(n: u8) -> FetchKey {
 pub fn test_req_op(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchPoolPush {
     FetchPoolPush {
         key: test_key_op(n),
-        author: None,
         context,
         space: test_space(0),
         source,

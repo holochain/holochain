@@ -517,8 +517,6 @@ impl SpaceInternalHandler for Space {
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
                         size: op_hash.maybe_size(),
-                        // TODO - get the author from somewhere
-                        author: None,
                         context: Some(context),
                         transfer_method: TransferMethod::Publish,
                     });

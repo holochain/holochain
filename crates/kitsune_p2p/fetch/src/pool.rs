@@ -177,7 +177,6 @@ impl State {
     pub fn push(&mut self, config: &dyn FetchPoolConfig, args: FetchPoolPush) {
         let FetchPoolPush {
             key,
-            author,
             context,
             space,
             source,
@@ -187,27 +186,11 @@ impl State {
 
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
-                let sources = if let Some(author) = author {
-                    // TODO This is currently not used. The idea is that the author will always be a valid alternative to fetch
-                    //      this data from. See one of the call sites for `push` to see where this was intended to be used from.
-                    Sources(
-                        [
-                            (source.clone(), SourceRecord::new(source, transfer_method)),
-                            (
-                                FetchSource::Agent(author.clone()),
-                                SourceRecord::agent(author, transfer_method),
-                            ),
-                        ]
+                let sources = Sources(
+                    [(source.clone(), SourceRecord::new(source))]
                         .into_iter()
                         .collect(),
-                    )
-                } else {
-                    Sources(
-                        [(source.clone(), SourceRecord::new(source, transfer_method))]
-                            .into_iter()
-                            .collect(),
-                    )
-                };
+                );
                 let item = FetchPoolItem {
                     sources,
                     space,
@@ -355,10 +338,6 @@ impl SourceRecord {
             transfer_method,
             last_request: None,
         }
-    }
-
-    fn agent(agent: KAgent, transfer_method: TransferMethod) -> Self {
-        Self::new(FetchSource::Agent(agent), transfer_method)
     }
 }
 
@@ -859,7 +838,6 @@ mod tests {
             space: test_space(u8::arbitrary(&mut u).unwrap()),
             source: unavailable_sources.iter().last().cloned().unwrap(),
             size: None,   // Not important for this test
-            author: None, // Unused field, ignore
             context: test_ctx(u32::arbitrary(&mut u).unwrap()),
             transfer_method: TransferMethod::Gossip,
         });
@@ -873,7 +851,6 @@ mod tests {
                     space: test_space(u8::arbitrary(&mut u).unwrap()),
                     source: test_source(u8::arbitrary(&mut u).unwrap()),
                     size: None,   // Not important for this test
-                    author: None, // Unused field, ignore
                     context: test_ctx(u32::arbitrary(&mut u).unwrap()),
                     transfer_method: TransferMethod::Gossip,
                 });

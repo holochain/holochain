@@ -4,7 +4,7 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
+use kitsune_p2p_types::{KOpHash, KSpace};
 
 mod pool;
 mod respond;
@@ -48,14 +48,6 @@ pub struct FetchPoolPush {
 
     /// The approximate size of the item
     pub size: Option<RoughInt>,
-
-    /// If specified, the author of the op.
-    ///
-    /// NOTE: author is additive-only. That is, an op without an author
-    /// is the same as one *with* an author, but should be updated to
-    /// include the author. It is UB to have two FetchKeys with the
-    /// same op_hash, but different authors.
-    pub author: Option<KAgent>,
 
     /// Opaque "context" to be provided and interpreted by the host.
     pub context: Option<FetchContext>,

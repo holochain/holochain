@@ -1949,6 +1949,9 @@ mod tests {
                 .load(Ordering::Acquire)
         );
 
+        // Manually drop the item from the pool that we failed to receive
+        fetch_pool.remove(&test_key_op(0));
+
         // and also a successful op push
         wait_for_condition(|| {
             fetch_pool.is_empty() && !host_receiver_stub.receive_ops_calls.read().is_empty()
