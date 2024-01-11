@@ -331,7 +331,7 @@ pub enum AdminRequest {
     StorageInfo,
 
     /// Initialize the DPKI conductor service by providing a Deepkey DNA
-    InitializeDeepkey { deepkey_dna: DnaBundle },
+    InstallDpki { dpki_dna: DnaBundle },
 }
 
 /// Represents the possible responses to an [`AdminRequest`]

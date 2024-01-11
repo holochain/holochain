@@ -10,20 +10,20 @@ use holochain_types::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "can't be written without real deepkey.dna"]
-async fn initialize_deepkey() {
+async fn initialize_dpki() {
     holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let admin_api = RealAdminInterfaceApi::new(conductor.raw_handle());
 
-    // Initialize deepkey
+    // Initialize dpki
     {
-        let deepkey_dna =
+        let dpki_dna =
             DnaBundle::read_from_file(&PathBuf::from("./tests/conductor_services/deepkey.dna"))
                 .await
                 .unwrap();
         let response = admin_api
-            .handle_admin_request(AdminRequest::InitializeDeepkey { deepkey_dna })
+            .handle_admin_request(AdminRequest::InstallDpki { dpki_dna })
             .await;
         dbg!(&response);
         assert!(matches!(response, AdminResponse::Ok));

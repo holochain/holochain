@@ -18,6 +18,7 @@ mockall = { workspace = true }
 must_future = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 
 holochain_keystore = { workspace = true, default-features = false }
 holochain_types = { workspace = true }

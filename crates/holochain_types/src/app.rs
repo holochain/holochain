@@ -133,7 +133,12 @@ pub struct InstallAppPayload {
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
-    pub agent_key: AgentPubKey,
+    /// If None, a new agent key will be generated.
+    ///
+    /// If a DPKI service is initialized at installation time, this field will
+    /// be ignored and a properly derived key will be used instead.
+    #[serde(default)]
+    pub agent_key: Option<AgentPubKey>,
 
     /// The unique identifier for an installed app in this conductor.
     /// If not specified, it will be derived from the app name in the bundle manifest.

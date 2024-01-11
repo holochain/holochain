@@ -24,6 +24,12 @@ pub trait DpkiService: Send + Sync {
         timestamp: Timestamp,
     ) -> DpkiServiceResult<KeyState>;
 
+    /// Derive a new key in lair using the given index, and register it with DPKI
+    async fn derive_and_register_new_key(
+        &self,
+        index: InstalledAppIndex,
+    ) -> DpkiServiceResult<AgentPubKey>;
+
     /// Defines the different ways that keys can be created and destroyed:
     /// If an old key is specified, it will be destroyed
     /// If a new key is specified, it will be registered
@@ -39,7 +45,7 @@ pub trait DpkiService: Send + Sync {
     fn cell_id(&self) -> &CellId;
 }
 
-/// Mirrors the output type of the "key_state" zome function in deepkey
+/// Mirrors the output type of the "key_state" zome function in dpki
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum KeyState {
     NotFound,
@@ -95,11 +101,11 @@ impl<T> DpkiServiceExt for T where T: DpkiService + Sized {}
 /// Data needed to initialize the DPKI service, if installed
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Debug, SerializedBytes)]
 pub struct DpkiInstallation {
-    /// The cell ID used by the DPKI service.
+    /// The initial cell ID used by the DPKI service.
     ///
-    /// The AgentPubKey of this cell was generated from the DPKI "device seed",
-    /// which is used to derive further seeds and keys for newly installed cells.
-    /// The seed can be referenced in lair via
+    /// The AgentPubKey of this cell was generated from the DPKI "device seed".
+    /// Upon installation, the first derivation of the seed is used.
+    /// Agent key updates use subsequent derivations.
     pub cell_id: CellId,
 
     /// The lair tag used to refer to the "device seed" which was used to generate
@@ -147,6 +153,21 @@ impl DpkiService for DeepkeyBuiltin {
             .map_err(DpkiServiceError::ZomeCallFailed)?;
         let state: KeyState = response.decode()?;
         Ok(state)
+    }
+
+    async fn derive_and_register_new_key(
+        &self,
+        index: InstalledAppIndex,
+    ) -> DpkiServiceResult<AgentPubKey> {
+        let derivation_path = todo!();
+        let info = self
+            .keystore
+            .lair_client()
+            .derive_seed(todo!(), None, todo!(), None, derivation_path)
+            .await
+            .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+        let agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
+        Ok(agent)
     }
 
     async fn key_mutation(

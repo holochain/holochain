@@ -270,7 +270,7 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let payload = InstallAppPayload {
-        agent_key,
+        agent_key: Some(agent_key),
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
