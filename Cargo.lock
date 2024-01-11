@@ -2797,7 +2797,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3134,7 +3134,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3452,7 +3452,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3603,7 +3603,7 @@ dependencies = [
  "once_cell",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4204,7 +4204,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.7.3",
  "rand 0.8.5",
  "serde",
@@ -4232,7 +4232,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -4308,7 +4308,7 @@ dependencies = [
  "once_cell",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "serde",
  "statrs",
@@ -4331,7 +4331,7 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4354,7 +4354,7 @@ dependencies = [
  "linked-hash-map",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "serde",
  "test-case 1.2.3",
@@ -4941,7 +4941,7 @@ dependencies = [
  "maplit",
  "matches",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "reqwest",
  "rmp-serde",
  "serde",
@@ -9497,18 +9497,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.7.29"
+version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d075cf85bbb114e933343e087b92f2146bac0d55b534cbb8188becf0039948e"
+checksum = "74d4d3961e53fa4c9a25a8637fc2bfaf2595b3d3ae34875568a5cf64787716be"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.7.29"
+version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86cd5ca076997b97ef09d3ad65efe811fa68c9e874cb636ccb211223a813b0c2"
+checksum = "9ce1b18ccd8e73a9321186f97e46f9f04b778851177567b1975109d26a08d2a6"
 dependencies = [
  "proc-macro2 1.0.70",
  "quote 1.0.33",
