@@ -712,7 +712,8 @@ pub fn do_publish_to_crates_io<'a>(
         let name = crt.name().to_owned();
         let ver = crt.version().to_owned();
 
-        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)?;
+        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)
+            .context(format!("looking up {name}-{ver} on local crate index"))?;
 
         if !state_changed && is_version_published {
             debug!(
