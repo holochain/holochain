@@ -80,7 +80,6 @@
           --log-level=debug \
           --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm)$" \
           release \
-            --no-verify \
             --force-tag-creation \
             --force-branch-creation \
             --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
