@@ -187,7 +187,7 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = Sources(
-                    [(source.clone(), SourceRecord::new(source))]
+                    [(source.clone(), SourceRecord::new(source, TransferMethod::Gossip))]
                         .into_iter()
                         .collect(),
                 );
@@ -326,9 +326,21 @@ pub struct FetchPoolItem {
 
 #[derive(Debug, PartialEq, Eq)]
 struct SourceRecord {
+    /// The source to fetch from
     source: FetchSource,
+    
     transfer_method: TransferMethod,
+    
+    /// When this source was created. It is expected that a source will be created per item to fetch
+    /// so that this field can be used to determine how long we've been tring to get a response from
+    /// this source.
+    created_at: Instant,
+
+    /// The last time we tried fetching from this source
     last_request: Option<Instant>,
+
+    /// How many times we've tried fetching from this source
+    tried_times: u32,
 }
 
 impl SourceRecord {
@@ -336,7 +348,9 @@ impl SourceRecord {
         Self {
             source,
             transfer_method,
+            created_at: Instant::now(),
             last_request: None,
+            tried_times: 0,
         }
     }
 }
@@ -356,6 +370,7 @@ impl Sources {
                     .unwrap_or(true)
                 {
                     sr.last_request = Some(Instant::now());
+                    sr.tried_times += 1;
                     return Some(source);
                 }
             }
@@ -433,8 +448,10 @@ mod tests {
                 test_source(1),
                 SourceRecord {
                     source: test_source(1),
+                    created_at: Instant::now(),
                     last_request: None,
                     transfer_method: TransferMethod::Gossip,
+                    tried_times: 0,
                 },
             )]
             .into_iter()
@@ -458,16 +475,20 @@ mod tests {
                     test_source(1),
                     SourceRecord {
                         source: test_source(1),
-                        last_request: Some(Instant::now()),
                         transfer_method: TransferMethod::Gossip,
+                        created_at: Instant::now(),
+                        last_request: Some(Instant::now()),
+                        tried_times: 1,
                     },
                 ),
                 (
                     test_source(2),
                     SourceRecord {
                         source: test_source(2),
-                        last_request: None,
                         transfer_method: TransferMethod::Gossip,
+                        created_at: Instant::now(),
+                        last_request: None,
+                        tried_times: 0,
                     },
                 ),
             ]
@@ -507,24 +528,30 @@ mod tests {
                     test_source(1),
                     SourceRecord {
                         source: test_source(1),
+                        created_at: Instant::now(),
                         last_request: Some(Instant::now()), // recently tried
                         transfer_method: TransferMethod::Gossip,
+                        tried_times: 1,
                     },
                 ),
                 (
                     test_source(2),
                     SourceRecord {
                         source: test_source(2),
+                        created_at: Instant::now(),
                         last_request: None, // never checked
                         transfer_method: TransferMethod::Gossip,
+                        tried_times: 0,
                     },
                 ),
                 (
                     test_source(3),
                     SourceRecord {
                         source: test_source(3),
+                        created_at: Instant::now(),
                         last_request: None, // never checked
                         transfer_method: TransferMethod::Gossip,
+                        tried_times: 0,
                     },
                 ),
             ]
@@ -560,8 +587,10 @@ mod tests {
                     test_source(i as u8),
                     SourceRecord {
                         source: test_source(i as u8),
+                        created_at: Instant::now(),
                         last_request: Instant::now().checked_sub(duration),
                         transfer_method: TransferMethod::Gossip,
+                        tried_times: 1,
                     },
                 )
             })
