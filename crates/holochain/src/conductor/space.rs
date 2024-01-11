@@ -42,7 +42,7 @@ use holochain_state::{
 };
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
-use kitsune_p2p_types::{agent_info::AgentInfoSigned, config::KitsuneP2pConfig};
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -58,12 +58,11 @@ mod tests;
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
     pub(crate) db_dir: Arc<DatabasesRootPath>,
-    pub(crate) db_sync_strategy: DbSyncStrategy,
+    pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
-    network_config: KitsuneP2pConfig,
 }
 
 #[derive(Clone)]
@@ -126,7 +125,7 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
+    pub fn new(config: Arc<ConductorConfig>) -> ConductorResult<Self> {
         let root_db_dir: DatabasesRootPath = config
             .data_root_path
             .clone()
@@ -144,11 +143,10 @@ impl Spaces {
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             db_dir: Arc::new(root_db_dir),
-            db_sync_strategy,
+            config,
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
-            network_config: config.network.clone().unwrap_or_default(),
         })
     }
 
@@ -342,7 +340,7 @@ impl Spaces {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             &self.db_dir,
-                            self.db_sync_strategy,
+                            self.config.db_sync_strategy,
                         )?;
 
                         let r = f(&space);
@@ -670,7 +668,8 @@ impl Spaces {
 
     /// Get the recent_threshold based on the kitsune network config
     pub fn recent_threshold(&self) -> Duration {
-        self.network_config
+        self.config
+            .network
             .tuning_params
             .danger_gossip_recent_threshold()
     }
@@ -798,10 +797,13 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(&ConductorConfig {
-            data_root_path: Some(temp_dir.path().to_path_buf().into()),
-            ..Default::default()
-        })
+        let spaces = Spaces::new(
+            ConductorConfig {
+                data_root_path: Some(temp_dir.path().to_path_buf().into()),
+                ..Default::default()
+            }
+            .into(),
+        )
         .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(

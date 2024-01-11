@@ -34,7 +34,7 @@ async fn test_publish() -> anyhow::Result<()> {
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
     config.tuning_params = Some(ConductorTuningParams {
         sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
         ..Default::default()

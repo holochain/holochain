@@ -28,11 +28,12 @@ members = [
   "crates/holochain_metrics",
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
-  "crates/holochain_services",
+  "crates/holochain_conductor_services",
 
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_sleuth",
   "crates/hc_run_local_services",
   "crates/hc_demo_cli",
   "crates/holochain_terminal",

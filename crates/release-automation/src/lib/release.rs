@@ -665,8 +665,7 @@ pub fn do_publish_to_crates_io<'a>(
 ) -> Fallible<()> {
     ensure_release_order_consistency(&crates).context("release ordering is broken")?;
 
-    let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
-
+    let crate_names: Vec<String> = crates.iter().map(|crt| crt.name()).collect();
     debug!("attempting to publish {:?}", crate_names);
 
     let mut queue = crates.iter().collect::<std::collections::LinkedList<_>>();
