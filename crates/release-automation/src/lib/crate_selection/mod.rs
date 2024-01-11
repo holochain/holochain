@@ -1135,7 +1135,8 @@ impl<'a> ReleaseWorkspace<'a> {
     pub fn git_head_branch_name(&'a self) -> Fallible<String> {
         self.git_head_branch().map(|(branch, _)| {
             branch
-                .name()?
+                .name()
+                .context("looking for head branch")?
                 .map(String::from)
                 .ok_or_else(|| anyhow::anyhow!("the current git branch has no name"))
         })?
