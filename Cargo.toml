@@ -75,9 +75,6 @@ serde = "1.0"
 thiserror = "1.0"
 tx5-signal-srv = "=0.0.6-alpha"
 
-holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
-holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
-
 [profile.fast-test]
 inherits = "dev"
 debug = 1

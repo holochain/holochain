@@ -19,5 +19,5 @@ must_future = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
-holochain_keystore = { workspace = true, default-features = false }
-holochain_types = { workspace = true }
+holochain_keystore = { version = "^0.3.0-beta-dev.22", path = "../holochain_keystore" }
+holochain_types = { version = "^0.3.0-beta-dev.27", path = "../holochain_types" }
