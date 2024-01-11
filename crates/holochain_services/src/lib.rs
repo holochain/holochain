@@ -4,7 +4,7 @@
 //! implementation details we don't know or care about. We want well-defined interfaces for these
 //! services such that a third party could write their own.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 mod dpki_service;
 pub use dpki_service::*;

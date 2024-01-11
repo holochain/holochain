@@ -296,7 +296,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.storage_info().await?,
             )),
             InstallDpki { dpki_dna } => {
-                let network_params = self.conductor_handle.get_dna_compat().await.await;
+                let network_params = self.conductor_handle.get_dna_compat().await;
                 let (dpki_dna, _) = dpki_dna
                     .into_dna_file(Default::default(), network_params)
                     .await?;

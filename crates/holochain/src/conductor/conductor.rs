@@ -1342,7 +1342,7 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
-            let dna_compat = self.get_dna_compat();
+            let dna_compat = self.get_dna_compat().await;
 
             let InstallAppPayload {
                 source,
@@ -1369,10 +1369,6 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
-            // Lock the state mutex while we install the app, to ensure that the
-            // app index doesn't advance
-            let state_lock = self.get_state().await;
-
             let agent_key = if let Some(agent_key) = agent_key {
                 if self.services().dpki.is_some() {
                     return Err(ConductorError::Other(
@@ -1382,8 +1378,7 @@ mod app_impls {
                     agent_key
                 }
             } else if let Some(dpki) = self.services().dpki {
-                let index = state_lock.get_state().await?.apps_installed;
-                dpki.derive_and_register_new_key(index).await?
+                dpki.lock().await.derive_and_register_new_key().await?
             } else {
                 self.keystore.new_sign_keypair_random().await?
             };
@@ -1590,8 +1585,8 @@ mod app_impls {
             state: &ConductorState,
         ) -> ConductorResult<Option<AppInfo>> {
             match state.get_app(app_id) {
-                None => Ok(None),
-                Some(app) => {
+                Err(_) => Ok(None),
+                Ok(app) => {
                     let dna_definitions = self.get_dna_definitions(app)?;
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
@@ -2153,9 +2148,8 @@ mod service_impls {
         pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.services.share_mut(|s| {
-                    let dpki =
+                    s.dpki =
                         DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), installation);
-                    s.dpki = Some(Arc::new(dpki));
                 });
             }
             Ok(())

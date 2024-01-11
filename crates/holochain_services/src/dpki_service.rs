@@ -12,6 +12,8 @@ pub mod derivation_paths;
 /// and is used to distinguish the DPKI service from other apps.
 pub const DPKI_APP_ID: &str = "DPKI";
 
+pub type DpkiMutex = Option<Arc<tokio::sync::Mutex<dyn DpkiService>>>;
+
 /// Interface for the DPKI service
 #[async_trait::async_trait]
 #[mockall::automock]
@@ -25,10 +27,7 @@ pub trait DpkiService: Send + Sync {
     ) -> DpkiServiceResult<KeyState>;
 
     /// Derive a new key in lair using the given index, and register it with DPKI
-    async fn derive_and_register_new_key(
-        &self,
-        index: InstalledAppIndex,
-    ) -> DpkiServiceResult<AgentPubKey>;
+    async fn derive_and_register_new_key(&self) -> DpkiServiceResult<AgentPubKey>;
 
     /// Defines the different ways that keys can be created and destroyed:
     /// If an old key is specified, it will be destroyed
@@ -114,11 +113,24 @@ pub struct DpkiInstallation {
 }
 
 /// The built-in implementation of the DPKI service contract, which runs a DNA
-#[derive(derive_more::Constructor)]
 pub struct DeepkeyBuiltin {
     runner: Arc<dyn CellRunner>,
     keystore: MetaLairClient,
     installation: DpkiInstallation,
+}
+
+impl DeepkeyBuiltin {
+    pub fn new(
+        runner: Arc<dyn CellRunner>,
+        keystore: MetaLairClient,
+        installation: DpkiInstallation,
+    ) -> DpkiMutex {
+        Some(Arc::new(tokio::sync::Mutex::new(Self {
+            runner,
+            keystore,
+            installation,
+        })))
+    }
 }
 
 #[allow(unreachable_code)]
@@ -155,11 +167,8 @@ impl DpkiService for DeepkeyBuiltin {
         Ok(state)
     }
 
-    async fn derive_and_register_new_key(
-        &self,
-        index: InstalledAppIndex,
-    ) -> DpkiServiceResult<AgentPubKey> {
-        let derivation_path = todo!();
+    async fn derive_and_register_new_key(&self) -> DpkiServiceResult<AgentPubKey> {
+        let derivation_path = todo!("get path from deepkey DNA");
         let info = self
             .keystore
             .lair_client()
