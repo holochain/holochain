@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 
-use crate::CellRunner;
-
 pub mod derivation_paths;
+
+mod deepkey;
+pub use deepkey::*;
 
 /// This magic string, when used as the installed app id, denotes that the app
 /// is not actually an app, but the DPKI service! This is now a reserved app id,
 /// and is used to distinguish the DPKI service from other apps.
 pub const DPKI_APP_ID: &str = "DPKI";
 
-pub type DpkiMutex = Option<Arc<tokio::sync::Mutex<dyn DpkiService>>>;
+pub type DpkiMutex = Arc<tokio::sync::Mutex<dyn DpkiService>>;
 
 /// Interface for the DPKI service
 #[async_trait::async_trait]
@@ -96,101 +96,6 @@ pub trait DpkiServiceExt: DpkiService {
     }
 }
 impl<T> DpkiServiceExt for T where T: DpkiService + Sized {}
-
-/// Data needed to initialize the DPKI service, if installed
-#[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Debug, SerializedBytes)]
-pub struct DpkiInstallation {
-    /// The initial cell ID used by the DPKI service.
-    ///
-    /// The AgentPubKey of this cell was generated from the DPKI "device seed".
-    /// Upon installation, the first derivation of the seed is used.
-    /// Agent key updates use subsequent derivations.
-    pub cell_id: CellId,
-
-    /// The lair tag used to refer to the "device seed" which was used to generate
-    /// the AgentPubKey for the DPKI cell
-    pub device_seed_lair_tag: String,
-}
-
-/// The built-in implementation of the DPKI service contract, which runs a DNA
-pub struct DeepkeyBuiltin {
-    runner: Arc<dyn CellRunner>,
-    keystore: MetaLairClient,
-    installation: DpkiInstallation,
-}
-
-impl DeepkeyBuiltin {
-    pub fn new(
-        runner: Arc<dyn CellRunner>,
-        keystore: MetaLairClient,
-        installation: DpkiInstallation,
-    ) -> DpkiMutex {
-        Some(Arc::new(tokio::sync::Mutex::new(Self {
-            runner,
-            keystore,
-            installation,
-        })))
-    }
-}
-
-#[allow(unreachable_code)]
-#[allow(unused_variables)]
-#[allow(clippy::needless_lifetimes)]
-#[async_trait::async_trait]
-impl DpkiService for DeepkeyBuiltin {
-    async fn key_state(
-        &self,
-        key: AgentPubKey,
-        timestamp: Timestamp,
-    ) -> DpkiServiceResult<KeyState> {
-        let keystore = self.keystore.clone();
-        let cell_id = self.installation.cell_id.clone();
-        let agent_anchor = key.get_raw_32();
-        let zome_name: ZomeName = "deepkey".into();
-        let fn_name: FunctionName = "key_state".into();
-        let payload = ExternIO::encode((agent_anchor, timestamp))?;
-        let cap_secret = None;
-        let provenance = cell_id.agent_pubkey().clone();
-        let response = self
-            .runner
-            .call_zome(
-                &provenance,
-                cap_secret,
-                cell_id,
-                zome_name,
-                fn_name,
-                payload,
-            )
-            .await
-            .map_err(DpkiServiceError::ZomeCallFailed)?;
-        let state: KeyState = response.decode()?;
-        Ok(state)
-    }
-
-    async fn derive_and_register_new_key(&self) -> DpkiServiceResult<AgentPubKey> {
-        let derivation_path = todo!("get path from deepkey DNA");
-        let info = self
-            .keystore
-            .lair_client()
-            .derive_seed(todo!(), None, todo!(), None, derivation_path)
-            .await
-            .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-        let agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
-        Ok(agent)
-    }
-
-    async fn key_mutation(
-        &self,
-        old_key: Option<AgentPubKey>,
-        new_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<()> {
-        todo!()
-    }
-
-    fn cell_id(&self) -> &CellId {
-        &self.installation.cell_id
-    }
-}
 
 /// Create a minimal usable mock of DPKI
 #[cfg(feature = "fuzzing")]

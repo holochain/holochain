@@ -2148,8 +2148,11 @@ mod service_impls {
         pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.services.share_mut(|s| {
-                    s.dpki =
-                        DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), installation);
+                    s.dpki = Some(DeepkeyBuiltin::new(
+                        self.clone(),
+                        self.keystore().clone(),
+                        installation,
+                    ));
                 });
             }
             Ok(())
@@ -2198,7 +2201,7 @@ mod service_impls {
                 .await?;
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
 
-            let installation = DpkiInstallation {
+            let installation = DeepkeyInstallation {
                 cell_id,
                 device_seed_lair_tag,
             };

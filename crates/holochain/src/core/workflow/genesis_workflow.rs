@@ -211,7 +211,7 @@ mod tests {
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()
                 .return_const(ConductorServices {
-                    dpki: Some(Arc::new(mock_dpki())),
+                    dpki: Some(Arc::new(tokio::sync::Mutex::new(mock_dpki()))),
                     app_store: Some(Arc::new(mock_app_store())),
                 });
             api.expect_keystore().return_const(keystore.clone());

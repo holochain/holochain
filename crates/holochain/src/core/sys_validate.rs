@@ -7,7 +7,6 @@ use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_services::DpkiMutex;
-use holochain_services::DpkiService;
 use holochain_services::KeyState;
 use holochain_types::prelude::*;
 use std::sync::Arc;

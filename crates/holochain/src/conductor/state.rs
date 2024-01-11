@@ -3,7 +3,7 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_services::DpkiInstallation;
+use holochain_services::DeepkeyInstallation;
 use holochain_services::DPKI_APP_ID;
 use holochain_types::prelude::*;
 use serde::Deserialize;
@@ -29,7 +29,7 @@ impl Default for ConductorStateTag {
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 pub struct ConductorServicesState {
     /// Data needed to initialize the DPKI service, if installed
-    pub dpki: Option<DpkiInstallation>,
+    pub dpki: Option<DeepkeyInstallation>,
 }
 
 /// Mutable conductor state, stored in a DB and writable only via Admin interface.
