@@ -184,7 +184,7 @@ async fn two_nodes_publish_and_fetch() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
-// #[ignore = "Takes nearly 5-10 minutes to run locally, that is far too slow for CI. Should it run quicker?"]
+#[ignore = "Takes nearly 5-10 minutes to run locally, that is far too slow for CI. Should it run quicker?"]
 async fn two_nodes_publish_and_fetch_large_number_of_ops() {
     holochain_trace::test_run().unwrap();
 
