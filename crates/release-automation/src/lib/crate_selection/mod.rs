@@ -168,11 +168,11 @@ impl<'a> Crate<'a> {
                 {
                     let extracted_version_req = match &manifest[key][name] {
                         toml_edit::Item::Value(toml_edit::Value::String(_)) => {
-                            return Err(anyhow::anyhow!("{} has a dependency on {} with a version req that is simple but must be detailed and include a path.", self.name(), name));
+                            bail!("{} has a dependency on {} with a version req that is simple but must be detailed and include a path.", self.name(), name);
                         }
                         toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
                             if t.get("path").is_none() {
-                                return Err(anyhow::anyhow!("{} has a dependency on {} that doesn't include a path.", self.name(), name));
+                                bail!("{} has a dependency on {} that doesn't include a path.", self.name(), name);
                             }
 
                             t.get("version").and_then(|v| v.as_str()).map(|version| {
@@ -184,7 +184,7 @@ impl<'a> Crate<'a> {
                             })
                         }
                         _ => {
-                            return Err(anyhow::anyhow!("{} has a dependency on {} with a version req that is in a format that wasn't recognised.", self.name(), name));
+                            bail!("{} has a dependency on {} with a version req that is in a format that wasn't recognised.", self.name(), name);
                         }
                     };
 
