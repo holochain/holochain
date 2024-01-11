@@ -922,7 +922,7 @@ impl<'a> ReleaseWorkspace<'a> {
                                     insert_state!(CrateStateFlags::HasPreviousRelease);
 
                                     // todo: make comparison ref configurable
-                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD")?;
+                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD").context(format!("evaluating changes between {git_tag} and HEAD"))?;
                                     if !changed_files.is_empty()
                                     {
                                         debug!("[{}] changed files since {git_tag}: {changed_files:?}", member.name());
