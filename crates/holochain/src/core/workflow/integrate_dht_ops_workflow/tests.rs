@@ -335,7 +335,7 @@ impl Db {
                         mutations::set_validation_stage(
                             txn,
                             &hash,
-                            ValidationLimboStatus::AwaitingIntegration,
+                            ValidationStage::AwaitingIntegration,
                         )
                         .unwrap();
                         mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)

@@ -128,9 +128,7 @@ mod chc;
 
 pub use chc::*;
 
-mod conductor_services;
-
-pub use conductor_services::*;
+pub use holochain_conductor_services::*;
 
 pub use accessor_impls::*;
 pub use app_impls::*;
@@ -203,7 +201,7 @@ pub struct Conductor {
     running_cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
-    pub config: ConductorConfig,
+    pub config: Arc<ConductorConfig>,
 
     /// The map of dna hash spaces.
     pub(crate) spaces: Spaces,
@@ -265,7 +263,7 @@ mod startup_shutdown_impls {
     impl Conductor {
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
-            config: ConductorConfig,
+            config: Arc<ConductorConfig>,
             ribosome_store: RwShare<RibosomeStore>,
             keystore: MetaLairClient,
             holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -273,7 +271,7 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
-            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
+            let tracing_scope = config.tracing_scope().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
@@ -1143,8 +1141,6 @@ mod network_impls {
                     let cutoff = self
                         .get_config()
                         .network
-                        .clone()
-                        .unwrap_or_default()
                         .tuning_params
                         .danger_gossip_recent_threshold();
                     let topo = self
@@ -1935,6 +1931,9 @@ mod app_status_impls {
                     };
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let network = cell.holochain_p2p_dna().clone();
+
+                    aitia::trace!(&hc_sleuth::Event::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
+
                     match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");

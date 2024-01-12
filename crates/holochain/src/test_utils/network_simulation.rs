@@ -386,7 +386,7 @@ async fn create_test_data(
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        network: Some(network),
+        network,
         data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };

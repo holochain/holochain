@@ -41,7 +41,9 @@ impl<'c, T: Fact> DepGraph<'c, T> {
             .collect()
     }
 
-    pub fn print(&self) {
+    pub fn report(&self) -> std::io::Result<String> {
+        use std::fmt::Write;
+        let mut out = "".to_string();
         let dot = format!(
             "{:?}",
             petgraph::dot::Dot::with_attr_getters(
@@ -53,14 +55,22 @@ impl<'c, T: Fact> DepGraph<'c, T> {
         );
 
         if let Ok(graph) = graph_easy(&dot) {
-            println!("Original dot output:\n\n{}", dot);
-            println!("`graph-easy` output:\n{}", graph);
+            writeln!(&mut out, "Original dot output:\n\n{}", dot).unwrap();
+            writeln!(&mut out, "`graph-easy` output:\n{}", graph).unwrap();
         } else {
-            println!(
+            writeln!(
+                &mut out,
                 "`graph-easy` not installed. Original dot output:\n\n{}",
                 dot
-            );
+            )
+            .unwrap();
         }
+        Ok(out)
+    }
+
+    pub fn print(&self) {
+        let report = self.report().unwrap();
+        println!("{report}");
     }
 }
 

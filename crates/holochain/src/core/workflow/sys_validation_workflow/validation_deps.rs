@@ -109,7 +109,7 @@ impl ValidationDependencies {
     }
 
     /// Forget which dependencies have been accessed since this method was last called.
-    /// This is intended to be used with [`purge_held_deps`] to remove any dependencies that are no longer needed.
+    /// This is intended to be used with [`Self::purge_held_deps`] to remove any dependencies that are no longer needed.
     pub fn clear_retained_deps(&mut self) {
         self.retained_deps.clear();
     }
