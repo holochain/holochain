@@ -1,7 +1,6 @@
 //! The workflow and queue consumer for validation receipt
 
 use super::*;
-use crate::conductor::conductor::CellStatus;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
 use futures::FutureExt;
 use tracing::*;
@@ -28,7 +27,7 @@ pub fn spawn_validation_receipt_consumer(
                 env.clone(),
                 network.clone(),
                 keystore.clone(),
-                conductor.running_cell_ids(Some(CellStatus::Joined)),
+                conductor.live_cell_ids(),
                 {
                     let conductor = conductor.clone();
                     move |block| {

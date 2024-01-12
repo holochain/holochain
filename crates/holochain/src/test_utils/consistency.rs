@@ -39,7 +39,7 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
     // For each space get all the cells, their db and the p2p envs.
     let mut spaces = HashMap::new();
     for (i, c) in conductors.iter().enumerate() {
-        for cell_id in c.running_cell_ids(None) {
+        for cell_id in c.running_cell_ids(|_| true) {
             let space = spaces
                 .entry(cell_id.dna_hash().clone())
                 .or_insert_with(|| vec![None; conductors.len()]);
@@ -113,7 +113,7 @@ pub async fn local_machine_session_with_hashes(
     // Grab the environments and cells for each conductor in this space.
     let mut conductors = vec![None; handles.len()];
     for (i, c) in handles.iter().enumerate() {
-        for cell_id in c.running_cell_ids(None) {
+        for cell_id in c.running_cell_ids(|_| true) {
             if cell_id.dna_hash() != space {
                 continue;
             }

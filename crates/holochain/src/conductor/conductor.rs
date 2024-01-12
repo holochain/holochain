@@ -158,11 +158,14 @@ pub enum PendingJoinReason {
     Initial,
 
     /// The join failed with an error that is safe to retry, such as not being connected to the internet.
-    Retry,
+    Retry(String),
 
     /// The network join failed and will not be retried. This will impact the status of the associated
     /// app and require manual intervention from the user.
-    Failed,
+    Failed(String),
+
+    /// The join attempt has timed out.
+    TimedOut,
 }
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
@@ -170,6 +173,7 @@ pub enum PendingJoinReason {
 pub enum CellStatus {
     /// Kitsune knows about this Cell and it is considered fully "online"
     Joined,
+
     /// The Cell is on its way to being fully joined. It is a valid Cell from
     /// the perspective of the conductor, and can handle HolochainP2pEvents,
     /// but it is considered not to be fully running from the perspective of
@@ -180,9 +184,6 @@ pub enum CellStatus {
     /// The Cell is currently in the process of trying to join the network.
     Joining,
 }
-
-/// Declarative filter for CellStatus
-pub type CellStatusFilter = CellStatus;
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
 #[derive(Debug, Clone, Serialize)]
@@ -1602,25 +1603,15 @@ mod cell_impls {
         /// fully initialized and are registered with the kitsune network layer.
         /// Generally used to handle conductor interface requests.
         pub fn live_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cell_ids(Some(CellStatusFilter::Joined))
+            self.running_cell_ids(|status| matches!(status, CellStatus::Joined))
         }
 
         /// List CellIds for Cells which match a status filter
-        pub fn running_cell_ids(&self, filter: Option<CellStatusFilter>) -> HashSet<CellId> {
+        pub fn running_cell_ids(&self, filter: impl Fn(&CellStatus) -> bool) -> HashSet<CellId> {
             self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
-                    .filter_map(|(id, cell)| {
-                        let matches = filter
-                            .as_ref()
-                            .map(|status| cell.status == *status)
-                            .unwrap_or(true);
-                        if matches {
-                            Some(id)
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(move |(id, cell)| filter(&cell.status).then_some(id))
                     .cloned()
                     .collect()
             })
@@ -1946,15 +1937,15 @@ mod app_status_impls {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
 
                             if Self::is_p2p_join_error_retryable(&e) {
-                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry(format!("{e:?}")))))
                             }
                             else {
-                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed(format!("{e:?}")))))
                             }
                         }
                         Err(_) => {
                             tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::TimedOut)))
                         }
                         Ok(Ok(_)) => Ok(cell_id),
                     }
@@ -2007,9 +1998,9 @@ mod app_status_impls {
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
             let cell_ids: HashSet<CellId> = self.live_cell_ids();
-            let retry_cell_ids = self.running_cell_ids(Some(CellStatusFilter::PendingJoin(
-                PendingJoinReason::Retry,
-            )));
+            let retry_cell_ids = self.running_cell_ids(|status| {
+                matches!(status, CellStatus::PendingJoin(PendingJoinReason::Retry(_)))
+            });
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]

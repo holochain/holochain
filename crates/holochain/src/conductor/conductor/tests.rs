@@ -1020,16 +1020,12 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.running_cell_ids(Some(Joined)).len(),
             conductor
-                .running_cell_ids(Some(PendingJoin(PendingJoinReason::Initial)))
-                .len()
-                + conductor
-                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Retry)))
-                    .len()
-                + conductor
-                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Failed)))
-                    .len(),
+                .running_cell_ids(|status| matches!(status, Joined))
+                .len(),
+            conductor
+                .running_cell_ids(|status| matches!(status, PendingJoin(_)))
+                .len(),
         )
     };
 
@@ -1039,7 +1035,7 @@ async fn test_cell_and_app_status_reconciliation() {
     conductor.update_cell_status(
         cell1
             .iter()
-            .map(|c| (c, PendingJoin(PendingJoinReason::Failed))),
+            .map(|c| (c, PendingJoin(PendingJoinReason::Failed("because".into())))),
     );
     assert_eq!(check().await, (Running, 2, 1));
 
