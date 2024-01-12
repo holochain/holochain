@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tracing::info;
 use wasmer::{
-    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target, Triple,
+    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target, Triple, Engine,
 };
 use wasmer_middlewares::*;
 
@@ -52,6 +52,6 @@ pub fn build_ios_module(wasm: &[u8]) -> Result<Module, CompileError> {
 
 /// Generate a headless Dylib Store suitable for iOS.
 /// Useful for re-building an iOS Module from a preserialized WASM Module.
-pub fn ios_dylib_headless_store() -> Store {
-    Store::default()
+pub fn ios_headless_engine() -> Engine {
+    Engine::default()
 }
