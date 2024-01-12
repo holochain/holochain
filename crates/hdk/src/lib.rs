@@ -398,7 +398,7 @@ pub mod countersigning;
 pub mod entry;
 
 pub use hdi;
-pub use hdi::entry_defs;
+pub use hdi::entry_types;
 
 pub mod hash;
 

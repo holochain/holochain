@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These 'store record' checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don't actually need.
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
 ## 0.3.0-beta-dev.29
 
 - Sys validation will now validate that a DeleteLink points to an action which is a CreateLink through the `link_add_address` of the delete.

@@ -48,32 +48,103 @@ pub(crate) mod traversal;
 #[cfg(feature = "tracing")]
 pub mod logging;
 
-pub use dep::Dep;
+use std::collections::HashSet;
+
+pub use dep::{Dep, DepError, DepResult};
 pub use fact::{Fact, FactTraits};
 
 #[cfg(test)]
 mod tests;
 
-use traversal::Traversal;
+use traversal::{Traversal, TraversalError, TraversalResult};
+
+#[macro_export]
+macro_rules! assert_fact {
+    ($ctx: expr, $fact: expr) => {{
+        use $crate::Fact;
+        let tr = $fact.clone().traverse($ctx);
+        if let Some(report) = $crate::simple_report(&tr) {
+            panic!("{report}");
+        }
+    }};
+}
+
+pub enum TraversalOutcome<'c, F: Fact> {
+    /// The fact was true and all dependencies were true
+    Success,
+    /// The fact was not true
+    DependencyNotMet,
+    /// The fact was true, but some dependencies were not, which indicates an incorrect model
+    IncorrectModel(&'c HashSet<Dep<F>>),
+}
+
+impl<'c, F: Fact> TraversalOutcome<'c, F> {
+    pub fn report(&self) -> Option<String> {
+        match self {
+            TraversalOutcome::Success => None,
+            TraversalOutcome::DependencyNotMet => Some("aitia dependency not met given the context".to_string()) ,
+            TraversalOutcome::IncorrectModel(deps) => Some(format!("Target fact was true, but some dependency checks failed. Your model may be incorrect. Failed checks: {deps:?}")) ,
+        }
+    }
+
+    pub fn from_traversal(tr: &'c Traversal<'c, F>) -> Self {
+        let Traversal {
+            root_check_passed,
+            terminals,
+            ..
+        } = tr;
+        if *root_check_passed {
+            if terminals.is_empty() {
+                // All is well
+                TraversalOutcome::Success
+            } else {
+                TraversalOutcome::IncorrectModel(terminals)
+            }
+        } else {
+            TraversalOutcome::DependencyNotMet
+        }
+    }
+}
 
 /// Helpful function for printing a report from a given Traversal
 ///
 /// You're encouraged to write your own reports as best serve you, but this
 /// is a good starting point.
-pub fn simple_report<T: Fact>(traversal: &Traversal<T>) {
-    match traversal {
-        Traversal::Pass => println!("PASS"),
-        Traversal::Fail { tree, passes, ctx } => {
-            tree.print();
-            let passes: Vec<_> = passes.iter().map(|p| p.explain(ctx)).collect();
-            println!("Passing checks");
-            for pass in passes {
-                println!("{pass}");
+#[must_use]
+pub fn simple_report<T: Fact>(tr: &TraversalResult<T>) -> Option<String> {
+    use std::fmt::Write;
+    match tr {
+        Ok(tr) => {
+            let mut out = "".to_string();
+            let outcome = TraversalOutcome::from_traversal(tr);
+            if let Some(problem) = outcome.report() {
+                writeln!(&mut out, "The targed fact FAILED: {problem}").unwrap();
+
+                writeln!(&mut out, "{}", tr.graph.report().unwrap()).unwrap();
+                let terminals: Vec<_> = tr.terminals.iter().map(|p| p.explain(tr.ctx)).collect();
+
+                writeln!(&mut out, "Terminal nodes:").unwrap();
+                for term in terminals {
+                    writeln!(&mut out, "{term}").unwrap();
+                }
+                Some(out)
+            } else {
+                None
             }
         }
-        Traversal::TraversalError { error, tree } => {
-            tree.print();
-            println!("Traversal error: {:?}", error)
+        Err(TraversalError { graph, inner }) => {
+            let mut out = "".to_string();
+            writeln!(&mut out, "{}", graph.report().unwrap()).unwrap();
+            writeln!(&mut out, "Traversal error: {inner:?}").unwrap();
+            Some(out)
         }
+    }
+}
+
+pub fn print_simple_report<T: Fact>(tr: &TraversalResult<T>) {
+    if let Some(report) = simple_report(tr) {
+        println!("{report}");
+    } else {
+        println!("The target fact PASSED");
     }
 }

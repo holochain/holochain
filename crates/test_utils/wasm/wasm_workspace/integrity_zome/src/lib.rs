@@ -8,14 +8,14 @@ pub struct Msg(pub String);
 #[hdk_entry_helper]
 pub struct PrivMsg(pub String);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Post(Post), // "post"
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Msg(Msg),
-    #[entry_def(required_validations = 5, visibility = "private")]
+    #[entry_type(required_validations = 5, visibility = "private")]
     PrivMsg(PrivMsg),
 }
 
@@ -24,7 +24,7 @@ fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallba
     let GenesisSelfCheckDataV2 {
         membrane_proof: _maybe_membrane_proof,
         agent_key: _agent_key,
-     } = data;
+    } = data;
     Ok(ValidateCallbackResult::Valid)
 }
 

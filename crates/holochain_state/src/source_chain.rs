@@ -340,13 +340,17 @@ impl SourceChain {
                 for shh in actions.iter() {
                     insert_action(txn, shh)?;
                 }
-                for (op, op_hash, op_order, timestamp, _) in &ops {
+                for (op, op_hash, op_order, timestamp, dep) in &ops {
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
                         set_withhold_publish(txn, op_hash)?;
                     }
+                    aitia::trace!(&hc_sleuth::Event::Authored {
+                        by: (*author).clone(),
+                        op: hc_sleuth::OpInfo::new(op.clone(), op_hash.clone(), dep.clone()),
+                    });
                 }
                 SourceChainResult::Ok(actions)
             })
@@ -910,7 +914,7 @@ fn build_ops_from_actions(
     actions: Vec<SignedActionHashed>,
 ) -> SourceChainResult<(
     Vec<SignedActionHashed>,
-    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, Dependency)>,
+    Vec<(DhtOpLite, DhtOpHash, OpOrder, Timestamp, SysValDep)>,
 )> {
     // Actions end up back in here.
     let mut actions_output = Vec::with_capacity(actions.len());
@@ -937,7 +941,7 @@ fn build_ops_from_actions(
             let op_order = OpOrder::new(op_type, action.timestamp());
             let timestamp = action.timestamp();
             // Put the action back by value.
-            let dependency = get_dependency(op_type, &action);
+            let dependency = op.get_type().sys_validation_dependency(&action);
             h = Some(action);
             // Collect the DhtOpLite, DhtOpHash and OpOrder.
             ops.push((op, op_hash, op_order, timestamp, dependency));

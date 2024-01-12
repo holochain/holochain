@@ -12,7 +12,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
+use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized, TransferMethod};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -273,11 +273,11 @@ impl ShardedGossip {
             }
         };
 
-        let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
-        let bytes = gossip.len();
-        let gossip = wire::Wire::gossip(
+        let encoded = gossip.encode_vec().map_err(KitsuneError::other)?;
+        let bytes = encoded.len();
+        let wire = wire::Wire::gossip(
             self.gossip.space.clone(),
-            gossip.into(),
+            encoded.into(),
             self.gossip.gossip_type.into(),
         );
 
@@ -297,7 +297,18 @@ impl ShardedGossip {
         };
         // Wait for enough available outgoing bandwidth here before
         // actually sending the gossip.
-        con.notify(&gossip, timeout).await?;
+        con.notify(&wire, timeout).await?;
+
+        if let ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished: _ }) = gossip {
+            for hash in ops.iter() {
+                self.gossip.host_api.handle_op_hash_transmitted(
+                    &self.gossip.space,
+                    hash,
+                    TransferMethod::Gossip,
+                );
+            }
+        }
+
         Ok(())
     }
 
@@ -1011,7 +1022,8 @@ impl ShardedGossipLocal {
                             // there is at least 1 agent
                             let agent = agent.agent.clone();
                             let source = FetchSource::Agent(agent);
-                            self.incoming_missing_op_hashes(source, ops).await?;
+                            self.incoming_missing_op_hashes(source, ops, TransferMethod::Gossip)
+                                .await?;
                         } else {
                             tracing::warn!(
                                 "Op hashes were received for a round with no remote agent(s). {} ops dropped!",

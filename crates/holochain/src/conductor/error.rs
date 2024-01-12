@@ -4,7 +4,7 @@ use crate::conductor::cell::error::CellError;
 use crate::conductor::conductor::CellStatus;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_services::DpkiServiceError;
+use holochain_conductor_services::DpkiServiceError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;

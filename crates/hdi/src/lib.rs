@@ -72,7 +72,7 @@
 //! # pub struct A;
 //! # #[hdk_entry_helper]
 //! # pub struct B;
-//! # #[hdk_entry_defs(skip_hdk_extern = true)]
+//! # #[hdk_entry_types(skip_hdk_extern = true)]
 //! # #[unit_enum(UnitEntryTypes)]
 //! # pub enum EntryTypes {
 //! #     A(A),
@@ -139,8 +139,8 @@
 /// Current HDI rust crate version.
 pub const HDI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_entry_types;
 pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdk_link_types;
 
