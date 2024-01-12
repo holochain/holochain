@@ -162,6 +162,11 @@ async fn non_dna_op_as_first_action() {
     let mut create = fixt!(Create);
     create.prev_action = previous_action.as_hash().clone();
     create.action_seq = 0; // Not valid, a DNA should always be first
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create.clone()));
 
     let outcome = test_case
@@ -227,11 +232,16 @@ async fn validate_valid_create_op() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone().into();
-    validation_package_action.action_seq = 10;
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.author = test_case.agent.clone().into();
+    prev_create_action.action_seq = 10;
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(validation_package_action))
+        .sign_action(Action::Create(prev_create_action))
         .await;
 
     // Op to validate
@@ -240,6 +250,11 @@ async fn validate_valid_create_op() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let outcome = test_case
@@ -263,11 +278,16 @@ async fn validate_create_op_with_prev_from_network() {
     let mut test_case = TestCase::new().await;
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone().into();
-    validation_package_action.action_seq = 10;
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.author = test_case.agent.clone().into();
+    prev_create_action.action_seq = 10;
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(validation_package_action))
+        .sign_action(Action::Create(prev_create_action))
         .await;
 
     // Op to validate
@@ -276,6 +296,11 @@ async fn validate_create_op_with_prev_from_network() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     test_case
@@ -324,6 +349,11 @@ async fn validate_create_op_with_prev_action_not_found() {
     create_action.action_seq = signed_action.action().action_seq() + 1;
     create_action.prev_action = signed_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     test_case
@@ -369,6 +399,11 @@ async fn validate_create_op_author_mismatch_with_prev() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
@@ -419,6 +454,11 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = common_timestamp.clone().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
@@ -468,6 +508,11 @@ async fn validate_create_op_with_timestamp_before_prev() {
     create_action.timestamp = (Timestamp::now() - std::time::Duration::from_secs(10))
         .unwrap()
         .into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
@@ -515,6 +560,11 @@ async fn validate_create_op_seq_number_decrements() {
     create_action.action_seq = 9; // Should be 11, has gone down instead of up
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
@@ -559,6 +609,11 @@ async fn validate_create_op_seq_number_reused() {
     create_action.action_seq = 10; // Should be 11, but has been re-used
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action.clone()));
 
     let outcome = test_case
@@ -594,6 +649,11 @@ async fn validate_create_op_not_preceeded_by_avp() {
     prev_create_action.author = test_case.agent.clone().into();
     prev_create_action.action_seq = 10;
     prev_create_action.timestamp = Timestamp::now().into();
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case
         .sign_action(Action::Create(prev_create_action))
         .await;
@@ -700,6 +760,11 @@ async fn validate_valid_store_record_with_no_entry() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -715,12 +780,7 @@ async fn validate_valid_store_record_with_no_entry() {
         holochain_zome_types::record::RecordEntry::NotStored,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert!(
         matches!(outcome, Outcome::Accepted),
@@ -741,6 +801,11 @@ async fn validate_store_record_leaks_entry() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -760,12 +825,7 @@ async fn validate_store_record_leaks_entry() {
         holochain_zome_types::record::RecordEntry::Present(Entry::App(fixt!(AppEntryBytes))), // but go ahead and provide the entry data anyway
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::PrivateEntryLeaked.to_string()),
@@ -807,12 +867,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_type() {
         holochain_zome_types::record::RecordEntry::Present(app_entry),
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTypeMismatch.to_string()),
@@ -832,6 +887,11 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -864,12 +924,7 @@ async fn validate_store_record_with_entry_having_wrong_entry_hash() {
         holochain_zome_types::record::RecordEntry::Present(mismatched_entry),
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryHash.to_string()),
@@ -896,6 +951,11 @@ async fn validate_store_record_with_large_entry() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -924,12 +984,7 @@ async fn validate_store_record_with_large_entry() {
         holochain_zome_types::record::RecordEntry::Present(app_entry),
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTooLarge(5_000_011).to_string()),
@@ -965,6 +1020,11 @@ async fn validate_valid_store_record_update() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -994,7 +1054,7 @@ async fn validate_valid_store_record_update() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, previous_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
         .with_op(op)
         .run()
         .await
@@ -1024,6 +1084,11 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let signed_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1048,7 +1113,7 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
         .with_op(op)
         .run()
         .await
@@ -1090,6 +1155,11 @@ async fn validate_store_record_update_changes_entry_type() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let signed_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1120,7 +1190,7 @@ async fn validate_store_record_update_changes_entry_type() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
         .with_op(op)
         .run()
         .await
@@ -1150,6 +1220,11 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1168,12 +1243,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_type() {
         app_entry,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTypeMismatch.to_string()),
@@ -1193,6 +1263,11 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1225,12 +1300,7 @@ async fn validate_store_entry_with_entry_having_wrong_entry_hash() {
         mismatched_entry,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryHash.to_string()),
@@ -1257,6 +1327,11 @@ async fn validate_store_entry_with_large_entry() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1285,12 +1360,7 @@ async fn validate_store_entry_with_large_entry() {
         app_entry,
     );
 
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![previous_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
+    let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert_eq!(
         Outcome::Rejected(ValidationOutcome::EntryTooLarge(5_000_011).to_string()),
@@ -1326,6 +1396,11 @@ async fn validate_valid_store_entry_update() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1355,7 +1430,7 @@ async fn validate_valid_store_entry_update() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action, previous_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action])
         .with_op(op)
         .run()
         .await
@@ -1381,6 +1456,11 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let signed_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1405,7 +1485,7 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
         .with_op(op)
         .run()
         .await
@@ -1447,6 +1527,11 @@ async fn validate_store_entry_update_changes_entry_type() {
     action.timestamp = Timestamp::now();
     action.action_seq = 10;
     action.prev_action = fixt!(ActionHash);
+    action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let signed_action = test_case.sign_action(Action::Create(action)).await;
 
     // Op to validate
@@ -1477,7 +1562,7 @@ async fn validate_store_entry_update_changes_entry_type() {
     );
 
     let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone(), signed_action])
+        .expect_retrieve_records_from_cascade(vec![to_update_signed_action.clone()])
         .with_op(op)
         .run()
         .await
@@ -1559,6 +1644,11 @@ async fn validate_register_updated_content_missing_updates_ref() {
     // Needed to set up mocking but not actually referenced
     let mut dummy_prev_action = fixt!(Create);
     dummy_prev_action.author = test_case.agent.clone().into();
+    dummy_prev_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let dummy_prev_action = test_case
         .sign_action(Action::Create(dummy_prev_action))
         .await;
@@ -1661,6 +1751,11 @@ async fn validate_register_updated_record_missing_updates_ref() {
     // Needed to set up mocking but not actually referenced
     let mut dummy_prev_action = fixt!(Create);
     dummy_prev_action.author = test_case.agent.clone().into();
+    dummy_prev_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let dummy_prev_action = test_case
         .sign_action(Action::Create(dummy_prev_action))
         .await;
@@ -1750,6 +1845,11 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
     // Dummy action to set up the mock, won't be referenced
     let mut dummy_action = fixt!(Create);
     dummy_action.author = test_case.agent.clone().into();
+    dummy_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let dummy_action = test_case.sign_action(Action::Create(dummy_action)).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
@@ -1859,6 +1959,11 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
     // Dummy action to set up the mock, won't be referenced
     let mut dummy_action = fixt!(Create);
     dummy_action.author = test_case.agent.clone().into();
+    dummy_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let dummy_action = test_case.sign_action(Action::Create(dummy_action)).await;
 
     let mut mismatched_action_hash = fixt!(ActionHash);
@@ -2237,6 +2342,11 @@ fn test_op(previous: SignedHashed<Action>) -> DhtOp {
     create_action.action_seq = previous.action().action_seq() + 1;
     create_action.prev_action = previous.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let action = Action::Create(create_action);
 
     DhtOp::RegisterAgentActivity(fixt!(Signature), action)
