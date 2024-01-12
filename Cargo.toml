@@ -57,9 +57,9 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-resolver = "2"
-
 exclude = ["crates/release-automation"]
+
+resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -68,12 +68,12 @@ derive_more = "0.99"
 futures = "0.3"
 mockall = "0.11"
 must_future = "0.1"
+lair_keystore = "0.4.0"
+lair_keystore_api = "=0.4.0"
+rmp-serde = "=0.15.5"
 serde = "1.0"
 thiserror = "1.0"
-
-holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
-holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
-
+tx5-signal-srv = "=0.0.6-alpha"
 
 [profile.fast-test]
 inherits = "dev"

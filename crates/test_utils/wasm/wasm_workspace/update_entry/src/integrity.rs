@@ -6,12 +6,12 @@ pub struct Post(pub String);
 #[hdk_entry_helper]
 pub struct Msg(pub String);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Post(Post),
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Msg(Msg),
 }
 
@@ -26,7 +26,7 @@ pub fn msg() -> EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry(StoreEntry{ action, entry }) => match action.hashed.app_entry_def() {
+        Op::StoreEntry(StoreEntry { action, entry }) => match action.hashed.app_entry_def() {
             Some(AppEntryDef {
                 entry_index: entry_def_index,
                 zome_index,

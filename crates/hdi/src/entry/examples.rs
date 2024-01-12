@@ -10,13 +10,13 @@
 //! #[hdk_entry_helper]
 //! pub struct PrivMsg(pub String);
 //!
-//! #[hdk_entry_defs]
+//! #[hdk_entry_types]
 //! #[unit_enum(UnitEntryTypes)]
 //! pub enum EntryTypes {
 //!     Post(Post),
-//!     #[entry_def(required_validations = 5)]
+//!     #[entry_type(required_validations = 5)]
 //!     Msg(Msg),
-//!     #[entry_def(name = "hidden_msg", required_validations = 5, visibility = "private")]
+//!     #[entry_type(name = "hidden_msg", required_validations = 5, visibility = "private")]
 //!     PrivMsg(PrivMsg),
 //! }
 //! # fn main() {
@@ -35,12 +35,12 @@ pub struct Msg(pub String);
 #[hdk_entry_helper]
 pub struct PrivMsg(pub String);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     Post(Post),
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Msg(Msg),
-    #[entry_def(name = "hidden_msg", required_validations = 5, visibility = "private")]
+    #[entry_type(name = "hidden_msg", required_validations = 5, visibility = "private")]
     PrivMsg(PrivMsg),
 }

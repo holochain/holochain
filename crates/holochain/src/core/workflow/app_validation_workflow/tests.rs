@@ -85,10 +85,10 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type")]
-    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[hdk_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitEntryTypes)]
     pub enum EntryTypes {
-        #[entry_def(visibility = "private")]
+        #[entry_type(visibility = "private")]
         Post(Post),
     }
 

@@ -14,7 +14,7 @@ pub struct Tick;
 #[hdk_entry_helper]
 pub struct Tock;
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     TickInit(TickInit),

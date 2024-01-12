@@ -8,7 +8,7 @@ use proc_macro_error::abort;
 use syn::parse_macro_input;
 
 #[derive(FromVariant)]
-#[darling(attributes(entry_def, entry_name))]
+#[darling(attributes(entry_type, entry_name))]
 struct VarOpts {
     ident: syn::Ident,
     #[darling(default)]

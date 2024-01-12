@@ -38,7 +38,7 @@ impl<'a> arbitrary::Arbitrary<'a> for AppEntryName {
 /// at compile time.
 ///
 /// # Derivable
-/// This trait can be used with `#[derive]` or by using the attribute macro `hdk_derive::hdk_entry_defs`.
+/// This trait can be used with `#[derive]` or by using the attribute macro `hdk_derive::hdk_entry_types`.
 pub trait EntryDefRegistration {
     /// The list of [`EntryDef`] properties for the implementing type.
     /// This must be in the same order as the
