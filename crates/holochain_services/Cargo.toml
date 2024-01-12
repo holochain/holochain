@@ -15,6 +15,7 @@ async-trait = { workspace = true }
 derive_more = { workspace = true }
 futures = { workspace = true }
 mockall = { workspace = true }
+nanoid = { workspace = true }
 must_future = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

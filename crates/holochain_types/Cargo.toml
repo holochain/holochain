@@ -41,7 +41,7 @@ lazy_static = "1.4.0"
 mockall = "0.11.3"
 mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.3"}
 must_future = "0.1.1"
-nanoid = "0.3"
+nanoid = { workspace = true }
 holochain_trace = { version = "^0.3.0-beta-dev.3", path = "../holochain_trace" }
 parking_lot = "0.10"
 rand = "0.8.5"

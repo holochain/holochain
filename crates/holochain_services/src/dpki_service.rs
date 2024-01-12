@@ -27,7 +27,11 @@ pub trait DpkiService: Send + Sync {
     ) -> DpkiServiceResult<KeyState>;
 
     /// Derive a new key in lair using the given index, and register it with DPKI
-    async fn derive_and_register_new_key(&self) -> DpkiServiceResult<AgentPubKey>;
+    async fn derive_and_register_new_key(
+        &self,
+        app_name: InstalledAppId,
+        dna_hash: DnaHash,
+    ) -> DpkiServiceResult<AgentPubKey>;
 
     /// Defines the different ways that keys can be created and destroyed:
     /// If an old key is specified, it will be destroyed
