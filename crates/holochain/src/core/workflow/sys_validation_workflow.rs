@@ -1,4 +1,78 @@
-//! The workflow and queue consumer for sys validation
+//! ### The sys validation workflow
+//!
+//! This workflow runs against all [`DhtOp`]s that are in the DHT database, either coming from the authored database or from other nodes on the network via gossip and publishing.
+//!
+//! The purpose of the workflow is to make fundamental checks on the integrity of the data being put into the DHT. This ensures that invalid data is not served
+//! to other nodes on the network. It also saves hApp developers from having to write these checks themselves since they set the minimum standards that all data
+//! should meet regardless of the requirements of a given hApp.
+//!
+//! #### Validation checks
+//!
+//! The workflow operates on [`DhtOp`]s which are roughly equivalent to [`Record`]s but catered to the needs of a specific type of Authority.
+//! Checks that you can rely on sys validation having performed are:
+//! - For a [`DhtOp::StoreRecord`]
+//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
+//!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
+//!    - Run the [store entry checks](#store-entry-checks).
+//! - For a [`DhtOp::StoreEntry`]
+//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op is accepted.
+//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//!    - Run the [store entry checks](#store-entry-checks).
+//! - For a [`DhtOp::RegisterAgentActivity`]
+//!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//!    - If the [`Action`] is a [`Action::Dna`], then verify the contained DNA hash matches the DNA hash that sys validation is being run for.
+//!    - Run the [store record checks](#store-record-checks).
+//! - For a [`DhtOp::RegisterUpdatedContent`]
+//!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
+//! - For a [`DhtOp::RegisterUpdatedRecord`]
+//!    - The [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//!    - If there is an [`Entry`], then the [store entry checks](#store-entry-checks) are run.
+//! - For a [`DhtOp::RegisterDeletedBy`]
+//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
+//! - For a [`DhtOp::RegisterDeletedEntryAction`]
+//!    - The [`Delete::deletes_address`] reference to the [`Action`] being deleted must point to an [`Action`] that can be found locally. The action being deleted must be a [`Action::Create`] or [`Action::Update`].
+//! - For a [`DhtOp::RegisterAddLink`]
+//!   - The size of the [`CreateLink::tag`] must be less than or equal to the maximum size that is accepted for this link tag. This is specified in the constant [`MAX_TAG_SIZE`].
+//! - For a [`DhtOp::RegisterRemoveLink`]
+//!   - The [`DeleteLink::link_add_address`] reference to the [`Action`] of the link being deleted must point to an [`Action`] that can be found locally. That action being deleted must also
+//!     be a [`Action::CreateLink`].
+//!
+//! ##### Store record checks
+//!
+//! These checks are run when storing a new action for a [`DhtOp`].
+//!
+//! - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
+//! - Checks that the author of the current action is the same as the author of the previous action.
+//! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
+//! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
+//! - Checks that every [`Action::Create`] or [`Action::Update`] of an `AgentPubKey` is preceded by an [`Action::AgentValidationPkg`].
+//!
+//! ##### Store entry checks
+//!
+//! These checks are run when storing an entry that is included as part of a [`DhtOp`].
+//!
+//! - The entry type specified in the [`Action`] must match the entry type specified in the [`Entry`].
+//! - The entry hash specified in the [`Action`] must match the entry hash specified in the [`Entry`], which will be hashed as part of the check to obtain a value that is deterministic.
+//! - The size of the [`Entry`] must be less than or equal to the maximum size that is accepted for this entry type. This is specified in the constant [`MAX_ENTRY_SIZE`].
+//! - If the [`Action`] is an [`Action::Update`], then the [`Update::original_action_address`] reference to the [`Action`] being updated must point to an [`Action`] that can be found locally. Once the [`Action`] address has been resolved, the [`Update::original_entry_address`] is checked against the entry address that the referenced [`Action`] specified.
+//! - If the [`Entry`] is an [`Entry::CounterSign`], then the pre-flight response signatures are checked.
+//!
+//! #### Workflow description
+//!
+//! - The workflow starts by fetching all the ops that need to be validated from the database. The ops are processed as follows:
+//!     - Ops are sorted by [`OpOrder`], to make it more likely that incoming ops will be processed in the order they were created.
+//!     - The dependencies of these ops are then concurrently fetched from any of the local databases. Missing dependencies are handled later.
+//!     - The [validation checks](#validation-checks) are run for each op.
+//!     - For any ops that passed validation, they will be marked as ready for app validation in the database.
+//!     - Any ops which were rejected will be marked rejected in the database.
+//! - If any ops passed validation, then app validation will be triggered.
+//! - For actions that were not found locally, the workflow will then attempt to fetch them from the network.
+//! - If any actions that were missing are found on the network, then sys validation is re-triggered to see if the newly fetched actions allow any outstanding ops to pass validation.
+//! - If fewer actions were fetched from the network than there were actions missing, then the workflow will sleep for a short time before re-triggering itself.
+//! - Once all ops have an outcome, the workflow is complete and will wait to be triggered again by new incoming ops.
+//!
 
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
@@ -41,6 +115,7 @@ mod unit_tests;
 #[cfg(test)]
 mod validate_op_tests;
 
+/// The sys validation worfklow. It is described in the module level documentation.
 #[instrument(skip(
     workspace,
     current_validation_dependencies,
@@ -348,9 +423,6 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                         _ => vec![],
                     };
 
-                    if let Some(prev_action) = action.prev_action() {
-                        actions.push(prev_action.as_hash().clone());
-                    }
                     if let Action::Update(update) = action {
                         actions.push(update.original_action_address.clone());
                     }
@@ -374,14 +446,8 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                         _ => vec![],
                     };
 
-                    match action {
-                        NewEntryAction::Create(create) => {
-                            actions.push(create.prev_action.as_hash().clone());
-                        }
-                        NewEntryAction::Update(update) => {
-                            actions.push(update.prev_action.as_hash().clone());
-                            actions.push(update.original_action_address.clone());
-                        }
+                    if let NewEntryAction::Update(update) = action {
+                        actions.push(update.original_action_address.clone());
                     }
                     Some(actions)
                 }
@@ -510,7 +576,7 @@ async fn validate_op_inner(
     check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
-            store_record(action, validation_dependencies.clone())?;
+            check_prev_action(action)?;
             if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = entry {
@@ -560,10 +626,8 @@ async fn validate_op_inner(
                 }
             }
 
-            store_entry((action).into(), entry, validation_dependencies.clone()).await?;
-
-            let action = action.clone().into();
-            store_record(&action, validation_dependencies)
+            check_prev_action(&action.clone().into())?;
+            store_entry(action.into(), entry, validation_dependencies.clone()).await
         }
         DhtOp::RegisterAgentActivity(_, action) => {
             register_agent_activity(action, validation_dependencies.clone(), dna_def)?;
