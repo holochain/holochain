@@ -8,7 +8,24 @@
         version = "1.71.1";
       };
 
+      crossPkgsMingwW64 = import pkgs.path {
+        crossSystem = "x86_64-pc-windows-gnu";
+        inherit (pkgs) overlays;
+      };
+
+      CARGO_BUILD_TARGET_MINGWW64 = "x86_64-pc-windows-gnu";
+
+      rustToolchainWindowsPc64 = config.rustHelper.mkRust {
+        track = "stable";
+        version = "1.71.1";
+        targets = config.rustHelper.defaultTargets ++
+          [
+            CARGO_BUILD_TARGET_MINGWW64
+          ];
+      };
+
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLibWindowsPc64 = inputs.crane.lib.${system}.overrideToolchain rustToolchainWindowsPc64;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -50,6 +67,18 @@
         doCheck = false;
       });
 
+      holochainDepsRelease_cross_mingwW64 = craneLib.buildDepsOnly (commonArgs // {
+        CARGO_PROFILE = "release";
+        src = flake.config.srcCleanedHolochain;
+        doCheck = false;
+
+        CARGO_BUILD_TARGET = CARGO_BUILD_TARGET_MINGWW64;
+        depsBuildBuild = [
+          pkgs.pkgsCross.mingwW64.stdenv.cc
+          pkgs.pkgsCross.mingwW64.windows.pthreads
+        ];
+      });
+
       # derivation with the main crates
       holochain = lib.makeOverridable craneLib.buildPackage (commonArgs // {
         CARGO_PROFILE = "release";
@@ -57,6 +86,20 @@
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
         passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
+      });
+
+      holochain_cross_mingwW64 = craneLibWindowsPc64.buildPackage (commonArgs // {
+        CARGO_PROFILE = "release";
+        cargoArtifacts = holochainDepsRelease_cross_mingwW64;
+        src = flake.config.srcCleanedHolochain;
+        doCheck = false;
+        passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
+
+        CARGO_BUILD_TARGET = CARGO_BUILD_TARGET_MINGWW64;
+        depsBuildBuild = [
+          pkgs.pkgsCross.mingwW64.stdenv.cc
+          pkgs.pkgsCross.mingwW64.windows.pthreads
+        ];
       });
 
       holochain_chc = holochain.override { cargoExtraArgs = " --features chc"; };
@@ -214,6 +257,8 @@
           inherit
             holochain
             holochain_chc
+
+            holochain_cross_mingwW64
 
             build-holochain-tests-unit
             build-holochain-tests-unit-wasm
