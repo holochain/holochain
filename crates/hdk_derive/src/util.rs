@@ -54,7 +54,7 @@ pub fn get_single_tuple_variant<'a>(ident: &syn::Ident, fields: &'a syn::Fields)
     match fields {
         syn::Fields::Named(_) | syn::Fields::Unit => abort!(
             ident,
-            "hdk_entry_defs_conversions only works for tuple enums"
+            "hdk_entry_types_conversions only works for tuple enums"
         ),
         syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }) => unnamed
             .first()
@@ -62,7 +62,7 @@ pub fn get_single_tuple_variant<'a>(ident: &syn::Ident, fields: &'a syn::Fields)
             .unwrap_or_else(|| {
                 abort!(
                     unnamed,
-                    "hdk_entry_defs_conversions must only have a single enum tuple"
+                    "hdk_entry_types_conversions must only have a single enum tuple"
                 );
             }),
     }

@@ -15,7 +15,7 @@ impl From<Thing> for ValidateCallbackResult {
     }
 }
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Thing(Thing),

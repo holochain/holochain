@@ -1,0 +1,5 @@
+error: Unknown field: `nam`. Did you mean `name`?
+ --> tests/macros/entry_type_registration_bad_opts.rs:5:18
+  |
+5 |     #[entry_type(nam = "a")]
+  |                  ^^^
