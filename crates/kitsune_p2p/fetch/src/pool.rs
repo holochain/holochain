@@ -187,7 +187,7 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = Sources(
-                    [(source.clone(), SourceRecord::new(source, TransferMethod::Gossip))]
+                    [(source.clone(), SourceRecord::new(source, transfer_method))]
                         .into_iter()
                         .collect(),
                 );
