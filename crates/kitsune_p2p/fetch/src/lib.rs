@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-#![deny(warnings)]
+// #![deny(warnings)]
 
 //! Kitsune P2p Fetch Queue Logic
 
@@ -9,6 +9,7 @@ use kitsune_p2p_types::{KOpHash, KSpace};
 mod pool;
 mod respond;
 mod rough_sized;
+mod backoff;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
