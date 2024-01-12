@@ -2266,7 +2266,7 @@ mod misc_impls {
         pub async fn dump_conductor_state(&self) -> ConductorApiResult<String> {
             #[derive(Serialize, Debug)]
             pub struct ConductorSerialized {
-                running_cells: HashMap<CellId, CellItem>,
+                running_cells: Vec<((DnaHashB64, AgentPubKeyB64), CellItem)>,
                 shutting_down: bool,
                 admin_websocket_ports: Vec<u16>,
                 app_interfaces: Vec<AppInterfaceId>,
@@ -2278,8 +2278,16 @@ mod misc_impls {
                 state: ConductorState,
             }
 
-            let dump = ConductorSerialized {
-                running_cells: self.running_cells.share_ref(|c| c.clone()),
+            let conductor = ConductorSerialized {
+                running_cells: self.running_cells.share_ref(|c| {
+                    c.clone()
+                        .into_iter()
+                        .map(|(id, status)| {
+                            let (dna, agent) = id.into_dna_and_agent();
+                            ((dna.into(), agent.into()), status)
+                        })
+                        .collect()
+                }),
                 shutting_down: self.shutting_down.load(Ordering::SeqCst),
                 admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
                 app_interfaces: self
@@ -2287,10 +2295,12 @@ mod misc_impls {
                     .share_ref(|i| i.clone().keys().cloned().collect()),
             };
 
-            let out = serde_json::to_string_pretty(&ConductorDump {
-                conductor: dump,
+            let dump = ConductorDump {
+                conductor,
                 state: self.get_state().await?,
-            })?;
+            };
+
+            let out = serde_json::to_string_pretty(&dump)?;
 
             Ok(out)
         }
