@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_fetch"
-version = "0.3.0-beta-dev.20"
+version = "0.3.0-beta-dev.21"
 description = "Kitsune P2p Fetch Queue Logic"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,7 +14,7 @@ edition = "2021"
 [dependencies]
 derive_more = { workspace = true }
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.5", path = "../timestamp"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.18", path = "../types" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../types" }
 serde = { version = "1.0", features = [ "derive" ] }
 tokio = { version = "1.27", features = [ "full" ] }
 tracing = "0.1.29"
@@ -29,7 +29,7 @@ proptest-derive = { version = "0", optional = true }
 kitsune_p2p_fetch = { path = ".", features = ["test_utils", "sqlite", "fuzzing"]}
 
 holochain_serialized_bytes = "0.0.53"
-holochain_trace = { version = "^0.3.0-beta-dev.5", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 test-case = "1.2"
 tokio = { version = "1.27", features = [ "full", "test-util" ] }
