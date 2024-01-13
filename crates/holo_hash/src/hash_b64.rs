@@ -11,7 +11,7 @@ use crate::{error::HoloHashResult, HashType};
 
 /// A wrapper around HoloHash that `Serialize`s into a base64 string
 /// rather than a raw byte array.
-pub type HoloHashB64<T: HashType> = HoloHash<T, Base64Serializer>;
+pub type HoloHashB64<T> = HoloHash<T, Base64Serializer>;
 
 impl<T: HashType> HoloHashB64<T> {
     /// Read a HoloHash from base64 string
@@ -21,38 +21,68 @@ impl<T: HashType> HoloHashB64<T> {
     }
 }
 
+macro_rules! impl_froms {
+    ($t: ty) => {
+        impl From<HoloHash<$t, $crate::ser::ByteArraySerializer>>
+            for HoloHash<$t, $crate::ser::Base64Serializer>
+        {
+            fn from(h: HoloHash<$t, $crate::ser::ByteArraySerializer>) -> Self {
+                h.change_serialization()
+            }
+        }
+
+        impl From<HoloHash<$t, $crate::ser::Base64Serializer>>
+            for HoloHash<$t, $crate::ser::ByteArraySerializer>
+        {
+            fn from(h: HoloHash<$t, $crate::ser::Base64Serializer>) -> Self {
+                h.change_serialization()
+            }
+        }
+    };
+}
+
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
 
 /// Base64-ready version of AgentPubKey
 pub type AgentPubKeyB64 = HoloHashB64<hash_type::Agent>;
+impl_froms!(hash_type::Agent);
 
 /// Base64-ready version of DnaHash
 pub type DnaHashB64 = HoloHashB64<hash_type::Dna>;
+impl_froms!(hash_type::Dna);
 
 /// Base64-ready version of DhtOpHash
 pub type DhtOpHashB64 = HoloHashB64<hash_type::DhtOp>;
+impl_froms!(hash_type::DhtOp);
 
 /// Base64-ready version of EntryHash
 pub type EntryHashB64 = HoloHashB64<hash_type::Entry>;
+impl_froms!(hash_type::Entry);
 
 /// Base64-ready version of ActionHash
 pub type ActionHashB64 = HoloHashB64<hash_type::Action>;
+impl_froms!(hash_type::Action);
 
 /// Base64-ready version of NetIdHash
 pub type NetIdHashB64 = HoloHashB64<hash_type::NetId>;
+impl_froms!(hash_type::NetId);
 
 /// Base64-ready version of WasmHash
 pub type WasmHashB64 = HoloHashB64<hash_type::Wasm>;
+impl_froms!(hash_type::Wasm);
 
 /// Base64-ready version of ExternalHash
 pub type ExternalHashB64 = HoloHashB64<hash_type::External>;
+impl_froms!(hash_type::External);
 
 /// Base64-ready version of AnyDhtHash
 pub type AnyDhtHashB64 = HoloHashB64<hash_type::AnyDht>;
+impl_froms!(hash_type::AnyDht);
 
 /// Base64-ready version of AnyLinkableHash
 pub type AnyLinkableHashB64 = HoloHashB64<hash_type::AnyLinkable>;
+impl_froms!(hash_type::AnyLinkable);
 
 impl From<EntryHashB64> for AnyLinkableHash {
     fn from(h: EntryHashB64) -> Self {

@@ -2,23 +2,14 @@
 
 use crate::hash_type;
 use crate::ActionHash;
-use crate::ActionHashB64;
 use crate::AgentPubKey;
-use crate::AgentPubKeyB64;
 use crate::AnyDhtHash;
-use crate::AnyDhtHashB64;
 use crate::AnyLinkableHash;
-use crate::AnyLinkableHashB64;
 use crate::DhtOpHash;
-use crate::DhtOpHashB64;
 use crate::DnaHash;
-use crate::DnaHashB64;
 use crate::EntryHash;
-use crate::EntryHashB64;
 use crate::NetIdHash;
-use crate::NetIdHashB64;
 use crate::WasmHash;
-use crate::WasmHashB64;
 use ::fixt::prelude::*;
 use std::convert::TryFrom;
 

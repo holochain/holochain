@@ -27,14 +27,14 @@ async fn gossip_test() {
 
     consistency_60s([&cell_1, &cell_2]).await;
 
-    let hashes: EntryHashes = conductors[1]
+    let hashes: Vec<EntryHash> = conductors[1]
         .call(
             &cell_2.zome(TestWasm::Anchor),
             "list_anchor_addresses",
             "alice",
         )
         .await;
-    assert_eq!(hashes.0.len(), 1);
+    assert_eq!(hashes.len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -7,9 +7,19 @@ use crate::HoloHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_serialized_bytes::UnsafeBytes;
+use serde::ser::SerializeSeq;
 
 /// Ways of serializing a HoloHash
-pub trait HashSerializer: Clone + Debug {}
+pub trait HashSerializer: Clone + Debug {
+    fn get() -> HashSerialization;
+}
+
+/// Ways of serializing a HoloHash
+pub enum HashSerialization {
+    ByteArray,
+    Base64,
+    ByteSequence,
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 /// This hash is serialized as a byte array
@@ -19,15 +29,64 @@ pub struct ByteArraySerializer;
 /// This hash is serialized as a base64 string
 pub struct Base64Serializer;
 
-impl HashSerializer for ByteArraySerializer {}
-impl HashSerializer for Base64Serializer {}
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// This hash is serialized as a byte sequence (rather than a byte array).
+///
+/// Byte arrays are generally more compact than sequences, but not all formats
+/// support them, JSON included. For those formats, you can use this serialization
+/// method, or Base64 strings.
+pub struct ByteSequenceSerializer;
 
-impl<T: HashType, HS: HashSerializer> serde::Serialize for HoloHash<T, HS> {
+impl HashSerializer for ByteArraySerializer {
+    fn get() -> HashSerialization {
+        HashSerialization::ByteArray
+    }
+}
+
+impl HashSerializer for Base64Serializer {
+    fn get() -> HashSerialization {
+        HashSerialization::Base64
+    }
+}
+
+impl HashSerializer for ByteSequenceSerializer {
+    fn get() -> HashSerialization {
+        HashSerialization::ByteSequence
+    }
+}
+
+impl<T, R> HoloHash<T, R>
+where
+    T: HashType,
+    R: HashSerializer,
+{
+    /// Change the serialization phantom type
+    pub(crate) fn change_serialization<S: HashSerializer>(self) -> HoloHash<T, S> {
+        HoloHash {
+            hash: self.hash,
+            hash_type: self.hash_type,
+            _serializer: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: HashType, H: HashSerializer> serde::Serialize for HoloHash<T, H> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.get_raw_39())
+        match H::get() {
+            HashSerialization::ByteArray => serializer.serialize_bytes(self.get_raw_39()),
+            HashSerialization::Base64 => serializer.serialize_str(&self.to_string()),
+            HashSerialization::ByteSequence => {
+                let bytes = self.get_raw_39();
+                let mut seq = serializer.serialize_seq(Some(bytes.len()))?;
+                for element in bytes {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            }
+        }
     }
 }
 

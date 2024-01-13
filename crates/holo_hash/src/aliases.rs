@@ -1,8 +1,7 @@
 //! Type aliases for the various concrete HoloHash types
 
-use std::hash::Hash;
-
 use crate::hash_type;
+use crate::hash_type::*;
 use crate::ser::ByteArraySerializer;
 use crate::ser::HashSerializer;
 use crate::HashType;
@@ -15,63 +14,63 @@ use crate::PrimitiveHashType;
 // PRIMITIVE HASH TYPES
 
 /// An Agent public signing key. Not really a hash, more of an "identity hash".
-pub type AgentPubKey<S = ByteArraySerializer> = HoloHash<hash_type::Agent, S>;
+pub type AgentPubKey = HoloHash<hash_type::Agent, ByteArraySerializer>;
 
 /// A public key of a pair of signing keys for signing zome calls.
-pub type ZomeCallSigningKey<S = ByteArraySerializer> = AgentPubKey<S>;
+pub type ZomeCallSigningKey = AgentPubKey;
 
 /// The hash of a DnaDef
-pub type DnaHash<S = ByteArraySerializer> = HoloHash<hash_type::Dna, S>;
+pub type DnaHash = HoloHash<hash_type::Dna, ByteArraySerializer>;
 
 /// The hash of a DhtOp's "unique form" representation
-pub type DhtOpHash<S = ByteArraySerializer> = HoloHash<hash_type::DhtOp, S>;
+pub type DhtOpHash = HoloHash<hash_type::DhtOp, ByteArraySerializer>;
 
 /// The hash of an Entry.
-pub type EntryHash<S = ByteArraySerializer> = HoloHash<hash_type::Entry, S>;
+pub type EntryHash = HoloHash<hash_type::Entry, ByteArraySerializer>;
 
 /// The hash of an action
-pub type ActionHash<S = ByteArraySerializer> = HoloHash<hash_type::Action, S>;
+pub type ActionHash = HoloHash<hash_type::Action, ByteArraySerializer>;
 
 /// The hash of a network ID
-pub type NetIdHash<S = ByteArraySerializer> = HoloHash<hash_type::NetId, S>;
+pub type NetIdHash = HoloHash<hash_type::NetId, ByteArraySerializer>;
 
 /// The hash of some wasm bytecode
-pub type WasmHash<S = ByteArraySerializer> = HoloHash<hash_type::Wasm, S>;
+pub type WasmHash = HoloHash<hash_type::Wasm, ByteArraySerializer>;
 
 /// The hash of some external data that can't or doesn't exist on the DHT.
-pub type ExternalHash<S = ByteArraySerializer> = HoloHash<hash_type::External, S>;
+pub type ExternalHash = HoloHash<hash_type::External, ByteArraySerializer>;
 
 // COMPOSITE HASH TYPES
 
 /// The hash of anything referrable in the DHT.
 /// This is a composite of either an EntryHash or a ActionHash
-pub type AnyDhtHash<S = ByteArraySerializer> = HoloHash<hash_type::AnyDht, S>;
+pub type AnyDhtHash = HoloHash<hash_type::AnyDht, ByteArraySerializer>;
 
 /// The hash of anything linkable.
-pub type AnyLinkableHash<S = ByteArraySerializer> = HoloHash<hash_type::AnyLinkable, S>;
+pub type AnyLinkableHash = HoloHash<hash_type::AnyLinkable, ByteArraySerializer>;
 
 /// Alias for AnyLinkableHash. This hash forms the notion of the "basis hash" of an op.
-pub type OpBasis<S = ByteArraySerializer> = AnyLinkableHash<S>;
+pub type OpBasis = AnyLinkableHash;
 
 /// The primitive hash types represented by this composite hash
 pub enum AnyDhtHashPrimitive<S: HashSerializer> {
     /// This is an EntryHash
-    Entry(EntryHash<S>),
+    Entry(HoloHash<Entry, S>),
     /// This is a ActionHash
-    Action(ActionHash<S>),
+    Action(HoloHash<Action, S>),
 }
 
 /// The primitive hash types represented by this composite hash
 pub enum AnyLinkableHashPrimitive<S: HashSerializer> {
     /// This is an EntryHash
-    Entry(EntryHash<S>),
+    Entry(HoloHash<Entry, S>),
     /// This is a ActionHash
-    Action(ActionHash<S>),
+    Action(HoloHash<Action, S>),
     /// This is an ExternalHash
-    External(ExternalHash<S>),
+    External(HoloHash<External, S>),
 }
 
-impl<S: HashSerializer> AnyLinkableHash<S> {
+impl<S: HashSerializer> HoloHash<AnyLinkable, S> {
     /// Match on the primitive hash type represented by this composite hash type
     pub fn into_primitive(self) -> AnyLinkableHashPrimitive<S> {
         match self.hash_type() {
@@ -88,16 +87,16 @@ impl<S: HashSerializer> AnyLinkableHash<S> {
     }
 
     /// Downcast to AnyDhtHash if this is not an external hash
-    pub fn into_any_dht_hash(self) -> Option<AnyDhtHash<S>> {
+    pub fn into_any_dht_hash(self) -> Option<HoloHash<AnyDht, S>> {
         match self.into_primitive() {
-            AnyLinkableHashPrimitive::Action(hash) => Some(AnyDhtHash::from(hash)),
-            AnyLinkableHashPrimitive::Entry(hash) => Some(AnyDhtHash::from(hash)),
+            AnyLinkableHashPrimitive::Action(hash) => Some(HoloHash::<AnyDht, S>::from(hash)),
+            AnyLinkableHashPrimitive::Entry(hash) => Some(HoloHash::<AnyDht, S>::from(hash)),
             AnyLinkableHashPrimitive::External(_) => None,
         }
     }
 
     /// If this hash represents an ActionHash, return it, else None
-    pub fn into_action_hash(self) -> Option<ActionHash<S>> {
+    pub fn into_action_hash(self) -> Option<HoloHash<Action, S>> {
         if *self.hash_type() == hash_type::AnyLinkable::Action {
             Some(self.retype(hash_type::Action))
         } else {
@@ -106,7 +105,7 @@ impl<S: HashSerializer> AnyLinkableHash<S> {
     }
 
     /// If this hash represents an EntryHash, return it, else None
-    pub fn into_entry_hash(self) -> Option<EntryHash<S>> {
+    pub fn into_entry_hash(self) -> Option<HoloHash<Entry, S>> {
         if *self.hash_type() == hash_type::AnyLinkable::Entry {
             Some(self.retype(hash_type::Entry))
         } else {
@@ -119,7 +118,7 @@ impl<S: HashSerializer> AnyLinkableHash<S> {
     //
     // NOTE: this is not completely correct since EntryHash should be a composite type,
     //       with a fallible conversion to Agent
-    pub fn into_agent_pub_key(self) -> Option<AgentPubKey<S>> {
+    pub fn into_agent_pub_key(self) -> Option<HoloHash<Agent, S>> {
         if *self.hash_type() == hash_type::AnyLinkable::Entry {
             Some(self.retype(hash_type::Agent))
         } else {
@@ -128,7 +127,7 @@ impl<S: HashSerializer> AnyLinkableHash<S> {
     }
 
     /// If this hash represents an ExternalHash, return it, else None
-    pub fn into_external_hash(self) -> Option<ExternalHash<S>> {
+    pub fn into_external_hash(self) -> Option<HoloHash<External, S>> {
         if *self.hash_type() == hash_type::AnyLinkable::External {
             Some(self.retype(hash_type::External))
         } else {
@@ -137,7 +136,7 @@ impl<S: HashSerializer> AnyLinkableHash<S> {
     }
 }
 
-impl<S: HashSerializer> AnyDhtHash<S> {
+impl<S: HashSerializer> HoloHash<AnyDht, S> {
     /// Match on the primitive hash type represented by this composite hash type
     pub fn into_primitive(self) -> AnyDhtHashPrimitive<S> {
         match self.hash_type() {
@@ -149,7 +148,7 @@ impl<S: HashSerializer> AnyDhtHash<S> {
     }
 
     /// If this hash represents an ActionHash, return it, else None
-    pub fn into_action_hash(self) -> Option<ActionHash<S>> {
+    pub fn into_action_hash(self) -> Option<HoloHash<Action, S>> {
         if *self.hash_type() == hash_type::AnyDht::Action {
             Some(self.retype(hash_type::Action))
         } else {
@@ -158,7 +157,7 @@ impl<S: HashSerializer> AnyDhtHash<S> {
     }
 
     /// If this hash represents an EntryHash, return it, else None
-    pub fn into_entry_hash(self) -> Option<EntryHash<S>> {
+    pub fn into_entry_hash(self) -> Option<HoloHash<Entry, S>> {
         if *self.hash_type() == hash_type::AnyDht::Entry {
             Some(self.retype(hash_type::Entry))
         } else {
@@ -171,7 +170,7 @@ impl<S: HashSerializer> AnyDhtHash<S> {
     //
     // NOTE: this is not completely correct since EntryHash should be a composite type,
     //       with a fallible conversion to Agent
-    pub fn into_agent_pub_key(self) -> Option<AgentPubKey<S>> {
+    pub fn into_agent_pub_key(self) -> Option<HoloHash<Agent, S>> {
         if *self.hash_type() == hash_type::AnyDht::Entry {
             Some(self.retype(hash_type::Agent))
         } else {
@@ -191,17 +190,17 @@ impl<S: HashSerializer> AnyDhtHash<S> {
 
 // AnyDhtHash <-> AnyLinkableHash
 
-impl<S: HashSerializer> From<AnyDhtHash<S>> for AnyLinkableHash<S> {
-    fn from(hash: AnyDhtHash<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<AnyDht, S>> for HoloHash<AnyLinkable, S> {
+    fn from(hash: HoloHash<AnyDht, S>) -> Self {
         let t = (*hash.hash_type()).into();
         hash.retype(t)
     }
 }
 
-impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for AnyDhtHash<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyLinkable, S>> for HoloHash<AnyDht, S> {
     type Error = CompositeHashConversionError<hash_type::AnyLinkable, S>;
 
-    fn try_from(hash: AnyLinkableHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyLinkable, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_any_dht_hash()
             .ok_or_else(|| CompositeHashConversionError(hash, "AnyDht".into()))
@@ -210,40 +209,40 @@ impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for AnyDhtHash<S> {
 
 // AnyDhtHash <-> primitives
 
-impl<S: HashSerializer> From<ActionHash<S>> for AnyDhtHash<S> {
-    fn from(hash: ActionHash<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<Action, S>> for HoloHash<AnyDht, S> {
+    fn from(hash: HoloHash<Action, S>) -> Self {
         hash.retype(hash_type::AnyDht::Action)
     }
 }
 
-impl<S: HashSerializer> From<EntryHash<S>> for AnyDhtHash<S> {
-    fn from(hash: EntryHash<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<Entry, S>> for HoloHash<AnyDht, S> {
+    fn from(hash: HoloHash<Entry, S>) -> Self {
         hash.retype(hash_type::AnyDht::Entry)
     }
 }
 
 // Since an AgentPubKey can be treated as an EntryHash, we can also go straight
 // to AnyDhtHash
-impl<S: HashSerializer> From<AgentPubKey<S>> for AnyDhtHash<S> {
-    fn from(hash: AgentPubKey<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<Agent, S>> for HoloHash<AnyDht, S> {
+    fn from(hash: HoloHash<Agent, S>) -> Self {
         hash.retype(hash_type::AnyDht::Entry)
     }
 }
 
-impl<S: HashSerializer> TryFrom<AnyDhtHash<S>> for ActionHash<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyDht, S>> for HoloHash<Action, S> {
     type Error = HashConversionError<hash_type::AnyDht, hash_type::Action, S>;
 
-    fn try_from(hash: AnyDhtHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyDht, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_action_hash()
             .ok_or(HashConversionError(hash, hash_type::Action))
     }
 }
 
-impl<S: HashSerializer> TryFrom<AnyDhtHash<S>> for EntryHash<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyDht, S>> for HoloHash<Entry, S> {
     type Error = HashConversionError<hash_type::AnyDht, hash_type::Entry, S>;
 
-    fn try_from(hash: AnyDhtHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyDht, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_entry_hash()
             .ok_or(HashConversionError(hash, hash_type::Entry))
@@ -252,10 +251,10 @@ impl<S: HashSerializer> TryFrom<AnyDhtHash<S>> for EntryHash<S> {
 
 // Since an AgentPubKey can be treated as an EntryHash, we can also go straight
 // from AnyDhtHash
-impl<S: HashSerializer> TryFrom<AnyDhtHash<S>> for AgentPubKey<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyDht, S>> for HoloHash<Agent, S> {
     type Error = HashConversionError<hash_type::AnyDht, hash_type::Agent, S>;
 
-    fn try_from(hash: AnyDhtHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyDht, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_agent_pub_key()
             .ok_or(HashConversionError(hash, hash_type::Agent))
@@ -264,44 +263,44 @@ impl<S: HashSerializer> TryFrom<AnyDhtHash<S>> for AgentPubKey<S> {
 
 // AnyLinkableHash <-> primitives
 
-impl<S: HashSerializer> From<ActionHash<S>> for AnyLinkableHash<S> {
-    fn from(hash: ActionHash<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<Action, S>> for HoloHash<AnyLinkable, S> {
+    fn from(hash: HoloHash<Action, S>) -> Self {
         hash.retype(hash_type::AnyLinkable::Action)
     }
 }
 
-impl<S: HashSerializer> From<EntryHash<S>> for AnyLinkableHash<S> {
-    fn from(hash: EntryHash<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<Entry, S>> for HoloHash<AnyLinkable, S> {
+    fn from(hash: HoloHash<Entry, S>) -> Self {
         hash.retype(hash_type::AnyLinkable::Entry)
     }
 }
 
-impl<S: HashSerializer> From<AgentPubKey<S>> for AnyLinkableHash<S> {
-    fn from(hash: AgentPubKey<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<Agent, S>> for HoloHash<AnyLinkable, S> {
+    fn from(hash: HoloHash<Agent, S>) -> Self {
         hash.retype(hash_type::AnyLinkable::Entry)
     }
 }
 
-impl<S: HashSerializer> From<ExternalHash<S>> for AnyLinkableHash<S> {
-    fn from(hash: ExternalHash<S>) -> Self {
+impl<S: HashSerializer> From<HoloHash<External, S>> for HoloHash<AnyLinkable, S> {
+    fn from(hash: HoloHash<External, S>) -> Self {
         hash.retype(hash_type::AnyLinkable::External)
     }
 }
 
-impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for ActionHash<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyLinkable, S>> for HoloHash<Action, S> {
     type Error = HashConversionError<hash_type::AnyLinkable, hash_type::Action, S>;
 
-    fn try_from(hash: AnyLinkableHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyLinkable, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_action_hash()
             .ok_or(HashConversionError(hash, hash_type::Action))
     }
 }
 
-impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for EntryHash<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyLinkable, S>> for HoloHash<Entry, S> {
     type Error = HashConversionError<hash_type::AnyLinkable, hash_type::Entry, S>;
 
-    fn try_from(hash: AnyLinkableHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyLinkable, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_entry_hash()
             .ok_or(HashConversionError(hash, hash_type::Entry))
@@ -310,10 +309,10 @@ impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for EntryHash<S> {
 
 // Since an AgentPubKey can be treated as an EntryHash, we can also go straight
 // from AnyLinkableHash
-impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for AgentPubKey<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyLinkable, S>> for HoloHash<Agent, S> {
     type Error = HashConversionError<hash_type::AnyLinkable, hash_type::Agent, S>;
 
-    fn try_from(hash: AnyLinkableHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyLinkable, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_agent_pub_key()
             .ok_or(HashConversionError(hash, hash_type::Agent))
@@ -322,10 +321,10 @@ impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for AgentPubKey<S> {
 
 // Since an AgentPubKey can be treated as an EntryHash, we can also go straight
 // from AnyLinkableHash
-impl<S: HashSerializer> TryFrom<AnyLinkableHash<S>> for ExternalHash<S> {
+impl<S: HashSerializer> TryFrom<HoloHash<AnyLinkable, S>> for HoloHash<External, S> {
     type Error = HashConversionError<hash_type::AnyLinkable, hash_type::External, S>;
 
-    fn try_from(hash: AnyLinkableHash<S>) -> Result<Self, Self::Error> {
+    fn try_from(hash: HoloHash<AnyLinkable, S>) -> Result<Self, Self::Error> {
         hash.clone()
             .into_external_hash()
             .ok_or(HashConversionError(hash, hash_type::External))
@@ -340,7 +339,7 @@ use holochain_serialized_bytes::prelude::*;
 // #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 // #[repr(transparent)]
 // #[serde(transparent)]
-// pub struct EntryHashes<S>(pub Vec<EntryHash<S>>);
+// pub struct EntryHashes<S>(pub Vec<HoloHash<Entry, S>>);
 
 /// Error converting a composite hash into a primitive one, due to type mismatch
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -92,7 +92,6 @@ pub use holo_hash::AgentPubKey;
 pub use holo_hash::AnyDhtHash;
 pub use holo_hash::AnyLinkableHash;
 pub use holo_hash::EntryHash;
-pub use holo_hash::EntryHashes;
 pub use holo_hash::ExternalHash;
 pub use holo_hash::HasHash;
 pub use holo_hash::HoloHash;

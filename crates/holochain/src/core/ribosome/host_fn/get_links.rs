@@ -185,7 +185,7 @@ pub mod slow_tests {
             EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
-        let list_anchor_type_addresses_output: EntryHashes = conductor
+        let list_anchor_type_addresses_output: Vec<EntryHash> = conductor
             .call(&alice, "list_anchor_type_addresses", ())
             .await;
 
@@ -194,24 +194,24 @@ pub mod slow_tests {
             hdk::prelude::Component::from("foo".as_bytes().to_vec()),
         ]);
         // should be 1 anchor type, "foo"
-        assert_eq!(list_anchor_type_addresses_output.0.len(), 1);
+        assert_eq!(list_anchor_type_addresses_output.len(), 1);
         assert_eq!(
-            (list_anchor_type_addresses_output.0)[0],
+            (list_anchor_type_addresses_output)[0],
             EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
         );
 
-        let list_anchor_addresses_output: EntryHashes = conductor
+        let list_anchor_addresses_output: Vec<EntryHash> = conductor
             .call(&alice, "list_anchor_addresses", "foo".to_string())
             .await;
 
         // should be 2 anchors under "foo" sorted by hash
-        assert_eq!(list_anchor_addresses_output.0.len(), 2);
+        assert_eq!(list_anchor_addresses_output.len(), 2);
         assert_eq!(
-            (list_anchor_addresses_output.0)[0].get_raw_32().to_vec(),
+            (list_anchor_addresses_output)[0].get_raw_32().to_vec(),
             anchor_address_one.get_raw_32().to_vec(),
         );
         assert_eq!(
-            (list_anchor_addresses_output.0)[1].get_raw_32().to_vec(),
+            (list_anchor_addresses_output)[1].get_raw_32().to_vec(),
             anchor_address_two.get_raw_32().to_vec(),
         );
 

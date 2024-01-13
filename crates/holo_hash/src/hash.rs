@@ -71,9 +71,9 @@ macro_rules! assert_length {
 /// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HoloHash<T: HashType, S: HashSerializer = ByteArraySerializer> {
-    hash: Vec<u8>,
-    hash_type: T,
-    _serializer: std::marker::PhantomData<S>,
+    pub(crate) hash: Vec<u8>,
+    pub(crate) hash_type: T,
+    pub(crate) _serializer: std::marker::PhantomData<S>,
 }
 
 #[cfg(feature = "fuzzing")]

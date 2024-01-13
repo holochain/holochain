@@ -278,11 +278,11 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             )
             .await
             .unwrap();
-            let hashes: EntryHashes = match response {
+            let hashes: Vec<EntryHash> = match response {
                 AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
-            bobbo_done = hashes.0.len() == num;
+            bobbo_done = hashes.len() == num;
         }
 
         if !alice_done {
@@ -302,11 +302,11 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             )
             .await
             .unwrap();
-            let hashes: EntryHashes = match response {
+            let hashes: Vec<EntryHash> = match response {
                 AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
-            alice_done = hashes.0.len() == num;
+            alice_done = hashes.len() == num;
         }
         if alice_done && bobbo_done {
             let el = timer.elapsed();

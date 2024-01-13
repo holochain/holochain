@@ -4,7 +4,6 @@ use criterion::BenchmarkId;
 use criterion::Criterion;
 
 use holo_hash::EntryHash;
-use holo_hash::EntryHashes;
 use holochain::sweettest::*;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_test_wasm_common::ManyAnchorInput;
@@ -129,7 +128,7 @@ impl Consumer {
         let start = std::time::Instant::now();
         let mut num = self.last;
         while num <= self.last {
-            let hashes: EntryHashes = self
+            let hashes: Vec<EntryHash> = self
                 .conductor
                 .call(
                     &self.cell.zome("anchor"),
@@ -137,7 +136,7 @@ impl Consumer {
                     "alice".to_string(),
                 )
                 .await;
-            num = hashes.0.len();
+            num = hashes.len();
             if start.elapsed().as_secs() > 1 {
                 for cell in cells {
                     holochain::test_utils::consistency(
