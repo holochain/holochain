@@ -32,6 +32,8 @@ use crate::PrimitiveHashType;
 
 #[cfg(feature = "hashing")]
 use crate::encode;
+use crate::ser::ByteArraySerializer;
+use crate::ser::HashSerializer;
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
@@ -68,13 +70,14 @@ macro_rules! assert_length {
 ///
 /// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HoloHash<T: HashType> {
+pub struct HoloHash<T: HashType, S: HashSerializer = ByteArraySerializer> {
     hash: Vec<u8>,
     hash_type: T,
+    _serializer: std::marker::PhantomData<S>,
 }
 
 #[cfg(feature = "fuzzing")]
-impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
+impl<'a, P: PrimitiveHashType, S: HashSerializer> arbitrary::Arbitrary<'a> for HoloHash<P, S> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut buf = [0; HOLO_HASH_FULL_LEN];
         buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(P::static_prefix());
@@ -83,17 +86,20 @@ impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
         Ok(HoloHash {
             hash: buf.to_vec(),
             hash_type: P::new(),
+            _serializer: std::marker::PhantomData,
         })
     }
 }
 
 #[cfg(feature = "fuzzing")]
-impl<T: HashType + proptest::arbitrary::Arbitrary> proptest::arbitrary::Arbitrary for HoloHash<T>
+impl<T: HashType + proptest::arbitrary::Arbitrary, S> proptest::arbitrary::Arbitrary
+    for HoloHash<T, S>
 where
     T::Strategy: 'static,
+    S: HashSerializer,
 {
     type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<HoloHash<T>>;
+    type Strategy = proptest::strategy::BoxedStrategy<HoloHash<T, S>>;
 
     fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
         use proptest::strategy::Strategy;
@@ -106,6 +112,7 @@ where
                 HoloHash {
                     hash: buf.to_vec(),
                     hash_type,
+                    _serializer: std::marker::PhantomData,
                 }
             })
         });
@@ -113,13 +120,17 @@ where
     }
 }
 
-impl<T: HashType> HoloHash<T> {
+impl<T: HashType, S: HashSerializer> HoloHash<T, S> {
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type
     pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
         assert_length!(HOLO_HASH_FULL_LEN, &hash);
         let hash_type = T::try_from_prefix(&hash[0..3])?;
-        Ok(Self { hash, hash_type })
+        Ok(Self {
+            hash,
+            hash_type,
+            _serializer: std::marker::PhantomData,
+        })
     }
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type. Panics if hash_type does not match.
@@ -134,16 +145,21 @@ impl<T: HashType> HoloHash<T> {
         let mut hash = hash_type.get_prefix().to_vec();
         hash.append(&mut bytes);
         assert_length!(HOLO_HASH_FULL_LEN, &hash);
-        Self { hash, hash_type }
+        Self {
+            hash,
+            hash_type,
+            _serializer: std::marker::PhantomData,
+        }
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
+    pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT, S> {
         let prefix = hash_type.get_prefix();
         self.hash[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(&prefix[0..HOLO_HASH_PREFIX_LEN]);
         HoloHash {
             hash: self.hash,
             hash_type,
+            _serializer: std::marker::PhantomData,
         }
     }
 
@@ -191,7 +207,7 @@ impl<T: HashType> HoloHash<T> {
 }
 
 #[cfg(feature = "hashing")]
-impl<T: HashType> HoloHash<T> {
+impl<T: HashType, S: HashSerializer> HoloHash<T, S> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
     /// and the 4 location bytes will be computed.
@@ -204,7 +220,7 @@ impl<T: HashType> HoloHash<T> {
     }
 }
 
-impl<P: PrimitiveHashType> HoloHash<P> {
+impl<P: PrimitiveHashType, S: HashSerializer> HoloHash<P, S> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_36(hash: Vec<u8>) -> Self {
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
@@ -219,7 +235,7 @@ impl<P: PrimitiveHashType> HoloHash<P> {
     }
 }
 
-impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> AsRef<[u8]> for HoloHash<T, S> {
     fn as_ref(&self) -> &[u8] {
         assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         &self.hash
@@ -227,14 +243,14 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
 }
 
 #[cfg(feature = "rusqlite")]
-impl<T: HashType> rusqlite::ToSql for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> rusqlite::ToSql for HoloHash<T, S> {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Borrowed(self.as_ref().into()))
     }
 }
 
 #[cfg(feature = "rusqlite")]
-impl<T: HashType> rusqlite::types::FromSql for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> rusqlite::types::FromSql for HoloHash<T, S> {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         Vec::<u8>::column_result(value).and_then(|bytes| {
             Self::from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
@@ -242,7 +258,7 @@ impl<T: HashType> rusqlite::types::FromSql for HoloHash<T> {
     }
 }
 
-impl<T: HashType> IntoIterator for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> IntoIterator for HoloHash<T, S> {
     type Item = u8;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -251,17 +267,17 @@ impl<T: HashType> IntoIterator for HoloHash<T> {
     }
 }
 
-impl<T: HashType> HasHash<T> for HoloHash<T> {
-    fn as_hash(&self) -> &HoloHash<T> {
+impl<T: HashType, S: HashSerializer> HasHash<T, S> for HoloHash<T, S> {
+    fn as_hash(&self) -> &HoloHash<T, S> {
         self
     }
-    fn into_hash(self) -> HoloHash<T> {
+    fn into_hash(self) -> HoloHash<T, S> {
         self
     }
 }
 
 // NB: See encode/encode_raw module for Display impl
-impl<T: HashType> std::fmt::Debug for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> std::fmt::Debug for HoloHash<T, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}({})", self.hash_type().hash_name(), self))?;
         Ok(())
@@ -278,9 +294,9 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use crate::{ser::HashSerializer, *};
 
-    fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
+    fn assert_type<T: HashType, S: HashSerializer>(t: &str, h: HoloHash<T, S>) {
         assert_eq!(3_688_618_971, h.get_loc().as_u32());
         assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(

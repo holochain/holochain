@@ -1,12 +1,28 @@
 //! Defines the serialization rules for HoloHashes
 
+use std::fmt::Debug;
+
 use crate::HashType;
 use crate::HoloHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_serialized_bytes::UnsafeBytes;
 
-impl<T: HashType> serde::Serialize for HoloHash<T> {
+/// Ways of serializing a HoloHash
+pub trait HashSerializer: Clone + Debug {}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// This hash is serialized as a byte array
+pub struct ByteArraySerializer;
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// This hash is serialized as a base64 string
+pub struct Base64Serializer;
+
+impl HashSerializer for ByteArraySerializer {}
+impl HashSerializer for Base64Serializer {}
+
+impl<T: HashType, HS: HashSerializer> serde::Serialize for HoloHash<T, HS> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -15,19 +31,25 @@ impl<T: HashType> serde::Serialize for HoloHash<T> {
     }
 }
 
-impl<'de, T: HashType> serde::Deserialize<'de> for HoloHash<T> {
-    fn deserialize<D>(deserializer: D) -> Result<HoloHash<T>, D::Error>
+impl<'de, T: HashType, S: HashSerializer> serde::Deserialize<'de> for HoloHash<T, S> {
+    fn deserialize<D>(deserializer: D) -> Result<HoloHash<T, S>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_bytes(HoloHashVisitor(std::marker::PhantomData))
+        deserializer.deserialize_bytes(HoloHashVisitor(
+            std::marker::PhantomData,
+            std::marker::PhantomData,
+        ))
     }
 }
 
-struct HoloHashVisitor<T: HashType>(std::marker::PhantomData<T>);
+struct HoloHashVisitor<T: HashType, HS: HashSerializer>(
+    std::marker::PhantomData<T>,
+    std::marker::PhantomData<HS>,
+);
 
-impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
-    type Value = HoloHash<T>;
+impl<'de, T: HashType, HS: HashSerializer> serde::de::Visitor<'de> for HoloHashVisitor<T, HS> {
+    type Value = HoloHash<T, HS>;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("a HoloHash of primitive hash_type")
@@ -78,9 +100,9 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
     }
 }
 
-impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
+impl<T: HashType, S: HashSerializer> std::convert::TryFrom<&HoloHash<T, S>> for SerializedBytes {
     type Error = SerializedBytesError;
-    fn try_from(t: &HoloHash<T>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
+    fn try_from(t: &HoloHash<T, S>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
         match holochain_serialized_bytes::encode(t) {
             Ok(v) => Ok(SerializedBytes::from(UnsafeBytes::from(v))),
             Err(e) => Err(SerializedBytesError::Serialize(e.to_string())),
@@ -88,16 +110,16 @@ impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
     }
 }
 
-impl<T: HashType> std::convert::TryFrom<HoloHash<T>> for SerializedBytes {
+impl<T: HashType, S: HashSerializer> std::convert::TryFrom<HoloHash<T, S>> for SerializedBytes {
     type Error = SerializedBytesError;
-    fn try_from(t: HoloHash<T>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
+    fn try_from(t: HoloHash<T, S>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
         SerializedBytes::try_from(&t)
     }
 }
 
-impl<T: HashType> std::convert::TryFrom<SerializedBytes> for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> std::convert::TryFrom<SerializedBytes> for HoloHash<T, S> {
     type Error = SerializedBytesError;
-    fn try_from(sb: SerializedBytes) -> std::result::Result<HoloHash<T>, SerializedBytesError> {
+    fn try_from(sb: SerializedBytes) -> std::result::Result<HoloHash<T, S>, SerializedBytesError> {
         match holochain_serialized_bytes::decode(sb.bytes()) {
             Ok(v) => Ok(v),
             Err(e) => Err(SerializedBytesError::Deserialize(e.to_string())),

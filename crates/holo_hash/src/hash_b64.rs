@@ -5,65 +5,19 @@
 //! be done.
 
 use super::*;
+use crate::ser::Base64Serializer;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
 
 /// A wrapper around HoloHash that `Serialize`s into a base64 string
 /// rather than a raw byte array.
-#[derive(
-    Debug,
-    Clone,
-    Hash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    serde::Deserialize,
-    derive_more::Constructor,
-    derive_more::Display,
-    derive_more::From,
-    derive_more::Into,
-    derive_more::AsRef,
-)]
-#[serde(transparent)]
-pub struct HoloHashB64<T: HashType>(HoloHash<T>);
+pub type HoloHashB64<T: HashType> = HoloHash<T, Base64Serializer>;
 
 impl<T: HashType> HoloHashB64<T> {
     /// Read a HoloHash from base64 string
     pub fn from_b64_str(str: &str) -> HoloHashResult<Self> {
         let bytes = holo_hash_decode_unchecked(str)?;
         HoloHash::from_raw_39(bytes).map(Into::into)
-    }
-}
-
-impl<T: HashType> serde::Serialize for HoloHashB64<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&holo_hash_encode(self.0.get_raw_39()))
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(HoloHash::arbitrary(u)?.into())
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<T: HashType + proptest::arbitrary::Arbitrary + 'static> proptest::arbitrary::Arbitrary
-    for HoloHashB64<T>
-where
-    T::Strategy: 'static,
-{
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<HoloHashB64<T>>;
-
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::Strategy;
-        HoloHash::arbitrary().prop_map(Into::into).boxed()
     }
 }
 

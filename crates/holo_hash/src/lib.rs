@@ -34,7 +34,7 @@ mod ser;
 #[cfg(feature = "serialization")]
 /// A convenience type, for specifying a hash by HashableContent rather than
 /// by its HashType
-pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
+pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType, ByteArraySerializer>;
 
 // feature: encoding
 // (string encoding)
@@ -63,6 +63,7 @@ mod hash_ext;
 
 #[cfg(feature = "hashing")]
 pub use hash_ext::*;
+use ser::ByteArraySerializer;
 
 // feature: fixturators
 // provides fixturators for all hash types

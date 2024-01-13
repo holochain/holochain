@@ -95,35 +95,18 @@ fixturator!(
 );
 
 fixturator!(
-    AgentPubKeyB64;
-    constructor fn new(AgentPubKey);
-);
-
-fixturator!(
     EntryHash;
     constructor fn from_raw_32(ThirtyTwoHashBytes);
-);
-fixturator!(
-    EntryHashB64;
-    constructor fn new(EntryHash);
 );
 
 fixturator!(
     DnaHash;
     constructor fn from_raw_32(ThirtyTwoHashBytes);
 );
-fixturator!(
-    DnaHashB64;
-    constructor fn new(DnaHash);
-);
 
 fixturator!(
     DhtOpHash;
     constructor fn from_raw_32(ThirtyTwoHashBytes);
-);
-fixturator!(
-    DhtOpHashB64;
-    constructor fn new(DhtOpHash);
 );
 
 fixturator!(
@@ -131,43 +114,23 @@ fixturator!(
     ActionHash;
     constructor fn from_raw_32(ThirtyTwoHashBytes);
 );
-fixturator!(
-    ActionHashB64;
-    constructor fn new(ActionHash);
-);
 
 fixturator!(
     NetIdHash;
     constructor fn from_raw_32(ThirtyTwoHashBytes);
-);
-fixturator!(
-    NetIdHashB64;
-    constructor fn new(NetIdHash);
 );
 
 fixturator!(
     WasmHash;
     constructor fn from_raw_32(ThirtyTwoHashBytes);
 );
-fixturator!(
-    WasmHashB64;
-    constructor fn new(WasmHash);
-);
 
 fixturator!(
     AnyDhtHash;
     constructor fn from_raw_32_and_type(ThirtyTwoHashBytes, HashTypeAnyDht);
 );
-fixturator!(
-    AnyDhtHashB64;
-    constructor fn new(AnyDhtHash);
-);
 
 fixturator!(
     AnyLinkableHash;
     constructor fn from_raw_32_and_type(ThirtyTwoHashBytes, HashTypeAnyLinkable);
-);
-fixturator!(
-    AnyLinkableHashB64;
-    constructor fn new(AnyLinkableHash);
 );

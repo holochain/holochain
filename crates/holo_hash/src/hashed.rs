@@ -1,3 +1,4 @@
+use crate::ser::ByteArraySerializer;
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
@@ -20,7 +21,7 @@ pub struct HoloHashed<C: HashableContent> {
     pub hash: HoloHashOf<C>,
 }
 
-impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
+impl<C: HashableContent> HasHash<C::HashType, ByteArraySerializer> for HoloHashed<C> {
     fn as_hash(&self) -> &HoloHashOf<C> {
         &self.hash
     }

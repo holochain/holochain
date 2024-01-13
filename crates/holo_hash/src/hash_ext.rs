@@ -1,6 +1,8 @@
 use crate::assert_length;
 use crate::encode;
 use crate::hash_type;
+use crate::ser::ByteArraySerializer;
+use crate::ser::HashSerializer;
 use crate::HashType;
 use crate::HashableContent;
 use crate::HashableContentBytes;
@@ -17,7 +19,7 @@ use must_future::MustBoxFuture;
 /// take too long to hash within a single tokio context
 pub const MAX_HASHABLE_CONTENT_LEN: usize = 16 * 1000 * 1000; // 16 MB
 
-impl<T: HashTypeSync> HoloHash<T> {
+impl<T: HashTypeSync, S: HashSerializer> HoloHash<T, S> {
     /// Synchronously hash a reference to the given content to produce a HoloHash
     /// If the content is larger than MAX_HASHABLE_CONTENT_LEN, this will **panic**!
     pub fn with_data_sync<C: HashableContent<HashType = T>>(content: &C) -> HoloHash<T> {
@@ -32,14 +34,14 @@ where
 {
     /// Compute the hash of this content and store it alongside
     pub fn from_content_sync(content: C) -> Self {
-        let hash: HoloHashOf<C> = HoloHash::<T>::with_data_sync(&content);
+        let hash: HoloHashOf<C> = HoloHash::<T, ByteArraySerializer>::with_data_sync(&content);
         Self { content, hash }
     }
 
     /// Verify that the cached hash matches the content.
     /// Important to run this after e.g. deserialization.
     pub fn verify_hash_sync(&self) -> Result<(), HoloHash<T>> {
-        let hash = HoloHash::<T>::with_data_sync(&self.content);
+        let hash = HoloHash::<T, ByteArraySerializer>::with_data_sync(&self.content);
         if self.hash == hash {
             Ok(())
         } else {
@@ -63,14 +65,14 @@ where
 {
     /// Compute the hash of this content and store it alongside
     pub async fn from_content(content: C) -> Self {
-        let hash: HoloHashOf<C> = HoloHash::<T>::with_data(&content).await;
+        let hash: HoloHashOf<C> = HoloHash::<T, ByteArraySerializer>::with_data(&content).await;
         Self { content, hash }
     }
 
     /// Verify that the cached hash matches the content.
     /// Important to run this after e.g. deserialization.
     pub async fn verify_hash(&self) -> Result<(), HoloHash<T>> {
-        let hash = HoloHash::<T>::with_data(&self.content).await;
+        let hash = HoloHash::<T, ByteArraySerializer>::with_data(&self.content).await;
         if self.hash == hash {
             Ok(())
         } else {
@@ -92,7 +94,7 @@ fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C)
             let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
             let hash = encode::blake2b_256(&bytes);
             assert_length!(HOLO_HASH_CORE_LEN, &hash);
-            HoloHash::<T>::from_raw_32_and_type(hash, content.hash_type())
+            HoloHash::from_raw_32_and_type(hash, content.hash_type())
         }
         HashableContentBytes::Prehashed39(bytes) => HoloHash::from_raw_39_panicky(bytes),
     }
@@ -128,7 +130,7 @@ where
     C: HashableContent<HashType = T>,
 {
     fn to_hash(&self) -> HoloHash<T> {
-        HoloHash::with_data_sync(self)
+        HoloHash::<T, ByteArraySerializer>::with_data_sync(self)
     }
 
     fn into_hashed(self) -> HoloHashed<Self> {

@@ -1,5 +1,6 @@
 use crate::assert_length;
 use crate::error::HoloHashError;
+use crate::ser::HashSerializer;
 use crate::HashType;
 use crate::HoloHash;
 use crate::PrimitiveHashType;
@@ -9,7 +10,7 @@ use crate::HOLO_HASH_PREFIX_LEN;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
-impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
+impl<P: PrimitiveHashType, S: HashSerializer> TryFrom<&str> for HoloHash<P, S> {
     type Error = HoloHashError;
     fn try_from(s: &str) -> Result<Self, HoloHashError> {
         let hash_type = P::new();
@@ -17,21 +18,21 @@ impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     }
 }
 
-impl<P: PrimitiveHashType> TryFrom<&String> for HoloHash<P> {
+impl<P: PrimitiveHashType, S: HashSerializer> TryFrom<&String> for HoloHash<P, S> {
     type Error = HoloHashError;
     fn try_from(s: &String) -> Result<Self, HoloHashError> {
         Self::try_from(s as &str)
     }
 }
 
-impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
+impl<P: PrimitiveHashType, S: HashSerializer> TryFrom<String> for HoloHash<P, S> {
     type Error = HoloHashError;
     fn try_from(s: String) -> Result<Self, HoloHashError> {
         Self::try_from(&s)
     }
 }
 
-impl<T: HashType> std::fmt::Display for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> std::fmt::Display for HoloHash<T, S> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         write!(f, "{}", holo_hash_encode(self.get_raw_39()))
     }

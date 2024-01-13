@@ -1,7 +1,7 @@
 use crate::HashType;
 use crate::HoloHash;
 
-impl<T: HashType> std::fmt::Display for HoloHash<T> {
+impl<T: HashType, S: HashSerializer> std::fmt::Display for HoloHash<T, S> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         f.write_fmt(format_args!(
             "0x{}",
