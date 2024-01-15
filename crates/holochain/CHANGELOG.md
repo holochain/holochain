@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Runtime engines to execute zome fns did not live long enough and were producing `RuntimeError: out of bounds memory access`. Engines are kept for the lifetime of the conductor process now.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
 - Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These 'store record' checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don't actually need.
 
 - Sys validation will now validate that a DeleteLink points to an action which is a CreateLink through the `link_add_address` of the delete.
