@@ -915,7 +915,8 @@ pub mod test {
             {
                 let mut count = 0;
                 for env in spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                    count += env.test_read(move |txn| txn.p2p_list_agents().unwrap().len())
+                    let space = env.kind().0.clone();
+                    count += env.test_read(move |txn| txn.p2p_list_agents(space).unwrap().len())
                 }
                 count
             },

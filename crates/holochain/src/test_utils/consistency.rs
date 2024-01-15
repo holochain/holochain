@@ -13,7 +13,7 @@ use holochain_p2p::{
     AgentPubKeyExt, DhtOpHashExt,
 };
 use holochain_sqlite::prelude::{
-    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
+    DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
 };
 use holochain_state::prelude::*;
 use kitsune_p2p::{KitsuneAgent, KitsuneOpHash};
@@ -581,15 +581,11 @@ async fn check_agents<'iter>(
 ) -> DatabaseResult<impl Iterator<Item = &'iter Arc<KitsuneAgent>> + 'iter> {
     // Poll the peer database for the currently held agents.
     let agents_held: HashSet<_> = p2p_agents_db
-        .read_async(|txn| {
-            DatabaseResult::Ok(
-                txn.p2p_list_agents()?
-                    .into_iter()
-                    .map(|a| a.agent.clone())
-                    .collect(),
-            )
-        })
-        .await?;
+        .p2p_list_agents()
+        .await?
+        .into_iter()
+        .map(|a| a.agent.clone())
+        .collect();
 
     // Filter out the currently held agents from the expected agents to return any missing.
     Ok(expected_agents
@@ -773,6 +769,5 @@ async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    db.read_async(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
-        .await
+    Ok(db.p2p_get_agent(&agent).await?.map(|info| info.storage_arc))
 }

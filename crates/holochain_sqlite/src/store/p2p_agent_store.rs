@@ -7,6 +7,7 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht_arc::DhtArcRange;
 use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
+use kitsune_p2p_bin_data::KitsuneSpace;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;
@@ -20,19 +21,60 @@ mod p2p_test;
 /// as p2p store accessors.
 pub trait AsP2pStateTxExt {
     /// Get an AgentInfoSigned record from the p2p_store
-    fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
+    fn p2p_get_agent(
+        &self,
+        space: Arc<KitsuneSpace>,
+        agent: &KitsuneAgent,
+    ) -> DatabaseResult<Option<AgentInfoSigned>>;
 
     /// Remove an agent from the p2p store
-    fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool>;
+    fn p2p_remove_agent(
+        &self,
+        space: Arc<KitsuneSpace>,
+        agent: &KitsuneAgent,
+    ) -> DatabaseResult<bool>;
 
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
-    fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
+    fn p2p_list_agents(&self, space: Arc<KitsuneSpace>) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Count agent records within a space in the p2p_agent_store
-    fn p2p_count_agents(&self) -> DatabaseResult<u32>;
+    fn p2p_count_agents(&self, space: Arc<KitsuneSpace>) -> DatabaseResult<u32>;
 
     /// Query agent list for gossip
     fn p2p_gossip_query_agents(
+        &self,
+        space: Arc<KitsuneSpace>,
+        since_ms: u64,
+        until_ms: u64,
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Query agents sorted by nearness to basis loc
+    fn p2p_query_near_basis(
+        &self,
+        space: Arc<KitsuneSpace>,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Extrapolate coverage from agents within our own storage arc
+    fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
+}
+
+/// Extension trait to treat database read handles as p2p store accessors.
+#[async_trait::async_trait]
+pub trait AsP2pStateReadExt {
+    /// Get an AgentInfoSigned record from the p2p_store
+    async fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
+
+    /// List all AgentInfoSigned records within a space in the p2p_agent_store
+    async fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Count agent records within a space in the p2p_agent_store
+    async fn p2p_count_agents(&self) -> DatabaseResult<u32>;
+
+    /// Query agent list for gossip
+    async fn p2p_gossip_query_agents(
         &self,
         since_ms: u64,
         until_ms: u64,
@@ -40,13 +82,25 @@ pub trait AsP2pStateTxExt {
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
-    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
+    async fn p2p_query_near_basis(
+        &self,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Extrapolate coverage from agents within our own storage arc
-    fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
+    async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
 }
 
-struct AgentStore(Mutex<HashMap<Arc<KitsuneAgent>, AgentInfoSigned>>);
+/// Extension trait to treat database write handles as p2p store accessors.
+#[async_trait::async_trait]
+pub trait AsP2pStateWriteExt {
+    /// Remove an agent from the p2p store
+    async fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool>;
+}
+
+#[derive(Clone)]
+struct AgentStore(Arc<Mutex<HashMap<Arc<KitsuneAgent>, AgentInfoSigned>>>);
 
 impl AgentStore {
     fn new(con: &Connection) -> DatabaseResult<Self> {
@@ -65,7 +119,7 @@ impl AgentStore {
             let r = r?;
             map.insert(r.agent.clone(), r);
         }
-        Ok(Self(Mutex::new(map)))
+        Ok(Self(Arc::new(Mutex::new(map))))
     }
 
     fn prune(&self, now: u64, local_agents: &[Arc<KitsuneAgent>]) -> DatabaseResult<()> {
@@ -184,8 +238,39 @@ impl AgentStore {
     }
 }
 
+// Note that this key includes the DnaHash/KitsuneSpace but using that as a key causes problems when running
+// multiple conductors in the same process. They will all share the same in-memory store that way, even if they
+// have databases in different locations. The ideal solution would be to move the cache onto the database handle
+// itself and use the KitsuneSpace as the key here but that requires a bigger refactor. For now using almost the
+// right key helps ensure the interface to this store shouldn't need to change if that refactor was done.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct StoreKey(String, Arc<KitsuneSpace>);
+
+impl From<DbRead<DbKindP2pAgents>> for StoreKey {
+    fn from(db: DbRead<DbKindP2pAgents>) -> Self {
+        Self(
+            db.path()
+                .to_str()
+                .expect("The database path should be a valid string")
+                .to_string(),
+            db.kind().0.clone(),
+        )
+    }
+}
+
+impl From<(&Connection, Arc<KitsuneSpace>)> for StoreKey {
+    fn from((con, space): (&Connection, Arc<KitsuneSpace>)) -> Self {
+        Self(
+            con.path()
+                .expect("The database path should be a valid string")
+                .to_string(),
+            space,
+        )
+    }
+}
+
 struct AgentStoreByPath {
-    map: Mutex<HashMap<String, Arc<AgentStore>>>,
+    map: Mutex<HashMap<StoreKey, AgentStore>>,
 }
 
 impl AgentStoreByPath {
@@ -195,11 +280,37 @@ impl AgentStoreByPath {
         }
     }
 
-    fn get(&self, con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
-        match self.map.lock().entry(con.path().unwrap().to_string()) {
+    fn get(&self, space: Arc<KitsuneSpace>, con: &Connection) -> DatabaseResult<AgentStore> {
+        let key = (con, space.clone()).into();
+        match self.map.lock().entry(key) {
             hash_map::Entry::Occupied(e) => Ok(e.get().clone()),
             hash_map::Entry::Vacant(e) => {
-                let agent_store = Arc::new(AgentStore::new(con)?);
+                let agent_store = AgentStore::new(con)?;
+                e.insert(agent_store.clone());
+                Ok(agent_store)
+            }
+        }
+    }
+
+    async fn get_async(&self, db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
+        let store_key = db.clone().into();
+        {
+            let map = self.map.lock();
+            if let Some(store) = map.get(&store_key) {
+                return Ok(store.clone());
+            }
+        }
+
+        let agent_store = db.read_async(|txn| AgentStore::new(&txn)).await?;
+
+        let mut map = self.map.lock();
+        match map.entry(store_key) {
+            hash_map::Entry::Occupied(e) => {
+                // In this case the map was written to by another thread while we weren't holding the lock so discard the AgentStore
+                // we created in favour of the one that was created by the other thread
+                Ok(e.get().clone())
+            }
+            hash_map::Entry::Vacant(e) => {
                 e.insert(agent_store.clone());
                 Ok(agent_store)
             }
@@ -209,8 +320,12 @@ impl AgentStoreByPath {
 
 static CACHE: Lazy<AgentStoreByPath> = Lazy::new(AgentStoreByPath::new);
 
-fn cache_get(con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
-    CACHE.get(con)
+fn cache_get(space: Arc<KitsuneSpace>, con: &Connection) -> DatabaseResult<AgentStore> {
+    CACHE.get(space, con)
+}
+
+async fn cache_get_async(db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
+    CACHE.get_async(db).await
 }
 
 /// Put an AgentInfoSigned record into the p2p_store
@@ -233,9 +348,10 @@ pub async fn p2p_put_all(
         ns.push(s.clone());
         records.push(P2pRecord::from_signed(s)?);
     }
+    let space = db.kind().0.clone();
     db.write_async(move |txn| {
         for s in ns {
-            cache_get(&*txn)?.put(s)?;
+            cache_get(space.clone(), &*txn)?.put(s)?;
         }
 
         for record in records {
@@ -247,8 +363,12 @@ pub async fn p2p_put_all(
 }
 
 /// Insert a p2p record from within a write transaction.
-pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
-    cache_get(&*txn)?.put(signed.clone())?;
+pub fn p2p_put_single(
+    space: Arc<KitsuneSpace>,
+    txn: &mut Transaction<'_>,
+    signed: &AgentInfoSigned,
+) -> DatabaseResult<()> {
+    cache_get(space, &*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
     tx_p2p_put(txn, record)
 }
@@ -288,13 +408,14 @@ pub async fn p2p_prune(
         // where the delete doesn't run if the subquery returns no rows
         agent_list.extend_from_slice(&[0; 36]);
     }
+    let space = db.kind().0.clone();
     db.write_async(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
-        cache_get(&*txn)?.prune(now, &local_agents)?;
+        cache_get(space, &*txn)?.prune(now, &local_agents)?;
 
         txn.execute(
             sql_p2p_agent_store::PRUNE,
@@ -310,13 +431,70 @@ pub async fn p2p_prune(
     Ok(())
 }
 
-impl AsP2pStateTxExt for Transaction<'_> {
-    fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        cache_get(self)?.get(agent)
+#[async_trait::async_trait]
+impl AsP2pStateReadExt for DbRead<DbKindP2pAgents> {
+    async fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+        cache_get_async(self).await?.get(agent)
     }
 
-    fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
-        cache_get(self)?.remove(agent)?;
+    async fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        cache_get_async(self).await?.get_all()
+    }
+
+    async fn p2p_count_agents(&self) -> DatabaseResult<u32> {
+        cache_get_async(self).await?.count()
+    }
+
+    async fn p2p_gossip_query_agents(
+        &self,
+        since_ms: u64,
+        until_ms: u64,
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        cache_get_async(self)
+            .await?
+            .query_agents(since_ms, until_ms, arcset)
+    }
+
+    async fn p2p_query_near_basis(
+        &self,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        cache_get_async(self).await?.query_near_basis(basis, limit)
+    }
+
+    async fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+        self.read_async(|txn| txn.p2p_extrapolated_coverage(dht_arc_set))
+            .await
+    }
+}
+
+#[async_trait::async_trait]
+impl AsP2pStateWriteExt for DbWrite<DbKindP2pAgents> {
+    async fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        let space = self.kind().0.clone();
+        let agent = agent.clone();
+        self.write_async(move |txn| txn.p2p_remove_agent(space, &agent))
+            .await
+    }
+}
+
+impl AsP2pStateTxExt for Transaction<'_> {
+    fn p2p_get_agent(
+        &self,
+        space: Arc<KitsuneSpace>,
+        agent: &KitsuneAgent,
+    ) -> DatabaseResult<Option<AgentInfoSigned>> {
+        cache_get(space, self)?.get(agent)
+    }
+
+    fn p2p_remove_agent(
+        &self,
+        space: Arc<KitsuneSpace>,
+        agent: &KitsuneAgent,
+    ) -> DatabaseResult<bool> {
+        cache_get(space, self)?.remove(agent)?;
 
         let mut stmt = self
             .prepare(sql_p2p_agent_store::DELETE)
@@ -325,25 +503,31 @@ impl AsP2pStateTxExt for Transaction<'_> {
         Ok(stmt.execute(named_params! { ":agent": &agent.0 })? > 0)
     }
 
-    fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        cache_get(self)?.get_all()
+    fn p2p_list_agents(&self, space: Arc<KitsuneSpace>) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        cache_get(space, self)?.get_all()
     }
 
-    fn p2p_count_agents(&self) -> DatabaseResult<u32> {
-        cache_get(self)?.count()
+    fn p2p_count_agents(&self, space: Arc<KitsuneSpace>) -> DatabaseResult<u32> {
+        cache_get(space, self)?.count()
     }
 
     fn p2p_gossip_query_agents(
         &self,
+        space: Arc<KitsuneSpace>,
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        cache_get(self)?.query_agents(since_ms, until_ms, arcset)
+        cache_get(space, self)?.query_agents(since_ms, until_ms, arcset)
     }
 
-    fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        cache_get(self)?.query_near_basis(basis, limit)
+    fn p2p_query_near_basis(
+        &self,
+        space: Arc<KitsuneSpace>,
+        basis: u32,
+        limit: u32,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        cache_get(space, self)?.query_near_basis(basis, limit)
     }
 
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {

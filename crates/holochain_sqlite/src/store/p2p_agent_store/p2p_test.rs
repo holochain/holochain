@@ -139,10 +139,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     }
 
     // check that we only get 20 results
-    let all = db
-        .read_async(move |txn| txn.p2p_list_agents())
-        .await
-        .unwrap();
+    let all = db.p2p_list_agents().await.unwrap();
     assert_eq!(20, all.len());
 
     // agents with zero arc lengths will never be returned, so count only the
@@ -154,46 +151,34 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // make sure we can get our example result
     println!("after insert select all count: {}", all.len());
-    let signed = db
-        .read_async({
-            let example_agent = example_agent.clone();
-            move |txn| txn.p2p_get_agent(&example_agent)
-        })
-        .await
-        .unwrap();
+    let signed = db.p2p_get_agent(&example_agent).await.unwrap();
     assert!(signed.is_some());
 
     // check that gossip query over full range returns 20 results
     let all = db
-        .read_async(move |txn| {
-            txn.p2p_gossip_query_agents(
-                u64::MIN,
-                u64::MAX,
-                DhtArcRange::from_bounds(0, u32::MAX).into(),
-            )
-        })
+        .p2p_gossip_query_agents(
+            u64::MIN,
+            u64::MAX,
+            DhtArcRange::from_bounds(0, u32::MAX).into(),
+        )
         .await
         .unwrap();
     assert_eq!(all.len(), num_nonzero);
 
     // check that gossip query over zero time returns zero results
     let all = db
-        .read_async(move |txn| {
-            txn.p2p_gossip_query_agents(
-                u64::MIN,
-                u64::MIN,
-                DhtArcRange::from_bounds(0, u32::MAX).into(),
-            )
-        })
+        .p2p_gossip_query_agents(
+            u64::MIN,
+            u64::MIN,
+            DhtArcRange::from_bounds(0, u32::MAX).into(),
+        )
         .await
         .unwrap();
     assert_eq!(all.len(), 0);
 
     // check that gossip query over zero arc returns zero results
     let all = db
-        .read_async(move |txn| {
-            txn.p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
-        })
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
         .await
         .unwrap();
     assert_eq!(all.len(), 0);
@@ -201,13 +186,11 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     // check that gossip query over half arc returns some but not all results
     // NB: there is a very small probability of this failing
     let all = db
-        .read_async(move |txn| {
-            txn.p2p_gossip_query_agents(
-                u64::MIN,
-                u64::MAX,
-                DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
-            )
-        })
+        .p2p_gossip_query_agents(
+            u64::MIN,
+            u64::MAX,
+            DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
+        )
         .await
         .unwrap();
     // NOTE - not sure this is right with <= num_nonzero... but it breaks
@@ -216,10 +199,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     // near
     let tgt = u32::MAX / 2;
-    let near = db
-        .read_async(move |txn| txn.p2p_query_near_basis(tgt, 20))
-        .await
-        .unwrap();
+    let near = db.p2p_query_near_basis(tgt, 20).await.unwrap();
     let mut prev = 0;
     for agent_info_signed in near {
         let loc = agent_info_signed.agent.get_loc();
@@ -263,21 +243,12 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     p2p_prune(&db, vec![]).await.unwrap();
 
     // after prune, make sure all are pruned
-    let all = db
-        .read_async(move |txn| txn.p2p_list_agents())
-        .await
-        .unwrap();
+    let all = db.p2p_list_agents().await.unwrap();
     assert_eq!(0, all.len());
 
     // make sure our specific get also returns None
     println!("after prune_all select all count: {}", all.len());
-    let signed = db
-        .read_async({
-            let example_agent = example_agent.clone();
-            move |txn| txn.p2p_get_agent(&example_agent)
-        })
-        .await
-        .unwrap();
+    let signed = db.p2p_get_agent(&example_agent).await.unwrap();
     assert!(signed.is_none());
 
     // clean up temp dir
