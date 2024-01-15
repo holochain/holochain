@@ -1,4 +1,4 @@
-use crate::ser::ByteArraySerializer;
+use crate::hash::ByteArraySerializer;
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;

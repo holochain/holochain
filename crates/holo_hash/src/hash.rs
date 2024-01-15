@@ -32,8 +32,70 @@ use crate::PrimitiveHashType;
 
 #[cfg(feature = "hashing")]
 use crate::encode;
-use crate::ser::ByteArraySerializer;
-use crate::ser::HashSerializer;
+
+/// Ways of serializing a HoloHash
+pub trait HashSerializer:
+    Clone
+    + std::fmt::Debug
+    + Eq
+    + Ord
+    + std::hash::Hash
+    + serde::Serialize
+    + serde::de::DeserializeOwned
+{
+    /// Produce the value corresponding to this type
+    fn get() -> HashSerialization;
+}
+
+/// Ways of serializing a HoloHash
+pub enum HashSerialization {
+    /// This hash is serialized as a byte array
+    ByteArray,
+    /// This hash is serialized as a base64 string
+    Base64,
+    /// This hash is serialized as a byte sequence (rather than a byte array).
+    ByteSequence,
+}
+
+#[derive(
+    Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+/// This hash is serialized as a byte array
+pub struct ByteArraySerializer;
+
+#[derive(
+    Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+/// This hash is serialized as a base64 string
+pub struct Base64Serializer;
+
+#[derive(
+    Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+/// This hash is serialized as a byte sequence (rather than a byte array).
+///
+/// Byte arrays are generally more compact than sequences, but not all formats
+/// support them, JSON included. For those formats, you can use this serialization
+/// method, or Base64 strings.
+pub struct ByteSequenceSerializer;
+
+impl HashSerializer for ByteArraySerializer {
+    fn get() -> HashSerialization {
+        HashSerialization::ByteArray
+    }
+}
+
+impl HashSerializer for Base64Serializer {
+    fn get() -> HashSerialization {
+        HashSerialization::Base64
+    }
+}
+
+impl HashSerializer for ByteSequenceSerializer {
+    fn get() -> HashSerialization {
+        HashSerialization::ByteSequence
+    }
+}
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
@@ -121,37 +183,6 @@ where
 }
 
 impl<T: HashType, S: HashSerializer> HoloHash<T, S> {
-    /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
-    /// bytes to determine the hash_type
-    pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
-        assert_length!(HOLO_HASH_FULL_LEN, &hash);
-        let hash_type = T::try_from_prefix(&hash[0..3])?;
-        Ok(Self {
-            hash,
-            hash_type,
-            _serializer: std::marker::PhantomData,
-        })
-    }
-    /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
-    /// bytes to determine the hash_type. Panics if hash_type does not match.
-    pub fn from_raw_39_panicky(hash: Vec<u8>) -> Self {
-        Self::from_raw_39(hash).expect("the specified hash_type does not match the prefix bytes")
-    }
-
-    /// Use a precomputed hash + location byte array in vec form,
-    /// along with a type, to construct a hash. Used in this crate only, for testing.
-    pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
-        assert_length!(HOLO_HASH_UNTYPED_LEN, &bytes);
-        let mut hash = hash_type.get_prefix().to_vec();
-        hash.append(&mut bytes);
-        assert_length!(HOLO_HASH_FULL_LEN, &hash);
-        Self {
-            hash,
-            hash_type,
-            _serializer: std::marker::PhantomData,
-        }
-    }
-
     /// Change the type of this HoloHash, keeping the same bytes
     pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT, S> {
         let prefix = hash_type.get_prefix();
@@ -206,11 +237,11 @@ impl<T: HashType, S: HashSerializer> HoloHash<T, S> {
     }
 }
 
-#[cfg(feature = "hashing")]
-impl<T: HashType, S: HashSerializer> HoloHash<T, S> {
+impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
     /// and the 4 location bytes will be computed.
+    #[cfg(feature = "hashing")]
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
         assert_length!(HOLO_HASH_CORE_LEN, &hash);
         hash.append(&mut encode::holo_dht_location_bytes(&hash));
@@ -218,9 +249,41 @@ impl<T: HashType, S: HashSerializer> HoloHash<T, S> {
 
         HoloHash::from_raw_36_and_type(hash, hash_type)
     }
+
+    /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
+    /// bytes to determine the hash_type
+    pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
+        assert_length!(HOLO_HASH_FULL_LEN, &hash);
+        let hash_type = T::try_from_prefix(&hash[0..3])?;
+        Ok(Self {
+            hash,
+            hash_type,
+            _serializer: std::marker::PhantomData,
+        })
+    }
+
+    /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
+    /// bytes to determine the hash_type. Panics if hash_type does not match.
+    pub fn from_raw_39_panicky(hash: Vec<u8>) -> Self {
+        Self::from_raw_39(hash).expect("the specified hash_type does not match the prefix bytes")
+    }
+
+    /// Use a precomputed hash + location byte array in vec form,
+    /// along with a type, to construct a hash. Used in this crate only, for testing.
+    pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
+        assert_length!(HOLO_HASH_UNTYPED_LEN, &bytes);
+        let mut hash = hash_type.get_prefix().to_vec();
+        hash.append(&mut bytes);
+        assert_length!(HOLO_HASH_FULL_LEN, &hash);
+        Self {
+            hash,
+            hash_type,
+            _serializer: std::marker::PhantomData,
+        }
+    }
 }
 
-impl<P: PrimitiveHashType, S: HashSerializer> HoloHash<P, S> {
+impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_36(hash: Vec<u8>) -> Self {
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
@@ -253,7 +316,9 @@ impl<T: HashType, S: HashSerializer> rusqlite::ToSql for HoloHash<T, S> {
 impl<T: HashType, S: HashSerializer> rusqlite::types::FromSql for HoloHash<T, S> {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         Vec::<u8>::column_result(value).and_then(|bytes| {
-            Self::from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
+            HoloHash::from_raw_39(bytes)
+                .map(|h| h.change_serialization())
+                .map_err(|_| rusqlite::types::FromSqlError::InvalidType)
         })
     }
 }
@@ -294,7 +359,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ser::HashSerializer, *};
+    use crate::{hash::HashSerializer, *};
 
     fn assert_type<T: HashType, S: HashSerializer>(t: &str, h: HoloHash<T, S>) {
         assert_eq!(3_688_618_971, h.get_loc().as_u32());

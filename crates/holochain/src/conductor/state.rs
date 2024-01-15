@@ -30,7 +30,7 @@ impl Default for ConductorStateTag {
 /// via string IDs.
 #[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct ConductorState {
+pub struct ConductorState<H: HashSerialization> {
     /// Unique conductor tag / identifier.
     #[serde(default)]
     tag: ConductorStateTag,

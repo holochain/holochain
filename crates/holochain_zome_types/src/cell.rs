@@ -2,8 +2,7 @@
 //! can track its source chain and service network requests / responses.
 
 use crate::prelude::*;
-use holo_hash::AgentPubKey;
-use holo_hash::DnaHash;
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use std::fmt;
 
@@ -11,19 +10,13 @@ use std::fmt;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 #[derive(
-    Clone,
-    Debug,
-    Hash,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-    Ord,
-    PartialOrd,
+    Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct CellId(DnaHash, AgentPubKey);
+pub struct CellId<H: HashSerializer = holo_hash::ByteArraySerializer>(
+    #[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))] DnaHash<H>,
+    #[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))] AgentPubKey<H>,
+);
 
 /// Delimiter in a clone id that separates the base cell's role name from the
 /// clone index.
@@ -113,30 +106,30 @@ impl fmt::Display for CellId {
     }
 }
 
-impl CellId {
+impl<H: HashSerializer> CellId<H> {
     /// Create a CellId from its components
-    pub fn new(dna_hash: DnaHash, agent_pubkey: AgentPubKey) -> Self {
+    pub fn new(dna_hash: DnaHash<H>, agent_pubkey: AgentPubKey<H>) -> Self {
         CellId(dna_hash, agent_pubkey)
     }
 
     /// The dna hash/address for this cell.
-    pub fn dna_hash(&self) -> &DnaHash {
+    pub fn dna_hash(&self) -> &DnaHash<H> {
         &self.0
     }
 
     /// The agent id / public key for this cell.
-    pub fn agent_pubkey(&self) -> &AgentPubKey {
+    pub fn agent_pubkey(&self) -> &AgentPubKey<H> {
         &self.1
     }
 
-    /// Into [DnaHash] and [AgentPubKey]
-    pub fn into_dna_and_agent(self) -> (DnaHash, AgentPubKey) {
+    /// Into [DnaHash<H>] and [AgentPubKey<H>]
+    pub fn into_dna_and_agent(self) -> (DnaHash<H>, AgentPubKey<H>) {
         (self.0, self.1)
     }
 }
 
-impl From<(DnaHash, AgentPubKey)> for CellId {
-    fn from(pair: (DnaHash, AgentPubKey)) -> Self {
+impl<H: HashSerializer> From<(DnaHash<H>, AgentPubKey<H>)> for CellId<H> {
+    fn from(pair: (DnaHash<H>, AgentPubKey<H>)) -> Self {
         Self(pair.0, pair.1)
     }
 }

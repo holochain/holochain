@@ -1,6 +1,6 @@
 //! Definition of the HasHash trait
 
-use crate::ser::HashSerializer;
+use crate::hash::HashSerializer;
 use crate::HashType;
 use crate::HoloHash;
 

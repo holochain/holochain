@@ -5,7 +5,7 @@
 //! be done.
 
 use super::*;
-use crate::ser::Base64Serializer;
+use crate::hash::Base64Serializer;
 use crate::HoloHash;
 use crate::{error::HoloHashResult, HashType};
 
@@ -17,24 +17,24 @@ impl<T: HashType> HoloHashB64<T> {
     /// Read a HoloHash from base64 string
     pub fn from_b64_str(str: &str) -> HoloHashResult<Self> {
         let bytes = holo_hash_decode_unchecked(str)?;
-        HoloHash::from_raw_39(bytes).map(Into::into)
+        HoloHash::from_raw_39(bytes).map(|h| h.change_serialization())
     }
 }
 
 macro_rules! impl_froms {
     ($t: ty) => {
-        impl From<HoloHash<$t, $crate::ser::ByteArraySerializer>>
-            for HoloHash<$t, $crate::ser::Base64Serializer>
+        impl From<HoloHash<$t, $crate::hash::ByteArraySerializer>>
+            for HoloHash<$t, $crate::hash::Base64Serializer>
         {
-            fn from(h: HoloHash<$t, $crate::ser::ByteArraySerializer>) -> Self {
+            fn from(h: HoloHash<$t, $crate::hash::ByteArraySerializer>) -> Self {
                 h.change_serialization()
             }
         }
 
-        impl From<HoloHash<$t, $crate::ser::Base64Serializer>>
-            for HoloHash<$t, $crate::ser::ByteArraySerializer>
+        impl From<HoloHash<$t, $crate::hash::Base64Serializer>>
+            for HoloHash<$t, $crate::hash::ByteArraySerializer>
         {
-            fn from(h: HoloHash<$t, $crate::ser::Base64Serializer>) -> Self {
+            fn from(h: HoloHash<$t, $crate::hash::Base64Serializer>) -> Self {
                 h.change_serialization()
             }
         }
@@ -83,27 +83,3 @@ impl_froms!(hash_type::AnyDht);
 /// Base64-ready version of AnyLinkableHash
 pub type AnyLinkableHashB64 = HoloHashB64<hash_type::AnyLinkable>;
 impl_froms!(hash_type::AnyLinkable);
-
-impl From<EntryHashB64> for AnyLinkableHash {
-    fn from(h: EntryHashB64) -> Self {
-        EntryHash::from(h).into()
-    }
-}
-
-impl From<ActionHashB64> for AnyLinkableHash {
-    fn from(h: ActionHashB64) -> Self {
-        ActionHash::from(h).into()
-    }
-}
-
-impl From<EntryHashB64> for AnyDhtHash {
-    fn from(h: EntryHashB64) -> Self {
-        EntryHash::from(h).into()
-    }
-}
-
-impl From<ActionHashB64> for AnyDhtHash {
-    fn from(h: ActionHashB64) -> Self {
-        ActionHash::from(h).into()
-    }
-}

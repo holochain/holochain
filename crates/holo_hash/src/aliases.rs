@@ -1,9 +1,9 @@
 //! Type aliases for the various concrete HoloHash types
 
+use crate::hash::ByteArraySerializer;
+use crate::hash::HashSerializer;
 use crate::hash_type;
 use crate::hash_type::*;
-use crate::ser::ByteArraySerializer;
-use crate::ser::HashSerializer;
 use crate::HashType;
 use crate::HoloHash;
 use crate::PrimitiveHashType;
@@ -14,40 +14,40 @@ use crate::PrimitiveHashType;
 // PRIMITIVE HASH TYPES
 
 /// An Agent public signing key. Not really a hash, more of an "identity hash".
-pub type AgentPubKey = HoloHash<hash_type::Agent, ByteArraySerializer>;
+pub type AgentPubKey<H = ByteArraySerializer> = HoloHash<hash_type::Agent, H>;
 
 /// A public key of a pair of signing keys for signing zome calls.
 pub type ZomeCallSigningKey = AgentPubKey;
 
 /// The hash of a DnaDef
-pub type DnaHash = HoloHash<hash_type::Dna, ByteArraySerializer>;
+pub type DnaHash<H = ByteArraySerializer> = HoloHash<hash_type::Dna, H>;
 
 /// The hash of a DhtOp's "unique form" representation
-pub type DhtOpHash = HoloHash<hash_type::DhtOp, ByteArraySerializer>;
+pub type DhtOpHash<H = ByteArraySerializer> = HoloHash<hash_type::DhtOp, H>;
 
 /// The hash of an Entry.
-pub type EntryHash = HoloHash<hash_type::Entry, ByteArraySerializer>;
+pub type EntryHash<H = ByteArraySerializer> = HoloHash<hash_type::Entry, H>;
 
 /// The hash of an action
-pub type ActionHash = HoloHash<hash_type::Action, ByteArraySerializer>;
+pub type ActionHash<H = ByteArraySerializer> = HoloHash<hash_type::Action, H>;
 
 /// The hash of a network ID
-pub type NetIdHash = HoloHash<hash_type::NetId, ByteArraySerializer>;
+pub type NetIdHash<H = ByteArraySerializer> = HoloHash<hash_type::NetId, H>;
 
 /// The hash of some wasm bytecode
-pub type WasmHash = HoloHash<hash_type::Wasm, ByteArraySerializer>;
+pub type WasmHash<H = ByteArraySerializer> = HoloHash<hash_type::Wasm, H>;
 
 /// The hash of some external data that can't or doesn't exist on the DHT.
-pub type ExternalHash = HoloHash<hash_type::External, ByteArraySerializer>;
+pub type ExternalHash<H = ByteArraySerializer> = HoloHash<hash_type::External, H>;
 
 // COMPOSITE HASH TYPES
 
 /// The hash of anything referrable in the DHT.
 /// This is a composite of either an EntryHash or a ActionHash
-pub type AnyDhtHash = HoloHash<hash_type::AnyDht, ByteArraySerializer>;
+pub type AnyDhtHash<H = ByteArraySerializer> = HoloHash<hash_type::AnyDht, H>;
 
 /// The hash of anything linkable.
-pub type AnyLinkableHash = HoloHash<hash_type::AnyLinkable, ByteArraySerializer>;
+pub type AnyLinkableHash<H = ByteArraySerializer> = HoloHash<hash_type::AnyLinkable, H>;
 
 /// Alias for AnyLinkableHash. This hash forms the notion of the "basis hash" of an op.
 pub type OpBasis = AnyLinkableHash;

@@ -1,8 +1,8 @@
 use crate::assert_length;
 use crate::encode;
+use crate::hash::ByteArraySerializer;
+use crate::hash::HashSerializer;
 use crate::hash_type;
-use crate::ser::ByteArraySerializer;
-use crate::ser::HashSerializer;
 use crate::HashType;
 use crate::HashableContent;
 use crate::HashableContentBytes;
@@ -19,7 +19,7 @@ use must_future::MustBoxFuture;
 /// take too long to hash within a single tokio context
 pub const MAX_HASHABLE_CONTENT_LEN: usize = 16 * 1000 * 1000; // 16 MB
 
-impl<T: HashTypeSync, S: HashSerializer> HoloHash<T, S> {
+impl<T: HashTypeSync> HoloHash<T> {
     /// Synchronously hash a reference to the given content to produce a HoloHash
     /// If the content is larger than MAX_HASHABLE_CONTENT_LEN, this will **panic**!
     pub fn with_data_sync<C: HashableContent<HashType = T>>(content: &C) -> HoloHash<T> {

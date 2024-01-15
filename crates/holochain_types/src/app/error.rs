@@ -5,7 +5,7 @@ use crate::prelude::*;
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Clone limit of {0} exceeded for app role assignment: {1:?}")]
-    CloneLimitExceeded(u32, AppRoleAssignment),
+    CloneLimitExceeded(u32, AppRoleAssignment<Base64Serializer>),
 
     #[error("Tried to create a cell with an existing id '{0}'")]
     DuplicateCellId(CellId),
@@ -14,10 +14,10 @@ pub enum AppError {
     DuplicateCloneIds(CloneId),
 
     #[error("Could not find clone cell with id '{0}'")]
-    CloneCellNotFound(CloneCellId),
+    CloneCellNotFound(CloneCellId<Base64Serializer>),
 
     #[error("Tried to delete a clone cell which was not already disabled: '{0}'")]
-    CloneCellMustBeDisabledBeforeDeleting(CloneCellId),
+    CloneCellMustBeDisabledBeforeDeleting(CloneCellId<Base64Serializer>),
 
     #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role name: {0}")]
     IllegalRoleName(RoleName),

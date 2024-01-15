@@ -1,59 +1,13 @@
 //! Defines the serialization rules for HoloHashes
 
-use std::fmt::Debug;
-
+use crate::HashSerialization;
+use crate::HashSerializer;
 use crate::HashType;
 use crate::HoloHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_serialized_bytes::UnsafeBytes;
 use serde::ser::SerializeSeq;
-
-/// Ways of serializing a HoloHash
-pub trait HashSerializer: Clone + Debug {
-    fn get() -> HashSerialization;
-}
-
-/// Ways of serializing a HoloHash
-pub enum HashSerialization {
-    ByteArray,
-    Base64,
-    ByteSequence,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-/// This hash is serialized as a byte array
-pub struct ByteArraySerializer;
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-/// This hash is serialized as a base64 string
-pub struct Base64Serializer;
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-/// This hash is serialized as a byte sequence (rather than a byte array).
-///
-/// Byte arrays are generally more compact than sequences, but not all formats
-/// support them, JSON included. For those formats, you can use this serialization
-/// method, or Base64 strings.
-pub struct ByteSequenceSerializer;
-
-impl HashSerializer for ByteArraySerializer {
-    fn get() -> HashSerialization {
-        HashSerialization::ByteArray
-    }
-}
-
-impl HashSerializer for Base64Serializer {
-    fn get() -> HashSerialization {
-        HashSerialization::Base64
-    }
-}
-
-impl HashSerializer for ByteSequenceSerializer {
-    fn get() -> HashSerialization {
-        HashSerialization::ByteSequence
-    }
-}
 
 impl<T, R> HoloHash<T, R>
 where
@@ -124,6 +78,7 @@ impl<'de, T: HashType, HS: HashSerializer> serde::de::Visitor<'de> for HoloHashV
             ))
         } else {
             HoloHash::from_raw_39(h.to_vec())
+                .map(|h| h.change_serialization())
                 .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
         }
     }
@@ -154,6 +109,7 @@ impl<'de, T: HashType, HS: HashSerializer> serde::de::Visitor<'de> for HoloHashV
             ))
         } else {
             HoloHash::from_raw_39(h.to_vec())
+                .map(|h| h.change_serialization())
                 .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
         }
     }

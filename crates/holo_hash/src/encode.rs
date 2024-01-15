@@ -1,6 +1,6 @@
 use crate::assert_length;
 use crate::error::HoloHashError;
-use crate::ser::HashSerializer;
+use crate::hash::HashSerializer;
 use crate::HashType;
 use crate::HoloHash;
 use crate::PrimitiveHashType;
@@ -15,6 +15,7 @@ impl<P: PrimitiveHashType, S: HashSerializer> TryFrom<&str> for HoloHash<P, S> {
     fn try_from(s: &str) -> Result<Self, HoloHashError> {
         let hash_type = P::new();
         HoloHash::from_raw_39(holo_hash_decode(hash_type.get_prefix(), s)?)
+            .map(|h| h.change_serialization())
     }
 }
 

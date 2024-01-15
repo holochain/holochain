@@ -2808,6 +2808,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "holo_hash_derive"
+version = "0.1.0"
+dependencies = [
+ "darling 0.14.4",
+ "heck 0.4.1",
+ "proc-macro-error",
+ "proc-macro2 1.0.70",
+ "quote 1.0.33",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "holochain"
 version = "0.3.0-beta-dev.32"
 dependencies = [

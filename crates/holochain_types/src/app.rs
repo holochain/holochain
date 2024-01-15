@@ -103,27 +103,29 @@ pub struct CreateCloneCellPayload {
 /// Ways of specifying a clone cell.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
-pub enum CloneCellId {
+#[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+pub enum CloneCellId<H: HashSerializer> {
     /// Clone id consisting of role name and clone index.
     CloneId(CloneId),
     /// Cell id consisting of DNA hash and agent pub key.
-    CellId(CellId),
+    CellId(CellId<H>),
 }
 
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct DisableCloneCellPayload {
+pub struct DisableCloneCellPayload<H: HashSerializer> {
     /// The app id that the clone cell belongs to
     pub app_id: InstalledAppId,
     /// The clone id or cell id of the clone cell
-    pub clone_cell_id: CloneCellId,
+    #[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+    pub clone_cell_id: CloneCellId<H>,
 }
 
 /// Argumtents to specify the clone cell to be enabled.
-pub type EnableCloneCellPayload = DisableCloneCellPayload;
+pub type EnableCloneCellPayload<H> = DisableCloneCellPayload<H>;
 
 /// Arguments to delete a disabled clone cell of an app.
-pub type DeleteCloneCellPayload = DisableCloneCellPayload;
+pub type DeleteCloneCellPayload<H> = DisableCloneCellPayload<H>;
 
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -253,16 +255,17 @@ impl InstalledCell {
     shrinkwraprs::Shrinkwrap,
 )]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct InstalledApp {
+#[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+pub struct InstalledApp<H: HashSerializer = ByteArraySerializer> {
     #[shrinkwrap(main_field)]
-    app: InstalledAppCommon,
+    app: InstalledAppCommon<H>,
     /// The status of the installed app
     pub status: AppStatus,
 }
 
-impl InstalledApp {
+impl<H: HashSerializer> InstalledApp<H> {
     /// Constructor for freshly installed app
-    pub fn new_fresh(app: InstalledAppCommon) -> Self {
+    pub fn new_fresh(app: InstalledAppCommon<H>) -> Self {
         Self {
             app,
             status: AppStatus::Disabled(DisabledAppReason::NeverStarted),
@@ -271,7 +274,7 @@ impl InstalledApp {
 
     /// Constructor for freshly installed app
     #[cfg(feature = "test_utils")]
-    pub fn new_running(app: InstalledAppCommon) -> Self {
+    pub fn new_running(app: InstalledAppCommon<H>) -> Self {
         Self {
             app,
             status: AppStatus::Running,
@@ -280,7 +283,7 @@ impl InstalledApp {
 
     /// Return the common app info, as well as a status which encodes the remaining
     /// information
-    pub fn into_app_and_status(self) -> (InstalledAppCommon, AppStatus) {
+    pub fn into_app_and_status(self) -> (InstalledAppCommon<H>, AppStatus) {
         (self.app, self.status)
     }
 
@@ -295,7 +298,7 @@ impl InstalledApp {
     }
 }
 
-impl automap::AutoMapped for InstalledApp {
+impl<H: HashSerializer> automap::AutoMapped for InstalledApp<H> {
     type Key = InstalledAppId;
 
     fn key(&self) -> &Self::Key {
@@ -304,7 +307,7 @@ impl automap::AutoMapped for InstalledApp {
 }
 
 /// A map from InstalledAppId -> InstalledApp
-pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
+pub type InstalledAppMap<H> = automap::AutoHashMap<InstalledApp<H>>;
 
 /// An active app
 #[derive(
@@ -318,9 +321,10 @@ pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
     shrinkwraprs::Shrinkwrap,
 )]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct RunningApp(InstalledAppCommon);
+#[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+pub struct RunningApp<H: HashSerializer = ByteArraySerializer>(InstalledAppCommon<H>);
 
-impl RunningApp {
+impl<H: HashSerializer> RunningApp<H> {
     /// Convert to a StoppedApp with the given reason
     pub fn into_stopped(self, reason: StoppedAppReason) -> StoppedApp {
         StoppedApp {
@@ -330,7 +334,7 @@ impl RunningApp {
     }
 
     /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
+    pub fn into_common(self) -> InstalledAppCommon<H> {
         self.0
     }
 }
@@ -349,9 +353,10 @@ impl From<RunningApp> for InstalledApp {
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct StoppedApp {
+pub struct StoppedApp<H: HashSerializer = ByteArraySerializer> {
     #[shrinkwrap(main_field)]
-    app: InstalledAppCommon,
+    #[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+    app: InstalledAppCommon<H>,
     reason: StoppedAppReason,
 }
 
@@ -407,22 +412,23 @@ impl From<StoppedApp> for InstalledApp {
 
 /// The common data between apps of any status
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InstalledAppCommon {
+#[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+pub struct InstalledAppCommon<H: HashSerializer = ByteArraySerializer> {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
     /// The agent key used to install this app.
-    agent_key: AgentPubKey,
+    agent_key: AgentPubKey<H>,
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
-    role_assignments: HashMap<RoleName, AppRoleAssignment>,
+    role_assignments: HashMap<RoleName, AppRoleAssignment<H>>,
     /// The manifest used to install the app.
     manifest: AppManifest,
 }
 
-impl InstalledAppCommon {
+impl<H: HashSerializer> InstalledAppCommon<H> {
     /// Constructor
-    pub fn new<S: ToString, I: IntoIterator<Item = (RoleName, AppRoleAssignment)>>(
+    pub fn new<S: ToString, I: IntoIterator<Item = (RoleName, AppRoleAssignment<H>)>>(
         installed_app_id: S,
-        agent_key: AgentPubKey,
+        agent_key: AgentPubKey<H>,
         role_assignments: I,
         manifest: AppManifest,
     ) -> AppResult<Self> {
@@ -448,28 +454,28 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&RoleName, &CellId)> {
+    pub fn provisioned_cells(&self) -> impl Iterator<Item = (&RoleName, &CellId<H>)> {
         self.role_assignments
             .iter()
             .filter_map(|(role_name, role)| role.provisioned_cell().map(|c| (role_name, c)))
     }
 
     /// Accessor
-    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (RoleName, CellId)> {
+    pub fn into_provisioned_cells(self) -> impl Iterator<Item = (RoleName, CellId<H>)> {
         self.role_assignments
             .into_iter()
             .filter_map(|(role_name, role)| role.into_provisioned_cell().map(|c| (role_name, c)))
     }
 
     /// Accessor
-    pub fn clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+    pub fn clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId<H>)> {
         self.role_assignments
             .iter()
             .flat_map(|app_role_assignment| app_role_assignment.1.clones.iter())
     }
 
     /// Accessor
-    pub fn disabled_clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+    pub fn disabled_clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId<H>)> {
         self.role_assignments
             .iter()
             .flat_map(|app_role_assignment| app_role_assignment.1.disabled_clones.iter())
@@ -479,7 +485,7 @@ impl InstalledAppCommon {
     pub fn clone_cells_for_role_name(
         &self,
         role_name: &RoleName,
-    ) -> Option<&HashMap<CloneId, CellId>> {
+    ) -> Option<&HashMap<CloneId, CellId<H>>> {
         match self.role_assignments.get(role_name) {
             None => None,
             Some(role_assignments) => Some(&role_assignments.clones),
@@ -490,7 +496,7 @@ impl InstalledAppCommon {
     pub fn disabled_clone_cells_for_role_name(
         &self,
         role_name: &RoleName,
-    ) -> Option<&HashMap<CloneId, CellId>> {
+    ) -> Option<&HashMap<CloneId, CellId<H>>> {
         match self.role_assignments.get(role_name) {
             None => None,
             Some(role_assignment) => Some(&role_assignment.disabled_clones),
@@ -498,17 +504,17 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+    pub fn clone_cell_ids(&self) -> impl Iterator<Item = &CellId<H>> {
         self.clone_cells().map(|(_, cell_id)| cell_id)
     }
 
     /// Accessor
-    pub fn disabled_clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+    pub fn disabled_clone_cell_ids(&self) -> impl Iterator<Item = &CellId<H>> {
         self.disabled_clone_cells().map(|(_, cell_id)| cell_id)
     }
 
     /// Iterator of all cells, both provisioned and cloned
-    pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn all_cells(&self) -> impl Iterator<Item = &CellId<H>> {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.clone_cell_ids())
@@ -518,7 +524,7 @@ impl InstalledAppCommon {
     /// Iterator of all running cells, both provisioned and cloned.
     /// Provisioned cells will always be running if the app is running,
     /// but some cloned cells may be disabled and will not be returned.
-    pub fn all_enabled_cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn all_enabled_cells(&self) -> impl Iterator<Item = &CellId<H>> {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.clone_cell_ids())
@@ -529,30 +535,30 @@ impl InstalledAppCommon {
     ///
     /// Currently this is simply all provisioned cells, but this concept may
     /// become more nuanced in the future.
-    pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
+    pub fn required_cells(&self) -> impl Iterator<Item = &CellId<H>> {
         self.provisioned_cells().map(|(_, c)| c)
     }
 
     /// Accessor for particular role
-    pub fn role(&self, role_name: &RoleName) -> AppResult<&AppRoleAssignment> {
+    pub fn role(&self, role_name: &RoleName) -> AppResult<&AppRoleAssignment<H>> {
         self.role_assignments
             .get(role_name)
             .ok_or_else(|| AppError::RoleNameMissing(role_name.clone()))
     }
 
-    fn role_mut(&mut self, role_name: &RoleName) -> AppResult<&mut AppRoleAssignment> {
+    fn role_mut(&mut self, role_name: &RoleName) -> AppResult<&mut AppRoleAssignment<H>> {
         self.role_assignments
             .get_mut(role_name)
             .ok_or_else(|| AppError::RoleNameMissing(role_name.clone()))
     }
 
     /// Accessor
-    pub fn roles(&self) -> &HashMap<RoleName, AppRoleAssignment> {
+    pub fn roles(&self) -> &HashMap<RoleName, AppRoleAssignment<H>> {
         &self.role_assignments
     }
 
     /// Add a clone cell.
-    pub fn add_clone(&mut self, role_name: &RoleName, cell_id: &CellId) -> AppResult<CloneId> {
+    pub fn add_clone(&mut self, role_name: &RoleName, cell_id: &CellId<H>) -> AppResult<CloneId> {
         let app_role_assignment = self.role_mut(role_name)?;
 
         assert_eq!(
@@ -564,7 +570,7 @@ impl InstalledAppCommon {
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
-                app_role_assignment.clone(),
+                app_role_assignment.clone().change_serialization(),
             ));
         }
         let clone_id = CloneId::new(role_name, app_role_assignment.next_clone_index);
@@ -582,7 +588,7 @@ impl InstalledAppCommon {
     }
 
     /// Get a clone cell id from its clone id.
-    pub fn get_clone_cell_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CellId> {
+    pub fn get_clone_cell_id(&self, clone_cell_id: &CloneCellId<H>) -> AppResult<CellId<H>> {
         let cell_id = match clone_cell_id {
             CloneCellId::CellId(cell_id) => cell_id,
             CloneCellId::CloneId(clone_id) => self
@@ -597,7 +603,7 @@ impl InstalledAppCommon {
     }
 
     /// Get the clone id from either clone or cell id.
-    pub fn get_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
+    pub fn get_clone_id(&self, clone_cell_id: &CloneCellId<H>) -> AppResult<CloneId> {
         let clone_id = match clone_cell_id {
             CloneCellId::CloneId(id) => id,
             CloneCellId::CellId(id) => {
@@ -611,7 +617,7 @@ impl InstalledAppCommon {
     }
 
     /// Get the clone id from either clone or cell id.
-    pub fn get_disabled_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
+    pub fn get_disabled_clone_id(&self, clone_cell_id: &CloneCellId<H>) -> AppResult<CloneId> {
         let clone_id = match clone_cell_id {
             CloneCellId::CloneId(id) => id.clone(),
             CloneCellId::CellId(id) => {
@@ -1002,11 +1008,12 @@ pub enum DisabledAppReason {
 
 /// App "roles" correspond to cell entries in the AppManifest.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct AppRoleAssignment {
+#[serde(bound(deserialize = "H: serde::de::DeserializeOwned"))]
+pub struct AppRoleAssignment<H: HashSerializer = ByteArraySerializer> {
     /// The Id of the Cell which will be provisioned for this role.
     /// This also identifies the basis for cloned DNAs, and this is how the
     /// Agent is determined for clones (always the same as the provisioned cell).
-    base_cell_id: CellId,
+    base_cell_id: CellId<H>,
     /// Records whether the base cell has actually been provisioned or not.
     /// If true, then `base_cell_id` refers to an actual existing Cell.
     /// If false, then `base_cell_id` is just recording what that cell will be
@@ -1018,16 +1025,16 @@ pub struct AppRoleAssignment {
     next_clone_index: u32,
     /// Cells which were cloned at runtime. The length cannot grow beyond
     /// `clone_limit`.
-    clones: HashMap<CloneId, CellId>,
+    clones: HashMap<CloneId, CellId<H>>,
     /// Clone cells that have been disabled. These cells cannot be called
     /// any longer and are not returned as part of the app info either.
     /// Disabled clone cells can be deleted through the Admin API.
-    disabled_clones: HashMap<CloneId, CellId>,
+    disabled_clones: HashMap<CloneId, CellId<H>>,
 }
 
-impl AppRoleAssignment {
+impl<H: HashSerializer> AppRoleAssignment<H> {
     /// Constructor. List of clones always starts empty.
-    pub fn new(base_cell_id: CellId, is_provisioned: bool, clone_limit: u32) -> Self {
+    pub fn new(base_cell_id: CellId<H>, is_provisioned: bool, clone_limit: u32) -> Self {
         Self {
             base_cell_id,
             is_provisioned,
@@ -1039,22 +1046,22 @@ impl AppRoleAssignment {
     }
 
     /// Accessor
-    pub fn cell_id(&self) -> &CellId {
+    pub fn cell_id(&self) -> &CellId<H> {
         &self.base_cell_id
     }
 
     /// Accessor
-    pub fn dna_hash(&self) -> &DnaHash {
+    pub fn dna_hash(&self) -> &DnaHash<H> {
         self.base_cell_id.dna_hash()
     }
 
     /// Accessor
-    pub fn agent_key(&self) -> &AgentPubKey {
+    pub fn agent_key(&self) -> &AgentPubKey<H> {
         self.base_cell_id.agent_pubkey()
     }
 
     /// Accessor
-    pub fn provisioned_cell(&self) -> Option<&CellId> {
+    pub fn provisioned_cell(&self) -> Option<&CellId<H>> {
         if self.is_provisioned {
             Some(&self.base_cell_id)
         } else {
@@ -1078,7 +1085,7 @@ impl AppRoleAssignment {
     }
 
     /// Transformer
-    pub fn into_provisioned_cell(self) -> Option<CellId> {
+    pub fn into_provisioned_cell(self) -> Option<CellId<H>> {
         if self.is_provisioned {
             Some(self.base_cell_id)
         } else {
