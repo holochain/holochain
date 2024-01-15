@@ -1012,7 +1012,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids: Vec<_> = conductor.running_cell_ids(None).into_iter().collect();
+    let cell_ids: Vec<_> = conductor.running_cell_ids(|_| true).into_iter().collect();
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
