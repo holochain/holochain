@@ -30,7 +30,10 @@ use holochain_types::dht_op::WireOps;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::record::WireRecordOps;
 use holochain_zome_types::action::ActionHashed;
+use holochain_zome_types::action::AppEntryDef;
+use holochain_zome_types::action::EntryType;
 use holochain_zome_types::dna_def::{DnaDef, DnaDefHashed};
+use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
@@ -72,18 +75,19 @@ async fn validate_op_with_dependency_held_in_cache() {
     let mut test_case = TestCase::new().await;
 
     // Previous op, to go in the cache
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.author = test_case.agent.clone();
+    prev_create_action.action_seq = 10;
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(
-            validation_package_action.clone(),
-        ))
+        .sign_action(Action::Create(prev_create_action.clone()))
         .await;
-    let previous_op = DhtOp::RegisterAgentActivity(
-        fixt!(Signature),
-        Action::AgentValidationPkg(validation_package_action),
-    );
+    let previous_op =
+        DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action));
     test_case
         .save_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
@@ -95,6 +99,11 @@ async fn validate_op_with_dependency_held_in_cache() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let op_hash = test_case
@@ -117,13 +126,16 @@ async fn validate_op_with_dependency_not_held() {
     let mut test_case = TestCase::new().await;
 
     // Previous op, to be fetched from the network
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone();
-    validation_package_action.action_seq = 10;
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.author = test_case.agent.clone();
+    prev_create_action.action_seq = 10;
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(
-            validation_package_action.clone(),
-        ))
+        .sign_action(Action::Create(prev_create_action.clone()))
         .await;
 
     // Op to validate, to go in the dht database
@@ -132,6 +144,11 @@ async fn validate_op_with_dependency_not_held() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     let op_hash = test_case
@@ -179,6 +196,11 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
 
     test_case
@@ -231,6 +253,11 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     create_action.action_seq = previous_action.action().action_seq() + 31;
     create_action.prev_action = previous_action.as_hash().clone();
     create_action.timestamp = Timestamp::now().into();
+    create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
     test_case
         .save_op_to_db(test_case.dht_db_handle(), op)

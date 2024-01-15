@@ -174,16 +174,16 @@
     "holochain": {
       "flake": false,
       "locked": {
-        "lastModified": 1692965835,
-        "narHash": "sha256-tylLGAliWQnnYjTdjTN8N7xxlcHgso085wkQ8NgmOpI=",
+        "lastModified": 1697824272,
+        "narHash": "sha256-4hkleGaiYeeUw2/rk/OSY1/eHejUstbvAhYmebq7eVQ=",
         "owner": "holochain",
         "repo": "holochain",
-        "rev": "6d424d347d5296bc8e92ff5233f5a6ed22ed736f",
+        "rev": "4e3eacc8473d9bef0467b3465f20c6f63eed636b",
         "type": "github"
       },
       "original": {
         "owner": "holochain",
-        "ref": "holochain-0.1.6",
+        "ref": "holochain-0.1.7",
         "repo": "holochain",
         "type": "github"
       }
@@ -360,11 +360,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1704939449,
-        "narHash": "sha256-AitvNVFGhHsA/TmyAXDL2likMObEPv7H1bJV0haxN9k=",
+        "lastModified": 1705285102,
+        "narHash": "sha256-e7uridAdtZOiUZD7fjrWkUB6qr1HM2thQpDRRgJfLNc=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "2716b0c756eef526a3ff75c555a59f958ac1fa17",
+        "rev": "d681ac8a92a1cce066df1d3a5a7f7c909688f4be",
         "type": "github"
       },
       "original": {
@@ -376,11 +376,11 @@
     "scaffolding": {
       "flake": false,
       "locked": {
-        "lastModified": 1695419457,
-        "narHash": "sha256-QhRm86kTX84GLP2qR+ICBgjkb2aOupV7/L+0g5imlfE=",
+        "lastModified": 1705075437,
+        "narHash": "sha256-QKfavCQniePQBpgP/QuFfUhQvo7Sil8o57QGieu3Jt0=",
         "owner": "holochain",
         "repo": "scaffolding",
-        "rev": "d873219e9061a3a045b872aa95a5db42e545e620",
+        "rev": "58564c43bc2a03bf35731178c144015452dd6711",
         "type": "github"
       },
       "original": {
@@ -413,8 +413,8 @@
         "scaffolding": "scaffolding"
       },
       "locked": {
-        "lastModified": 1695429997,
-        "narHash": "sha256-2vXCykfKGm61+9uu6h+0mvzKwyfvdRFlRM7qpX1E3zQ=",
+        "lastModified": 1705083288,
+        "narHash": "sha256-eroaNtCnSP/NrLWlbnr/4mNarYwmnnnsCBW1SmJzPMM=",
         "path": "./versions/0_1",
         "type": "path"
       },

@@ -30,7 +30,7 @@ macro_rules! wasm_common {
         }
 
         /// Entry type enum for hc demo-cli.
-        #[hdk_entry_defs]
+        #[hdk_entry_types]
         #[unit_enum(UnitEntryTypes)]
         pub enum EntryTypes {
             File(File),

@@ -1,0 +1,5 @@
+error: Unexpected literal type `int` at name
+ --> tests/macros/entry_type_registration_bad_opts_types.rs:5:25
+  |
+5 |     #[entry_type(name = 55)]
+  |                         ^^
