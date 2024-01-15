@@ -1,17 +1,18 @@
 use std::time::{Duration, Instant};
 
-use backon::{FibonacciBackoff, FibonacciBuilder, BackoffBuilder};
+use backon::{BackoffBuilder, FibonacciBackoff, FibonacciBuilder};
 
-struct FetchItemBackoff {
+/// a struct
+#[derive(Debug)]
+pub struct FetchBackoff {
     backoff: FibonacciBackoff,
-    min_delay: Duration,
     current_wait: Duration,
     started_wait_at: Instant,
-    new_sources: u32,
-    expired: bool
+    expired: bool,
 }
 
-impl FetchItemBackoff {
+impl FetchBackoff {
+    /// create it
     pub fn new(initial_delay: Duration) -> Self {
         let backoff = FibonacciBuilder::default()
             .with_jitter()
@@ -22,14 +23,13 @@ impl FetchItemBackoff {
 
         Self {
             backoff,
-            min_delay: initial_delay,
             current_wait: Duration::ZERO,
             started_wait_at: Instant::now(),
-            new_sources: 0,
             expired: false,
         }
     }
 
+    /// ready
     pub fn is_ready(&mut self) -> bool {
         if self.expired {
             return false;
@@ -43,32 +43,19 @@ impl FetchItemBackoff {
         }
     }
 
+    /// expired
     pub fn is_expired(&self) -> bool {
         self.expired
     }
 
-    pub fn new_sources(&mut self) {
-        self.current_wait = Duration::ZERO;
-        self.new_sources += 1;
-    }
-
     fn advance(&mut self) {
-        if self.new_sources > 0 {
-            self.new_sources -= 1;
-        }
-
-        if self.new_sources > 0 {
-            self.current_wait = self.min_delay;
-            self.started_wait_at = Instant::now();
-        } else {
-            match self.backoff.next() {
-                Some(d) => {
-                    self.current_wait = d;
-                    self.started_wait_at = Instant::now();
-                }
-                None => {
-                    self.expired = true;
-                }
+        match self.backoff.next() {
+            Some(d) => {
+                self.current_wait = d;
+                self.started_wait_at = Instant::now();
+            }
+            None => {
+                self.expired = true;
             }
         }
     }
@@ -76,19 +63,19 @@ impl FetchItemBackoff {
 
 #[cfg(test)]
 mod tests {
+    use super::FetchBackoff;
     use std::time::Duration;
-    use super::FetchItemBackoff;
-    
+
     #[test]
     fn backoff_is_ready_at_initialisation() {
-        let mut backoff = FetchItemBackoff::new(Duration::from_secs(1));
+        let mut backoff = FetchBackoff::new(Duration::from_secs(1));
         assert!(backoff.is_ready());
     }
 
     #[test]
     fn first_delay_is_initial_delay() {
         let initial_delay = Duration::from_secs(1);
-        let mut backoff = FetchItemBackoff::new(initial_delay);
+        let mut backoff = FetchBackoff::new(initial_delay);
         assert!(backoff.is_ready());
 
         // After ready check, should delay and so not be ready
@@ -96,5 +83,29 @@ mod tests {
 
         // Account for jitter and check that the delay is roughly the initial delay
         assert!(initial_delay <= backoff.current_wait && backoff.current_wait < initial_delay * 2);
+    }
+
+    #[test]
+    fn number_of_tries_is_limited() {
+        let mut backoff = FetchBackoff::new(Duration::from_nanos(1));
+        assert!(backoff.is_ready());
+        assert!(!backoff.is_expired());
+
+        let mut num_tries = 0;
+        for _ in 0..1000 {
+            if backoff.is_expired() {
+                break;
+            }
+
+            while !backoff.is_ready() {
+                std::thread::sleep(Duration::from_nanos(10));
+            }
+
+            num_tries += 1;
+        }
+
+        assert!(backoff.is_expired());
+        assert!(!backoff.is_ready());
+        assert_eq!(15, num_tries);
     }
 }
