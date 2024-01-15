@@ -5,7 +5,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tracing::info;
 use wasmer::{
-    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Module, Store, Target, Triple, Engine,
+    wasmparser, CompileError, CompilerConfig, CpuFeature, Cranelift, Engine, Module,
+    NativeEngineExt, Store, Target, Triple,
 };
 use wasmer_middlewares::*;
 
@@ -46,12 +47,14 @@ pub fn build_ios_module(wasm: &[u8]) -> Result<Module, CompileError> {
         "Found wasm and was instructed to serialize it for ios in wasmer format, doing so now..."
     );
     let compiler_config = cranelift();
-    let store = Store::new(compiler_config);
+    let engine = Engine::from(compiler_config);
+    let store = Store::new(engine);
     Module::from_binary(&store, wasm)
 }
 
 /// Generate a headless Dylib Store suitable for iOS.
 /// Useful for re-building an iOS Module from a preserialized WASM Module.
-pub fn ios_headless_engine() -> Engine {
-    Engine::default()
+pub fn ios_dylib_headless_store() -> Store {
+    let engine = Engine::headless();
+    Store::new(engine)
 }
