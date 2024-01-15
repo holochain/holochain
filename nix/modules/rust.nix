@@ -64,7 +64,6 @@
                 rustc = final.rustToolchain;
                 cargo = final.rustToolchain;
               })
-
             ];
           };
 
