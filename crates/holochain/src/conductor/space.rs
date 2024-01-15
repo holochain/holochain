@@ -29,8 +29,9 @@ use holochain_p2p::{
     event::FetchOpDataQuery,
 };
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents,
-    DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite, ReadAccess,
+    AsP2pStateReadExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
+    ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,

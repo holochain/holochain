@@ -7,7 +7,7 @@ use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht_arc::DhtArcRange;
 use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
-use kitsune_p2p_bin_data::KitsuneSpace;
+use kitsune_p2p::KitsuneSpace;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rusqlite::*;

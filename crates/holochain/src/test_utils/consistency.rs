@@ -13,7 +13,7 @@ use holochain_p2p::{
     AgentPubKeyExt, DhtOpHashExt,
 };
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
+    AsP2pStateReadExt, DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
 };
 use holochain_state::{prelude::StateQueryResult, query::from_blob};
 use holochain_types::{db::DbRead, dht_op::DhtOpType, prelude::DhtOp};

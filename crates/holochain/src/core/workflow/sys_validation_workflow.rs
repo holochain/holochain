@@ -106,6 +106,7 @@ use futures::FutureExt;
 use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holo_hash::HasHash;
+use holo_hash::HashableContentExtSync;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::HolochainP2pDnaT;
