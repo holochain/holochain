@@ -43,12 +43,13 @@
           nix flake update --tarball-ttl 0
         )
 
+        ANY_CHANGED=0
         if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
           echo got no actual source changes, reverting modifications..
           git checkout $VERSIONS_DIR/flake.lock
-          exit 0
         else
           git add "$VERSIONS_DIR"/flake.lock
+          ANY_CHANGED=1
         fi
 
         if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
@@ -60,9 +61,13 @@
           git checkout flake.lock
         else
           git add flake.lock
+          ANY_CHANGED=1
         fi
 
-        git commit -m "chore(flakes): update $VERSIONS_DIR"
+        if [[ $ANY_CHANGED -eq 1 ]]; then
+          echo committing changes..
+          git commit -m "chore(flakes): update $VERSIONS_DIR"
+        fi
       '';
 
       scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''
