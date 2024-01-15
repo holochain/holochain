@@ -239,7 +239,7 @@ impl AgentStore {
 }
 
 // Note that this key includes the DnaHash/KitsuneSpace but using that as a key causes problems when running
-// multiple conductors in the same process. They will all share the same in-memory store that way, even if they 
+// multiple conductors in the same process. They will all share the same in-memory store that way, even if they
 // have databases in different locations. The ideal solution would be to move the cache onto the database handle
 // itself and use the KitsuneSpace as the key here but that requires a bigger refactor. For now using almost the
 // right key helps ensure the interface to this store shouldn't need to change if that refactor was done.
@@ -248,13 +248,24 @@ struct StoreKey(String, Arc<KitsuneSpace>);
 
 impl From<DbRead<DbKindP2pAgents>> for StoreKey {
     fn from(db: DbRead<DbKindP2pAgents>) -> Self {
-        Self(db.path().to_str().expect("The database path should be a valid string").to_string(), db.kind().0.clone())
+        Self(
+            db.path()
+                .to_str()
+                .expect("The database path should be a valid string")
+                .to_string(),
+            db.kind().0.clone(),
+        )
     }
 }
 
 impl From<(&Connection, Arc<KitsuneSpace>)> for StoreKey {
     fn from((con, space): (&Connection, Arc<KitsuneSpace>)) -> Self {
-        Self(con.path().expect("The database path should be a valid string").to_string(), space)
+        Self(
+            con.path()
+                .expect("The database path should be a valid string")
+                .to_string(),
+            space,
+        )
     }
 }
 
