@@ -238,8 +238,28 @@ impl AgentStore {
     }
 }
 
+// Note that this key includes the DnaHash/KitsuneSpace but using that as a key causes problems when running
+// multiple conductors in the same process. They will all share the same in-memory store that way, even if they 
+// have databases in different locations. The ideal solution would be to move the cache onto the database handle
+// itself and use the KitsuneSpace as the key here but that requires a bigger refactor. For now using almost the
+// right key helps ensure the interface to this store shouldn't need to change if that refactor was done.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct StoreKey(String, Arc<KitsuneSpace>);
+
+impl From<DbRead<DbKindP2pAgents>> for StoreKey {
+    fn from(db: DbRead<DbKindP2pAgents>) -> Self {
+        Self(db.path().to_str().expect("The database path should be a valid string").to_string(), db.kind().0.clone())
+    }
+}
+
+impl From<(&Connection, Arc<KitsuneSpace>)> for StoreKey {
+    fn from((con, space): (&Connection, Arc<KitsuneSpace>)) -> Self {
+        Self(con.path().expect("The database path should be a valid string").to_string(), space)
+    }
+}
+
 struct AgentStoreByPath {
-    map: Mutex<HashMap<Arc<KitsuneSpace>, AgentStore>>,
+    map: Mutex<HashMap<StoreKey, AgentStore>>,
 }
 
 impl AgentStoreByPath {
@@ -250,7 +270,8 @@ impl AgentStoreByPath {
     }
 
     fn get(&self, space: Arc<KitsuneSpace>, con: &Connection) -> DatabaseResult<AgentStore> {
-        match self.map.lock().entry(space) {
+        let key = (con, space.clone()).into();
+        match self.map.lock().entry(key) {
             hash_map::Entry::Occupied(e) => Ok(e.get().clone()),
             hash_map::Entry::Vacant(e) => {
                 let agent_store = AgentStore::new(con)?;
@@ -261,10 +282,10 @@ impl AgentStoreByPath {
     }
 
     async fn get_async(&self, db: &DbRead<DbKindP2pAgents>) -> DatabaseResult<AgentStore> {
-        let space = db.kind().0.clone();
+        let store_key = db.clone().into();
         {
             let map = self.map.lock();
-            if let Some(store) = map.get(&space) {
+            if let Some(store) = map.get(&store_key) {
                 return Ok(store.clone());
             }
         }
@@ -272,7 +293,7 @@ impl AgentStoreByPath {
         let agent_store = db.read_async(|txn| AgentStore::new(&txn)).await?;
 
         let mut map = self.map.lock();
-        match map.entry(space) {
+        match map.entry(store_key) {
             hash_map::Entry::Occupied(e) => {
                 // In this case the map was written to by another thread while we weren't holding the lock so discard the AgentStore
                 // we created in favour of the one that was created by the other thread
