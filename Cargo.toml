@@ -79,10 +79,10 @@ holochain_wasmer_host = {git = "https://github.com/holochain/holochain-wasmer.gi
 # tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "3549bb75ac8ddd08a7b0fefe11e77788611fad68" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "3549bb75ac8ddd08a7b0fefe11e77788611fad68" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "2023-09-20-wasmer3" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
+# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
