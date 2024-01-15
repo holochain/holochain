@@ -9,6 +9,10 @@ use holochain_serialized_bytes::SerializedBytesError;
 use holochain_serialized_bytes::UnsafeBytes;
 use serde::ser::SerializeSeq;
 
+pub trait HashEncoding<H: HashSerializer> {
+    fn hash_encoding<HH: HashSerializer>(self) -> !;
+}
+
 impl<T, R> HoloHash<T, R>
 where
     T: HashType,
