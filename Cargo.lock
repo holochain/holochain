@@ -4361,6 +4361,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_trace",
  "human-repr",
+ "indexmap 2.1.0",
  "kitsune_p2p_fetch",
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",

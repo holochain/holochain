@@ -11,6 +11,7 @@ mod pool;
 mod respond;
 mod rough_sized;
 mod source;
+mod queue;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;

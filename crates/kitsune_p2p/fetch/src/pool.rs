@@ -10,12 +10,13 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::{collections::{HashMap, hash_map::Entry}, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tokio::time::{Duration, Instant};
+use indexmap::map::Entry;
 
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
 
-use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt, FetchSource, SourceState, Sources};
+use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt, FetchSource, SourceState, Sources, queue::MapQueue};
 
 mod pool_reader;
 pub use pool_reader::*;
@@ -89,7 +90,7 @@ impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
 #[derive(Debug, Default)]
 pub struct State {
     /// Items ready to be fetched
-    queue: HashMap<FetchKey, FetchPoolItem>,
+    queue: MapQueue<FetchKey, FetchPoolItem>,
 
     /// Fetch sources
     sources: HashMap<FetchSource, SourceState>,
@@ -189,7 +190,7 @@ impl State {
             space,
             source,
             size,
-            transfer_method,
+            ..
         } = args;
 
         // Register sources once as they are discovered
@@ -200,7 +201,7 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = Sources::new(
-                    [source.clone()].into_iter().collect(),
+                    [source.clone()],
                 );
                 let item = FetchPoolItem {
                     sources,
@@ -225,6 +226,7 @@ impl State {
         }
     }
 
+    // TODO update docs
     /// Poll for queue items to fetch. Items accessed will be moved to the end of the queue.
     ///
     /// Only items whose `last_fetch` is more than `interval` ago will be returned.
@@ -233,9 +235,15 @@ impl State {
             .queue
             .keys().cloned().collect();
 
+        let batch_size = 100;
+
         let mut to_fetch = vec![];
-        for key in keys {
-            let item = match self.queue.get_mut(&key) {
+        for _ in keys {
+            if to_fetch.len() >= batch_size {
+                break;
+            }
+
+            let (key, item) = match self.queue.front() {
                 Some(item) => item,
                 None => continue,
             };
@@ -277,7 +285,7 @@ impl State {
                 }) {
                     let space = item.space.clone();
                     item.last_fetch = Some(PendingItemResponse { when: Instant::now(), source: source.clone() });
-                    to_fetch.push((key, space, source, item.context));
+                    to_fetch.push((key.clone(), space, source, item.context));
                 }
             }
         }
@@ -309,12 +317,12 @@ impl State {
         // Drop any sources we are no longer using from the sources used by items
         let keys: Vec<_> = self.queue.keys().cloned().collect();
         for key in keys {
-            self.queue.get_mut(&key).expect("Iterating keys").sources.0.retain(|s| {
+            self.queue.get_mut(&key).expect("Iterating keys").sources.retain(|s| {
                 self.sources.contains_key(s)
             });
 
             // If we've removed all sources from an item, remove the item
-            if self.queue.get(&key).expect("Iterating keys").sources.0.is_empty() {
+            if self.queue.get(&key).expect("Iterating keys").sources.is_empty() {
                 self.queue.remove(&key);
             }
         }
@@ -389,7 +397,6 @@ mod tests {
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;
-    use rand::{Rng, RngCore};
     use std::collections::HashSet;
     use std::{sync::Arc, time::Duration};
 
@@ -422,8 +429,7 @@ mod tests {
             sources: Sources::new(
                 sources
                     .into_iter()
-                    .map(|s| (s.clone()))
-                    .collect(),
+                    .map(|s| (s.clone())),
             ),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,

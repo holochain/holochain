@@ -32,17 +32,13 @@ mod tests {
     use crate::test_utils::*;
     use crate::{pool::tests::*, State};
     use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-    use std::collections::HashMap;
     use std::sync::Arc;
 
     #[test]
     fn queue_info_empty() {
         let fetch_pool_reader = FetchPoolReader(FetchPool {
             config: Arc::new(Config(1, 1)),
-            state: ShareOpen::new(State {
-                queue: HashMap::new(),
-                sources: Default::default(),
-            }),
+            state: ShareOpen::new(Default::default()),
         });
 
         let info = fetch_pool_reader.info([test_space(0), test_space(1)].into_iter().collect());

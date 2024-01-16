@@ -1,4 +1,5 @@
-use std::{default, collections::VecDeque};
+use std::{default, ops::Deref};
+use indexmap::IndexSet;
 use kitsune_p2p_types::KAgent;
 use tokio::time::Duration;
 use crate::FetchBackoff;
@@ -10,28 +11,41 @@ pub enum FetchSource {
     Agent(KAgent),
 }
 
-// TODO this wrapper needs work, use indexmap and clean up the custom implementation
 /// Fetch item within the fetch queue state.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct Sources(pub VecDeque<FetchSource>);
+pub(crate) struct Sources {
+    inner: IndexSet<FetchSource>,
+    index: usize,
+}
+
+impl Deref for Sources {
+    type Target = IndexSet<FetchSource>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
 
 impl Sources {
-    pub(crate) fn new(queue: VecDeque<FetchSource>) -> Self {
-        let mut this = Self(VecDeque::new());
-        for source in queue {
-            this.add(source);
+    pub(crate) fn new(queue: impl IntoIterator<Item=FetchSource>) -> Self {
+        Self {
+            inner: queue.into_iter().collect(),
+            index: 0,
         }
-
-        this
     }
 
-    pub(crate) fn next<T>(&mut self, mut state_filter: T) -> Option<FetchSource> where T: FnMut(&FetchSource) -> bool {
-        for _ in 0..self.0.len() {
-            let source = self.0.pop_front().unwrap();
-            self.0.push_back(source.clone());
+    pub(crate) fn next(&mut self, mut state_filter: impl FnMut(&FetchSource) -> bool) -> Option<FetchSource> {
+        for _ in 0..self.inner.len() {
+            let fetch_index = self.index;
+            self.index = (self.index + 1) % self.inner.len();
 
-            if state_filter(&source) {
-                return Some(source);
+            match self.inner.get_index(fetch_index) {
+                Some(source) => {
+                    if state_filter(source) {
+                        return Some(source.clone());
+                    }
+                }
+                None => (),
             }
         }
 
@@ -39,26 +53,26 @@ impl Sources {
     }
 
     pub(crate) fn add(&mut self, source: FetchSource) {
-        if self.0.contains(&source) {
-            return;
-        }
-
-        self.0.push_back(source);
+        self.inner.insert(source);
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.0.len()
+    pub(crate) fn retain(&mut self, filter: impl Fn(&FetchSource) -> bool) {
+        self.inner.retain(filter);
     }
 }
 
 /// The state of a source
 #[derive(Debug, Default)]
-pub struct SourceState {
+pub(crate) struct SourceState {
     /// The current state of the source
     current_state: SourceCurrentState,
 
-    /// The number of requests to this source that have timed out
-    timed_out_count: usize,
+    /// The number of requests to this source that have timed out.
+    /// 
+    /// Note that these failures do not age out, so if a source is unreliable it will get put on a timeout
+    /// briefly after it fails to respond too many times. This isn't a bad thing if the source is
+    /// not responding because it is overwhelmed.
+    timeout_count: usize,
 }
 
 impl SourceState {
@@ -97,7 +111,7 @@ impl SourceState {
 
     /// check
     pub fn record_timeout(&mut self) {
-        self.timed_out_count += 1;
+        self.timeout_count += 1;
     }
 
     /// record response
