@@ -30,7 +30,7 @@ impl FetchTask {
                     // Drop sources that aren't responding to fetch requests, and any items that have no remaining sources to fetch from.
                     fetch_pool.check_sources();
 
-                    let list = fetch_pool.get_items_to_fetch();
+                    let list = fetch_pool.get_batch();
 
                     for (key, space, source, context) in list {
                         let FetchKey::Op(op_hash) = &key;

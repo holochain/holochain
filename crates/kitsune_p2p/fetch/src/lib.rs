@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-// #![deny(warnings)]
+#![deny(warnings)]
 
 //! Kitsune P2p Fetch Queue Logic
 
@@ -16,11 +16,10 @@ mod queue;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
 
-pub use backoff::*;
 pub use pool::*;
 pub use respond::*;
 pub use rough_sized::*;
-pub use source::*;
+pub use source::FetchSource;
 
 /// Determine what should be fetched.
 #[derive(

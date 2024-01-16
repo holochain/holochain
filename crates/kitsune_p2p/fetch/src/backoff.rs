@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use backon::{BackoffBuilder, FibonacciBackoff, FibonacciBuilder};
 
-/// a struct
+/// A backoff strategy for use when fetching data from remote nodes that appear to not be responding.
 #[derive(Debug)]
 pub struct FetchBackoff {
     backoff: FibonacciBackoff,
@@ -12,7 +12,7 @@ pub struct FetchBackoff {
 }
 
 impl FetchBackoff {
-    /// create it
+    /// Create a new instance with the given initial delay.
     pub fn new(initial_delay: Duration) -> Self {
         let backoff = FibonacciBuilder::default()
             .with_jitter()
@@ -29,7 +29,9 @@ impl FetchBackoff {
         }
     }
 
-    /// ready
+    /// Check whether the backoff is ready to try again. It will return true once each time it is
+    /// ready and then start the next delay so the consumer must make an attempt to use the backoff
+    /// before calling this again.
     pub fn is_ready(&mut self) -> bool {
         if self.expired {
             return false;
@@ -43,7 +45,7 @@ impl FetchBackoff {
         }
     }
 
-    /// expired
+    /// Check whether the backoff has expired.
     pub fn is_expired(&self) -> bool {
         self.expired
     }

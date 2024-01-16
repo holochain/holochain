@@ -5,9 +5,9 @@
 //! but also the source(s) to fetch it from, and other data including the last time
 //! a fetch was attempted.
 //!
-//! The consumer of the queue can read items whose last_fetch time is older than some interval
+//! The consumer of the queue can read items whose last fetch time is older than some interval
 //! from the current moment. The items thus returned are not guaranteed to be returned in
-//! order of last_fetch time, but they are guaranteed to be at least as old as the specified
+//! order of last fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
 use std::{collections::HashMap, sync::Arc};
@@ -16,7 +16,7 @@ use indexmap::map::Entry;
 
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
 
-use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt, FetchSource, SourceState, Sources, queue::MapQueue};
+use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt, queue::MapQueue, source::{FetchSource, SourceState, Sources}};
 
 mod pool_reader;
 pub use pool_reader::*;
@@ -28,11 +28,11 @@ pub use pool_reader::*;
 /// source to the front of the list of sources, and the contexts are merged by the
 /// method defined in [`FetchPoolConfig`].
 ///
-/// The queue items can be accessed only through its Iterator implementation.
-/// Each item contains a FetchKey and one Source agent from which to fetch it.
-/// Each time an item is obtained in this way, it is moved to the end of the list.
-/// It is important to use the iterator lazily, and only take what is needed.
-/// Accessing any item through iteration implies that a fetch was attempted.
+/// Each item consists a FetchKey (Op) and one or more sources (Agent) from which to fetch it.
+/// Items can be retrieved in batches using [`FetchPool::get_items_to_fetch`]. Any items which
+/// were considered while building the batch, either because they were still awaiting a response
+/// or because they were returned in the batch, will be moved to the end of the queue. This makes
+/// fetching items reasonably fair.
 #[derive(Clone)]
 pub struct FetchPool {
     config: FetchConfig,
@@ -74,6 +74,11 @@ pub trait FetchPoolConfig: 'static + Send + Sync {
     /// When a fetch key is added twice, this determines how the two different contexts
     /// get reconciled.
     fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
+
+    /// How many items should be returned for fetching per call to [`FetchPool::get_items_to_fetch`].
+    fn fetch_batch_size(&self) -> usize {
+        100
+    }
 }
 
 // TODO: move this to host, but for now, for convenience, we just use this one config
@@ -88,11 +93,14 @@ impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
 
 /// The actual inner state of the FetchPool, from which items can be obtained
 #[derive(Debug, Default)]
-pub struct State {
-    /// Items ready to be fetched
+pub(crate) struct State {
+    /// Items to be fetched, ordered by least recently considered for fetching.
     queue: MapQueue<FetchKey, FetchPoolItem>,
 
-    /// Fetch sources
+    /// The state of all sources that we have seen in [`FetchPoolPush`]es.
+    ///
+    /// Note that sources are put on a backoff if they fail to respond to enough fetches. If the backoff
+    /// expires and the source is still not responding, it will be removed from this map.
     sources: HashMap<FetchSource, SourceState>,
 }
 
@@ -151,10 +159,10 @@ impl FetchPool {
     }
 
     /// Get a list of the next items that should be fetched.
-    pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
+    pub fn get_batch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
         self.state
             .share_mut(|s| {
-                s.poll_items(self.config.clone()).clone()
+                s.get_batch(self.config.clone()).clone()
         })
     }
 
@@ -193,7 +201,7 @@ impl State {
             ..
         } = args;
 
-        // Register sources once as they are discovered
+        // Register sources once as they are discovered, with a default initial state
         self.sources.entry(source.clone()).or_insert_with(|| {
             SourceState::default()
         });
@@ -208,7 +216,7 @@ impl State {
                     space,
                     size,
                     context,
-                    last_fetch: None,
+                    pending_response: None,
                 };
                 e.insert(item);
             }
@@ -226,30 +234,29 @@ impl State {
         }
     }
 
-    // TODO update docs
-    /// Poll for queue items to fetch. Items accessed will be moved to the end of the queue.
-    ///
-    /// Only items whose `last_fetch` is more than `interval` ago will be returned.
-    pub fn poll_items(&mut self, config: Arc<dyn FetchPoolConfig>) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
-        let keys: Vec<_> = self
-            .queue
-            .keys().cloned().collect();
-
-        let batch_size = 100;
+    /// Poll for a batch of queue items to fetch. The size of the batch is determined by [`FetchPoolConfig::fetch_batch_size`].
+    /// Items which are accessed while trying to fill the batch will be moved to the end of the queue. This is the case
+    /// even if the item was not returned in the batch because it was waiting for a response already.
+    pub fn get_batch(&mut self, config: Arc<dyn FetchPoolConfig>) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
+        let batch_size = config.fetch_batch_size();
 
         let mut to_fetch = vec![];
-        for _ in keys {
+        // The queue provides a `front` method which will repeatedly loop over all the items it contains so bound the
+        // search by the size of the queue.
+        for _ in 0..self.queue.len() {
+            // If we have enough items, stop looking
             if to_fetch.len() >= batch_size {
                 break;
             }
 
+            // Get the next item from the queue
             let (key, item) = match self.queue.front() {
                 Some(item) => item,
                 None => continue,
             };
 
-            // Check for a pending response for this item
-            let should_fetch_item = match &item.last_fetch {
+            // Check for a pending response on this item
+            let should_fetch_item = match &item.pending_response {
                 Some(pending_response) => {
                     if pending_response.when.elapsed() > config.item_retry_delay() {
                         self.sources.get_mut(&pending_response.source).map(|state| {
@@ -266,7 +273,7 @@ impl State {
             if should_fetch_item {
                 // Clear the last fetch state if it was set. Even if there are no sources and we don't do a fetch, we want to forget
                 // the previous request if we're planning to make a new one.
-                item.last_fetch = None;
+                item.pending_response = None;
 
                 // Find the next source for this item which is in good standing across other fetches
                 if let Some(source) = item.sources.next(|source| {
@@ -284,7 +291,7 @@ impl State {
                     false
                 }) {
                     let space = item.space.clone();
-                    item.last_fetch = Some(PendingItemResponse { when: Instant::now(), source: source.clone() });
+                    item.pending_response = Some(PendingItemResponse { when: Instant::now(), source: source.clone() });
                     to_fetch.push((key.clone(), space, source, item.context));
                 }
             }
@@ -297,7 +304,7 @@ impl State {
     pub fn remove(&mut self, key: &FetchKey) -> Option<FetchPoolItem> {
         match self.queue.remove(key) {
             Some(item) => {
-                item.last_fetch.as_ref().map(|pending| {
+                item.pending_response.as_ref().map(|pending| {
                     self.sources.get_mut(&pending.source).map(|state| {
                         state.record_response();
                     });
@@ -330,6 +337,7 @@ impl State {
 
     /// Get a string summary of the queue's contents
     #[cfg(any(test, feature = "test_utils"))]
+    #[allow(dead_code)]
     pub fn summary(&self) -> String {
         use human_repr::HumanCount;
 
@@ -349,7 +357,7 @@ impl State {
                     "{:10}  {:^6} {:^6} {:>6}",
                     key,
                     v.sources.len(),
-                    v.last_fetch
+                    v.pending_response
                         .as_ref()
                         .map(|t| format!("{:?}", t.when.elapsed()))
                         .unwrap_or_else(|| "-".to_string()),
@@ -363,6 +371,7 @@ impl State {
 
     /// The heading to go along with the summary
     #[cfg(any(test, feature = "test_utils"))]
+    #[allow(dead_code)]
     pub fn summary_heading() -> String {
         format!("{:10}  {:>6} {:>6} {}", "key", "#src", "last", "size")
     }
@@ -380,11 +389,12 @@ pub struct FetchPoolItem {
     size: Option<RoughInt>,
     /// Opaque user data specified by the host
     pub context: Option<FetchContext>,
-    /// The last time we tried fetching this item from any source
-    last_fetch: Option<PendingItemResponse>,
+    /// If there is a response pending for this item then track the source and when the request was made.
+    pending_response: Option<PendingItemResponse>,
 }
 
-/// struct
+/// Tracks the source and when a request was made for a [`FetchPoolItem`]. This is used to track timeouts
+/// for sources that don't respond before the configured timeout.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PendingItemResponse {
     when: Instant,
@@ -393,10 +403,12 @@ pub struct PendingItemResponse {
 
 #[cfg(test)]
 mod tests {
+    use crate::TransferMethod;
     use crate::test_utils::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;
+    use rand::RngCore;
     use std::collections::HashSet;
     use std::{sync::Arc, time::Duration};
 
@@ -434,127 +446,12 @@ mod tests {
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
             size: None,
-            last_fetch: None,
+            pending_response: None,
         }
     }
 
     fn arbitrary_test_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
         test_sources(std::iter::repeat_with(|| u8::arbitrary(u).unwrap()).take(count))
-    }
-
-    /*
-    #[tokio::test(start_paused = true)]
-    async fn single_source() {
-        let source_delay = Duration::from_secs(10);
-        let mut sources = Sources::new(
-            [
-                test_source(1),
-            ]
-            .into_iter()
-            .collect(),
-        );
-
-        assert_eq!(sources.next(source_delay), Some(test_source(1)));
-
-        tokio::time::advance(source_delay).await;
-
-        assert_eq!(sources.next(source_delay), Some(test_source(1)));
-        assert_eq!(sources.next(source_delay), None);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn source_rotation() {
-        let source_delay = Duration::from_secs(10);
-        let mut sources = Sources::new(
-            [
-                    test_source(1),
-                    test_source(2),
-            ]
-            .into_iter()
-            .collect(),
-        );
-
-        tokio::time::advance(Duration::from_secs(1)).await;
-
-        assert_eq!(sources.next(source_delay), Some(test_source(2)));
-        assert_eq!(sources.next(source_delay), None);
-
-        tokio::time::advance(Duration::from_secs(9)).await;
-
-        assert_eq!(sources.next(source_delay), Some(test_source(1)));
-
-        tokio::time::advance(Duration::from_secs(1)).await;
-
-        assert_eq!(sources.next(source_delay), Some(test_source(2)));
-        // source 1 has already had its delay backed off another 10s
-        // due to a retry, so it returns None
-        assert_eq!(sources.next(source_delay), None);
-
-        tokio::time::advance(Duration::from_secs(10)).await;
-
-        assert_eq!(sources.next(source_delay), Some(test_source(1)));
-        assert_eq!(sources.next(source_delay), Some(test_source(2)));
-        assert_eq!(sources.next(source_delay), None);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn source_rotation_prioritises_less_recently_tried() {
-        let source_delay = Duration::from_secs(10);
-        let mut sources = Sources::new(
-            [
-                test_source(1),
-                test_source(2),
-                test_source(3),
-            ]
-            .into_iter()
-            .collect(),
-        );
-
-        assert_eq!(sources.next(source_delay), Some(test_source(2)));
-
-        // All sources now past their retry delay
-        tokio::time::advance(source_delay).await;
-
-        // Would expect source 1 to be tried next but trying 2 first rotated 1 and 2 to the end of the list
-        assert_eq!(sources.next(source_delay), Some(test_source(3)));
-        assert_eq!(sources.next(source_delay), Some(test_source(1)));
-        assert_eq!(sources.next(source_delay), Some(test_source(2)));
-        assert_eq!(sources.next(source_delay), None);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn source_rotation_uses_all_sources() {
-        let mut noise = [0; 1_000];
-        rand::thread_rng().fill_bytes(&mut noise);
-        let mut u = Unstructured::new(&noise);
-
-        let source_delay = Duration::from_secs(rand::thread_rng().gen_range(1..50));
-
-        let v = std::iter::repeat_with(|| Duration::arbitrary(&mut u).unwrap())
-            .take(100)
-            .enumerate()
-            .map(|(i, duration)| {
-                test_source(i as u8)
-            })
-            .collect();
-        let mut sources = Sources::new(v);
-
-        let mut seen_sources: HashSet<u8> = HashSet::new();
-        for _ in 0..100 {
-            if let Some(s) = sources.next(source_delay) {
-                match s {
-                    FetchSource::Agent(a) => {
-                        // The source agent key is a repeating byte array of the source number, so we can retrieve any
-                        // byte here to get the source number
-                        seen_sources.insert(a.0[0]);
-                    }
-                }
-            }
-
-            tokio::time::advance(source_delay).await;
-        }
-
-        assert_eq!(100, seen_sources.len());
     }
 
     #[test]
@@ -614,7 +511,7 @@ mod tests {
         q.push(&cfg, test_req_op(1, test_ctx(2), test_source(1)));
         assert_eq!(1, q.queue.front().unwrap().1.sources.len());
     }
-*/
+
     #[test]
     fn queue_push() {
         let mut q = State::default();
@@ -638,85 +535,74 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn queue_next() {
-        let cfg = Arc::new(Config(1, 10));
+        let cfg = Arc::new(Config(5, 10));
         let mut q = {
             let mut queue = [
                 (test_key_op(1), item(cfg.clone(), test_sources(0..=2), test_ctx(1))),
                 (test_key_op(2), item(cfg.clone(), test_sources(1..=3), test_ctx(1))),
                 (test_key_op(3), item(cfg.clone(), test_sources(2..=4), test_ctx(1))),
             ];
-            // Set the last_fetch time of one of the sources to something a bit earlier,
-            // so it won't show up in next() right away
-            // queue[1]
-            //     .1
-            //     .sources
-            //     .0
-            //     .get_mut(&test_source(2))
-            //     .unwrap()
-            //     .last_request = Some(Instant::now() - Duration::from_secs(3));
+
+            queue[1].1.pending_response = Some(PendingItemResponse {
+                when: Instant::now() - Duration::from_secs(3),
+                source: test_source(1),
+            });
 
             let queue = queue.into_iter().collect();
-            State { queue, ..Default::default() }
+            State {
+                queue,
+                sources: test_sources(0..=4)
+                    .into_iter()
+                    .map(|s| (s, SourceState::default()))
+                    .collect(),
+            }
         };
 
         // We can try fetching items one source at a time by waiting 1 sec in between
 
-        assert_eq!(3, q.poll_items(cfg.clone()).len());
+        assert_eq!(2, q.get_batch(cfg.clone()).len());
 
-        tokio::time::advance(Duration::from_secs(1)).await;
+        tokio::time::advance(Duration::from_secs(3)).await;
 
-        assert_eq!(3, q.poll_items(cfg.clone()).len());
+        assert_eq!(1, q.get_batch(cfg.clone()).len());
 
-        tokio::time::advance(Duration::from_secs(1)).await;
+        tokio::time::advance(Duration::from_secs(10)).await;
 
-        assert_eq!(2, q.poll_items(cfg.clone()).len());
-
-        // Wait for manually modified source to be ready
-        // (5 + 1 + 1 + 3 = 10)
-        tokio::time::advance(Duration::from_secs(5)).await;
-
-        // The next (and only) item will be the one with the timestamp explicitly set
-        assert_eq!(
-            vec![(test_key_op(2), test_space(0), test_source(2), test_ctx(1))],
-            q.poll_items(cfg.clone())
-        );
-        assert_eq!(0, q.poll_items(cfg.clone()).len());
-
-        // wait long enough for some items to be retryable
-        // (10 - 5 - 1 = 4)
-        tokio::time::advance(Duration::from_secs(4)).await;
-
-        assert_eq!(3, q.poll_items(cfg).len());
+        assert_eq!(3, q.get_batch(cfg.clone()).len());
     }
 
     #[tokio::test(start_paused = true)]
-    async fn state_iter_uses_all_sources() {
+    async fn uses_all_sources() {
         let cfg = Arc::new(Config(1, 10));
         let num_items = 10;
 
         let mut q = {
             let mut queue = vec![];
+            let mut sources = vec![];
             for i in 0..num_items {
+                let these_sources = test_sources((i * num_items) as u8..(i * num_items + num_items) as u8);
                 queue.push((
                     test_key_op(i as u8),
                     // Give each item a different set of sources
                     item(
                         cfg.clone(),
-                        test_sources((i * num_items) as u8..(i * num_items + num_items) as u8),
+                        these_sources.clone(),
                         test_ctx(1),
                     ),
-                ))
+                ));
+
+                sources.extend(these_sources);
             }
 
             State {
                 queue: queue.into_iter().collect(),
-                ..Default::default()
+                sources: sources.into_iter().map(|s| (s, SourceState::default())).collect(),
             }
         };
 
         let mut seen_sources = HashSet::new();
         for _ in 0..num_items {
-            q.poll_items(cfg.clone())
+            q.get_batch(cfg.clone())
                 .into_iter()
                 .map(|item| match item.2 {
                     FetchSource::Agent(a) => a.0.clone(),
@@ -734,24 +620,28 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn remove_fetch_item() {
-        let cfg = Arc::new(Config(1, 10));
-        let mut q = {
-            let queue = [(test_key_op(1), item(cfg.clone(), test_sources([1]), test_ctx(1)))];
+        holochain_trace::test_run().unwrap();
 
+        let cfg = Arc::new(Config(1, 10));
+        let mut q: State = {
+            let queue = [(test_key_op(1), item(cfg.clone(), test_sources([1]), test_ctx(1)))];
             let queue = queue.into_iter().collect();
-            State { queue, ..Default::default() }
+
+            let sources = [(test_source(1), SourceState::default())]
+                .into_iter()
+                .collect();
+            State { queue, sources }
         };
 
-        assert_eq!(1, q.poll_items(cfg.clone()).len());
+        assert_eq!(1, q.get_batch(cfg.clone()).len());
         q.remove(&test_key_op(1));
 
         // Move time forwards to be able to retry the item
         tokio::time::advance(Duration::from_secs(30)).await;
 
-        assert_eq!(0, q.poll_items(cfg).len());
+        assert_eq!(0, q.get_batch(cfg).len());
     }
 
-    /*
     #[tokio::test(start_paused = true)]
     async fn fetch_pool() {
         // Use a nearly real fetch config.
@@ -800,7 +690,7 @@ mod tests {
             }
 
             // Try to process all items (because that's how this is used in practice)
-            let items = fetch_pool.get_items_to_fetch();
+            let items = fetch_pool.get_batch();
             for item in items {
                 // If the source is available the fetch succeeds and we remove the item, otherwise leave it in the pool
                 if !unavailable_sources.contains(&item.2) {
@@ -816,7 +706,7 @@ mod tests {
 
         // We created an item that will always fail, so should have at least one left
         assert!(
-            !fetch_pool.get_items_to_fetch().is_empty(),
+            !fetch_pool.get_batch().is_empty(),
             "Pool should have had at least one item but got \n {}",
             fetch_pool.state.share_ref(|s| format!(
                 "{}\n{}",
@@ -833,7 +723,7 @@ mod tests {
             failed_count
         );
     }
-*/
+
     #[test]
     fn default_fetch_context_merge_maintains_flags_from_both_contexts() {
         const FLAG_1: u32 = 1 << 5;

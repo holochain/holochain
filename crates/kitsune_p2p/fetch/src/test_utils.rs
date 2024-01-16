@@ -1,6 +1,7 @@
 //! Test utilities for the fetch crate.
 
-use crate::{FetchContext, FetchKey, FetchPoolPush, FetchSource, TransferMethod};
+use crate::source::FetchSource;
+use crate::{FetchContext, FetchKey, FetchPoolPush, TransferMethod};
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
 use kitsune_p2p_types::{KOpHash, KSpace};
 use std::sync::Arc;

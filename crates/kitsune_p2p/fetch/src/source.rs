@@ -2,7 +2,8 @@ use std::{default, ops::Deref};
 use indexmap::IndexSet;
 use kitsune_p2p_types::KAgent;
 use tokio::time::Duration;
-use crate::FetchBackoff;
+
+use crate::backoff::FetchBackoff;
 
 /// A source to fetch from: either a node, or an agent on a node
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -166,5 +167,43 @@ impl FetchSourceBackoff {
 
     fn is_expired(&self) -> bool {
         self.backoff.is_expired()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Sources;
+    use crate::test_utils::*;
+
+    #[test]
+    fn single_source() {
+        let mut sources = Sources::new(
+            [
+                test_source(1),
+            ],
+        );
+
+        // The first source is returned
+        assert_eq!(Some(test_source(1)), sources.next(|_| true));
+        // The first source is returned a second time with no delay
+        assert_eq!(Some(test_source(1)), sources.next(|_| true));
+        // The first source can be filtered out
+        assert_eq!(None, sources.next(|_| false));
+    }
+
+    #[test]
+    fn source_rotation() {
+        let mut sources = Sources::new([]);
+        sources.add(test_source(1));
+        sources.add(test_source(2));
+
+        assert_eq!(Some(test_source(1)), sources.next(|_| true));
+        assert_eq!(Some(test_source(2)), sources.next(|_| true));
+        assert_eq!(Some(test_source(1)), sources.next(|_| true));
+
+        sources.add(test_source(3));
+        assert_eq!(Some(test_source(2)), sources.next(|_| true));
+        assert_eq!(Some(test_source(3)), sources.next(|_| true));
+        assert_eq!(Some(test_source(1)), sources.next(|_| true));
     }
 }
