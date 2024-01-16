@@ -27,7 +27,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         }) => (ident, variants, attrs),
         _ => abort!(
             input,
-            "hdk_entry_defs_name_registration can only be used on Enums"
+            "hdk_entry_types_name_registration can only be used on Enums"
         ),
     };
 

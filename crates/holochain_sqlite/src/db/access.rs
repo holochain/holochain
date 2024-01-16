@@ -415,7 +415,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         R: Send + 'static,
     {
         holochain_util::tokio_helper::block_forever_on(async {
-            self.write_async(move |txn| -> DatabaseResult<R> { Ok(f(txn)) })
+            self.write_async(|txn| -> DatabaseResult<R> { Ok(f(txn)) })
                 .await
                 .unwrap()
         })

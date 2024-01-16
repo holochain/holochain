@@ -11,6 +11,8 @@ use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
+use aitia::Fact;
+use hc_sleuth::SleuthId;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
@@ -444,7 +446,7 @@ pub async fn setup_app_inner(
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port: 0 },
         }]),
-        network,
+        network: network.unwrap_or_default(),
         ..Default::default()
     };
     let conductor_handle = ConductorBuilder::new()
@@ -475,7 +477,7 @@ pub fn warm_wasm_tests() {
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
-    all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
+    all_cell_dbs: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     num_attempts: usize,
     delay: Duration,
 ) where
@@ -483,7 +485,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     DhtDb: ReadAccess<DbKindDht>,
 {
     let mut published = HashSet::new();
-    for (author, db, _) in all_cell_dbs.iter() {
+    for (_, author, db, _) in all_cell_dbs.iter() {
         published.extend(
             request_published_ops(*db, Some((*author).to_owned()))
                 .await
@@ -493,8 +495,19 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
         );
     }
     let published = published.into_iter().collect::<Vec<_>>();
-    for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
-        wait_for_integration_diff(db, &published, num_attempts, delay).await
+    let all_node_ids: HashSet<_> = all_cell_dbs
+        .iter()
+        .map(|(node_id, _, _, _)| node_id)
+        .collect();
+    for (&db, node_id) in all_cell_dbs
+        .iter()
+        .flat_map(|(node_id, _, _, d)| Some((d.as_ref()?, node_id)))
+    {
+        let others: Vec<String> = all_node_ids
+            .difference(&[node_id].into_iter().collect())
+            .map(|n| n.to_string())
+            .collect();
+        wait_for_integration_diff(&others, db, &published, num_attempts, delay).await
     }
 }
 
@@ -503,6 +516,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 /// which were not integrated.
 #[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
+    node_ids: &[SleuthId],
     db: &Db,
     published: &[DhtOp],
     num_attempts: usize,
@@ -540,16 +554,17 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     // Timeout has been reached at this point, so print a helpful report
 
-    let mut published: Vec<_> = published.iter().map(display_op).collect();
+    // Otherwise just print a report of which ops were not integrated
+    let mut published_displays: Vec<_> = published.iter().map(display_op).collect();
     let mut integrated: Vec<_> = get_integrated_ops(db)
         .await
         .iter()
         .map(display_op)
         .collect();
-    published.sort();
+    published_displays.sort();
     integrated.sort();
 
-    let unintegrated = diff::slice(&published, &integrated)
+    let unintegrated = diff::slice(&published_displays, &integrated)
         .into_iter()
         .filter_map(|d| match d {
             diff::Result::Left(l) => Some(l),
@@ -563,19 +578,42 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         "consistency should only fail if items were published but not integrated"
     );
 
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        // If hc_sleuth has been initialized, print a sleuthy report
+
+        let ctx = s.lock();
+        for fact in published
+            .iter()
+            .map(DhtOpHash::with_data_sync)
+            .flat_map(|hash| {
+                node_ids
+                    .iter()
+                    .map(move |node_id| hc_sleuth::Event::Integrated {
+                        by: node_id.clone(),
+                        op: hash.clone(),
+                    })
+            })
+        {
+            let tr = fact.clone().traverse(&ctx);
+            if let Some(report) = aitia::simple_report(&tr) {
+                println!("aitia report for {fact:#?}:\n\n{report}")
+            }
+        }
+    }
+
     let timeout = delay * num_attempts as u32;
 
     let integration_dump = integration_dump(db).await.unwrap();
 
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
-        timeout.as_millis(),
-        num_published,
-        num_integrated,
-        header,
-        unintegrated.join("\n"),
-        integration_dump,
-    );
+            "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
+            timeout.as_millis(),
+            num_published,
+            num_integrated,
+            header,
+            unintegrated.join("\n"),
+            integration_dump,
+        );
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.

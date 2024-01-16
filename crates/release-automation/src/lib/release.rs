@@ -665,8 +665,7 @@ pub fn do_publish_to_crates_io<'a>(
 ) -> Fallible<()> {
     ensure_release_order_consistency(&crates).context("release ordering is broken")?;
 
-    let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
-
+    let crate_names: Vec<String> = crates.iter().map(|crt| crt.name()).collect();
     debug!("attempting to publish {:?}", crate_names);
 
     let mut queue = crates.iter().collect::<std::collections::LinkedList<_>>();
@@ -713,7 +712,8 @@ pub fn do_publish_to_crates_io<'a>(
         let name = crt.name().to_owned();
         let ver = crt.version().to_owned();
 
-        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)?;
+        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)
+            .context(format!("looking up {name}-{ver} on local crate index"))?;
 
         if !state_changed && is_version_published {
             debug!(

@@ -59,7 +59,7 @@ pub fn spawn_task_outcome_handler(
 ) -> JoinHandle<TaskManagerResult> {
     let span = tracing::error_span!(
         "spawn_task_outcome_handler",
-        scope = conductor.get_config().tracing_scope
+        scope = conductor.get_config().tracing_scope()
     );
     tokio::spawn(async move {
         while let Some((_group, result)) = outcomes.next().await {

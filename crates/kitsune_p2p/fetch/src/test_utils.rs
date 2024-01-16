@@ -1,6 +1,6 @@
 //! Test utilities for the fetch crate.
 
-use crate::{FetchContext, FetchKey, FetchPoolPush, FetchSource};
+use crate::{FetchContext, FetchKey, FetchPoolPush, FetchSource, TransferMethod};
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
 use kitsune_p2p_types::{KOpHash, KSpace};
 use std::sync::Arc;
@@ -24,6 +24,7 @@ pub fn test_req_op(n: u8, context: Option<FetchContext>, source: FetchSource) ->
         space: test_space(0),
         source,
         size: None,
+        transfer_method: TransferMethod::Gossip,
     }
 }
 

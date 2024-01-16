@@ -1,5 +1,5 @@
 use derive_more::Display;
-use holochain_services::DpkiServiceError;
+use holochain_conductor_services::DpkiServiceError;
 use std::convert::TryFrom;
 
 use super::SourceChainError;

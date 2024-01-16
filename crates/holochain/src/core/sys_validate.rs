@@ -5,6 +5,8 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
+use holochain_conductor_services::DpkiService;
+use holochain_conductor_services::KeyState;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_services::DpkiMutex;
 use holochain_services::KeyState;
@@ -238,7 +240,14 @@ pub fn check_agent_validation_pkg_predecessor(
     let maybe_error = match (prev_action, action) {
         (
             Action::AgentValidationPkg(AgentValidationPkg { .. }),
-            Action::Create(Create { .. }) | Action::Update(Update { .. }),
+            Action::Create(Create {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            })
+            | Action::Update(Update {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }),
         ) => None,
         (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
             "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
@@ -280,15 +289,7 @@ pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidation
         },
     ) = prev_action
     {
-        #[cfg(feature = "dpki")]
-        {
-            u.entry_hash.clone().into()
-        }
-
-        #[cfg(not(feature = "dpki"))]
-        {
-            u.author.clone()
-        }
+        u.entry_hash.clone().into()
     } else {
         prev_action.author().clone()
     };

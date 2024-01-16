@@ -130,7 +130,7 @@ mod chc;
 
 pub use chc::*;
 
-pub use holochain_services::*;
+pub use holochain_conductor_services::*;
 
 pub use accessor_impls::*;
 pub use app_impls::*;
@@ -203,7 +203,7 @@ pub struct Conductor {
     running_cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
-    pub config: ConductorConfig,
+    pub config: Arc<ConductorConfig>,
 
     /// The map of dna hash spaces.
     pub(crate) spaces: Spaces,
@@ -264,7 +264,7 @@ mod startup_shutdown_impls {
     impl Conductor {
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
-            config: ConductorConfig,
+            config: Arc<ConductorConfig>,
             ribosome_store: RwShare<RibosomeStore>,
             keystore: MetaLairClient,
             holochain_p2p: holochain_p2p::HolochainP2pRef,
@@ -272,7 +272,7 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
-            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
+            let tracing_scope = config.tracing_scope().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
@@ -872,17 +872,20 @@ mod network_impls {
                 let (current_number_of_peers, arc_size, total_network_peers) = db
                     .read_async({
                         let agent_pub_key = agent_pub_key.clone();
+                        let space = dna.clone().into_kitsune();
                         move |txn| -> DatabaseResult<(u32, f64, u32)> {
-                            let current_number_of_peers = txn.p2p_count_agents()?;
+                            let current_number_of_peers = txn.p2p_count_agents(space.clone())?;
 
                             // query arc size and extrapolated coverage and estimate total peers
                             let (arc_size, total_network_peers) = match txn.p2p_get_agent(
+                                space.clone(),
                                 &KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()),
                             )? {
                                 None => (0.0, 0),
                                 Some(agent) => {
                                     let arc_size = agent.storage_arc.coverage();
                                     let agents_in_arc = txn.p2p_gossip_query_agents(
+                                        space.clone(),
                                         u64::MIN,
                                         u64::MAX,
                                         agent.storage_arc.inner().into(),
@@ -1097,12 +1100,10 @@ mod network_impls {
                 } => {
                     let db = { self.p2p_agents_db(&dna_hash) };
                     let res = db
-                        .read_async(move |txn| {
-                            txn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                        })
-                        .await;
+                        .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
 
-                    let res = res.map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryAgentInfoSignedNearBasis {
@@ -1132,8 +1133,6 @@ mod network_impls {
                     let cutoff = self
                         .get_config()
                         .network
-                        .clone()
-                        .unwrap_or_default()
                         .tuning_params
                         .danger_gossip_recent_threshold();
                     let topo = self
@@ -1965,14 +1964,15 @@ mod app_status_impls {
                 .map(|(cell_id, cell)| async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.read_async(move |tx| {
-                        tx.p2p_get_agent(&kagent)
-                    }).await {
+                    let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let network = cell.holochain_p2p_dna().clone();
+
+                    aitia::trace!(&hc_sleuth::Event::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
+
                     match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
@@ -2133,7 +2133,7 @@ mod app_status_impls {
 /// Methods related to management of Conductor state
 mod service_impls {
 
-    use holochain_services::derivation_paths::derivation_path_for_dpki_instance;
+    use holochain_conductor_services::derivation_paths::derivation_path_for_dpki_instance;
 
     use super::*;
 
@@ -2618,7 +2618,7 @@ mod accessor_impls {
 }
 
 #[async_trait::async_trait]
-impl holochain_services::CellRunner for Conductor {
+impl holochain_conductor_services::CellRunner for Conductor {
     async fn call_zome(
         &self,
         provenance: &AgentPubKey,
