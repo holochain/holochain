@@ -725,6 +725,45 @@ mod tests {
     }
 
     #[test]
+    fn drain_fetch_pool() {
+        // Use a nearly real fetch config.
+        struct TestFetchConfig {}
+        impl FetchPoolConfig for TestFetchConfig {
+            // Don't really care about this, but the default trait functions for timeouts are wanted for this test
+            fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+                a | b
+            }
+        }
+
+        // Create a fetch pool to test
+        let fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}));
+
+        for i in (0..200).step_by(5) {
+            for j in 0..5 {
+                fetch_pool.push(FetchPoolPush {
+                    key: test_key_op(i),
+                    space: test_space(j),
+                    source: test_source(j),
+                    size: None, // Not important for this test
+                    context: test_ctx(0),
+                    transfer_method: TransferMethod::Gossip,
+                });
+            }
+        }
+
+        for _ in 0..2 {
+            for (key, _, _, _) in fetch_pool.get_batch() {
+                if fetch_pool.check_item(&key).0 {
+                    fetch_pool.remove(&key);
+                }
+            }
+        }
+
+        assert!(fetch_pool.is_empty());
+        assert_eq!(0, fetch_pool.get_batch().len());
+    }
+
+    #[test]
     fn default_fetch_context_merge_maintains_flags_from_both_contexts() {
         const FLAG_1: u32 = 1 << 5;
         const FLAG_2: u32 = 1 << 10;
