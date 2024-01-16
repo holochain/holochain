@@ -31,7 +31,7 @@ rusqlite = { version = "0.29", optional = true }
 serde = { version = ">= 1.0, <= 1.0.166", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true }
-holochain_wasmer_common = { version = "=0.0.90", optional = true }
+holochain_wasmer_common = { version = "=0.0.92", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = ["preserve_order"] }

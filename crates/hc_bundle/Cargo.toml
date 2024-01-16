@@ -8,18 +8,18 @@ documentation = "https://docs.rs/holochain_cli_bundle"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
-edition = "2021"
+    edition = "2021"
 
-[[bin]]
-name = "hc-app"
-path = "src/bin/hc-app.rs"
+    [[bin]]
+    name = "hc-app"
+    path = "src/bin/hc-app.rs"
 
-[[bin]]
-name = "hc-dna"
-path = "src/bin/hc-dna.rs"
+    [[bin]]
+    name = "hc-dna"
+    path = "src/bin/hc-dna.rs"
 
-[dependencies]
-holochain_wasmer_host = "=0.0.90"
+    [dependencies]
+holochain_wasmer_host = "=0.0.92"
 wasmer = "=4.2.4"
 futures = "0.3"
 anyhow = "1.0"

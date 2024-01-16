@@ -66,7 +66,6 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-holochain_wasmer_host = {git = "https://github.com/holochain/holochain-wasmer.git", branch = "refactor/reinstate-module-cache"}
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
 # contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
