@@ -47,14 +47,21 @@ impl Sources {
         this
     }
 
-    pub(crate) fn next(&mut self, interval: Duration) -> Option<FetchSource> {
-        match self.0.pop_front() {
-            Some(next_source_key) => {
-                self.0.push_back(next_source_key.clone());
-                Some(next_source_key)
-            },
-            None => None,
+    pub(crate) fn next(&mut self, states: &mut HashMap<FetchSource, SourceState<'_>>, fetch_key: FetchKey, timeout: Duration) -> Option<FetchSource> {
+        for _ in 0..self.0.len() {
+            let source = self.0.pop_front().unwrap();
+            self.0.push_back(source.clone());
+            match states.get_mut(&source) {
+                Some(&mut state) if state.should_use(fetch_key.clone(), timeout) => {
+                    return Some(source);
+                },
+                _ => {
+                    tracing::warn!("Not considering source because it is not registered: {:?}", source);
+                },
+            }
         }
+
+        None
     }
 
     pub(crate) fn add(&mut self, source: FetchSource) {
@@ -84,7 +91,7 @@ pub struct SourceState<'a> {
 #[derive(Debug)]
 pub struct OutstandingRequest<'a> {
     request_time: Instant,
-    maybe_permit: Option<SemaphorePermit<'a>>,
+    _maybe_permit: Option<SemaphorePermit<'a>>,
 }
 
 impl <'a> SourceState<'a> {
@@ -96,10 +103,9 @@ impl <'a> SourceState<'a> {
             SourceCurrentState::Available(current_num_timed_out) => {
                 *current_num_timed_out += num_timed_out;
 
-
                 self.outstanding_requests.insert(fetch_key, OutstandingRequest {
                     request_time: Instant::now(),
-                    maybe_permit: None,
+                    _maybe_permit: None,
                 });
                 true
             }
@@ -109,7 +115,7 @@ impl <'a> SourceState<'a> {
                     permit => {
                         self.outstanding_requests.insert(fetch_key, OutstandingRequest {
                             request_time: Instant::now(),
-                            maybe_permit: permit,
+                            _maybe_permit: permit,
                         });
                         true
                     }
