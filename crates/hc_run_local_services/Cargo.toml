@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_run_local_services"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.20"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_run_local_services"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -17,9 +17,9 @@ path = "src/bin/hc-run-local-services.rs"
 [dependencies]
 clap = { version = "4.0", features = [ "derive" ] }
 futures = "0.3.28"
-holochain_trace = { version = "^0.3.0-beta-dev.4", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 if-addrs = "0.10.1"
-kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.17", path = "../kitsune_p2p/bootstrap" }
+kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.19", path = "../kitsune_p2p/bootstrap" }
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
-tx5-signal-srv = "=0.0.5-alpha"
+tx5-signal-srv = { workspace = true }

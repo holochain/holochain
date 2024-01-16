@@ -86,11 +86,11 @@ dependencies = [
 
 [[package]]
 name = "aitia"
-version = "0.2.0-beta-dev.0"
+version = "0.2.0-beta-dev.2"
 dependencies = [
  "anyhow",
  "derive_more",
- "holochain_trace 0.3.0-beta-dev.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holochain_trace",
  "maplit",
  "parking_lot 0.10.2",
  "petgraph",
@@ -1720,7 +1720,7 @@ dependencies = [
  "crossterm 0.27.0",
  "futures",
  "holochain_diagnostics",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "tokio",
  "tokio-stream",
  "tui",
@@ -2593,13 +2593,13 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ded13e388a81713db6919cd750e6113acf2fe5afbaedf8aff79780ec4fc47425"
+checksum = "397f372672597305f39af2b2abf389a077077489bc4f412e7ed574214c268208"
 dependencies = [
  "futures",
  "one_err",
- "rmp-serde 1.1.2",
+ "rmp-serde 0.15.5",
  "rmpv",
  "serde",
  "serde_bytes",
@@ -2608,7 +2608,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.2.0-beta-dev.0"
+version = "0.2.0-beta-dev.2"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2616,7 +2616,7 @@ dependencies = [
  "derive_more",
  "hc_sleuth",
  "holochain_state_types",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "kitsune_p2p",
  "once_cell",
@@ -2632,7 +2632,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.3.0-beta-dev.6"
+version = "0.3.0-beta-dev.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2653,7 +2653,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.4.0-beta-dev.21"
+version = "0.4.0-beta-dev.23"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -2673,7 +2673,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.25"
+version = "0.3.0-beta-dev.27"
 dependencies = [
  "fixt",
  "getrandom 0.2.11",
@@ -2694,7 +2694,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.3.0-beta-dev.20"
+version = "0.3.0-beta-dev.22"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -2783,7 +2783,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -2809,7 +2809,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2854,7 +2854,7 @@ dependencies = [
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_util",
  "holochain_wasm_test_utils",
@@ -2931,7 +2931,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2949,7 +2949,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_state",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_util",
  "holochain_zome_types",
@@ -2971,7 +2971,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "anyhow",
  "clap 4.4.11",
@@ -2979,14 +2979,14 @@ dependencies = [
  "holochain_cli_bundle",
  "holochain_cli_run_local_services",
  "holochain_cli_sandbox",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "lazy_static",
  "tokio",
 ]
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.3.0-beta-dev.28"
+version = "0.3.0-beta-dev.30"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -3014,11 +3014,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_run_local_services"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.20"
 dependencies = [
  "clap 4.4.11",
  "futures",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "if-addrs 0.10.2",
  "kitsune_p2p_bootstrap",
  "tokio",
@@ -3028,7 +3028,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3039,7 +3039,7 @@ dependencies = [
  "futures",
  "holochain_conductor_api",
  "holochain_p2p",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_util",
  "holochain_websocket",
@@ -3060,7 +3060,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "derive_more",
  "directories",
@@ -3068,7 +3068,7 @@ dependencies = [
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_state_types",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -3089,7 +3089,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.2.0-beta-dev.1"
+version = "0.2.0-beta-dev.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3122,7 +3122,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.20"
+version = "0.3.0-beta-dev.22"
 dependencies = [
  "arbitrary",
  "derive_builder",
@@ -3145,7 +3145,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.22"
+version = "0.3.0-beta-dev.24"
 dependencies = [
  "assert_cmd 2.0.12",
  "base64 0.13.1",
@@ -3203,7 +3203,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.31"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3217,7 +3217,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_p2p",
  "holochain_serialized_bytes",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_util",
  "holochain_zome_types",
@@ -3272,7 +3272,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.29"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3285,7 +3285,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -3320,7 +3320,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.31"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3346,7 +3346,7 @@ dependencies = [
  "holochain_sqlite",
  "holochain_state",
  "holochain_state_types",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_util",
  "holochain_wasm_test_utils",
@@ -3371,7 +3371,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state_types"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.29"
 dependencies = [
  "holo_hash",
  "holochain_integrity_types",
@@ -3380,7 +3380,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.25"
+version = "0.3.0-beta-dev.27"
 dependencies = [
  "hdk",
  "serde",
@@ -3388,7 +3388,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_trace"
-version = "0.3.0-beta-dev.4"
+version = "0.3.0-beta-dev.6"
 dependencies = [
  "chrono",
  "derive_more",
@@ -3409,26 +3409,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_trace"
-version = "0.3.0-beta-dev.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d06e7ed01d69701138e3f34ec00f3e90bfc93e149b37960a1c7fb7aac28d06f"
-dependencies = [
- "chrono",
- "derive_more",
- "inferno",
- "once_cell",
- "serde_json",
- "thiserror",
- "tracing",
- "tracing-core",
- "tracing-serde",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "holochain_types"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.29"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3451,7 +3433,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "holochain_util",
  "holochain_wasmer_host",
@@ -3509,7 +3491,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.3.0-beta-dev.28"
+version = "0.3.0-beta-dev.30"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3568,13 +3550,13 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.9"
 dependencies = [
  "criterion 0.3.6",
  "futures",
  "ghost_actor 0.4.0-alpha.5",
  "holochain_serialized_bytes",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "holochain_types",
  "linefeed",
  "must_future",
@@ -3596,7 +3578,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.21"
+version = "0.3.0-beta-dev.23"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -4182,7 +4164,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.3.0-beta-dev.26"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4197,7 +4179,7 @@ dependencies = [
  "futures",
  "ghost_actor 0.3.0-alpha.6",
  "governor",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "itertools 0.11.0",
  "kitsune_p2p",
  "kitsune_p2p_bin_data",
@@ -4239,7 +4221,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.3.0-beta-dev.12"
+version = "0.3.0-beta-dev.14"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -4256,7 +4238,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.3.0-beta-dev.14"
+version = "0.3.0-beta-dev.16"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -4265,7 +4247,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.2.0-beta-dev.17"
+version = "0.2.0-beta-dev.19"
 dependencies = [
  "clap 4.4.11",
  "criterion 0.5.1",
@@ -4287,7 +4269,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.25"
 dependencies = [
  "ed25519-dalek",
  "fixt",
@@ -4306,7 +4288,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.13"
+version = "0.3.0-beta-dev.15"
 dependencies = [
  "arbitrary",
  "colored",
@@ -4314,7 +4296,7 @@ dependencies = [
  "derive_more",
  "futures",
  "holochain_serialized_bytes",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
@@ -4335,12 +4317,12 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.3.0-beta-dev.11"
+version = "0.3.0-beta-dev.13"
 dependencies = [
  "arbitrary",
  "derive_more",
  "gcollections",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "intervallum",
  "kitsune_p2p_timestamp",
  "maplit",
@@ -4357,12 +4339,12 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.3.0-beta-dev.19"
+version = "0.3.0-beta-dev.21"
 dependencies = [
  "arbitrary",
  "derive_more",
  "holochain_serialized_bytes",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "human-repr",
  "kitsune_p2p_fetch",
  "kitsune_p2p_timestamp",
@@ -4393,14 +4375,14 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "base64 0.21.5",
  "criterion 0.5.1",
  "crossterm 0.27.0",
  "derive_more",
  "futures",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "serde",
@@ -4427,7 +4409,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "blake2b_simd 1.0.2",
  "futures",
@@ -4441,7 +4423,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "arbitrary",
  "base64 0.21.5",
@@ -4450,7 +4432,7 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor 0.3.0-alpha.6",
- "holochain_trace 0.3.0-beta-dev.4",
+ "holochain_trace",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
@@ -4488,9 +4470,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843c7dbcbc8d75eef0b30397a7eb0d04549aabeff4ea69ebd272aea991555746"
+checksum = "0e71d9d2e55c66921ef9f39fbd393e2430d64f7ac6e83784ff2c777ec8142ec7"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4504,9 +4486,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5829f25d0eab6309ae4307aa645f123a64e568a41ec17c358dcbd65dec207e10"
+checksum = "af33456610975b9138a8a8b2051fdeab69743f63d32adbb3f47d5fb8ce329663"
 dependencies = [
  "base64 0.13.1",
  "dunce",
@@ -4944,7 +4926,7 @@ dependencies = [
 
 [[package]]
 name = "mr_bundle"
-version = "0.3.0-beta-dev.3"
+version = "0.3.0-beta-dev.4"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -8373,9 +8355,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19f91696fd3614f0fca86fa4f42e4639472eaa6adfb7f5d0bb0b630f824f6591"
+checksum = "bd134f3accf5bb9027cf69de1fef04728d9459e22fecf520a18623bc13831f49"
 dependencies = [
  "bytes",
  "futures",
@@ -8397,9 +8379,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83d75f1bd2a341413a006ca67060b117ad2a88c16510cdcb8a95ac7f71fb2d49"
+checksum = "d04199b3ea6873836b444fda70982bb5566a64b13ae9cebed64d0faac7d25892"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8415,9 +8397,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1ace6ad58b7f2376f2cb15223c7191dae485fe9be96176c69823252e509b0ad"
+checksum = "aec1c77232fe9307aa37749545c1722d54abc0a19b745cb6b0c4033f33042673"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
@@ -8429,9 +8411,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf5d2ffe9dfcb9c458bd761927120df70ae7f00bc96c5c7515912947ac48dec9"
+checksum = "f914c7e4724adc3061f12e449d36cefb1b476a07ca77da601bda645e8c3e58e5"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8448,9 +8430,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "252173d1e028b0e4909d596bb174bceffcb47bcc4abb6deb072470230fd0830c"
+checksum = "3af0ed5298942b171593fd1842e50f507da0aae34b64e80f55daad4c15e33a7b"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8466,9 +8448,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14bdea8228e5a9760d2a40ea15ce91432358d97866ba070d05a5896a6dffa762"
+checksum = "9324b127b0b0d63a723c4fd2d09b9d5491686878b02b1ccfbe61b898b045845c"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8495,9 +8477,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal-srv"
-version = "0.0.5-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4db58c14ceb436a89e6db4f1f602e6e44198ad60bc0efd0d22c4a0348ffd09a"
+checksum = "95d19b62bad76105f28ae9aa5338a4d765546ffa6162223ad3204352a3afa2a2"
 dependencies = [
  "clap 4.4.11",
  "dirs 5.0.1",

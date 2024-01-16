@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Provide a mechanism to automatically encrypt databases which are currently unencrypted. This is useful if you are switching from a Holochain built with the `sqlite` feature, to a Holochain built with `sqlite-encrypted`. In order to enable this mechanism you will need to set the environment variable `HOLOCHAIN_MIGRATE_UNENCRYPTED=true`. *DANGER*: If you switch your Holochain without this environment variable then on first startup it will recognise your cache, dht, peer and kitsune metrics databases will be recognised as corrupt and automatically wiped. These databases may be rebuilt, assuming that the same data is still available from other peers, but please consider making a backup before attempting to make the switch.
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
 ## 0.3.0-beta-dev.27
 
 ## 0.3.0-beta-dev.26
