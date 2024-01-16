@@ -32,7 +32,7 @@ mod tests {
     use crate::test_utils::*;
     use crate::{pool::tests::*, State};
     use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-    use linked_hash_map::LinkedHashMap;
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     #[test]
@@ -40,7 +40,7 @@ mod tests {
         let fetch_pool_reader = FetchPoolReader(FetchPool {
             config: Arc::new(Config(1, 1)),
             state: ShareOpen::new(State {
-                queue: LinkedHashMap::new(),
+                queue: HashMap::new(),
                 sources: Default::default(),
             }),
         });
