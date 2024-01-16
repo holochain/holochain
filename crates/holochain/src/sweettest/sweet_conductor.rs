@@ -185,8 +185,6 @@ impl SweetConductor {
             config.into().into()
         };
 
-        tracing::info!(?config);
-
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
                 .await;
