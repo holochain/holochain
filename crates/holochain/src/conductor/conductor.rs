@@ -255,6 +255,16 @@ impl Conductor {
     pub fn builder() -> ConductorBuilder {
         ConductorBuilder::new()
     }
+
+    /// Get a map with the status of each cell
+    pub fn cell_status(&self) -> HashMap<CellId, CellStatus> {
+        self.running_cells.share_ref(|running_cells| {
+            running_cells
+                .iter()
+                .map(|(cell_id, cell_item)| (cell_id.clone(), cell_item.status.clone()))
+                .collect()
+        })
+    }
 }
 
 /// Methods related to conductor startup/shutdown
