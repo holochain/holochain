@@ -106,7 +106,7 @@ sd-notify = "0.3.0"
 
 
 [dev-dependencies]
-holochain = { path = ".", features = ["test_utils"] }
+holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "glacial_tests", "tx2", "tx5", "metrics_influxive"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
@@ -148,7 +148,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5", "metrics_influxive"]
+default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
