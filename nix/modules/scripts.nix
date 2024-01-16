@@ -67,7 +67,7 @@
         set -e
         if [[ "$ANY_CHANGED" -eq 1 ]]; then
           echo committing changes..
-          # git commit -m "chore(flakes): update $VERSIONS_DIR"
+          git commit -m "chore(flakes): update $VERSIONS_DIR"
         fi
       '';
 
