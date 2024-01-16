@@ -80,7 +80,6 @@
           --log-level=debug \
           --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm)$" \
           release \
-            --no-verify \
             --force-tag-creation \
             --force-branch-creation \
             --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
@@ -131,6 +130,40 @@
             git commit -m "docs(crate-level): generate readmes from doc comments" $changed_readmes
           fi
         '';
+
+      scripts-cargo-regen-lockfiles = pkgs.writeShellApplication {
+        name = "scripts-cargo-regen-lockfiles";
+        runtimeInputs = [
+          pkgs.cargo
+        ];
+        text = ''
+          set -xeu -o pipefail
+
+          cargo fetch --locked
+          cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+          cargo generate-lockfile --offline
+          cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+        '';
+      };
+
+
+      scripts-cargo-update =
+        pkgs.writeShellApplication {
+          name = "scripts-cargo-update";
+          runtimeInputs = [
+            pkgs.cargo
+          ];
+          text = ''
+            set -xeu -o pipefail
+
+            # Update the Holochain project Cargo.lock
+            cargo update --manifest-path Cargo.toml
+            # Update the release-automation crate's Cargo.lock
+            cargo update --manifest-path crates/release-automation/Cargo.toml
+            # Update the WASM workspace Cargo.lock
+            cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
+          '';
+        };
     };
 
   };
