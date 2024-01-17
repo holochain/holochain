@@ -36,7 +36,8 @@ async fn migrate_unencrypted() {
     std::env::set_var("HOLOCHAIN_MIGRATE_UNENCRYPTED", "true");
 
     // Now it should open and read just fine, because it will be encrypted automatically
-    let db = DbWrite::open(&std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap();
+    let db: DbWrite<DbKindConductor> =
+        DbWrite::open(&std::path::Path::new(tmp_dir.path()), DbKindConductor).unwrap();
     let msg = db
         .read_async(|txn| -> DatabaseResult<String> {
             Ok(txn.query_row(
