@@ -254,13 +254,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 }
                 // Check if the database is valid and take the appropriate
                 // action if it isn't.
-                match Connection::open(&path)
-                    // For some reason calling pragma_update is necessary to prove the database file is valid.
-                    .and_then(|mut c| {
-                        initialize_connection(&mut c, sync_level)?;
-                        c.pragma_update(None, "synchronous", "0".to_string())
-                    }) {
-                    Ok(_) => (),
+                match Self::check_database_file(&path, sync_level) {
+                    Ok(path) => path,
                     // These are the two errors that can
                     // occur if the database is not valid.
                     err @ Err(Error::SqliteFailure(
@@ -293,11 +288,16 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                             // If we don't wipe we need to return an error.
                             err?;
                         }
+
+                        // Now that we've taken the appropriate action we can try again.
+                        match Self::check_database_file(&path, sync_level) {
+                            Ok(path) => path,
+                            Err(e) => return Err(e.into()),
+                        }
                     }
                     // Another error has occurred when trying to open the db.
                     Err(e) => return Err(e.into()),
                 }
-                Some(path)
             }
             None => None,
         };
@@ -403,6 +403,19 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .entry(kind)
             .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
             .clone()
+    }
+
+    fn check_database_file(
+        path: &Path,
+        sync_level: DbSyncLevel,
+    ) -> rusqlite::Result<Option<PathBuf>> {
+        Connection::open(path)
+            // For some reason calling pragma_update is necessary to prove the database file is valid.
+            .and_then(|mut c| {
+                initialize_connection(&mut c, sync_level)?;
+                c.pragma_update(None, "synchronous", "0".to_string())?;
+                Ok(c.path().map(PathBuf::from))
+            })
     }
 
     /// Create a unique db in a temp dir with no static management of the
