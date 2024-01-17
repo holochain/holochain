@@ -259,7 +259,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                     .and_then(|mut c| {
                         initialize_connection(&mut c, sync_level)?;
                         c.pragma_update(None, "synchronous", "0".to_string())?;
-                        Ok(c.path().map(|p| PathBuf::from(p)))
+                        Ok(c.path().map(PathBuf::from))
                     }) {
                     Ok(path) => path,
                     // These are the two errors that can
