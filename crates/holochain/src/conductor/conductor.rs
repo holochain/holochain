@@ -152,24 +152,28 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 pub type ConductorHandle = Arc<Conductor>;
 
 /// The reason why a cell is waiting to join the network.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PendingJoinReason {
     /// The initial state, no attempt has been made to join the network yet.
     Initial,
 
     /// The join failed with an error that is safe to retry, such as not being connected to the internet.
-    Retry,
+    Retry(String),
 
     /// The network join failed and will not be retried. This will impact the status of the associated
     /// app and require manual intervention from the user.
-    Failed,
+    Failed(String),
+
+    /// The join attempt has timed out.
+    TimedOut,
 }
 
 /// The status of an installed Cell, which captures different phases of its lifecycle
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CellStatus {
     /// Kitsune knows about this Cell and it is considered fully "online"
     Joined,
+
     /// The Cell is on its way to being fully joined. It is a valid Cell from
     /// the perspective of the conductor, and can handle HolochainP2pEvents,
     /// but it is considered not to be fully running from the perspective of
@@ -181,14 +185,18 @@ pub enum CellStatus {
     Joining,
 }
 
-/// Declarative filter for CellStatus
-pub type CellStatusFilter = CellStatus;
-
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(into = "CellStatus")]
 struct CellItem {
     cell: Arc<Cell>,
     status: CellStatus,
+}
+
+impl From<CellItem> for CellStatus {
+    fn from(item: CellItem) -> Self {
+        item.status
+    }
 }
 
 #[allow(dead_code)]
@@ -1596,25 +1604,15 @@ mod cell_impls {
         /// fully initialized and are registered with the kitsune network layer.
         /// Generally used to handle conductor interface requests.
         pub fn live_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cell_ids(Some(CellStatusFilter::Joined))
+            self.running_cell_ids(|status| matches!(status, CellStatus::Joined))
         }
 
         /// List CellIds for Cells which match a status filter
-        pub fn running_cell_ids(&self, filter: Option<CellStatusFilter>) -> HashSet<CellId> {
+        pub fn running_cell_ids(&self, filter: impl Fn(&CellStatus) -> bool) -> HashSet<CellId> {
             self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
-                    .filter_map(|(id, cell)| {
-                        let matches = filter
-                            .as_ref()
-                            .map(|status| cell.status == *status)
-                            .unwrap_or(true);
-                        if matches {
-                            Some(id)
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(move |(id, cell)| filter(&cell.status).then_some(id))
                     .cloned()
                     .collect()
             })
@@ -1938,15 +1936,15 @@ mod app_status_impls {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
 
                             if Self::is_p2p_join_error_retryable(&e) {
-                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry(format!("{e:?}")))))
                             }
                             else {
-                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed(format!("{e:?}")))))
                             }
                         }
                         Err(_) => {
                             tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::TimedOut)))
                         }
                         Ok(Ok(_)) => Ok(cell_id),
                     }
@@ -1999,9 +1997,9 @@ mod app_status_impls {
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
             let cell_ids: HashSet<CellId> = self.live_cell_ids();
-            let retry_cell_ids = self.running_cell_ids(Some(CellStatusFilter::PendingJoin(
-                PendingJoinReason::Retry,
-            )));
+            let retry_cell_ids = self.running_cell_ids(|status| {
+                matches!(status, CellStatus::PendingJoin(PendingJoinReason::Retry(_)))
+            });
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -2182,6 +2180,8 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
+    use std::sync::atomic::Ordering;
+
     use holochain_zome_types::action::builder;
 
     use super::*;
@@ -2250,6 +2250,49 @@ mod misc_impls {
             let summary = out.to_string();
             let out = (out, summary);
             Ok(serde_json::to_string_pretty(&out)?)
+        }
+
+        /// Create a JSON dump of the conductor's state
+        pub async fn dump_conductor_state(&self) -> ConductorApiResult<String> {
+            #[derive(Serialize, Debug)]
+            pub struct ConductorSerialized {
+                running_cells: Vec<((DnaHashB64, AgentPubKeyB64), CellItem)>,
+                shutting_down: bool,
+                admin_websocket_ports: Vec<u16>,
+                app_interfaces: Vec<AppInterfaceId>,
+            }
+
+            #[derive(Serialize, Debug)]
+            struct ConductorDump {
+                conductor: ConductorSerialized,
+                state: ConductorState,
+            }
+
+            let conductor = ConductorSerialized {
+                running_cells: self.running_cells.share_ref(|c| {
+                    c.clone()
+                        .into_iter()
+                        .map(|(id, status)| {
+                            let (dna, agent) = id.into_dna_and_agent();
+                            ((dna.into(), agent.into()), status)
+                        })
+                        .collect()
+                }),
+                shutting_down: self.shutting_down.load(Ordering::SeqCst),
+                admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
+                app_interfaces: self
+                    .app_interfaces
+                    .share_ref(|i| i.clone().keys().cloned().collect()),
+            };
+
+            let dump = ConductorDump {
+                conductor,
+                state: self.get_state().await?,
+            };
+
+            let out = serde_json::to_string_pretty(&dump)?;
+
+            Ok(out)
         }
 
         /// Create a comprehensive structured dump of a cell's state
