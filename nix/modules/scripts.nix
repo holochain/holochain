@@ -46,7 +46,6 @@
         if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
           echo got no actual source changes, reverting modifications..
           git checkout $VERSIONS_DIR/flake.lock
-          exit 0
         else
           git add "$VERSIONS_DIR"/flake.lock
         fi
@@ -62,7 +61,14 @@
           git add flake.lock
         fi
 
-        git commit -m "chore(flakes): update $VERSIONS_DIR"
+        set +e
+        git diff --staged --quiet
+        ANY_CHANGED=$?
+        set -e
+        if [[ "$ANY_CHANGED" -eq 1 ]]; then
+          echo committing changes..
+          git commit -m "chore(flakes): update $VERSIONS_DIR"
+        fi
       '';
 
       scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''

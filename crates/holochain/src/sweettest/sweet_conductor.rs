@@ -220,8 +220,6 @@ impl SweetConductor {
             config.data_root_path = Some(dir.as_ref().to_path_buf().into());
         }
 
-        tracing::info!(?config);
-
         let handle = Self::handle_from_existing(
             keystore.unwrap_or_else(holochain_keystore::test_keystore),
             &config,
