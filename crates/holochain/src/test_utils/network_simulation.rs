@@ -20,7 +20,7 @@ use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
-use kitsune_p2p::{KitsuneP2pConfig, KitsuneSpace};
+use kitsune_p2p::KitsuneP2pConfig;
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
 use rand::Rng;
@@ -289,7 +289,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
         }
     }
     for agent in data.agent_to_info.values() {
-        p2p_put_single(agent.space.clone(), &mut txn, agent).unwrap();
+        p2p_put_single(&mut txn, agent).unwrap();
     }
     txn.commit().unwrap();
     conn
@@ -316,9 +316,7 @@ fn get_cached() -> Option<GeneratedData> {
             .ok()
             .flatten()?;
         let ops = get_ops(&mut txn);
-        let peer_data = txn
-            .p2p_list_agents(Arc::new(KitsuneSpace::new(vec![0; 36])))
-            .unwrap();
+        let peer_data = txn.p2p_list_agents().unwrap();
         let authored = txn
             .prepare("SELECT agent, dht_op_hash FROM Authored")
             .unwrap()

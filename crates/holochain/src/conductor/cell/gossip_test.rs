@@ -3,7 +3,7 @@ use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
-use holochain_sqlite::store::AsP2pStateReadExt;
+use holochain_sqlite::prelude::{AsP2pStateTxExt, DatabaseResult};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -80,7 +80,10 @@ async fn agent_info_test() {
 
     consistency_10s([&cell_1, &cell_2]).await;
     for p2p_agents_db in p2p_agents_dbs {
-        let len = p2p_agents_db.p2p_count_agents().await.unwrap();
+        let len = p2p_agents_db
+            .read_async(move |txn| -> DatabaseResult<usize> { Ok(txn.p2p_list_agents()?.len()) })
+            .await
+            .unwrap();
         assert_eq!(len, 2);
     }
 }

@@ -887,20 +887,17 @@ mod network_impls {
                 let (current_number_of_peers, arc_size, total_network_peers) = db
                     .read_async({
                         let agent_pub_key = agent_pub_key.clone();
-                        let space = dna.clone().into_kitsune();
                         move |txn| -> DatabaseResult<(u32, f64, u32)> {
-                            let current_number_of_peers = txn.p2p_count_agents(space.clone())?;
+                            let current_number_of_peers = txn.p2p_count_agents()?;
 
                             // query arc size and extrapolated coverage and estimate total peers
                             let (arc_size, total_network_peers) = match txn.p2p_get_agent(
-                                space.clone(),
                                 &KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()),
                             )? {
                                 None => (0.0, 0),
                                 Some(agent) => {
                                     let arc_size = agent.storage_arc.coverage();
                                     let agents_in_arc = txn.p2p_gossip_query_agents(
-                                        space.clone(),
                                         u64::MIN,
                                         u64::MAX,
                                         agent.storage_arc.inner().into(),
@@ -1116,10 +1113,12 @@ mod network_impls {
                 } => {
                     let db = { self.p2p_agents_db(&dna_hash) };
                     let res = db
-                        .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
+                        .read_async(move |txn| {
+                            txn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                        })
+                        .await;
 
+                    let res = res.map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryAgentInfoSignedNearBasis {
@@ -1932,7 +1931,9 @@ mod app_status_impls {
                 .map(|(cell_id, cell)| async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
+                    let maybe_agent_info = match p2p_agents_db.read_async(move |tx| {
+                        tx.p2p_get_agent(&kagent)
+                    }).await {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
