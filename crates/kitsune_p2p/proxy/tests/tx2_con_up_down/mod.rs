@@ -4,7 +4,7 @@ use kitsune_p2p_proxy::ProxyUrl;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::tx_utils::*;
 use kitsune_p2p_types::*;
 
 kitsune_p2p_types::write_codec_enum! {

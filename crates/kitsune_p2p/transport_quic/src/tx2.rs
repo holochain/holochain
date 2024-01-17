@@ -7,10 +7,51 @@ use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dependencies::{ghost_actor::dependencies::tracing, serde_json};
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_adapter::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::tx_utils::*;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
+
+use kitsune_p2p_types::dependencies::url2::*;
+use kitsune_p2p_types::*;
+use std::net::SocketAddr;
+
+const SCHEME: &str = "kitsune-quic";
+
+/// internal helper convert urls to socket addrs for binding / connection
+pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> KitsuneResult<SocketAddr> {
+    if url.scheme() != scheme || url.host_str().is_none() || url.port().is_none() {
+        return Err(format!(
+            "invalid input. got: '{}', expected: '{}://host:port'",
+            scheme, url
+        )
+        .into());
+    }
+
+    let rendered = format!("{}:{}", url.host_str().unwrap(), url.port().unwrap());
+
+    if let Ok(mut iter) = tokio::net::lookup_host(rendered.clone()).await {
+        let mut tmp = iter.next();
+        let mut fallback = None;
+        loop {
+            if tmp.is_none() {
+                break;
+            }
+
+            if tmp.as_ref().unwrap().is_ipv4() {
+                return Ok(tmp.unwrap());
+            }
+
+            fallback = tmp;
+            tmp = iter.next();
+        }
+        if let Some(addr) = fallback {
+            return Ok(addr);
+        }
+    }
+
+    Err(format!("could not parse '{}', as 'host:port'", rendered).into())
+}
 
 /// Configuration for QuicBackendAdapt
 #[non_exhaustive]

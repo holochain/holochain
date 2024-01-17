@@ -1,5 +1,5 @@
 use super::*;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
+use kitsune_p2p_types::tx_utils::TxUrl;
 use SearchRemotesCoveringBasisLogicResult::*;
 
 async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {

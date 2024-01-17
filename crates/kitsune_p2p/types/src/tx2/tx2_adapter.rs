@@ -1,7 +1,7 @@
 //! Types and Traits for writing tx2 adapters.
 
-use crate::tx2::tx2_utils::TxUrl;
 use crate::tx2::*;
+use crate::tx_utils::TxUrl;
 use crate::*;
 
 use futures::{future::BoxFuture, stream::Stream};
@@ -174,7 +174,7 @@ pub mod test_utils {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::tx2::tx2_utils::PoolBuf;
+        use crate::tx_utils::PoolBuf;
         use futures::future::FutureExt;
         use futures::stream::StreamExt;
 

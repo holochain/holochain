@@ -13,7 +13,7 @@
 use std::sync::Arc;
 use tokio::time::{Duration, Instant};
 
-use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace};
+use kitsune_p2p_types::{tx_utils::ShareOpen, KAgent, KSpace};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt, TransferMethod};

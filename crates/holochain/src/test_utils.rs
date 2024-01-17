@@ -239,7 +239,7 @@ where
     let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::default();
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.tx2_implicit_timeout_ms = 500;
+    tuning.tx5_implicit_timeout_ms = 500;
     let tuning = std::sync::Arc::new(tuning);
     let cutoff = tuning.danger_gossip_recent_threshold();
     config.tuning_params = tuning;

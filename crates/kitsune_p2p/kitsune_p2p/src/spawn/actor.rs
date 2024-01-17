@@ -1,7 +1,6 @@
 // this is largely a passthrough that routes to a specific space handler
 
-use crate::actor;
-use crate::actor::*;
+use self::actor::*;
 use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::gossip::sharded_gossip::KitsuneDiagnostics;
@@ -10,13 +9,12 @@ use crate::types::metrics::KitsuneMetrics;
 use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
-use futures::stream::StreamExt;
 use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
-use kitsune_p2p_types::tx2::tx2_api::*;
+use kitsune_p2p_types::metrics::Tx2ApiMetrics;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -210,23 +208,14 @@ impl KitsuneP2pActor {
 
 async fn create_meta_net(
     config: &KitsuneP2pConfig,
-    tls_config: tls::TlsConfig,
+    _tls_config: tls::TlsConfig,
     internal_sender: ghost_actor::GhostSender<Internal>,
     host: HostApiLegacy,
-    metrics: Tx2ApiMetrics,
+    _metrics: Tx2ApiMetrics,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
     let mut ep_hnd = None;
     let mut ep_evt = None;
     let mut bootstrap_net = None;
-
-    #[cfg(feature = "tx2")]
-    if ep_hnd.is_none() && config.is_tx2() {
-        tracing::trace!("tx2");
-        let (h, e) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
-        ep_hnd = Some(h);
-        ep_evt = Some(e);
-        bootstrap_net = Some(BootstrapNet::Tx2);
-    }
 
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
@@ -984,27 +973,12 @@ mod tests {
     use crate::KitsuneP2pResult;
     use ghost_actor::actor_builder::GhostActorBuilder;
     use kitsune_p2p_bootstrap_client::BootstrapNet;
-    use kitsune_p2p_types::config::{KitsuneP2pConfig, NetworkType, TransportConfig};
+    use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+    use kitsune_p2p_types::metrics::Tx2ApiMetrics;
     use kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
     use std::net::SocketAddr;
     use tokio::task::AbortHandle;
     use url2::url2;
-
-    #[cfg(feature = "tx2")]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_tx2_with_mdns_meta_net() {
-        // Anything other than WebRTC will do here but the tx2 transport isn't available any more
-        let mut config = KitsuneP2pConfig::default();
-        config.transport_pool = vec![TransportConfig::Mem {}];
-        config.bootstrap_service = None;
-        config.network_type = NetworkType::QuicMdns;
-
-        let (_, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
-
-        // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
-        assert_eq!(BootstrapNet::Tx2, bootstrap_net);
-    }
 
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
@@ -1016,7 +990,6 @@ mod tests {
             signal_url: format!("ws://{:?}", signal_addr),
         }];
         config.bootstrap_service = None;
-        config.network_type = NetworkType::QuicMdns;
 
         let (meta_net, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
 
@@ -1036,7 +1009,6 @@ mod tests {
             signal_url: format!("ws://{:?}", signal_addr),
         }];
         config.bootstrap_service = Some(url2!("ws://not-a-bootstrap.test"));
-        config.network_type = NetworkType::QuicBootstrap;
 
         let (meta_net, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
 

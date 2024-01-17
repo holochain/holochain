@@ -31,7 +31,7 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use crate::{pool::tests::*, State};
-    use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
+    use kitsune_p2p_types::tx_utils::ShareOpen;
     use linked_hash_map::LinkedHashMap;
     use std::sync::Arc;
 

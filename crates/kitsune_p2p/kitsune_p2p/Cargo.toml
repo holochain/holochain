@@ -77,7 +77,7 @@ ed25519-dalek = "1"
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
 [features]
-default = [ "tx2", "tx5" ]
+default = [ "tx5" ]
 
 fuzzing = [
   "arbitrary",

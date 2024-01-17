@@ -10,6 +10,9 @@ pub use latency::*;
 mod logic_chan;
 pub use logic_chan::*;
 
+mod framed;
+pub use framed::*;
+
 mod mem_chan;
 pub use mem_chan::*;
 
@@ -30,3 +33,5 @@ pub use t_chan::*;
 
 mod tx_url;
 pub use tx_url::*;
+
+pub use super::metrics::metric_task;

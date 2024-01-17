@@ -1,4 +1,4 @@
-use crate::tx2::tx2_utils::*;
+use crate::tx_utils::*;
 use crate::*;
 
 struct Inner<T: 'static + Send> {

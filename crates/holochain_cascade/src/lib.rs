@@ -61,7 +61,7 @@ use tracing::*;
 #[cfg(feature = "test_utils")]
 use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
 #[cfg(feature = "test_utils")]
-use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx_utils::ShareOpen;
 #[cfg(feature = "test_utils")]
 use std::collections::HashMap;
 

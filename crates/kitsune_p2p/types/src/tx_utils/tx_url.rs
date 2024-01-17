@@ -1,3 +1,5 @@
+//! Defines the TxUrl type
+
 use std::sync::Arc;
 
 use crate::{KitsuneError, KitsuneErrorKind, KitsuneResult};

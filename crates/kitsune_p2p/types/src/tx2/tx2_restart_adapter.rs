@@ -1,7 +1,7 @@
 //! Wrap a tx2 backend adapter in endpoint close / binding restart backoff code.
 
 use crate::tx2::tx2_adapter::*;
-use crate::tx2::tx2_utils::*;
+use crate::tx_utils::*;
 use crate::*;
 
 use futures::future::{BoxFuture, FutureExt};

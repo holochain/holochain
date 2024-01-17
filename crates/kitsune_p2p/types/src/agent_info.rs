@@ -2,7 +2,7 @@
 
 use crate::bin_types::*;
 use crate::dht_arc::DhtArc;
-use crate::tx2::tx2_utils::TxUrl;
+use crate::tx_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
 

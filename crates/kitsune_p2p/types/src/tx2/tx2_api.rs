@@ -4,8 +4,8 @@
 use crate::codec::*;
 use crate::tx2::tx2_adapter::Uniq;
 use crate::tx2::tx2_pool::*;
-use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
+use crate::tx_utils::*;
 use crate::*;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::Stream;
@@ -819,43 +819,6 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Ep<C> {
     /// A cheaply clone-able handle to this endpoint.
     pub fn handle(&self) -> &Tx2EpHnd<C> {
         &self.0
-    }
-}
-
-type WriteLenCb = Box<dyn Fn(&'static str, usize) + 'static + Send + Sync>;
-
-/// Metrics callback manager to be injected into the endpoint
-pub struct Tx2ApiMetrics {
-    write_len: Option<WriteLenCb>,
-}
-
-impl Default for Tx2ApiMetrics {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Tx2ApiMetrics {
-    /// Construct a new default Tx2ApiMetrics with no set callbacks
-    pub fn new() -> Self {
-        Self { write_len: None }
-    }
-
-    /// This callback will be invoked when we successfully write data
-    /// to a transport connection.
-    pub fn set_write_len<F>(mut self, f: F) -> Self
-    where
-        F: Fn(&'static str, usize) + 'static + Send + Sync,
-    {
-        let f: WriteLenCb = Box::new(f);
-        self.write_len = Some(f);
-        self
-    }
-
-    fn write_len(&self, d: &'static str, l: usize) {
-        if let Some(cb) = &self.write_len {
-            cb(d, l)
-        }
     }
 }
 

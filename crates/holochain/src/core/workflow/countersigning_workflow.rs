@@ -7,7 +7,7 @@ use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx2::tx2_utils::Share;
+use kitsune_p2p_types::tx_utils::Share;
 use rusqlite::{named_params, Transaction};
 
 use crate::conductor::interface::SignalBroadcaster;

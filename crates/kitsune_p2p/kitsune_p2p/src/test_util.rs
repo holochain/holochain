@@ -77,7 +77,7 @@ pub(crate) use harness_actor::*;
 
 pub(crate) mod scenario_def_local;
 
-#[cfg(feature = "mock_network")]
-pub mod mock_network;
+// #[cfg(feature = "mock_network")]
+// pub mod mock_network;
 
 pub mod data;

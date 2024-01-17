@@ -1,7 +1,7 @@
 use crate::agent_store::AgentInfoSigned;
 use crate::meta_net::*;
 use crate::types::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::tx_utils::*;
 use std::sync::Arc;
 
 /// A bloom filter of Kitsune hash types

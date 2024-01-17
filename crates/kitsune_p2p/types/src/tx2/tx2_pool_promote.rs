@@ -7,8 +7,8 @@ const INTERNAL_ERR: u32 = 500;
 
 use crate::tx2::tx2_adapter::*;
 use crate::tx2::tx2_pool::*;
-use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
+use crate::tx_utils::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt, Shared};
 use futures::stream::{Stream, StreamExt};

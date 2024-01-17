@@ -4,8 +4,8 @@
 use crate::config::*;
 use crate::tls::*;
 use crate::tx2::tx2_adapter::*;
-use crate::tx2::tx2_utils::*;
 use crate::tx2::*;
+use crate::tx_utils::*;
 use crate::*;
 use futures::{
     future::{BoxFuture, FutureExt},

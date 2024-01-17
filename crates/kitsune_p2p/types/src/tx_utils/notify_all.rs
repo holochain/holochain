@@ -1,6 +1,6 @@
 #![allow(clippy::blocks_in_if_conditions)]
 
-use crate::tx2::tx2_utils::*;
+use crate::tx_utils::*;
 use crate::*;
 
 /// Sync callback signature to be invoked on notify()

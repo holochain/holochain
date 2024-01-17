@@ -32,7 +32,6 @@ impl KitsuneTestHarness {
     }
 
     pub fn use_bootstrap_server(mut self, bootstrap_addr: SocketAddr) -> Self {
-        self.config.network_type = kitsune_p2p_types::config::NetworkType::QuicBootstrap;
         self.config.bootstrap_service = Some(url2::url2!("http://{:?}", bootstrap_addr));
         self
     }

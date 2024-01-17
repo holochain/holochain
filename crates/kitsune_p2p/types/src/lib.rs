@@ -232,7 +232,6 @@ impl From<&Tx2Cert> for CertDigest {
 }
 
 use base64::Engine;
-use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
 /// Error related to remote communication.
@@ -359,11 +358,10 @@ pub mod metrics;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+pub mod tx_utils;
+
 #[cfg(feature = "fixt")]
 pub mod fixt;
-
-#[cfg(feature = "tx2")]
-pub mod tx2;
 
 pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
@@ -378,21 +376,3 @@ pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
 pub type KSpace = Arc<bin_types::KitsuneSpace>;
 /// KitsuneOpData in an Arc
 pub type KOpData = Arc<bin_types::KitsuneOpData>;
-
-use metrics::metric_task;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "tx2")]
-    async fn test_tx2_digest() {
-        let d: Tx2Cert = vec![0xdb; 32].into();
-        println!("raw_debug: {:?}", d);
-        println!("as_digest: {:?}", d.as_digest());
-        println!("as_bytes: {:?}", d.as_bytes());
-        println!("as_str: {:?}", d.as_str());
-        println!("as_nick: {:?}", d.as_nick());
-    }
-}

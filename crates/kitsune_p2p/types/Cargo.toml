@@ -56,7 +56,7 @@ name = "api_thru"
 harness = false
 
 [features]
-default = [ "tx2" ]
+default = [ "tx5" ]
 
 fuzzing = [
   "arbitrary",
