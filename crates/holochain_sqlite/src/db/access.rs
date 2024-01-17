@@ -244,7 +244,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
             Some(path_prefix) => {
-                let path = path_prefix.canonicalize()?.join(kind.filename());
+                let path = path_prefix.join(kind.filename());
                 let parent = path
                     .parent()
                     .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
@@ -258,9 +258,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                     // For some reason calling pragma_update is necessary to prove the database file is valid.
                     .and_then(|mut c| {
                         initialize_connection(&mut c, sync_level)?;
-                        c.pragma_update(None, "synchronous", "0".to_string())
+                        c.pragma_update(None, "synchronous", "0".to_string())?;
+                        Ok(c.path().map(|p| PathBuf::from(p)))
                     }) {
-                    Ok(_) => (),
+                    Ok(path) => path,
                     // These are the two errors that can
                     // occur if the database is not valid.
                     err @ Err(Error::SqliteFailure(
@@ -293,11 +294,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                             // If we don't wipe we need to return an error.
                             err?;
                         }
+
+                        None
                     }
                     // Another error has occurred when trying to open the db.
                     Err(e) => return Err(e.into()),
                 }
-                Some(path)
             }
             None => None,
         };
