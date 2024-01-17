@@ -405,7 +405,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .clone()
     }
 
-    fn check_database_file(path: &Path, sync_level: DbSyncLevel) -> rusqlite::Result<Option<PathBuf>> {
+    fn check_database_file(
+        path: &Path,
+        sync_level: DbSyncLevel,
+    ) -> rusqlite::Result<Option<PathBuf>> {
         Connection::open(&path)
             // For some reason calling pragma_update is necessary to prove the database file is valid.
             .and_then(|mut c| {
