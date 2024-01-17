@@ -56,14 +56,8 @@ async fn main() {
                             "{id} Failed to join: {:?}",
                             fail
                         ));
-                    } else if let Some(_) = status
-                        .iter()
-                        .find(|s| !matches!(s, CellStatus::WellConnected))
-                    {
-                        println!("{id} still joining, waiting 1 sec");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
                     } else {
-                        println!("{id} JOINED");
+                        println!("{id} LIVE: {status:?}");
 
                         {
                             let t = Instant::now();
@@ -95,7 +89,7 @@ async fn main() {
         .chain([tokio::task::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                println!("{}", ".".repeat(NUM));
+                println!("{} {:?}", ".".repeat(NUM), start.elapsed());
             }
         })]);
 

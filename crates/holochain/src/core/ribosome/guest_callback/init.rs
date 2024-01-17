@@ -360,7 +360,7 @@ mod slow_tests {
             match create_post_result {
                 Err(crate::conductor::api::error::ConductorApiError::ConductorError(
                     crate::conductor::error::ConductorError::CellNetworkNotReady(
-                        CellStatus::Joining,
+                        CellStatus::Unrecoverable(_),
                     )
                     | crate::conductor::error::ConductorError::CellDisabled(_),
                 )) => {

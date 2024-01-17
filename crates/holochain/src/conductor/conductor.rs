@@ -103,7 +103,6 @@ use holochain_state::source_chain;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
-use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
@@ -145,6 +144,11 @@ pub use state_impls::*;
 
 mod graft_records_onto_source_chain;
 
+/// How long we should attempt to achieve a "well-connected" CellStatus when first activating a cell,
+/// before moving on and letting the network health activity go on in the background.
+pub const JOIN_NETWORK_WAITING_PERIOD: std::time::Duration = std::time::Duration::from_secs(5);
+
+
 /// A list of Cells which failed to start, and why
 pub type CellStartupErrors = Vec<(CellId, CellError)>;
 
@@ -165,24 +169,78 @@ pub enum CellStatus {
     /// network performance in general may be poor.
     PartiallyConnected(String),
 
-    /// TODO: remove
-    PendingJoin(String),
-
     /// The Cell has no peers, or couldn't connect to its peers. Peers don't know about
     /// this cell, so network activity will likely be impossible. This could be due to
     /// not being connected to any network at all (being "offline"), or there could be
     /// no peers to connect to.
+    /// 
+    /// This is also the initial state of a Cell, before it has been fully initialized.
+    /// TODO: perhaps we want to distinguish between these two cases, for different
+    /// retry behavior?
     ///
     /// Periodic attempts to discover more peers should be made.
     Isolated,
-
-    /// TODO: remove
-    Joining,
 
     /// The cell experienced an error which indicates that no more attempts should be made
     /// to increase network connectivity for this cell. Any app which depends on this cell
     /// will be put into a Paused state.
     Unrecoverable(String),
+}
+
+impl CellStatus {
+
+    /// Can this cell be considered "online" in any sense?
+    /// It's a fuzzy concept, but one we seem to be using.
+    pub fn is_online(&self) -> bool {
+        match self {
+            CellStatus::WellConnected |
+            CellStatus::PartiallyConnected(_) => true,
+
+            CellStatus::Isolated |
+            CellStatus::Unrecoverable(_) => false,
+        }
+    }
+
+    /// "Liveness" means that the cell is not experiencing an 
+    /// unrecoverable error which would cause its app to be paused 
+    /// or disabled. In other words, all apps which are "running"
+    /// contain only "live" cells -- any app with a non-live cell
+    /// cannot be in a running state.
+    pub fn is_live(&self) -> bool {
+        match self {
+            CellStatus::WellConnected |
+            CellStatus::PartiallyConnected(_) |
+            CellStatus::Isolated => true,
+
+            CellStatus::Unrecoverable(_) => false,
+        }
+    }
+
+    /// Should retry network join, to improve network health.
+    /// The only reasons *no*t to do this are if the cell is already
+    /// in tip-top shape, i.e. `WellConnected`, or if it's in an
+    /// `Unrecoverable` state.
+    pub fn should_improve_network_health(&self) -> bool {
+        match self {
+            CellStatus::PartiallyConnected(_) |
+            CellStatus::Isolated => true,
+
+            CellStatus::Unrecoverable(_) |
+            CellStatus::WellConnected => false,
+        }
+    }    
+    
+    /// Should retry network join, to improve network health.
+    /// Any status other than `WellConnected` means we should retry.
+    pub fn should_retry_join(&self) -> bool {
+        match self {
+            CellStatus::PartiallyConnected(_) |
+            CellStatus::Isolated |
+            CellStatus::Unrecoverable(_) => true,
+
+            CellStatus::WellConnected => false,
+        }
+    }
 }
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
@@ -1587,7 +1645,7 @@ mod cell_impls {
         ) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
             if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
-                if require_network_ready && cell.status != CellStatus::WellConnected {
+                if require_network_ready && !cell.status.is_online() {
                     Err(ConductorError::CellNetworkNotReady(cell.status))
                 } else {
                     Ok(cell.cell)
@@ -1614,7 +1672,7 @@ mod cell_impls {
         /// fully initialized and are registered with the kitsune network layer.
         /// Generally used to handle conductor interface requests.
         pub fn live_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cell_ids(|status| matches!(status, CellStatus::WellConnected))
+            self.running_cell_ids(|status| status.is_live())
         }
 
         /// List CellIds for Cells which match a status filter
@@ -1903,15 +1961,17 @@ mod app_status_impls {
                 .map(Result::unwrap_err)
                 .collect();
 
-            // Add the newly created cells to the Conductor with the PendingJoin
+            // Add the newly created cells to the Conductor with the Isolated
             // status, and start their workflow loops
             self.add_and_initialize_cells(new_cells);
 
-            // Join these newly created cells to the network
-            // (as well as any others which need joining),
-            // but don't wait for the result. If there are any errors,
-            // they will be handled by the space's retrying workflow.
-            let _ = self.join_all_pending_cells();
+            // "Join the network" with these newly created cells,
+            // meaning we attempt to increase the connectivity beyond Isolated.
+            // We wait for a short time ([`JOIN_NETWORK_TIMEOUT`]) for this to complete,
+            // but if any cells can't achieve `WellConnected` status within that time,
+            // we move on and let this happen in the background, and in subsequent
+            // network health loops.
+            self.join_all_pending_cells().await;
 
             Ok(errors)
         }
@@ -1929,7 +1989,7 @@ mod app_status_impls {
             use holochain_p2p::AgentPubKeyExt;
 
             let tasks = self
-                .mark_pending_cells_as_joining()
+                .get_cells_to_attempt_joining()
                 .into_iter()
                 .map(|(cell_id, cell)| async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
@@ -1940,23 +2000,35 @@ mod app_status_impls {
                     };
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let network = cell.holochain_p2p_dna().clone();
+                    let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     aitia::trace!(&hc_sleuth::Event::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
-
-                    match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
+                    
+                    // Spawn a task for join so that it completes even if it takes longer than the timeout.
+                    // If join does complete before the timeout, we can make use of that info to update the CellStatus
+                    // indicating that network join succeeded, but if not, we don't need to make a big deal of it since
+                    // we will be retrying join later.
+                    let join_fut = tokio::spawn(async move {
+                        network.join(agent_pubkey, maybe_agent_info, maybe_initial_arc).await
+                    });
+                    match tokio::time::timeout(JOIN_NETWORK_WAITING_PERIOD, join_fut).await {
                         Ok(Err(e)) => {
+                            tracing::error!(error = ?e, cell_id = ?cell_id, "Networking joining task panicked");
+                            Err((cell_id, CellStatus::Unrecoverable(format!("{e:?}"))))
+                        }
+                        Ok(Ok(Err(e))) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
 
                             if Self::is_p2p_join_error_retryable(&e) {
-                                Err((cell_id, CellStatus::PendingJoin(format!("{e:?}"))))
+                                Err((cell_id, CellStatus::PartiallyConnected(format!("{e:?}"))))
                             }
                             else {
                                 Err((cell_id, CellStatus::Unrecoverable(format!("{e:?}"))))
                             }
                         }
-                        Err(_) => {
+                        Err(_elapsed) => {
                             tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err((cell_id, CellStatus::PendingJoin("network join timed out".to_string())))
+                            Err((cell_id, CellStatus::PartiallyConnected("network join timed out".to_string())))
                         }
                         Ok(Ok(_)) => Ok(cell_id),
                     }
@@ -2010,7 +2082,7 @@ mod app_status_impls {
             // the app starts.
             let cell_ids: HashSet<CellId> = self.live_cell_ids();
             let retry_cell_ids =
-                self.running_cell_ids(|status| matches!(status, CellStatus::PendingJoin(_)));
+                self.running_cell_ids(|status| status.should_improve_network_health());
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -2541,7 +2613,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: CellStatus::Joining,
+                        status: CellStatus::Isolated,
                     },
                 );
             }
@@ -2556,17 +2628,11 @@ impl Conductor {
     ///
     /// Used to discover which cells need to be joined to the network.
     /// The cells' status are upgraded to `Joining` when this function is called.
-    fn mark_pending_cells_as_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
+    fn get_cells_to_attempt_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
         self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
-                .filter_map(|(id, item)| match item.status {
-                    CellStatus::PendingJoin(_) => {
-                        item.status = CellStatus::Joining;
-                        Some((id.clone(), item.cell.clone()))
-                    }
-                    _ => None,
-                })
+                .filter_map(|(id, item)| item.status.should_retry_join().then_some((id.clone(), item.cell.clone())) )
                 .collect()
         })
     }
