@@ -5,7 +5,5 @@ use derive_more::*;
 use kitsune_p2p_types::dependencies::url2;
 use kitsune_p2p_types::*;
 
-// pub mod tx2;
-
 mod proxy_url;
 pub use proxy_url::*;
