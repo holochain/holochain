@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Removed `network_type` from `KitsuneP2pConfig`
+
 ## 0.3.0-beta-dev.28
 
 ## 0.3.0-beta-dev.27

@@ -108,6 +108,8 @@ pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
 pub mod actor;
 pub mod event;
 
+// TODO: learn from this work, and either remove it, or rewrite it.
+//       it was built on tx2 so we can't use it as is
 // #[cfg(feature = "mock_network")]
 // pub mod mock_network;
 
