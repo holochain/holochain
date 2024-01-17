@@ -38,7 +38,7 @@ pub struct ConductorState {
     #[serde(default)]
     installed_apps: InstalledAppMap,
     /// List of interfaces any UI can use to access zome functions.
-    #[serde(default, skip)]
+    #[serde(default)]
     pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
