@@ -34,7 +34,7 @@ holochain_serialized_bytes = "=0.0.53"
 holochain_state = { version = "^0.3.0-beta-dev.31", path = "../holochain_state" }
 holochain_types = { version = "^0.3.0-beta-dev.29", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.91"
+holochain_wasmer_host = { workspace = true }
 holochain_websocket = { version = "^0.3.0-beta-dev.9", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.23", path = "../holochain_zome_types", features = ["full"] }
 holochain_nonce = { version = "^0.3.0-beta-dev.22", path = "../holochain_nonce" }
@@ -90,8 +90,8 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.30", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
-wasmer = "=4.2.4"
-wasmer-middlewares = "=4.2.4"
+wasmer = { workspace = true }
+wasmer-middlewares = { workspace = true }
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 
 # Dependencies for test_utils
