@@ -244,7 +244,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
             Some(path_prefix) => {
-                let path = path_prefix.join(kind.filename());
+                let path = path_prefix.canonicalize()?.join(kind.filename());
                 let parent = path
                     .parent()
                     .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
