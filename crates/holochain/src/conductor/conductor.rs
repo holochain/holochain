@@ -3175,7 +3175,7 @@ async fn p2p_event_task(
         })
         .await;
 
-    tracing::warn!("p2p_event_task has ended");
+    tracing::info!("p2p_event_task has ended");
 }
 
 #[cfg(test)]

@@ -1715,6 +1715,7 @@ dependencies = [
 name = "diagnostic_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chashmap",
  "colored",
  "crossterm 0.27.0",

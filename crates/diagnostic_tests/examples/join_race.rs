@@ -12,14 +12,18 @@ use holochain_diagnostics::{
     },
     seeded_rng, Rng, StdRng,
 };
+use tokio::time::Instant;
 
 #[tokio::main]
 async fn main() {
     holochain_trace::test_run().ok();
 
+    const NUM: usize = 10;
+    const MAX_WAIT_MS: Duration = Duration::from_secs(3);
+
     // let config = config_no_networking();
     let config = SweetConductorConfig::rendezvous(true);
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM, config).await;
 
     let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -28,42 +32,72 @@ async fn main() {
     conductors.setup_app("app2", &[dna2]).await.unwrap();
     conductors.setup_app("app3", &[dna3]).await.unwrap();
 
+    let start = Instant::now();
+
     fn random_duration(rng: &mut StdRng, max: u64) -> Duration {
-        let min = 500;
+        let min = 100;
         Duration::from_millis(rng.gen_range(min..=max))
     }
 
-    let num_conductors = conductors.len();
-    let tasks = conductors.into_iter().enumerate().map(|(i, mut c)| {
-        tokio::task::spawn(async move {
-            let mut rng = seeded_rng(None);
-            let id = format!("{}{}{}", " ".repeat(i), i, " ".repeat(num_conductors - i));
-            loop {
-                let status: CellStatus = c.cell_status().values().cloned().next().unwrap();
-                match status {
-                    CellStatus::Joined => {
-                        println!("{id} JOINED");
-                        c.shutdown().await;
-                        let shutdown_dur = random_duration(&mut rng, 2_000);
-                        println!("{id} shut down, waiting {:?}", shutdown_dur);
-                        tokio::time::sleep(shutdown_dur).await;
-                        c.startup().await;
-                        let startup_dur = random_duration(&mut rng, 5_000);
-                        println!("{id} restarted, waiting {:?}", startup_dur);
-                        tokio::time::sleep(startup_dur).await;
-                    }
-                    CellStatus::Joining => {
+    let tasks = conductors
+        .into_iter()
+        .enumerate()
+        .map(|(i, mut c)| {
+            tokio::task::spawn(async move {
+                let mut rng = seeded_rng(None);
+                let id = format!("{}{}{}", " ".repeat(i), i, " ".repeat(NUM - i));
+                loop {
+                    let status: Vec<CellStatus> = c.cell_status().values().cloned().collect();
+                    if let Some(fail) = status
+                        .iter()
+                        .find(|s| matches!(s, CellStatus::PendingJoin(_)))
+                    {
+                        return anyhow::Result::<()>::Err(anyhow::anyhow!(
+                            "{id} Failed to join: {:?}",
+                            fail
+                        ));
+                    } else if let Some(_) = status.iter().find(|s| matches!(s, CellStatus::Joining))
+                    {
                         println!("{id} still joining, waiting 1 sec");
                         tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-                    CellStatus::PendingJoin(reason) => {
-                        println!("{id} Failed to join: {:?}", reason);
-                        panic!("{id} Failed to join: {:?}", reason);
+                    } else {
+                        println!("{id} JOINED");
+
+                        {
+                            let t = Instant::now();
+                            c.shutdown().await;
+                            let shutdown_dur = random_duration(&mut rng, 500);
+                            println!(
+                                "{id} shut down in {:?}, waiting {:?}",
+                                t.elapsed(),
+                                shutdown_dur
+                            );
+                            tokio::time::sleep(shutdown_dur).await;
+                        }
+                        {
+                            let t = Instant::now();
+                            c.startup().await;
+                            let startup_dur =
+                                random_duration(&mut rng, MAX_WAIT_MS.as_millis() as u64);
+                            println!(
+                                "{id} restarted in {:?}, waiting {:?}",
+                                t.elapsed(),
+                                startup_dur
+                            );
+                            tokio::time::sleep(startup_dur).await;
+                        }
                     }
                 }
-            }
+            })
         })
-    });
+        .chain([tokio::task::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                println!("{}", ".".repeat(NUM));
+            }
+        })]);
 
-    futures::future::join_all(tasks).await;
+    let (r, i, _tasks) = futures::future::select_all(tasks).await;
+    println!("FAILURE in {} after {:?}", i, start.elapsed());
+    r.unwrap().unwrap();
 }
