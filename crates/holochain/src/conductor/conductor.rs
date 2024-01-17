@@ -148,7 +148,6 @@ mod graft_records_onto_source_chain;
 /// before moving on and letting the network health activity go on in the background.
 pub const JOIN_NETWORK_WAITING_PERIOD: std::time::Duration = std::time::Duration::from_secs(5);
 
-
 /// A list of Cells which failed to start, and why
 pub type CellStartupErrors = Vec<(CellId, CellError)>;
 
@@ -173,46 +172,36 @@ pub enum CellStatus {
     /// this cell, so network activity will likely be impossible. This could be due to
     /// not being connected to any network at all (being "offline"), or there could be
     /// no peers to connect to.
-    /// 
+    ///
     /// This is also the initial state of a Cell, before it has been fully initialized.
     /// TODO: perhaps we want to distinguish between these two cases, for different
     /// retry behavior?
     ///
     /// Periodic attempts to discover more peers should be made.
     Isolated,
-
-    /// The cell experienced an error which indicates that no more attempts should be made
-    /// to increase network connectivity for this cell. Any app which depends on this cell
-    /// will be put into a Paused state.
-    Unrecoverable(String),
 }
 
 impl CellStatus {
-
     /// Can this cell be considered "online" in any sense?
     /// It's a fuzzy concept, but one we seem to be using.
     pub fn is_online(&self) -> bool {
         match self {
-            CellStatus::WellConnected |
-            CellStatus::PartiallyConnected(_) => true,
+            CellStatus::WellConnected | CellStatus::PartiallyConnected(_) => true,
 
-            CellStatus::Isolated |
-            CellStatus::Unrecoverable(_) => false,
+            CellStatus::Isolated => false,
         }
     }
 
-    /// "Liveness" means that the cell is not experiencing an 
-    /// unrecoverable error which would cause its app to be paused 
+    /// "Liveness" means that the cell is not experiencing an
+    /// unrecoverable error which would cause its app to be paused
     /// or disabled. In other words, all apps which are "running"
     /// contain only "live" cells -- any app with a non-live cell
     /// cannot be in a running state.
     pub fn is_live(&self) -> bool {
         match self {
-            CellStatus::WellConnected |
-            CellStatus::PartiallyConnected(_) |
-            CellStatus::Isolated => true,
-
-            CellStatus::Unrecoverable(_) => false,
+            CellStatus::WellConnected
+            | CellStatus::PartiallyConnected(_)
+            | CellStatus::Isolated => true,
         }
     }
 
@@ -222,21 +211,17 @@ impl CellStatus {
     /// `Unrecoverable` state.
     pub fn should_improve_network_health(&self) -> bool {
         match self {
-            CellStatus::PartiallyConnected(_) |
-            CellStatus::Isolated => true,
+            CellStatus::PartiallyConnected(_) | CellStatus::Isolated => true,
 
-            CellStatus::Unrecoverable(_) |
             CellStatus::WellConnected => false,
         }
-    }    
-    
+    }
+
     /// Should retry network join, to improve network health.
     /// Any status other than `WellConnected` means we should retry.
     pub fn should_retry_join(&self) -> bool {
         match self {
-            CellStatus::PartiallyConnected(_) |
-            CellStatus::Isolated |
-            CellStatus::Unrecoverable(_) => true,
+            CellStatus::PartiallyConnected(_) | CellStatus::Isolated => true,
 
             CellStatus::WellConnected => false,
         }
@@ -2003,7 +1988,7 @@ mod app_status_impls {
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     aitia::trace!(&hc_sleuth::Event::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
-                    
+
                     // Spawn a task for join so that it completes even if it takes longer than the timeout.
                     // If join does complete before the timeout, we can make use of that info to update the CellStatus
                     // indicating that network join succeeded, but if not, we don't need to make a big deal of it since
@@ -2012,10 +1997,19 @@ mod app_status_impls {
                         network.join(agent_pubkey, maybe_agent_info, maybe_initial_arc).await
                     });
                     match tokio::time::timeout(JOIN_NETWORK_WAITING_PERIOD, join_fut).await {
+                        // timeout
+                        Err(_elapsed) => {
+                            tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
+                            Err((cell_id, CellStatus::PartiallyConnected("network join timed out".to_string())))
+                        }
+
+                        // tokio task panicked
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Networking joining task panicked");
                             Err((cell_id, CellStatus::Unrecoverable(format!("{e:?}"))))
                         }
+
+                        // join returned an error
                         Ok(Ok(Err(e))) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
 
@@ -2026,10 +2020,8 @@ mod app_status_impls {
                                 Err((cell_id, CellStatus::Unrecoverable(format!("{e:?}"))))
                             }
                         }
-                        Err(_elapsed) => {
-                            tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err((cell_id, CellStatus::PartiallyConnected("network join timed out".to_string())))
-                        }
+
+                        // join succeeded
                         Ok(Ok(_)) => Ok(cell_id),
                     }
                 });
@@ -2632,7 +2624,11 @@ impl Conductor {
         self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
-                .filter_map(|(id, item)| item.status.should_retry_join().then_some((id.clone(), item.cell.clone())) )
+                .filter_map(|(id, item)| {
+                    item.status
+                        .should_retry_join()
+                        .then_some((id.clone(), item.cell.clone()))
+                })
                 .collect()
         })
     }
