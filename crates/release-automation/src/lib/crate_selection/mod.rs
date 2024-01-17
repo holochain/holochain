@@ -938,7 +938,7 @@ impl<'a> ReleaseWorkspace<'a> {
                                     insert_state!(CrateStateFlags::HasPreviousRelease);
 
                                     // todo: make comparison ref configurable
-                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD")?;
+                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD").context(format!("evaluating changes between {git_tag} and HEAD"))?;
                                     if !changed_files.is_empty()
                                     {
                                         debug!("[{}] changed files since {git_tag}: {changed_files:?}", member.name());
@@ -1133,7 +1133,11 @@ impl<'a> ReleaseWorkspace<'a> {
 
     /// Tries to resolve the git HEAD to its corresponding branch.
     pub fn git_head_branch(&'a self) -> Fallible<(git2::Branch, git2::BranchType)> {
-        for branch in self.git_repo.branches(None)? {
+        for branch in self
+            .git_repo
+            .branches(None)
+            .context("getting repo branches")?
+        {
             let branch = branch?;
             if branch.0.is_head() {
                 return Ok(branch);
@@ -1147,7 +1151,8 @@ impl<'a> ReleaseWorkspace<'a> {
     pub fn git_head_branch_name(&'a self) -> Fallible<String> {
         self.git_head_branch().map(|(branch, _)| {
             branch
-                .name()?
+                .name()
+                .context("looking for head branch")?
                 .map(String::from)
                 .ok_or_else(|| anyhow::anyhow!("the current git branch has no name"))
         })?
