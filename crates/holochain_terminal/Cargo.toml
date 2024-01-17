@@ -1,6 +1,6 @@
 [package]
 name = "hcterm"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 description = "A terminal for Holochain"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,6 +21,6 @@ kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/typ
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.14", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.25", path = "../kitsune_p2p/bootstrap_client" }
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util" }
-holochain_conductor_api = { version = "^0.3.0-beta-dev.32", path = "../holochain_conductor_api" }
-holochain_websocket = { version = "^0.3.0-beta-dev.9", path = "../holochain_websocket" }
-holochain_types = { version = "^0.3.0-beta-dev.29", path = "../holochain_types" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.33", path = "../holochain_conductor_api" }
+holochain_websocket = { version = "^0.3.0-beta-dev.10", path = "../holochain_websocket" }
+holochain_types = { version = "^0.3.0-beta-dev.30", path = "../holochain_types" }

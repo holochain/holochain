@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - Refactor: All logic related to modules and wasmer caching has been moved to `holochain-wasmer`. Consequently functions for wasmer development under iOS need to be imported from there.
 
+## 0.3.0-beta-dev.30
+
 ## 0.3.0-beta-dev.29
 
 ## 0.3.0-beta-dev.28
