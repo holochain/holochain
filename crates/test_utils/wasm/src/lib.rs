@@ -49,6 +49,7 @@ pub enum TestWasm {
     MigrateAgentPass,
     MultipleCalls,
     MustGet,
+    MustGetAgentActivity,
     PostCommitSuccess,
     PostCommitVolley,
     Query,
@@ -154,6 +155,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::MustGet => "must_get",
+            TestWasm::MustGetAgentActivity => "must_get_agent_activity",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
@@ -240,6 +242,7 @@ impl From<TestWasm> for PathBuf {
                 "wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm"
             }
             TestWasm::MustGet => "wasm32-unknown-unknown/release/test_wasm_must_get.wasm",
+            TestWasm::MustGetAgentActivity => "wasm32-unknown-unknown/release/test_wasm_must_get_agent_activity.wasm",
             TestWasm::PostCommitSuccess => {
                 "wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
             }

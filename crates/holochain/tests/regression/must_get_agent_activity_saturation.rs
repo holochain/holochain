@@ -5,8 +5,11 @@ use holochain_zome_types::prelude::Record;
 use rand::{thread_rng, Rng};
 use std::time::{Duration, Instant};
 
+// Intended to keep https://github.com/holochain/holochain/issues/3028 fixed.
+// ensure that multiple `must_get_agent_activity` calls do not oversaturate the
+// fetch pool and bring gossip to a halt
 #[tokio::test(flavor = "multi_thread")]
-async fn t() {
+async fn must_get_agent_activity_saturation() {
     holochain_trace::test_run().ok();
     let mut rng = thread_rng();
     let (dna, _, _) =
@@ -37,7 +40,7 @@ async fn t() {
     }
 
     let start = Instant::now();
-    tokio::time::sleep(Duration::from_secs(60)).await;
+    tokio::time::sleep(Duration::from_secs(360)).await;
     let elapsed = Instant::now() - start;
     println!("\n\n\n\nslept {elapsed:?}\n\n\n\n");
 
