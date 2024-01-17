@@ -264,13 +264,16 @@ impl SpaceInternalHandler for Space {
                 bootstrap_service: &bootstrap_service,
                 dynamic_arcs,
             };
+            dbg!();
             let peer_data = vec![update_single_agent_info(input).await?];
+            dbg!();
             internal_sender
                 .publish_agent_info_signed(PutAgentInfoSignedEvt {
                     space: space.clone(),
                     peer_data,
                 })
                 .await?;
+            dbg!();
             Ok(())
         }
         .boxed()

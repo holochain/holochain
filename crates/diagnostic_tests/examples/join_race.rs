@@ -4,7 +4,7 @@
 //! - Install multiple apps on each
 //! - Shut down and restart conductors until error manifests
 
-use std::{io::Write, time::Duration};
+use std::time::Duration;
 
 use holochain_diagnostics::{
     holochain::{
@@ -50,13 +50,15 @@ async fn main() {
                     let status: Vec<CellStatus> = c.cell_status().values().cloned().collect();
                     if let Some(fail) = status
                         .iter()
-                        .find(|s| matches!(s, CellStatus::PendingJoin(_)))
+                        .find(|s| matches!(s, CellStatus::Unrecoverable(_)))
                     {
                         return anyhow::Result::<()>::Err(anyhow::anyhow!(
                             "{id} Failed to join: {:?}",
                             fail
                         ));
-                    } else if let Some(_) = status.iter().find(|s| matches!(s, CellStatus::Joining))
+                    } else if let Some(_) = status
+                        .iter()
+                        .find(|s| !matches!(s, CellStatus::WellConnected))
                     {
                         println!("{id} still joining, waiting 1 sec");
                         tokio::time::sleep(Duration::from_secs(1)).await;

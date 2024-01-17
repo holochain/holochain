@@ -1021,10 +1021,10 @@ async fn test_cell_and_app_status_reconciliation() {
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
             conductor
-                .running_cell_ids(|status| matches!(status, Joined))
+                .running_cell_ids(|status| matches!(status, WellConnected))
                 .len(),
             conductor
-                .running_cell_ids(|status| matches!(status, PendingJoin(_)))
+                .running_cell_ids(|status| matches!(status, Unrecoverable(_)))
                 .len(),
         )
     };
@@ -1032,11 +1032,7 @@ async fn test_cell_and_app_status_reconciliation() {
     assert_eq!(check().await, (Running, 3, 0));
 
     // - Simulate a cell failing to join the network
-    conductor.update_cell_status(
-        cell1
-            .iter()
-            .map(|c| (c, PendingJoin(PendingJoinReason::Failed("because".into())))),
-    );
+    conductor.update_cell_status(cell1.iter().map(|c| (c, Unrecoverable("because".into()))));
     assert_eq!(check().await, (Running, 2, 1));
 
     // - Reconciled app state is Paused due to one unjoined Cell
