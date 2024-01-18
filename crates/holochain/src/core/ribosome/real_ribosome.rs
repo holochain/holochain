@@ -323,7 +323,7 @@ impl RealRibosome {
         let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
-        Ok(key.into())
+        Ok(key)
     }
 
     pub fn build_instance_with_store(
