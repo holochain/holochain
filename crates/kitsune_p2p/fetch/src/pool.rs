@@ -169,8 +169,8 @@ impl FetchPool {
         })
     }
 
-    /// Get a list of the next items that should be fetched.
-    pub fn get_batch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
+    /// Get a list of the next items to be fetched.
+    pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
         self.state
             .share_mut(|s| s.get_batch(self.config.clone()).clone())
     }
@@ -178,7 +178,6 @@ impl FetchPool {
     /// Get the current size of the fetch pool. This is the number of outstanding items
     /// and may be different to the size of response from `get_items_to_fetch` because it
     /// ignores retry delays.
-    #[cfg(any(test, feature = "test_utils"))]
     pub fn len(&self) -> usize {
         self.state.share_ref(|s| s.queue.len())
     }
@@ -710,7 +709,7 @@ mod tests {
             }
 
             // Try to process all items (because that's how this is used in practice)
-            let items = fetch_pool.get_batch();
+            let items = fetch_pool.get_items_to_fetch();
             for item in items {
                 // If the source is available the fetch succeeds and we remove the item, otherwise leave it in the pool
                 if !unavailable_sources.contains(&item.2) {
@@ -726,7 +725,7 @@ mod tests {
 
         // We created an item that will always fail, so should have at least one left
         assert!(
-            !fetch_pool.get_batch().is_empty(),
+            !fetch_pool.get_items_to_fetch().is_empty(),
             "Pool should have had at least one item but got \n {}",
             fetch_pool.state.share_ref(|s| format!(
                 "{}\n{}",
@@ -778,7 +777,7 @@ mod tests {
         }
 
         for _ in 0..2 {
-            for (key, _, _, _) in fetch_pool.get_batch() {
+            for (key, _, _, _) in fetch_pool.get_items_to_fetch() {
                 if fetch_pool.check_item(&key).0 {
                     fetch_pool.remove(&key);
                 }
@@ -786,7 +785,7 @@ mod tests {
         }
 
         assert!(fetch_pool.is_empty());
-        assert_eq!(0, fetch_pool.get_batch().len());
+        assert_eq!(0, fetch_pool.get_items_to_fetch().len());
     }
 
     #[tokio::test(start_paused = true)]
@@ -826,7 +825,7 @@ mod tests {
 
         // Send enough ops for the first source to be put on a backoff
         for _ in 0..(config.source_unavailable_timeout_threshold() + 1) {
-            fetch_pool.get_batch();
+            fetch_pool.get_items_to_fetch();
 
             // Wait long enough for items to be retried
             tokio::time::advance(2 * config.item_retry_delay()).await;
@@ -839,7 +838,7 @@ mod tests {
             // Need to wait by both the source and item retry delays, accounting for source delays being increased in the backoff
             tokio::time::advance(1000 * config.source_retry_delay()).await;
 
-            assert_eq!(2, fetch_pool.get_batch().len());
+            assert_eq!(2, fetch_pool.get_items_to_fetch().len());
         }
 
         let keep_source_two_alive_key = test_key_op(5);
@@ -865,7 +864,7 @@ mod tests {
         // Wait for the first item to be ready again
         tokio::time::advance(2 * config.item_retry_delay()).await;
 
-        let batch = fetch_pool.get_batch();
+        let batch = fetch_pool.get_items_to_fetch();
         assert_eq!(1, batch.len());
         assert_eq!(test_source(2), batch.first().unwrap().2);
     }

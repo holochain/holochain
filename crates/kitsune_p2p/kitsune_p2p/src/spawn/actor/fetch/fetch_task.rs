@@ -25,12 +25,11 @@ impl FetchTask {
         tokio::spawn({
             let this = this.clone();
             async move {
-                let mut fetch_call_count = 0;
                 'task_loop: loop {
                     // Drop sources that aren't responding to fetch requests, and any items that have no remaining sources to fetch from.
                     fetch_pool.check_sources();
 
-                    let list = fetch_pool.get_batch();
+                    let list = fetch_pool.get_items_to_fetch();
 
                     for (key, space, source, context) in list {
                         let FetchKey::Op(op_hash) = &key;
@@ -45,17 +44,6 @@ impl FetchTask {
                             }
                         }
 
-                        // TODO this line gets hit super often, it would be a lot nicer to batch fetches by source
-                        // TODO actually, there's meant to be a timeout on ops, why is it being hit so often?
-                        // tracing::info!("Sending fetch request while pool has size {}", fetch_pool.len());
-                        fetch_call_count += 1;
-                        if fetch_call_count % 100 == 0 {
-                            tracing::info!(
-                                "Sending fetch request while pool has size {} with fetch call count {}",
-                                fetch_pool.len(),
-                                fetch_call_count
-                            );
-                        }
                         if let Err(err) = internal_sender.fetch(key, space, source).await {
                             match err {
                                 KitsuneP2pError::GhostError(GhostError::Disconnected) => {

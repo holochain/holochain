@@ -82,7 +82,6 @@ impl<C: FetchResponseConfig> FetchResponseQueue<C> {
 
         let len = len as u32;
 
-        // TODO - we should probably limit by caller, rather than globally. Anybody who wants to can prevent op fetching by keeping this semaphore full.
         let byte_permit = match self.byte_limit.clone().try_acquire_many_owned(len) {
             Err(_) => {
                 tracing::warn!(%len, "fetch responder overloaded, dropping op");

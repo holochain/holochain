@@ -388,7 +388,6 @@ impl MetaNetTask {
                     op_hash_list,
                     context,
                 } => {
-                    tracing::trace!("incoming publish broadcast from {:?}", source);
                     if let Err(err) = self
                         .i_s
                         .incoming_publish(space, to_agent, source, op_hash_list, context, None)
