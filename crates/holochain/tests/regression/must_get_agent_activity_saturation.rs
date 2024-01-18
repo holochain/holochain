@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 // ensure that multiple `must_get_agent_activity` calls do not oversaturate the
 // fetch pool and bring gossip to a halt
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
 async fn must_get_agent_activity_saturation() {
     holochain_trace::test_run().ok();
     let mut rng = thread_rng();
@@ -35,14 +36,8 @@ async fn must_get_agent_activity_saturation() {
                 content,
             )
             .await;
-        println!("{i} record {record:?}");
         hash = record.action_hashed().hash.clone();
     }
-
-    let start = Instant::now();
-    tokio::time::sleep(Duration::from_secs(360)).await;
-    let elapsed = Instant::now() - start;
-    println!("\n\n\n\nslept {elapsed:?}\n\n\n\n");
 
     let record: Option<Record> = conductors[1]
         .call(
@@ -51,6 +46,5 @@ async fn must_get_agent_activity_saturation() {
             hash,
         )
         .await;
-    println!("read record {record:?}");
     assert!(matches!(record, Some(_)));
 }
