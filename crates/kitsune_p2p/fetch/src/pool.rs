@@ -187,7 +187,7 @@ impl FetchPool {
         self.state.share_ref(|s| s.queue.is_empty())
     }
 
-    /// Check the state of all sources and remove any that have expired. See the docs on [`State::check_sources`] for details.
+    /// Check the state of all sources and remove any that have expired. See the docs on State::check_sources for details.
     pub fn check_sources(&self) {
         self.state.share_mut(|s| {
             s.check_sources(self.config.clone());
