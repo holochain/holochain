@@ -562,12 +562,10 @@ impl RealRibosome {
         instance_with_store: Arc<InstanceWithStore>,
     ) -> Result<ExternIO, RibosomeError> {
         let fn_name = fn_name.clone();
-        let result: Result<ExternIO, RuntimeError>;
-        {
         let instance = instance_with_store.instance.clone();
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
-            result = holochain_wasmer_host::guest::call(
+        let result = holochain_wasmer_host::guest::call(
             &mut store_mut,
             instance,
             fn_name.as_ref(),
@@ -576,20 +574,10 @@ impl RealRibosome {
             // @todo - is this a problem for large payloads like entries?
             invocation.to_owned().host_input()?,
         );
-        }
 
-        // a bit of typefu to avoid cloning the result.
-        let result = match result {
-            Err(runtime_error) => {
-                // This will bubble up and be logged later but capture zome/function that was called while the context is available
+        if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
-                match runtime_error.downcast::<WasmError>() {
-                    Ok(wasm_error) => Err(wasm_error.into()),
-                    Err(result) => Err(result),
         }
-            }
-            result => result,
-        };
 
         Ok(result?)
     }
