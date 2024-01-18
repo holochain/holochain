@@ -330,7 +330,7 @@ impl State {
         }
     }
 
-    /// Check for sources which have expired and remove them from the list of sources. 
+    /// Check for sources which have expired and remove them from the list of sources.
     /// Any ops which don't have any sources left will be removed from the queue.
     pub fn check_sources(&mut self, config: FetchConfig) {
         self.sources
@@ -854,7 +854,7 @@ mod tests {
         // Verify the item is in the pool and remove it again to mark a successful fetch for source 2
         assert!(fetch_pool.check_item(&keep_source_two_alive_key).0);
         fetch_pool.remove(&keep_source_two_alive_key);
-        
+
         // Now check sources to remove source 1 which hasn't had a successful receive in the backoff period
         fetch_pool.check_sources();
 

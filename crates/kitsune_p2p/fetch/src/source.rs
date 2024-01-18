@@ -113,9 +113,7 @@ impl SourceState {
 
                 true
             }
-            SourceCurrentState::Backoff(ref backoff) => {
-                !backoff.is_expired()
-            }
+            SourceCurrentState::Backoff(ref backoff) => !backoff.is_expired(),
         }
     }
 
@@ -124,7 +122,7 @@ impl SourceState {
         match &mut self.current_state {
             SourceCurrentState::Available(num_timeouts) => {
                 *num_timeouts += 1;
-            },
+            }
             _ => (),
         }
     }
@@ -145,7 +143,7 @@ impl SourceState {
 #[derive(Debug)]
 pub enum SourceCurrentState {
     /// As far as we know, this source is available and responding.
-    /// 
+    ///
     /// The inner value tracks the number of requests to this source that have timed out.
     /// Note that these failures do not age out, so if a source is unreliable it will get put on a timeout
     /// briefly after it fails to respond too many times. This isn't a bad thing if the source is
@@ -202,10 +200,15 @@ impl FetchSourceBackoff {
 #[cfg(test)]
 mod tests {
     use std::{sync::Arc, time::Duration};
-    
+
     #[allow(warnings)]
     use super::{SourceState, Sources, NUM_PROBE_ATTEMPTS};
-    use crate::{backoff::{FetchBackoff, BACKOFF_RETRY_COUNT}, source::FetchSourceBackoff, test_utils::*, FetchPoolConfig};
+    use crate::{
+        backoff::{FetchBackoff, BACKOFF_RETRY_COUNT},
+        source::FetchSourceBackoff,
+        test_utils::*,
+        FetchPoolConfig,
+    };
 
     #[test]
     fn single_source() {
