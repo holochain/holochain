@@ -47,13 +47,10 @@ impl Sources {
             let fetch_index = self.index;
             self.index = (self.index + 1) % self.inner.len();
 
-            match self.inner.get_index(fetch_index) {
-                Some(source) => {
-                    if state_filter(source) {
-                        return Some(source.clone());
-                    }
+            if let Some(source) = self.inner.get_index(fetch_index) {
+                if state_filter(source) {
+                    return Some(source.clone());
                 }
-                None => (),
             }
         }
 
@@ -69,7 +66,7 @@ impl Sources {
 
         // Ensure the index is still valid
         if !self.inner.is_empty() {
-            self.index = self.index % self.inner.len();
+            self.index %= self.inner.len();
         }
     }
 }
@@ -89,13 +86,7 @@ impl SourceState {
     pub fn should_use(&mut self) -> bool {
         match &mut self.current_state {
             SourceCurrentState::Available(_) => true,
-            SourceCurrentState::Backoff(backoff) => {
-                if backoff.is_ready() {
-                    true
-                } else {
-                    false
-                }
-            }
+            SourceCurrentState::Backoff(backoff) => backoff.is_ready(),
         }
     }
 
@@ -119,11 +110,8 @@ impl SourceState {
 
     /// Notify the state that a request to this source has timed out.
     pub fn record_timeout(&mut self) {
-        match &mut self.current_state {
-            SourceCurrentState::Available(num_timeouts) => {
-                *num_timeouts += 1;
-            }
-            _ => (),
+        if let SourceCurrentState::Available(num_timeouts) = &mut self.current_state {
+            *num_timeouts += 1;
         }
     }
 
@@ -181,14 +169,12 @@ impl FetchSourceBackoff {
         if self.backoff.is_ready() {
             self.probes = self.probe_limit - 1; // Grant more probes for this retry
             true
+        } else if self.probes > 0 {
+            self.probes -= 1;
+            true
         } else {
-            if self.probes > 0 {
-                self.probes -= 1;
-                true
-            } else {
-                // Probes exhausted, wait for the backoff to expire and grant more probes
-                false
-            }
+            // Probes exhausted, wait for the backoff to expire and grant more probes
+            false
         }
     }
 

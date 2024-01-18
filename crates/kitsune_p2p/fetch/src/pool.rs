@@ -213,7 +213,7 @@ impl State {
         // Register sources once as they are discovered, with a default initial state
         self.sources
             .entry(source.clone())
-            .or_insert_with(|| SourceState::default());
+            .or_insert_with(SourceState::default);
 
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
@@ -268,9 +268,9 @@ impl State {
             let should_fetch_item = match &item.pending_response {
                 Some(pending_response) => {
                     if pending_response.when.elapsed() > config.item_retry_delay() {
-                        self.sources.get_mut(&pending_response.source).map(|state| {
+                        if let Some(state) = self.sources.get_mut(&pending_response.source) {
                             state.record_timeout();
-                        });
+                        }
                         true
                     } else {
                         false
@@ -319,11 +319,12 @@ impl State {
     pub fn remove(&mut self, key: &FetchKey) -> Option<FetchPoolItem> {
         match self.queue.remove(key) {
             Some(item) => {
-                item.pending_response.as_ref().map(|pending| {
-                    self.sources.get_mut(&pending.source).map(|state| {
+                if let Some(pending) = item.pending_response.as_ref() {
+                    if let Some(state) = self.sources.get_mut(&pending.source) {
                         state.record_response();
-                    });
-                });
+                    }
+                }
+
                 Some(item)
             }
             None => None,
