@@ -154,79 +154,8 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
-/// The status of an installed Cell, which captures different phases of its lifecycle
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CellStatus {
-    /// The cell is fully "online" and well-connected to a good number of peers
-    /// who know of its existence.
-    ///
-    /// This is the desired state for a cell, and should be maintained.
-    WellConnected,
-
-    /// The cell is connected to some peers, but there is evidence that there could
-    /// be more done to get to a better-connected state. Gossip may be weak and
-    /// network performance in general may be poor.
-    PartiallyConnected(String),
-
-    /// The Cell has no peers, or couldn't connect to its peers. Peers don't know about
-    /// this cell, so network activity will likely be impossible. This could be due to
-    /// not being connected to any network at all (being "offline"), or there could be
-    /// no peers to connect to.
-    ///
-    /// This is also the initial state of a Cell, before it has been fully initialized.
-    /// TODO: perhaps we want to distinguish between these two cases, for different
-    /// retry behavior?
-    ///
-    /// Periodic attempts to discover more peers should be made.
-    Isolated,
-}
-
-impl CellStatus {
-    /// Can this cell be considered "online" in any sense?
-    /// It's a fuzzy concept, but one we seem to be using.
-    pub fn is_online(&self) -> bool {
-        match self {
-            CellStatus::WellConnected | CellStatus::PartiallyConnected(_) => true,
-
-            CellStatus::Isolated => false,
-        }
-    }
-
-    /// "Liveness" means that the cell is not experiencing an
-    /// unrecoverable error which would cause its app to be paused
-    /// or disabled. In other words, all apps which are "running"
-    /// contain only "live" cells -- any app with a non-live cell
-    /// cannot be in a running state.
-    pub fn is_live(&self) -> bool {
-        match self {
-            CellStatus::WellConnected
-            | CellStatus::PartiallyConnected(_)
-            | CellStatus::Isolated => true,
-        }
-    }
-
-    /// Should retry network join, to improve network health.
-    /// The only reasons *no*t to do this are if the cell is already
-    /// in tip-top shape, i.e. `WellConnected`, or if it's in an
-    /// `Unrecoverable` state.
-    pub fn should_improve_network_health(&self) -> bool {
-        match self {
-            CellStatus::PartiallyConnected(_) | CellStatus::Isolated => true,
-
-            CellStatus::WellConnected => false,
-        }
-    }
-
-    /// Should retry network join, to improve network health.
-    /// Any status other than `WellConnected` means we should retry.
-    pub fn should_retry_join(&self) -> bool {
-        match self {
-            CellStatus::PartiallyConnected(_) | CellStatus::Isolated => true,
-
-            CellStatus::WellConnected => false,
-        }
-    }
-}
+/// There is nothing extra to say about cells at the moment.
+pub type CellStatus = ();
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
 #[derive(Debug, Clone, Serialize)]
@@ -1812,6 +1741,7 @@ mod clone_cell_impls {
 /// Methods related to management of app and cell status
 mod app_status_impls {
     use super::*;
+    use holochain_p2p::AgentPubKeyExt;
     use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 
     impl Conductor {
@@ -1932,7 +1862,7 @@ mod app_status_impls {
             let (new_cells, errors): (Vec<_>, Vec<_>) =
                 results.into_iter().partition(Result::is_ok);
 
-            let new_cells = new_cells
+            let new_cells: Vec<_> = new_cells
                 .into_iter()
                 // We can unwrap the successes because of the partition
                 .map(Result::unwrap)
@@ -1946,105 +1876,39 @@ mod app_status_impls {
                 .map(Result::unwrap_err)
                 .collect();
 
-            // Add the newly created cells to the Conductor with the Isolated
-            // status, and start their workflow loops
-            self.add_and_initialize_cells(new_cells);
+            // Add agents to local agent store in kitsune
 
-            // "Join the network" with these newly created cells,
-            // meaning we attempt to increase the connectivity beyond Isolated.
-            // We wait for a short time ([`JOIN_NETWORK_TIMEOUT`]) for this to complete,
-            // but if any cells can't achieve `WellConnected` status within that time,
-            // we move on and let this happen in the background, and in subsequent
-            // network health loops.
-            self.join_all_pending_cells().await;
-
-            Ok(errors)
-        }
-
-        /// Attempt to join all PendingJoin cells to the kitsune network.
-        /// Returns the cells which were joined during this call.
-        ///
-        /// NB: this could take as long as JOIN_NETWORK_TIMEOUT, which is significant.
-        ///   Be careful to only await this future if it's important that cells be
-        ///   joined before proceeding.
-        pub(crate) async fn join_all_pending_cells(&self) -> Vec<CellId> {
-            // Join the network but ignore errors because the
-            // space retries joining all cells every 5 minutes.
-
-            use holochain_p2p::AgentPubKeyExt;
-
-            let tasks = self
-                .get_cells_to_attempt_joining()
-                .into_iter()
-                .map(|(cell_id, cell)| async move {
+            future::join_all(new_cells.iter().map(|(cell, _)| {
+                let sleuth_id = self.config.sleuth_id();
+                async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
+                    let cell_id = cell.id().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
                     let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
-                    let network = cell.holochain_p2p_dna().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    aitia::trace!(&hc_sleuth::Event::AgentJoined { node: self.config.sleuth_id(), agent: cell_id.agent_pubkey().clone() });
+                    cell.holochain_p2p_dna()
+                        .clone()
+                        .join(agent_pubkey, maybe_agent_info, maybe_initial_arc)
+                        .await;
 
-                    // Spawn a task for join so that it completes even if it takes longer than the timeout.
-                    // If join does complete before the timeout, we can make use of that info to update the CellStatus
-                    // indicating that network join succeeded, but if not, we don't need to make a big deal of it since
-                    // we will be retrying join later.
-                    let join_fut = tokio::spawn(async move {
-                        network.join(agent_pubkey, maybe_agent_info, maybe_initial_arc).await
+                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
+                        node: sleuth_id,
+                        agent: cell_id.agent_pubkey().clone()
                     });
-                    match tokio::time::timeout(JOIN_NETWORK_WAITING_PERIOD, join_fut).await {
-                        // timeout
-                        Err(_elapsed) => {
-                            tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err((cell_id, CellStatus::PartiallyConnected("network join timed out".to_string())))
-                        }
+                }
+            }))
+            .await;
 
-                        // tokio task panicked
-                        Ok(Err(e)) => {
-                            tracing::error!(error = ?e, cell_id = ?cell_id, "Networking joining task panicked");
-                            Err((cell_id, CellStatus::Unrecoverable(format!("{e:?}"))))
-                        }
+            // Add the newly created cells to the Conductor with the Isolated
+            // status, and start their workflow loops
+            self.add_and_initialize_cells(new_cells);
 
-                        // join returned an error
-                        Ok(Ok(Err(e))) => {
-                            tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-
-                            if Self::is_p2p_join_error_retryable(&e) {
-                                Err((cell_id, CellStatus::PartiallyConnected(format!("{e:?}"))))
-                            }
-                            else {
-                                Err((cell_id, CellStatus::Unrecoverable(format!("{e:?}"))))
-                            }
-                        }
-
-                        // join succeeded
-                        Ok(Ok(_)) => Ok(cell_id),
-                    }
-                });
-
-            let maybes: Vec<_> = futures::stream::iter(tasks)
-                .buffer_unordered(100)
-                .collect()
-                .await;
-
-            let (cell_ids, failed_joins): (Vec<_>, Vec<_>) =
-                maybes.into_iter().partition(Result::is_ok);
-
-            // These unwraps are both safe because of the partition.
-            let cell_ids: Vec<_> = cell_ids.into_iter().map(Result::unwrap).collect();
-            let failed_joins = failed_joins.into_iter().map(Result::unwrap_err);
-
-            // Update the status of the cells which were able to join the network
-            // (may or may not be all cells which were added)
-            self.update_cell_status(cell_ids.iter().map(|c| (c, CellStatus::WellConnected)));
-
-            self.update_cell_status(failed_joins);
-
-            cell_ids
+            Ok(errors)
         }
 
         /// Adjust app statuses (via state transitions) to match the current
