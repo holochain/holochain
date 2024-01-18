@@ -822,7 +822,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
             for peer in all_peers {
                 for peer in peer? {
                     if let Some(net_key) = peer.url_list.get(0).map(|u| {
-                        kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
+                        kitsune_p2p_types::tx_utils::ProxyUrl::from(u.as_url2())
                             .digest()
                             .to_string()
                     }) {

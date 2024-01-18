@@ -3,6 +3,8 @@
 use crate::*;
 use base64::Engine;
 
+use derive_more::{AsRef, Deref, Display};
+
 /// Utility for dealing with proxy urls.
 /// Proxy URLs are like super-urls... they need to be able to
 /// compose a sub or base-transport url, while adding a new scheme and

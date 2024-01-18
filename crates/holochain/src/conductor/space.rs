@@ -175,7 +175,7 @@ impl Spaces {
             .flatten()
             .filter(|agent| {
                 agent.url_list.iter().any(|url| {
-                    kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
+                    kitsune_p2p_types::tx_utils::ProxyUrl::from(url.as_str())
                         .digest()
                         .0
                         == *node_id

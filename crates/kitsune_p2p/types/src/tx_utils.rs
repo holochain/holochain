@@ -22,6 +22,9 @@ pub use notify_all::*;
 mod pool_buf;
 pub use pool_buf::*;
 
+mod proxy_url;
+pub use proxy_url::*;
+
 mod resource_bucket;
 pub use resource_bucket::*;
 

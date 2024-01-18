@@ -267,7 +267,7 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
 
 /// Get an agents cert from their agent info
 pub fn cert_from_info(info: AgentInfoSigned) -> Tx2Cert {
-    let digest = kitsune_p2p_proxy::ProxyUrl::from_full(info.url_list[0].as_str())
+    let digest = kitsune_p2p_types::tx_utils::ProxyUrl::from_full(info.url_list[0].as_str())
         .unwrap()
         .digest();
     Tx2Cert::from(digest)

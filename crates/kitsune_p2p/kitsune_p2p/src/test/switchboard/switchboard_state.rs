@@ -9,7 +9,6 @@ use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
 use itertools::Itertools;
-use kitsune_p2p_proxy::tx2::{tx2_proxy, ProxyConfig};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMetaInfoEncode};
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};

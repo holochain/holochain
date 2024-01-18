@@ -433,7 +433,7 @@ fn k_error<E: std::fmt::Debug>(e: E) -> KitsuneError {
 
 fn url_to_cert(url: &TxUrl) -> Tx2Cert {
     Tx2Cert::from(
-        kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+        kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str())
             .expect("Mock network failed to parse url")
             .digest(),
     )
