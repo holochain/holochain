@@ -4,7 +4,7 @@ use hdk::prelude::*;
 #[hdk_extern]
 pub fn create_thing(content: u32) -> ExternResult<Record> {
     let thing = Thing { content };
-    let thing_hash = create_entry(&EntryTypes::Thing(thing.clone()))?;
+    let thing_hash = create_entry(EntryTypes::Thing(thing))?;
     let record = get(thing_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest(String::from("Could not find the newly created Thing"))
     ))?;
