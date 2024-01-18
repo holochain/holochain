@@ -93,6 +93,7 @@ use wasmer::Instance;
 use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
+use wasmer::Type;
 
 use crate::core::ribosome::host_fn::count_links::count_links;
 use holochain_types::zome_types::GlobalZomeTypes;
@@ -326,27 +327,27 @@ impl RealRibosome {
         Ok(key)
     }
 
-    pub fn build_instance_with_store(
-        &self,
-        zome: &Zome<ZomeDef>,
-        context_key: u64,
-    ) -> RibosomeResult<Arc<InstanceWithStore>> {
-        let module = match &zome.def {
+    pub fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
+        match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
                 if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    Arc::new(holochain_wasmer_host::module::get_ios_module_from_file(
-                        path,
-                    )?)
+                    let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
+                    Ok(Arc::new(module))
                 } else {
-                    self.runtime_compiled_module(zome.zome_name())?
+                    self.runtime_compiled_module(zome.zome_name())
                 }
             }
-            _ => {
-                return RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
-                    ZomeError::NonWasmZome(zome.zome_name().clone()),
-                )));
-            }
-        };
+            _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
+                ZomeError::NonWasmZome(zome.zome_name().clone()),
+            ))),
+        }
+    }
+
+    pub fn build_instance_with_store(
+        &self,
+        module: Arc<Module>,
+        context_key: u64,
+    ) -> RibosomeResult<Arc<InstanceWithStore>> {
         let store = Arc::new(Mutex::new(Store::default()));
         let function_env = FunctionEnv::new(&mut store.lock().as_store_mut(), Env::default());
         let (function_env, imports) = Self::imports(self, context_key, store.clone(), function_env);
@@ -553,7 +554,7 @@ impl RealRibosome {
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
 
-    pub fn call_wasm_instance<I: Invocation>(
+    pub fn call_zome_fn<I: Invocation>(
         &self,
         invocation: &I,
         zome: &Zome,
@@ -563,29 +564,29 @@ impl RealRibosome {
         let fn_name = fn_name.clone();
         let result: Result<ExternIO, RuntimeError>;
         {
-            let instance = instance_with_store.instance.clone();
-            let mut store_lock = instance_with_store.store.lock();
-            let mut store_mut = store_lock.as_store_mut();
+        let instance = instance_with_store.instance.clone();
+        let mut store_lock = instance_with_store.store.lock();
+        let mut store_mut = store_lock.as_store_mut();
             result = holochain_wasmer_host::guest::call(
-                &mut store_mut,
-                instance,
-                fn_name.as_ref(),
-                // be aware of this clone!
-                // the whole invocation is cloned!
-                // @todo - is this a problem for large payloads like entries?
-                invocation.to_owned().host_input()?,
-            );
+            &mut store_mut,
+            instance,
+            fn_name.as_ref(),
+            // be aware of this clone!
+            // the whole invocation is cloned!
+            // @todo - is this a problem for large payloads like entries?
+            invocation.to_owned().host_input()?,
+        );
         }
 
         // a bit of typefu to avoid cloning the result.
         let result = match result {
             Err(runtime_error) => {
                 // This will bubble up and be logged later but capture zome/function that was called while the context is available
-                tracing::error!(?runtime_error, ?zome, ?fn_name);
+            tracing::error!(?runtime_error, ?zome, ?fn_name);
                 match runtime_error.downcast::<WasmError>() {
                     Ok(wasm_error) => Err(wasm_error.into()),
                     Err(result) => Err(result),
-                }
+        }
             }
             result => result,
         };
@@ -593,23 +594,11 @@ impl RealRibosome {
         Ok(result?)
     }
 
-    pub fn get_const_fn_for_wasm(
+    pub fn call_const_fn(
         &self,
-        call_context: CallContext,
+        instance_with_store: Arc<InstanceWithStore>,
         name: &str,
     ) -> Result<Option<i32>, RibosomeError> {
-        // create a new key for the context map.
-        let context_key = Self::next_context_key();
-        let instance_with_store =
-            self.build_instance_with_store(&call_context.zome, context_key)?;
-
-        // add call context to map for following call
-        {
-            CONTEXT_MAP
-                .lock()
-                .insert(context_key, Arc::new(call_context));
-        }
-
         let result;
         {
             let mut store_lock = instance_with_store.store.lock();
@@ -627,12 +616,6 @@ impl RealRibosome {
                     )
                 })?;
         }
-
-        // Remove the blank context.
-        {
-            CONTEXT_MAP.lock().remove(&context_key);
-        }
-
         Ok(result)
     }
 
@@ -788,14 +771,13 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let context_key = Self::next_context_key();
-                let instance_with_store = self.build_instance_with_store(zome, context_key)?;
+                let module = self.get_module_for_zome(zome)?;
+                if module.info().exports.contains_key(fn_name.as_ref()) {
+                    // there is a corresponding zome fn
+                    let context_key = Self::next_context_key();
+                    let instance_with_store =
+                        self.build_instance_with_store(module, context_key)?;
 
-                if instance_with_store
-                    .instance
-                    .exports
-                    .contains(fn_name.as_ref())
-                {
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -804,7 +786,7 @@ impl RibosomeT for RealRibosome {
                     }
 
                     let result = self
-                        .call_wasm_instance::<I>(invocation, zome, fn_name, instance_with_store)
+                        .call_zome_fn::<I>(invocation, zome, fn_name, instance_with_store)
                         .map(Some);
 
                     // remove context from map after call
@@ -830,16 +812,48 @@ impl RibosomeT for RealRibosome {
     }
 
     fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError> {
-        // Create a blank context as this is not actually used.
-        let call_context = CallContext {
-            zome: zome.clone(),
-            function_name: name.into(),
-            host_context: HostContext::EntryDefs(EntryDefsHostAccess {}),
-            auth: super::InvocationAuth::LocalCallback,
-        };
-
         match zome.zome_def() {
-            ZomeDef::Wasm(_) => self.get_const_fn_for_wasm(call_context, name),
+            ZomeDef::Wasm(_) => {
+                let module = self.get_module_for_zome(zome)?;
+                if module.exports().functions().any(|f| {
+                    f.name() == name
+                        && f.ty().params().is_empty()
+                        && f.ty().results() == [Type::I32]
+                }) {
+                    // there is a corresponding const fn
+
+                    // create a blank context as this is not actually used.
+                    let call_context = CallContext {
+                        zome: zome.clone(),
+                        function_name: name.into(),
+                        host_context: HostContext::EntryDefs(EntryDefsHostAccess {}),
+                        auth: super::InvocationAuth::LocalCallback,
+                    };
+
+                    // create a new key for the context map.
+                    let context_key = Self::next_context_key();
+                    let instance_with_store =
+                        self.build_instance_with_store(module, context_key)?;
+
+                    // add call context to map for following call
+                    {
+                        CONTEXT_MAP
+                            .lock()
+                            .insert(context_key, Arc::new(call_context));
+                    }
+
+                    let result = self.call_const_fn(instance_with_store, name);
+                    // remove the blank context.
+                    {
+                        CONTEXT_MAP.lock().remove(&context_key);
+                    }
+
+                    result
+                } else {
+                    // fn does not exist in the module
+                    Ok(None)
+                }
+            }
             ZomeDef::Inline {
                 inline_zome: zome, ..
             } => Ok(zome.0.get_global(name).map(|i| i as i32)),
