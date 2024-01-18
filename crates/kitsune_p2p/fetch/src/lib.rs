@@ -8,10 +8,10 @@ use kitsune_p2p_types::{KOpHash, KSpace};
 
 mod backoff;
 mod pool;
+mod queue;
 mod respond;
 mod rough_sized;
 mod source;
-mod queue;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;

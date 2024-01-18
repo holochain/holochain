@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use indexmap::{IndexMap, map::Entry};
+use indexmap::{map::Entry, IndexMap};
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct MapQueue<K: Eq + std::hash::Hash, V> {
@@ -8,13 +8,19 @@ pub(crate) struct MapQueue<K: Eq + std::hash::Hash, V> {
     index: usize,
 }
 
-impl<K, V> Default for MapQueue<K, V> where K: Eq + std::hash::Hash {
+impl<K, V> Default for MapQueue<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<K, V> Deref for MapQueue<K, V> where K: Eq + std::hash::Hash {
+impl<K, V> Deref for MapQueue<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
     type Target = IndexMap<K, V>;
 
     fn deref(&self) -> &Self::Target {
@@ -22,7 +28,10 @@ impl<K, V> Deref for MapQueue<K, V> where K: Eq + std::hash::Hash {
     }
 }
 
-impl<K, V> MapQueue<K, V> where K: Eq + std::hash::Hash {
+impl<K, V> MapQueue<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
     pub(crate) fn new() -> Self {
         Self {
             inner: IndexMap::new(),
@@ -55,8 +64,11 @@ impl<K, V> MapQueue<K, V> where K: Eq + std::hash::Hash {
     }
 }
 
-impl<K, V> FromIterator<(K, V)> for MapQueue<K, V> where K: Eq + std::hash::Hash {
-    fn from_iter<T: IntoIterator<Item=(K, V)>>(iter: T) -> Self {
+impl<K, V> FromIterator<(K, V)> for MapQueue<K, V>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         Self {
             inner: iter.into_iter().collect(),
             index: 0,

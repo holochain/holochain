@@ -1,6 +1,9 @@
-use std::time::{Duration, Instant};
+use tokio::time::{Duration, Instant};
 
 use backon::{BackoffBuilder, FibonacciBackoff, FibonacciBuilder};
+
+/// The number of times to retry a fetch before giving up.
+pub const BACKOFF_RETRY_COUNT: usize = 10;
 
 /// A backoff strategy for use when fetching data from remote nodes that appear to not be responding.
 #[derive(Debug)]
@@ -14,17 +17,17 @@ pub struct FetchBackoff {
 impl FetchBackoff {
     /// Create a new instance with the given initial delay.
     pub fn new(initial_delay: Duration) -> Self {
-        let backoff = FibonacciBuilder::default()
+        let mut backoff = FibonacciBuilder::default()
             .with_jitter()
             .with_min_delay(initial_delay)
-            .with_max_delay(std::time::Duration::from_secs(6 * 60 * 60))
-            .with_max_times(15)
+            .with_max_delay(6 * initial_delay)
+            .with_max_times(BACKOFF_RETRY_COUNT)
             .build();
 
         Self {
-            backoff,
-            current_wait: Duration::ZERO,
+            current_wait: backoff.next().expect("At least one backoff period"),
             started_wait_at: Instant::now(),
+            backoff,
             expired: false,
         }
     }
@@ -65,22 +68,17 @@ impl FetchBackoff {
 
 #[cfg(test)]
 mod tests {
+    use crate::backoff::BACKOFF_RETRY_COUNT;
+
     use super::FetchBackoff;
     use std::time::Duration;
-
-    #[test]
-    fn backoff_is_ready_at_initialisation() {
-        let mut backoff = FetchBackoff::new(Duration::from_secs(1));
-        assert!(backoff.is_ready());
-    }
 
     #[test]
     fn first_delay_is_initial_delay() {
         let initial_delay = Duration::from_secs(1);
         let mut backoff = FetchBackoff::new(initial_delay);
-        assert!(backoff.is_ready());
 
-        // After ready check, should delay and so not be ready
+        // The backoff should not be ready due to the initial delay period
         assert!(!backoff.is_ready());
 
         // Account for jitter and check that the delay is roughly the initial delay
@@ -90,11 +88,10 @@ mod tests {
     #[test]
     fn number_of_tries_is_limited() {
         let mut backoff = FetchBackoff::new(Duration::from_nanos(1));
-        assert!(backoff.is_ready());
         assert!(!backoff.is_expired());
 
         let mut num_tries = 0;
-        for _ in 0..1000 {
+        for _ in 0..100 {
             if backoff.is_expired() {
                 break;
             }
@@ -108,6 +105,6 @@ mod tests {
 
         assert!(backoff.is_expired());
         assert!(!backoff.is_ready());
-        assert_eq!(15, num_tries);
+        assert_eq!(BACKOFF_RETRY_COUNT, num_tries);
     }
 }
