@@ -3,7 +3,7 @@ use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFi
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::Record;
 use rand::{thread_rng, Rng};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 // Intended to keep https://github.com/holochain/holochain/issues/3028 fixed.
 // ensure that multiple `must_get_agent_activity` calls do not oversaturate the
@@ -27,7 +27,7 @@ async fn must_get_agent_activity_saturation() {
     let bob_app = &apps[1];
 
     let mut hash = ActionHash::from_raw_32(vec![0; 32]);
-    for i in 0..100 {
+    for _ in 0..100 {
         let content: u32 = rng.gen();
         let record: Record = conductors[0]
             .call(
@@ -38,6 +38,9 @@ async fn must_get_agent_activity_saturation() {
             .await;
         hash = record.action_hashed().hash.clone();
     }
+
+    // let conductors catch up
+    tokio::time::sleep(Duration::from_secs(60)).await;
 
     let record: Option<Record> = conductors[1]
         .call(
