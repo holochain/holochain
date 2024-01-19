@@ -69,6 +69,10 @@ pub trait FetchPoolConfig: 'static + Send + Sync {
 
     /// How long to put a source on a backoff if it fails to respond to a fetch.
     /// This is an initial value for a backoff on the source and will be increased if the source remains unresponsive.
+    /// 
+    /// With the default settings of 30s for this delay and 8 retries, the total retry period is around 20 minutes (with jitter) so that the 
+    /// time we keep sources in the pool is close to the default value for the TTL on agent info. This means if an agent goes offline then
+    /// they should be removed from the fetch pool in a similar amount of time to other communication with them ceasing.
     fn source_retry_delay(&self) -> Duration {
         Duration::from_secs(30)
     }

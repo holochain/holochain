@@ -3,7 +3,7 @@ use tokio::time::{Duration, Instant};
 use backon::{BackoffBuilder, FibonacciBackoff, FibonacciBuilder};
 
 /// The number of times to retry a fetch before giving up.
-pub const BACKOFF_RETRY_COUNT: usize = 10;
+pub const BACKOFF_RETRY_COUNT: usize = 8;
 
 /// A backoff strategy for use when fetching data from remote nodes that appear to not be responding.
 #[derive(Debug)]
