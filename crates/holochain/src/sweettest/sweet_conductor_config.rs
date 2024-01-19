@@ -65,8 +65,7 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        todo!("this won't work, will it?");
-        KitsuneP2pConfig::empty().into()
+        Self::rendezvous(false)
     }
 
     /// Rendezvous config for SweetConductors

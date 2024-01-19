@@ -67,11 +67,6 @@ impl PartialEq for SweetConductor {
 
 impl Eq for SweetConductor {}
 
-/// Standard config for SweetConductors
-pub fn standard_config() -> SweetConductorConfig {
-    SweetConductorConfig::standard()
-}
-
 /// A DnaFile with a role name assigned
 #[derive(Clone)]
 pub struct DnaWithRole {
@@ -260,7 +255,7 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_standard_config() -> SweetConductor {
-        Self::from_config(standard_config()).await
+        Self::from_config(SweetConductorConfig::rendezvous(false)).await
     }
 
     /// Get the rendezvous config that this conductor is using, if any
