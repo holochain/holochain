@@ -509,7 +509,8 @@ impl MetaNetTask {
                         }
 
                         // Now that the host is holding the op, remove it from the fetch pool. Any sooner and we might queue the op for fetching again.
-                        // TODO we haven't waited for the op to finish validation, need to be careful about limbo state here?
+                        // We don't need to wait for validation to complete, at least with respect to gossip, because we don't ask for unvalidated
+                        // ops during gossip. (See crates/holochain/src/conductor/kitsune_host_impl/query_region_set.rs)
                         self.fetch_pool.remove(&key);
 
                         // trigger any delegation that is pending on having this data
