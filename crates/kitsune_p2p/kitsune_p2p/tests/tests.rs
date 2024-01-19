@@ -16,13 +16,6 @@ use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 
-/* Tests to add
-- Restart a node during gossip and check that it will recover
-- Overloaded, return busy to new peers. Can that be observed? and how can i test that?
-- Can round timeout be tested? Would need a way to shut down during a round then to ensure that the node with its round open can start a new gossip round with another node
-- Enough large ops to hit the throttle limit, check how that behaves
-*/
-
 // Test that two nodes can discover each other and connect. This checks that peer discovery
 // works and that networking works well enough for a request reply.
 #[cfg(feature = "tx5")]
@@ -186,7 +179,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
     holochain_trace::test_run().unwrap();
 
     // Must be larger than ShardedGossipLocal::UPPER_HASHES_BOUND, to encourage batching. But I'm wondering if that's even useful because each op is
-    // actually send individually.
+    // actually sent individually.
     let num_ops = 30_000;
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
@@ -873,19 +866,26 @@ async fn publish_only_fetches_ops_once() {
         .unwrap();
 
     // Wait for the delegate publish to happen and give the remotes a chance to fetch the op if they were going to.
-    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    tokio::time::timeout(std::time::Duration::from_millis(250), async {
+        loop {
+            let events = harness_a.drain_legacy_host_events().await;
+            let fetch_op_events = events
+                .iter()
+                .filter_map(|e| match e {
+                    e @ RecordedKitsuneP2pEvent::FetchOpData { .. } => Some(e),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
 
-    let events = harness_a.drain_legacy_host_events().await;
-    let fetch_op_events = events
-        .iter()
-        .filter_map(|e| match e {
-            e @ RecordedKitsuneP2pEvent::FetchOpData { .. } => Some(e),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
+            // There should be no new fetch events because everyone already has this op
+            assert_eq!(0, fetch_op_events.len());
 
-    // There should be no new fetch events because everyone already has this op
-    assert_eq!(0, fetch_op_events.len());
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    // This should time out, if it doesn't then an event was received when it shouldn't have been.
+    .unwrap_err();
 }
 
 #[cfg(feature = "tx5")]
@@ -1064,6 +1064,8 @@ async fn wait_for_connected(
     .unwrap();
 }
 
+// Note that even with the ignore reason, this test isn't in perfect shape. I wrote it with the expectation that the bandwidth limits apply to op data
+// which they do not. That will need to be figured out then the test can be completed around that. For now I just want to keep what I've done so far.
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "This doesn't really work, the bandwidth limits are only applied to gossip directly and not the fetch mechanism so this test can't work as is"]

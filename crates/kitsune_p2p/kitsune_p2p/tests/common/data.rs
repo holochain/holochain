@@ -40,11 +40,6 @@ impl TestHostOp {
         self
     }
 
-    // pub fn with_hash(mut self, hash: KitsuneOpHash) -> Self {
-    //     self.hash = corrected_locaion_hash(hash);
-    //     self
-    // }
-
     pub fn space(&self) -> KSpace {
         self.space.clone()
     }
@@ -118,14 +113,6 @@ fn generated_hash() -> KitsuneOpHash {
 
     KitsuneOpHash::new(buf)
 }
-
-// fn corrected_location_hash(hash: KitsuneOpHash) -> KitsuneOpHash {
-//     let mut buf = vec![];
-//     buf.extend_from_slice(&hash.get_bytes()[..32]); // Keep the hash
-//     buf.extend(&dht_location(buf.as_slice()[..32].try_into().unwrap()));
-
-//     KitsuneOpHash::new(buf)
-// }
 
 // Ideally this would match the implementation in `holo_dht_location_bytes`
 #[cfg(feature = "test_utils")]

@@ -232,8 +232,7 @@ impl KitsuneHost for TestHost {
             Ok(Topology {
                 space: Dimension::standard_space(),
                 time: Dimension::time(std::time::Duration::from_secs(60 * 5)),
-                // TODO Timestamp::now is the default if the happ manifest doesn't set an origin time
-                time_origin: Timestamp::ZERO, // Timestamp::now(),
+                time_origin: Timestamp::ZERO,
                 time_cutoff: cutoff,
             })
         }
