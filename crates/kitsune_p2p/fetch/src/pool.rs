@@ -84,9 +84,12 @@ pub trait FetchPoolConfig: 'static + Send + Sync {
 
     /// The number of times a source can fail to respond in time before it is put on a backoff.
     ///
-    /// This is a total number of timeouts so if a source is unreliable over time then it will be put a backoff even if it is currently responding.
+    /// This is a total number of timeouts so if a source is unreliable over time then it will be put on a backoff even if it is currently responding.
     /// If the source responds after its timeout period then this counter will be reset and the source will be considered available again after
     /// a single backoff period.
+    ///
+    /// The reasoning behind this parameter is that we want to limit the amount of resources we sink into an unresponsive source,
+    /// as well as limiting the load on the source itself, who may be unresponsive because they're already struggling with too much load.
     fn source_unavailable_timeout_threshold(&self) -> usize {
         30
     }
