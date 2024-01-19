@@ -517,6 +517,8 @@ impl SpaceInternalHandler for Space {
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
                         size: op_hash.maybe_size(),
+                        // TODO - get the author from somewhere
+                        author: None,
                         context: Some(context),
                         transfer_method: TransferMethod::Publish,
                     });
@@ -754,19 +756,12 @@ async fn update_single_agent_info(
             }
         }
         NetworkType::QuicBootstrap => {
-            match kitsune_p2p_bootstrap_client::put(
+            kitsune_p2p_bootstrap_client::put(
                 bootstrap_service.clone(),
                 agent_info_signed.clone(),
                 bootstrap_net,
             )
-            .await {
-                Ok(_) => {
-                    tracing::debug!("Successfully publish agent info to the bootstrap service");
-                }
-                Err(err) => {
-                    tracing::warn!(?err, "Failed to publish agent info to the bootstrap service, will try again later");
-                }
-            }
+            .await?;
         }
     }
     Ok(agent_info_signed)
@@ -1039,7 +1034,7 @@ impl KitsuneP2pHandler for Space {
             let task_permit = ro_inner
                 .parallel_notify_permit
                 .clone()
-                .acquire_owned() // TODO only acquire one regardless of how many nodes we're planning to notify?
+                .acquire_owned()
                 .await
                 .ok();
             tokio::task::spawn(async move {
