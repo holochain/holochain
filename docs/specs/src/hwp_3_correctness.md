@@ -179,8 +179,8 @@ e.  **Generalized Micro-Consensus Consent: Entwined multi-agent state
 <!-- -->
 ```
 1.  **Scaling:** Holochain's architecture is specifically designed to maintain resilience and performance as both the number of users and interactions increase. Key factors contributing to its scaling capabilities include:
-  a. Agent-centric approach: Unlike traditional blockchain systems, which require global consensus before progressing, Holochain adopts an agent-centric approach where changes made to an agent’s state become authoritative once signed to their chain and communicated to others via the DHT. As a result, agents are able to initiate actions without delay.
-  b. Bottle-neck Free Sharded DHT: Holochain's DHT is sharded, meaning that each node only stores a fraction of the total data, reducing the storage and computational requirements for each participant. At the same time, the storage of content with agents whose public key is “near” the hash of each Action or Entry enables in combination with the use of Linking metadata to make the DHT a graphing DHT enables participants to create paths to quickly locate relevant content. When the agents responsible for validating a particular state change receive an authoring agent’s proposed state change, they are able to a) request information from others in the DHT regarding the prior state of the authoring agent (where relevant), and b) make use of their own copy of the apps validation rules to deterministically validate the change.
+  a. Agent-centric approach: Unlike traditional blockchain systems, which require global consensus before progressing, Holochain adopts an agent-centric approach where changes made to an agent's state become authoritative once signed to their chain and communicated to others via the DHT. As a result, agents are able to initiate actions without delay.
+  b. Bottle-neck Free Sharded DHT: Holochain's DHT is sharded, meaning that each node only stores a fraction of the total data, reducing the storage and computational requirements for each participant. At the same time, the storage of content with agents whose public key is “near” the hash of each Action or Entry enables in combination with the use of Linking metadata to make the DHT a graphing DHT enables participants to create paths to quickly locate relevant content. When the agents responsible for validating a particular state change receive an authoring agent's proposed state change, they are able to a) request information from others in the DHT regarding the prior state of the authoring agent (where relevant), and b) make use of their own copy of the apps validation rules to deterministically validate the change.
   While that agent and its validating peers are engaged with the creation and validation of a particular change to the state of the authors chain, in parallel, other agents are able to author state changes to their own chain and have these validated by the validating peers for each of those changes.  This bottle-neck free architecture allows users to continue interacting with the system without waiting for global agreement.
   With singular actions by any particular agent (and the validation of those actions by a small number of other agents) able to occur simultaneous with singular actions by other agents as well as countersigned actions by particular groups of agents. The network is not updating state globally (as blockchains typically do) but is instead creating, validating, storing and serving changes of the state of particular agents in parallel. 
   c. Multiple networks: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data heavy, or processing heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
@@ -307,7 +307,7 @@ validation, nobody​ ​ever​ ​needs​ ​to​ ​trust​ ​a​ ​con
 
 Since Holochain does not rely on any kind of majority consensus, it is already less vulnerable to Sybil Attacks, the creation of lots of fake colluding accounts which are typically used to overwhelm consensus of honest agents. But since Holochain enables "1 of N" and even "0 of N" trust models, Sybils simply cannot overwhem or disrupt honest agents.
 
-Also, since Holochain is not a monolithic environment where every app and transaction run on a single chain in a single network, a Sybil Attack can only be attempted on a single app's network at a time. Also, unlike the absolutes of public vs. blockchains, each hApp can define their own membrane on a spectrum from very open and permissive to closed and strict by the kind of membership proof involved in passing into their network's membrane.
+Also, since Holochain is not a monolithic environment where every app and transaction run on a single chain in a single network, a Sybil Attack can only be attempted on a single app's network at a time. Also, unlike the binary of public vs. permissioned ledgers, each hApp can define their own membrane on a spectrum from very open and permissive to closed and strict by the kind of membership proof involved in passing into their network's membrane.
 
 Membership proofs are passed in during the installation process of any Holochain app, so that it can be committed to the agent's chain just ahead of their public key. An agent's public key acts as their address in that applications DHT network, and is created during the genesis process in order to join the network. Other agents can confirm whether an agent's key can join by validating the membership proof.
 
@@ -345,12 +345,22 @@ the application.
 
 #### Eclipse Attacks
 
-This is a standard vulnerability for DHTs. How do you know you are
-talking to honest nodes so that you are getting an honest picture of the
-network. If all the nodes you are talking to are falsifying data...
-(then what?) If the first node you talk to is malicious you may never
-get any honest node. We are proposing the following solution: \[WP-TODO:
-ACB\]
+ \[WP-TODO: ACB REVIEW\] 
+An Eclipse Attack is an attack in which an honest node's immediate peers are all dishonest, blocking or modifying communication between the honest node and the larger network. This attack is specific to gossip-based peer-to-peer networks such as Bitcoin, Holochain, and DHTs like IPFS. While this attack can never be fully prevented, it can be mitigated. As an example, Bitcoin nodes only connect to [one peer per /16 IP block](https://en.bitcoin.it/wiki/Weaknesses#Sybil_attack).
+
+Holochain reduces the impact of Eclipse Attacks by providing basic, built-in guarantees of data integrity. Each piece of data carries its author's signature, so adversaries can never tamper with others' data.
+
+However, intrinsic data integrity merely protects the integrity of existing data. Even though Holochain can guarantee that data hasn't been tampered with, adversaries in an Eclipse Attack could still make life miserable for an honest node by blocking the transmission of data. In general Holochain's approach to the complexities of distributed computing is to provide affordances and capabilities that can be scaled appropriately according to what is appropriate for the specific use case of the application in questions.  Thus we provide some basic capacities at the base layer and assume that individual applications will also add hardening appropriate to their context. Built in mitigation strategies include:
+
+- Provide a bootstrapping server that provides a large number of randomly chosen peers to which a node can connect.
+- Avoid connecting with too many peers in a certain IP block, as with Bitcoin.
+- Allow DNA's to specifyknown peers that can act as ‘harbour pilot' so that a node's introduction to a new DHT is facilitated. This process can be extended to take advantage of existing human, or digital, trust and reputation factors.
+- Nodes can ask their initial peers for assurances of trust based on reputation or identity verification.
+
+Application developers can take steps to further protect their users:
+- Put appropriate processes in place, such as identity verification, to govern membership in a DHT and place a limit on the number of DHT nodes each real-world identity can create. This reduces the chances of a malicious actor cheaply creating a large number of nodes to stage a Sybil Attack against the network, which then makes Eclipse Attacks easier.
+- Design validation rules requiring high-stakes entries to carry proof of their author's reputation, ideally by referring to data outside of the DHT. This doesn't prevent an Eclipse Attack, but it does give an honest node the power to detect suspicious peers and reject data originating from them.
+
 
 ### Human​ ​Error
 
