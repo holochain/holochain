@@ -20,7 +20,7 @@ async fn main() {
 
     const NUM: usize = 10;
     const MIN_WAIT_MS: Duration = Duration::from_millis(100);
-    const MAX_WAIT_MS: Duration = Duration::from_secs(500);
+    const MAX_WAIT_MS: Duration = Duration::from_millis(500);
 
     // let config = config_no_networking();
     let config = SweetConductorConfig::rendezvous(true);
