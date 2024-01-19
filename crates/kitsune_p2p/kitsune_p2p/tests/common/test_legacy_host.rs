@@ -1,19 +1,30 @@
 use futures::{channel::mpsc::Receiver, FutureExt, StreamExt};
 use itertools::Itertools;
-use kitsune_p2p::event::{full_time_window, FetchOpDataEvtQuery, KitsuneP2pEvent, QueryAgentsEvt, QueryOpHashesEvt, PutAgentInfoSignedEvt, FetchOpDataEvt, SignNetworkDataEvt};
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSignature, KitsuneOpData, KitsuneSpace};
+use kitsune_p2p::event::{
+    full_time_window, FetchOpDataEvt, FetchOpDataEvtQuery, KitsuneP2pEvent, PutAgentInfoSignedEvt,
+    QueryAgentsEvt, QueryOpHashesEvt, SignNetworkDataEvt,
+};
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature, KitsuneSpace};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
+    dependencies::lair_keystore_api::LairClient,
     dht::{
         arq::LocalStorageConfig,
         spacetime::{Dimension, Topology},
         ArqStrat, PeerStrat,
     },
-    dht_arc::{DhtArcRange, DhtArc}, KAgent, dependencies::lair_keystore_api::LairClient,
+    dht_arc::{DhtArc, DhtArcRange},
+    KAgent,
 };
-use std::{collections::{HashSet, HashMap}, sync::{Arc, atomic::{AtomicU32, Ordering}}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+};
 
 use super::TestHostOp;
 
@@ -196,7 +207,9 @@ impl TestLegacyHost {
                             let mut op_store = op_store.write();
                             for op in ops {
                                 let incoming_op: TestHostOp = op.clone().into();
-                                if op_store.iter().any(|existing_op| existing_op.kitsune_hash() == incoming_op.kitsune_hash()) {
+                                if op_store.iter().any(|existing_op| {
+                                    existing_op.kitsune_hash() == incoming_op.kitsune_hash()
+                                }) {
                                     duplicate_ops_received_count.fetch_add(1, Ordering::Acquire);
                                     continue;
                                 }
@@ -329,12 +342,16 @@ impl TestLegacyHost {
 
     pub async fn create_agent(&self) -> KAgent {
         let tag = nanoid::nanoid!();
-        let info = self.keystore.new_seed(tag.into(), None, false).await.unwrap();
+        let info = self
+            .keystore
+            .new_seed(tag.into(), None, false)
+            .await
+            .unwrap();
         Arc::new(KitsuneAgent(info.ed25519_pub_key.0.to_vec()))
     }
 }
 
-/// For recording events being received by the legacy host. This enum should match KitsuneP2pEvent with 
+/// For recording events being received by the legacy host. This enum should match KitsuneP2pEvent with
 /// the responders and tracing context removed. Just the payload should be available for test assertions.
 pub enum RecordedKitsuneP2pEvent {
     PutAgentInfoSigned {
@@ -373,19 +390,22 @@ pub enum RecordedKitsuneP2pEvent {
     },
 }
 
-async fn record_event(events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEvent>>>, evt: &KitsuneP2pEvent) {
+async fn record_event(
+    events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEvent>>>,
+    evt: &KitsuneP2pEvent,
+) {
     if events.lock().await.len() % 500 == 0 {
         dump_event_dist(events.clone()).await;
     }
-    
+
     let mut events = events.lock().await;
-    
+
     match evt {
         KitsuneP2pEvent::PutAgentInfoSigned { input, .. } => {
             events.push(RecordedKitsuneP2pEvent::PutAgentInfoSigned {
                 input: input.clone(),
             });
-        },
+        }
         KitsuneP2pEvent::QueryAgents { input, .. } => {
             events.push(RecordedKitsuneP2pEvent::QueryAgents {
                 input: input.clone(),
@@ -397,21 +417,36 @@ async fn record_event(events: Arc<futures::lock::Mutex<Vec<RecordedKitsuneP2pEve
                 dht_arc: dht_arc.clone(),
             });
         }
-        KitsuneP2pEvent::Call { space, to_agent, payload, .. } => {
+        KitsuneP2pEvent::Call {
+            space,
+            to_agent,
+            payload,
+            ..
+        } => {
             events.push(RecordedKitsuneP2pEvent::Call {
                 space: space.clone(),
                 to_agent: to_agent.clone(),
                 payload: payload.clone(),
             });
         }
-        KitsuneP2pEvent::Notify { space, to_agent, payload, .. } => {
+        KitsuneP2pEvent::Notify {
+            space,
+            to_agent,
+            payload,
+            ..
+        } => {
             events.push(RecordedKitsuneP2pEvent::Notify {
                 space: space.clone(),
                 to_agent: to_agent.clone(),
                 payload: payload.clone(),
             });
         }
-        KitsuneP2pEvent::ReceiveOps { space, ops, context, .. } => {
+        KitsuneP2pEvent::ReceiveOps {
+            space,
+            ops,
+            context,
+            ..
+        } => {
             events.push(RecordedKitsuneP2pEvent::ReceiveOps {
                 space: space.clone(),
                 ops: ops.clone(),

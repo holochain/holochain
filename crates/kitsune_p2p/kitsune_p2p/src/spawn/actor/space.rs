@@ -1563,7 +1563,7 @@ impl Space {
                             tracing::debug!("Successfully publish agent info to the bootstrap service");
                         }
                         Err(err) => {
-                            tracing::warn!(?err, "Failed to publish agent info to the bootstrap service, will try again later");
+                            tracing::info!(?err, "Failed to publish agent info to the bootstrap service while leaving");
                         }
                     }
                 }

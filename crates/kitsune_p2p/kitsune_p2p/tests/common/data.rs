@@ -5,9 +5,9 @@ use fixt::prelude::*;
 use kitsune_p2p_bin_data::{KOp, KitsuneBinType, KitsuneOpData, KitsuneOpHash};
 use kitsune_p2p_fetch::RoughSized;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::KSpace;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 use kitsune_p2p_types::dht::region::RegionBounds;
+use kitsune_p2p_types::KSpace;
 use kitsune_p2p_types::{dht_arc::DhtLocation, KOpHash};
 use serde::{Deserialize, Serialize};
 

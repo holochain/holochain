@@ -1,15 +1,17 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use super::{test_keystore, RecordedKitsuneP2pEvent, TestHost, TestHostOp, TestLegacyHost};
 use kitsune_p2p::{
     actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
 };
 use kitsune_p2p_types::{
+    agent_info::AgentInfoSigned,
     config::{tuning_params_struct, KitsuneP2pConfig},
-    tls::TlsConfig, agent_info::AgentInfoSigned, KAgent,
+    tls::TlsConfig,
+    KAgent,
 };
-use tokio::task::AbortHandle;
 use parking_lot::RwLock;
-use super::{TestHost, TestHostOp, TestLegacyHost, RecordedKitsuneP2pEvent, test_keystore};
+use tokio::task::AbortHandle;
 
 pub struct KitsuneTestHarness {
     name: String,
@@ -26,13 +28,14 @@ impl KitsuneTestHarness {
         let keystore = test_keystore();
         let agent_store = Arc::new(RwLock::new(Vec::new()));
         let op_store = Arc::new(RwLock::new(Vec::new()));
-    
+
         // Unpack the keystore, since we need to pass it to the host_api
         let keystore = Arc::try_unwrap(keystore).unwrap().into_inner();
 
-        let host_api = Arc::new(TestHost::new(keystore.clone(), agent_store.clone(), op_store.clone()).await);
+        let host_api =
+            Arc::new(TestHost::new(keystore.clone(), agent_store.clone(), op_store.clone()).await);
         let legacy_host_api = TestLegacyHost::new(keystore);
-        
+
         Ok(Self {
             name: name.to_string(),
             config: Default::default(),
@@ -71,35 +74,34 @@ impl KitsuneTestHarness {
         self
     }
 
-    pub async fn spawn(
-        &mut self,
-    ) -> KitsuneP2pResult<ghost_actor::GhostSender<KitsuneP2p>> {
+    pub async fn spawn(&mut self) -> KitsuneP2pResult<ghost_actor::GhostSender<KitsuneP2p>> {
         let (sender, receiver) = self.spawn_without_legacy_host(self.name.clone()).await?;
 
         self.start_legacy_host(vec![receiver]).await;
-        
+
         Ok(sender)
     }
 
     pub async fn spawn_without_legacy_host(
         &mut self,
         name: String,
-    ) -> KitsuneP2pResult<(ghost_actor::GhostSender<KitsuneP2p>, KitsuneP2pEventReceiver)> {
+    ) -> KitsuneP2pResult<(
+        ghost_actor::GhostSender<KitsuneP2p>,
+        KitsuneP2pEventReceiver,
+    )> {
         let mut config = self.config.clone();
         config.tracing_scope = Some(name);
 
-        let (sender, receiver) = spawn_kitsune_p2p(
-            config,
-            self.tls_config.clone(),
-            self.host_api.clone(),
-        )
-        .await?;
+        let (sender, receiver) =
+            spawn_kitsune_p2p(config, self.tls_config.clone(), self.host_api.clone()).await?;
 
         Ok((sender, receiver))
     }
 
     pub async fn start_legacy_host(&mut self, receivers: Vec<KitsuneP2pEventReceiver>) {
-        self.legacy_host_api.start(self.agent_store.clone(), self.op_store.clone(), receivers).await;
+        self.legacy_host_api
+            .start(self.agent_store.clone(), self.op_store.clone(), receivers)
+            .await;
     }
 
     pub async fn create_agent(&mut self) -> KAgent {

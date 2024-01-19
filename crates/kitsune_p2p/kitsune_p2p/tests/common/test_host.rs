@@ -1,5 +1,4 @@
 use super::data::TestHostOp;
-use std::sync::Arc;
 use futures::FutureExt;
 use kitsune_p2p::{KitsuneHost, KitsuneP2pResult};
 use kitsune_p2p_block::BlockTargetId;
@@ -7,6 +6,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     config::RECENT_THRESHOLD_DEFAULT,
+    dependencies::lair_keystore_api::LairClient,
     dht::{
         arq::ArqSet,
         hash::RegionHash,
@@ -14,8 +14,9 @@ use kitsune_p2p_types::{
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::{Dimension, TelescopingTimes, Topology},
         ArqStrat,
-    }, dependencies::lair_keystore_api::LairClient,
+    },
 };
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct TestHost {
@@ -44,7 +45,8 @@ impl TestHost {
         let tag = nanoid::nanoid!();
         keystore
             .new_seed(tag.clone().into(), None, false)
-            .await.expect("Could not register lair seed");
+            .await
+            .expect("Could not register lair seed");
 
         Self {
             tag,
@@ -74,14 +76,17 @@ impl KitsuneHost for TestHost {
         input: kitsune_p2p_block::BlockTargetId,
         timestamp: kitsune_p2p_types::dht::prelude::Timestamp,
     ) -> kitsune_p2p::KitsuneHostResult<bool> {
-        let blocked = self.blocks.read().iter().find(|b| {
-            let target_id: BlockTargetId = b.target().clone().into();
+        let blocked = self
+            .blocks
+            .read()
+            .iter()
+            .find(|b| {
+                let target_id: BlockTargetId = b.target().clone().into();
 
-            target_id == input
-                && b.start() <= timestamp
-                && b.end() >= timestamp
-        }).is_some();
-        
+                target_id == input && b.start() <= timestamp && b.end() >= timestamp
+            })
+            .is_some();
+
         async move { Ok(blocked) }.boxed().into()
     }
 
@@ -269,7 +274,9 @@ impl KitsuneHost for TestHost {
         Some(self.tag.clone().into())
     }
 
-    fn lair_client(&self) -> Option<kitsune_p2p_types::dependencies::lair_keystore_api::LairClient> {
+    fn lair_client(
+        &self,
+    ) -> Option<kitsune_p2p_types::dependencies::lair_keystore_api::LairClient> {
         Some(self.keystore.clone())
     }
 }

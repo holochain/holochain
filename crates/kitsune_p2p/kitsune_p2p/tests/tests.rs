@@ -39,10 +39,7 @@ async fn two_agents_on_same_host_rpc_single() {
         .configure_tx5_network(signal_url)
         .use_bootstrap_server(bootstrap_addr);
 
-    let sender = harness
-        .spawn()
-        .await
-        .expect("should be able to spawn node");
+    let sender = harness.spawn().await.expect("should be able to spawn node");
 
     let space = Arc::new(fixt!(KitsuneSpace));
     let agent_a = harness.create_agent().await;
@@ -385,14 +382,14 @@ async fn two_nodes_broadcast_agent_info() {
     sender_a
         .join(space.clone(), agent_c.clone(), None, None)
         .await
-        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions 
+        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions
         // and that is enough for this test to continue.
         .unwrap_err();
     let agent_d = harness_a.create_agent().await;
     sender_a
         .join(space.clone(), agent_d.clone(), None, None)
         .await
-        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions 
+        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions
         // and that is enough for this test to continue.
         .unwrap_err();
 
@@ -483,7 +480,7 @@ async fn two_nodes_gossip_agent_info() {
     sender_b
         .join(space.clone(), agent_b.clone(), None, None)
         .await
-        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions 
+        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions
         // and that is enough for this test to continue.
         .unwrap_err();
 
@@ -849,12 +846,13 @@ async fn publish_only_fetches_ops_once() {
     assert_eq!(1, harness_c.op_store().read().len());
 
     let events = harness_a.drain_legacy_host_events().await;
-    let fetch_op_events = events.iter().filter_map(|e| match e {
-        e @ RecordedKitsuneP2pEvent::FetchOpData { .. } => {
-            Some(e)
-        }
-        _ => None,
-    }).collect::<Vec<_>>();
+    let fetch_op_events = events
+        .iter()
+        .filter_map(|e| match e {
+            e @ RecordedKitsuneP2pEvent::FetchOpData { .. } => Some(e),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
 
     // The op should be fetched once each by B and C
     assert_eq!(2, fetch_op_events.len());
@@ -878,12 +876,13 @@ async fn publish_only_fetches_ops_once() {
     tokio::time::sleep(std::time::Duration::from_millis(250)).await;
 
     let events = harness_a.drain_legacy_host_events().await;
-    let fetch_op_events = events.iter().filter_map(|e| match e {
-        e @ RecordedKitsuneP2pEvent::FetchOpData { .. } => {
-            Some(e)
-        }
-        _ => None,
-    }).collect::<Vec<_>>();
+    let fetch_op_events = events
+        .iter()
+        .filter_map(|e| match e {
+            e @ RecordedKitsuneP2pEvent::FetchOpData { .. } => Some(e),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
 
     // There should be no new fetch events because everyone already has this op
     assert_eq!(0, fetch_op_events.len());
@@ -987,8 +986,14 @@ async fn delegate_publish() {
     bootstrap_handle.abort();
 
     // Make A and C forget about each other. Because gossip is disabled, this should stick.
-    harness_a.agent_store().write().retain(|a| a.agent() != agent_c);
-    harness_c.agent_store().write().retain(|a| a.agent() != agent_a);
+    harness_a
+        .agent_store()
+        .write()
+        .retain(|a| a.agent() != agent_c);
+    harness_c
+        .agent_store()
+        .write()
+        .retain(|a| a.agent() != agent_a);
 
     // TODO This requires host code, does it make sense to construct valid values here?
     let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
@@ -1122,10 +1127,10 @@ async fn single_large_op_exceeds_gossip_rate_limit() {
     wait_for_connected(sender_a.clone(), agent_b.clone(), space.clone()).await;
     wait_for_connected(sender_b.clone(), agent_a.clone(), space.clone()).await;
 
-    harness_a.op_store().write().push(
-        TestHostOp::new(space.clone())
-            .sized_5mb(),
-    );
+    harness_a
+        .op_store()
+        .write()
+        .push(TestHostOp::new(space.clone()).sized_5mb());
 
     tokio::time::timeout(std::time::Duration::from_secs(60), {
         let op_store_b = harness_b.op_store();
@@ -1142,7 +1147,7 @@ async fn single_large_op_exceeds_gossip_rate_limit() {
     .unwrap();
 
     // TODO the op should get through because of the logic for handling messages larger than the limit. To complete this test we need to send more
-    //      data and actually assert the rate or something like that. 
+    //      data and actually assert the rate or something like that.
     assert_eq!(1, harness_b.op_store().read().len());
 }
 
