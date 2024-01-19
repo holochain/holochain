@@ -1,9 +1,9 @@
-use crate::actor::BroadcastData;
+use crate::actor::*;
 use crate::spawn::actor::{
-    EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
+    EvtRcv, InternalHandler, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
 };
 use crate::spawn::meta_net::MetaNetCon;
-use crate::spawn::{Internal, InternalHandler};
+use crate::spawn::Internal;
 use crate::{GossipModuleType, KitsuneP2pError};
 use futures::FutureExt;
 use ghost_actor::GhostError;

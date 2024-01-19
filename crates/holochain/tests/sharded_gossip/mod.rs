@@ -1243,7 +1243,7 @@ async fn mock_network_sharded_gossip() {
         mock_network: mock_network.into(),
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = ConductorConfig::empty();
     config.network = network;
 
     // Add it to the conductor builder.
@@ -1749,7 +1749,7 @@ async fn mock_network_sharding() {
         mock_network: mock_network.into(),
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = ConductorConfig::empty();
     config.network = network;
 
     // Add it to the conductor builder.

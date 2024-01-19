@@ -15,7 +15,7 @@ pub struct KitsuneTestHarness {
 impl KitsuneTestHarness {
     pub async fn try_new(host_api: HostApi) -> KitsuneP2pResult<Self> {
         Ok(Self {
-            config: Default::default(),
+            config: KitsuneP2pConfig::empty(),
             tls_config: TlsConfig::new_ephemeral().await?,
             host_api,
         })

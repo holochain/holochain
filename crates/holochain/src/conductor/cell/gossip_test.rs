@@ -43,7 +43,7 @@ async fn signature_smoke_test() {
 
     let rendezvous = SweetLocalRendezvous::new().await;
 
-    let mut network_config = KitsuneP2pConfig::default();
+    let mut network_config = KitsuneP2pConfig::empty();
     network_config.transport_pool = vec![TransportConfig::Mem {}];
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.

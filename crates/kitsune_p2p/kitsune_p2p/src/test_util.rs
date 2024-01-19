@@ -65,6 +65,25 @@ pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
     ))
 }
 
+/// Start a test signal server
+pub fn start_signal_srv() -> (std::net::SocketAddr, tokio::task::AbortHandle) {
+    let mut config = tx5_signal_srv::Config::default();
+    config.interfaces = "127.0.0.1".to_string();
+    config.port = 0;
+    config.demo = false;
+    let (sig_driver, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+
+    assert!(err_list.is_empty());
+    assert_eq!(1, addr_list.len());
+
+    let abort_handle = tokio::spawn(async move {
+        sig_driver.await;
+    })
+    .abort_handle();
+
+    (*addr_list.first().unwrap(), abort_handle)
+}
+
 mod harness_event;
 pub(crate) use harness_event::*;
 

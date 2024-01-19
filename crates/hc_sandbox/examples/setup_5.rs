@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     let happ = hc_sandbox::bundles::parse_happ(input.happ)?;
 
     // Using the default mem network.
-    let network = KitsuneP2pConfig::default();
+    let network = KitsuneP2pConfig::empty();
 
     // Choose an app id and properties.
     let app_id = "my-cool-app".to_string();

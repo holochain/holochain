@@ -234,6 +234,7 @@ mod tests {
     use holochain_keystore::test_keystore;
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
+    use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken::sign;
 
     use crate::HolochainP2pSender;
     use holochain_types::prelude::*;
@@ -267,9 +268,10 @@ mod tests {
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
         let keystore = test_keystore();
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
 
         let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
+            KitsuneP2pConfig::from_signal_addr(signal_url),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
         )
@@ -349,9 +351,10 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
 
         let (p2p, mut evt): (HolochainP2pRef, _) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
+            KitsuneP2pConfig::from_signal_addr(signal_url),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
         )
@@ -407,12 +410,13 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
 
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_strategy = "none".to_string();
         let tuning_params = Arc::new(tuning_params);
-        let mut config = KitsuneP2pConfig::default();
+        let mut config = KitsuneP2pConfig::from_signal_addr(signal_url);
         config.tuning_params = tuning_params;
 
         let host_list = Arc::new(Mutex::new(Vec::new()));
@@ -504,6 +508,7 @@ mod tests {
         holochain_trace::test_run().ok();
 
         let (dna, a1, a2, _a3) = test_setup();
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
 
         let cert = TlsConfig::new_ephemeral().await.unwrap();
 
@@ -511,7 +516,7 @@ mod tests {
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         params.default_rpc_multi_remote_agent_count = 1;
         params.default_rpc_multi_remote_request_grace_ms = 100;
-        let mut config = KitsuneP2pConfig::default();
+        let mut config = KitsuneP2pConfig::from_signal_addr(signal_url);
         config.tuning_params = Arc::new(params);
         let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
             .await
@@ -599,12 +604,13 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
 
         let mut params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         params.default_rpc_multi_remote_agent_count = 1;
         params.default_rpc_multi_remote_request_grace_ms = 100;
-        let mut config = KitsuneP2pConfig::default();
+        let mut config = KitsuneP2pConfig::from_signal_addr(signal_url);
         config.tuning_params = Arc::new(params);
 
         let (p2p, mut evt) = spawn_holochain_p2p(

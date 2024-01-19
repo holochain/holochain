@@ -1,6 +1,8 @@
 //! Kitsune Config Tuning Params
 #![allow(missing_docs)]
 
+use std::net::SocketAddr;
+
 use crate::tx_utils::TxUrl;
 use url2::Url2;
 
@@ -354,10 +356,22 @@ pub struct KitsuneP2pConfig {
     pub tracing_scope: Option<String>,
 }
 
-impl Default for KitsuneP2pConfig {
-    fn default() -> Self {
+impl KitsuneP2pConfig {
+    /// Minimal but non-functional config. Without a transport pool set,
+    /// nothing will work.
+    pub fn empty() -> Self {
         Self {
-            transport_pool: Vec::new(),
+            transport_pool: vec![],
+            bootstrap_service: None,
+            tuning_params: KitsuneP2pTuningParams::default(),
+            tracing_scope: None,
+        }
+    }
+
+    pub fn from_signal_addr(socket_addr: SocketAddr) -> Self {
+        let signal_url = format!("ws://{:?}", socket_addr);
+        Self {
+            transport_pool: vec![TransportConfig::WebRTC { signal_url }],
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             tracing_scope: None,

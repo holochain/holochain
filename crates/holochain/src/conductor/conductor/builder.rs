@@ -8,7 +8,6 @@ use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
-#[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
     pub config: ConductorConfig,
@@ -28,7 +27,15 @@ pub struct ConductorBuilder {
 impl ConductorBuilder {
     /// Default ConductorBuilder.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            config: ConductorConfig::empty(),
+            ribosome_store: Default::default(),
+            passphrase: None,
+            keystore: None,
+            #[cfg(any(test, feature = "test_utils"))]
+            state: None,
+            no_print_setup: false,
+        }
     }
 }
 

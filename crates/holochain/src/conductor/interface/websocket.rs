@@ -254,6 +254,7 @@ pub mod test {
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
@@ -899,7 +900,7 @@ pub mod test {
             test_db_dir,
             dnas.clone(),
             agents.clone(),
-            Default::default(),
+            KitsuneP2pConfig::empty(),
         )
         .await
         .0;

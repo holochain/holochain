@@ -339,7 +339,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
-        ..Default::default()
+        ..ConductorConfig::empty()
     }
 }
 

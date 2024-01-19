@@ -1,6 +1,6 @@
 // this is largely a passthrough that routes to a specific space handler
 
-use self::actor::*;
+use crate::actor::*;
 use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::gossip::sharded_gossip::KitsuneDiagnostics;
@@ -31,7 +31,7 @@ mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
 
-#[cfg(test)]
+#[cfg(feature = "test_utils")]
 pub mod test_util;
 
 type EvtRcv = futures::channel::mpsc::Receiver<KitsuneP2pEvent>;
@@ -168,10 +168,10 @@ impl KitsuneP2pActor {
 
         // Start a loop to handle our fetch queue fetch items.
         FetchTask::spawn(
-            config.clone(),
             fetch_pool.clone(),
             host_api.clone(),
             internal_sender.clone(),
+            config.tracing_scope.clone(),
         );
 
         let i_s = internal_sender.clone();
@@ -183,11 +183,12 @@ impl KitsuneP2pActor {
 
         MetaNetTask::new(
             host_api.clone(),
-            config.clone(),
+            config.tuning_params.clone(),
             fetch_pool.clone(),
             fetch_response_queue,
             ep_evt,
             i_s,
+            config.tracing_scope.clone(),
         )
         .spawn();
 
@@ -963,34 +964,27 @@ impl ghost_actor::GhostHandler<KitsuneP2pEvent> for MockKitsuneP2pEventHandler {
 impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::spawn::actor::create_meta_net;
+    use crate::spawn::actor::test_util::InternalStub;
     use crate::spawn::actor::MetaNet;
     use crate::spawn::actor::MetaNetEvtRecv;
-    use crate::spawn::test_util::InternalStub;
     use crate::spawn::Internal;
+    use crate::test_util::start_signal_srv;
     use crate::HostStub;
     use crate::KitsuneP2pResult;
     use ghost_actor::actor_builder::GhostActorBuilder;
     use kitsune_p2p_bootstrap_client::BootstrapNet;
-    use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use kitsune_p2p_types::metrics::Tx2ApiMetrics;
     use kitsune_p2p_types::tls::TlsConfig;
-    use std::net::SocketAddr;
-    use tokio::task::AbortHandle;
     use url2::url2;
 
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
         let (signal_addr, abort_handle) = start_signal_srv();
-
-        let mut config = KitsuneP2pConfig::default();
-        config.transport_pool = vec![TransportConfig::WebRTC {
-            signal_url: format!("ws://{:?}", signal_addr),
-        }];
-        config.bootstrap_service = None;
-
+        let config = KitsuneP2pConfig::from_signal_addr(signal_addr);
         let (meta_net, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
 
         // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
@@ -1003,11 +997,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_bootstrap_meta_net() {
         let (signal_addr, abort_handle) = start_signal_srv();
-
-        let mut config = KitsuneP2pConfig::default();
-        config.transport_pool = vec![TransportConfig::WebRTC {
-            signal_url: format!("ws://{:?}", signal_addr),
-        }];
+        let mut config = KitsuneP2pConfig::from_signal_addr(signal_addr);
         config.bootstrap_service = Some(url2!("ws://not-a-bootstrap.test"));
 
         let (meta_net, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
@@ -1042,24 +1032,5 @@ mod tests {
             Tx2ApiMetrics::new(),
         )
         .await
-    }
-
-    fn start_signal_srv() -> (SocketAddr, AbortHandle) {
-        let mut config = tx5_signal_srv::Config::default();
-        config.interfaces = "127.0.0.1".to_string();
-        config.port = 0;
-        config.demo = false;
-        let (sig_driver, addr_list, err_list) =
-            tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
-
-        assert!(err_list.is_empty());
-        assert_eq!(1, addr_list.len());
-
-        let abort_handle = tokio::spawn(async move {
-            sig_driver.await;
-        })
-        .abort_handle();
-
-        (*addr_list.first().unwrap(), abort_handle)
     }
 }

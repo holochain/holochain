@@ -29,7 +29,7 @@ async fn test_dna_properties_macro() {
     })];
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
+    let mut conductor = SweetConductor::from_config(ConductorConfig::empty()).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
         .setup_app_for_agent("app", agent, dnas)
@@ -66,7 +66,7 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     })];
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
+    let mut conductor = SweetConductor::from_config(ConductorConfig::empty()).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
         .setup_app_for_agent("app", agent, dnas)

@@ -27,13 +27,15 @@ async fn test_publish() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
+    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
+
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
 
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::from_signal_addr(signal_url);
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = ConductorConfig::empty();
     config.network = network;
     config.tuning_params = Some(ConductorTuningParams {
         sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),

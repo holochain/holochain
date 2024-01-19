@@ -31,7 +31,7 @@ use crate::config::conductor::paths::DataRootPath;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -55,7 +55,6 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    #[serde(default)]
     pub network: KitsuneP2pConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
@@ -90,6 +89,22 @@ where
 }
 
 impl ConductorConfig {
+    /// The most minimal config, which will not work
+    pub fn empty() -> Self {
+        Self {
+            tracing_override: None,
+            data_root_path: None,
+            keystore: KeystoreConfig::default(),
+            dpki: None,
+            admin_interfaces: None,
+            network: KitsuneP2pConfig::empty(),
+            db_sync_strategy: DbSyncStrategy::default(),
+            tuning_params: None,
+            #[cfg(feature = "chc")]
+            chc_url: None,
+        }
+    }
+
     /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
@@ -211,7 +226,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                network: Default::default(),
+                network: KitsuneP2pConfig::empty(),
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
@@ -266,7 +281,7 @@ mod tests {
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::default();
+        let mut network_config = KitsuneP2pConfig::empty();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://signal.holotest.net".into(),
@@ -322,7 +337,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                network: Default::default(),
+                network: KitsuneP2pConfig::empty(),
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),

@@ -31,7 +31,7 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
             tuning_params: Some(ConductorTuningParams {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
             }),
-            ..Default::default()
+            ..ConductorConfig::empty()
         }
         .into()
     }
@@ -65,7 +65,8 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        KitsuneP2pConfig::default().into()
+        todo!("this won't work, will it?");
+        KitsuneP2pConfig::empty().into()
     }
 
     /// Rendezvous config for SweetConductors
@@ -74,7 +75,7 @@ impl SweetConductorConfig {
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
 
-        let mut network = KitsuneP2pConfig::default();
+        let mut network = KitsuneP2pConfig::empty();
         if bootstrap {
             network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }

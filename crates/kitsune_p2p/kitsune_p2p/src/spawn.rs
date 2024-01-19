@@ -5,11 +5,13 @@ use crate::HostApiLegacy;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod actor;
-pub(crate) use actor::meta_net;
-use actor::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+pub(crate) use actor::meta_net;
+
+#[cfg(feature = "test_utils")]
 pub use actor::MockKitsuneP2pEventHandler;
+
+use self::actor::Internal;
 
 /// Spawn a new KitsuneP2p actor.
 pub async fn spawn_kitsune_p2p(
@@ -30,9 +32,12 @@ pub async fn spawn_kitsune_p2p(
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
     let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(builder.spawn(
-        KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host).await?,
-    ));
+    tokio::task::spawn(
+        builder.spawn(
+            actor::KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host)
+                .await?,
+        ),
+    );
 
     Ok((sender, evt_recv))
 }

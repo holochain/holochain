@@ -179,8 +179,8 @@ mod tests {
         KAgent, KBasis, KSpace, MaybeDelegate, OpHashList, Payload, SpaceInternal,
         SpaceInternalHandler, SpaceInternalHandlerResult, VecMXM, WireConHnd,
     };
+    use crate::spawn::actor::test_util::LegacyHostStub;
     use crate::spawn::actor::MetaNetCon;
-    use crate::spawn::test_util::LegacyHostStub;
     use crate::types::actor::BroadcastData;
     use crate::wire::Wire;
     use crate::KitsuneP2pResult;

@@ -795,7 +795,7 @@ impl TestSpaces {
         let spaces = Spaces::new(
             ConductorConfig {
                 data_root_path: Some(temp_dir.path().to_path_buf().into()),
-                ..Default::default()
+                ..ConductorConfig::empty()
             }
             .into(),
         )

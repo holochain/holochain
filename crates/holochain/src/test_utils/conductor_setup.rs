@@ -216,7 +216,7 @@ impl ConductorTestData {
             test_db_dir(),
             vec![dna_file],
             agents,
-            network.unwrap_or_default(),
+            network.unwrap_or_else(KitsuneP2pConfig::empty),
         )
         .await;
 

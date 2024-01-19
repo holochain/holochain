@@ -33,16 +33,13 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..Default::default()
-        }
-        .into(),
-    )
-    .unwrap();
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..ConductorConfig::empty()
+    };
+    let spaces = Spaces::new(config.clone().into()).unwrap();
     let conductor = Conductor::new(
-        Default::default(),
+        config.into(),
         ribosome_store,
         keystore,
         holochain_p2p,
@@ -87,16 +84,13 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..Default::default()
-        }
-        .into(),
-    )
-    .unwrap();
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..ConductorConfig::empty()
+    };
+    let spaces = Spaces::new(config.clone().into()).unwrap();
     let conductor = Conductor::new(
-        Default::default(),
+        config.into(),
         ribosome_store,
         test_keystore(),
         holochain_p2p,
@@ -372,7 +366,7 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..Default::default()
+        ..ConductorConfig::empty()
     };
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
