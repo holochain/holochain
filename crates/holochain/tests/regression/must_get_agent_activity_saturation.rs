@@ -38,6 +38,8 @@ async fn must_get_agent_activity_saturation() {
         hash = record.action_hashed().hash.clone();
     }
 
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
     let record: Option<Record> = conductors[1]
         .call(
             &bob_app.zome(TestWasm::MustGetAgentActivity.coordinator_zome_name()),
