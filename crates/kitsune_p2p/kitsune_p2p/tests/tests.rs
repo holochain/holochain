@@ -385,12 +385,16 @@ async fn two_nodes_broadcast_agent_info() {
     sender_a
         .join(space.clone(), agent_c.clone(), None, None)
         .await
-        .unwrap();
+        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions 
+        // and that is enough for this test to continue.
+        .unwrap_err();
     let agent_d = harness_a.create_agent().await;
     sender_a
         .join(space.clone(), agent_d.clone(), None, None)
         .await
-        .unwrap();
+        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions 
+        // and that is enough for this test to continue.
+        .unwrap_err();
 
     tokio::time::timeout(std::time::Duration::from_secs(60), {
         let agent_store_b = harness_b.agent_store();
@@ -479,7 +483,9 @@ async fn two_nodes_gossip_agent_info() {
     sender_b
         .join(space.clone(), agent_b.clone(), None, None)
         .await
-        .unwrap();
+        // This will error because it can't connect to the bootstrap server but it won't roll back the other join actions 
+        // and that is enough for this test to continue.
+        .unwrap_err();
 
     // Add agent_a to agent_b's store so these two nodes can gossip
     harness_b.agent_store().write().push(agent_a_info);
