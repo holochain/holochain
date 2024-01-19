@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct InternalStub {
     fetch_calls: Vec<(FetchKey, KSpace, FetchSource)>,
     pub incoming_publish_calls: Arc<

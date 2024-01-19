@@ -39,6 +39,12 @@ impl ConductorBuilder {
     }
 }
 
+impl Default for ConductorBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConductorBuilder {
     /// Set the ConductorConfig used to build this Conductor
     pub fn config(mut self, config: ConductorConfig) -> Self {

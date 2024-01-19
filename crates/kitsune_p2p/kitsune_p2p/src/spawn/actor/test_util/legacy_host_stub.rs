@@ -21,12 +21,13 @@ pub struct LegacyHostStub {
 
     pub put_agent_info_signed_calls: Arc<parking_lot::RwLock<Vec<PutAgentInfoSignedEvt>>>,
     pub notify_calls: Arc<parking_lot::RwLock<Vec<(KSpace, KAgent, Payload)>>>,
-    pub receive_ops_calls:
-        Arc<parking_lot::RwLock<Vec<(KSpace, Vec<KOp>, Option<kitsune_p2p_fetch::FetchContext>)>>>,
+    pub receive_ops_calls: Arc<parking_lot::RwLock<Vec<OpsCalls>>>,
 
     put_events: Receiver<PutAgentInfoSignedEvt>,
     abort_handle: AbortHandle,
 }
+
+pub type OpsCalls = (KSpace, Vec<KOp>, Option<kitsune_p2p_fetch::FetchContext>);
 
 impl LegacyHostStub {
     pub fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
