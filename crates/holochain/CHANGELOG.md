@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
+- **BREAKING CHANGE:** Wasmer-related items from `holochain_types` have been moved to crate `holochain_wasmer_host::module`.
 
 ## 0.3.0-beta-dev.33
 
