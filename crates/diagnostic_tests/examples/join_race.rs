@@ -4,7 +4,7 @@
 //! - Install multiple apps on each
 //! - Shut down and restart conductors until error manifests
 
-use std::{io::Write, time::Duration};
+use std::time::Duration;
 
 use holochain_diagnostics::{
     holochain::{
@@ -19,7 +19,8 @@ async fn main() {
     holochain_trace::test_run().ok();
 
     const NUM: usize = 10;
-    const MAX_WAIT_MS: Duration = Duration::from_secs(3);
+    const MIN_WAIT_MS: Duration = Duration::from_millis(100);
+    const MAX_WAIT_MS: Duration = Duration::from_secs(500);
 
     // let config = config_no_networking();
     let config = SweetConductorConfig::rendezvous(true);
@@ -35,7 +36,7 @@ async fn main() {
     let start = Instant::now();
 
     fn random_duration(rng: &mut StdRng, max: u64) -> Duration {
-        let min = 100;
+        let min = MIN_WAIT_MS.as_millis() as u64;
         Duration::from_millis(rng.gen_range(min..=max))
     }
 
@@ -56,12 +57,11 @@ async fn main() {
                             "{id} Failed to join: {:?}",
                             fail
                         ));
-                    } else if let Some(_) = status.iter().find(|s| matches!(s, CellStatus::Joining))
-                    {
-                        println!("{id} still joining, waiting 1 sec");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    } else if status.iter().all(|s| matches!(s, CellStatus::Joining)) {
+                        println!("{id} still joining");
+                        tokio::time::sleep(random_duration(&mut rng, 500)).await;
                     } else {
-                        println!("{id} JOINED");
+                        println!("{id} LIVE: {status:?}");
 
                         {
                             let t = Instant::now();
@@ -79,11 +79,22 @@ async fn main() {
                             c.startup().await;
                             let startup_dur =
                                 random_duration(&mut rng, MAX_WAIT_MS.as_millis() as u64);
-                            println!(
-                                "{id} restarted in {:?}, waiting {:?}",
-                                t.elapsed(),
-                                startup_dur
-                            );
+                            let elapsed = t.elapsed();
+
+                            if elapsed >= Duration::from_millis(500) {
+                                println!(
+                                    "\n{id}  !!!  restarted in {:?}, waiting {:?}  !!!\n",
+                                    t.elapsed(),
+                                    startup_dur
+                                );
+                            } else {
+                                println!(
+                                    "{id} restarted in {:?}, waiting {:?}",
+                                    t.elapsed(),
+                                    startup_dur
+                                );
+                            }
+
                             tokio::time::sleep(startup_dur).await;
                         }
                     }
@@ -93,7 +104,7 @@ async fn main() {
         .chain([tokio::task::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                println!("{}", ".".repeat(NUM));
+                println!("{} {:?}", ".".repeat(NUM), start.elapsed());
             }
         })]);
 
