@@ -119,10 +119,11 @@ pub struct RealRibosome {
 
     /// Dependencies for every zome.
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
-
-    /// File system and in-memory cache for wasm modules.
-    pub module_cache: Arc<RwLock<ModuleCache>>,
 }
+
+/// In-memory cache for wasm modules.
+static MODULE_CACHE: Lazy<Arc<RwLock<ModuleCache>>> =
+    Lazy::new(|| Arc::new(RwLock::new(ModuleCache::new(None))));
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
 // Map from a context key to a call context. Call contexts are passed to host
@@ -212,7 +213,6 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         };
 
         // Collect the number of entry and link types
@@ -304,14 +304,13 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         }
     }
 
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = self.module_cache.write();
+        let module_cache = MODULE_CACHE.write();
         let module = module_cache.get(cache_key, wasm)?;
         Ok(module)
     }
