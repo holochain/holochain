@@ -19,7 +19,7 @@ holo_hash = { version = "^0.2.4", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
 futures = "0.3"
 holochain_keystore = { version = "^0.2.4", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_p2p = { version = "^0.2.4", path = "../holochain_p2p" }
 holochain_types = { version = "^0.2.4", path = "../holochain_types" }
 holochain_util = { version = "^0.2.4", path = "../holochain_util" }

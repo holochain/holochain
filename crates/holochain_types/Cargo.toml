@@ -29,9 +29,9 @@ getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
 holo_hash = { version = "^0.2.4", path = "../holo_hash", features = ["encoding"] }
 holochain_keystore = { version = "^0.2.4", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.2.4"}
-holochain_wasmer_host = { version = "0.0.84", features = ["dylib"] }
+holochain_wasmer_host = "=0.0.92"
 holochain_util = { version = "^0.2.4", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.2.4", features = ["full"] }
 itertools = { version = "0.10" }
@@ -59,11 +59,11 @@ tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "rt" ] }
 tracing = "0.1.26"
-wasmer-middlewares = "2"
+wasmer = "=4.2.4"
+wasmer-middlewares = "=4.2.4"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
-
 
 # contrafact
 contrafact = { version = "0.2.0-rc.1", optional = true }
@@ -85,13 +85,17 @@ default = ["fixturators", "test_utils"]
 
 fixturators = ["holochain_zome_types/fixturators"]
 test_utils = [
-  "arbitrary",
-  "contrafact",
-  "holochain_zome_types/arbitrary",
+  "fuzzing",
   "holo_hash/arbitrary",
   "isotest",
   "mr_bundle/arbitrary",
   "holochain_zome_types/test_utils",
+]
+
+fuzzing = [
+  "arbitrary",
+  "contrafact",
+  "holochain_zome_types/fuzzing",
 ]
 
 sqlite-encrypted = [

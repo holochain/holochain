@@ -22,16 +22,16 @@ blake2b_simd = { version = "0.5.10", optional = true }
 derive_more = { version = "0.99", optional = true }
 fixt = { version = "^0.2.4", path = "../fixt", optional = true }
 futures = { version = "0.3", optional = true }
-holochain_serialized_bytes = { version = "=0.0.51", optional = true }
 kitsune_p2p_dht_arc = { version = "^0.2.4", path = "../kitsune_p2p/dht_arc" }
 holochain_util = { version = "^0.2.4", path = "../holochain_util", default-features = false }
+holochain_serialized_bytes = { version = "=0.0.53", optional = true }
 must_future = { version = "0.1", optional = true }
 rand = { version = "0.8.5", optional = true }
 rusqlite = { version = "0.29", optional = true }
 serde = { version = ">= 1.0, <= 1.0.166", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true }
-holochain_wasmer_common = { version = "=0.0.84", optional = true }
+holochain_wasmer_common = { version = "=0.0.92", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = ["preserve_order"] }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::core::ribosome::HostFnAccess;
 use holochain_types::access::Permission;
 use crate::core::ribosome::RibosomeError;
+use wasmer::RuntimeError;
 
 pub fn create_x25519_keypair(
     _ribosome: Arc<impl RibosomeT>,

@@ -8,24 +8,25 @@ documentation = "https://docs.rs/holochain_cli_bundle"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
-edition = "2021"
+    edition = "2021"
 
-[[bin]]
-name = "hc-app"
-path = "src/bin/hc-app.rs"
+    [[bin]]
+    name = "hc-app"
+    path = "src/bin/hc-app.rs"
 
-[[bin]]
-name = "hc-dna"
-path = "src/bin/hc-dna.rs"
+    [[bin]]
+    name = "hc-dna"
+    path = "src/bin/hc-dna.rs"
 
-[dependencies]
-holochain_wasmer_host = "=0.0.84"
+    [dependencies]
+holochain_wasmer_host = "=0.0.92"
+wasmer = "=4.2.4"
 futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = [ "derive" ] }
-holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.2.4"}
-holochain_serialized_bytes = "=0.0.51"
+holochain_serialized_bytes = "=0.0.53"
 holochain_types = { version = "^0.2.4", path = "../holochain_types" }
+holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.2.4"}
 mr_bundle = {version = "^0.2.4", path = "../mr_bundle"}
 serde = { version = ">= 1.0, <= 1.0.166", features = [ "derive" ] }
 serde_bytes = "0.11"

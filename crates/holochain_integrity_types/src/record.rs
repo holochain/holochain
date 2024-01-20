@@ -424,7 +424,7 @@ impl TryFrom<Record> for DeleteLink {
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a, T> arbitrary::Arbitrary<'a> for SignedHashed<T>
 where
     T: HashableContent,

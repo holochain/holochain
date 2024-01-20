@@ -6,6 +6,7 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 use tiny_keccak::{Hasher, Keccak, Sha3};
+use wasmer::RuntimeError;
 
 pub fn hash(
     _ribosome: Arc<impl RibosomeT>,

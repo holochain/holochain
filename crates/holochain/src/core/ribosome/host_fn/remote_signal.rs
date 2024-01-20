@@ -16,6 +16,7 @@ use holochain_zome_types::zome_io::ZomeCallUnsigned;
 use holochain_zome_types::Timestamp;
 use std::sync::Arc;
 use tracing::Instrument;
+use wasmer::RuntimeError;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(

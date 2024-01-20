@@ -6,6 +6,7 @@ use holochain_types::prelude::*;
 use holochain_types::signal::Signal;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn emit_signal(
     ribosome: Arc<impl RibosomeT>,

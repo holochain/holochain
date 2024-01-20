@@ -29,12 +29,12 @@ holochain_cascade = { version = "^0.2.4", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.2.4", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "^0.2.4", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.2.4", path = "../holochain_p2p" }
+holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { version = "^0.2.4", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.51"
 holochain_state = { version = "^0.2.4", path = "../holochain_state" }
 holochain_types = { version = "^0.2.4", path = "../holochain_types" }
 holochain_util = { version = "^0.2.4", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.84"
+holochain_wasmer_host = "=0.0.92"
 holochain_websocket = { version = "^0.2.4", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.2.4", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
@@ -82,8 +82,9 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 holochain_wasm_test_utils = { version = "^0.2.4", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
-wasmer-middlewares = "2"
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
+wasmer = "=4.2.4"
+wasmer-middlewares = "=4.2.4"
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }

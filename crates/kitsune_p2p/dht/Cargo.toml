@@ -33,7 +33,7 @@ tracing = "0.1.29"
 [dev-dependencies]
 kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"]}
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
-holochain_serialized_bytes = "0.0.51"
+holochain_serialized_bytes = "0.0.53"
 maplit = "1"
 holochain_trace = { version = "^0.2.4", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"

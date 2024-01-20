@@ -31,6 +31,7 @@ members = [
     "migrate_agent_pass",
     "multiple_calls",
     "must_get",
+    "must_get_agent_activity",
     "post_commit_success",
     "post_commit_volley",
     "query",
@@ -52,6 +53,8 @@ members = [
     "whoami",
     "zome_info",
 ]
+
+resolver = "2"
 
 [profile.release]
 opt-level = "z"
