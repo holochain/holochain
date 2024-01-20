@@ -6,6 +6,81 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20240120.122931
+
+## [holochain\_cli-0.2.5-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain-0.2.5-rc.0](crates/holochain/CHANGELOG.md#0.2.5-rc.0)
+
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Runtime engines to execute zome fns did not live long enough and were producing `RuntimeError: out of bounds memory access`. Engines are kept for the lifetime of the conductor process now.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
+- Make sqlite-encrypted a default feature
+- Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These ‘store record’ checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don’t actually need.
+- Sys validation will now validate that a DeleteLink points to an action which is a CreateLink through the `link_add_address` of the delete.
+
+## [holochain\_cli\_bundle-0.2.5-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_cli\_run\_local\_services-0.2.5-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.5-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_cascade-0.2.5-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_conductor\_api-0.2.5-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.5-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.5-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_websocket-0.2.5-rc.0](crates/holochain_websocket/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.5-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.5-rc.0)
+
+## [hdk-0.2.5-rc.0](crates/hdk/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_state-0.2.5-rc.0](crates/holochain_state/CHANGELOG.md#0.2.5-rc.0)
+
+## [hdi-0.3.5-rc.0](crates/hdi/CHANGELOG.md#0.3.5-rc.0)
+
+## [holochain\_p2p-0.2.5-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.5-rc.0)
+
+## [hdk\_derive-0.2.5-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_types-0.2.5-rc.0](crates/holochain_types/CHANGELOG.md#0.2.5-rc.0)
+
+Refactor: Wasmer-related items from holochain\_types have been moved to crate `holochain_wasmer_host::module`.
+
+## [holochain\_keystore-0.2.5-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_sqlite-0.2.5-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.5-rc.0)
+
+- Provide a mechanism to automatically encrypt databases which are currently unencrypted. This is useful if you are switching from a Holochain built with the `sqlite` feature, to a Holochain built with `sqlite-encrypted`. In order to enable this mechanism you will need to set the environment variable `HOLOCHAIN_MIGRATE_UNENCRYPTED=true`. *DANGER*: If you switch your Holochain without this environment variable then on first startup it will recognise your cache, dht, peer and kitsune metrics databases will be recognised as corrupt and automatically wiped. These databases may be rebuilt, assuming that the same data is still available from other peers, but please consider making a backup before attempting to make the switch.
+
+## [holochain\_zome\_types-0.2.5-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p-0.2.5-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_integrity\_types-0.2.5-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.5-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_proxy-0.2.5-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.5-rc.0)
+
+## [holo\_hash-0.2.5-rc.0](crates/holo_hash/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.5-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.5-rc.0)
+
+## [fixt-0.2.5-rc.0](crates/fixt/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_types-0.2.5-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_block-0.2.5-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.5-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.5-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.5-rc.0)
+
 # 20231214.142611
 
 ## [holochain\_cli-0.2.4](crates/holochain_cli/CHANGELOG.md#0.2.4)
