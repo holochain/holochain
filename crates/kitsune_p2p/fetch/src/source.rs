@@ -91,7 +91,7 @@ impl SourceState {
     }
 
     /// Check the state of this source. If the source has had too many timeouts then it is still considered valid but it will be put into a backoff state.
-    /// If the source is in a backoff state state and the backoff has expired then the check fails and this source should be dropped.
+    /// If the source is in a backoff state and the backoff has expired, then the check fails and this source should be dropped.
     pub fn check(&mut self, config: FetchConfig) -> bool {
         match &self.current_state {
             SourceCurrentState::Available(num_timed_out) => {
