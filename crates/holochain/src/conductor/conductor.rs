@@ -152,7 +152,9 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 pub type ConductorHandle = Arc<Conductor>;
 
 /// There is nothing extra to say about cells at the moment.
-pub type CellStatus = ();
+/// This is a placeholder for extra cell-specific info we may want to store.
+#[derive(Debug, Clone, Serialize)]
+pub struct CellStatus;
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
 #[derive(Debug, Clone, Serialize)]
@@ -2419,7 +2421,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: (),
+                        status: CellStatus,
                     },
                 );
             }
