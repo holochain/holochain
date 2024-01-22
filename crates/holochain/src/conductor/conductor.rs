@@ -151,10 +151,42 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
-/// There is nothing extra to say about cells at the moment.
-/// This is a placeholder for extra cell-specific info we may want to store.
-#[derive(Debug, Clone, Serialize)]
-pub struct CellStatus;
+/// Legacy CellStatus which is no longer used. This can be removed
+/// and is only here to avoid breaking deserialization specs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CellStatus {
+    /// Kitsune knows about this Cell and it is considered fully "online"
+    Joined,
+
+    /// The Cell is on its way to being fully joined. It is a valid Cell from
+    /// the perspective of the conductor, and can handle HolochainP2pEvents,
+    /// but it is considered not to be fully running from the perspective of
+    /// app status, i.e. if any app has a required Cell with this status,
+    /// the app is considered to be in the Paused state.
+    PendingJoin(PendingJoinReason),
+
+    /// The Cell is currently in the process of trying to join the network.
+    Joining,
+}
+
+/// The reason why a cell is waiting to join the network.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PendingJoinReason {
+    /// The initial state, no attempt has been made to join the network yet.
+    Initial,
+
+    /// The join failed with an error that is safe to retry, such as not
+    /// being connected to the internet.
+    Retry(String),
+
+    /// The network join failed and will not be retried. This will impact
+    /// the status of the associated
+    /// app and require manual intervention from the user.
+    Failed(String),
+
+    /// The join attempt has timed out.
+    TimedOut,
+}
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
 #[derive(Debug, Clone, Serialize)]
@@ -2421,7 +2453,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: CellStatus,
+                        status: CellStatus::Joined,
                     },
                 );
             }
