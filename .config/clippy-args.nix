@@ -12,5 +12,6 @@
   -D clippy::correctness \
   -D clippy::dbg_macro \
   \
-  -A clippy::redundant_pattern_matching
+  -A clippy::redundant_pattern_matching \
+  -A clippy::collapsible_else_if
 ''
