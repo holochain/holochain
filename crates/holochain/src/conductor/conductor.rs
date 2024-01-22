@@ -93,7 +93,6 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
@@ -102,9 +101,7 @@ use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneP2pError;
 use rusqlite::Transaction;
-use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -1574,22 +1571,14 @@ mod cell_impls {
             }
         }
 
-        /// Iterator over only the cells which are fully "live", meaning they have been
+        /// Iterator over cells which are fully "live", meaning they have been
         /// fully initialized and are registered with the kitsune network layer.
         /// Generally used to handle conductor interface requests.
-        pub fn live_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cell_ids(|status| status.is_live())
-        }
-
-        /// List CellIds for Cells which match a status filter
-        pub fn running_cell_ids(&self, filter: impl Fn(&CellStatus) -> bool) -> HashSet<CellId> {
-            self.running_cells.share_ref(|cells| {
-                cells
-                    .iter()
-                    .filter_map(move |(id, cell)| filter(&cell.status).then_some(id))
-                    .cloned()
-                    .collect()
-            })
+        ///
+        /// If a cell is in `running_cells`, then it is "live".
+        pub fn running_cell_ids(&self) -> HashSet<CellId> {
+            self.running_cells
+                .share_ref(|cells| cells.keys().cloned().collect())
         }
     }
 }
@@ -1734,7 +1723,6 @@ mod clone_cell_impls {
 mod app_status_impls {
     use super::*;
     use holochain_p2p::AgentPubKeyExt;
-    use kitsune_p2p_bootstrap_client::prelude::BootstrapClientError;
 
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
@@ -1883,15 +1871,19 @@ mod app_status_impls {
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    cell.holochain_p2p_dna()
+                    if let Ok(_) = cell
+                        .holochain_p2p_dna()
                         .clone()
                         .join(agent_pubkey, maybe_agent_info, maybe_initial_arc)
-                        .await;
-
-                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
-                        node: sleuth_id,
-                        agent: cell_id.agent_pubkey().clone()
-                    });
+                        .await
+                    {
+                        aitia::trace!(&hc_sleuth::Event::AgentJoined {
+                            node: sleuth_id,
+                            agent: cell_id.agent_pubkey().clone()
+                        });
+                    } else {
+                        todo!("what to do on error?")
+                    }
                 }
             }))
             .await;
@@ -1928,7 +1920,7 @@ mod app_status_impls {
             // we might consider relaxing this check so that this race condition isn't
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
-            let cell_ids: HashSet<CellId> = self.live_cell_ids();
+            let cell_ids: HashSet<CellId> = self.running_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1977,16 +1969,6 @@ mod app_status_impls {
                 })
                 .await?;
             Ok(delta)
-        }
-
-        fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
-            match e {
-                // TODO this is brittle because some other network access could fail first if Kitune changes.
-                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Bootstrap(
-                    BootstrapClientError::Reqwest(e),
-                )) => e.is_connect(),
-                _ => false,
-            }
         }
     }
 }
@@ -2069,7 +2051,7 @@ mod scheduler_impls {
         pub(crate) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
-                for cell_id in self.live_cell_ids() {
+                for cell_id in self.running_cell_ids() {
                     if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
                         cell_arcs.push(cell_arc);
                     }
@@ -2437,7 +2419,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: CellStatus::Isolated,
+                        status: (),
                     },
                 );
             }
@@ -2445,24 +2427,6 @@ impl Conductor {
         for trigger in triggers {
             trigger.initialize_workflows();
         }
-    }
-
-    /// Return Cells which are pending network join, and mark them as
-    /// currently joining.
-    ///
-    /// Used to discover which cells need to be joined to the network.
-    /// The cells' status are upgraded to `Joining` when this function is called.
-    fn get_cells_to_attempt_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
-        self.running_cells.share_mut(|cells| {
-            cells
-                .iter_mut()
-                .filter_map(|(id, item)| {
-                    item.status
-                        .should_retry_join()
-                        .then_some((id.clone(), item.cell.clone()))
-                })
-                .collect()
-        })
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.

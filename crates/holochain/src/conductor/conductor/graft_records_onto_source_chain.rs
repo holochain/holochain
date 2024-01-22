@@ -104,7 +104,7 @@ pub(crate) async fn graft_records_onto_source_chain(
 
     // Check which ops need to be integrated.
     // Only integrated if a cell is installed.
-    if conductor.live_cell_ids().contains(&cell_id) {
+    if conductor.running_cell_ids().contains(&cell_id) {
         holochain_state::integrate::authored_ops_to_dht_db(
             &network,
             ops_to_integrate,

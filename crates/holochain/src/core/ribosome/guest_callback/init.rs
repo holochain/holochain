@@ -225,7 +225,6 @@ mod test {
 mod slow_tests {
     use super::InitResult;
     use crate::conductor::api::error::ConductorApiResult;
-    use crate::conductor::conductor::CellStatus;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
@@ -359,10 +358,7 @@ mod slow_tests {
 
             match create_post_result {
                 Err(crate::conductor::api::error::ConductorApiError::ConductorError(
-                    crate::conductor::error::ConductorError::CellNetworkNotReady(
-                        CellStatus::Unrecoverable(_),
-                    )
-                    | crate::conductor::error::ConductorError::CellDisabled(_),
+                    crate::conductor::error::ConductorError::CellDisabled(_),
                 )) => {
                     // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
                 }

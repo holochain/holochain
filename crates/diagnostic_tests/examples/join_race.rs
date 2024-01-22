@@ -50,7 +50,7 @@ async fn main() {
                     let status: Vec<CellStatus> = c.cell_status().values().cloned().collect();
                     if let Some(fail) = status
                         .iter()
-                        .find(|s| matches!(s, CellStatus::Unrecoverable(_)))
+                        .find(|_s| todo!("this used to be a match on the Unrecoverable cell status. What is the equivalent now?"))
                     {
                         return anyhow::Result::<()>::Err(anyhow::anyhow!(
                             "{id} Failed to join: {:?}",
