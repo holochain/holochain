@@ -32,7 +32,7 @@ holochain_keystore = { version = "^0.3.0-beta-dev.25", path = "../holochain_keys
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.30"}
-holochain_wasmer_host = "=0.0.91"
+holochain_wasmer_host = { workspace = true }
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", features = ["backtrace"] }
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.24", features = ["full"] }
 itertools = { version = "0.10" }
@@ -60,8 +60,6 @@ tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "rt" ] }
 tracing = "0.1.26"
-wasmer = "4.2.2"
-wasmer-middlewares = "4.2.2"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
