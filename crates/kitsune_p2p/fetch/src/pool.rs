@@ -257,7 +257,7 @@ impl State {
         let batch_size = config.fetch_batch_size();
 
         let mut to_fetch = vec![];
-        // The queue provides a `front` method which will repeatedly loop over all the items it contains so bound the
+        // The queue provides a `front` method which will repeatedly loop over all the items it contains to bound the
         // search by the size of the queue.
         for _ in 0..self.queue.len() {
             // If we have enough items, stop looking
