@@ -32,7 +32,7 @@ pub use pool_reader::*;
 /// source to the front of the list of sources, and the contexts are merged by the
 /// method defined in [`FetchPoolConfig`].
 ///
-/// Each item consists a FetchKey (Op) and one or more sources (Agent) from which to fetch it.
+/// Each item consists of a FetchKey (Op) and one or more sources (Agent) from which to fetch it.
 /// Items can be retrieved in batches using [`FetchPool::get_items_to_fetch`]. Any items which
 /// were considered while building the batch, either because they were still awaiting a response
 /// or because they were returned in the batch, will be moved to the end of the queue. This makes
