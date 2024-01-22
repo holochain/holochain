@@ -1,3 +1,6 @@
+# Keep the high-level lints at the top of this list,
+# and add fine-grained exceptions to the bottom.
+
 ''
   -A clippy::nursery \
   -A clippy::cargo \
@@ -7,6 +10,7 @@
   -D clippy::complexity \
   -D clippy::perf \
   -D clippy::correctness \
-  \
   -D clippy::dbg_macro \
+  \
+  -A clippy::redundant_pattern_matching
 ''
