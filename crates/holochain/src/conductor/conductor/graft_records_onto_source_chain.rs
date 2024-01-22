@@ -10,7 +10,7 @@ pub(crate) async fn graft_records_onto_source_chain(
     records: Vec<Record>,
 ) -> ConductorApiResult<()> {
     // Require that the cell is installed.
-    if let err @ Err(ConductorError::CellMissing(_)) = conductor.cell_by_id(&cell_id, false).await {
+    if let err @ Err(ConductorError::CellMissing(_)) = conductor.cell_by_id(&cell_id).await {
         let _ = err?;
     }
 
@@ -116,7 +116,7 @@ pub(crate) async fn graft_records_onto_source_chain(
 
         // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
         conductor
-            .cell_by_id(&cell_id, false)
+            .cell_by_id(&cell_id)
             .await?
             .notify_authored_ops_moved_to_limbo();
     }
