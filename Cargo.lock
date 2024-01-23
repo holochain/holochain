@@ -551,6 +551,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "backon"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c1a6197b2120bb2185a267f6515038558b019e92b832bb0320e96d66268dcf9"
+dependencies = [
+ "fastrand 1.9.0",
+ "futures-core",
+ "pin-project",
+ "tokio",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4331,14 +4343,15 @@ name = "kitsune_p2p_fetch"
 version = "0.3.0-beta-dev.21"
 dependencies = [
  "arbitrary",
+ "backon",
  "derive_more",
  "holochain_serialized_bytes",
  "holochain_trace",
  "human-repr",
+ "indexmap 2.1.0",
  "kitsune_p2p_fetch",
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
- "linked-hash-map",
  "pretty_assertions",
  "proptest",
  "proptest-derive 0.4.0",
@@ -4633,12 +4646,6 @@ checksum = "9d240c6f7e1ba3a28b0249f774e6a9dd0175054b52dfbb61b16eb8505c3785c9"
 dependencies = [
  "cc",
 ]
-
-[[package]]
-name = "linked-hash-map"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "linux-raw-sys"

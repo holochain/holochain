@@ -18,7 +18,8 @@ kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../types" }
 serde = { version = "1.0", features = [ "derive" ] }
 tokio = { version = "1.27", features = [ "full" ] }
 tracing = "0.1.29"
-linked-hash-map = "0.5.6"
+backon = "0.4.1"
+indexmap = "2.1.0"
 
 human-repr = { version = "1", optional = true}
 arbitrary = { version = "1", optional = true }
