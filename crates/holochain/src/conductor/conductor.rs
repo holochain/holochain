@@ -520,6 +520,8 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
+    use std::borrow::BorrowMut;
+
     use super::*;
 
     impl Conductor {
@@ -762,6 +764,10 @@ mod dna_impls {
 
         /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
+            if self.get_ribosome(dna.dna_hash()).is_ok() {
+                // ribosome for dna is already registered in store
+                return Ok(());
+            }
             let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
             self.register_dna_entry_defs(entry_defs);
