@@ -88,7 +88,7 @@ pub struct DnaModifiers {
     /// The time used to denote the origin of the network, used to calculate
     /// time windows during gossip.
     /// All Action timestamps must come after this time.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
+    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::ZERO"))]
     pub origin_time: Timestamp,
 
     /// The smallest unit of time used for gossip time windows.

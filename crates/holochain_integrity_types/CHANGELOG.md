@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Changed the default `DnaModifiers::origin_time` from the current time to the unix epoch. This only gets used if you don't set an origin time for your happ, which is a good thing to do even if you set it to the same value as the default. This value is used by Kitsune as a cutoff for gossip. So for a happ which doesn't set a value for this field, users wouldn't have old data gossiped to them because they'd never ask for hashes from before their install time. This is confusing when it happens because it's not made visible anywhere unless you debug the time ranges that Kitsune is requesting.
+
 ## 0.3.0-beta-dev.23
 
 ## 0.3.0-beta-dev.22
