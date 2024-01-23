@@ -23,7 +23,8 @@ serde_bytes = "0.11"
 thiserror = "1.0"
 tokio = { version = "1.27", features = [ "full" ] }
 tracing = "0.1.29"
-linked-hash-map = "0.5.6"
+backon = "0.4.1"
+indexmap = "2.1.0"
 
 human-repr = { version = "1", optional = true}
 
