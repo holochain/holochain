@@ -206,7 +206,10 @@ impl HostFnBuilder {
 
 impl RealRibosome {
     /// Create a new instance
-    pub fn new(dna_file: DnaFile, wasmer_module_cache: Arc<RwLock<ModuleCache>>) -> RibosomeResult<Self> {
+    pub fn new(
+        dna_file: DnaFile,
+        wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+    ) -> RibosomeResult<Self> {
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
