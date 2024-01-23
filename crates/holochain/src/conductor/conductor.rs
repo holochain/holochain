@@ -288,6 +288,7 @@ mod startup_shutdown_impls {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
             let maybe_data_root_path = config
                 .data_root_path
+                .clone()
                 .and_then(|path| Some(PathBuf::from(path)));
 
             Self {
