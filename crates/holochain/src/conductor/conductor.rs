@@ -289,7 +289,7 @@ mod startup_shutdown_impls {
             let maybe_data_root_path = config
                 .data_root_path
                 .clone()
-                .and_then(|path| Some(PathBuf::from(path)));
+                .map(|path| PathBuf::from(path));
 
             Self {
                 spaces,
@@ -2294,7 +2294,7 @@ mod misc_impls {
                 admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
                 app_interfaces: self
                     .app_interfaces
-                    .share_ref(|i| i.clone().keys().cloned().collect()),
+                    .share_ref(|i| i.keys().cloned().collect()),
             };
 
             let dump = ConductorDump {
