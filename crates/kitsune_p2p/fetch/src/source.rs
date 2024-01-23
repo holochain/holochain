@@ -256,7 +256,7 @@ mod tests {
             source_state.record_response();
 
             if i % 100 == 0 {
-                assert!(source_state.check(config.clone()));
+                assert!(source_state.is_valid(config.clone()));
             }
         }
 
@@ -276,7 +276,7 @@ mod tests {
             assert!(source_state.should_use());
 
             // The check should keep passing
-            source_state.check(config.clone());
+            source_state.is_valid(config.clone());
 
             // Record another timeout
             source_state.record_timeout();
@@ -286,7 +286,7 @@ mod tests {
         assert!(source_state.should_use());
 
         // Now it goes into a backoff state
-        source_state.check(config.clone());
+        source_state.is_valid(config.clone());
         assert!(!source_state.should_use());
 
         tokio::time::advance(Duration::from_secs(2)).await;
@@ -317,7 +317,7 @@ mod tests {
         for _ in 0..=config.source_unavailable_timeout_threshold() {
             source_state.record_timeout();
         }
-        source_state.check(config.clone());
+        source_state.is_valid(config.clone());
         assert!(!source_state.should_use());
 
         for _ in 0..BACKOFF_RETRY_COUNT {
@@ -328,6 +328,6 @@ mod tests {
         }
 
         // The source state is now dead and should be removed.
-        assert!(!source_state.check(config.clone()));
+        assert!(!source_state.is_valid(config.clone()));
     }
 }

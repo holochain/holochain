@@ -342,7 +342,7 @@ impl State {
     /// Any ops which don't have any sources left will be removed from the queue.
     pub fn check_sources(&mut self, config: FetchConfig) {
         self.sources
-            .retain(|_, source| source.check(config.clone()));
+            .retain(|_, source| source.is_valid(config.clone()));
 
         // Drop any sources we are no longer using from the sources used by items
         let keys: Vec<_> = self.queue.keys().cloned().collect();
