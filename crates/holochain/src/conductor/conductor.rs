@@ -100,10 +100,12 @@ use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
+use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
+use parking_lot::RwLock;
 use rusqlite::Transaction;
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
@@ -248,6 +250,10 @@ pub struct Conductor {
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
     pub(crate) services: RwShare<Option<ConductorServices>>,
+
+    /// File system and in-memory cache for wasmer modules.
+    // Used in ribosomes but kept here as a single instance.
+    pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
 }
 
 impl Conductor {
@@ -280,6 +286,10 @@ mod startup_shutdown_impls {
             outcome_sender: OutcomeSender,
         ) -> Self {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
+            let maybe_data_root_path = config
+                .data_root_path
+                .and_then(|path| Some(PathBuf::from(path)));
+
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
@@ -296,6 +306,7 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 services: RwShare::new(None),
+                wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
             }
         }
 
@@ -635,7 +646,7 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file, self.config.data_root_path.clone())?;
+                let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone())?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -753,7 +764,7 @@ mod dna_impls {
 
         /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-            let ribosome = RealRibosome::new(dna, self.config.data_root_path.clone())?;
+            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
             self.register_dna_entry_defs(entry_defs);
             self.add_ribosome_to_store(ribosome);
