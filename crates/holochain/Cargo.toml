@@ -135,6 +135,7 @@ criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
 indoc = "1.0"
 isotest = "0"
+kitsune_p2p = { version = "^0.3.0-beta-dev.28", path = "../kitsune_p2p/kitsune_p2p", features = [ "test_utils" ] }
 maplit = "1"
 pretty_assertions = "1.4"
 rand_dalek = {package = "rand", version = "0.7"}

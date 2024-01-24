@@ -762,3 +762,167 @@ async fn full_state_dump_cursor_works() {
 
     assert_eq!(1, new_all_dht_ops_count);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
+// NOTE: This is a full integration test that
+// actually runs the holochain binary
+async fn repro_network_join_failure() {
+    holochain_trace::test_run().ok();
+    static REQ_TIMEOUT_MS: u64 = 15000;
+
+    let alice_dir = TempDir::new().unwrap();
+    let bob_dir = TempDir::new().unwrap();
+    let alice_path = alice_dir.path().to_path_buf();
+    let bob_path = bob_dir.path().to_path_buf();
+    let alice_root = alice_path.clone();
+    let bob_root = bob_path.clone();
+
+    let (signal_addr, _abort_handle) = kitsune_p2p::test_util::start_signal_srv();
+    let mut kconfig = kitsune_p2p_types::config::KitsuneP2pConfig::default();
+    kconfig.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
+        signal_url: format!("ws://{:?}", signal_addr),
+    }];
+
+    let mut alice_config = create_config(0, alice_root.into());
+    let mut bob_config = create_config(0, bob_root.into());
+    alice_config.network = kconfig.clone();
+    bob_config.network = kconfig;
+
+    let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
+    let name = format!("fake_dna");
+
+    // Install Dna
+    let dna = holochain_types::test_utils::fake_dna_zomes_named(
+        &uuid::Uuid::new_v4().to_string(),
+        &name,
+        zomes.clone(),
+    );
+    let original_dna_hash = dna.dna_hash().clone();
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+
+    let alice_config_path = write_config(alice_path.clone(), &alice_config);
+
+    let (alice_process, alice_port) = start_holochain(alice_config_path.clone()).await;
+    let (bob_process, bob_port) = start_holochain(write_config(bob_path, &bob_config)).await;
+
+    let alice_port = alice_port.await.unwrap();
+    let bob_port = bob_port.await.unwrap();
+
+    let (mut alice_ws, _) = websocket_client_by_port(alice_port).await.unwrap();
+    let (mut bob_ws, _) = websocket_client_by_port(bob_port).await.unwrap();
+
+    let alice_agent = generate_agent_pubkey(&mut alice_ws, REQ_TIMEOUT_MS).await;
+    let bob_agent = generate_agent_pubkey(&mut bob_ws, REQ_TIMEOUT_MS).await;
+    // println!("[{}] Agent pub key generated", i);
+
+    let alice_dna_hash = register_and_install_dna_named(
+        &mut alice_ws,
+        original_dna_hash.clone(),
+        alice_agent,
+        fake_dna_path.clone(),
+        None,
+        name.clone(),
+        name.clone(),
+        REQ_TIMEOUT_MS,
+    )
+    .await;
+
+    let bob_dna_hash = register_and_install_dna_named(
+        &mut bob_ws,
+        original_dna_hash.clone(),
+        bob_agent,
+        fake_dna_path.clone(),
+        None,
+        name.clone(),
+        name.clone(),
+        REQ_TIMEOUT_MS,
+    )
+    .await;
+
+    assert_eq!(alice_dna_hash, bob_dna_hash);
+
+    let alice_res: AdminResponse = alice_ws
+        .request(AdminRequest::EnableApp {
+            installed_app_id: name.clone(),
+        })
+        .await
+        .unwrap();
+    dbg!(alice_res);
+    let bob_res: AdminResponse = bob_ws
+        .request(AdminRequest::EnableApp {
+            installed_app_id: name.clone(),
+        })
+        .await
+        .unwrap();
+    dbg!(bob_res);
+
+    if let AdminResponse::NetworkMetricsDumped(metrics) = alice_ws
+        .request(AdminRequest::DumpNetworkMetrics { dna_hash: None })
+        .await
+        .unwrap()
+    {
+        dbg!(metrics);
+    } else {
+        unreachable!();
+    }
+
+    let before = std::time::Instant::now();
+
+    drop(alice_process);
+    // drop(bob_process);
+
+    let (alice_process, alice_port) = start_holochain(alice_config_path).await;
+
+    tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+
+    let alice_port = alice_port.await.unwrap();
+
+    let (mut alice_ws, _) = websocket_client_by_port(alice_port).await.unwrap();
+
+    if let AdminResponse::AppEnabled { app, errors: _ } = alice_ws
+        .request(AdminRequest::EnableApp {
+            installed_app_id: name,
+        })
+        .await
+        .unwrap()
+    {
+        assert_eq!(app.status, holochain_conductor_api::AppInfoStatus::Running);
+    } else {
+        unreachable!();
+    }
+}
+
+/*
+
+/// Test that network join doesn't hang up just because some recently-seen
+/// peers are not available
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_network_join_real() -> anyhow::Result<()> {
+    let t = tempfile::TempDir::new().unwrap();
+    let path = t.path().join("config.yaml");
+    let config = SweetConductorConfig::rendezvous(true);
+
+    let (signal_addr, abort_handle) = start_signal_srv();
+    let mut kconfig = kitsune_p2p_types::config::KitsuneP2pConfig::default();
+    kconfig.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
+        signal_url: format!("ws://{:?}", signal_addr),
+    }];
+    let mut config = ConductorConfig::default();
+    config.network = kconfig;
+
+    std::fs::write(&path, serde_yaml::to_string(&config)?)?;
+
+    let (alice, alice_port) = crate::test_utils::start_holochain(path.clone()).await;
+    let (bob, bob_port) = crate::test_utils::start_holochain(path.clone()).await;
+
+    let alice_port = alice_port.await?;
+    let bob_port = bob_port.await?;
+
+    dbg!(alice_port, bob_port);
+
+    Ok(())
+}
+
+*/
