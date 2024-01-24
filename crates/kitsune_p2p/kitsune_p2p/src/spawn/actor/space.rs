@@ -512,8 +512,6 @@ impl SpaceInternalHandler for Space {
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
                         size: op_hash.maybe_size(),
-                        // TODO - get the author from somewhere
-                        author: None,
                         context: Some(context),
                         transfer_method: TransferMethod::Publish,
                     });
@@ -1555,12 +1553,19 @@ impl Space {
             match network_type {
                 NetworkType::QuicMdns => tracing::warn!("NOT publishing leaves to mdns"),
                 NetworkType::QuicBootstrap => {
-                    kitsune_p2p_bootstrap_client::put(
+                    match kitsune_p2p_bootstrap_client::put(
                         bootstrap_service.clone(),
                         agent_info_signed,
                         bootstrap_net,
                     )
-                    .await?;
+                    .await {
+                        Ok(_) => {
+                            tracing::debug!("Successfully publish agent info to the bootstrap service");
+                        }
+                        Err(err) => {
+                            tracing::info!(?err, "Failed to publish agent info to the bootstrap service while leaving");
+                        }
+                    }
                 }
             }
 

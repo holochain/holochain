@@ -32,16 +32,13 @@ mod tests {
     use crate::test_utils::*;
     use crate::{pool::tests::*, State};
     use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-    use linked_hash_map::LinkedHashMap;
     use std::sync::Arc;
 
     #[test]
     fn queue_info_empty() {
         let fetch_pool_reader = FetchPoolReader(FetchPool {
-            config: Arc::new(Config(1, 1)),
-            state: ShareOpen::new(State {
-                queue: LinkedHashMap::new(),
-            }),
+            config: Arc::new(TestFetchConfig(1, 1)),
+            state: ShareOpen::new(Default::default()),
         });
 
         let info = fetch_pool_reader.info([test_space(0), test_space(1)].into_iter().collect());
@@ -51,16 +48,22 @@ mod tests {
 
     #[test]
     fn queue_info_fetch_no_spaces() {
-        let cfg = Config(1, 1);
+        let cfg = Arc::new(TestFetchConfig(1, 1));
         let q = {
-            let mut queue = [(test_key_op(1), item(&cfg, test_sources(0..=2), test_ctx(1)))];
+            let mut queue = [(
+                test_key_op(1),
+                item(cfg.clone(), test_sources(0..=2), test_ctx(1)),
+            )];
 
             queue[0].1.size = Some(100.into());
 
             let queue = queue.into_iter().collect();
             FetchPoolReader(FetchPool {
-                config: Arc::new(cfg),
-                state: ShareOpen::new(State { queue }),
+                config: cfg,
+                state: ShareOpen::new(State {
+                    queue,
+                    ..Default::default()
+                }),
             })
         };
 
@@ -72,12 +75,21 @@ mod tests {
 
     #[test]
     fn queue_info() {
-        let cfg = Config(1, 1);
+        let cfg = Arc::new(TestFetchConfig(1, 1));
         let q = {
             let mut queue = [
-                (test_key_op(1), item(&cfg, test_sources(0..=2), test_ctx(1))),
-                (test_key_op(2), item(&cfg, test_sources(1..=3), test_ctx(1))),
-                (test_key_op(3), item(&cfg, test_sources(2..=4), test_ctx(1))),
+                (
+                    test_key_op(1),
+                    item(cfg.clone(), test_sources(0..=2), test_ctx(1)),
+                ),
+                (
+                    test_key_op(2),
+                    item(cfg.clone(), test_sources(1..=3), test_ctx(1)),
+                ),
+                (
+                    test_key_op(3),
+                    item(cfg.clone(), test_sources(2..=4), test_ctx(1)),
+                ),
             ];
 
             queue[0].1.size = Some(100.into());
@@ -85,8 +97,11 @@ mod tests {
 
             let queue = queue.into_iter().collect();
             FetchPoolReader(FetchPool {
-                config: Arc::new(cfg),
-                state: ShareOpen::new(State { queue }),
+                config: cfg,
+                state: ShareOpen::new(State {
+                    queue,
+                    ..Default::default()
+                }),
             })
         };
 
@@ -98,13 +113,13 @@ mod tests {
 
     #[test]
     fn queue_info_filter_spaces() {
-        let cfg = Config(1, 1);
+        let cfg = Arc::new(TestFetchConfig(1, 1));
         let q = {
-            let mut item_for_space_1 = item(&cfg, test_sources(0..=2), test_ctx(1));
+            let mut item_for_space_1 = item(cfg.clone(), test_sources(0..=2), test_ctx(1));
             item_for_space_1.space = test_space(1);
             item_for_space_1.size = Some(100.into());
 
-            let mut item_for_space_2 = item(&cfg, test_sources(0..=2), test_ctx(1));
+            let mut item_for_space_2 = item(cfg.clone(), test_sources(0..=2), test_ctx(1));
             item_for_space_2.space = test_space(2);
             item_for_space_2.size = Some(500.into());
 
@@ -115,8 +130,11 @@ mod tests {
 
             let queue = queue.into_iter().collect();
             FetchPoolReader(FetchPool {
-                config: Arc::new(cfg),
-                state: ShareOpen::new(State { queue }),
+                config: cfg,
+                state: ShareOpen::new(State {
+                    queue,
+                    ..Default::default()
+                }),
             })
         };
 
