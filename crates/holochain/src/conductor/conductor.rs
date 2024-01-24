@@ -1,4 +1,6 @@
 #![deny(missing_docs)]
+#![allow(deprecated)]
+
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
@@ -141,8 +143,11 @@ pub use state_impls::*;
 
 mod graft_records_onto_source_chain;
 
-/// How long we should attempt to achieve a "well-connected" CellStatus when first activating a cell,
+/// How long we should attempt to achieve a "network join" when first activating a cell,
 /// before moving on and letting the network health activity go on in the background.
+///
+/// This gives us a chance to start an app in an "online" state, increasing the probability
+/// of an app having full network access as soon as its UI begins making requests.
 pub const JOIN_NETWORK_WAITING_PERIOD: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// A list of Cells which failed to start, and why
@@ -154,6 +159,7 @@ pub type ConductorHandle = Arc<Conductor>;
 /// Legacy CellStatus which is no longer used. This can be removed
 /// and is only here to avoid breaking deserialization specs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[deprecated = "Only here for deserialization, should be removed altogether when all clients are updated"]
 pub enum CellStatus {
     /// Kitsune knows about this Cell and it is considered fully "online"
     Joined,
@@ -189,17 +195,12 @@ pub enum PendingJoinReason {
 }
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
-#[derive(Debug, Clone, Serialize)]
-#[serde(into = "CellStatus")]
+#[derive(Debug, Clone)]
+#[allow(deprecated)]
+#[allow(unused)]
 struct CellItem {
     cell: Arc<Cell>,
     status: CellStatus,
-}
-
-impl From<CellItem> for CellStatus {
-    fn from(item: CellItem) -> Self {
-        item.status
-    }
 }
 
 #[allow(dead_code)]
@@ -257,16 +258,6 @@ impl Conductor {
     /// Create a conductor builder.
     pub fn builder() -> ConductorBuilder {
         ConductorBuilder::new()
-    }
-
-    /// Get a map with the status of each cell
-    pub fn cell_status(&self) -> HashMap<CellId, CellStatus> {
-        self.running_cells.share_ref(|running_cells| {
-            running_cells
-                .iter()
-                .map(|(cell_id, cell_item)| (cell_id.clone(), cell_item.status.clone()))
-                .collect()
-        })
     }
 }
 
@@ -1922,8 +1913,7 @@ mod app_status_impls {
             }))
             .await;
 
-            // Add the newly created cells to the Conductor with the Isolated
-            // status, and start their workflow loops
+            // Add the newly created cells to the Conductor
             self.add_and_initialize_cells(new_cells);
 
             Ok(errors)
@@ -2179,7 +2169,7 @@ mod misc_impls {
         pub async fn dump_conductor_state(&self) -> ConductorApiResult<String> {
             #[derive(Serialize, Debug)]
             pub struct ConductorSerialized {
-                running_cells: Vec<((DnaHashB64, AgentPubKeyB64), CellItem)>,
+                running_cells: Vec<(DnaHashB64, AgentPubKeyB64)>,
                 shutting_down: bool,
                 admin_websocket_ports: Vec<u16>,
                 app_interfaces: Vec<AppInterfaceId>,
@@ -2195,9 +2185,9 @@ mod misc_impls {
                 running_cells: self.running_cells.share_ref(|c| {
                     c.clone()
                         .into_iter()
-                        .map(|(id, status)| {
+                        .map(|(id, _status)| {
                             let (dna, agent) = id.into_dna_and_agent();
-                            ((dna.into(), agent.into()), status)
+                            (dna.into(), agent.into())
                         })
                         .collect()
                 }),
@@ -2443,6 +2433,7 @@ impl Conductor {
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
+    #[allow(deprecated)]
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
         self.running_cells.share_mut(|cells| {

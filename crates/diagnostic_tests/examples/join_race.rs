@@ -3,13 +3,14 @@
 //! - Spin up multiple conductors
 //! - Install multiple apps on each
 //! - Shut down and restart conductors until error manifests
+//!
+//! NOTE: this doesn't currently *do* anything, it's just a framework for stopping
+//! and starting many conductors in a haphazard fashion, trying to trip it up.
 
 use std::time::Duration;
 
 use holochain_diagnostics::{
-    holochain::{
-        conductor::conductor::CellStatus, sweettest::*, test_utils::inline_zomes::simple_crud_zome,
-    },
+    holochain::{sweettest::*, test_utils::inline_zomes::simple_crud_zome},
     seeded_rng, Rng, StdRng,
 };
 use tokio::time::Instant;
@@ -48,52 +49,42 @@ async fn main() {
                 let mut rng = seeded_rng(None);
                 let id = format!("{}{}{}", " ".repeat(i), i, " ".repeat(NUM - i));
                 loop {
-                    let status: Vec<CellStatus> = c.cell_status().values().cloned().collect();
-                    if let Some(fail) = status
-                        .iter()
-                        .find(|_s| todo!("this used to be a match on the Unrecoverable cell status. What is the equivalent now?"))
+                    let num_running = c.running_cell_ids().len();
+
+                    println!("{id} LIVE: {num_running}");
+
                     {
-                        return anyhow::Result::<()>::Err(anyhow::anyhow!(
-                            "{id} Failed to join: {:?}",
-                            fail
-                        ));
-                    } else {
-                        println!("{id} LIVE: {status:?}");
+                        let t = Instant::now();
+                        c.shutdown().await;
+                        let shutdown_dur = random_duration(&mut rng, 500);
+                        println!(
+                            "{id} shut down in {:?}, waiting {:?}",
+                            t.elapsed(),
+                            shutdown_dur
+                        );
+                        tokio::time::sleep(shutdown_dur).await;
+                    }
+                    {
+                        let t = Instant::now();
+                        c.startup().await;
+                        let startup_dur = random_duration(&mut rng, MAX_WAIT_MS.as_millis() as u64);
+                        let elapsed = t.elapsed();
 
-                        {
-                            let t = Instant::now();
-                            c.shutdown().await;
-                            let shutdown_dur = random_duration(&mut rng, 500);
+                        if elapsed >= Duration::from_millis(500) {
                             println!(
-                                "{id} shut down in {:?}, waiting {:?}",
+                                "\n{id}  !!!  restarted in {:?}, waiting {:?}  !!!\n",
                                 t.elapsed(),
-                                shutdown_dur
+                                startup_dur
                             );
-                            tokio::time::sleep(shutdown_dur).await;
+                        } else {
+                            println!(
+                                "{id} restarted in {:?}, waiting {:?}",
+                                t.elapsed(),
+                                startup_dur
+                            );
                         }
-                        {
-                            let t = Instant::now();
-                            c.startup().await;
-                            let startup_dur =
-                                random_duration(&mut rng, MAX_WAIT_MS.as_millis() as u64);
-                            let elapsed = t.elapsed();
 
-                            if elapsed >= Duration::from_millis(500) {
-                                println!(
-                                    "\n{id}  !!!  restarted in {:?}, waiting {:?}  !!!\n",
-                                    t.elapsed(),
-                                    startup_dur
-                                );
-                            } else {
-                                println!(
-                                    "{id} restarted in {:?}, waiting {:?}",
-                                    t.elapsed(),
-                                    startup_dur
-                                );
-                            }
-
-                            tokio::time::sleep(startup_dur).await;
-                        }
+                        tokio::time::sleep(startup_dur).await;
                     }
                 }
             })
@@ -103,6 +94,8 @@ async fn main() {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 println!("{} {:?}", ".".repeat(NUM), start.elapsed());
             }
+            #[allow(unused)]
+            anyhow::Result::<()>::Ok(())
         })]);
 
     let (r, i, _tasks) = futures::future::select_all(tasks).await;

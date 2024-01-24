@@ -360,7 +360,7 @@ mod slow_tests {
                 Err(crate::conductor::api::error::ConductorApiError::ConductorError(
                     crate::conductor::error::ConductorError::CellDisabled(_),
                 )) => {
-                    // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
+                    // Expected errors
                 }
                 Ok(_) => {
                     had_successful_zome_call = true;
