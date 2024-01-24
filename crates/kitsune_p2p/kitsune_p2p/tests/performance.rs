@@ -99,7 +99,7 @@ async fn minimise_p2p_agent_store_host_calls() {
                 let use_space = &all_spaces[i % 10];
                 let test_data = TestHostOp::new(use_space.clone());
                 harness_a.op_store().write().push(test_data.clone());
-            
+
                 sender_a
                     .broadcast(
                         use_space.clone(),
@@ -118,7 +118,7 @@ async fn minimise_p2p_agent_store_host_calls() {
                 let use_space = &all_spaces[i % 10];
                 let test_data = TestHostOp::new(use_space.clone());
                 harness_b.op_store().write().push(test_data.clone());
-            
+
                 sender_b
                     .broadcast(
                         use_space.clone(),
@@ -144,23 +144,28 @@ async fn minimise_p2p_agent_store_host_calls() {
 
     let drained_events = harness_a.drain_legacy_host_events().await;
 
-    let put_agent_info_signed_count = drained_events.iter().filter(|e| {
-        matches!(e, RecordedKitsuneP2pEvent::PutAgentInfoSigned { .. })
-    }).count();
+    let put_agent_info_signed_count = drained_events
+        .iter()
+        .filter(|e| matches!(e, RecordedKitsuneP2pEvent::PutAgentInfoSigned { .. }))
+        .count();
 
     put_agent_info_signed_count.assert_close_to(90, 5);
 
-    let query_agents_count = drained_events.iter().filter(|e| {
-        matches!(e, RecordedKitsuneP2pEvent::QueryAgents { .. })
-    }).count();
+    let query_agents_count = drained_events
+        .iter()
+        .filter(|e| matches!(e, RecordedKitsuneP2pEvent::QueryAgents { .. }))
+        .count();
 
     query_agents_count.assert_close_to(13732, 500);
 
-    let query_peer_density_count = drained_events.iter().filter(|e| {
-        matches!(e, RecordedKitsuneP2pEvent::QueryPeerDensity { .. })
-    }).count();
+    let query_peer_density_count = drained_events
+        .iter()
+        .filter(|e| matches!(e, RecordedKitsuneP2pEvent::QueryPeerDensity { .. }))
+        .count();
 
     query_peer_density_count.assert_close_to(10, 2);
+
+    println!("total calls: {:?}", drained_events.len());
 }
 
 trait CloseToAssertion<T> {
