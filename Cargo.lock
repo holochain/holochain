@@ -2798,7 +2798,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3135,7 +3135,7 @@ dependencies = [
  "kitsune_p2p_timestamp",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3453,7 +3453,7 @@ dependencies = [
  "parking_lot 0.10.2",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3602,7 +3602,7 @@ dependencies = [
  "once_cell",
  "paste",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4203,7 +4203,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.7.3",
  "rand 0.8.5",
  "serde",
@@ -4354,7 +4354,7 @@ dependencies = [
  "kitsune_p2p_types",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.3.0",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "serde",
  "test-case 1.2.3",
@@ -4472,9 +4472,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e71d9d2e55c66921ef9f39fbd393e2430d64f7ac6e83784ff2c777ec8142ec7"
+checksum = "fcbac7629f0f04caae576442599f4328402e1313989a57c66f343947ef1b4add"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4488,9 +4488,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af33456610975b9138a8a8b2051fdeab69743f63d32adbb3f47d5fb8ce329663"
+checksum = "111229e06eaf24ed8359fed70e37c2715efdafa6e26394e9bd7a4617722caa41"
 dependencies = [
  "base64 0.13.1",
  "dunce",
