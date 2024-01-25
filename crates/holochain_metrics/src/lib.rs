@@ -147,13 +147,6 @@ pub enum HolochainMetricsConfig {
     },
 }
 
-const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
-
-const E_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
-const E_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
-const E_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
-const E_EXTERNAL_TOKEN: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN";
-
 impl HolochainMetricsConfig {
     /// Initialize a new default metrics config.
     ///
@@ -162,6 +155,13 @@ impl HolochainMetricsConfig {
     pub fn new(root_path: &std::path::Path) -> Self {
         #[cfg(feature = "influxive")]
         {
+            const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
+
+            const E_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
+            const E_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
+            const E_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
+            const E_EXTERNAL_TOKEN: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN";
+
             if std::env::var_os(E_CHILD_SVC).is_some() {
                 let mut database_path = std::path::PathBuf::from(root_path);
                 database_path.push("influxive");

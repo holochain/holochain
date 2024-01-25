@@ -577,8 +577,8 @@ async fn three_way_gossip_historical() {
 }
 
 /// Test that:
-/// - 6MB of data can pass from node A to B,
-/// - then A can shut down and C and start up,
+/// - 6MB of data passes from node A to B,
+/// - then A shuts down and C starts up,
 /// - and then that same data passes from B to C.
 async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
@@ -667,40 +667,9 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         cell.agent_pubkey().to_kitsune()
     );
 
-    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
-        let ctx = s.lock();
-        dbg!(&ctx.map_agent_to_node);
-
-        let step = hc_sleuth::Event::Integrated {
-            by: conductors[2].id(),
-            op: ctx
-                .op_from_action(
-                    hashes[0].clone(),
-                    holochain_types::prelude::DhtOpType::StoreRecord,
-                )
-                .unwrap(),
-        };
-
-        hc_sleuth::report(step, &ctx);
-    }
-
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(10))
+        .require_initial_gossip_activity_for_cell(&cell, 2, Duration::from_secs(30))
         .await;
-
-    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
-        let ctx = s.lock();
-        let step = hc_sleuth::Event::Integrated {
-            by: conductors[2].id(),
-            op: ctx
-                .op_from_action(
-                    hashes[0].clone(),
-                    holochain_types::prelude::DhtOpType::StoreRecord,
-                )
-                .unwrap(),
-        };
-        hc_sleuth::report(step, &ctx);
-    }
 
     println!(
         "Initial gossip activity completed. Elapsed: {:?}",
