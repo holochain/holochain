@@ -1,10 +1,11 @@
 use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::interactive;
 use holochain::conductor::manager::handle_shutdown;
-use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::process::ERROR_CODE;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_api::config::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_trace::Output;
 use holochain_util::tokio_helper;
@@ -14,7 +15,6 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 
-const ERROR_CODE: i32 = 42;
 const MAGIC_CONDUCTOR_READY_STRING: &str = "Conductor ready.";
 
 #[derive(Debug, StructOpt)]
@@ -48,14 +48,6 @@ struct Opt {
     pub piped: bool,
 
     #[structopt(
-        short = "i",
-        long,
-        help = "Receive helpful prompts to create missing files and directories,
-    useful when running a conductor for the first time"
-    )]
-    interactive: bool,
-
-    #[structopt(
         long,
         help = "Display version information such as git revision and HDK version"
     )]
@@ -64,7 +56,7 @@ struct Opt {
 
 fn main() {
     // the async_main function should only end if our program is done
-    tokio_helper::block_forever_on(async_main())
+    tokio_helper::block_forever_on(async_main());
 }
 
 async fn async_main() {
@@ -80,7 +72,9 @@ async fn async_main() {
         return;
     }
 
-    let config = get_conductor_config(&opt);
+    let config_path = opt.config_path.clone().map(ConfigRootPath::from);
+
+    let config = load_config(config_path);
 
     if let Some(t) = &config.tracing_override {
         std::env::set_var("CUSTOM_FILTER", t);
@@ -89,7 +83,9 @@ async fn async_main() {
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 
-    holochain_metrics::HolochainMetricsConfig::new(config.environment_path.as_ref())
+    let data_root_path: DataRootPath = config.data_root_path_or_die();
+
+    holochain_metrics::HolochainMetricsConfig::new(data_root_path.as_ref())
         .init()
         .await;
 
@@ -120,27 +116,6 @@ async fn async_main() {
     handle_shutdown(shutdown_result);
 }
 
-fn get_conductor_config(opt: &Opt) -> ConductorConfig {
-    let config_path = opt.config_path.clone();
-    let config_path_default = config_path.is_none();
-    let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
-    debug!("config_path: {}", config_path);
-
-    let config: ConductorConfig = if opt.interactive {
-        // Load config, offer to create default config if missing
-        interactive::load_config_or_prompt_for_default(config_path)
-            .expect("Could not load conductor config")
-            .unwrap_or_else(|| {
-                println!("Cannot continue without configuration");
-                std::process::exit(ERROR_CODE);
-            })
-    } else {
-        load_config(&config_path, config_path_default)
-    };
-
-    config
-}
-
 async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> ConductorHandle {
     // read the passphrase to prepare for usage
     let passphrase = match &config.keystore {
@@ -156,13 +131,9 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
 
     // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
-    let env_path = PathBuf::from(config.environment_path.clone());
+    let env_path = config.data_root_path_or_die();
     if !env_path.is_dir() {
-        let result = if opt.interactive {
-            interactive::prompt_for_database_dir(&env_path)
-        } else {
-            std::fs::create_dir_all(&env_path)
-        };
+        let result = std::fs::create_dir_all(env_path.as_ref());
         match result {
             Ok(()) => println!("Created database at {}.", env_path.display()),
             Err(e) => {
@@ -188,68 +159,63 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
 }
 
 /// Load config, throw friendly error on failure
-fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> ConductorConfig {
-    match ConductorConfig::load_yaml(config_path.as_ref()) {
-        Err(ConductorConfigError::ConfigMissing(_)) => {
-            display_friendly_missing_config_message(config_path, config_path_default);
-            std::process::exit(ERROR_CODE);
+fn load_config(maybe_config_root_path: Option<ConfigRootPath>) -> ConductorConfig {
+    if let Some(ref config_root_path) = maybe_config_root_path {
+        match ConductorConfig::load_yaml(config_root_path.as_ref()) {
+            Err(ConductorConfigError::ConfigMissing(_)) => {
+                display_friendly_missing_config_message(maybe_config_root_path.as_ref());
+                std::process::exit(ERROR_CODE);
+            }
+            Err(ConductorConfigError::SerializationError(err)) => {
+                display_friendly_malformed_config_message(config_root_path, err);
+                std::process::exit(ERROR_CODE);
+            }
+            result => result.expect("Could not load conductor config"),
         }
-        Err(ConductorConfigError::SerializationError(err)) => {
-            display_friendly_malformed_config_message(config_path, err);
-            std::process::exit(ERROR_CODE);
-        }
-        result => result.expect("Could not load conductor config"),
+    } else {
+        display_friendly_missing_config_message(maybe_config_root_path.as_ref());
+        std::process::exit(ERROR_CODE);
     }
 }
 
-fn display_friendly_missing_config_message(
-    config_path: &ConfigFilePath,
-    config_path_default: bool,
-) {
-    if config_path_default {
+fn display_friendly_missing_config_message(maybe_config_root_path: Option<&ConfigRootPath>) {
+    if let Some(config_root_path) = maybe_config_root_path {
         println!(
             "
-Error: The conductor is set up to load its configuration from the default path:
+    Error: You asked to load configuration from the path:
 
-    {path}
+        {path}
 
-but this file doesn't exist. If you meant to specify a path, run this command
-again with the -c option. Otherwise, please either create a YAML config file at
-this path yourself, or rerun the command with the '-i' flag, which will help you
-automatically create a default config file.
-        ",
-            path = config_path,
+    but this file doesn't exist. Please create a YAML config file at this path.
+            ",
+            path = config_root_path.display(),
         );
     } else {
         println!(
             "
-Error: You asked to load configuration from the path:
+    Error: You tried to load a conductor config file, but didn't specify a path.
+    Please run this command again with the -c flag, like this:
 
-    {path}
-
-but this file doesn't exist. Please either create a YAML config file at this
-path yourself, or rerun the command with the '-i' flag, which will help you
-automatically create a default config file.
-        ",
-            path = config_path,
+        holochain -c path/to/conductor-config.yml
+        "
         );
     }
 }
 
 fn display_friendly_malformed_config_message(
-    config_path: &ConfigFilePath,
+    config_root_path: &ConfigRootPath,
     error: serde_yaml::Error,
 ) {
     println!(
         "
 The specified config file ({})
 could not be parsed, because it is not valid YAML. Please check and fix the
-file, or delete the file and run the conductor again with the -i flag to create
-a valid default configuration. Details:
+file. Details:
 
     {}
 
     ",
-        config_path, error
+        config_root_path.display(),
+        error
     )
 }

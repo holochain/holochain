@@ -1,6 +1,6 @@
 [package]
 name = "holochain_trace"
-version = "0.3.0-beta-dev.2"
+version = "0.3.0-beta-dev.6"
 authors = ["freesig <tom.gowan@holo.host>", "Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "tracing helpers"
@@ -17,7 +17,7 @@ channels = ["tokio", "shrinkwraprs"]
 
 [dependencies]
 chrono = "0.4.24"
-derive_more = "0.99.17"
+derive_more = { workspace = true }
 inferno = "0.11.15"
 serde_json = { version = "1.0.94", features = [ "preserve_order" ] }
 thiserror = "1.0.39"

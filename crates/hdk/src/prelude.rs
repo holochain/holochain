@@ -25,8 +25,8 @@ pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
 pub use crate::entry::update;
 pub use crate::entry::update_entry;
-pub use crate::entry_def;
-pub use crate::entry_defs;
+pub use crate::entry_type;
+pub use crate::entry_types;
 pub use crate::hash::*;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::list_anchor_addresses;
@@ -51,7 +51,7 @@ pub use crate::map_extern::ExternResult;
 pub use crate::p2p::call;
 pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
-pub use crate::p2p::remote_signal;
+pub use crate::p2p::send_remote_signal;
 pub use crate::random::*;
 pub use crate::time::schedule;
 pub use crate::time::sleep;
@@ -78,9 +78,9 @@ pub use hdk_derive;
 pub use hdk_derive::dna_properties;
 pub use hdk_derive::hdk_dependent_entry_types;
 pub use hdk_derive::hdk_dependent_link_types;
-pub use hdk_derive::hdk_entry_defs;
-pub use hdk_derive::hdk_entry_defs_conversions;
 pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_entry_types;
+pub use hdk_derive::hdk_entry_types_conversions;
 pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdk_link_types;
 pub use hdk_derive::hdk_to_coordinates;
@@ -149,7 +149,7 @@ macro_rules! holochain_externs {
             call:1,
             create:1,
             emit_signal:1,
-            remote_signal:1,
+            send_remote_signal:1,
             create_link:1,
             delete_link:1,
             update:1,

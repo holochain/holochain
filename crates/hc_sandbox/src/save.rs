@@ -8,11 +8,12 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::config;
-use crate::config::CONDUCTOR_CONFIG;
+use holochain_conductor_api::conductor::paths::ConfigFilePath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use once_cell::sync::Lazy;
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
-pub fn save(mut hc_dir: PathBuf, paths: Vec<PathBuf>) -> anyhow::Result<()> {
+pub fn save(mut hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
     use std::io::Write;
     std::fs::create_dir_all(&hc_dir)?;
     hc_dir.push(".hc");
@@ -77,9 +78,8 @@ pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
         let existing = std::fs::read_to_string(hc_dir)?;
         for sandbox in existing.lines() {
             let path = PathBuf::from(sandbox);
-            let mut config_path = path.clone();
-            config_path.push(CONDUCTOR_CONFIG);
-            if config_path.exists() {
+            let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
+            if config_file_path.as_ref().exists() {
                 paths.push(path);
             } else {
                 tracing::error!("Failed to load path {} from existing .hc", path.display());
@@ -97,7 +97,7 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
             let r = match verbose {
                 false => format!("{}{}: {}\n", out, i, path.display()),
                 true => {
-                    let config = config::read_config(path.clone())?;
+                    let config = config::read_config(ConfigRootPath::from(path.clone()))?;
                     format!(
                         "{}{}: {}\nConductor Config:\n{:?}\n",
                         out,

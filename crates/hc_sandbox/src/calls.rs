@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
@@ -76,6 +77,7 @@ pub enum AdminRequestCli {
     EnableApp(EnableApp),
     DisableApp(DisableApp),
     DumpState(DumpState),
+    DumpConductorState,
     /// Calls AdminRequest::AddAgentInfo.
     /// _Unimplemented_.
     AddAgents,
@@ -233,8 +235,13 @@ pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyho
                         if let std::io::ErrorKind::ConnectionRefused
                         | std::io::ErrorKind::AddrNotAvailable = e.kind()
                         {
-                            let (port, holochain, lair) =
-                                run_async(holochain_path, path, None, structured.clone()).await?;
+                            let (port, holochain, lair) = run_async(
+                                holochain_path,
+                                ConfigRootPath::from(path),
+                                None,
+                                structured.clone(),
+                            )
+                            .await?;
                             cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                             continue;
                         }
@@ -328,6 +335,10 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::DumpState(args) => {
             let state = dump_state(cmd, args).await?;
             msg!("DUMP STATE \n{}", state);
+        }
+        AdminRequestCli::DumpConductorState => {
+            let state = dump_conductor_state(cmd).await?;
+            msg!("DUMP CONDUCTOR STATE \n{}", state);
         }
         AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
         AdminRequestCli::ListAgents(args) => {
@@ -584,6 +595,12 @@ pub async fn dump_state(cmd: &mut CmdRunner, args: DumpState) -> anyhow::Result<
         })
         .await?;
     Ok(expect_match!(resp => AdminResponse::StateDumped, "Failed to dump state"))
+}
+
+/// Calls [`AdminRequest::DumpConductorState`] and dumps the current conductor state.
+pub async fn dump_conductor_state(cmd: &mut CmdRunner) -> anyhow::Result<String> {
+    let resp = cmd.command(AdminRequest::DumpConductorState).await?;
+    Ok(expect_match!(resp => AdminResponse::ConductorStateDumped, "Failed to dump state"))
 }
 
 /// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.

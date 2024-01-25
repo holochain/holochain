@@ -42,7 +42,7 @@ async fn test_new_lair_conductor_integration() {
     conductor_config.admin_interfaces = Some(vec![AdminInterfaceConfig {
         driver: InterfaceDriver::Websocket { port: ADMIN_PORT },
     }]);
-    conductor_config.environment_path = tmp.path().to_owned().into();
+    conductor_config.data_root_path = Some(tmp.path().to_owned().into());
     conductor_config.keystore = KeystoreConfig::LairServer {
         connection_url: keystore_config.connection_url.clone().into(),
     };

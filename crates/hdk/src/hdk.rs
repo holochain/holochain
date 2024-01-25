@@ -58,7 +58,7 @@ pub trait HdkT: HdiT {
     fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
-    fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
+    fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
     // Random
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
@@ -131,7 +131,7 @@ mockall::mock! {
         fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
         fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
         fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
-        fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
+        fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
         // Random
         fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
         // Time
@@ -345,7 +345,7 @@ impl HdkT for ErrHdk {
     fn emit_signal(&self, _: AppSignal) -> ExternResult<()> {
         Self::err()
     }
-    fn remote_signal(&self, _: RemoteSignal) -> ExternResult<()> {
+    fn send_remote_signal(&self, _: RemoteSignal) -> ExternResult<()> {
         Self::err()
     }
     // Random
@@ -549,8 +549,8 @@ impl HdkT for HostHdk {
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
         host_call::<AppSignal, ()>(__hc__emit_signal_1, app_signal)
     }
-    fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
-        host_call::<RemoteSignal, ()>(__hc__remote_signal_1, remote_signal)
+    fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
+        host_call::<RemoteSignal, ()>(__hc__send_remote_signal_1, remote_signal)
     }
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
         host_call::<u32, Bytes>(__hc__random_bytes_1, number_of_bytes)

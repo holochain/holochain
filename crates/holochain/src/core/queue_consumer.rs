@@ -159,10 +159,14 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
                 authored_db.clone().into(),
-                dht_db.clone().into(),
+                dht_db.clone(),
                 dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
+                conductor
+                    .get_config()
+                    .conductor_tuning_params()
+                    .sys_validation_retry_delay(),
             ),
             space.clone(),
             conductor.clone(),
@@ -667,9 +671,13 @@ async fn queue_consumer_main_task_impl<
             let start = Instant::now();
             match fut().await {
                 Ok(WorkComplete::Incomplete(delay)) => {
-                    tracing::info!("Work incomplete, re-triggering workflow.");
+                    tracing::debug!("Work incomplete, re-triggering workflow - {}.", name);
                     if let Some(dly) = delay {
-                        tracing::info!("Sleeping for {} ms before re-triggering.", dly.as_millis());
+                        tracing::debug!(
+                            "Sleeping for {} ms before re-triggering - {}.",
+                            dly.as_millis(),
+                            name
+                        );
                         tokio::time::sleep(dly).await;
                     }
                     tx.trigger(&"retrigger")

@@ -200,7 +200,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn remote_signal(
+    async fn send_remote_signal(
         &self,
         _from_agent: AgentPubKey,
         _to_agent_list: Vec<(Signature, AgentPubKey)>,
@@ -406,7 +406,7 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn remote_signal(
+    async fn send_remote_signal(
         &self,
         _from_agent: AgentPubKey,
         _to_agent_list: Vec<(Signature, AgentPubKey)>,

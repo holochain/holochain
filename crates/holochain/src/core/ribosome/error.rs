@@ -99,6 +99,9 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     ModuleDeserializeError(#[from] DeserializeError),
+
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
 
 /// Type alias

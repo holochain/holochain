@@ -39,6 +39,7 @@ pub enum TestWasm {
     GenesisSelfCheckValidV1,
     GenesisSelfCheckInvalid,
     GenesisSelfCheckValid,
+    GenesisSelfCheckRequiresProperties,
     HashPath,
     HdkExtern,
     InitFail,
@@ -48,6 +49,7 @@ pub enum TestWasm {
     MigrateAgentPass,
     MultipleCalls,
     MustGet,
+    MustGetAgentActivity,
     PostCommitSuccess,
     PostCommitVolley,
     Query,
@@ -65,6 +67,7 @@ pub enum TestWasm {
     ValidateCreateLinkInvalid,
     ValidateValid,
     ValidateCreateLinkValid,
+    ValidateRejectAppTypes,
     WhoAmI,
     ZomeInfo,
 }
@@ -140,6 +143,9 @@ impl From<TestWasm> for ZomeName {
             TestWasm::GenesisSelfCheckValidV1 => "genesis_self_check_1",
             TestWasm::GenesisSelfCheckInvalid => "genesis_self_check_invalid",
             TestWasm::GenesisSelfCheckValid => "genesis_self_check_valid",
+            TestWasm::GenesisSelfCheckRequiresProperties => {
+                "genesis_self_check_requires_properties"
+            }
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
@@ -149,6 +155,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::MustGet => "must_get",
+            TestWasm::MustGetAgentActivity => "must_get_agent_activity",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
@@ -166,6 +173,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateCreateLinkInvalid => "validate_link_add_invalid",
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
+            TestWasm::ValidateRejectAppTypes => "validate_reject_app_types",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
         })
@@ -216,6 +224,9 @@ impl From<TestWasm> for PathBuf {
             TestWasm::GenesisSelfCheckValid => {
                 "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_valid.wasm"
             }
+            TestWasm::GenesisSelfCheckRequiresProperties => {
+                "wasm32-unknown-unknown/release/test_wasm_genesis_self_check_requires_properties.wasm"
+            }
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
@@ -231,6 +242,7 @@ impl From<TestWasm> for PathBuf {
                 "wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm"
             }
             TestWasm::MustGet => "wasm32-unknown-unknown/release/test_wasm_must_get.wasm",
+            TestWasm::MustGetAgentActivity => "wasm32-unknown-unknown/release/test_wasm_must_get_agent_activity.wasm",
             TestWasm::PostCommitSuccess => {
                 "wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
             }
@@ -265,6 +277,9 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::ValidateCreateLinkValid => {
                 "wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm"
+            }
+            TestWasm::ValidateRejectAppTypes => {
+                "wasm32-unknown-unknown/release/test_wasm_validate_reject_app_types.wasm"
             }
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",

@@ -295,6 +295,7 @@ impl TestDir {
         let old = std::mem::replace(self, Self::Blank);
         match old {
             Self::Temp(d) => {
+                println!("Made temp dir permanent at {:?}", d);
                 tracing::info!("Made temp dir permanent at {:?}", d);
                 *self = Self::Perm(d.into_path());
             }

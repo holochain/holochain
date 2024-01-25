@@ -1,7 +1,4 @@
-use crate::{
-    traversal::{traverse, Traversal},
-    Fact,
-};
+use crate::Fact;
 
 #[derive(Clone, PartialEq, Eq, Hash, derive_more::From)]
 pub enum Dep<T> {
@@ -26,10 +23,6 @@ impl<T: Fact> Dep<T> {
 
     pub fn every_named(name: impl ToString, deps: Vec<Dep<T>>) -> Self {
         Self::Every(Some(name.to_string()), deps)
-    }
-
-    pub fn traverse<'c>(&self, ctx: &'c T::Context) -> Traversal<'c, T> {
-        traverse(self, ctx)
     }
 
     pub fn fact(&self) -> Option<&T> {

@@ -6,6 +6,21 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+## 0.3.0-beta-dev.14
+
 - **BREAKING CHANGE:** Export error types directly `holo_hash::HoloHashError` instead of path `holo_hash::error::HoloHashError`.
 
 ## 0.3.0-beta-dev.13

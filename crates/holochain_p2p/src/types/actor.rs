@@ -273,7 +273,7 @@ ghost_actor::ghost_chan! {
         /// This is a fire-and-forget operation, a best effort will be made
         /// to forward the signal, but if the conductor network is overworked
         /// it may decide not to deliver some of the signals.
-        fn remote_signal(
+        fn send_remote_signal(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
             to_agent_list: Vec<(Signature, AgentPubKey)>,

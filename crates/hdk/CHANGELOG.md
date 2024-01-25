@@ -9,6 +9,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 * If the `mock` feature is enabled, pass it to the HDI as well. [#1548](https://github.com/holochain/holochain/pull/1548)
 
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+- **BREAKING CHANGE** Rename `remote_signal` to `send_remote_signal` to match the grammar of other HDK functions. [\#3113](https://github.com/holochain/holochain/pull/3113)
+
+- Remove access to `Timestamp::now()` which comes from `kitsune_p2p_timestamp` and was not supposed to be available in WASM. It would always panic in WASM calls so it should be safe to assume that nobody was actually using this in real apps. If you were trying to and this breaks your hApp then please consider using `sys_time` from the HDK instead which is safe to use for getting the current time.
+
+## 0.3.0-beta-dev.22
+
 ## 0.3.0-beta-dev.21
 
 - Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor. [\#2980](https://github.com/holochain/holochain/pull/2980)

@@ -42,6 +42,8 @@ pub use agent_pubkey_ext::*;
 
 pub mod lair_keystore;
 
+pub mod paths;
+
 mod test_keystore;
 pub use test_keystore::*;
 

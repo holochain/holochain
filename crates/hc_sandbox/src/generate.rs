@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
@@ -21,11 +23,11 @@ pub fn generate(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     in_process_lair: bool,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
-    let mut config = create_config(dir.clone(), con_url);
-    config.network = network;
+    let mut config = create_config(dir.clone(), con_url)?;
+    config.network = network.unwrap_or_default();
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
@@ -50,17 +52,20 @@ pub fn generate_with_config(
     config: Option<ConductorConfig>,
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<ConfigRootPath> {
     let (dir, con_url) = generate_directory(root, directory, true)?;
-    let config = config.unwrap_or_else(|| {
-        let mut config = create_config(dir.clone(), con_url.clone());
-        config.keystore = KeystoreConfig::LairServer {
-            connection_url: con_url.expect(
-                "Lair should have been initialised but did not get a connection URL for it",
-            ),
-        };
-        config
-    });
+    let config = match config {
+        Some(config) => config,
+        None => {
+            let mut config = create_config(dir.clone(), con_url.clone())?;
+            config.keystore = KeystoreConfig::LairServer {
+                connection_url: con_url.expect(
+                    "Lair should have been initialised but did not get a connection URL for it",
+                ),
+            };
+            config
+        }
+    };
     write_config(dir.clone(), &config);
     Ok(dir)
 }
@@ -70,28 +75,28 @@ pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     initialise_lair: bool,
-) -> anyhow::Result<(PathBuf, Option<url2::Url2>)> {
+) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
     let passphrase = holochain_util::pw::pw_get()?;
 
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
     let directory = directory.unwrap_or_else(|| nanoid::nanoid!().into());
     dir.push(directory);
     std::fs::create_dir(&dir)?;
-    let mut keystore_dir = dir.clone();
-    keystore_dir.push("keystore");
-    std::fs::create_dir(&keystore_dir)?;
+
+    let config_root_path = ConfigRootPath::from(dir);
+    let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
 
     let con_url = if initialise_lair {
-        Some(init_lair(&keystore_dir, passphrase)?)
+        Some(init_lair(&keystore_path, passphrase)?)
     } else {
         None
     };
 
-    Ok((dir, con_url))
+    Ok((config_root_path, con_url))
 }
 
 pub(crate) fn init_lair(
-    dir: &std::path::Path,
+    dir: &KeystorePath,
     passphrase: sodoken::BufRead,
 ) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
@@ -105,13 +110,13 @@ pub(crate) fn init_lair(
 }
 
 pub(crate) fn init_lair_inner(
-    dir: &std::path::Path,
+    dir: &KeystorePath,
     passphrase: sodoken::BufRead,
 ) -> anyhow::Result<url2::Url2> {
     let mut cmd = std::process::Command::new("lair-keystore");
 
     cmd.args(["init", "--piped"])
-        .current_dir(dir)
+        .current_dir(dir.as_ref())
         .stdin(std::process::Stdio::piped());
 
     let mut proc = cmd.spawn()?;
@@ -125,11 +130,9 @@ pub(crate) fn init_lair_inner(
     if !proc.wait()?.success() {
         return Err(std::io::Error::new(std::io::ErrorKind::Other, "LairInitFail").into());
     }
+    let conf = dir.as_ref().join("lair-keystore-config.yaml");
 
-    let mut conf = std::path::PathBuf::from(dir);
-    conf.push("lair-keystore-config.yaml");
-
-    let conf = std::fs::read(&conf)?;
+    let conf = std::fs::read(conf)?;
 
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]

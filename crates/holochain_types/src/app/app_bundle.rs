@@ -294,13 +294,27 @@ impl AppRoleResolution {
     /// Return the IDs of new cells to be created as part of the resolution.
     /// Does not return existing cells to be reused.
     pub fn cells_to_create(&self) -> Vec<(CellId, Option<MembraneProof>)> {
+        let provisioned = self
+            .role_assignments
+            .iter()
+            .filter_map(|role| {
+                if role.1.is_provisioned {
+                    Some(role.1.cell_id().clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<std::collections::HashSet<_>>();
+
         self.dnas_to_register
             .iter()
-            .map(|(dna, proof)| {
-                (
-                    CellId::new(dna.dna_hash().clone(), self.agent.clone()),
-                    proof.clone(),
-                )
+            .filter_map(|(dna, proof)| {
+                let cell_id = CellId::new(dna.dna_hash().clone(), self.agent.clone());
+                if provisioned.contains(&cell_id) {
+                    Some((cell_id, proof.clone()))
+                } else {
+                    None
+                }
             })
             .collect()
     }

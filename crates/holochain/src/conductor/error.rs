@@ -7,6 +7,7 @@ use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
+use holochain_websocket::WebsocketError;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -129,9 +130,18 @@ pub enum ConductorError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
+    #[error(transparent)]
+    WebsocketError(#[from] WebsocketError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error("The conductor has no data directory.")]
+    NoDataRootPath,
+
+    #[error("The conductor has no config directory.")]
+    NoConfigPath,
 }
 
 impl ConductorError {

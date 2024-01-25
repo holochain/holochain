@@ -18,6 +18,7 @@ use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::test_utils::test_db_dir;
@@ -84,10 +85,10 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type")]
-    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[hdk_entry_types(skip_hdk_extern = true)]
     #[unit_enum(UnitEntryTypes)]
     pub enum EntryTypes {
-        #[entry_def(visibility = "private")]
+        #[entry_type(visibility = "private")]
         Post(Post),
     }
 
@@ -258,7 +259,12 @@ async fn check_app_entry_def_test() {
     entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();
-    let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+    let data_root_dir: DataRootPath = db_dir.path().to_path_buf().into();
+    let conductor_handle = Conductor::builder()
+        .with_data_root_path(data_root_dir)
+        .test(&[])
+        .await
+        .unwrap();
 
     // ## Dna is missing
     let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);

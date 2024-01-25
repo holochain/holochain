@@ -3,7 +3,7 @@ use crate::query::from_blob;
 use crate::query::to_blob;
 use crate::schedule::fn_is_scheduled;
 use crate::scratch::Scratch;
-use crate::validation_db::ValidationLimboStatus;
+use crate::validation_db::ValidationStage;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
@@ -12,11 +12,12 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
+use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
-use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
+use holochain_types::prelude::SysValDep;
 use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
 use holochain_types::sql::AsSql;
 use holochain_zome_types::block::Block;
@@ -29,37 +30,6 @@ use std::str::FromStr;
 pub use error::*;
 
 mod error;
-
-#[derive(Debug)]
-pub enum Dependency {
-    Action(ActionHash),
-    Null,
-}
-
-pub fn get_dependency(op_type: DhtOpType, action: &Action) -> Dependency {
-    match op_type {
-        DhtOpType::StoreRecord | DhtOpType::StoreEntry => Dependency::Null,
-        DhtOpType::RegisterAgentActivity => action
-            .prev_action()
-            .map(|p| Dependency::Action(p.clone()))
-            .unwrap_or_else(|| Dependency::Null),
-        DhtOpType::RegisterUpdatedContent | DhtOpType::RegisterUpdatedRecord => match action {
-            Action::Update(update) => Dependency::Action(update.original_action_address.clone()),
-            _ => Dependency::Null,
-        },
-        DhtOpType::RegisterDeletedBy | DhtOpType::RegisterDeletedEntryAction => match action {
-            Action::Delete(delete) => Dependency::Action(delete.deletes_address.clone()),
-            _ => Dependency::Null,
-        },
-        DhtOpType::RegisterAddLink => Dependency::Null,
-        DhtOpType::RegisterRemoveLink => match action {
-            Action::DeleteLink(delete_link) => {
-                Dependency::Action(delete_link.link_add_address.clone())
-            }
-            _ => Dependency::Null,
-        },
-    }
-}
 
 #[macro_export]
 macro_rules! sql_insert {
@@ -145,7 +115,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 
         insert_entry(txn, entry_hash, entry)?;
     }
-    let dependency = get_dependency(op_light.get_type(), &action);
+    let dependency = op.sys_validation_dependency();
     let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
     let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
     let op_order = OpOrder::new(op_light.get_type(), action_hashed.action().timestamp());
@@ -412,15 +382,12 @@ pub fn set_validation_status(
 pub fn set_dependency(
     txn: &mut Transaction,
     hash: &DhtOpHash,
-    dependency: Dependency,
+    dependency: SysValDep,
 ) -> StateMutationResult<()> {
-    match dependency {
-        Dependency::Action(dep) => {
-            dht_op_update!(txn, hash, {
-                "dependency": dep,
-            })?;
-        }
-        Dependency::Null => (),
+    if let Some(dep) = dependency {
+        dht_op_update!(txn, hash, {
+            "dependency": dep,
+        })?;
     }
     Ok(())
 }
@@ -441,15 +408,8 @@ pub fn set_require_receipt(
 pub fn set_validation_stage(
     txn: &mut Transaction,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    stage: ValidationStage,
 ) -> StateMutationResult<()> {
-    let stage = match status {
-        ValidationLimboStatus::Pending => None,
-        ValidationLimboStatus::AwaitingSysDeps(_) => Some(0),
-        ValidationLimboStatus::SysValidated => Some(1),
-        ValidationLimboStatus::AwaitingAppDeps(_) => Some(2),
-        ValidationLimboStatus::AwaitingIntegration => Some(3),
-    };
     let now = holochain_zome_types::prelude::Timestamp::now();
     // TODO num_validation_attempts is incremented every time this is called but never reset between sys and app validation
     // which means that if an op takes a few tries to pass sys validation then it will be 'deprioritised' in the app validation

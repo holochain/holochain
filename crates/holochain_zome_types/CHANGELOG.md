@@ -6,6 +6,23 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+## 0.3.0-beta-dev.22
+
+## 0.3.0-beta-dev.21
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
 - **BREAKING CHANGE:** Export error types directly `inline_zome::*` instead of `inline_zome::error::*`.
 
 ## 0.3.0-beta-dev.17

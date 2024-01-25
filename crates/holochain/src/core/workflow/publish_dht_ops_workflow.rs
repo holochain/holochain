@@ -47,8 +47,11 @@ pub async fn publish_dht_ops_workflow(
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
+    if to_publish_count > 0 {
+        info!("publishing {} ops", to_publish_count);
+    }
+
     // Commit to the network
-    info!("publishing {} ops", to_publish_count);
     let mut success = Vec::with_capacity(to_publish.len());
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
@@ -78,7 +81,9 @@ pub async fn publish_dht_ops_workflow(
         }
     }
 
-    info!("published {} ops", success.len());
+    if to_publish_count > 0 {
+        info!("published {}/{} ops", success.len(), to_publish_count);
+    }
 
     let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
     let continue_publish = db

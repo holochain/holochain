@@ -20,6 +20,7 @@ members = [
     "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
+    "genesis_self_check_requires_properties",
     "hc-stress-test-integrity",
     "hc-stress-test-coordinator",
     "hash_path",
@@ -32,6 +33,7 @@ members = [
     "migrate_agent_pass",
     "multiple_calls",
     "must_get",
+    "must_get_agent_activity",
     "post_commit_success",
     "post_commit_volley",
     "query",
@@ -49,14 +51,18 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
+    "validate_reject_app_types",
     "whoami",
     "zome_info",
 ]
+
+resolver = "2"
 
 [profile.release]
 opt-level = "z"
 
 [workspace.dependencies]
+derive_more = "0.99"
 serde = "1.0"
 hdi = { path = "../../../hdi" }
 hdk = { path = "../../../hdk" }

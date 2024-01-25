@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::{SweetCell, SweetLocalRendezvous};
@@ -7,6 +5,7 @@ use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -18,12 +17,17 @@ impl SweetConductorBatch {
     pub fn new(conductors: Vec<SweetConductor>) -> Self {
         let paths: HashSet<PathBuf> = conductors
             .iter()
-            .map(|c| c.config.environment_path.clone().into())
+            .filter_map(|c| {
+                c.config
+                    .data_root_path
+                    .as_ref()
+                    .map(|data_path| data_path.as_ref().clone())
+            })
             .collect();
         assert_eq!(
             conductors.len(),
             paths.len(),
-            "Some conductors in a SweetConductorBatch share the same database path!"
+            "Some conductors in a SweetConductorBatch share the same data path (or don't have a path)!"
         );
         Self(conductors)
     }
@@ -62,7 +66,7 @@ impl SweetConductorBatch {
         config: C,
     ) -> SweetConductorBatch {
         let config = config.into();
-        Self::from_configs(std::iter::repeat_with(|| config.random_scope()).take(num)).await
+        Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -74,7 +78,7 @@ impl SweetConductorBatch {
         let config = config.into();
         Self::new(
             future::join_all(
-                std::iter::repeat_with(|| config.random_scope())
+                std::iter::repeat(config)
                     .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
@@ -233,6 +237,13 @@ impl SweetConductorBatch {
     pub async fn force_all_publish_dht_ops(&self) {
         for c in self.0.iter() {
             c.force_all_publish_dht_ops().await;
+        }
+    }
+
+    /// Make the temp db dir persistent
+    pub fn persist_dbs(&mut self) {
+        for c in self.0.iter_mut() {
+            let _ = c.persist_dbs();
         }
     }
 

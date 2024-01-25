@@ -59,7 +59,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        let ribosome = RealRibosome::new(dna_file).unwrap();
+        let ribosome = RealRibosome::new(dna_file, None).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

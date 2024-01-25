@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
@@ -14,10 +15,11 @@ use crate::config::read_config;
 use crate::config::write_config;
 
 /// Update the first admin interface to use this port.
-pub fn force_admin_port(path: PathBuf, port: u16) -> anyhow::Result<()> {
-    let mut config = read_config(path.clone())?.expect("Failed to find config to force admin port");
+pub fn force_admin_port(config_root_path: ConfigRootPath, port: u16) -> anyhow::Result<()> {
+    let mut config =
+        read_config(config_root_path.clone())?.expect("Failed to find config to force admin port");
     set_admin_port(&mut config, port);
-    write_config(path, &config);
+    write_config(config_root_path, &config);
     Ok(())
 }
 
@@ -30,7 +32,7 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
             ports.push(port);
             continue;
         }
-        if let Some(config) = read_config(p)? {
+        if let Some(config) = read_config(ConfigRootPath::from(p))? {
             if let Some(ai) = config.admin_interfaces {
                 if let Some(AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port },

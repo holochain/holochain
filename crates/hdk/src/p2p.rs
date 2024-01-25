@@ -127,7 +127,7 @@ where
 /// This is a non-blocking call and will not return an
 /// error if the calls fail. This is designed to be used
 /// as a send and forget operation.
-/// A log will be produced at `[remote_signal]=info` if the calls
+/// A log will be produced at `[send_remote_signal]=info` if the calls
 /// fail though (this may be removed in the future).
 ///
 /// ### Usage
@@ -145,12 +145,12 @@ where
 ///
 /// This requirements will likely be removed in the future as
 /// we design a better way to grant the capability to remote signal.
-pub fn remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
+pub fn send_remote_signal<I>(input: I, agents: Vec<AgentPubKey>) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
-        h.borrow().remote_signal(RemoteSignal {
+        h.borrow().send_remote_signal(RemoteSignal {
             signal: ExternIO::encode(input).map_err(|e| wasm_error!(e))?,
             agents,
         })

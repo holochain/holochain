@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use crate::conductor::api::error::ConductorApiError;
 use crate::{conductor::error::ConductorError, sweettest::*};
 use ::fixt::prelude::strum_macros;
 use holo_hash::{AgentPubKey, DnaHash};
@@ -10,11 +11,18 @@ use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
+    holochain_trace::test_run().unwrap();
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent = SweetAgents::one(conductor.keystore()).await;
 
     async fn make_payload(agent_key: AgentPubKey, clone_limit: u32) -> InstallAppPayload {
-        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        // The integrity zome in this WASM will fail if the properties are not set. This helps verify that genesis
+        // is not being run for the clone-only cell and will only run for the cloned cells.
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
+            TestWasm::GenesisSelfCheckRequiresProperties,
+        ])
+        .await;
         let path = PathBuf::from(format!("{}", dna.dna_hash()));
         let modifiers = DnaModifiersOpt::none();
         let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
@@ -82,7 +90,9 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .create_clone_cell(CreateCloneCellPayload {
                 app_id: "app_1".into(),
                 role_name: "name".into(),
-                modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+                modifiers: DnaModifiersOpt::none()
+                    .with_network_seed("1".into())
+                    .with_properties(YamlProperties::new(serde_yaml::Value::String("foo".into()))),
                 membrane_proof: None,
                 name: Some("Johnny".into()),
             })
@@ -98,16 +108,24 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         assert_eq!(app.clone_cells().count(), 1);
     }
     {
-        conductor
+        let err = conductor
             .create_clone_cell(CreateCloneCellPayload {
                 app_id: "app_1".into(),
                 role_name: "name".into(),
-                modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+                modifiers: DnaModifiersOpt::none()
+                    .with_network_seed("1".into())
+                    .with_properties(YamlProperties::new(serde_yaml::Value::String("foo".into()))),
                 membrane_proof: None,
                 name: None,
             })
             .await
             .unwrap_err();
+        assert_matches!(
+            err,
+            ConductorApiError::ConductorError(ConductorError::AppError(
+                AppError::CloneLimitExceeded(1, _)
+            ))
+        );
         let state = conductor.get_state().await.unwrap();
         let app = state.get_app(&"app_1".to_string()).unwrap();
 

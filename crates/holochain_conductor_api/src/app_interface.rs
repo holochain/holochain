@@ -450,6 +450,11 @@ pub struct NetworkInfo {
     pub completed_rounds_since_last_time_queried: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub enum ScottyPanel {
+    GossipInfo { last_round: Option<Timestamp> },
+}
+
 #[test]
 fn app_request_serialization() {
     use rmp_serde::Deserializer;

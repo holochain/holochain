@@ -2,6 +2,7 @@
 
 use crate::cmds::*;
 use clap::{ArgAction, Parser};
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_trace::Output;
 use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
@@ -173,7 +174,7 @@ impl HcSandbox {
 
                 let result = tokio::select! {
                     result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
-                    result = run_n(&holochain_path, paths, ports, force_admin_ports, self.structured) => result,
+                    result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
                 };
                 crate::save::release_ports(std::env::current_dir()?).await?;
                 return result;
@@ -238,13 +239,13 @@ impl LaunchInfo {
 /// Run a conductor for each path
 pub async fn run_n(
     holochain_path: &Path,
-    paths: Vec<PathBuf>,
+    paths: Vec<ConfigRootPath>,
     app_ports: Vec<u16>,
     force_admin_ports: Vec<u16>,
     structured: Output,
 ) -> anyhow::Result<()> {
     let run_holochain = |holochain_path: PathBuf,
-                         path: PathBuf,
+                         path: ConfigRootPath,
                          index: usize,
                          ports,
                          force_admin_port,
@@ -290,7 +291,7 @@ pub async fn generate(
     app_id: InstalledAppId,
     network_seed: Option<String>,
     structured: Output,
-) -> anyhow::Result<Vec<PathBuf>> {
+) -> anyhow::Result<Vec<ConfigRootPath>> {
     let happ = crate::bundles::parse_happ(happ)?;
     let paths = crate::sandbox::default_n(
         holochain_path,

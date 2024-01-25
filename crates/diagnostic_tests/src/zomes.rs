@@ -108,7 +108,7 @@ pub fn syn_zome() -> InlineIntegrityZome {
         .function(
             "send_message",
             |api, (msg, agents): (Vec<u8>, Vec<AgentPubKey>)| {
-                api.remote_signal(RemoteSignal {
+                api.send_remote_signal(RemoteSignal {
                     agents,
                     signal: ExternIO::encode(msg).unwrap(),
                 })?;

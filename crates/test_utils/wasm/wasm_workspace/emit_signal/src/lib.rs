@@ -8,7 +8,7 @@ fn emit(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn signal_others(signal: RemoteSignal) -> ExternResult<()> {
-    remote_signal(&signal.signal, signal.agents)
+    send_remote_signal(&signal.signal, signal.agents)
 }
 
 #[hdk_extern]

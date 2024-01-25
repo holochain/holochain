@@ -3,9 +3,9 @@ use holochain_zome_types::entry_def::EntryDef;
 use std::collections::HashMap;
 use tracing::*;
 
-use crate::core::ribosome::{error::RibosomeResult, real_ribosome::RealRibosome, RibosomeT};
+use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct RibosomeStore {
     ribosomes: HashMap<DnaHash, RealRibosome>,
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
@@ -19,14 +19,6 @@ impl RibosomeStore {
         })
     }
 
-    #[instrument]
-    pub fn add_dna(&mut self, dna: DnaFile) -> RibosomeResult<()> {
-        let hash = dna.dna_hash().clone();
-        let ribosome = RealRibosome::new(dna)?;
-        self.ribosomes.insert(hash, ribosome);
-        Ok(())
-    }
-
     pub fn add_ribosome(&mut self, ribosome: RealRibosome) {
         self.ribosomes.insert(ribosome.dna_hash().clone(), ribosome);
     }
@@ -38,12 +30,12 @@ impl RibosomeStore {
         self.ribosomes.extend(ribosomes);
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn list(&self) -> Vec<DnaHash> {
         self.ribosomes.keys().cloned().collect()
     }
 
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
         self.ribosomes
             .get(hash)
@@ -51,7 +43,7 @@ impl RibosomeStore {
     }
 
     // TODO: use Arc, eliminate cloning
-    #[instrument]
+    #[instrument(skip(self))]
     pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
         self.ribosomes.get(hash).map(|r| r.dna_file().clone())
     }

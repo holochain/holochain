@@ -14,7 +14,7 @@ path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-derive_more = "0.99.11"
+derive_more = { workspace = true }
 serde = { workspace = true }
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }

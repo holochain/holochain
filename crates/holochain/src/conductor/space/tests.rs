@@ -39,12 +39,15 @@ async fn test_region_queries() {
     let mut g = random_generator();
 
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let path = temp_dir.path().to_path_buf();
+    let data_root_path = temp_dir.path().to_path_buf().into();
 
-    let spaces = Spaces::new(&ConductorConfig {
-        environment_path: path.into(),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(data_root_path),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();

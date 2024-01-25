@@ -146,6 +146,9 @@ pub async fn incoming_dht_ops_workflow(
 
     // Check again whether everything has been filtered out and avoid launching a Tokio task if so
     if filter_ops.is_empty() {
+        tracing::trace!(
+            "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
+        );
         return Ok(());
     }
 
@@ -188,7 +191,7 @@ pub async fn incoming_dht_ops_workflow(
                     }
 
                     // trigger validation of queued ops
-                    tracing::info!(
+                    tracing::debug!(
                         "Incoming dht ops workflow is now triggering the sys_validation_trigger"
                     );
                     sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");

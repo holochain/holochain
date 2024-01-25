@@ -42,6 +42,7 @@ use arbitrary::Unstructured;
 use contrafact::Fact;
 use error::SysValidationError;
 
+use futures::FutureExt;
 use holochain_cascade::MockCascade;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
@@ -205,35 +206,21 @@ async fn record_with_deps_fixup(
     (record, deps)
 }
 
-async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Record, MockCascade) {
+async fn record_with_cascade(
+    keystore: &MetaLairClient,
+    action: Action,
+) -> (Record, Arc<MockCascade>) {
     let (record, deps) = record_with_deps(keystore, action).await;
-    (record, MockCascade::with_records(deps))
-}
-
-#[allow(dead_code)]
-async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
-    let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade: MockCascade = MockCascade::with_records(deps.clone());
-    sys_validate_record(&record, &cascade).await
+    (record, Arc::new(MockCascade::with_records(deps)))
 }
 
 async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
-    let result = sys_validate_record(&record, &cascade).await;
+    let cascade = Arc::new(MockCascade::with_records(deps.clone()));
+    let result = sys_validate_record(&record, cascade).await;
     if result.is_err() {
         dbg!(&deps, &record);
         result.unwrap();
-    }
-}
-
-#[allow(dead_code)]
-async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
-    let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
-    let result = sys_validate_record(&record, &cascade).await;
-    if result.is_ok() {
-        result.unwrap_err();
     }
 }
 
@@ -266,8 +253,10 @@ async fn verify_action_signature_test() {
         SignedActionHashed::new_unchecked(record_valid.action().clone(), wrong_signature);
     let record_invalid = Record::new(action_invalid, None);
 
-    sys_validate_record(&record_valid, &cascade).await.unwrap();
-    sys_validate_record(&record_invalid, &cascade)
+    sys_validate_record(&record_valid, cascade.clone())
+        .await
+        .unwrap();
+    sys_validate_record(&record_invalid, cascade)
         .await
         .unwrap_err();
 }
@@ -290,9 +279,16 @@ async fn check_previous_action() {
     // This check is manual because `validate_action` will modify any action
     // coming in with a 0 action_seq since it knows that can't be valid.
     {
+        let mut cascade = MockCascade::new();
+        cascade
+            .expect_retrieve_action()
+            .times(2)
+            // Doesn't matter what we return, the action should be rejected before deps are checked.
+            .returning(|_, _| async move { Ok(None) }.boxed());
+
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,
-            &MockCascade::new(),
+            Arc::new(cascade),
         )
         .await
         .unwrap_err()
@@ -337,6 +333,7 @@ async fn check_valid_if_dna_test() {
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
+        std::time::Duration::from_secs(10),
     );
 
     // Initializing the cache actually matters. TODO: why?
@@ -413,12 +410,12 @@ async fn check_previous_timestamp() {
     let (record, mut deps) = record_with_deps(&keystore, action).await;
     *deps[0].as_action_mut().timestamp_mut() = before;
 
-    sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
         .await
         .unwrap();
 
     *deps[0].as_action_mut().timestamp_mut() = after;
-    let r = sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    let r = sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
         .await
         .unwrap_err()
         .into_outcome();
@@ -446,14 +443,14 @@ async fn check_previous_seq() {
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 1;
 
     assert!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .is_ok()
     );
 
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 2;
     assert_matches!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .unwrap_err()
             .into_outcome(),
@@ -465,7 +462,7 @@ async fn check_previous_seq() {
 
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 3;
     assert_matches!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .unwrap_err()
             .into_outcome(),
@@ -479,7 +476,7 @@ async fn check_previous_seq() {
     let record = rebuild_record(record, &keystore).await;
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 0;
     assert_matches!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .unwrap_err()
             .into_outcome(),
@@ -491,8 +488,8 @@ async fn check_previous_seq() {
 }
 
 /// Entry type in the action matches the entry variant
-#[tokio::test(flavor = "multi_thread")]
-async fn check_entry_type_test() {
+#[test]
+fn check_entry_type_test() {
     let entry_fixt = EntryFixturator::new(Predictable);
     let et_fixt = EntryTypeFixturator::new(Predictable);
 
@@ -516,8 +513,8 @@ async fn check_entry_type_test() {
 }
 
 /// Hash integrity check. The hash of an entry always matches what's in the action.
-#[tokio::test(flavor = "multi_thread")]
-async fn check_entry_hash_test() {
+#[test]
+fn check_entry_hash_test() {
     let mut g = random_generator();
 
     let mut ec = Create::arbitrary(&mut g).unwrap();
@@ -530,7 +527,7 @@ async fn check_entry_hash_test() {
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
-        check_entry_hash(&eh, &entry).await,
+        check_entry_hash(&eh, &entry),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryHash
         ))
@@ -540,7 +537,7 @@ async fn check_entry_hash_test() {
     let action: Action = ec.clone().into();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
-    assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
+    assert_matches!(check_entry_hash(&eh, &entry), Ok(()));
     assert_matches!(
         check_new_entry_action(&CreateLink::arbitrary(&mut g).unwrap().into()),
         Err(SysValidationError::ValidationOutcome(
@@ -566,7 +563,7 @@ async fn check_entry_size_test() {
         EntryType::App(AppEntryDef::arbitrary(&mut g).unwrap());
     *record.as_entry_mut() = RecordEntry::Present(tiny_entry);
     let mut record = rebuild_record(record, &keystore).await;
-    sys_validate_record(&record, &cascade).await.unwrap();
+    sys_validate_record(&record, cascade.clone()).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
@@ -575,7 +572,7 @@ async fn check_entry_size_test() {
     let record = rebuild_record(record, &keystore).await;
 
     assert_eq!(
-        sys_validate_record(&record, &cascade)
+        sys_validate_record(&record, cascade)
             .await
             .unwrap_err()
             .into_outcome(),
@@ -617,7 +614,7 @@ async fn check_update_reference_test() {
     let record = rebuild_record(record, &keystore).await;
 
     assert_eq!(
-        sys_validate_record(&record, &cascade)
+        sys_validate_record(&record, cascade)
             .await
             .unwrap_err()
             .into_outcome(),
@@ -646,7 +643,7 @@ async fn check_link_tag_size_test() {
     let (record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     assert_eq!(
-        sys_validate_record(&record, &cascade)
+        sys_validate_record(&record, cascade)
             .await
             .unwrap_err()
             .into_outcome(),
@@ -1014,5 +1011,5 @@ async fn valid_chain_fact_test() {
 
     let cascade = MockCascade::with_records(chain);
 
-    sys_validate_record(&last, &cascade).await.unwrap();
+    sys_validate_record(&last, Arc::new(cascade)).await.unwrap();
 }
