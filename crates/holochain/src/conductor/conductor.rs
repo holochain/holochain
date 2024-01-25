@@ -1907,7 +1907,9 @@ mod app_status_impls {
                             agent: cell_id.agent_pubkey().clone()
                         });
                     } else {
-                        todo!("what to do on error?")
+                        tracing::error!(
+                            "Network join failed for {cell_id}. This should never happen."
+                        );
                     }
                 }
             }))
