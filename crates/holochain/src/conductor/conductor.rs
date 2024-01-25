@@ -1896,11 +1896,12 @@ mod app_status_impls {
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    if let Ok(_) = cell
+                    if cell
                         .holochain_p2p_dna()
                         .clone()
                         .join(agent_pubkey, maybe_agent_info, maybe_initial_arc)
                         .await
+                        .is_ok()
                     {
                         aitia::trace!(&hc_sleuth::Event::AgentJoined {
                             node: sleuth_id,
