@@ -40,21 +40,19 @@ fn config() -> ConductorConfig {
     // config_standard()
 
     let mut config = config_standard();
-    if let Some(c) = config.network.as_mut() {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            tp.disable_recent_gossip = false;
-            tp.danger_gossip_recent_threshold_secs = 5;
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        tp.disable_recent_gossip = false;
+        tp.danger_gossip_recent_threshold_secs = 5;
 
-            tp.gossip_inbound_target_mbps = 1000000.0;
-            tp.gossip_outbound_target_mbps = 1000000.0;
-            tp.gossip_historic_outbound_target_mbps = 1000000.0;
-            tp.gossip_historic_inbound_target_mbps = 1000000.0;
+        tp.gossip_inbound_target_mbps = 1000000.0;
+        tp.gossip_outbound_target_mbps = 1000000.0;
+        tp.gossip_historic_outbound_target_mbps = 1000000.0;
+        tp.gossip_historic_inbound_target_mbps = 1000000.0;
 
-            tp.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 5;
-            tp
-        });
-    }
+        tp.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 5;
+        tp
+    });
     config
 }
 
@@ -156,7 +154,7 @@ async fn setup_app(mut rng: StdRng) -> App {
 async fn construct_node(dna: DnaFile) -> Node {
     let (mut conductor, zome) =
         diagnostic_tests::setup_conductor_with_single_dna(config(), dna).await;
-    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist());
+    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist_dbs());
     let conductor = Arc::new(conductor);
 
     Node::new(conductor.clone(), zome).await

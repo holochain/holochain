@@ -166,16 +166,32 @@ impl<'a> Crate<'a> {
                         .expect("manifest is already verified")
                         .contains_key(name)
                 {
-                    let existing_version_req = if let Some(Ok(existing_version_req)) =
-                        manifest[key][name]["version"].as_str().map(|version| {
-                            VersionReq::parse(version).context(anyhow::anyhow!(
-                                "parsing version {:?} for dependency {} ",
-                                version,
-                                self.name()
-                            ))
-                        }) {
+                    let extracted_version_req = match &manifest[key][name] {
+                        toml_edit::Item::Value(toml_edit::Value::String(_)) => {
+                            bail!("{} has a dependency on {} with a version req that is simple but must be detailed and include a path.", self.name(), name);
+                        }
+                        toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
+                            if t.get("path").is_none() {
+                                bail!("{} has a dependency on {} that doesn't include a path.", self.name(), name);
+                            }
+
+                            t.get("version").and_then(|v| v.as_str()).map(|version| {
+                                VersionReq::parse(version).context(anyhow::anyhow!(
+                                    "parsing version {:?} for dependency {} ",
+                                    version,
+                                    self.name()
+                                ))
+                            })
+                        }
+                        _ => {
+                            bail!("{} has a dependency on {} with a version req that is in a format that wasn't recognised.", self.name(), name);
+                        }
+                    };
+
+                    let existing_version_req = if let Some(Ok(existing_version_req)) = extracted_version_req {
                         existing_version_req
                     } else {
+                        // TODO We've already checked the key and name are present so hitting this is actually serious and shouldn't just log and continue
                         debug!(
                             "could not parse {}'s {} version req to string: {:?}",
                             name, key, manifest[key][name]["version"]
@@ -922,7 +938,7 @@ impl<'a> ReleaseWorkspace<'a> {
                                     insert_state!(CrateStateFlags::HasPreviousRelease);
 
                                     // todo: make comparison ref configurable
-                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD")?;
+                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD").context(format!("evaluating changes between {git_tag} and HEAD"))?;
                                     if !changed_files.is_empty()
                                     {
                                         debug!("[{}] changed files since {git_tag}: {changed_files:?}", member.name());
@@ -1117,7 +1133,11 @@ impl<'a> ReleaseWorkspace<'a> {
 
     /// Tries to resolve the git HEAD to its corresponding branch.
     pub fn git_head_branch(&'a self) -> Fallible<(git2::Branch, git2::BranchType)> {
-        for branch in self.git_repo.branches(None)? {
+        for branch in self
+            .git_repo
+            .branches(None)
+            .context("getting repo branches")?
+        {
             let branch = branch?;
             if branch.0.is_head() {
                 return Ok(branch);
@@ -1131,7 +1151,8 @@ impl<'a> ReleaseWorkspace<'a> {
     pub fn git_head_branch_name(&'a self) -> Fallible<String> {
         self.git_head_branch().map(|(branch, _)| {
             branch
-                .name()?
+                .name()
+                .context("looking for head branch")?
                 .map(String::from)
                 .ok_or_else(|| anyhow::anyhow!("the current git branch has no name"))
         })?

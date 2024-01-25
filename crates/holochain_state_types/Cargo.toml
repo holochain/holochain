@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state_types"
-version = "0.3.0-beta-dev.26"
+version = "0.3.0-beta-dev.31"
 description = "Types for the holochain_state crate"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,5 +10,5 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", features = [ "derive" ] }
-holochain_integrity_types = { version = "^0.3.0-beta-dev.19", path = "../holochain_integrity_types", default-features = false }
-holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash" }
+holochain_integrity_types = { version = "^0.3.0-beta-dev.24", path = "../holochain_integrity_types", default-features = false }
+holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash" }

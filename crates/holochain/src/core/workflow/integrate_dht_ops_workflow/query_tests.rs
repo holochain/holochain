@@ -217,8 +217,7 @@ async fn create_and_insert_op(
                     .unwrap();
             }
             if facts.awaiting_integration {
-                set_validation_stage(txn, &hash, ValidationLimboStatus::AwaitingIntegration)
-                    .unwrap();
+                set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration).unwrap();
             }
             Ok(())
         }

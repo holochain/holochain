@@ -1,10 +1,10 @@
 [package]
-name = "holochain_services"
-version = "0.2.0-beta-dev.0"
+name = "holochain_conductor_services"
+version = "0.2.0-beta-dev.5"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://docs.rs/holochain_services"
+documentation = "https://docs.rs/holochain_conductor_services"
 readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
@@ -19,5 +19,5 @@ must_future = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
-holochain_keystore = { workspace = true, default-features = false }
-holochain_types = { workspace = true }
+holochain_keystore = { version = "^0.3.0-beta-dev.26", path = "../holochain_keystore" }
+holochain_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_types" }

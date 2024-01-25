@@ -5,7 +5,7 @@ use hdi::prelude::*;
 #[derive(Default, Clone, Copy, PartialEq)]
 pub struct CounTree(pub u32);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
     Countree(CounTree),

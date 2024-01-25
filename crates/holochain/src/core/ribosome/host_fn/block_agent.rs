@@ -97,7 +97,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn zome_call_get_block() {
-        holochain_trace::test_run().ok();
+        hc_sleuth::init_subscriber();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 

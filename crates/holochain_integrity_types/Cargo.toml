@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.19"
+version = "0.3.0-beta-dev.24"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,7 +10,7 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
-holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash" }
+holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", default-features = false }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}

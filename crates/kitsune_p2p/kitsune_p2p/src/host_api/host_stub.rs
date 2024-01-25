@@ -214,7 +214,8 @@ impl KitsuneHost for HostStub {
 
         async move {
             // Probably not important but we could compute a real hash here if a test needs it
-            Ok(Arc::new(KitsuneOpHash::new(vec![0; 36])))
+            let hash_byte = op_data.0.first().cloned().unwrap_or(0);
+            Ok(Arc::new(KitsuneOpHash::new(vec![hash_byte; 36])))
         }
         .boxed()
         .into()

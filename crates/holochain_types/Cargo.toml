@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.3.0-beta-dev.26"
+version = "0.3.0-beta-dev.31"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -27,22 +27,22 @@ flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
-holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.3.0-beta-dev.21", path = "../holochain_keystore" }
+holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash", features = ["encoding"] }
+holochain_keystore = { version = "^0.3.0-beta-dev.26", path = "../holochain_keystore" }
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
 holochain_serialized_bytes = "=0.0.53"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.26"}
-holochain_wasmer_host = "=0.0.91"
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.31"}
+holochain_wasmer_host = { workspace = true }
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", features = ["backtrace"] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.20", features = ["full"] }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.25", features = ["full"] }
 itertools = { version = "0.10" }
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.12", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.15", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.3"}
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.4"}
 must_future = "0.1.1"
 nanoid = "0.3"
-holochain_trace = { version = "^0.3.0-beta-dev.3", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 parking_lot = "0.10"
 rand = "0.8.5"
 regex = "1.4"
@@ -60,8 +60,6 @@ tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "rt" ] }
 tracing = "0.1.26"
-wasmer = "4.2.2"
-wasmer-middlewares = "4.2.2"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
@@ -72,7 +70,7 @@ proptest-derive = { version = "0", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 
 [dev-dependencies]
-holochain_types = { path = ".", features = ["test_utils", "fuzzing"]}
+holochain_types = { version = "^0.3.0-beta-dev.27", path = ".", features = ["test_utils", "fuzzing"]}
 
 arbitrary = "1.0"
 isotest = { version = "0" }
