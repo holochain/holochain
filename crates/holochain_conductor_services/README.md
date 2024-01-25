@@ -1,4 +1,4 @@
-# holochain-services
+# holochain_conductor_services
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Forum](https://img.shields.io/badge/chat-forum%2eholochain%2enet-blue.svg?style=flat-square)](https://forum.holochain.org)
@@ -16,7 +16,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2023, Holochain Foundation
+Copyright (C) 2019 - 2024, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (Apache 2.0).  This program is distributed in the hope that it will be useful,

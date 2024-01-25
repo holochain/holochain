@@ -33,10 +33,13 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -84,10 +87,13 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -371,7 +377,7 @@ async fn test_signing_error_during_genesis() {
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
         db_dir.into(),
-        config,
+        config.into(),
         None,
     )
     .await;
@@ -1006,7 +1012,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids: Vec<_> = conductor.running_cell_ids(None).into_iter().collect();
+    let cell_ids: Vec<_> = conductor.running_cell_ids(|_| true).into_iter().collect();
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
@@ -1014,16 +1020,12 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.running_cell_ids(Some(Joined)).len(),
             conductor
-                .running_cell_ids(Some(PendingJoin(PendingJoinReason::Initial)))
-                .len()
-                + conductor
-                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Retry)))
-                    .len()
-                + conductor
-                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Failed)))
-                    .len(),
+                .running_cell_ids(|status| matches!(status, Joined))
+                .len(),
+            conductor
+                .running_cell_ids(|status| matches!(status, PendingJoin(_)))
+                .len(),
         )
     };
 
@@ -1033,7 +1035,7 @@ async fn test_cell_and_app_status_reconciliation() {
     conductor.update_cell_status(
         cell1
             .iter()
-            .map(|c| (c, PendingJoin(PendingJoinReason::Failed))),
+            .map(|c| (c, PendingJoin(PendingJoinReason::Failed("because".into())))),
     );
     assert_eq!(check().await, (Running, 2, 1));
 
