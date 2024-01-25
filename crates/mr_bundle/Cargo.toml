@@ -16,7 +16,7 @@ flate2 = "1.0"
 holochain_util = { path = "../holochain_util", version = "^0.2.4"}
 futures = "0.3"
 reqwest = "0.11"
-rmp-serde = "0.15"
+rmp-serde = "=0.15.5"
 serde = { version = ">= 1.0, <= 1.0.166", features = ["serde_derive", "derive"] }
 serde_bytes = "0.11"
 serde_derive = "1.0"

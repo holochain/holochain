@@ -2584,13 +2584,13 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ded13e388a81713db6919cd750e6113acf2fe5afbaedf8aff79780ec4fc47425"
+checksum = "397f372672597305f39af2b2abf389a077077489bc4f412e7ed574214c268208"
 dependencies = [
  "futures",
  "one_err",
- "rmp-serde 1.1.2",
+ "rmp-serde",
  "rmpv",
  "serde",
  "serde_bytes",
@@ -3130,7 +3130,7 @@ dependencies = [
  "holochain_serialized_bytes_derive",
  "proptest",
  "proptest-derive",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_bytes",
@@ -3186,7 +3186,7 @@ dependencies = [
  "r2d2",
  "r2d2_sqlite_neonphog",
  "rand 0.8.5",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rusqlite",
  "scheduled-thread-pool",
  "serde",
@@ -3320,7 +3320,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -4106,7 +4106,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "rand 0.8.5",
  "reqwest",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -4217,7 +4217,7 @@ dependencies = [
  "kitsune_p2p_types",
  "nanoid 0.3.0",
  "parking_lot 0.11.2",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rustls",
  "sct",
  "serde",
@@ -4282,7 +4282,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.11.2",
  "paste",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rustls",
  "serde",
  "serde_bytes",
@@ -4310,9 +4310,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843c7dbcbc8d75eef0b30397a7eb0d04549aabeff4ea69ebd272aea991555746"
+checksum = "fcbac7629f0f04caae576442599f4328402e1313989a57c66f343947ef1b4add"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions 1.4.0",
@@ -4326,9 +4326,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5829f25d0eab6309ae4307aa645f123a64e568a41ec17c358dcbd65dec207e10"
+checksum = "111229e06eaf24ed8359fed70e37c2715efdafa6e26394e9bd7a4617722caa41"
 dependencies = [
  "base64 0.13.1",
  "dunce",
@@ -4794,7 +4794,7 @@ dependencies = [
  "maplit",
  "matches",
  "reqwest",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -6504,17 +6504,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rmp-serde"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bffea85eea980d8a74453e5d02a8d93028f3c34725de143085a844ebe953258a"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
-]
-
-[[package]]
 name = "rmpv"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8178,9 +8167,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68891d49fb7fdb4f0aedfe8347cf3dc9b8e28ab99cf6b6da5b1ae90682cafa21"
+checksum = "bd134f3accf5bb9027cf69de1fef04728d9459e22fecf520a18623bc13831f49"
 dependencies = [
  "bytes",
  "futures",
@@ -8202,9 +8191,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46ce4d742f95206169d6d68dc47f2064e594bd755b882740218eb2db078125df"
+checksum = "d04199b3ea6873836b444fda70982bb5566a64b13ae9cebed64d0faac7d25892"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8220,9 +8209,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "344f080c69c305c7d3075c077799b66de47568f79577704622d28c33ef3dfdd2"
+checksum = "aec1c77232fe9307aa37749545c1722d54abc0a19b745cb6b0c4033f33042673"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
@@ -8234,9 +8223,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa8e91c1a85f6b9de962c63a7086619d78cf4f876a2a1888be715091bc4a1c2"
+checksum = "f914c7e4724adc3061f12e449d36cefb1b476a07ca77da601bda645e8c3e58e5"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8253,9 +8242,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a2ee4982985842265529632f96751020ecd109e6e249662037eef2cdf2a881"
+checksum = "3af0ed5298942b171593fd1842e50f507da0aae34b64e80f55daad4c15e33a7b"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8271,9 +8260,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c01b23ba903fc189bdbb38ec4726274f297b3b303c62daf029063478137a8af9"
+checksum = "9324b127b0b0d63a723c4fd2d09b9d5491686878b02b1ccfbe61b898b045845c"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8300,9 +8289,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal-srv"
-version = "0.0.4-alpha"
+version = "0.0.6-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1041cf202eb8789aaa4fc70acdae424ea3ad361e4031aa14dc30fcf0a246f69"
+checksum = "95d19b62bad76105f28ae9aa5338a4d765546ffa6162223ad3204352a3afa2a2"
 dependencies = [
  "clap 4.4.18",
  "dirs 5.0.1",
