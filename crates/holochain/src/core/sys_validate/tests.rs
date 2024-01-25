@@ -837,6 +837,7 @@ fn valid_chain_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "dpki")]
 async fn test_dpki_agent_update() {
     use crate::core::workflow::inline_validation;
     use crate::sweettest::SweetAgents;

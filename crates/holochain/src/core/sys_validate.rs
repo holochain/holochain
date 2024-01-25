@@ -289,7 +289,15 @@ pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidation
         },
     ) = prev_action
     {
-        u.entry_hash.clone().into()
+        #[cfg(feature = "dpki")]
+        {
+            u.entry_hash.clone().into()
+        }
+
+        #[cfg(not(feature = "dpki"))]
+        {
+            u.author.clone()
+        }
     } else {
         prev_action.author().clone()
     };
