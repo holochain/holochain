@@ -2184,8 +2184,8 @@ mod misc_impls {
             let conductor = ConductorSerialized {
                 running_cells: self.running_cells.share_ref(|c| {
                     c.clone()
-                        .into_iter()
-                        .map(|(id, _status)| {
+                        .into_keys()
+                        .map(|id| {
                             let (dna, agent) = id.into_dna_and_agent();
                             (dna.into(), agent.into())
                         })
