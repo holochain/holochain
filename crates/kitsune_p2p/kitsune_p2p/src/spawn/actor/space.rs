@@ -425,10 +425,10 @@ impl SpaceInternalHandler for Space {
             // i.e. if `agent.get_loc() % mod_cnt == mod_idx` we know we are
             // responsible for delegating the broadcast to that agent.
             let mut all = Vec::new();
-            for info in info_list
-                .into_iter()
-                .filter(|info| info.agent.get_loc().as_u32() % mod_cnt == mod_idx && Some(info.agent()) != broadcast_source)
-            {
+            for info in info_list.into_iter().filter(|info| {
+                info.agent.get_loc().as_u32() % mod_cnt == mod_idx
+                    && Some(info.agent()) != broadcast_source
+            }) {
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
                 let data = data.clone();
