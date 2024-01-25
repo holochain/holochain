@@ -39,7 +39,7 @@ parking_lot = "0.10"
 rand = "0.8.5"
 r2d2 = "0.8"
 r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
-rmp-serde = "0.15"
+rmp-serde = "=0.15.5"
 scheduled-thread-pool = "0.2"
 serde = ">= 1.0, <= 1.0.166"
 serde_derive = "1.0"
