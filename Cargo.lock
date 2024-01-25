@@ -2598,6 +2598,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc_seed_bundle"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "397f372672597305f39af2b2abf389a077077489bc4f412e7ed574214c268208"
+dependencies = [
+ "futures",
+ "one_err",
+ "rmp-serde 0.15.5",
+ "rmpv",
+ "serde",
+ "serde_bytes",
+ "sodoken",
+]
+
+[[package]]
 name = "hdi"
 version = "0.3.5-rc.0"
 dependencies = [
@@ -3320,7 +3335,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -4275,7 +4290,7 @@ dependencies = [
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_types",
- "lair_keystore_api",
+ "lair_keystore_api 0.4.1",
  "lru 0.8.1",
  "mockall",
  "nanoid 0.3.0",
@@ -4310,11 +4325,11 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843c7dbcbc8d75eef0b30397a7eb0d04549aabeff4ea69ebd272aea991555746"
+checksum = "fcbac7629f0f04caae576442599f4328402e1313989a57c66f343947ef1b4add"
 dependencies = [
- "lair_keystore_api",
+ "lair_keystore_api 0.4.1",
  "pretty_assertions 1.4.0",
  "rpassword 7.3.1",
  "rusqlite",
@@ -4332,7 +4347,34 @@ checksum = "5829f25d0eab6309ae4307aa645f123a64e568a41ec17c358dcbd65dec207e10"
 dependencies = [
  "base64 0.13.1",
  "dunce",
- "hc_seed_bundle",
+ "hc_seed_bundle 0.1.7",
+ "lru 0.10.1",
+ "nanoid 0.4.0",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "rcgen 0.10.0",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "time",
+ "tokio",
+ "toml 0.5.11",
+ "toml 0.7.8",
+ "tracing",
+ "url 2.5.0",
+ "winapi 0.3.9",
+ "zeroize",
+]
+
+[[package]]
+name = "lair_keystore_api"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "111229e06eaf24ed8359fed70e37c2715efdafa6e26394e9bd7a4617722caa41"
+dependencies = [
+ "base64 0.13.1",
+ "dunce",
+ "hc_seed_bundle 0.2.0",
  "lru 0.10.1",
  "nanoid 0.4.0",
  "once_cell",
@@ -8276,7 +8318,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c01b23ba903fc189bdbb38ec4726274f297b3b303c62daf029063478137a8af9"
 dependencies = [
  "futures",
- "lair_keystore_api",
+ "lair_keystore_api 0.3.0",
  "once_cell",
  "parking_lot 0.12.1",
  "rand 0.8.5",
