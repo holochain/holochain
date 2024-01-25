@@ -10,6 +10,7 @@ impl ShardedGossipLocal {
         &self,
         agent_list: Vec<AgentInfoSigned>,
         all_agents: &[AgentInfoSigned],
+        agent_info_session: &AgentInfoSession,
     ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
@@ -31,8 +32,7 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals: Vec<_> = store::local_arcs(&self.host_api, &self.space, &local_agents)
-            .await?
+        let intervals: Vec<_> = agent_info_session.local_arcs()
             .into_iter()
             .map(DhtArcRange::from)
             .collect();
@@ -84,6 +84,7 @@ impl ShardedGossipLocal {
         remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
+        agent_info_session: &AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -128,21 +129,13 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_agent_arcs =
-            store::local_agent_arcs(&self.host_api, &self.space, &local_agents).await?;
-        let local_arcs: Vec<DhtArcRange> = local_agent_arcs
+        let local_arcs: Vec<DhtArcRange> = agent_info_session.local_arcs()
             .into_iter()
-            .map(|(_, arc)| arc.into())
+            .map(|arc| arc.into())
             .collect();
 
-        let agent_list = self
-            .host_api
-            .legacy
-            .query_agents(
-                QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
-            )
-            .await
-            .map_err(KitsuneError::other)?;
+        tracing::info!("Gossip initiated, querying agents");
+        let agent_list = agent_info_session.get_local_agents().to_vec();
 
         // Send the intervals back as the accept message.
         let mut gossip = vec![ShardedGossipWire::accept(local_arcs.clone(), agent_list)];
@@ -187,6 +180,8 @@ impl ShardedGossipLocal {
         Ok(gossip)
     }
 
+    // TODO So this uses the results of `agent join` as a starting point, then queries the host for all agent info to filter out any agents that are joined to Kitsune
+    //      but don't have agent info in the conductor store. Essentially this converts `KitsuneAgent`s into `AgentInfoSigned`s.
     /// Fetch a current list of agents to initiate gossip with.
     pub(super) async fn query_agents_by_local_agents(&self) -> KitsuneResult<Vec<AgentInfoSigned>> {
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;

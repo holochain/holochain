@@ -1,6 +1,7 @@
 //! This module is the ideal interface we would have for the conductor (or other store that kitsune uses).
 //! We should update the conductor to match this interface.
 
+use std::collections::HashMap;
 use std::ops::ControlFlow;
 use std::{collections::HashSet, sync::Arc};
 
@@ -20,11 +21,69 @@ use kitsune_p2p_types::{
 
 use super::ShardedGossipLocal;
 
+/// A short-lived session for agent info. Local agents from Kitsune are combined with the list of agents from the host
+/// to allow gossip to access agent info as needed. The session should be regularly refreshed from these sources.
+#[derive(Default, Clone)] // TODO make me not clone again
+pub(super) struct AgentInfoSession {
+    /// The local agents that have joined a Kitsune space, converted to agent infos by calling the host.
+    local_agents: Vec<AgentInfoSigned>,
+
+    /// All the agents for this space. 
+    /// 
+    /// This includes both local and remote agents but note that it's possible for local agents to exist in this list but not in the `local_agents` list if the agents
+    /// are in the host store but haven't yet joined the Kitsune space.
+    all_agents: Vec<AgentInfoSigned>,
+}
+
+impl AgentInfoSession {
+    pub(super) fn new(local_agents: Vec<AgentInfoSigned>, all_agents: Vec<AgentInfoSigned>) -> Self {
+        Self {
+            local_agents,
+            all_agents,
+        }
+    }
+
+    pub(super) fn get_local_agents(&self) -> &[AgentInfoSigned] {
+        &self.local_agents
+    }
+
+    pub(super) fn all_agent_info(&self) -> &[AgentInfoSigned] {
+        &self.all_agents
+    }
+
+    pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
+        self.local_agents
+            .iter()
+            .map(|info| (info.agent.clone(), info.storage_arc))
+            .collect()
+    }
+
+    // Get the arc intervals for locally joined agents.
+    pub(super) fn local_arcs(&self) -> Vec<DhtArc> {
+        self.local_agents
+            .iter()
+            .map(|info| info.storage_arc)
+            .collect()
+    }
+
+    // TODO caching for these results? Track call count
+    pub(super) async fn agent_info_within_arc_set(&self, host_api: &HostApiLegacy, space: &Arc<KitsuneSpace>, arc_set: Arc<DhtArcSet>) -> KitsuneResult<Vec<AgentInfoSigned>> {
+        Ok(host_api
+            .legacy
+            // TODO work out how often this is being called to make sure it's worth the effort of caching the results
+            // TODO This we actually need to call, we just don't want to run it too often. Hold the result in a cache that is bound to the refresh interval for agent info in Kitsune
+            .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
+            .await
+            .map_err(KitsuneError::other)?)
+    }
+}
+ 
 /// Get all agent info signed for a space.
 pub(super) async fn all_agent_info(
     host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
+    tracing::info!("&&& Getting all agent info");
     host_api
         .legacy
         .query_agents(QueryAgentsEvt::new(space.clone()))
@@ -33,11 +92,13 @@ pub(super) async fn all_agent_info(
 }
 
 /// Get all `AgentInfoSigned` for agents in a space.
-pub(super) async fn query_agent_info(
+async fn query_agent_info(
     host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
+    tracing::info!("&&& Querying agent info");
+    // TODO this is equivalent to `all_agent_info` filtered against the input of `agents` which came from ??? (suspect `all_agent_info`) so this is a redundant query!
     let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
     host_api
         .legacy
@@ -52,24 +113,13 @@ pub(super) async fn local_agent_arcs(
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
+    tracing::info!("&&& Getting local agent arcs");
+    // TODO This `query_agent_info` is redundant, remove it and just make this a transform of the `local_agents`
     Ok(query_agent_info(host_api, space, local_agents)
         .await?
         .into_iter()
         .map(|info| (info.agent.clone(), info.storage_arc))
         .collect::<Vec<_>>())
-}
-
-/// Get just the arc intervals for specified agents.
-pub(super) async fn local_arcs(
-    host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
-    local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<DhtArc>> {
-    Ok(local_agent_arcs(host_api, space, local_agents)
-        .await?
-        .into_iter()
-        .map(|(_, arc)| arc)
-        .collect())
 }
 
 /// Get `AgentInfoSigned` for all agents within a `DhtArcSet`.
@@ -78,11 +128,14 @@ pub(super) async fn agent_info_within_arc_set(
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
+    tracing::info!("&&& Querying agent info within arc set");
     let set: HashSet<_> = agents_within_arcset(host_api, space, arc_set)
         .await?
         .into_iter()
         .map(|(a, _)| a)
         .collect();
+
+    // TODO here we already hold all the agent infos, so we should not ask for them again just to filter against them. Just use the values we already have
     Ok(all_agent_info(host_api, space)
         .await?
         .into_iter()
@@ -93,10 +146,14 @@ pub(super) async fn agent_info_within_arc_set(
 pub(super) async fn agents_within_arcset(
     host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
+    arc_set: Arc<DhtArcSet>, // TODO would need to make this hashable to avoid duplicate queries
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
+    tracing::info!("&&& Quering agents within arcset");
+
     Ok(host_api
         .legacy
+        // TODO work out how often this is being called to make sure it's worth the effort of caching the results
+        // TODO This we actually need to call, we just don't want to run it too often. Hold the result in a cache that is bound to the refresh interval for agent info in Kitsune
         .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
         .await
         .map_err(KitsuneError::other)?

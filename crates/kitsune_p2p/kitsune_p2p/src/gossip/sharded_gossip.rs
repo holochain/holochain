@@ -32,6 +32,7 @@ use tokio::time::Instant;
 pub use self::bandwidth::BandwidthThrottle;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
+use self::store::AgentInfoSession;
 use crate::metrics::MetricsSync;
 
 use super::{HowToConnect, MetaOpKey};
@@ -194,8 +195,10 @@ impl ShardedGossip {
             bandwidth,
         });
 
+        // TODO all of these should really be initialised before the first gossip loop because 
         let mut agent_list_by_local_agents = vec![];
         let mut all_agents = vec![];
+        let mut agent_info_session = AgentInfoSession::default();
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
         metric_task_instrumented(config.tracing_scope.clone(), {
@@ -212,12 +215,18 @@ impl ShardedGossip {
                     this.run_one_iteration(
                         agent_list_by_local_agents.clone(),
                         all_agents.as_slice(),
+                        &agent_info_session,
                     )
                     .await;
                     this.stats(&mut stats);
 
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
+                        // TODO Between these two calls we have a list of all agents and only local agents that are invalidated every second.
+                        //      after this there should be no reason to go to the host for the same information
+
+                        // Contributing 1 call every 1 second
                         agent_list_by_local_agents =
+                            // TODO rename to `get_agent_info_signed_for_local_joined_agents`
                             match this.gossip.query_agents_by_local_agents().await {
                                 Ok(a) => a,
                                 Err(e) => {
@@ -228,6 +237,7 @@ impl ShardedGossip {
                                     vec![]
                                 }
                             };
+                        // Contributing 1 call every 1 second
                         all_agents =
                             match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
                                 .await
@@ -238,6 +248,12 @@ impl ShardedGossip {
                                     vec![]
                                 }
                             };
+
+                        agent_info_session = AgentInfoSession::new(
+                            agent_list_by_local_agents.clone(),
+                            all_agents.clone(),
+                        );
+
                         refresh_agent_list_timer = std::time::Instant::now();
                     }
                 }
@@ -312,7 +328,7 @@ impl ShardedGossip {
         Ok(())
     }
 
-    async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
+    async fn process_incoming_outgoing(&self, agent_info_session: &AgentInfoSession) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         let gossip_type_char = match self.gossip.gossip_type {
             GossipType::Recent => 'R',
@@ -344,7 +360,7 @@ impl ShardedGossip {
                 .to_string()
                 .replace("ShardedGossipWire::", "");
             let len = msg.encode_vec().expect("can't encode msg").len();
-            let outgoing = match self.gossip.process_incoming(con.peer_id(), msg).await {
+            let outgoing = match self.gossip.process_incoming(con.peer_id(), msg, agent_info_session).await {
                 Ok(r) => {
                     tracing::debug!(
                         "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
@@ -397,10 +413,11 @@ impl ShardedGossip {
         &self,
         agent_list_by_local_agents: Vec<AgentInfoSigned>,
         all_agents: &[AgentInfoSigned],
+        agent_info_session: &AgentInfoSession,
     ) {
         match self
             .gossip
-            .try_initiate(agent_list_by_local_agents, all_agents)
+            .try_initiate(agent_list_by_local_agents, all_agents, agent_info_session)
             .await
         {
             Ok(Some(outgoing)) => {
@@ -417,7 +434,7 @@ impl ShardedGossip {
             Ok(None) => (),
             Err(err) => tracing::error!("Gossip failed when trying to initiate with {:?}", err),
         }
-        if let Err(err) = self.process_incoming_outgoing().await {
+        if let Err(err) = self.process_incoming_outgoing(agent_info_session).await {
             tracing::error!("Gossip failed to process a message because of: {:?}", err);
         }
         self.gossip.record_timeouts();
@@ -881,6 +898,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: NodeCert,
         msg: ShardedGossipWire,
+        agent_info_session: &AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
             GossipType::Recent => {
@@ -909,7 +927,7 @@ impl ShardedGossipLocal {
                 id,
                 agent_list,
             }) => {
-                self.incoming_initiate(peer_cert, intervals, id, agent_list)
+                self.incoming_initiate(peer_cert, intervals, id, agent_list, agent_info_session)
                     .await?
             }
             ShardedGossipWire::Accept(Accept {
@@ -922,7 +940,7 @@ impl ShardedGossipLocal {
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&peer_cert)? {
                     let filter = decode_bloom_filter(&filter);
-                    self.incoming_agents(state, filter).await?
+                    self.incoming_agents(state, filter, &agent_info_session).await?
                 } else {
                     Vec::with_capacity(0)
                 }
