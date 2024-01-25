@@ -15,9 +15,11 @@ async-trait = { workspace = true }
 derive_more = { workspace = true }
 futures = { workspace = true }
 mockall = { workspace = true }
+nanoid = { workspace = true }
 must_future = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 
 holochain_keystore = { version = "^0.3.0-beta-dev.26", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_types" }

@@ -457,6 +457,7 @@ mod interface_impls {
                 Ok(())
             })?;
             let config = AppInterfaceConfig::websocket(port);
+
             self.update_state(|mut state| {
                 state.app_interfaces.insert(interface_id, config);
                 Ok(state)
@@ -1348,7 +1349,7 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
-            let dna_compat = self.get_dna_compat();
+            let dna_compat = self.get_dna_compat().await;
 
             let InstallAppPayload {
                 source,
@@ -1375,9 +1376,27 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
+            let agent_key = if let Some(agent_key) = agent_key {
+                if self.services().dpki.is_some() {
+                    return Err(ConductorError::Other(
+                        "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
+                    ));
+                } else {
+                    agent_key
+                }
+            } else if let Some(dpki) = self.services().dpki {
+                dpki.lock()
+                    .await
+                    .derive_and_register_new_key(installed_app_id.clone(), todo!("which DNA?"))
+                    .await?
+            } else {
+                self.keystore.new_sign_keypair_random().await?
+            };
+
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
+
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
@@ -1575,9 +1594,9 @@ mod app_impls {
             app_id: &InstalledAppId,
             state: &ConductorState,
         ) -> ConductorResult<Option<AppInfo>> {
-            match state.installed_apps_and_services().get(app_id) {
-                None => Ok(None),
-                Some(app) => {
+            match state.get_app(app_id) {
+                Err(_) => Ok(None),
+                Ok(app) => {
                     let dna_definitions = self.get_dna_definitions(app)?;
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
@@ -2123,11 +2142,18 @@ mod service_impls {
         }
 
         pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
+            self.initialize_service_dpki().await?;
+            Ok(())
+        }
+
+        pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.services.share_mut(|s| {
-                    let dpki =
-                        DeepkeyBuiltin::new(self.clone(), self.keystore().clone(), installation);
-                    s.dpki = Some(Arc::new(dpki));
+                    s.dpki = Some(DeepkeyBuiltin::new(
+                        self.clone(),
+                        self.keystore().clone(),
+                        installation,
+                    ));
                 });
             }
             Ok(())
@@ -2176,7 +2202,7 @@ mod service_impls {
                 .await?;
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
 
-            let installation = DpkiInstallation {
+            let installation = DeepkeyInstallation {
                 cell_id,
                 device_seed_lair_tag,
             };
@@ -2614,14 +2640,16 @@ mod accessor_impls {
         }
 
         /// Construct the DnaCompatParams given the current setup
-        pub fn get_dna_compat(&self) -> DnaCompatParams {
+        pub async fn get_dna_compat(&self) -> DnaCompatParams {
+            let f = self
+                .services()
+                .dpki
+                .clone()
+                .map(|c| async move { c.lock().await.cell_id().dna_hash().clone().into() })
+                .transpose();
             DnaCompatParams {
                 protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
-                dpki_hash: self
-                    .services()
-                    .dpki
-                    .as_ref()
-                    .map(|c| c.cell_id().dna_hash().clone().into()),
+                dpki_hash: f.await,
             }
         }
 

@@ -69,16 +69,22 @@ futures = "0.3"
 holochain_wasmer_common = "=0.0.92"
 holochain_wasmer_guest = "=0.0.92"
 holochain_wasmer_host = "=0.0.92"
-mockall = "0.11"
-must_future = "0.1"
 lair_keystore = { version = "0.4.1", default-features = false }
 lair_keystore_api = "=0.4.1"
+mockall = "0.11"
+must_future = "0.1"
+nanoid = "0.4"
 rmp-serde = "=0.15.5"
 serde = "1.0"
 thiserror = "1.0"
+tokio = { version = "1.27", features = ["full"] }
 tx5-signal-srv = "=0.0.6-alpha"
 wasmer = "=4.2.4"
 wasmer-middlewares = "=4.2.4"
+
+holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
+holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
+
 
 [profile.fast-test]
 inherits = "dev"

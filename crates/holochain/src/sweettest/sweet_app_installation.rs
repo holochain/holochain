@@ -46,7 +46,7 @@ pub async fn get_install_app_payload_from_dnas(
 ) -> InstallAppPayload {
     let bundle = app_bundle_from_dnas(dnas).await;
     InstallAppPayload {
-        agent_key,
+        agent_key: Some(agent_key),
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,
