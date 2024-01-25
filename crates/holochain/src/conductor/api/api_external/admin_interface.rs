@@ -4,7 +4,6 @@ use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
-use crate::conductor::conductor::CellStatus;
 use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
@@ -178,11 +177,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
             ListCellIds => {
-                let cell_ids = self
-                    .conductor_handle
-                    .running_cell_ids(Some(CellStatus::Joined))
-                    .into_iter()
-                    .collect();
+                let cell_ids = self.conductor_handle.live_cell_ids().into_iter().collect();
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListApps { status_filter } => {
@@ -240,6 +235,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
+            }
+            DumpConductorState => {
+                let state = self.conductor_handle.dump_conductor_state().await?;
+                Ok(AdminResponse::ConductorStateDumped(state))
             }
             DumpFullState {
                 cell_id,

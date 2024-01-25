@@ -1,6 +1,6 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2021"
 description = "Utilities for Wasm testing for Holochain"
@@ -19,7 +19,7 @@ only_check = []
 
 
 [dependencies]
-holochain_types = { path = "../../holochain_types", version = "^0.3.0-beta-dev.29"}
+holochain_types = { path = "../../holochain_types", version = "^0.3.0-beta-dev.31"}
 strum = "0.18.0"
 strum_macros = "0.18.0"
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../../holochain_util" }

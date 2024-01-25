@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.31"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -17,12 +17,12 @@ chashmap = "=2.2.0"
 derive_more = { workspace = true }
 fallible-iterator = "0.2.0"
 futures = "0.3.1"
-holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.19"}
+holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.20"}
 holochain_serialized_bytes = "=0.0.53"
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", features = ["backtrace"], optional = true }
-holochain_zome_types = { version = "^0.3.0-beta-dev.23", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.3.0-beta-dev.25", path = "../holochain_zome_types" }
 holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
-kitsune_p2p = { version = "^0.3.0-beta-dev.28", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.3.0-beta-dev.29", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/types", optional = true }
 kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.13", path = "../kitsune_p2p/dht_arc" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.14", path = "../kitsune_p2p/bin_data" }

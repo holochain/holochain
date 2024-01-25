@@ -220,8 +220,6 @@ impl SweetConductor {
             config.data_root_path = Some(dir.as_ref().to_path_buf().into());
         }
 
-        tracing::info!(?config);
-
         let handle = Self::handle_from_existing(
             keystore.unwrap_or_else(holochain_keystore::test_keystore),
             &config,
@@ -615,12 +613,15 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
-            let iter = handle.running_cell_ids(None).into_iter().map(|id| async {
-                let id = id;
-                let db = self.get_authored_db(id.dna_hash()).unwrap();
-                let trigger = self.get_cell_triggers(&id).await.unwrap();
-                (db, trigger)
-            });
+            let iter = handle
+                .running_cell_ids(|_| true)
+                .into_iter()
+                .map(|id| async {
+                    let id = id;
+                    let db = self.get_authored_db(id.dna_hash()).unwrap();
+                    let trigger = self.get_cell_triggers(&id).await.unwrap();
+                    (db, trigger)
+                });
             futures::stream::iter(iter)
                 .then(|f| f)
                 .for_each(|(db, mut triggers)| async move {

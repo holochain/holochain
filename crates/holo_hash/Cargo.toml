@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.3.0-beta-dev.19"
+version = "0.3.0-beta-dev.20"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo", "hash", "blake", "blake2b"]
 categories = ["cryptography"]
@@ -33,7 +33,7 @@ rusqlite = { version = "0.29", optional = true }
 serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true }
-holochain_wasmer_common = { version = "=0.0.91", optional = true }
+holochain_wasmer_common = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
