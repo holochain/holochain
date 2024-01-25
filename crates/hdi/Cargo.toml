@@ -1,6 +1,6 @@
 [package]
 name = "hdi"
-version = "0.4.0-beta-dev.18"
+version = "0.4.0-beta-dev.25"
 description = "The HDI"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdi"
@@ -11,12 +11,12 @@ categories = ["cryptography"]
 edition = "2021"
 
 [dependencies]
-hdk_derive = { version = "^0.3.0-beta-dev.17", path = "../hdk_derive" }
-holo_hash = { version = "^0.3.0-beta-dev.14", path = "../holo_hash" }
-holochain_wasmer_guest = "=0.0.90"
+hdk_derive = { version = "^0.3.0-beta-dev.24", path = "../hdk_derive" }
+holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash" }
+holochain_wasmer_guest = { workspace = true }
 # it's important that we depend on holochain_integrity_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_integrity_types = { version = "^0.3.0-beta-dev.17", path = "../holochain_integrity_types", default-features = false }
+holochain_integrity_types = { version = "^0.3.0-beta-dev.24", path = "../holochain_integrity_types", default-features = false }
 paste = "1.0"
 serde = "1.0"
 serde_bytes = "0.11"

@@ -477,7 +477,16 @@ impl MetaNetTask {
                         };
 
                         let key = FetchKey::Op(op_hash.clone());
-                        let fetch_context = self.fetch_pool.remove(&key).and_then(|i| i.context);
+                        let fetch_context = match self.fetch_pool.check_item(&key) {
+                            (true, maybe_fetch_context) => maybe_fetch_context,
+                            (false, _) => {
+                                tracing::warn!(
+                                    "Dropping incoming op because the fetch pool did not contain it, this may indicate a hashing mismatch or unsolicited pushes {:?}",
+                                    op
+                                );
+                                continue;
+                            }
+                        };
 
                         // forward the received op
                         if let Err(err) = self
@@ -498,6 +507,11 @@ impl MetaNetTask {
                             // In the case of an error we don't want to attempt to `resolve_publish_pending_delegates`
                             continue;
                         }
+
+                        // Now that the host is holding the op, remove it from the fetch pool. Any sooner and we might queue the op for fetching again.
+                        // We don't need to wait for validation to complete, at least with respect to gossip, because we don't ask for unvalidated
+                        // ops during gossip. (See crates/holochain/src/conductor/kitsune_host_impl/query_region_set.rs)
+                        self.fetch_pool.remove(&key);
 
                         // trigger any delegation that is pending on having this data
                         if let Err(err) = self
@@ -576,8 +590,8 @@ mod tests {
     use crate::dht_arc::DhtLocation;
     use crate::spawn::actor::fetch::FetchResponseConfig;
     use crate::spawn::actor::meta_net_task::MetaNetTask;
-    use crate::spawn::actor::test_util::HostStub as HostReceiverStub;
     use crate::spawn::actor::test_util::InternalStub;
+    use crate::spawn::actor::test_util::LegacyHostStub as HostReceiverStub;
     use crate::spawn::actor::Internal;
     use crate::spawn::meta_net::{MetaNetCon, MetaNetConTest, MetaNetEvt};
     use crate::test_util::data::mk_agent_info;
@@ -1796,7 +1810,7 @@ mod tests {
     async fn send_notify_push_op_data() {
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
-        fetch_pool.push(test_req_op(0, None, test_source(2)));
+        fetch_pool.push(test_req_op(1, None, test_source(2)));
         assert_eq!(1, fetch_pool.len());
 
         ep_evt_send
@@ -1843,14 +1857,14 @@ mod tests {
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                                op_data: KitsuneOpData::new(vec![0, 4, 10]),
                                 region: None,
                             }],
                         ),
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 3, 90]),
+                                op_data: KitsuneOpData::new(vec![0, 3, 90]),
                                 region: None,
                             }],
                         ),
@@ -1880,6 +1894,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
+        holochain_trace::test_run().unwrap();
+
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
         host_receiver_stub
@@ -1887,7 +1903,8 @@ mod tests {
             .store(true, Ordering::SeqCst);
 
         fetch_pool.push(test_req_op(0, None, test_source(2)));
-        assert_eq!(1, fetch_pool.len());
+        fetch_pool.push(test_req_op(1, None, test_source(3)));
+        assert_eq!(2, fetch_pool.len());
 
         ep_evt_send
             .send(MetaNetEvt::Notify {
@@ -1898,7 +1915,7 @@ mod tests {
                         (
                             test_space(1),
                             vec![PushOpItem {
-                                op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                                op_data: KitsuneOpData::new(vec![0, 4, 10]),
                                 region: None,
                             }],
                         ),
@@ -1932,6 +1949,9 @@ mod tests {
                 .load(Ordering::Acquire)
         );
 
+        // Manually drop the item from the pool that we failed to receive
+        fetch_pool.remove(&test_key_op(0));
+
         // and also a successful op push
         wait_for_condition(|| {
             fetch_pool.is_empty() && !host_receiver_stub.receive_ops_calls.read().is_empty()
@@ -1961,7 +1981,7 @@ mod tests {
                     op_data_list: vec![(
                         test_space(1),
                         vec![PushOpItem {
-                            op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                            op_data: KitsuneOpData::new(vec![0, 4, 10]),
                             region: None,
                         }],
                     )],
@@ -1994,7 +2014,7 @@ mod tests {
                     op_data_list: vec![(
                         test_space(1),
                         vec![PushOpItem {
-                            op_data: KitsuneOpData::new(vec![1, 4, 10]),
+                            op_data: KitsuneOpData::new(vec![0, 4, 10]),
                             region: None,
                         }],
                     )],

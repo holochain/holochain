@@ -32,7 +32,7 @@ async fn signed_zome_call() {
     let cell_id = app.cells()[0].cell_id();
 
     // generate a cap access public key
-    let cap_access_public_key = fixt!(AgentPubKey, fixt::Predictable, 1);
+    let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
 
     // compute a cap access secret
     let mut buf = arbitrary::Unstructured::new(&[]);
@@ -170,7 +170,7 @@ async fn signed_zome_call_wildcard() {
     let cell_id = app.cells()[0].cell_id();
 
     // generate a cap access public key
-    let cap_access_public_key = fixt!(AgentPubKey, fixt::Predictable, 1);
+    let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
 
     // compute a cap access secret
     let mut buf = arbitrary::Unstructured::new(&[]);

@@ -52,7 +52,6 @@ jobs:
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
-                - build-holochain-build-crates-standalone
                 - build-holochain-tests-static-all
                 - build-release-automation-tests-unit
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"

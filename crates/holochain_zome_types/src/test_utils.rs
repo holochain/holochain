@@ -3,7 +3,6 @@
 //! We don't use fixturators for these, because this crate defines no fixturators
 
 use crate::prelude::*;
-use holo_hash::*;
 
 fn fake_holo_hash<T: holo_hash::HashType>(name: u8, hash_type: T) -> HoloHash<T> {
     HoloHash::from_raw_32_and_type([name; 32].to_vec(), hash_type)

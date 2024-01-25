@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use holo_hash::AgentPubKey;
-use holochain_zome_types::prelude::*;
+use holochain_keystore::MetaLairClient;
+use holochain_types::prelude::*;
 
-use crate::conductor::ConductorHandle;
+use crate::CellRunner;
 
 /// Interface for the DPKI service
 #[async_trait::async_trait]
-// #[cfg_attr(feature = "test_utils", mockall::automock)]
 #[mockall::automock]
 #[allow(clippy::needless_lifetimes)]
 pub trait DpkiService: Send + Sync {
@@ -31,11 +30,11 @@ pub trait DpkiService: Send + Sync {
 }
 
 /// The errors which can be produced by DPKI
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
 pub enum DpkiServiceError {
     #[error("DPKI DNA could not be called: {0}")]
-    ZomeCallFailed(String),
+    ZomeCallFailed(anyhow::Error),
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
@@ -65,16 +64,11 @@ pub trait DpkiServiceExt: DpkiService {
 }
 
 /// The built-in implementation of the DPKI service contract, which runs a DNA
+#[derive(derive_more::Constructor)]
 pub struct DeepkeyBuiltin {
-    conductor: ConductorHandle,
+    runner: Arc<dyn CellRunner>,
+    keystore: MetaLairClient,
     cell_id: CellId,
-}
-
-impl DeepkeyBuiltin {
-    /// Constructor
-    pub fn new(conductor: ConductorHandle, cell_id: CellId) -> Arc<Self> {
-        Arc::new(Self { conductor, cell_id })
-    }
 }
 
 #[allow(unreachable_code)]
@@ -87,16 +81,16 @@ impl DpkiService for DeepkeyBuiltin {
         key: AgentPubKey,
         timestamp: Timestamp,
     ) -> DpkiServiceResult<bool> {
-        let keystore = self.conductor.keystore();
+        let keystore = self.keystore.clone();
         let cell_id = self.cell_id.clone();
-        let zome_name: String = "TODO: depends on dna implementation".to_string();
-        let fn_name: String = "TODO: depends on dna implementation".to_string();
-        let payload = "TODO: depends on dna implementation".to_string();
+        let zome_name: ZomeName = "TODO: depends on dna implementation".into();
+        let fn_name: FunctionName = "TODO: depends on dna implementation".into();
+        let payload = todo!("TODO: depends on dna implementation");
         let cap_secret = None;
         let provenance = cell_id.agent_pubkey().clone();
-        let is_valid: bool = self
-            .conductor
-            .easy_call_zome(
+        let response = self
+            .runner
+            .call_zome(
                 &provenance,
                 cap_secret,
                 cell_id,
@@ -105,7 +99,8 @@ impl DpkiService for DeepkeyBuiltin {
                 payload,
             )
             .await
-            .map_err(|e| DpkiServiceError::ZomeCallFailed(e.to_string()))?;
+            .map_err(DpkiServiceError::ZomeCallFailed)?;
+        let is_valid = todo!("deserialize response");
         Ok(is_valid)
     }
 

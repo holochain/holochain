@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_proxy"
-version = "0.3.0-beta-dev.14"
+version = "0.3.0-beta-dev.19"
 description = "Proxy transport module for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,11 +12,11 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.21.2"
-derive_more = "0.99.7"
+derive_more = { workspace = true }
 futures = "0.3"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.14", path = "../types" }
-kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.14", path = "../transport_quic" }
-holochain_trace = { version = "^0.3.0-beta-dev.2", path = "../../holochain_trace" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../types" }
+kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.19", path = "../transport_quic" }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../../holochain_trace" }
 serde = { version = "1", features = [ "derive" ] }
 serde_bytes = "0.11"
 structopt = "0.3"

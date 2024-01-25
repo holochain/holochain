@@ -9,14 +9,14 @@ pub struct Msg(pub String);
 #[hdk_entry_helper]
 pub struct PrivMsg(pub String);
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
 pub enum EntryTypes {
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Post(Post),
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     Msg(Msg),
-    #[entry_def(required_validations = 5, visibility = "private")]
+    #[entry_type(required_validations = 5, visibility = "private")]
     PrivMsg(PrivMsg),
 }
 
@@ -40,15 +40,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     {
         action
             .app_entry_def()
-            .map(|AppEntryDef { entry_index, zome_index, .. }| (zome_index, entry_index))
-            .map_or(Ok(ValidateCallbackResult::Valid), |(zome_index, entry_index)| {
-                match EntryTypes::deserialize_from_type(*zome_index, *entry_index, &entry)? {
+            .map(
+                |AppEntryDef {
+                     entry_index,
+                     zome_index,
+                     ..
+                 }| (zome_index, entry_index),
+            )
+            .map_or(
+                Ok(ValidateCallbackResult::Valid),
+                |(zome_index, entry_index)| match EntryTypes::deserialize_from_type(
+                    *zome_index,
+                    *entry_index,
+                    &entry,
+                )? {
                     Some(EntryTypes::Post(post)) if post.0 == "Banana" => {
                         Ok(ValidateCallbackResult::Invalid("No Bananas!".to_string()))
                     }
                     _ => Ok(ValidateCallbackResult::Valid),
-                }
-            })
+                },
+            )
     } else {
         Ok(ValidateCallbackResult::Valid)
     }
