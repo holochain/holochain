@@ -8,6 +8,7 @@ keywords = [ "holochain", "holo" ]
 edition = "2021"
 
 [dependencies]
+anyhow = { workspace = true }
 chashmap = "2.2"
 colored = "2"
 futures = { workspace = true }

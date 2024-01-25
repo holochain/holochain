@@ -152,7 +152,7 @@ pub fn spawn_task_outcome_handler(
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         let cells_with_same_dna: Vec<_> = conductor
-                            .running_cell_ids(|_| true)
+                            .running_cell_ids()
                             .into_iter()
                             .filter(|id| id.dna_hash() == dna_hash.as_ref())
                             .collect();

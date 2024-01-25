@@ -695,8 +695,6 @@ async fn network_stats() {
 
     let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
 
-    #[cfg(not(feature = "tx5"))]
-    const EXPECT: &str = "tx2-quic";
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";
 
