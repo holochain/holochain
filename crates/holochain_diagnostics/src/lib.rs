@@ -55,62 +55,52 @@ pub fn config_standard() -> ConductorConfig {
 
 pub fn config_no_networking() -> ConductorConfig {
     let mut config = config_standard();
-    config.network.as_mut().map(|c| {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            tp.disable_recent_gossip = true;
-            tp.disable_historical_gossip = true;
-            tp
-        });
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        tp.disable_recent_gossip = true;
+        tp.disable_historical_gossip = true;
+        tp
     });
     config
 }
 pub fn config_no_publish() -> ConductorConfig {
     let mut config = config_standard();
-    config.network.as_mut().map(|c| {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            tp
-        });
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        tp
     });
     config
 }
 
 pub fn config_historical_only(threshold: u64) -> ConductorConfig {
     let mut config = config_standard();
-    config.network.as_mut().map(|c| {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            tp.disable_recent_gossip = true;
-            // Let historical gossip cover everything
-            tp.danger_gossip_recent_threshold_secs = threshold;
-            tp
-        });
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        tp.disable_recent_gossip = true;
+        // Let historical gossip cover everything
+        tp.danger_gossip_recent_threshold_secs = threshold;
+        tp
     });
     config
 }
 
 pub fn config_historical_and_agent_gossip_only(threshold: u64) -> ConductorConfig {
     let mut config = config_standard();
-    config.network.as_mut().map(|c| {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            // keep recent gossip for agent gossip, but gossip no ops.
-            tp.danger_gossip_recent_threshold_secs = threshold;
-            tp
-        });
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        // keep recent gossip for agent gossip, but gossip no ops.
+        tp.danger_gossip_recent_threshold_secs = threshold;
+        tp
     });
     config
 }
 
 pub fn config_recent_only() -> ConductorConfig {
     let mut config = config_standard();
-    config.network.as_mut().map(|c| {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            tp.disable_historical_gossip = true;
-            tp
-        });
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        tp.disable_historical_gossip = true;
+        tp
     });
     config
 }

@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use contrafact::*;
-use holo_hash::*;
 
 /// Action is of a given type
 pub fn is_of_type(action_type: ActionType) -> impl Fact<'static, Action> {

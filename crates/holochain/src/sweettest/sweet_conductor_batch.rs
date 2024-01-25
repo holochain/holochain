@@ -66,7 +66,7 @@ impl SweetConductorBatch {
         config: C,
     ) -> SweetConductorBatch {
         let config = config.into();
-        Self::from_configs(std::iter::repeat_with(|| config.random_scope()).take(num)).await
+        Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
@@ -78,7 +78,7 @@ impl SweetConductorBatch {
         let config = config.into();
         Self::new(
             future::join_all(
-                std::iter::repeat_with(|| config.random_scope())
+                std::iter::repeat(config)
                     .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
@@ -237,6 +237,13 @@ impl SweetConductorBatch {
     pub async fn force_all_publish_dht_ops(&self) {
         for c in self.0.iter() {
             c.force_all_publish_dht_ops().await;
+        }
+    }
+
+    /// Make the temp db dir persistent
+    pub fn persist_dbs(&mut self) {
+        for c in self.0.iter_mut() {
+            let _ = c.persist_dbs();
         }
     }
 

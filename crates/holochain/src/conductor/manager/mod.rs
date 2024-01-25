@@ -59,7 +59,7 @@ pub fn spawn_task_outcome_handler(
 ) -> JoinHandle<TaskManagerResult> {
     let span = tracing::error_span!(
         "spawn_task_outcome_handler",
-        scope = conductor.get_config().tracing_scope
+        scope = conductor.get_config().tracing_scope()
     );
     tokio::spawn(async move {
         while let Some((_group, result)) = outcomes.next().await {
@@ -152,7 +152,7 @@ pub fn spawn_task_outcome_handler(
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         let cells_with_same_dna: Vec<_> = conductor
-                            .running_cell_ids(None)
+                            .running_cell_ids(|_| true)
                             .into_iter()
                             .filter(|id| id.dna_hash() == dna_hash.as_ref())
                             .collect();

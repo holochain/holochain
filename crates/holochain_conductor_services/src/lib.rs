@@ -12,8 +12,21 @@ pub use dpki_service::*;
 mod app_store_service;
 pub use app_store_service::*;
 
-use super::ConductorHandle;
-use holochain_zome_types::prelude::CellId;
+use holochain_keystore::MetaLairClient;
+use holochain_types::prelude::*;
+
+#[async_trait::async_trait]
+pub trait CellRunner: Send + Sync + 'static {
+    async fn call_zome(
+        &self,
+        provenance: &AgentPubKey,
+        cap_secret: Option<CapSecret>,
+        cell_id: CellId,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        payload: ExternIO,
+    ) -> anyhow::Result<ExternIO>;
+}
 
 /// The set of all Conductor Services available to the conductor
 #[derive(Clone)]
@@ -26,10 +39,14 @@ pub struct ConductorServices {
 
 impl ConductorServices {
     /// Construct services from the default built-in implementations
-    pub fn builtin(conductor: ConductorHandle, cell_ids: ConductorServiceCells) -> Self {
+    pub fn builtin(
+        runner: Arc<impl CellRunner>,
+        keystore: MetaLairClient,
+        cell_ids: ConductorServiceCells,
+    ) -> Self {
         Self {
-            dpki: DeepkeyBuiltin::new(conductor.clone(), cell_ids.dpki),
-            app_store: AppStoreBuiltin::new(conductor, cell_ids.app_store),
+            dpki: Arc::new(DeepkeyBuiltin::new(runner.clone(), keystore, cell_ids.dpki)),
+            app_store: AppStoreBuiltin::new(runner, cell_ids.app_store),
         }
     }
 

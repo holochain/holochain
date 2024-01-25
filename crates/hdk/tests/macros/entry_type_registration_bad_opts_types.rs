@@ -2,7 +2,7 @@ use hdk::prelude::hdi::prelude::*;
 
 #[derive(EntryDefRegistration)]
 enum Nesting {
-    #[entry_def(visibility = "open")]
+    #[entry_type(name = 55)]
     A(A),
     B(B),
 }
