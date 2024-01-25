@@ -77,12 +77,6 @@ impl TryFrom<DataRootPath> for KeystorePath {
     }
 }
 
-impl From<DataRootPath> for PathBuf {
-    fn from(value: DataRootPath) -> Self {
-        value.0
-    }
-}
-
 /// Newtype to make sure we never accidentaly use or not use the databases path.
 /// Intentionally has no default value.
 #[derive(
