@@ -5,11 +5,10 @@ use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
+use holochain_conductor_services::DpkiMutex;
 use holochain_conductor_services::DpkiService;
 use holochain_conductor_services::KeyState;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_services::DpkiMutex;
-use holochain_services::KeyState;
 use holochain_types::prelude::*;
 use std::sync::Arc;
 

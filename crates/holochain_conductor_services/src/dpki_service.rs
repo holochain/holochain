@@ -33,17 +33,6 @@ pub trait DpkiService: Send + Sync {
         dna_hash: DnaHash,
     ) -> DpkiServiceResult<AgentPubKey>;
 
-    /// Defines the different ways that keys can be created and destroyed:
-    /// If an old key is specified, it will be destroyed
-    /// If a new key is specified, it will be registered
-    /// If both a new and an old key are specified, the new key will atomically replace the old key
-    /// (If no keys are specified, nothing will happen)
-    async fn key_mutation(
-        &self,
-        old_key: Option<AgentPubKey>,
-        new_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<()>;
-
     /// The CellId which backs this service
     fn cell_id(&self) -> &CellId;
 }
@@ -75,31 +64,6 @@ pub enum DpkiServiceError {
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
-
-/// Some more helpful methods built around the methods provided by the service
-#[async_trait::async_trait]
-pub trait DpkiServiceExt: DpkiService {
-    /// Register a newly created key with DPKI
-    async fn register_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
-        self.key_mutation(None, Some(key)).await
-    }
-
-    /// Replace an old key with a new one
-    async fn update_key(
-        &self,
-        old_key: AgentPubKey,
-        new_key: AgentPubKey,
-    ) -> DpkiServiceResult<()> {
-        self.key_mutation(Some(old_key), Some(new_key)).await
-    }
-
-    /// Delete an existing key without replacing it with a new one.
-    /// This effectively terminates the "lineage" that this key was a part of.
-    async fn remove_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
-        self.key_mutation(Some(key), None).await
-    }
-}
-impl<T> DpkiServiceExt for T where T: DpkiService + Sized {}
 
 /// Create a minimal usable mock of DPKI
 #[cfg(feature = "fuzzing")]

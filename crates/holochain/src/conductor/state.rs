@@ -3,7 +3,7 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_conductor_services::DpkiInstallation;
+use holochain_conductor_services::DeepkeyInstallation;
 use holochain_conductor_services::DPKI_APP_ID;
 use holochain_types::prelude::*;
 use serde::Deserialize;

@@ -121,7 +121,7 @@ impl DpkiService for DeepkeyBuiltin {
             let provenance = cell_id.agent_pubkey().clone();
             let zome_name: ZomeName = "deepkey".into();
             let fn_name: FunctionName = "register_key".into();
-            let payload = ExternIO::encode(((agent.clone(), signature, dna_hash, app_name)))?;
+            let payload = ExternIO::encode((agent.clone(), signature, dna_hash, app_name))?;
             let cap_secret = None;
             self.runner
                 .call_zome(
@@ -138,14 +138,6 @@ impl DpkiService for DeepkeyBuiltin {
         };
 
         Ok(agent)
-    }
-
-    async fn key_mutation(
-        &self,
-        old_key: Option<AgentPubKey>,
-        new_key: Option<AgentPubKey>,
-    ) -> DpkiServiceResult<()> {
-        todo!()
     }
 
     fn cell_id(&self) -> &CellId {
