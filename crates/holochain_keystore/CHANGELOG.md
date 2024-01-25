@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Update Lair version to 0.4.1, see the Lair changelog [here](https://github.com/holochain/lair/blob/main/crates/lair_keystore/CHANGELOG.md#041). #3249
+
 ## 0.3.0-beta-dev.26
 
 ## 0.3.0-beta-dev.25
