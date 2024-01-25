@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20240125.194538
+
+## [holochain\_cli-0.2.5-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain-0.2.5-rc.1](crates/holochain/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cli\_bundle-0.2.5-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cli\_run\_local\_services-0.2.5-rc.1](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cli\_sandbox-0.2.5-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cascade-0.2.5-rc.1](crates/holochain_cascade/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_conductor\_api-0.2.5-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.2.5-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_bootstrap-0.1.5-rc.1](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.5-rc.1)
+
+## [holochain\_state-0.2.5-rc.1](crates/holochain_state/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_p2p-0.2.5-rc.1](crates/holochain_p2p/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_types-0.2.5-rc.1](crates/holochain_types/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_keystore-0.2.5-rc.1](crates/holochain_keystore/CHANGELOG.md#0.2.5-rc.1)
+
+- Update Lair version to 0.4.1, see the Lair changelog [here](https://github.com/holochain/lair/blob/main/crates/lair_keystore/CHANGELOG.md#041).
+
+## [holochain\_sqlite-0.2.5-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.2.5-rc.1)
+
+## [mr\_bundle-0.2.5-rc.0](crates/mr_bundle/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p-0.2.5-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.2.5-rc.1)
+
+- Minor optimisation when delegate broadcasting ops, the delegated broadcasts will now avoid connecting back to the source. There is currently no way to prevent other agents that were delegated to from connecting to each other but this change takes care of one case.
+
+## [kitsune\_p2p\_fetch-0.2.5-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_proxy-0.2.5-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.2.5-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_types-0.2.5-rc.1](crates/kitsune_p2p_types/CHANGELOG.md#0.2.5-rc.1)
+
 # 20240120.122931
 
 ## [holochain\_cli-0.2.5-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.5-rc.0)
