@@ -14,6 +14,126 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240124.004605
+
+## [hcterm-0.3.0-beta-dev.10](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [holochain\_cli-0.3.0-beta-dev.34](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [holochain-0.3.0-beta-dev.34](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.34)
+
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
+- **BREAKING CHANGE:** Wasmer-related items from `holochain_types` have been moved to crate `holochain_wasmer_host::module`.
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.32](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.34](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [holochain\_cascade-0.3.0-beta-dev.34](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.34](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.34)
+
+- Added `DumpConductorState` admin method
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.5](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.5)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.29](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.29)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.32](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [holochain\_websocket-0.3.0-beta-dev.11](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.11)
+
+## [hdk-0.3.0-beta-dev.29](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.29)
+
+## [holochain\_state-0.3.0-beta-dev.33](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [hdi-0.4.0-beta-dev.25](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.25)
+
+## [holochain\_p2p-0.3.0-beta-dev.33](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [hc\_sleuth-0.2.0-beta-dev.4](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.4)
+
+## [hdk\_derive-0.3.0-beta-dev.24](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_state\_types-0.3.0-beta-dev.31](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.31)
+
+## [holochain\_types-0.3.0-beta-dev.31](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.31)
+
+- Refactor: All logic related to modules and wasmer caching has been moved to `holochain-wasmer`. Consequently functions for wasmer development under iOS need to be imported from there.
+
+## [holochain\_keystore-0.3.0-beta-dev.26](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.26)
+
+## [holochain\_sqlite-0.3.0-beta-dev.31](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.31)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.25](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [kitsune\_p2p-0.3.0-beta-dev.29](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.29)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.24](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.22](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.22)
+
+- Enhance source backoff logic. The fetch pool used to give a source a 5 minute pause if it failed to serve an op before using the source again. Now the failures to serve by sources is tracked across the pool. Sources that fail too often will be put on a backoff to give them a chance to deal with their current workload before we use them again. For hosts that continue to not respond they will be dropped as sources for ops. Ops that end up with no sources will be dropped from the fetch pool. This means that we can stop using resources on ops we will never be able to fetch. If a source appears who is capable of serving the missing ops then they should be re-added to the fetch pool.
+
+## [holo\_hash-0.3.0-beta-dev.20](crates/holo_hash/CHANGELOG.md#0.3.0-beta-dev.20)
+
+# 20240117.004514
+
+## [hcterm-0.3.0-beta-dev.9](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.9)
+
+## [holochain\_cli-0.3.0-beta-dev.33](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [holochain-0.3.0-beta-dev.33](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.33)
+
+- Make sqlite-encrypted a default feature
+
+- Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These ‘store record’ checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don’t actually need.
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.31](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.31)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.33](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [holochain\_cascade-0.3.0-beta-dev.33](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.33](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.33)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.4](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.4)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.28](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.31](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.31)
+
+## [holochain\_websocket-0.3.0-beta-dev.10](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.10)
+
+## [hdk-0.3.0-beta-dev.28](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.28)
+
+## [holochain\_state-0.3.0-beta-dev.32](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [hdi-0.4.0-beta-dev.24](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.24)
+
+## [holochain\_p2p-0.3.0-beta-dev.32](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [hc\_sleuth-0.2.0-beta-dev.3](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.3)
+
+## [hdk\_derive-0.3.0-beta-dev.23](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.23)
+
+- **BREAKING CHANGE**: Renamed macros `hdk_entry_defs` to `hdk_entry_types` and `entry_def` to `entry_type` for naming consistency with `hdk_link_types` [\#2979](https://github.com/holochain/holochain/pull/2979)
+
+## [holochain\_state\_types-0.3.0-beta-dev.30](crates/holochain_state_types/CHANGELOG.md#0.3.0-beta-dev.30)
+
+## [holochain\_types-0.3.0-beta-dev.30](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.30)
+
+## [holochain\_keystore-0.3.0-beta-dev.25](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.25)
+
+## [holochain\_sqlite-0.3.0-beta-dev.30](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.30)
+
+- Provide a mechanism to automatically encrypt databases which are currently unencrypted. This is useful if you are switching from a Holochain built with the `sqlite` feature, to a Holochain built with `sqlite-encrypted`. In order to enable this mechanism you will need to set the environment variable `HOLOCHAIN_MIGRATE_UNENCRYPTED=true`. *DANGER*: If you switch your Holochain without this environment variable then on first startup it will recognise your cache, dht, peer and kitsune metrics databases will be recognised as corrupt and automatically wiped. These databases may be rebuilt, assuming that the same data is still available from other peers, but please consider making a backup before attempting to make the switch.
+
+## [holochain\_zome\_types-0.3.0-beta-dev.24](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.24)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.23](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.23)
+
 # 20240112.112002
 
 ## [hcterm-0.3.0-beta-dev.8](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.8)
