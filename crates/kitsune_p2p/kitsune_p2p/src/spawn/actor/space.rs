@@ -352,7 +352,7 @@ impl SpaceInternalHandler for Space {
         // local agents.
         let mut local_notify_events = Vec::new();
         let mut local_agent_info_events = Vec::new();
-        match &data {
+        let broadcast_source = match &data {
             BroadcastData::User(data) => {
                 for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
@@ -368,6 +368,8 @@ impl SpaceInternalHandler for Space {
                         }
                     }
                 }
+
+                None
             }
             BroadcastData::AgentInfo(agent_info) => {
                 if self
@@ -387,13 +389,16 @@ impl SpaceInternalHandler for Space {
                         }
                     });
                 }
+
+                None
             }
-            BroadcastData::Publish { .. } => {
+            BroadcastData::Publish { source, .. } => {
                 // Don't do anything here. This case is handled by the actor
                 // invoking incoming_publish instead of
                 // incoming_delegate_broadcast.
+                Some(source.clone())
             }
-        }
+        };
 
         // next, gather a list of agents covering this data to be
         // published to.
@@ -412,10 +417,10 @@ impl SpaceInternalHandler for Space {
             // i.e. if `agent.get_loc() % mod_cnt == mod_idx` we know we are
             // responsible for delegating the broadcast to that agent.
             let mut all = Vec::new();
-            for info in info_list
-                .into_iter()
-                .filter(|info| info.agent.get_loc().as_u32() % mod_cnt == mod_idx)
-            {
+            for info in info_list.into_iter().filter(|info| {
+                info.agent.get_loc().as_u32() % mod_cnt == mod_idx
+                    && Some(info.agent()) != broadcast_source
+            }) {
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
                 let data = data.clone();
@@ -1063,8 +1068,8 @@ impl KitsuneP2pHandler for Space {
 
                 let mut all = Vec::new();
 
-                // determine the total number of nodes we'll be publishing to
-                // we'll make each remote responsible for a subset of delegate
+                // Determine the total number of nodes we'll be publishing to.
+                // We'll make each remote responsible for a subset of delegate
                 // broadcasting by having them apply the formula:
                 // `agent.get_loc() % mod_cnt == mod_idx` -- if true,
                 // they'll be responsible for forwarding the data to that node.
