@@ -91,6 +91,7 @@ sqlite-encrypted = [
   "kitsune_p2p_dht_arc/sqlite-encrypted",
   "kitsune_p2p_bin_data/sqlite-encrypted",
 ]
+
 sqlite = [
   "kitsune_p2p_dht/sqlite",
   "kitsune_p2p_dht_arc/sqlite",
