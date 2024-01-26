@@ -184,9 +184,8 @@ impl ShardedGossipLocal {
         Ok(gossip)
     }
 
-    // TODO So this uses the results of `agent join` as a starting point, then queries the host for all agent info to filter out any agents that are joined to Kitsune
-    //      but don't have agent info in the conductor store. Essentially this converts `KitsuneAgent`s into `AgentInfoSigned`s.
     /// Fetch a current list of agents to initiate gossip with.
+    #[cfg(test)]
     pub(super) async fn query_agents_by_local_agents(&self) -> KitsuneResult<Vec<AgentInfoSigned>> {
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
 
@@ -209,15 +208,10 @@ impl ShardedGossipLocal {
         gossip: &mut Vec<ShardedGossipWire>,
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<RoundState> {
-        println!("Generating from local arcs {:?} and remote arcs {:?}", local_arcs, remote_arc_set);
-
         // Create the common arc set from the remote and local arcs.
         let arc_set: DhtArcSet = local_arcs.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
-        println!("Local and remote arc sets are {:?} and {:?}", arc_set, remote_arc_set);
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
-
-        println!("Common after intersection is {:?}", common_arc_set);
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let region_set = store::query_region_set(

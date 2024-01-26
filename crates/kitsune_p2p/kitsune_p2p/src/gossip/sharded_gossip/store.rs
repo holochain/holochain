@@ -53,6 +53,8 @@ impl AgentInfoSession {
         &self.local_agents
     }
 
+    // This will be used by the accept handler once its tests are fixed
+    #[allow(unused)]
     pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
         self.local_agents
             .iter()
@@ -62,7 +64,6 @@ impl AgentInfoSession {
 
     // Get the arc intervals for locally joined agents.
     pub(super) fn local_arcs(&self) -> Vec<DhtArc> {
-        tracing::info!("&&& Getting local arcs from {:?}", self.local_agents);
         self.local_agents
             .iter()
             .map(|info| info.storage_arc)
@@ -95,7 +96,6 @@ pub(super) async fn all_agent_info(
     host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    tracing::info!("&&& Getting all agent info");
     host_api
         .legacy
         .query_agents(QueryAgentsEvt::new(space.clone()))
@@ -109,7 +109,6 @@ async fn query_agent_info(
     space: &Arc<KitsuneSpace>,
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    tracing::info!("&&& Querying agent info");
     // TODO this is equivalent to `all_agent_info` filtered against the input of `agents` which came from ??? (suspect `all_agent_info`) so this is a redundant query!
     let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
     host_api

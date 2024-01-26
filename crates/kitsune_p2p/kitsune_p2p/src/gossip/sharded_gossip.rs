@@ -225,19 +225,6 @@ impl ShardedGossip {
                         //      after this there should be no reason to go to the host for the same information
 
                         // Contributing 1 call every 1 second
-                        agent_list_by_local_agents =
-                            // TODO rename to `get_agent_info_signed_for_local_joined_agents`
-                            match this.gossip.query_agents_by_local_agents().await {
-                                Ok(a) => a,
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Failed to query for agents by local agents - {:?}",
-                                        e
-                                    );
-                                    vec![]
-                                }
-                            };
-                        // Contributing 1 call every 1 second
                         all_agents =
                             match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
                                 .await
@@ -248,6 +235,10 @@ impl ShardedGossip {
                                     vec![]
                                 }
                             };
+
+                        agent_list_by_local_agents = this.gossip.inner.share_ref(|s| {
+                            Ok(all_agents.iter().filter(|a| s.local_agents.contains(&a.agent)).cloned().collect())
+                        })?;
 
                         agent_info_session = AgentInfoSession::new(
                             agent_list_by_local_agents.clone(),
