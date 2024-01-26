@@ -173,9 +173,9 @@ pub(crate) mod local_v1 {
 
     #[cfg(test)]
     mod tests {
-        use serde::{Deserialize, Serialize};
+        
         use std::time::Duration;
-        use uuid::Uuid;
+        
 
         use super::super::*;
         use super::*;
@@ -398,9 +398,9 @@ pub(crate) mod remote_v1 {
                                 localv1.put(key, value).await.map_err(|e| e.to_string()),
                             ),
                             RequestMessage::Get {
-                                pattern,
-                                min_data,
-                                maybe_timeout,
+                                pattern: _,
+                                min_data: _,
+                                maybe_timeout: _,
                             } => {
                                 // TODO
                                 let data = Default::default();
@@ -489,9 +489,9 @@ pub(crate) mod remote_v1 {
 
         async fn get_pattern_t(
             &mut self,
-            pattern: String,
-            min_data: usize,
-            maybe_wait_timeout: Option<Duration>,
+            _pattern: String,
+            _min_data: usize,
+            _maybe_wait_timeout: Option<Duration>,
         ) -> Fallible<Data<String>> {
             todo!();
 
@@ -517,9 +517,9 @@ pub(crate) mod remote_v1 {
     }
     #[cfg(test)]
     mod tests {
-        use std::time::Duration;
+        
 
-        use crate::test_utils::shared_values::AgentDummyInfo;
+        
 
         use super::*;
 
