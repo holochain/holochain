@@ -196,8 +196,6 @@ impl ShardedGossip {
         });
 
         // TODO all of these should really be initialised before the first gossip loop because
-        let mut agent_list_by_local_agents = vec![];
-        let mut all_agents = vec![];
         let mut agent_info_session = AgentInfoSession::default();
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
@@ -213,8 +211,6 @@ impl ShardedGossip {
                 {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                     this.run_one_iteration(
-                        agent_list_by_local_agents.clone(),
-                        all_agents.as_slice(),
                         &mut agent_info_session,
                     )
                     .await;
@@ -225,7 +221,7 @@ impl ShardedGossip {
                         //      after this there should be no reason to go to the host for the same information
 
                         // Contributing 1 call every 1 second
-                        all_agents =
+                        let all_agents =
                             match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
                                 .await
                             {
@@ -236,13 +232,13 @@ impl ShardedGossip {
                                 }
                             };
 
-                        agent_list_by_local_agents = this.gossip.inner.share_ref(|s| {
+                        let agent_list_by_local_agents = this.gossip.inner.share_ref(|s| {
                             Ok(all_agents.iter().filter(|a| s.local_agents.contains(&a.agent)).cloned().collect())
                         })?;
 
                         agent_info_session = AgentInfoSession::new(
-                            agent_list_by_local_agents.clone(),
-                            all_agents.clone(),
+                            agent_list_by_local_agents,
+                            all_agents,
                         );
 
                         refresh_agent_list_timer = std::time::Instant::now();
@@ -409,13 +405,11 @@ impl ShardedGossip {
 
     async fn run_one_iteration(
         &self,
-        agent_list_by_local_agents: Vec<AgentInfoSigned>,
-        all_agents: &[AgentInfoSigned],
         agent_info_session: &mut AgentInfoSession,
     ) {
         match self
             .gossip
-            .try_initiate(agent_list_by_local_agents, all_agents, agent_info_session)
+            .try_initiate(agent_info_session)
             .await
         {
             Ok(Some(outgoing)) => {

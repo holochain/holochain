@@ -8,8 +8,6 @@ impl ShardedGossipLocal {
     /// have an outgoing gossip.
     pub(super) async fn try_initiate(
         &self,
-        agent_list: Vec<AgentInfoSigned>,
-        all_agents: &[AgentInfoSigned],
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
@@ -42,8 +40,6 @@ impl ShardedGossipLocal {
         let remote_agent = self
             .find_remote_agent_within_arcset(
                 Arc::new(intervals.clone().into()),
-                &local_agents,
-                all_agents,
                 agent_info_session,
             )
             .await?;
@@ -56,7 +52,7 @@ impl ShardedGossipLocal {
         {
             let id = rand::thread_rng().gen();
 
-            let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
+            let gossip = ShardedGossipWire::initiate(intervals, id, agent_info_session.get_agents().to_vec());
 
             let tgt = ShardedGossipTarget {
                 remote_agent_list: agent_info_list,

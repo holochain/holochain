@@ -23,7 +23,7 @@ use super::ShardedGossipLocal;
 
 /// A short-lived session for agent info. Local agents from Kitsune are combined with the list of agents from the host
 /// to allow gossip to access agent info as needed. The session should be regularly refreshed from these sources.
-#[derive(Default, Clone)] // TODO make me not clone again
+#[derive(Default)]
 pub(super) struct AgentInfoSession {
     /// The local agents that have joined a Kitsune space, converted to agent infos by calling the host.
     local_agents: Vec<AgentInfoSigned>,
@@ -34,6 +34,8 @@ pub(super) struct AgentInfoSession {
     /// are in the host store but haven't yet joined the Kitsune space.
     all_agents: Vec<AgentInfoSigned>,
 
+    /// Cache of agents whose storage arc is contained in an arc set. 
+    /// Finding these agents requires a host query so we cache the results because they are used frequently.
     agents_by_arc_set_cache: HashMap<Arc<DhtArcSet>, Vec<AgentInfoSigned>>,
 }
 
@@ -49,8 +51,19 @@ impl AgentInfoSession {
         }
     }
 
+    pub(super) fn get_agents(&self) -> &[AgentInfoSigned] {
+        &self.all_agents
+    }
+
     pub(super) fn get_local_agents(&self) -> &[AgentInfoSigned] {
         &self.local_agents
+    }
+
+    pub(super) fn get_local_kitsune_agents(&self) -> HashSet<Arc<KitsuneAgent>> {
+        self.local_agents
+            .iter()
+            .map(|info| info.agent.clone())
+            .collect()
     }
 
     // This will be used by the accept handler once its tests are fixed

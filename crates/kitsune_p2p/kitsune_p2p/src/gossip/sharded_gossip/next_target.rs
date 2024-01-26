@@ -17,11 +17,11 @@ impl ShardedGossipLocal {
     pub(super) async fn find_remote_agent_within_arcset(
         &self,
         arc_set: Arc<DhtArcSet>,
-        local_agents: &HashSet<Arc<KitsuneAgent>>,
-        all_agents: &[AgentInfoSigned],
         agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<NodeCert, Node> = HashMap::new();
+
+        let local_agents = agent_info_session.get_local_kitsune_agents();
 
         // Get all the remote nodes in this arc set.
         let remote_agents_within_arc_set: HashSet<_> = agent_info_session
@@ -38,7 +38,7 @@ impl ShardedGossipLocal {
             .collect();
 
         // Get all the agent info for these remote nodes.
-        for info in all_agents
+        for info in agent_info_session.get_agents()
             .iter()
             .filter(|a| {
                 std::time::Duration::from_millis(a.expires_at_ms)
