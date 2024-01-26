@@ -195,14 +195,14 @@ impl ShardedGossip {
             bandwidth,
         });
 
-        // TODO all of these should really be initialised before the first gossip loop because
-        let mut agent_info_session = AgentInfoSession::default();
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
         metric_task_instrumented(config.tracing_scope.clone(), {
             let this = this.clone();
 
             async move {
+                let mut agent_info_session = this.create_agent_info_session().await?;
+
                 let mut stats = Stats::reset();
                 while !this
                     .gossip
@@ -217,30 +217,7 @@ impl ShardedGossip {
                     this.stats(&mut stats);
 
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
-                        // TODO Between these two calls we have a list of all agents and only local agents that are invalidated every second.
-                        //      after this there should be no reason to go to the host for the same information
-
-                        // Contributing 1 call every 1 second
-                        let all_agents =
-                            match store::all_agent_info(&this.gossip.host_api, &this.gossip.space)
-                                .await
-                            {
-                                Ok(a) => a,
-                                Err(e) => {
-                                    tracing::error!("Failed to query for all agents - {:?}", e);
-                                    vec![]
-                                }
-                            };
-
-                        let agent_list_by_local_agents = this.gossip.inner.share_ref(|s| {
-                            Ok(all_agents.iter().filter(|a| s.local_agents.contains(&a.agent)).cloned().collect())
-                        })?;
-
-                        agent_info_session = AgentInfoSession::new(
-                            agent_list_by_local_agents,
-                            all_agents,
-                        );
-
+                        agent_info_session = this.create_agent_info_session().await?;
                         refresh_agent_list_timer = std::time::Instant::now();
                     }
                 }
@@ -248,6 +225,29 @@ impl ShardedGossip {
             }
         });
         this
+    }
+
+    async fn create_agent_info_session(&self) -> KitsuneResult<AgentInfoSession> {
+        let all_agents =
+            match store::all_agent_info(&self.gossip.host_api, &self.gossip.space)
+                .await
+            {
+                Ok(a) => a,
+                Err(e) => {
+                    tracing::error!("Failed to query for all agents - {:?}", e);
+                    vec![]
+                }
+            };
+
+        // Find local agents by filtering the complete list of known agents against the agents which have joined Kitsune.
+        let local_agents = self.gossip.inner.share_ref(|s| {
+            Ok(all_agents.iter().filter(|a| s.local_agents.contains(&a.agent)).cloned().collect())
+        })?;
+
+        Ok(AgentInfoSession::new(
+            local_agents,
+            all_agents,
+        ))
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
