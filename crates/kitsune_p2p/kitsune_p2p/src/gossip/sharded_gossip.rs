@@ -195,7 +195,7 @@ impl ShardedGossip {
             bandwidth,
         });
 
-        // TODO all of these should really be initialised before the first gossip loop because 
+        // TODO all of these should really be initialised before the first gossip loop because
         let mut agent_list_by_local_agents = vec![];
         let mut all_agents = vec![];
         let mut agent_info_session = AgentInfoSession::default();
@@ -215,7 +215,7 @@ impl ShardedGossip {
                     this.run_one_iteration(
                         agent_list_by_local_agents.clone(),
                         all_agents.as_slice(),
-                        &agent_info_session,
+                        &mut agent_info_session,
                     )
                     .await;
                     this.stats(&mut stats);
@@ -328,7 +328,10 @@ impl ShardedGossip {
         Ok(())
     }
 
-    async fn process_incoming_outgoing(&self, agent_info_session: &AgentInfoSession) -> KitsuneResult<()> {
+    async fn process_incoming_outgoing(
+        &self,
+        agent_info_session: &mut AgentInfoSession,
+    ) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
         let gossip_type_char = match self.gossip.gossip_type {
             GossipType::Recent => 'R',
@@ -360,7 +363,11 @@ impl ShardedGossip {
                 .to_string()
                 .replace("ShardedGossipWire::", "");
             let len = msg.encode_vec().expect("can't encode msg").len();
-            let outgoing = match self.gossip.process_incoming(con.peer_id(), msg, agent_info_session).await {
+            let outgoing = match self
+                .gossip
+                .process_incoming(con.peer_id(), msg, agent_info_session)
+                .await
+            {
                 Ok(r) => {
                     tracing::debug!(
                         "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
@@ -413,7 +420,7 @@ impl ShardedGossip {
         &self,
         agent_list_by_local_agents: Vec<AgentInfoSigned>,
         all_agents: &[AgentInfoSigned],
-        agent_info_session: &AgentInfoSession,
+        agent_info_session: &mut AgentInfoSession,
     ) {
         match self
             .gossip
@@ -898,7 +905,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: NodeCert,
         msg: ShardedGossipWire,
-        agent_info_session: &AgentInfoSession,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
             GossipType::Recent => {
@@ -934,13 +941,14 @@ impl ShardedGossipLocal {
                 intervals,
                 agent_list,
             }) => {
-                self.incoming_accept(peer_cert, intervals, agent_list)
+                self.incoming_accept(peer_cert, intervals, agent_list, agent_info_session)
                     .await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&peer_cert)? {
                     let filter = decode_bloom_filter(&filter);
-                    self.incoming_agents(state, filter, &agent_info_session).await?
+                    self.incoming_agents(state, filter, agent_info_session)
+                        .await?
                 } else {
                     Vec::with_capacity(0)
                 }

@@ -9,6 +9,7 @@ impl ShardedGossipLocal {
         peer_cert: NodeCert,
         remote_arc_set: Vec<DhtArcRange>,
         remote_agent_list: Vec<AgentInfoSigned>,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
             self.inner.share_mut(|i, _| {
@@ -45,6 +46,27 @@ impl ShardedGossipLocal {
         if local_agents.is_empty() {
             return Ok(vec![ShardedGossipWire::no_agents()]);
         }
+        
+        /* TODO This change is wanted but breaks two tests which rely on an incomplete host implementation
+            gossip::sharded_gossip::tests::test_two_nodes::initiate_times_out
+            gossip::sharded_gossip::tests::test_two_nodes::sharded_sanity_test
+
+            The old store::local_agent_arcs is returning arcs for all agents when it should only return joined
+            agents because it is being passed a filter for those agents. It does, it returns them all which means we get
+            a Full arc and quantisation works. With the filter, quantisation fails and the tests break.
+        // Get the local intervals.
+        let local_agent_arcs: Vec<_> = agent_info_session
+            .local_agent_arcs()
+            .into_iter()
+            .filter_map(|(agent, arc)| {
+                if local_agents.contains(&agent) {
+                    Some(arc.into())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        */
 
         // Get the local intervals.
         let local_agent_arcs: Vec<_> =
@@ -63,6 +85,7 @@ impl ShardedGossipLocal {
                 local_agent_arcs,
                 remote_arc_set,
                 &mut gossip,
+                agent_info_session,
             )
             .await?;
 

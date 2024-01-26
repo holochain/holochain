@@ -155,6 +155,7 @@ async fn standard_responses(
         strat: ArqStrat::default(),
         with_data,
     };
+    // Note that this mock is not realistic, query by agents should filter by input agents
     evt_handler.expect_handle_query_agents().returning({
         move |_| {
             let infos = infos.clone();

@@ -10,7 +10,7 @@ impl ShardedGossipLocal {
         &self,
         agent_list: Vec<AgentInfoSigned>,
         all_agents: &[AgentInfoSigned],
-        agent_info_session: &AgentInfoSession,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
@@ -32,7 +32,8 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals: Vec<_> = agent_info_session.local_arcs()
+        let intervals: Vec<_> = agent_info_session
+            .local_arcs()
             .into_iter()
             .map(DhtArcRange::from)
             .collect();
@@ -43,6 +44,7 @@ impl ShardedGossipLocal {
                 Arc::new(intervals.clone().into()),
                 &local_agents,
                 all_agents,
+                agent_info_session,
             )
             .await?;
 
@@ -84,7 +86,7 @@ impl ShardedGossipLocal {
         remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
-        agent_info_session: &AgentInfoSession,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
             self.inner.share_mut(|i, _| {
@@ -129,7 +131,8 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_arcs: Vec<DhtArcRange> = agent_info_session.local_arcs()
+        let local_arcs: Vec<DhtArcRange> = agent_info_session
+            .local_arcs()
             .into_iter()
             .map(|arc| arc.into())
             .collect();
@@ -147,6 +150,7 @@ impl ShardedGossipLocal {
                 local_arcs,
                 remote_arc_set,
                 &mut gossip,
+                agent_info_session,
             )
             .await?;
 
@@ -203,11 +207,17 @@ impl ShardedGossipLocal {
         local_arcs: Vec<DhtArcRange>,
         remote_arc_set: Vec<DhtArcRange>,
         gossip: &mut Vec<ShardedGossipWire>,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<RoundState> {
+        println!("Generating from local arcs {:?} and remote arcs {:?}", local_arcs, remote_arc_set);
+
         // Create the common arc set from the remote and local arcs.
         let arc_set: DhtArcSet = local_arcs.into();
         let remote_arc_set: DhtArcSet = remote_arc_set.into();
+        println!("Local and remote arc sets are {:?} and {:?}", arc_set, remote_arc_set);
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
+
+        println!("Common after intersection is {:?}", common_arc_set);
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let region_set = store::query_region_set(
@@ -232,7 +242,9 @@ impl ShardedGossipLocal {
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {
-            let bloom = self.generate_agent_bloom(state.clone()).await?;
+            let bloom = self
+                .generate_agent_bloom(state.clone(), agent_info_session)
+                .await?;
             if let Some(bloom) = bloom {
                 let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
