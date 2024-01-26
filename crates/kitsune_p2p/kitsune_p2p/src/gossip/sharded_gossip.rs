@@ -210,10 +210,7 @@ impl ShardedGossip {
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
-                    this.run_one_iteration(
-                        &mut agent_info_session,
-                    )
-                    .await;
+                    this.run_one_iteration(&mut agent_info_session).await;
                     this.stats(&mut stats);
 
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
@@ -229,9 +226,7 @@ impl ShardedGossip {
 
     async fn create_agent_info_session(&self) -> KitsuneResult<AgentInfoSession> {
         let all_agents =
-            match store::all_agent_info(&self.gossip.host_api, &self.gossip.space)
-                .await
-            {
+            match store::all_agent_info(&self.gossip.host_api, &self.gossip.space).await {
                 Ok(a) => a,
                 Err(e) => {
                     tracing::error!("Failed to query for all agents - {:?}", e);
@@ -241,13 +236,14 @@ impl ShardedGossip {
 
         // Find local agents by filtering the complete list of known agents against the agents which have joined Kitsune.
         let local_agents = self.gossip.inner.share_ref(|s| {
-            Ok(all_agents.iter().filter(|a| s.local_agents.contains(&a.agent)).cloned().collect())
+            Ok(all_agents
+                .iter()
+                .filter(|a| s.local_agents.contains(&a.agent))
+                .cloned()
+                .collect())
         })?;
 
-        Ok(AgentInfoSession::new(
-            local_agents,
-            all_agents,
-        ))
+        Ok(AgentInfoSession::new(local_agents, all_agents))
     }
 
     async fn process_outgoing(&self, outgoing: Outgoing) -> KitsuneResult<()> {
@@ -403,15 +399,8 @@ impl ShardedGossip {
         Ok(())
     }
 
-    async fn run_one_iteration(
-        &self,
-        agent_info_session: &mut AgentInfoSession,
-    ) {
-        match self
-            .gossip
-            .try_initiate(agent_info_session)
-            .await
-        {
+    async fn run_one_iteration(&self, agent_info_session: &mut AgentInfoSession) {
+        match self.gossip.try_initiate(agent_info_session).await {
             Ok(Some(outgoing)) => {
                 if let Err(err) = self.state.share_mut(|i, _| {
                     i.push_outgoing([outgoing]);

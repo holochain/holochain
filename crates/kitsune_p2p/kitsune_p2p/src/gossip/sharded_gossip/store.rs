@@ -34,7 +34,7 @@ pub(super) struct AgentInfoSession {
     /// are in the host store but haven't yet joined the Kitsune space.
     all_agents: Vec<AgentInfoSigned>,
 
-    /// Cache of agents whose storage arc is contained in an arc set. 
+    /// Cache of agents whose storage arc is contained in an arc set.
     /// Finding these agents requires a host query so we cache the results because they are used frequently.
     agents_by_arc_set_cache: HashMap<Arc<DhtArcSet>, Vec<AgentInfoSigned>>,
 }

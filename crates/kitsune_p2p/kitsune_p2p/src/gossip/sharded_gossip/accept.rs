@@ -46,7 +46,7 @@ impl ShardedGossipLocal {
         if local_agents.is_empty() {
             return Ok(vec![ShardedGossipWire::no_agents()]);
         }
-        
+
         /* TODO This change is wanted but breaks two tests which rely on an incomplete host implementation
             gossip::sharded_gossip::tests::test_two_nodes::initiate_times_out
             gossip::sharded_gossip::tests::test_two_nodes::sharded_sanity_test

@@ -38,7 +38,8 @@ impl ShardedGossipLocal {
             .collect();
 
         // Get all the agent info for these remote nodes.
-        for info in agent_info_session.get_agents()
+        for info in agent_info_session
+            .get_agents()
             .iter()
             .filter(|a| {
                 std::time::Duration::from_millis(a.expires_at_ms)
