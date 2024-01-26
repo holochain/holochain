@@ -6,9 +6,6 @@ use crate::tx2::tx2_utils::TxUrl;
 use crate::KitsuneResult;
 use url2::Url2;
 
-/// How long kitsune should wait before timing out when joining the network.
-pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
-
 /// Fifteen minutes
 pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 15);
 

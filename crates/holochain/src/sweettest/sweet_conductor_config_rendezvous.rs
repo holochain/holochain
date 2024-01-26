@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 /// How conductors should learn about each other / speak to each other.
-/// Just a bootstrap server in tx2 mode.
 /// Signal/TURN + bootstrap in tx5 mode.
 pub trait SweetRendezvous: 'static + Send + Sync {
     /// Get the bootstrap address.

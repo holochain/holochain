@@ -33,6 +33,8 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasmer_host::module::ModuleCache;
+use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -59,7 +61,8 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        let ribosome = RealRibosome::new(dna_file, None).unwrap();
+        let ribosome =
+            RealRibosome::new(dna_file, Arc::new(RwLock::new(ModuleCache::new(None)))).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

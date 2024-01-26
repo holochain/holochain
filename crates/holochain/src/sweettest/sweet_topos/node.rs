@@ -90,7 +90,7 @@ impl NetworkTopologyNode {
             .await
             .read()
             .await
-            .live_cell_ids()
+            .running_cell_ids()
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
