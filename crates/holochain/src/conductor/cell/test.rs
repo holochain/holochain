@@ -6,7 +6,10 @@ use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::*;
+use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -26,8 +29,8 @@ async fn test_cell_handle_publish() {
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.dna_network();
 
-    let db_dir = test_db_dir();
-    let data_root_path: DataRootPath = db_dir.path().to_path_buf().into();
+    let db_dir = test_db_dir().path().to_path_buf();
+    let data_root_path: DataRootPath = db_dir.clone().into();
     let handle = Conductor::builder()
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
@@ -35,8 +38,9 @@ async fn test_cell_handle_publish() {
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
+    let wasmer_module_cache = Arc::new(RwLock::new(ModuleCache::new(Some(db_dir))));
 
-    let ribosome = RealRibosome::new(dna_file, Some(data_root_path)).unwrap();
+    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache).unwrap();
 
     super::Cell::genesis(
         cell_id.clone(),
