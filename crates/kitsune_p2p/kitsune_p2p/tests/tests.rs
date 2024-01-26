@@ -1035,35 +1035,6 @@ async fn delegate_publish() {
     assert_eq!(1, harness_c.op_store().read().len());
 }
 
-async fn wait_for_connected(
-    sender: GhostSender<KitsuneP2p>,
-    to_agent: Arc<KitsuneAgent>,
-    space: Arc<KitsuneSpace>,
-) {
-    tokio::time::timeout(std::time::Duration::from_secs(10), async move {
-        loop {
-            match sender
-                .rpc_single(
-                    space.clone(),
-                    to_agent.clone(),
-                    "connection test".as_bytes().to_vec(),
-                    Some(std::time::Duration::from_secs(10).as_millis() as u64),
-                )
-                .await
-            {
-                Ok(resp) => {
-                    return resp;
-                }
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                }
-            }
-        }
-    })
-    .await
-    .unwrap();
-}
-
 // Note that even with the ignore reason, this test isn't in perfect shape. I wrote it with the expectation that the bandwidth limits apply to op data
 // which they do not. That will need to be figured out then the test can be completed around that. For now I just want to keep what I've done so far.
 #[cfg(feature = "tx5")]

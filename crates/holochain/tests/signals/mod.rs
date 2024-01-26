@@ -7,6 +7,7 @@ use holochain::sweettest::{SweetCell, SweetConductorBatch, SweetConductorConfig,
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -50,8 +51,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
     // Listen for signals on Bob's and Carol's conductors.
     // These are all the signals on that conductor but the only app installed
     // is the one for this test.
-    let mut conductor_1_signal_stream = conductors[1].signal_stream().await.map(to_signal_message);
-    let mut conductor_2_signal_stream = conductors[2].signal_stream().await.map(to_signal_message);
+    let conductor_1_signal_stream = conductors[1].signal_stream().await.map(to_signal_message);
+    let conductor_2_signal_stream = conductors[2].signal_stream().await.map(to_signal_message);
 
     // Call `signal_others` multiple times as Alice to send signals to Bob.
     for i in 0..6 {
@@ -72,13 +73,22 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
 
     // Check that Bob and Carol receive all the signals.
     tokio::time::timeout(Duration::from_secs(60), async move {
-        for i in 0..6 {
-            let message = conductor_1_signal_stream.next().await.unwrap();
-            assert_eq!(format!("message {}", i), message.value);
+        let msgs_1: HashSet<String> = conductor_1_signal_stream
+            .take(6)
+            .map(|m| m.value)
+            .collect()
+            .await;
+        let msgs_2: HashSet<String> = conductor_2_signal_stream
+            .take(6)
+            .map(|m| m.value)
+            .collect()
+            .await;
+        let expected = (0..6)
+            .map(|i| format!("message {}", i))
+            .collect::<HashSet<_>>();
 
-            let message = conductor_2_signal_stream.next().await.unwrap();
-            assert_eq!(format!("message {}", i), message.value);
-        }
+        assert_eq!(msgs_1, expected);
+        assert_eq!(msgs_1, msgs_2);
     })
     .await
     .unwrap();

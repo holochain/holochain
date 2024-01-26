@@ -733,7 +733,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.live_cell_ids() {
+    for cell_id in conductor.running_cell_ids() {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))
