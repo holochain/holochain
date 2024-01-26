@@ -52,7 +52,7 @@ impl ShardedGossipLocal {
         {
             let id = rand::thread_rng().gen();
 
-            let gossip = ShardedGossipWire::initiate(intervals, id, agent_info_session.get_agents().to_vec());
+            let gossip = ShardedGossipWire::initiate(intervals, id, agent_info_session.get_local_agents().to_vec());
 
             let tgt = ShardedGossipTarget {
                 remote_agent_list: agent_info_list,
@@ -133,7 +133,6 @@ impl ShardedGossipLocal {
             .map(|arc| arc.into())
             .collect();
 
-        tracing::info!("Gossip initiated, querying agents");
         let agent_list = agent_info_session.get_local_agents().to_vec();
 
         // Send the intervals back as the accept message.

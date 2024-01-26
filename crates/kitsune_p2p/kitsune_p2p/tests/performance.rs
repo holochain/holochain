@@ -151,8 +151,6 @@ async fn minimise_p2p_agent_store_host_calls() {
         .filter(|e| matches!(e, RecordedKitsuneP2pEvent::QueryAgents { .. }))
         .count();
 
-    println!("query_agents_count: {:?}", query_agents_count);
-
     query_agents_count.assert_close_to(1400, 100);
 
     let query_peer_density_count = drained_events

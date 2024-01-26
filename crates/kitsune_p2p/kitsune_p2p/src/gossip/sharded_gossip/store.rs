@@ -116,13 +116,13 @@ pub(super) async fn all_agent_info(
         .map_err(KitsuneError::other)
 }
 
-/// BIN
+// TODO This can be removed once initiate_times_out and sharded_sanity_test are fixed.
+/// Get all `AgentInfoSigned` for agents in a space.
 async fn query_agent_info(
     host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    // TODO this is equivalent to `all_agent_info` filtered against the input of `agents` which came from ??? (suspect `all_agent_info`) so this is a redundant query!
     let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
     host_api
         .legacy
@@ -131,14 +131,13 @@ async fn query_agent_info(
         .map_err(KitsuneError::other)
 }
 
-/// BIN
+// TODO This can be removed once initiate_times_out and sharded_sanity_test are fixed.
+/// Get the arc intervals for specified agent, paired with their respective agent.
 pub(super) async fn local_agent_arcs(
     host_api: &HostApiLegacy,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
-    tracing::info!("&&& Getting local agent arcs");
-    // TODO This `query_agent_info` is redundant, remove it and just make this a transform of the `local_agents`
     Ok(query_agent_info(host_api, space, local_agents)
         .await?
         .into_iter()
