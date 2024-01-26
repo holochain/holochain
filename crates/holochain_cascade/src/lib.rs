@@ -688,6 +688,7 @@ where
     ///
     /// Also returns Rejected actions, which may affect the interpreted validity status of this Entry.
     #[instrument(skip(self, options))]
+    #[allow(deprecated)]
     pub async fn get_entry_details(
         &self,
         entry_hash: EntryHash,
@@ -740,17 +741,24 @@ where
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
+        match options.style {
+            GetStyle::NetworkBlocking => {
+                // We don't need metadata and only need the content
+                // so if we have it locally then we can avoid the network.
+                if let GetStrategy::Content = options.strategy {
+                    let results = self.cascading(query.clone()).await?;
+                    // We got a result so can short circuit.
+                    if results.is_some() {
+                        return Ok(results);
+                    // We didn't get a result so if we are either authoring
+                    // or the authority there's nothing left to do.
+                    } else if authoring || authority {
+                        return Ok(None);
+                    }
+                }
+            }
+            GetStyle::LocalOnly => {
+                return Ok(self.cascading(query.clone()).await?);
             }
         }
 

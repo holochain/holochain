@@ -51,13 +51,18 @@ pub struct AppEntryDefLocation {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get works
 pub struct GetOptions {
+    /// Controls whether data will be fetched only
+    pub style: GetStyle,
+
     /// If this is true the get call will wait for
     /// the latest data before returning.
     /// If it is false you will get whatever is locally
     /// available on this conductor.
+    #[deprecated = "Use GetOptions::style instead"]
     pub strategy: GetStrategy,
 }
 
+#[allow(deprecated)]
 impl GetOptions {
     /// This will get you the content
     /// with latest metadata if it can
@@ -70,6 +75,7 @@ impl GetOptions {
     pub fn latest() -> Self {
         Self {
             strategy: GetStrategy::Latest,
+            style: GetStyle::NetworkBlocking,
         }
     }
     /// Gets the content but does not
@@ -82,6 +88,7 @@ impl GetOptions {
     pub fn content() -> Self {
         Self {
             strategy: GetStrategy::Content,
+            style: GetStyle::NetworkBlocking,
         }
     }
 }
@@ -106,6 +113,44 @@ pub enum GetStrategy {
     /// Does not go to the network if you are an authority for the data.
     Content,
 }
+
+/// Describes distinct methods of performing a get.
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub enum GetStyle {
+    /// Always go to the network to look for data and block until a response
+    /// is received or the call times out.
+    ///
+    /// If you already have a definitive response to the query stored locally,
+    /// a network call may not be necessary.
+    /// For instance, if you're getting a single entry and you already have the
+    /// entry stored locally, there's no need to go to the network.
+    /// However, if you're looking for links or potential updates and deletes to
+    /// content, this will always go to the network to look for the latest data.
+    NetworkBlocking,
+
+    /// Returns immediately with whatever local data is available, while also
+    /// triggering an async network request. If and when the network request
+    /// returns, a signal will be sent over the App websocket with the results,
+    /// including the provided subscription token.
+    NetworkSubscription(NetworkSubscriptionToken),
+
+    /// Never go to the network, and only query local storage.
+    /// The get returns immediately, but the data may be out of date.
+    /// Note that every network request is cached, so subsequent LocalOnly calls
+    /// will include data returned from recent network calls.
+    LocalOnly,
+}
+
+impl Default for GetStyle {
+    fn default() -> Self {
+        Self::NetworkBlocking
+    }
+}
+
+/// When using [`GetStyle::NetworkSubscription`], the caller must provide a
+/// subscription token. This token is used to correlate the response with the
+/// original request when handling the signal.
+pub type NetworkSubscriptionToken = String;
 
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
