@@ -66,8 +66,6 @@ impl AgentInfoSession {
             .collect()
     }
 
-    // This will be used by the accept handler once its tests are fixed
-    #[allow(unused)]
     pub(super) fn local_agent_arcs(&self) -> Vec<(Arc<KitsuneAgent>, DhtArc)> {
         self.local_agents
             .iter()
@@ -114,35 +112,6 @@ pub(super) async fn all_agent_info(
         .query_agents(QueryAgentsEvt::new(space.clone()))
         .await
         .map_err(KitsuneError::other)
-}
-
-// TODO This can be removed once initiate_times_out and sharded_sanity_test are fixed.
-/// Get all `AgentInfoSigned` for agents in a space.
-async fn query_agent_info(
-    host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
-    agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
-    host_api
-        .legacy
-        .query_agents(query)
-        .await
-        .map_err(KitsuneError::other)
-}
-
-// TODO This can be removed once initiate_times_out and sharded_sanity_test are fixed.
-/// Get the arc intervals for specified agent, paired with their respective agent.
-pub(super) async fn local_agent_arcs(
-    host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
-    local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
-    Ok(query_agent_info(host_api, space, local_agents)
-        .await?
-        .into_iter()
-        .map(|info| (info.agent.clone(), info.storage_arc))
-        .collect::<Vec<_>>())
 }
 
 /// Get all ops for all agents that fall within the specified arcset.

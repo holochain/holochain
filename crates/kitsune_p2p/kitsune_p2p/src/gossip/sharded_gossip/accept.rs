@@ -47,13 +47,6 @@ impl ShardedGossipLocal {
             return Ok(vec![ShardedGossipWire::no_agents()]);
         }
 
-        /* TODO This change is wanted but breaks two tests which rely on an incomplete host implementation
-            gossip::sharded_gossip::tests::test_two_nodes::initiate_times_out
-            gossip::sharded_gossip::tests::test_two_nodes::sharded_sanity_test
-
-            The old store::local_agent_arcs is returning arcs for all agents when it should only return joined
-            agents because it is being passed a filter for those agents. It does, it returns them all which means we get
-            a Full arc and quantisation works. With the filter, quantisation fails and the tests break.
         // Get the local intervals.
         let local_agent_arcs: Vec<_> = agent_info_session
             .local_agent_arcs()
@@ -66,15 +59,6 @@ impl ShardedGossipLocal {
                 }
             })
             .collect();
-        */
-
-        // Get the local intervals.
-        let local_agent_arcs: Vec<_> =
-            store::local_agent_arcs(&self.host_api, &self.space, &local_agents)
-                .await?
-                .into_iter()
-                .map(|(_, a)| a.into())
-                .collect();
 
         let mut gossip = Vec::new();
 
