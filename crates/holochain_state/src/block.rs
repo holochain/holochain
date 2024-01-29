@@ -433,12 +433,9 @@ mod test {
     // Blocks only block their span.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_not_block_is_not_blocked() {
-        for (start, check, end) in vec![
-            // before
-            (1, 0, 1),
+        for (start, check, end) in [(1, 0, 1),
             // after
-            (0, 1, 0),
-        ] {
+            (0, 1, 0)] {
             let db = test_conductor_db();
 
             let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
@@ -497,16 +494,13 @@ mod test {
     // no other target.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_is_blocked() {
-        for (start, mid, end) in vec![
-            // block is inclusive
-            (0, 0, 0),
+        for (start, mid, end) in [(0, 0, 0),
             (1, 1, 1),
             (-1, -1, -1),
             (i64::MIN, i64::MIN, i64::MIN),
             (i64::MAX, i64::MAX, i64::MAX),
             // Some other values
-            (10, 15, 20),
-        ] {
+            (10, 15, 20)] {
             let db = test_conductor_db();
 
             // control

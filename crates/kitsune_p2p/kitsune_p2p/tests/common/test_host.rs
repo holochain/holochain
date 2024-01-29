@@ -208,8 +208,7 @@ impl KitsuneHost for TestHost {
                         None
                     }
                 })
-                .collect::<Vec<_>>()
-                .into())
+                .collect::<Vec<_>>())
         }
         .boxed()
         .into()

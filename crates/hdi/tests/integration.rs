@@ -320,10 +320,7 @@ fn entry_defs_to_entry_type_index() {
         Ok(Some(integrity_a::EntryTypes::C(C {})))
     );
 
-    assert!(matches!(
-        integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap()),
-        Err(_)
-    ));
+    assert!(integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap()).is_err());
     assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(0, 0, &Entry::try_from(A {}).unwrap()),
         Ok(None)
@@ -393,14 +390,8 @@ fn link_types_from_action() {
         LinkTypes::try_from(scoped_link_type(1, 2)),
         Ok(LinkTypes::C)
     );
-    assert!(matches!(
-        LinkTypes::try_from(scoped_link_type(1, 50)),
-        Err(_)
-    ));
-    assert!(matches!(
-        LinkTypes::try_from(scoped_link_type(0, 1)),
-        Err(_)
-    ));
+    assert!(LinkTypes::try_from(scoped_link_type(1, 50)).is_err());
+    assert!(LinkTypes::try_from(scoped_link_type(0, 1)).is_err());
 }
 
 #[test]
