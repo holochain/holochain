@@ -614,7 +614,6 @@ impl SweetConductor {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
             let iter = handle.running_cell_ids().into_iter().map(|id| async {
-                let id = id;
                 let db = self.get_authored_db(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).await.unwrap();
                 (db, trigger)
