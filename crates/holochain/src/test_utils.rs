@@ -64,7 +64,6 @@ mod wait_for;
 pub use wait_for::*;
 
 mod big_stack_test;
-pub use big_stack_test::*;
 
 mod generate_records;
 pub use generate_records::*;
