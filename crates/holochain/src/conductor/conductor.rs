@@ -104,7 +104,7 @@ use holochain_state::source_chain;
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use rusqlite::Transaction;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -529,8 +529,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-    use std::borrow::BorrowMut;
-
     use super::*;
 
     impl Conductor {
