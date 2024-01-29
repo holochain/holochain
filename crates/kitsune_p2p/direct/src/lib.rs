@@ -1,5 +1,4 @@
 //! Kitsune P2p Direct Application Framework
-#![deny(warnings)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
