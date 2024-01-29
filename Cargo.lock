@@ -2130,13 +2130,13 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ded13e388a81713db6919cd750e6113acf2fe5afbaedf8aff79780ec4fc47425"
+checksum = "397f372672597305f39af2b2abf389a077077489bc4f412e7ed574214c268208"
 dependencies = [
  "futures",
  "one_err",
- "rmp-serde 1.1.2",
+ "rmp-serde",
  "rmpv",
  "serde",
  "serde_bytes",
@@ -2589,7 +2589,7 @@ checksum = "9805b3e01e7b5c144782a0823db4dc895fec18a9ccd45a492ce7c7bf157a9e38"
 dependencies = [
  "arbitrary",
  "holochain_serialized_bytes_derive 0.0.51",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_bytes",
@@ -2604,7 +2604,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bac6151d65c9a6f26f1b1068046a98900214030924377a2142f60c279b091f51"
 dependencies = [
  "holochain_serialized_bytes_derive 0.0.52",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_bytes",
@@ -2667,7 +2667,7 @@ dependencies = [
  "r2d2",
  "r2d2_sqlite",
  "rand 0.8.5",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rusqlite",
  "scheduled-thread-pool",
  "serde",
@@ -2777,7 +2777,7 @@ dependencies = [
  "observability",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3334,7 +3334,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "rand 0.8.5",
  "reqwest",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3493,7 +3493,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.11.2",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rustls 0.20.8",
  "serde",
  "serde_bytes",
@@ -3555,7 +3555,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.11.2",
  "paste",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "rustls 0.20.8",
  "serde",
  "serde_bytes",
@@ -3582,9 +3582,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843c7dbcbc8d75eef0b30397a7eb0d04549aabeff4ea69ebd272aea991555746"
+checksum = "fcbac7629f0f04caae576442599f4328402e1313989a57c66f343947ef1b4add"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions 1.4.0",
@@ -3598,9 +3598,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5829f25d0eab6309ae4307aa645f123a64e568a41ec17c358dcbd65dec207e10"
+checksum = "111229e06eaf24ed8359fed70e37c2715efdafa6e26394e9bd7a4617722caa41"
 dependencies = [
  "base64 0.13.1",
  "dunce",
@@ -4095,7 +4095,7 @@ dependencies = [
  "maplit",
  "matches",
  "reqwest",
- "rmp-serde 0.15.5",
+ "rmp-serde",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -5709,17 +5709,6 @@ name = "rmp-serde"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "723ecff9ad04f4ad92fe1c8ca6c20d2196d9286e9c60727c4cb5511629260e9d"
-dependencies = [
- "byteorder",
- "rmp",
- "serde",
-]
-
-[[package]]
-name = "rmp-serde"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bffea85eea980d8a74453e5d02a8d93028f3c34725de143085a844ebe953258a"
 dependencies = [
  "byteorder",
  "rmp",
