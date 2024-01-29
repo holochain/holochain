@@ -27,7 +27,7 @@ pub(crate) trait SharedValues: DynClone + Sync + Send {
         min_data: usize,
         maybe_wait_timeout: Option<Duration>,
     ) -> Fallible<Data<String>>;
-    fn num_waiters_t(&self) -> Fallible<usize>;
+    async fn num_waiters_t(&self) -> Fallible<usize>;
 }
 dyn_clone::clone_trait_object!(SharedValues);
 
@@ -166,130 +166,8 @@ pub(crate) mod local_v1 {
                 }
             }
         }
-        fn num_waiters_t(&self) -> Fallible<usize> {
+        async fn num_waiters_t(&self) -> Fallible<usize> {
             Ok(self.num_waiters())
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        
-        use std::time::Duration;
-        
-
-        use super::super::*;
-        use super::*;
-
-        #[tokio::test]
-        // #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-        async fn shared_values_localv1_get_waits() {
-            let mut values = Box::new(LocalV1::default()) as Box<dyn SharedValues>;
-
-            const EXPECTED_NUM_WAITERS: usize = 1;
-
-            let prefix = "something".to_string();
-            let s = "we expect this back".to_string();
-
-            let handle = {
-                let prefix = prefix.clone();
-                let s = s.clone();
-                let mut values = values.clone();
-
-                tokio::spawn({
-                    async move {
-                        let got: String = values
-                            .get_pattern_t(prefix.clone(), EXPECTED_NUM_WAITERS, None)
-                            .await
-                            .unwrap()
-                            .into_values()
-                            .nth(0)
-                            .unwrap();
-                        eprintln!("got {got}");
-                        assert_eq!(s, got);
-
-                        got
-                    }
-                })
-            };
-
-            // make sure the getter really comes first
-            tokio::select! {
-                _ = async {
-                    loop {
-                        let num = values.num_waiters_t().unwrap();
-                        match num {
-                            0 => tokio::time::sleep(Duration::from_millis(10)).await,
-                            EXPECTED_NUM_WAITERS => { eprintln!("saw a getter!"); break },
-                            _ => panic!("saw more than one waiter"),
-                        };
-                    }
-                } => { }
-                _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                    panic!("didn't see a waiter");
-                }
-            };
-
-            values.put_t(prefix, s).await.unwrap();
-
-            if let Err(e) = handle.await {
-                panic!("{:#?}", e);
-            };
-        }
-
-        #[tokio::test(flavor = "multi_thread")]
-        async fn shared_values_localv1_simulate_agent_discovery() {
-            let values: Box<dyn SharedValues + Sync> = Box::new(LocalV1::default());
-
-            const PREFIX: &str = "agent_";
-
-            let required_agents = 2;
-            let num_agents = 2;
-
-            let get_handle = {
-                let mut values = values.clone();
-                tokio::spawn(async move {
-                    tokio::select! {
-                        _ = async {
-                            let all_agents: Data<AgentDummyInfo> = values.get_pattern_t(PREFIX.to_string(), required_agents, None)
-                                .await
-                                .unwrap()
-                                .into_iter()
-                                .map(|(key, value)| Ok((key, serde_json::from_str(&value)?)))
-                                .collect::<Fallible<_>>()
-                                .unwrap();
-                            assert!(required_agents <= all_agents.len());
-                            assert!(all_agents.len() <= num_agents);
-                            eprintln!("{} agents {all_agents:#?}", all_agents.len());
-                        } => { }
-                        _ = tokio::time::sleep(Duration::from_millis(50)) => { panic!("not enough agents"); }
-                    }
-                })
-            };
-
-            let mut handles = vec![get_handle];
-            for _ in 0..num_agents {
-                let mut values = values.clone();
-
-                let handle = tokio::spawn(async move {
-                    let agent_dummy_info = AgentDummyInfo {
-                        id: uuid::Uuid::new_v4(),
-                    };
-                    values
-                        .put_t(
-                            format!("{PREFIX}{}", &agent_dummy_info.id),
-                            serde_json::to_string(&agent_dummy_info).unwrap(),
-                        )
-                        .await
-                        .unwrap();
-                });
-                handles.push(handle);
-            }
-
-            for handle in handles {
-                if let Err(e) = handle.await {
-                    panic!("{:#?}", e);
-                };
-            }
         }
     }
 }
@@ -334,6 +212,7 @@ pub(crate) mod remote_v1 {
             min_data: usize,
             maybe_timeout: Option<Duration>,
         },
+        NumWaiters,
     }
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
@@ -341,6 +220,7 @@ pub(crate) mod remote_v1 {
         Test(String),
         Put(Result<Option<String>, String>),
         Get(Result<Data<String>, String>),
+        NumWaiters(usize),
     }
 
     impl RemoteV1Server {
@@ -406,6 +286,10 @@ pub(crate) mod remote_v1 {
                                 let data = Default::default();
 
                                 ResponseMessage::Get(Ok(data))
+                            }
+
+                            RequestMessage::NumWaiters => {
+                                ResponseMessage::NumWaiters(localv1.num_waiters())
                             }
                         };
 
@@ -489,38 +373,44 @@ pub(crate) mod remote_v1 {
 
         async fn get_pattern_t(
             &mut self,
-            _pattern: String,
-            _min_data: usize,
-            _maybe_wait_timeout: Option<Duration>,
+            pattern: String,
+            min_data: usize,
+            maybe_timeout: Option<Duration>,
         ) -> Fallible<Data<String>> {
-            todo!();
+            match self
+                .request(RequestMessage::Get {
+                    pattern,
+                    min_data,
+                    maybe_timeout,
+                })
+                .await?
+            {
+                ResponseMessage::Get(Ok(data)) => {
+                    todo!("parse {data:#?}");
+                }
 
-            // tokio::select! {
-            //     data = self.get_pattern(pattern.as_str(), |(_previous_data, data)| { data.len() >= min_data }) => Ok(data?),
-            //     _ = {
-            //         let duration = if let Some(wait_timeout) =  maybe_wait_timeout {
-            //             wait_timeout
-            //         } else {
-            //             std::time::Duration::MAX
-            //         };
+                ResponseMessage::Get(Err(msg)) => {
+                    bail!("{msg}")
+                }
 
-            //         tokio::time::sleep(duration)
-            //     }  => todo!(),
+                unexpected => {
+                    bail!("unexpected response: {unexpected:#?}")
+                }
+            }
         }
-        //         anyhow::bail!("timeout")
-        //     }
-        // }
 
-        fn num_waiters_t(&self) -> Fallible<usize> {
-            todo!()
+        async fn num_waiters_t(&self) -> Fallible<usize> {
+            match self.request(RequestMessage::NumWaiters).await? {
+                ResponseMessage::NumWaiters(num_waiters) => Ok(num_waiters),
+
+                unexpected => {
+                    bail!("unexpected response: {unexpected:#?}")
+                }
+            }
         }
     }
     #[cfg(test)]
     mod tests {
-        
-
-        
-
         use super::*;
 
         #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -547,76 +437,201 @@ pub(crate) mod remote_v1 {
 
             server.abort();
         }
+    }
+}
 
-        #[tokio::test]
-        async fn shared_values_remote_v1_basic() {
-            let server = RemoteV1Server::new(None).await.unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tests::local_v1::*;
+    use tests::remote_v1::*;
 
-            let client = RemoteV1Client::new(server.url(), None).await.unwrap();
+    use std::time::Duration;
 
-            let s = "expecting this back".to_string();
+    async fn inner_shared_values_trait_get_works(mut values: Box<dyn SharedValues>) {
+        let prefix = "something".to_string();
+        let s = "we expect this back".to_string();
 
-            let r = match client.request(RequestMessage::Test(s.clone())).await {
-                Ok(ResponseMessage::Test(r)) => r,
-                other => panic!("{other:#?}"),
-            };
+        let handle = {
+            let prefix = prefix.clone();
+            let s = s.clone();
+            let mut values = values.clone();
 
-            assert_eq!(s, r);
+            tokio::spawn({
+                async move {
+                    let got: String = values
+                        .get_pattern_t(prefix.clone(), 0, None)
+                        .await
+                        .unwrap()
+                        .into_values()
+                        .nth(0)
+                        .unwrap();
+                    eprintln!("got {got}");
+                    assert_eq!(s, got);
+
+                    got
+                }
+            })
+        };
+
+        values.put_t(prefix, s).await.unwrap();
+
+        if let Err(e) = handle.await {
+            panic!("{:#?}", e);
+        };
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_localv1_get_works() {
+        inner_shared_values_trait_get_works(Box::new(LocalV1::default()) as Box<dyn SharedValues>)
+            .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_remotev1_get_works() {
+        let server = RemoteV1Server::new(None).await.unwrap();
+
+        inner_shared_values_trait_get_works(Box::new(
+            RemoteV1Client::new(server.url(), None).await.unwrap(),
+        ) as Box<dyn SharedValues>)
+        .await;
+    }
+
+    async fn inner_shared_values_trait_get_waits(mut values: Box<dyn SharedValues>) {
+        const EXPECTED_NUM_WAITERS: usize = 1;
+
+        let prefix = "something".to_string();
+        let s = "we expect this back".to_string();
+
+        let handle = {
+            let prefix = prefix.clone();
+            let s = s.clone();
+            let mut values = values.clone();
+
+            tokio::spawn({
+                async move {
+                    let got: String = values
+                        .get_pattern_t(prefix.clone(), EXPECTED_NUM_WAITERS, None)
+                        .await
+                        .unwrap()
+                        .into_values()
+                        .nth(0)
+                        .unwrap();
+                    eprintln!("got {got}");
+                    assert_eq!(s, got);
+
+                    got
+                }
+            })
+        };
+
+        // make sure the getter really comes first
+        tokio::select! {
+            _ = async {
+                loop {
+                    let num = values.num_waiters_t().await.unwrap();
+                    match num {
+                        0 => tokio::time::sleep(Duration::from_millis(10)).await,
+                        EXPECTED_NUM_WAITERS => { eprintln!("saw a getter!"); break },
+                        _ => panic!("saw more than one waiter"),
+                    };
+                }
+            } => { }
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+                panic!("didn't see a waiter");
+            }
+        };
+
+        values.put_t(prefix, s).await.unwrap();
+
+        if let Err(e) = handle.await {
+            panic!("{:#?}", e);
+        };
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_localv1_get_waits() {
+        inner_shared_values_trait_get_waits(Box::new(LocalV1::default()) as Box<dyn SharedValues>)
+            .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_remotev1_get_waits() {
+        let server = RemoteV1Server::new(None).await.unwrap();
+
+        inner_shared_values_trait_get_waits(Box::new(
+            RemoteV1Client::new(server.url(), None).await.unwrap(),
+        ) as Box<dyn SharedValues>)
+        .await;
+    }
+
+    async fn inner_shared_values_trait_simulate_agent_discovery(
+        values: Box<dyn SharedValues + Sync>,
+    ) {
+        const PREFIX: &str = "agent_";
+
+        let required_agents = 2;
+        let num_agents = 2;
+
+        let get_handle = {
+            let mut values = values.clone();
+            tokio::spawn(async move {
+                tokio::select! {
+                    _ = async {
+                        let all_agents: Data<AgentDummyInfo> = values.get_pattern_t(PREFIX.to_string(), required_agents, None)
+                            .await
+                            .unwrap()
+                            .into_iter()
+                            .map(|(key, value)| Ok((key, serde_json::from_str(&value)?)))
+                            .collect::<Fallible<_>>()
+                            .unwrap();
+                        assert!(required_agents <= all_agents.len());
+                        assert!(all_agents.len() <= num_agents);
+                        eprintln!("{} agents {all_agents:#?}", all_agents.len());
+                    } => { }
+                    _ = tokio::time::sleep(Duration::from_millis(50)) => { panic!("not enough agents"); }
+                }
+            })
+        };
+
+        let mut handles = vec![get_handle];
+        for _ in 0..num_agents {
+            let mut values = values.clone();
+
+            let handle = tokio::spawn(async move {
+                let agent_dummy_info = AgentDummyInfo {
+                    id: uuid::Uuid::new_v4(),
+                };
+                values
+                    .put_t(
+                        format!("{PREFIX}{}", &agent_dummy_info.id),
+                        serde_json::to_string(&agent_dummy_info).unwrap(),
+                    )
+                    .await
+                    .unwrap();
+            });
+            handles.push(handle);
         }
 
-        // #[tokio::test(flavor = "multi_thread")]
-        // async fn shared_values_remotev1_simulate_agent_discovery() {
-        //     const PREFIX: &str = "agent_";
+        for handle in handles {
+            if let Err(e) = handle.await {
+                panic!("{:#?}", e);
+            };
+        }
+    }
 
-        //     let required_agents = 2;
-        //     let num_agents_required = 2;
-        //     let num_agents_spawned = num_agents_required * 10;
+    #[tokio::test(flavor = "multi_thread")]
+    async fn shared_values_localv1_simulate_agent_discovery() {
+        let values: Box<dyn SharedValues + Sync> = Box::new(LocalV1::default());
+        inner_shared_values_trait_simulate_agent_discovery(values).await;
+    }
 
-        //     let server = RemoteV1Server::new(None).await.unwrap();
-        //     let url = server.url();
+    #[tokio::test(flavor = "multi_thread")]
+    async fn shared_values_remotev1_simulate_agent_discovery() {
+        let server = RemoteV1Server::new(None).await.unwrap();
 
-        //     let agent_fn = || async move {
-        //         let values = RemoteV1Client::new(url, None).await;
-
-        //         let agent_dummy_info = AgentDummyInfo {
-        //             id: uuid::Uuid::new_v4(),
-        //         };
-        //         values
-        //             .put(
-        //                 format!("{PREFIX}{}", &agent_dummy_info.id),
-        //                 serde_json::to_string(&agent_dummy_info).unwrap(),
-        //             )
-        //             .await
-        //             .unwrap();
-
-        //         // TODO: wait with a timeout until num_agents have been registered
-        //         let handle = {
-        //             let mut values = values.clone();
-        //             tokio::spawn(async move {
-        //                 tokio::select! {
-        //                     _ = async {
-        //                         let all_agents: Data<AgentDummyInfo> = values.get_pattern(PREFIX, |(_, results)| results.len() >= num_agents_required)
-        //                             .await
-        //                             .unwrap()
-        //                             .into_iter()
-        //                             .map(|(key, value)| Ok((key, serde_json::from_str(&value)?)))
-        //                             .collect::<Fallible<_>>()
-        //                             .unwrap();
-        //                         assert!(required_agents <= all_agents.len());
-        //                         assert!(all_agents.len() <= num_agents_required);
-        //                         eprintln!("{} agents {all_agents:#?}", all_agents.len());
-        //                     } => { }
-        //                     _ = tokio::time::sleep(Duration::from_millis(50)) => { panic!("not enough agents"); }
-        //                 }
-        //             })
-        //         };
-
-        //         if let Err(e) = handle.await {
-        //             panic!("{:#?}", e);
-        //         };
-
-        //         // this concludes a checkpoint, possibly providing data, that holochain specific logic can rely on
-        //     };
-        // }
+        let values: Box<dyn SharedValues + Sync> =
+            Box::new(RemoteV1Client::new(server.url(), None).await.unwrap());
+        inner_shared_values_trait_simulate_agent_discovery(values).await;
     }
 }
