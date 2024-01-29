@@ -209,14 +209,15 @@ impl ShardedGossip {
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
-                    this.run_one_iteration(&mut agent_info_session).await;
-                    this.stats(&mut stats);
-
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
                         agent_info_session = this.create_agent_info_session().await?;
                         refresh_agent_list_timer = std::time::Instant::now();
                     }
+
+                    this.run_one_iteration(&mut agent_info_session).await;
+                    this.stats(&mut stats);
+
+                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                 }
                 KitsuneResult::Ok(())
             }
