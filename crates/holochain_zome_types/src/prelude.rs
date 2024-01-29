@@ -1,6 +1,5 @@
 //! Common types
 
-
 pub use crate::action::*;
 pub use crate::agent_activity::*;
 pub use crate::block::*;
@@ -34,12 +33,8 @@ pub use crate::schedule::*;
 pub use crate::signal::*;
 pub use crate::signature::*;
 
-
 pub use crate::validate::*;
 pub use crate::warrant::*;
-
-
-
 
 pub use crate::x_salsa20_poly1305::*;
 pub use crate::zome::*;

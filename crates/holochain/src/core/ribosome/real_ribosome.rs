@@ -250,7 +250,7 @@ impl RealRibosome {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
+        let map = GlobalZomeTypes::from_ordered_iterator(iter);
 
         ribosome.zome_types = Arc::new(map?);
 

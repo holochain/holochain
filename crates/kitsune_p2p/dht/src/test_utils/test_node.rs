@@ -51,8 +51,8 @@ impl TestNode {
         self.arqs
             .iter()
             .enumerate()
-            .map(|(i, (_, arq))| {
-                format!(
+            .fold("".to_string(), |mut acc, (i, (_, arq))| {
+                acc += format!(
                     "{:>3}: |{}| {}/{} @ {}\n",
                     i,
                     add_location_ascii(
@@ -62,9 +62,10 @@ impl TestNode {
                     arq.power(),
                     arq.count(),
                     arq.start_loc()
-                )
+                ).as_str();
+
+                acc
             })
-            .collect()
     }
 }
 

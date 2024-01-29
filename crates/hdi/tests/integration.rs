@@ -320,7 +320,10 @@ fn entry_defs_to_entry_type_index() {
         Ok(Some(integrity_a::EntryTypes::C(C {})))
     );
 
-    assert!(integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap()).is_err());
+    assert!(
+        integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap())
+            .is_err()
+    );
     assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(0, 0, &Entry::try_from(A {}).unwrap()),
         Ok(None)

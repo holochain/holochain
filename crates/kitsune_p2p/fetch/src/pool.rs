@@ -218,9 +218,7 @@ impl State {
         } = args;
 
         // Register sources once as they are discovered, with a default initial state
-        self.sources
-            .entry(source.clone())
-            .or_default();
+        self.sources.entry(source.clone()).or_default();
 
         match self.queue.entry(key) {
             Entry::Vacant(e) => {

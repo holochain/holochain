@@ -613,7 +613,7 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
-            let iter = handle.running_cell_ids().into_iter().map(|id| async {
+            let iter = handle.running_cell_ids().into_iter().map(|id| async move {
                 let db = self.get_authored_db(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).await.unwrap();
                 (db, trigger)
