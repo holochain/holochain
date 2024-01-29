@@ -387,21 +387,28 @@ pub async fn check_dpki_agent_validity(
     let timestamp = op.action().timestamp();
     let author = op.action().author().clone();
 
-    match dpki.key_state(author.clone(), timestamp).await? {
-        KeyState::Valid(_) => Ok(()),
-        KeyState::Invalidated(_) => {
-            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp.clone()).into())
+    if let RecordEntry::Present(entry) = op.entry() {
+        if let Entry::Agent(agent_pubkey) = entry {
+            validate_dpki_key_state(&*dpki, agent_pubkey.clone(), timestamp).await?;
         }
-        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author.clone()).into()),
     }
+
+    validate_dpki_key_state(&*dpki, author.clone(), timestamp).await
 }
 
 /// Check the actions entry hash matches the hash of the entry
-pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
-    if *hash == EntryHash::with_data_sync(entry) {
-        Ok(())
-    } else {
-        Err(ValidationOutcome::EntryHash.into())
+pub async fn validate_dpki_key_state(
+    dpki: &dyn DpkiService,
+    agent: AgentPubKey,
+    timestamp: Timestamp,
+) -> SysValidationResult<()> {
+    let keystate = dpki.key_state(agent.clone(), timestamp.clone()).await?;
+    match keystate {
+        KeyState::Valid(_) => Ok(()),
+        KeyState::Invalidated(_) => {
+            Err(ValidationOutcome::DpkiAgentInvalid(agent, timestamp).into())
+        }
+        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(agent).into()),
     }
 }
 
