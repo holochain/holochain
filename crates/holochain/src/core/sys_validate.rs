@@ -379,7 +379,8 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
     }
 }
 
-/// Check that the agent was valid at the time of authoring according to the installed DPKI network
+/// Check that the agent was valid at the time of authoring according to the installed DPKI network,
+/// including for newly created or update agents, since the author may be updating to a new agent key.
 pub async fn check_dpki_agent_validity(
     op: &DhtOp,
     dpki: Arc<dyn DpkiService>,
@@ -387,21 +388,44 @@ pub async fn check_dpki_agent_validity(
     let timestamp = op.action().timestamp();
     let author = op.action().author().clone();
 
-    match dpki.key_state(author.clone(), timestamp).await? {
-        KeyState::Valid(_) => Ok(()),
-        KeyState::Invalidated(_) => {
-            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp.clone()).into())
+    // Check that the updated agent is valid in DPKI
+    match op.action() {
+        Action::Create(Create {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash,
+            ..
+        })
+        | Action::Update(Update {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash,
+            ..
+        }) => {
+            let agent: AgentPubKey = entry_hash.into();
+            // if the agent is the author, that will get checked next
+            if agent != author {
+                validate_dpki_key_state(&*dpki, agent, timestamp).await?;
+            }
         }
-        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author.clone()).into()),
+        _ => (),
     }
+
+    // Check that the author is valid in DPKI at the time of authoring this action
+    validate_dpki_key_state(&*dpki, author.clone(), timestamp).await
 }
 
 /// Check the actions entry hash matches the hash of the entry
-pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
-    if *hash == EntryHash::with_data_sync(entry) {
-        Ok(())
-    } else {
-        Err(ValidationOutcome::EntryHash.into())
+pub async fn validate_dpki_key_state(
+    dpki: &dyn DpkiService,
+    agent: AgentPubKey,
+    timestamp: Timestamp,
+) -> SysValidationResult<()> {
+    let keystate = dpki.key_state(agent.clone(), timestamp.clone()).await?;
+    match keystate {
+        KeyState::Valid(_) => Ok(()),
+        KeyState::Invalidated(_) => {
+            Err(ValidationOutcome::DpkiAgentInvalid(agent, timestamp).into())
+        }
+        KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(agent).into()),
     }
 }
 
