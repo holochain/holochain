@@ -259,6 +259,7 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
         std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         (std::time::UNIX_EPOCH.elapsed().unwrap() + std::time::Duration::from_secs(60 * 60))
             .as_millis() as u64,
+        true,
         |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
     )
     .await

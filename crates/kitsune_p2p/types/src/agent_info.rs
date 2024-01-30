@@ -33,8 +33,15 @@ pub mod agent_info_helper {
         /// WARNING-this is a weird offset from the signed_at_ms time!!!!
         pub expires_after_ms: u64,
 
+        #[serde(default = "true_default")]
+        pub joined: bool,
+
         #[serde(with = "serde_bytes")]
         pub meta_info: Box<[u8]>,
+    }
+
+    fn true_default() -> bool {
+        true
     }
 
     #[allow(missing_docs)]
@@ -90,6 +97,10 @@ pub struct AgentInfoInner {
 
     /// the raw encoded bytes sent to bootstrap server or use for sig verify.
     pub encoded_bytes: Box<[u8]>,
+
+    /// The agent is currently joined to the network. If false, this info signifies
+    /// that the agent has left, and should no longer be considered an active peer.
+    pub joined: bool,
 }
 
 impl AgentInfoInner {
@@ -188,6 +199,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             urls,
             signed_at_ms,
             expires_after_ms,
+            joined,
             ..
         } = info;
 
@@ -200,6 +212,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             expires_at_ms: signed_at_ms + expires_after_ms,
             signature,
             encoded_bytes: agent_info,
+            joined,
         };
 
         Ok(AgentInfoSigned(Arc::new(inner)))
@@ -215,6 +228,7 @@ impl AgentInfoSigned {
         url_list: UrlList,
         signed_at_ms: u64,
         expires_at_ms: u64,
+        joined: bool,
         f: F,
     ) -> KitsuneResult<Self>
     where
@@ -235,6 +249,7 @@ impl AgentInfoSigned {
             signed_at_ms,
             expires_after_ms: expires_at_ms - signed_at_ms,
             meta_info: meta,
+            joined,
         };
         let mut buf = Vec::new();
         crate::codec::rmp_encode(&mut buf, info).map_err(KitsuneError::other)?;
@@ -252,6 +267,7 @@ impl AgentInfoSigned {
             expires_at_ms,
             signature,
             encoded_bytes,
+            joined,
         };
 
         Ok(Self(Arc::new(inner)))
@@ -297,6 +313,7 @@ mod tests {
             vec![],
             42,
             69,
+            true,
             |_| async move { Ok(Arc::new(vec![0x03; 64].into())) },
         )
         .await

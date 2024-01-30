@@ -16,6 +16,7 @@ async fn mk_agent_info(u: u8, covers: u32, offline: bool) -> AgentInfoSigned {
         url_list,
         0,
         0,
+        true,
         |_| async move { Ok(Arc::new(KitsuneSignature(vec![0; 64]))) },
     )
     .await

@@ -474,6 +474,7 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
             peer.signed_at_ms,
             (std::time::UNIX_EPOCH.elapsed().unwrap() + std::time::Duration::from_secs(60_000_000))
                 .as_millis() as u64,
+            true,
             |_| async move { Ok(Arc::new(fixt!(KitsuneSignature, Predictable))) },
         )
         .await

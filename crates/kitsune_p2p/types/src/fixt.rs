@@ -47,6 +47,7 @@ fixturator!(
                 fixt!(UrlList, Empty),
                 0,
                 0,
+                true,
                 |_| async move {
                     Ok(Arc::new(fixt!(KitsuneSignature, Empty)))
                 },
@@ -62,6 +63,7 @@ fixturator!(
                 fixt!(UrlList, Unpredictable),
                 0,
                 0,
+                BoolFixturator::new(Unpredictable).next().unwrap(),
                 |_| async move {
                     Ok(Arc::new(fixt!(KitsuneSignature, Unpredictable)))
                 },
@@ -77,6 +79,7 @@ fixturator!(
                 fixt!(UrlList, Empty),
                 0,
                 0,
+                true,
                 |_| async move {
                     Ok(Arc::new(fixt!(KitsuneSignature, Predictable)))
                 },

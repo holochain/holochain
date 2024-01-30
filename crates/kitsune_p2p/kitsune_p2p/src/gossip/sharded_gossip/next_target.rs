@@ -182,6 +182,7 @@ mod tests {
             vec![random_url(rng).into()],
             42,
             69,
+            true,
             |_| async move { Ok(Arc::new(vec![0x03; 64].into())) },
         ))
         .unwrap()

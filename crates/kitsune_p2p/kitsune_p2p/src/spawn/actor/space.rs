@@ -704,6 +704,7 @@ async fn update_single_agent_info(
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
+        true,
         |d| {
             let data = Arc::new(d.to_vec());
             async {
@@ -1516,6 +1517,7 @@ impl Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let host = self.host_api.clone();
+        let i_s = self.i_s.clone();
 
         Ok(async move {
             let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
@@ -1527,6 +1529,7 @@ impl Space {
                 Vec::new(), // no urls
                 signed_at_ms,
                 expires_at_ms,
+                false,
                 |d| {
                     let data = Arc::new(d.to_vec());
                     async {
@@ -1550,9 +1553,15 @@ impl Space {
             // TODO: at some point, we should not remove agents who have left, but rather
             // there should be a flag indicating they have left. The removed agent may just
             // get re-gossiped to another local agent in the same space, defeating the purpose.
-            host.remove_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+            host.remove_agent_info_signed(GetAgentInfoSignedEvt { space: space.clone(), agent })
                 .await
                 .map_err(KitsuneP2pError::other)?;
+
+            // Broadcast the new zero-arc agent info
+            i_s.publish_agent_info_signed(PutAgentInfoSignedEvt {
+                space,
+                peer_data: vec![agent_info_signed.clone()],
+            }).await?;
 
             // Push to the network as well
             match network_type {
