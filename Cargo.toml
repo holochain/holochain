@@ -71,8 +71,8 @@ holochain_wasmer_guest = "=0.0.92"
 holochain_wasmer_host = "=0.0.92"
 mockall = "0.11"
 must_future = "0.1"
-lair_keystore = { version = "0.4.1", default-features = false }
-lair_keystore_api = "=0.4.1"
+lair_keystore = { version = "0.4.2", default-features = false }
+lair_keystore_api = "=0.4.2"
 rmp-serde = "=0.15.5"
 serde = "1.0"
 thiserror = "1.0"

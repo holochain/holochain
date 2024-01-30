@@ -2595,9 +2595,9 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "397f372672597305f39af2b2abf389a077077489bc4f412e7ed574214c268208"
+checksum = "617899e4db04c1c5edf234004aef010543f4684690d1eae0690672ebbd845567"
 dependencies = [
  "futures",
  "one_err",
@@ -4473,9 +4473,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcbac7629f0f04caae576442599f4328402e1313989a57c66f343947ef1b4add"
+checksum = "c7e973eb3f86bb833b87c15f389758b4ddd1b98c8bc0cf9e7c8138e01dd7bea6"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4489,9 +4489,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "111229e06eaf24ed8359fed70e37c2715efdafa6e26394e9bd7a4617722caa41"
+checksum = "ec8c930d24c7c4125471400d1534ab36a0c935eec1c70e0a733ea6f7350747c6"
 dependencies = [
  "base64 0.13.1",
  "dunce",
