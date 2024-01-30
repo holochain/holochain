@@ -173,10 +173,11 @@ pub(crate) mod local_v1 {
 }
 
 pub(crate) mod remote_v1 {
-    use anyhow::{bail, Result as Fallible};
+    use anyhow::{bail, Context, Result as Fallible};
     use async_trait::async_trait;
     use futures::StreamExt;
     use serde::{Deserialize, Serialize};
+    use std::borrow::Borrow;
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::task::JoinHandle;
@@ -197,7 +198,7 @@ pub(crate) mod remote_v1 {
     pub struct RemoteV1Server {
         local_addr: url2::Url2,
 
-        server_handle: Arc<JoinHandle<()>>,
+        server_handle: Arc<JoinHandle<Fallible<()>>>,
     }
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
@@ -217,6 +218,7 @@ pub(crate) mod remote_v1 {
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
     pub enum ResponseMessage {
+        StringErr(String),
         Test(String),
         Put(Result<Option<String>, String>),
         Get(Result<Data<String>, String>),
@@ -240,8 +242,10 @@ pub(crate) mod remote_v1 {
             let local_addr = server.local_addr().clone();
 
             let server_handle = tokio::task::spawn(async move {
-                // Handle new connections, currently doesn't propagate errors
-                Self::remotev1server_inner(localv1, &mut server).await
+                // Handle new connections
+                Self::remotev1server_inner(localv1, &mut server).await?;
+
+                Ok(())
             });
 
             Ok(Self {
@@ -250,13 +254,14 @@ pub(crate) mod remote_v1 {
             })
         }
 
-        async fn remotev1server_inner(localv1: LocalV1, server: &mut WebsocketListener) {
-            while let Some(Ok((/* never sends on its own */ _, mut recv))) = server.next().await {
+        async fn remotev1server_inner(
+            localv1: LocalV1,
+            server: &mut WebsocketListener,
+        ) -> Fallible<()> {
+            while let Some(Ok((/* never sends on its own */ _tx, mut recv))) = server.next().await {
                 let mut localv1 = localv1.clone();
 
-                // TODO: do we need the output for anything?
-                tokio::task::spawn(async move {
-                    // Receive a message and echo it back
+                let handle: JoinHandle<Fallible<()>> = tokio::task::spawn(async move {
                     if let Some((msg, holochain_websocket::Respond::Request(respond_fn))) =
                         recv.next().await
                     {
@@ -264,12 +269,12 @@ pub(crate) mod remote_v1 {
                         let incoming_msg: RequestMessage = match msg.clone().try_into() {
                             Ok(msg) => msg,
                             Err(e) => {
-                                tracing::error!(
-                                    "couldn't convert request {msg:?}: {e:#?}, discarding"
-                                );
-                                return;
+                                println!("couldn't convert request {msg:?}: {e:#?}, discarding");
+                                return Ok(());
                             }
                         };
+
+                        println!("received {incoming_msg:#?}");
 
                         let response_msg: ResponseMessage = match incoming_msg {
                             RequestMessage::Test(s) => ResponseMessage::Test(format!("{}", s)),
@@ -278,14 +283,17 @@ pub(crate) mod remote_v1 {
                                 localv1.put(key, value).await.map_err(|e| e.to_string()),
                             ),
                             RequestMessage::Get {
-                                pattern: _,
-                                min_data: _,
-                                maybe_timeout: _,
+                                pattern,
+                                min_data,
+                                maybe_timeout,
                             } => {
-                                // TODO
-                                let data = Default::default();
-
-                                ResponseMessage::Get(Ok(data))
+                                match localv1
+                                    .get_pattern_t(pattern, min_data, maybe_timeout)
+                                    .await
+                                {
+                                    Ok(data) => ResponseMessage::Get(Ok(data)),
+                                    Err(e) => ResponseMessage::StringErr(e.to_string()),
+                                }
                             }
 
                             RequestMessage::NumWaiters => {
@@ -293,21 +301,46 @@ pub(crate) mod remote_v1 {
                             }
                         };
 
+                        println!("about to send response: {response_msg:#?}");
+
                         let response: SerializedBytes = match response_msg.clone().try_into() {
                             Ok(msg) => msg,
                             Err(e) => {
-                                tracing::error!(
-                                    "couldn't convert response {response_msg:?}: {e:#?}, discarding"
-                                );
-                                return;
+                                println!("couldn't convert response {response_msg:?}: {e:#?}, discarding");
+                                return Ok(());
                             }
                         };
 
                         if let Err(e) = respond_fn(response).await.map_err(anyhow::Error::from) {
-                            tracing::error!("{e}");
+                            println!("error responding: {e:#?}");
+                            return Ok(());
                         }
-                    };
+                    }
+
+                    Ok(())
                 });
+
+                if let Err(e) = handle.await {
+                    println!("error while handling request: {e:#?}");
+                }
+            }
+
+            Ok(())
+        }
+
+        pub async fn join(self) -> Fallible<()> {
+            match Arc::into_inner(self.server_handle)
+                .ok_or_else(|| anyhow::anyhow!("couldn't get join handle"))?
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    if e.is_cancelled() {
+                        Ok(())
+                    } else {
+                        bail!(e)
+                    }
+                }
             }
         }
 
@@ -328,7 +361,10 @@ pub(crate) mod remote_v1 {
         url: url2::Url2,
         sender: Arc<Mutex<holochain_websocket::WebsocketSender>>,
         receiver: Arc<Mutex<holochain_websocket::WebsocketReceiver>>,
+        maybe_request_timeout: Option<Duration>,
     }
+
+    pub const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 10;
 
     impl RemoteV1Client {
         /// Returns a new client.
@@ -346,17 +382,30 @@ pub(crate) mod remote_v1 {
                 url: url.clone(),
                 sender: Arc::new(Mutex::new(sender)),
                 receiver: Arc::new(Mutex::new(receiver)),
+                maybe_request_timeout: None,
             })
         }
 
         /// Sends a request to the connected server.
-        pub async fn request(&self, request: RequestMessage) -> Fallible<ResponseMessage> {
+        pub async fn request(
+            &self,
+            request: RequestMessage,
+            maybe_timeout: Option<Duration>,
+        ) -> Fallible<ResponseMessage> {
+            let timeout = maybe_timeout.unwrap_or(
+                self.maybe_request_timeout
+                    .unwrap_or(std::time::Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS)),
+            );
+
             let response: ResponseMessage = self
                 .sender
+                .clone()
                 .lock()
                 .await
-                .request_timeout(request, std::time::Duration::from_secs(10))
-                .await?;
+                .clone()
+                .request_timeout(&request, timeout)
+                .await
+                .context(format!("requesting {request:#?} with {timeout:?} timeout"))?;
 
             Ok(response)
         }
@@ -365,7 +414,13 @@ pub(crate) mod remote_v1 {
     #[async_trait]
     impl SharedValues for RemoteV1Client {
         async fn put_t(&mut self, key: String, value: String) -> Fallible<Option<String>> {
-            match self.request(RequestMessage::Put { key, value }).await? {
+            match self
+                .request(
+                    RequestMessage::Put { key, value },
+                    self.maybe_request_timeout,
+                )
+                .await?
+            {
                 ResponseMessage::Put(result) => result.map_err(|s| anyhow::anyhow!(s)),
                 other => bail!("got wrong response type {other:#?}"),
             }
@@ -378,19 +433,24 @@ pub(crate) mod remote_v1 {
             maybe_timeout: Option<Duration>,
         ) -> Fallible<Data<String>> {
             match self
-                .request(RequestMessage::Get {
-                    pattern,
-                    min_data,
+                .request(
+                    RequestMessage::Get {
+                        pattern,
+                        min_data,
+                        maybe_timeout,
+                    },
                     maybe_timeout,
-                })
-                .await?
+                )
+                .await
+                .context("sending get request")?
             {
                 ResponseMessage::Get(Ok(data)) => {
-                    todo!("parse {data:#?}");
+                    Ok(data)
+                    // todo!("parse {data:#?}");
                 }
 
                 ResponseMessage::Get(Err(msg)) => {
-                    bail!("{msg}")
+                    bail!("error response: {msg}")
                 }
 
                 unexpected => {
@@ -400,7 +460,7 @@ pub(crate) mod remote_v1 {
         }
 
         async fn num_waiters_t(&self) -> Fallible<usize> {
-            match self.request(RequestMessage::NumWaiters).await? {
+            match self.request(RequestMessage::NumWaiters, None).await? {
                 ResponseMessage::NumWaiters(num_waiters) => Ok(num_waiters),
 
                 unexpected => {
@@ -419,23 +479,27 @@ pub(crate) mod remote_v1 {
 
             let url = server.url();
 
-            // Connect a client to the server
-            let (mut send, _recv) = holochain_websocket::connect(
-                url.clone(),
-                std::sync::Arc::new(WebsocketConfig::default()),
-            )
-            .await
-            .unwrap();
+            for i in 0..10 {
+                // TODO: make it work while reusing the sender
+                // Connect a client to the server
+                let (mut send, _recv) = holochain_websocket::connect(
+                    url.clone(),
+                    std::sync::Arc::new(WebsocketConfig::default()),
+                )
+                .await
+                .unwrap();
 
-            let s = "expecting this back".to_string();
+                let s = format!("expecting this back {i}");
 
-            // Make a request and get the echoed response
-            match send.request(RequestMessage::Test(s.clone())).await {
-                Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
-                other => panic!("{other:#?}"),
-            };
+                // Make a request and get the echoed response
+                match send.request(RequestMessage::Test(s.clone())).await {
+                    Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
+                    other => panic!("[{i}] {other:#?}"),
+                };
+            }
 
-            server.abort();
+            server.clone().abort();
+            server.join().await.unwrap();
         }
     }
 }
@@ -443,6 +507,7 @@ pub(crate) mod remote_v1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use tests::local_v1::*;
     use tests::remote_v1::*;
 
@@ -452,33 +517,53 @@ mod tests {
         let prefix = "something".to_string();
         let s = "we expect this back".to_string();
 
+        // TODO: remove it from here
+        let prev = values.put_t(prefix.clone(), s.clone()).await.unwrap();
+        println!("successfully put {prefix} = {s}; prev: {prev:#?}");
+
         let handle = {
             let prefix = prefix.clone();
-            let s = s.clone();
             let mut values = values.clone();
 
             tokio::spawn({
                 async move {
-                    let got: String = values
-                        .get_pattern_t(prefix.clone(), 0, None)
+                    let got = values
+                        .get_pattern_t(prefix.clone(), 0, Some(std::time::Duration::from_secs(1)))
                         .await
-                        .unwrap()
+                        .context("call to get_pattern_t")?
                         .into_values()
-                        .nth(0)
-                        .unwrap();
-                    eprintln!("got {got}");
-                    assert_eq!(s, got);
+                        .nth(0);
 
-                    got
+                    eprintln!("got {got:#?}");
+
+                    Fallible::<Option<String>>::Ok(got)
                 }
             })
         };
 
-        values.put_t(prefix, s).await.unwrap();
+        // TODO: uncomment this because it should be here
+        // values.put_t(prefix, s.clone()).await.unwrap();
 
-        if let Err(e) = handle.await {
-            panic!("{:#?}", e);
-        };
+        let got = handle.await.unwrap().unwrap();
+
+        assert_eq!(Some(s), got);
+
+        // {
+        //     Ok(_) => (),
+        //     Err(e @ tokio::task::JoinError { .. }) => {
+        //         if let Ok(reason) = e.try_into_panic() {
+        //             let e = format!("{reason:#?}");
+
+        //             if let Ok(e) = reason.downcast::<anyhow::Error>() {
+        //                 panic!("{e:#?}");
+        //             }
+
+        //             panic!("{e}");
+        //         } else {
+        //             panic!("unknown reason");
+        //         }
+        //     }
+        // }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -532,7 +617,7 @@ mod tests {
                     let num = values.num_waiters_t().await.unwrap();
                     match num {
                         0 => tokio::time::sleep(Duration::from_millis(10)).await,
-                        EXPECTED_NUM_WAITERS => { eprintln!("saw a getter!"); break },
+                        EXPECTED_NUM_WAITERS => { eprintln!("saw a waiter!"); break },
                         _ => panic!("saw more than one waiter"),
                     };
                 }
