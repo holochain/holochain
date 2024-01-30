@@ -94,6 +94,10 @@ pub enum RibosomeError {
     #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]
     HostFnPermissions(ZomeName, FunctionName, String),
 
+    /// An attempt to call a host function that changes the state of an installed app from a cell that isn't part of that app.
+    #[error("Invalid request to modify cell {0} with a zome call to {1}")]
+    CrossCellConductorCall(CellId, CellId),
+
     #[error(transparent)]
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
 

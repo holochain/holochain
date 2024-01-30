@@ -19,21 +19,31 @@ pub fn create_clone_cell<'a>(
             write_workspace: Permission::Allow,
             ..
         } => {
-            let conductor_handle = call_context.host_context().call_zome_handle();
+            let host_context = call_context.host_context();
+            let conductor_handle = host_context.call_zome_handle();
+            let app_id = input.app_id.clone();
             let installed_app: InstalledApp =
                 tokio_helper::block_forever_on(async move {
-                    conductor_handle.get_app(&input.app_id).await
+                    conductor_handle.get_app(&app_id).await
                 })
                 .map_err(|conductor_error| -> RuntimeError {
                     wasm_error!(WasmErrorInner::Host(conductor_error.to_string())).into()
                 })?;
 
             let current_cell_id = conductor_handle.cell_id();
-
-            if current_cell_id != installed_app.role(&input.role_name).map_err(|conductor_error| -> RuntimeError {
+            let target_cell_id = installed_app.role(&input.role_name).map_err(|conductor_error| -> RuntimeError {
                 wasm_error!(WasmErrorInner::Host(conductor_error.to_string())).into()
-            })?.cell_id() {
+            })?.cell_id();
+
+            if current_cell_id != target_cell_id {
                 // Mismatch between current zome being called and the target of the clone
+                return Err(wasm_error!(WasmErrorInner::Host(
+                    RibosomeError::CrossCellConductorCall(
+                        target_cell_id.clone(),
+                        current_cell_id.clone(),
+                    )
+                    .to_string(),
+                )).into());
             }
 
             tokio_helper::block_forever_on(async move {

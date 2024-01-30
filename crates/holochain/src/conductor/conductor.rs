@@ -2458,6 +2458,7 @@ mod accessor_impls {
             self.task_manager.clone()
         }
 
+        /// Get a copy of the [InstalledApp] for the specified [InstalledAppId]
         pub async fn get_app(&self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
             Ok(self.get_state().await?.get_app(app_id)?.clone())
         }
