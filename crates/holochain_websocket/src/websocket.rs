@@ -706,8 +706,7 @@ impl Websocket {
     /// Try to deserialize the wire message and continue to next
     /// message if failure.
     fn deserialize_message(bytes: Vec<u8>) -> Loop<WireMessage> {
-        match WireMessage::try_from(SerializedBytes::from(UnsafeBytes::from(bytes)))
-        {
+        match WireMessage::try_from(SerializedBytes::from(UnsafeBytes::from(bytes))) {
             Ok(msg) => Ok(msg),
             Err(e) => {
                 tracing::error!("Websocket failed to deserialize {:?}", e,);

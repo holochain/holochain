@@ -62,7 +62,8 @@ impl TestNode {
                     arq.power(),
                     arq.count(),
                     arq.start_loc()
-                ).as_str();
+                )
+                .as_str();
 
                 acc
             })
