@@ -71,6 +71,7 @@ use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_rand
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
+use crate::core::ribosome::host_fn::create_clone_cell::create_clone_cell;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
@@ -545,7 +546,8 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell);
 
         imports.register_namespace("env", ns);
 

@@ -624,6 +624,10 @@ impl HdkT for HostHdk {
             x_25519_x_salsa20_poly1305_encrypt,
         )
     }
+
+    fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
+        host_call::<CreateCloneCellInput, ClonedCell>(__hc__create_clone_cell_1, input)
+    }
 }
 
 /// At any time the global HDK can be set to a different hdk.

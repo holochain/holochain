@@ -65,6 +65,7 @@ pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_encrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_shared_secret_create_random;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_shared_secret_export;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_shared_secret_ingest;
+pub use crate::clone::*;
 pub use hdi;
 pub use hdi::map_extern_infallible;
 pub use hdi::op::OpHelper;

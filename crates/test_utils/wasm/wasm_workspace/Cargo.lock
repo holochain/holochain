@@ -2596,6 +2596,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_clone"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_coordinator_zome"
 version = "0.0.1"
 dependencies = [

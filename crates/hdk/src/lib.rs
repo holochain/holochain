@@ -573,3 +573,6 @@ pub mod random;
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
 pub mod hdk;
+
+/// TODO clone docs
+pub mod clone;
