@@ -1,5 +1,6 @@
 //! Cells can be cloned to create new cells with the different properties.
 
+use derive_more::Display;
 use holo_hash::DnaHash;
 use holochain_integrity_types::DnaModifiers;
 use crate::cell::{CellId, CloneId};
@@ -37,4 +38,23 @@ pub struct ClonedCell {
     pub name: String,
     /// Whether or not the cell is running
     pub enabled: bool,
+}
+
+/// Ways of specifying a clone cell.
+#[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum CloneCellId {
+    /// Clone id consisting of role name and clone index.
+    CloneId(CloneId),
+    /// Cell id consisting of DNA hash and agent pub key.
+    CellId(CellId),
+}
+
+/// Arguments to specify the clone cell to be disabled.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DisableCloneCellInput {
+    /// The app id that the clone cell belongs to
+    pub app_id: String,
+    /// The clone id or cell id of the clone cell
+    pub clone_cell_id: CloneCellId,
 }

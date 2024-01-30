@@ -29,6 +29,7 @@ subtle = "2"
 thiserror = "1.0.22"
 tracing = { workspace = true }
 holochain_wasmer_common = { workspace = true }
+derive_more = { workspace = true }
 
 # fixturator dependencies
 fixt = { version = "^0.3.0-beta-dev.1", path = "../fixt", optional = true }
