@@ -89,6 +89,9 @@ pub trait HdkT: HdiT {
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
     // Cloning
     fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
+    fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
+    fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
+    fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
 }
 
 #[cfg(feature = "mock")]
@@ -407,7 +410,20 @@ impl HdkT for ErrHdk {
         Self::err()
     }
 
+    // Cloning
     fn create_clone_cell(&self, _input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
+        Self::err()
+    }
+
+    fn disable_clone_cell(&self, _input: DisableCloneCellInput) -> ExternResult<()> {
+        Self::err()
+    }
+
+    fn enable_clone_cell(&self, _input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
+        Self::err()
+    }
+
+    fn delete_clone_cell(&self, _input: DeleteCloneCellInput) -> ExternResult<()> {
         Self::err()
     }
 }
@@ -627,6 +643,18 @@ impl HdkT for HostHdk {
 
     fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
         host_call::<CreateCloneCellInput, ClonedCell>(__hc__create_clone_cell_1, input)
+    }
+
+    fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()> {
+        host_call::<DisableCloneCellInput, ()>(__hc__disable_clone_cell_1, input)
+    }
+
+    fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
+        host_call::<EnableCloneCellInput, ()>(__hc__enable_clone_cell_1, input)
+    }
+
+    fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()> {
+        host_call::<DeleteCloneCellInput, ()>(__hc__delete_clone_cell_1, input)
     }
 }
 

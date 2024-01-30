@@ -1173,6 +1173,7 @@ name = "holochain_zome_types"
 version = "0.3.0-beta-dev.27"
 dependencies = [
  "derive_builder",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",

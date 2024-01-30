@@ -58,3 +58,9 @@ pub struct DisableCloneCellInput {
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
 }
+
+/// Arguments to specify the clone cell to be enabled.
+pub type EnableCloneCellInput = DisableCloneCellInput;
+
+/// Arguments to delete a disabled clone cell of an app.
+pub type DeleteCloneCellInput = DisableCloneCellInput;

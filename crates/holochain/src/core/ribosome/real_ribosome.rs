@@ -389,7 +389,7 @@ impl RealRibosome {
                 instance
                     .exports
                     .get_typed_function(&store_mut, "__hc__allocate_1")
-                    .map_err(|e| -> RuntimeError {
+                    .map_err(|e: wasmer::ExportError| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
                     })?,
             );
@@ -547,7 +547,10 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_1", delete)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
-            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell);
+            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", create_clone_cell);
 
         imports.register_namespace("env", ns);
 

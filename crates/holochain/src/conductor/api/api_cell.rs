@@ -226,6 +226,24 @@ pub trait CellConductorReadHandleT: Send + Sync {
         &self,
         input: CreateCloneCellInput,
     ) -> ConductorResult<ClonedCell>;
+
+    /// Expose disable_clone_cell functionality to zomes.
+    async fn disable_clone_cell(
+        &self,
+        input: DisableCloneCellInput,
+    ) -> ConductorResult<()>;
+
+    /// Expose enable_clone_cell functionality to zomes.
+    async fn enable_clone_cell(
+        &self,
+        input: EnableCloneCellInput,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose delete_clone_cell functionality to zomes.
+    async fn delete_clone_cell(
+        &self,
+        input: DeleteCloneCellInput,
+    ) -> ConductorResult<()>;
 }
 
 #[async_trait]
@@ -299,5 +317,26 @@ impl CellConductorReadHandleT for CellConductorApi {
         input: CreateCloneCellInput,
     ) -> ConductorResult<ClonedCell> {
         self.conductor_handle.clone().create_clone_cell(input).await
+    }
+
+    async fn disable_clone_cell(
+        &self,
+        input: DisableCloneCellInput,
+    ) -> ConductorResult<()> {
+        self.conductor_handle.clone().disable_clone_cell(&input).await
+    }
+
+    async fn enable_clone_cell(
+        &self,
+        input: EnableCloneCellInput,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle.clone().enable_clone_cell(&input).await
+    }
+
+    async fn delete_clone_cell(
+        &self,
+        input: DeleteCloneCellInput,
+    ) -> ConductorResult<()> {
+        self.conductor_handle.clone().delete_clone_cell(&input).await
     }
 }
