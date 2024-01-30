@@ -83,7 +83,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::ClonedCell;
+use holochain_zome_types::prelude::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -1621,7 +1621,7 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_conductor_api::ClonedCell;
+    use holochain_zome_types::prelude::ClonedCell;
 
     use super::*;
 
@@ -2456,6 +2456,10 @@ mod accessor_impls {
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
+        }
+
+        pub async fn get_app(&self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+            Ok(self.get_state().await?.get_app(app_id)?.clone())
         }
     }
 }

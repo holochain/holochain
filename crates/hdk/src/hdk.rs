@@ -87,6 +87,8 @@ pub trait HdkT: HdiT {
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    // Cloning
+    fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
 }
 
 #[cfg(feature = "mock")]
@@ -402,6 +404,10 @@ impl HdkT for ErrHdk {
         &self,
         _x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
+    fn create_clone_cell(&self, _input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
         Self::err()
     }
 }

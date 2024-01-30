@@ -217,6 +217,15 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Expose is_blocked functionality to zomes.
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
+
+    /// Get an installed app by its [InstalledAppId].
+    async fn get_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp>;
+
+    /// Expose create_clone_cell functionality to zomes.
+    async fn create_clone_cell(
+        &self,
+        input: CreateCloneCellInput,
+    ) -> ConductorResult<ClonedCell>;
 }
 
 #[async_trait]
@@ -279,5 +288,16 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
+    }
+
+    async fn get_app(&self, installed_app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
+        self.conductor_handle.get_app(installed_app_id).await
+    }
+
+    async fn create_clone_cell(
+        &self,
+        input: CreateCloneCellInput,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle.clone().create_clone_cell(input).await
     }
 }

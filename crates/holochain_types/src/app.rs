@@ -83,22 +83,8 @@ pub struct UpdateCoordinatorsPayload {
     pub source: CoordinatorSource,
 }
 
-/// The arguments to create a clone of an existing cell.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateCloneCellPayload {
-    /// The app id that the DNA to clone belongs to
-    pub app_id: InstalledAppId,
-    /// The DNA's role name to clone
-    pub role_name: RoleName,
-    /// Modifiers to set for the new cell.
-    /// At least one of the modifiers must be set to obtain a distinct hash for
-    /// the clone cell's DNA.
-    pub modifiers: DnaModifiersOpt<YamlProperties>,
-    /// Optionally set a proof of membership for the clone cell
-    pub membrane_proof: Option<MembraneProof>,
-    /// Optionally a name for the DNA clone
-    pub name: Option<String>,
-}
+/// Alias for [holochain_zome_types::clone::CreateCloneCellInput]
+pub type CreateCloneCellPayload = holochain_zome_types::clone::CreateCloneCellInput;
 
 /// Ways of specifying a clone cell.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]

@@ -163,7 +163,8 @@ macro_rules! holochain_externs {
             x_salsa20_poly1305_decrypt:1,
             x_25519_x_salsa20_poly1305_encrypt:1,
             x_25519_x_salsa20_poly1305_decrypt:1,
-            create_x25519_keypair:1
+            create_x25519_keypair:1,
+            create_clone_cell:1
         );
     };
 }

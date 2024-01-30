@@ -213,4 +213,6 @@ host_fn_api_impls! {
     // These are constant for the lifetime of a zome call.
     fn zome_info (()) -> zt::info::ZomeInfo;
 
+    // Create a clone of an existing cell.
+    fn create_clone_cell(zt::clone::CreateCloneCellInput) -> zt::clone::ClonedCell;
 }
