@@ -1,4 +1,5 @@
 use holochain::sweettest::*;
+use holochain_conductor_api::CellInfo;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
@@ -28,6 +29,21 @@ async fn create_clone_cell() {
     };
     let _: ClonedCell = conductor.call(&zome, "create_clone", request).await;
 
-    let app = conductor.get_app(app.installed_app_id()).await.unwrap();
-    assert_eq!(1, app.clone_cells().count());
+    let apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(1, apps.len());
+
+    let cell_infos = apps
+        .first()
+        .unwrap()
+        .cell_info
+        .get(&dna_file.dna_hash().to_string())
+        .unwrap();
+    assert_eq!(2, cell_infos.len());
+    assert_eq!(
+        1,
+        cell_infos
+            .into_iter()
+            .filter(|c| matches!(c, CellInfo::Cloned(_)))
+            .count()
+    );
 }
