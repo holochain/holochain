@@ -379,7 +379,8 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
     }
 }
 
-/// Check that the agent was valid at the time of authoring according to the installed DPKI network
+/// Check that the agent was valid at the time of authoring according to the installed DPKI network,
+/// including for newly created or update agents, since the author may be updating to a new agent key.
 pub async fn check_dpki_agent_validity(
     op: &DhtOp,
     dpki: Arc<dyn DpkiService>,
@@ -387,12 +388,28 @@ pub async fn check_dpki_agent_validity(
     let timestamp = op.action().timestamp();
     let author = op.action().author().clone();
 
-    if let RecordEntry::Present(entry) = op.entry() {
-        if let Entry::Agent(agent_pubkey) = entry {
-            validate_dpki_key_state(&*dpki, agent_pubkey.clone(), timestamp).await?;
+    // Check that the updated agent is valid in DPKI
+    match op.action() {
+        Action::Create(Create {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash,
+            ..
+        })
+        | Action::Update(Update {
+            entry_type: EntryType::AgentPubKey,
+            entry_hash,
+            ..
+        }) => {
+            let agent: AgentPubKey = entry_hash.into();
+            // if the agent is the author, that will get checked next
+            if agent != author {
+                validate_dpki_key_state(&*dpki, agent, timestamp).await?;
+            }
         }
+        _ => (),
     }
 
+    // Check that the author is valid in DPKI at the time of authoring this action
     validate_dpki_key_state(&*dpki, author.clone(), timestamp).await
 }
 
