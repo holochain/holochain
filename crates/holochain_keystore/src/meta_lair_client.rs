@@ -43,7 +43,7 @@ impl MetaLairClient {
         let opts = IpcKeystoreClientOptions {
             connection_url: connection_url.clone().into(),
             passphrase: passphrase.clone(),
-            exact_client_server_version_match: true,
+            exact_client_server_version_match: false,
         };
 
         let client = ipc_keystore_connect_options(opts).await?;
@@ -115,7 +115,7 @@ impl MetaLairClient {
                         let opts = IpcKeystoreClientOptions {
                             connection_url: connection_url.clone().into(),
                             passphrase: passphrase.clone(),
-                            exact_client_server_version_match: true,
+                            exact_client_server_version_match: false,
                         };
 
                         tracing::warn!("lair connection lost, attempting reconnect");
