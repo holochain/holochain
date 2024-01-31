@@ -544,10 +544,6 @@ where
         self.zomes_initialized.store(value, Ordering::Relaxed);
     }
 
-    pub fn is_empty(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? == 0)
-    }
-
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
     pub fn persisted_head_info(&self) -> Option<HeadInfo> {
@@ -566,7 +562,7 @@ where
         self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
     }
 
-    #[allow(clippy::len_without_is_empty)]
+    #[cfg(feature = "test_utils")]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = scratch.chain_head().map(|h| h.seq);
@@ -579,6 +575,12 @@ where
             }
         })?)
     }
+
+    #[cfg(feature = "test_utils")]
+    pub fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len()? == 0)
+    }
+
     pub async fn valid_cap_grant(
         &self,
         check_function: GrantedFunction,

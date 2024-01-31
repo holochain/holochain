@@ -75,16 +75,14 @@ where
 
     // commit the workspace
     if should_write {
-        let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
         match HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await
         {
             Ok(flushed_actions) => {
-                // Q: what is the purpose of checking for an empty chain? When would this ever happen? The chain should
-                //    be genesis'd by now, right?
-                if !is_empty {
+                // Skip if nothing was written
+                if !flushed_actions.is_empty() {
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
@@ -106,19 +104,19 @@ where
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
-                }
 
-                // Only send post commit if this is a coordinator zome.
-                if let Some(coordinator_zome) = coordinator_zome {
-                    send_post_commit(
-                        conductor_handle,
-                        workspace,
-                        network,
-                        keystore,
-                        flushed_actions,
-                        vec![coordinator_zome],
-                    )
-                    .await?;
+                    // Only send post commit if this is a coordinator zome.
+                    if let Some(coordinator_zome) = coordinator_zome {
+                        send_post_commit(
+                            conductor_handle,
+                            workspace,
+                            network,
+                            keystore,
+                            flushed_actions,
+                            vec![coordinator_zome],
+                        )
+                        .await?;
+                    }
                 }
             }
             err => {
