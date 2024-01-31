@@ -343,6 +343,8 @@ mod startup_shutdown_impls {
         ) -> ConductorResult<CellStartupErrors> {
             self.load_dnas().await?;
 
+            info!("Conductor startup: DNAs loaded.");
+
             // Start the task manager
             self.outcomes_task.share_mut(|lock| {
                 if lock.is_some() {
@@ -368,13 +370,21 @@ mod startup_shutdown_impls {
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;
+
+            info!("Conductor startup: admin interface(s) added.");
+
             self.clone().startup_app_interfaces().await?;
+
+            info!("Conductor startup: app interfaces started.");
 
             // We don't care what fx are returned here, since all cells need to
             // be spun up
             let _ = self.start_paused_apps().await?;
+            let res = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
-            self.process_app_status_fx(AppStatusFx::SpinUp, None).await
+            info!("Conductor startup: apps started.");
+
+            res
         }
     }
 }
@@ -1897,21 +1907,37 @@ mod app_status_impls {
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    if cell
-                        .holochain_p2p_dna()
-                        .clone()
-                        .join(agent_pubkey, maybe_agent_info, maybe_initial_arc)
-                        .await
-                        .is_ok()
-                    {
-                        aitia::trace!(&hc_sleuth::Event::AgentJoined {
-                            node: sleuth_id,
-                            agent: cell_id.agent_pubkey().clone()
-                        });
-                    } else {
-                        tracing::error!(
-                            "Network join failed for {cell_id}. This should never happen."
-                        );
+                    let res = tokio::time::timeout(
+                        JOIN_NETWORK_WAITING_PERIOD,
+                        cell.holochain_p2p_dna().clone().join(
+                            agent_pubkey,
+                            maybe_agent_info,
+                            maybe_initial_arc,
+                        ),
+                    )
+                    .await;
+
+                    match res {
+                        Ok(r) => {
+                            match r {
+                                Ok(_) => {
+                                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
+                                        node: sleuth_id,
+                                        agent: cell_id.agent_pubkey().clone()
+                                    });
+                                },
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
+                                    );
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            tracing::warn!(
+                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
+                            );
+                        }
                     }
                 }
             }))
