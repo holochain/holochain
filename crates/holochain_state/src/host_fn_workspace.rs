@@ -66,6 +66,7 @@ impl HostFnWorkspace {
 }
 
 impl SourceChainWorkspace {
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
@@ -87,6 +88,7 @@ impl SourceChainWorkspace {
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn init_as_root(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
@@ -164,6 +166,7 @@ where
     SourceChainDb: ReadAccess<DbKindAuthored>,
     SourceChainDht: ReadAccess<DbKindDht>,
 {
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn new(
         authored: SourceChainDb,
         dht: SourceChainDht,

@@ -137,6 +137,7 @@ impl SourceChain {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -469,6 +470,7 @@ where
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
 {
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn new(
         vault: AuthorDb,
         dht_db: DhtDb,
@@ -1165,16 +1167,20 @@ pub fn put_raw(
 }
 
 /// Get the current chain head of the database, if the chain is nonempty.
+
+#[tracing::instrument(skip_all, fields(CHDB = true))]
 pub fn chain_head_db(
     txn: &Transaction,
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<HeadInfo>> {
+    tracing::trace!("chain_head_db called");
     let chain_head = ChainHeadQuery::new(author);
     Ok(chain_head.run(Txn::from(txn))?)
 }
 
 /// Get the current chain head of the database.
 /// Error if the chain is empty.
+#[tracing::instrument(skip_all, fields(CHDB = true))]
 pub fn chain_head_db_nonempty(
     txn: &Transaction,
     author: Arc<AgentPubKey>,

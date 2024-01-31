@@ -864,6 +864,7 @@ impl Cell {
 
     /// Function called by the Conductor
     // #[instrument(skip(self, call, workspace_lock))]
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn call_zome(
         &self,
         call: ZomeCall,

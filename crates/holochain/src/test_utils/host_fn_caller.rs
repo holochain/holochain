@@ -162,6 +162,7 @@ impl HostFnCaller {
         self.dht_db.clone()
     }
 
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, HostFnWorkspace) {
         let HostFnCaller {
             authored_db,

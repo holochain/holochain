@@ -139,6 +139,13 @@ async fn call_zome_workflow_inner<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    tracing::info!(
+        "Calling zome function {} from zome {} in cell {}",
+        args.invocation.fn_name,
+        args.invocation.zome.zome_name(),
+        args.cell_id
+    );
+
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -151,7 +158,6 @@ where
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id).into_call_zome_handle();
 
-    tracing::trace!("Before zome call");
     let host_access = ZomeCallHostAccess::new(
         workspace.clone().into(),
         keystore,
@@ -161,7 +167,6 @@ where
     );
     let (ribosome, result) =
         call_zome_function_authorized(ribosome, host_access, invocation).await?;
-    tracing::trace!("After zome call");
 
     let validation_result =
         inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;

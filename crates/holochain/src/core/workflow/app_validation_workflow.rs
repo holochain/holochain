@@ -793,6 +793,7 @@ impl AppValidationWorkspace {
         }
     }
 
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
         Ok(HostFnWorkspace::new(
             self.authored_db.clone(),

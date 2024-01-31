@@ -762,6 +762,7 @@ impl Space {
     }
 
     /// Create a SourceChainWorkspace from this Space
+    #[tracing::instrument(skip_all, fields(CHDB = true))]
     pub async fn source_chain_workspace(
         &self,
         keystore: MetaLairClient,

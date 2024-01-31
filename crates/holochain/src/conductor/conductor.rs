@@ -2193,6 +2193,8 @@ mod misc_impls {
 
     impl Conductor {
         /// Grant a zome call capability for a cell
+
+        #[tracing::instrument(skip_all, fields(CHDB = true))]
         pub async fn grant_zome_call_capability(
             &self,
             payload: GrantZomeCallCapabilityPayload,
