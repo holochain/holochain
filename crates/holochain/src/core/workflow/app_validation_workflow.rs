@@ -260,7 +260,7 @@ async fn app_validation_workflow_inner(
                 ops_ps
             );
         }
-        tracing::debug!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
+        tracing::warn!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
     }
     jh.await?;
     Ok(if saturated || ops_validated < num_ops_to_validate {
