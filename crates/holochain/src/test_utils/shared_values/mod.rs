@@ -128,10 +128,10 @@ pub(crate) mod local_v1 {
 
             for (pattern, notifier) in self.notification.lock().await.iter() {
                 if key.matches(pattern).count() > 0 {
-                    eprintln!("{key} matched by {pattern}");
+                    tracing::debug!("{key} matched by {pattern}");
                     notifier.notify_waiters();
                 } else {
-                    eprintln!("{key} not matched by {pattern}");
+                    tracing::debug!("{key} not matched by {pattern}");
                 }
             }
 
@@ -231,7 +231,19 @@ pub(crate) mod remote_v1 {
             let localv1 = LocalV1::default();
 
             let original_url =
-                url2::Url2::try_parse(bind_socket.unwrap_or(SHARED_VALUES_REMOTEV1_URL_DEFAULT))?;
+                url2::Url2::try_parse(bind_socket.map(ToString::to_string).unwrap_or_else(|| {
+                    std::env::var(SHARED_VALUES_REMOTEV1_URL_ENV)
+                        .map_err(|e| {
+                            tracing::debug!(
+                                "could not read env var {SHARED_VALUES_REMOTEV1_URL_ENV}: {e}"
+                            );
+                            e
+                        })
+                        .ok()
+                        .unwrap_or(SHARED_VALUES_REMOTEV1_URL_DEFAULT.to_string())
+                }))?;
+
+            tracing::debug!("binding server to {original_url}");
 
             let mut server = WebsocketListener::bind(
                 original_url.clone(),
@@ -240,6 +252,8 @@ pub(crate) mod remote_v1 {
             .await?;
 
             let local_addr = server.local_addr().clone();
+
+            tracing::info!("server bound to {local_addr}");
 
             let server_handle = tokio::task::spawn(async move {
                 // Handle new connections
@@ -270,12 +284,14 @@ pub(crate) mod remote_v1 {
                         let incoming_msg: RequestMessage = match msg.clone().try_into() {
                             Ok(msg) => msg,
                             Err(e) => {
-                                println!("couldn't convert request {msg:?}: {e:#?}, discarding");
+                                tracing::warn!(
+                                    "couldn't convert request {msg:?}: {e:#?}, discarding"
+                                );
                                 return Ok(());
                             }
                         };
 
-                        println!("received {incoming_msg:#?}");
+                        tracing::trace!("received {incoming_msg:#?}");
 
                         let response_msg: ResponseMessage = match incoming_msg {
                             RequestMessage::Test(s) => ResponseMessage::Test(format!("{}", s)),
@@ -302,18 +318,18 @@ pub(crate) mod remote_v1 {
                             }
                         };
 
-                        println!("about to send response: {response_msg:#?}");
+                        tracing::trace!("about to send response: {response_msg:#?}");
 
                         let response: SerializedBytes = match response_msg.clone().try_into() {
                             Ok(msg) => msg,
                             Err(e) => {
-                                println!("couldn't convert response {response_msg:?}: {e:#?}, discarding");
+                                tracing::warn!("couldn't convert response {response_msg:?}: {e:#?}, discarding");
                                 return Ok(());
                             }
                         };
 
                         if let Err(e) = respond_fn(response).await.map_err(anyhow::Error::from) {
-                            println!("error responding: {e:#?}");
+                            tracing::debug!("error responding: {e:#?}");
                             return Ok(());
                         }
                     }
@@ -475,26 +491,55 @@ pub(crate) mod remote_v1 {
 
         #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
         async fn shared_values_remotev1_server_message_test() {
+            const NUM_MESSAGES: usize = 5_000;
+
             let server = RemoteV1Server::new(None).await.unwrap();
 
-            for i in 0..10 {
-                // TODO: make it work while reusing the sender
-                // Connect a client to the server
-                let (mut send, _recv) = holochain_websocket::connect(
-                    server.url().clone(),
-                    std::sync::Arc::new(WebsocketConfig::default()),
-                )
-                .await
-                .unwrap();
+            let (tasks_tx, mut tasks_rx) = tokio::sync::mpsc::channel::<JoinHandle<_>>(100);
 
-                let s = format!("expecting this back {i}");
+            {
+                let server = server.clone();
+                tokio::spawn(async move {
+                    for i in 0..NUM_MESSAGES {
+                        let server = server.clone();
+                        let sender_task = tokio::spawn(async move {
+                            // TODO: make it work while reusing the sender
+                            // Connect a client to the server
+                            let (mut send, _recv) = holochain_websocket::connect(
+                                server.url().clone(),
+                                std::sync::Arc::new(WebsocketConfig::default()),
+                            )
+                            .await
+                            .unwrap();
 
-                // Make a request and get the echoed response
-                match send.request(RequestMessage::Test(s.clone())).await {
-                    Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
-                    other => panic!("request {i}: {other:#?}"),
-                };
+                            let s = format!("expecting this back {i}");
+
+                            // Make a request and get the echoed response
+                            match send.request(RequestMessage::Test(s.clone())).await {
+                                Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
+                                other => panic!("request {i}: {other:#?}"),
+                            };
+                        });
+
+                        tasks_tx.send(sender_task).await.unwrap();
+                    }
+                });
+            };
+
+            let mut handled_tasks = 0;
+            while let Some(recv) = tokio::select! {
+                maybe_recv = tasks_rx.recv() => maybe_recv,
+
+                _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+                    println!("did not receive a task in 100ms");
+                    None
+                }
+            } {
+                handled_tasks += 1;
+                recv.await.unwrap();
             }
+
+            assert_eq!(NUM_MESSAGES, handled_tasks);
 
             server.clone().abort();
             server.join().await.unwrap();
