@@ -124,10 +124,10 @@ reqwest = "0.11.2"
 serial_test = "0.4.0"
 test-case = "1.2.1"
 
-holofuel_types = { git = "ssh://git@github.com/Holo-Host/holofuel.git", branch = "test/holochain-0.2.1" }
-transactor = { git = "ssh://git@github.com/Holo-Host/holofuel.git", branch = "test/holochain-0.2.1" }
-transactor_integrity = { git = "ssh://git@github.com/Holo-Host/holofuel.git", branch = "test/holochain-0.2.1" }
-reserves = { git = "ssh://git@github.com/Holo-Host/holofuel.git", branch = "test/holochain-0.2.1" }
+holofuel_types = { path = "../../../holofuel/crates/holofuel_types" }
+transactor = { path = "../../../holofuel/zomes/transactor" }
+transactor_integrity = { path = "../../../holofuel/zomes/transactor_integrity" }
+reserves = { path = "../../../holofuel/zomes/reserves" }
 
 [build-dependencies]
 hdk = { version = "^0.2.5", path = "../hdk"}

@@ -65,11 +65,6 @@ overflow-checks = false
 incremental = false
 codegen-units = 16
 
-[patch.'https://github.com/holochain/holochain']
-holochain_integrity_types = { path = "crates/holochain_integrity_types" }
-holochain_zome_types = { path = "crates/holochain_zome_types" }
-holo_hash = { path = "crates/holo_hash" }
-
 [patch.crates-io]
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }

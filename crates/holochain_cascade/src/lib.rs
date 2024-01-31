@@ -1004,44 +1004,17 @@ where
         })
             .await??;
 
-        let mut merged_results = (MustGetAgentActivityResponse::EmptyRange, None);
-
-        for result in &results {
-            match (&merged_results, result) {
-                ((_, None), (_, Some(_))) => {
-                    merged_results = result.to_owned();
-                }
-                (
-                    (MustGetAgentActivityResponse::Activity(responses), chain_filter),
-                    (MustGetAgentActivityResponse::Activity(more_responses), other_chain_filter),
-                ) => {
-                    if chain_filter == other_chain_filter {
-                        let mut merged_responses = responses.clone();
-                        merged_responses.extend(more_responses.to_owned());
-                        let mut merged_activity =
-                            MustGetAgentActivityResponse::Activity(merged_responses);
-                        merged_activity.normalize();
-                        merged_results = (merged_activity, chain_filter.clone());
-                    }
-                    // If the chain filters disagree on what the filter is we
-                    // have a problem.
-                    else {
-                        merged_results = (MustGetAgentActivityResponse::IncompleteChain, None);
-                    }
-                }
-                ((MustGetAgentActivityResponse::Activity(_), _), _) => {
-                    // Noop.
-                }
-                _ => {
-                    merged_results = result.to_owned();
-                }
-            }
-        }
+        let merged_results = results.iter().fold(
+            // It's sort of arbitrary what the initial value is as long as it's
+            // not an activity response.
+            BoundedMustGetAgentActivityResponse::EmptyRange,
+            holochain_types::chain::merge_bounded_agent_activity_responses,
+        );
 
         let result =
             authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
                 merged_results,
-            )?;
+            );
 
         // Short circuit if we have a result.
         if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
