@@ -220,11 +220,8 @@ async fn app_validation_workflow_inner(
                                 "Received invalid op. The op author will be blocked.\nOp: {:?}",
                                 op_light
                             );
-                            if let Dependency::Null = dependency {
-                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
-                            }
+                            // If the op is invalid, we can fully integrate it as such
+                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                         }
                     }
                 }
