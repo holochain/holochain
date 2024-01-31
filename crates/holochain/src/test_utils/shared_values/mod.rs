@@ -261,7 +261,8 @@ pub(crate) mod remote_v1 {
             while let Some(Ok((/* never sends on its own */ _tx, mut recv))) = server.next().await {
                 let mut localv1 = localv1.clone();
 
-                let handle: JoinHandle<Fallible<()>> = tokio::task::spawn(async move {
+                // TODO: should we join the handle in a separate task to deal with any errors?
+                let _handle: JoinHandle<Fallible<()>> = tokio::task::spawn(async move {
                     if let Some((msg, holochain_websocket::Respond::Request(respond_fn))) =
                         recv.next().await
                     {
@@ -319,10 +320,6 @@ pub(crate) mod remote_v1 {
 
                     Ok(())
                 });
-
-                if let Err(e) = handle.await {
-                    println!("error while handling request: {e:#?}");
-                }
             }
 
             Ok(())
@@ -359,8 +356,9 @@ pub(crate) mod remote_v1 {
     #[derive(Clone)]
     pub struct RemoteV1Client {
         url: url2::Url2,
-        sender: Arc<Mutex<holochain_websocket::WebsocketSender>>,
-        receiver: Arc<Mutex<holochain_websocket::WebsocketReceiver>>,
+        // TODO: figure out how to reuse an existing sender. the first attempt yielded errors for subsequent requests
+        // sender: Arc<Mutex<holochain_websocket::WebsocketSender>>,
+        // receiver: Arc<Mutex<holochain_websocket::WebsocketReceiver>>,
         maybe_request_timeout: Option<Duration>,
     }
 
@@ -380,8 +378,8 @@ pub(crate) mod remote_v1 {
 
             Ok(Self {
                 url: url.clone(),
-                sender: Arc::new(Mutex::new(sender)),
-                receiver: Arc::new(Mutex::new(receiver)),
+                // sender: Arc::new(Mutex::new(sender)),
+                // receiver: Arc::new(Mutex::new(receiver)),
                 maybe_request_timeout: None,
             })
         }
@@ -397,12 +395,14 @@ pub(crate) mod remote_v1 {
                     .unwrap_or(std::time::Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS)),
             );
 
-            let response: ResponseMessage = self
-                .sender
-                .clone()
-                .lock()
-                .await
-                .clone()
+            let (mut send, _recv) = holochain_websocket::connect(
+                self.url.clone(),
+                std::sync::Arc::new(WebsocketConfig::default()),
+            )
+            .await
+            .context(format!("connecting to {}", self.url))?;
+
+            let response: ResponseMessage = send
                 .request_timeout(&request, timeout)
                 .await
                 .context(format!("requesting {request:#?} with {timeout:?} timeout"))?;
@@ -473,17 +473,15 @@ pub(crate) mod remote_v1 {
     mod tests {
         use super::*;
 
-        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
         async fn shared_values_remotev1_server_message_test() {
             let server = RemoteV1Server::new(None).await.unwrap();
-
-            let url = server.url();
 
             for i in 0..10 {
                 // TODO: make it work while reusing the sender
                 // Connect a client to the server
                 let (mut send, _recv) = holochain_websocket::connect(
-                    url.clone(),
+                    server.url().clone(),
                     std::sync::Arc::new(WebsocketConfig::default()),
                 )
                 .await
@@ -494,7 +492,7 @@ pub(crate) mod remote_v1 {
                 // Make a request and get the echoed response
                 match send.request(RequestMessage::Test(s.clone())).await {
                     Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
-                    other => panic!("[{i}] {other:#?}"),
+                    other => panic!("request {i}: {other:#?}"),
                 };
             }
 
@@ -513,13 +511,40 @@ mod tests {
 
     use std::time::Duration;
 
-    async fn inner_shared_values_trait_get_works(mut values: Box<dyn SharedValues>) {
+    async fn inner_shared_values_trait_put_works(mut values: Box<dyn SharedValues>) {
         let prefix = "something".to_string();
         let s = "we expect this back".to_string();
 
-        // TODO: remove it from here
         let prev = values.put_t(prefix.clone(), s.clone()).await.unwrap();
         println!("successfully put {prefix} = {s}; prev: {prev:#?}");
+
+        assert_eq!(None, prev);
+
+        let prev = values.put_t(prefix.clone(), s.clone()).await.unwrap();
+        println!("successfully put {prefix} = {s}; prev: {prev:#?}");
+
+        assert_eq!(Some(s), prev);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_localv1_put_works() {
+        inner_shared_values_trait_put_works(Box::new(LocalV1::default()) as Box<dyn SharedValues>)
+            .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_values_remotev1_put_works() {
+        let server = RemoteV1Server::new(None).await.unwrap();
+
+        inner_shared_values_trait_put_works(Box::new(
+            RemoteV1Client::new(server.url(), None).await.unwrap(),
+        ) as Box<dyn SharedValues>)
+        .await;
+    }
+
+    async fn inner_shared_values_trait_get_works(mut values: Box<dyn SharedValues>) {
+        let prefix = "something".to_string();
+        let s = "we expect this back".to_string();
 
         let handle = {
             let prefix = prefix.clone();
@@ -541,29 +566,12 @@ mod tests {
             })
         };
 
-        // TODO: uncomment this because it should be here
-        // values.put_t(prefix, s.clone()).await.unwrap();
+        let prev = values.put_t(prefix.clone(), s.clone()).await.unwrap();
+        println!("successfully put {prefix} = {s}; prev: {prev:#?}");
 
         let got = handle.await.unwrap().unwrap();
 
         assert_eq!(Some(s), got);
-
-        // {
-        //     Ok(_) => (),
-        //     Err(e @ tokio::task::JoinError { .. }) => {
-        //         if let Ok(reason) = e.try_into_panic() {
-        //             let e = format!("{reason:#?}");
-
-        //             if let Ok(e) = reason.downcast::<anyhow::Error>() {
-        //                 panic!("{e:#?}");
-        //             }
-
-        //             panic!("{e}");
-        //         } else {
-        //             panic!("unknown reason");
-        //         }
-        //     }
-        // }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -588,7 +596,7 @@ mod tests {
         let prefix = "something".to_string();
         let s = "we expect this back".to_string();
 
-        let handle = {
+        let get_handle = {
             let prefix = prefix.clone();
             let s = s.clone();
             let mut values = values.clone();
@@ -602,7 +610,7 @@ mod tests {
                         .into_values()
                         .nth(0)
                         .unwrap();
-                    eprintln!("got {got}");
+                    println!("got {got}");
                     assert_eq!(s, got);
 
                     got
@@ -613,12 +621,20 @@ mod tests {
         // make sure the getter really comes first
         tokio::select! {
             _ = async {
-                loop {
+                for i in 0..core::usize::MAX {
+                    println!("{i}: asking for num_waiters");
                     let num = values.num_waiters_t().await.unwrap();
                     match num {
-                        0 => tokio::time::sleep(Duration::from_millis(10)).await,
-                        EXPECTED_NUM_WAITERS => { eprintln!("saw a waiter!"); break },
-                        _ => panic!("saw more than one waiter"),
+                        0 => {
+                            println!("{i}: still no waiter...");
+                            tokio::time::sleep(Duration::from_millis(10)).await;
+                        }
+                            ,
+                        EXPECTED_NUM_WAITERS => {
+                            println!("{i} saw a waiter!");
+                            break
+                        },
+                        more => panic!("{i} saw more than one waiter: {more}"),
                     };
                 }
             } => { }
@@ -629,9 +645,7 @@ mod tests {
 
         values.put_t(prefix, s).await.unwrap();
 
-        if let Err(e) = handle.await {
-            panic!("{:#?}", e);
-        };
+        get_handle.await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
