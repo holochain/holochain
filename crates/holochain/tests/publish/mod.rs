@@ -5,12 +5,15 @@ use holochain::sweettest::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use std::time::Duration;
+use holochain_sqlite::error::DatabaseResult;
 
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn publish_termination() {
+    use rusqlite::named_params;
+
     let _g = holochain_trace::test_run().unwrap();
 
     // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
@@ -30,7 +33,7 @@ async fn publish_termination() {
 
     let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
 
-    let _: ActionHash = conductors[0]
+    let action_hash: ActionHash = conductors[0]
         .call(&alice.zome(TestWasm::Create), "create_entry", ())
         .await;
 
@@ -61,6 +64,21 @@ async fn publish_termination() {
         }
     })
     .await;
+
+    use holochain_types::validation_receipt::{SignedValidationReceipt, ValidationReceipt, ValidationReceiptBundle};
+    if !ops_to_publish.is_ok() {
+        let receipt_count = alice.dht_db().read_async(move |txn| -> DatabaseResult<usize> {
+            let stmt = txn.prepare("SELECT blob FROM ValidationReceipt INNER JOIN DhtOp ON DhtOp.hash = ValidationReceipt.op_hash WHERE DhtOp.action_hash = :action_hash").unwrap();
+    
+            let x: Vec<SignedValidationReceipt> = stmt.query(named_params! {
+                ":action_hash": action_hash,
+            }).unwrap().and_then(|r| r.get(0)).collect::<rusqlite::Result<Vec<SignedValidationReceipt>>>()?;
+
+            Ok(x.len())
+        }).await.unwrap();
+
+        assert_eq!(5, receipt_count, "Expected 5 validation receipts to be received");
+    }
 
     assert_eq!(Ok(0), ops_to_publish);
 }
