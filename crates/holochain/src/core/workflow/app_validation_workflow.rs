@@ -247,13 +247,14 @@ async fn app_validation_workflow_inner(
         ops_validated += accepted_ops;
         ops_validated += rejected_ops;
         if let (Some(start), Some(round_time)) = (start, &mut round_time) {
-            let round_el = round_time.elapsed();
+            let start_el = start.elapsed().max(Duration::from_secs(1));
+            let round_el = round_time.elapsed().max(Duration::from_secs(1));
             *round_time = std::time::Instant::now();
-            let avg_ops_ps =
-                ops_validated as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let avg_ops_ps = ops_validated as f64 / start_el.as_micros() as f64 * 1_000_000.0;
             let ops_ps = accepted_ops as f64 / round_el.as_micros() as f64 * 1_000_000.0;
             tracing::warn!(
-                "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
+                "App validation is saturated. Num ops remaining: {}. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
+                (num_ops_to_validate - ops_validated),
                 (num_ops_to_validate - ops_validated) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
                 avg_ops_ps,
                 ops_ps
