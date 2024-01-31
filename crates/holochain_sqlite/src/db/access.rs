@@ -17,7 +17,10 @@ use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
+use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
+
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
+static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
@@ -80,6 +83,7 @@ pub struct DbRead<Kind: DbKindT> {
     statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
+    use_time_metric: UseTimeMetric,
 }
 
 impl<Kind: DbKindT> std::fmt::Debug for DbRead<Kind> {
@@ -118,10 +122,15 @@ impl<Kind: DbKindT> DbRead<Kind> {
         let mut conn = self
             .checkout_connection(self.read_semaphore.clone())
             .await?;
-        let r = tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
+
+        // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
+        // this timeout should prevent the caller being blocked by this await that may not finish.
+        tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
+                conn.execute_in_read_txn(f)
+            })).await.map_err(|e| {
+                tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
+                DatabaseError::from(e)
+            })?.map_err(DatabaseError::from)?
     }
 
     /// Intended to be used for transactions that need to be kept open for a longer period of time than just running a
@@ -149,6 +158,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         }
 
         let permit = Self::acquire_reader_permit(semaphore).await?;
+
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
         let mut conn = self.get_connection_from_pool()?;
@@ -156,7 +166,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
             conn.trace(self.statement_trace_fn);
         }
 
-        Ok(PConnGuard::new(conn, permit))
+        Ok(PConnGuard::new(conn, permit, self.use_time_metric.clone()))
     }
 
     /// Get a connection from the pool.
@@ -166,7 +176,8 @@ impl<Kind: DbKindT> DbRead<Kind> {
         let r = Ok(PConn::new(self.connection_pool.get()?));
         let el = now.elapsed();
         if el.as_millis() > 20 {
-            tracing::error!("Connection pool took {:?} to be free'd", el);
+            // TODO Convert to a metric
+            tracing::info!("Connection pool took {:?} to be freed", el);
         }
         r
     }
@@ -243,13 +254,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 }
                 // Check if the database is valid and take the appropriate
                 // action if it isn't.
-                match Connection::open(&path)
-                    // For some reason calling pragma_update is necessary to prove the database file is valid.
-                    .and_then(|mut c| {
-                        initialize_connection(&mut c, sync_level)?;
-                        c.pragma_update(None, "synchronous", "0".to_string())
-                    }) {
-                    Ok(_) => (),
+                match Self::check_database_file(&path, sync_level) {
+                    Ok(path) => path,
                     // These are the two errors that can
                     // occur if the database is not valid.
                     err @ Err(Error::SqliteFailure(
@@ -266,18 +272,32 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                         },
                         ..,
                     )) => {
+                        // Check if the database might be unencrypted.
+                        if "true"
+                            == std::env::var("HOLOCHAIN_MIGRATE_UNENCRYPTED")
+                                .unwrap_or_default()
+                                .as_str()
+                        {
+                            #[cfg(feature = "sqlite-encrypted")]
+                            encrypt_unencrypted_database(&path)?;
+                        }
                         // Check if this database kind requires wiping.
-                        if kind.if_corrupt_wipe() {
+                        else if kind.if_corrupt_wipe() {
                             std::fs::remove_file(&path)?;
                         } else {
                             // If we don't wipe we need to return an error.
                             err?;
                         }
+
+                        // Now that we've taken the appropriate action we can try again.
+                        match Self::check_database_file(&path, sync_level) {
+                            Ok(path) => path,
+                            Err(e) => return Err(e.into()),
+                        }
                     }
                     // Another error has occurred when trying to open the db.
                     Err(e) => return Err(e.into()),
                 }
-                Some(path)
             }
             None => None,
         };
@@ -289,17 +309,31 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
-        Ok(DbWrite(DbRead {
+        let use_time_metric = create_connection_use_time_metric(kind.kind());
+
+        let db_read = DbRead {
             write_semaphore: Self::get_write_semaphore(kind.kind()),
             read_semaphore: Self::get_read_semaphore(kind.kind()),
             long_read_semaphore: Self::get_long_read_semaphore(kind.kind()),
             max_readers: num_read_threads() * 2,
             num_readers: Arc::new(AtomicUsize::new(0)),
-            kind,
+            kind: kind.clone(),
             path: path.unwrap_or_default(),
             connection_pool: pool,
             statement_trace_fn,
-        }))
+            use_time_metric,
+        };
+
+        create_pool_usage_metric(
+            kind.kind(),
+            vec![
+                db_read.write_semaphore.clone(),
+                db_read.read_semaphore.clone(),
+                db_read.long_read_semaphore.clone(),
+            ],
+        );
+
+        Ok(DbWrite(db_read))
     }
 
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
@@ -316,10 +350,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         .map_err(DatabaseError::from)?;
 
         let mut conn = self.get_connection_from_pool()?;
-        let r = tokio::task::spawn_blocking(move || conn.execute_in_exclusive_rw_txn(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
+
+        // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
+        // this timeout should prevent the caller being blocked by this await that may not finish.
+        tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
+            conn.execute_in_exclusive_rw_txn(f)
+        })).await.map_err(|e| {
+            tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
+            DatabaseError::from(e)
+        })?.map_err(DatabaseError::from)?
     }
 
     pub fn available_writer_count(&self) -> usize {
@@ -366,6 +405,19 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .clone()
     }
 
+    fn check_database_file(
+        path: &Path,
+        sync_level: DbSyncLevel,
+    ) -> rusqlite::Result<Option<PathBuf>> {
+        Connection::open(path)
+            // For some reason calling pragma_update is necessary to prove the database file is valid.
+            .and_then(|mut c| {
+                initialize_connection(&mut c, sync_level)?;
+                c.pragma_update(None, "synchronous", "0".to_string())?;
+                Ok(c.path().map(PathBuf::from))
+            })
+    }
+
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
@@ -390,6 +442,64 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 .unwrap()
         })
     }
+}
+
+// The method for this function is taken from https://discuss.zetetic.net/t/how-to-encrypt-a-plaintext-sqlite-database-to-use-sqlcipher-and-avoid-file-is-encrypted-or-is-not-a-database-errors/868
+#[cfg(feature = "sqlite-encrypted")]
+pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
+    // e.g. conductor/conductor.sqlite3 -> conductor/conductor-encrypted.sqlite3
+    let encrypted_path = path
+        .parent()
+        .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
+        .join(
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
+                .to_string()
+                + "-encrypted."
+                + path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?,
+        );
+
+    tracing::warn!(
+        "Attempting encryption of unencrypted database: {:?} -> {:?}",
+        path,
+        encrypted_path
+    );
+
+    // Migrate the database
+    {
+        let conn = Connection::open(path)?;
+
+        // Ensure everything in the WAL is written to the main database
+        conn.execute("VACUUM", ())?;
+
+        // Start an exclusive transaction to avoid anybody writing to the database while we're migrating it
+        conn.execute("BEGIN EXCLUSIVE", ())?;
+
+        conn.execute(
+            "ATTACH DATABASE :db_name AS encrypted KEY :key",
+            rusqlite::named_params! {
+                ":db_name": encrypted_path.to_str(),
+                ":key": super::pool::FAKE_KEY,
+            },
+        )?;
+
+        conn.query_row("SELECT sqlcipher_export('encrypted')", (), |_| Ok(0))?;
+
+        conn.execute("COMMIT", ())?;
+
+        conn.execute("DETACH DATABASE encrypted", ())?;
+        conn.close().map_err(|(_, err)| err)?;
+    }
+
+    // Swap the databases over
+    std::fs::remove_file(path)?;
+    std::fs::rename(encrypted_path, path)?;
+
+    Ok(())
 }
 
 #[cfg(feature = "test_utils")]

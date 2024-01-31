@@ -57,6 +57,10 @@ pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
 ) -> JoinHandle<TaskManagerResult> {
+    let span = tracing::error_span!(
+        "spawn_task_outcome_handler",
+        scope = conductor.get_config().tracing_scope
+    );
     tokio::spawn(async move {
         while let Some((_group, result)) = outcomes.next().await {
             match result {
@@ -199,7 +203,7 @@ pub fn spawn_task_outcome_handler(
             };
         }
         Ok(())
-    })
+    }.instrument(span))
 }
 
 #[tracing::instrument(skip(kind))]
@@ -271,8 +275,9 @@ pub struct TaskManagerClient {
 
 impl TaskManagerClient {
     /// Construct the TaskManager and the outcome channel receiver
-    pub fn new(tx: OutcomeSender) -> Self {
-        let tm = task_motel::TaskManager::new(tx, |g| match g {
+    pub fn new(tx: OutcomeSender, scope: String) -> Self {
+        let span = tracing::error_span!("managed task", scope = scope);
+        let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
             TaskGroup::Conductor => None,
             TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
             TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),

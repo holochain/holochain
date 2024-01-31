@@ -583,7 +583,7 @@ async fn double_initiate_is_handled() {
         .unwrap();
 
     // - Check we always have at least one node not proceeding with initiate.
-    assert!((bob_outgoing.len() == 0 || alice_outgoing.len() == 0));
+    assert!((bob_outgoing.is_empty() || alice_outgoing.is_empty()));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -745,10 +745,7 @@ async fn initiate_times_out() {
 
     // Process the Bob's accept with Alice.
     for bo in bob_outgoing {
-        alice
-            .process_incoming(tgt2_cert.clone().into(), bo)
-            .await
-            .unwrap();
+        alice.process_incoming(tgt2_cert.clone(), bo).await.unwrap();
     }
 
     // Check the round is now active.

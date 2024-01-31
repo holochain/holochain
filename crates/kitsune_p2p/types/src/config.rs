@@ -243,6 +243,12 @@ pub mod tuning_params_struct {
         /// Tx5 ban time in seconds.
         tx5_ban_time_s: u32 = 10,
 
+        /// Tx5 min ephemeral port
+        tx5_min_ephemeral_udp_port: u16 = 1,
+
+        /// Tx5 max ephemeral port
+        tx5_max_ephemeral_udp_port: u16 = 65535,
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
@@ -275,6 +281,11 @@ pub mod tuning_params_struct {
         /// The default value of `2` causes the delay to grow quickly up to the max time of 1 hour.
         /// For testing consider using `1` to prevent the delay from growing.
         bootstrap_check_delay_backoff_multiplier: u32 = 2,
+
+        /// Set the bootstrap fetch maximum backoff time.
+        /// The default value is 60 * 5 s = five minutes.
+        /// The minimum value is 60 s = one minute.
+        bootstrap_max_delay_s: u32 = 60 * 5,
     }
 
     impl KitsuneP2pTuningParams {

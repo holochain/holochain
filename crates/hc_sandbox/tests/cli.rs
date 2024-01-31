@@ -66,10 +66,9 @@ async fn new_websocket_client_for_port(
 
 async fn get_app_info(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = new_websocket_client_for_port(port).await.expect(&format!(
-        "Failed to connect to conductor on port [{}]",
-        port
-    ));
+    let (mut app_tx, _) = new_websocket_client_for_port(port)
+        .await
+        .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };

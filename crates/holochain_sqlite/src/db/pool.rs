@@ -11,6 +11,9 @@ static CONNECTION_TIMEOUT_MS: AtomicU64 = AtomicU64::new(3_000);
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[cfg(feature = "sqlite-encrypted")]
+pub(super) const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
+
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
     let t = ScheduledThreadPool::new(1);
     Arc::new(t)
@@ -21,11 +24,12 @@ pub type ConnectionPool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 /// The sqlite synchronous level.
 /// Corresponds to the `PRAGMA synchronous` pragma.
 /// See [sqlite documentation](https://www.sqlite.org/pragma.html#pragma_synchronous).
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default)]
 pub enum DbSyncLevel {
     /// Use xSync for all writes. Not needed for WAL mode.
     Full,
     /// Sync at critical moments. Default.
+    #[default]
     Normal,
     /// Syncing is left to the operating system and power loss could result in corrupted database.
     Off,
@@ -34,11 +38,12 @@ pub enum DbSyncLevel {
 /// The strategy for database file system synchronization.
 /// Some databases like the cache can be safely rebuilt if
 /// corruption occurs due to using the faster [`DbSyncLevel::Off`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default)]
 pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
     /// This is the default.
+    #[default]
     Fast,
     /// Makes all databases use at least [`DbSyncLevel::Normal`].
     /// This is probably not needed unless you have an SSD and
@@ -87,18 +92,6 @@ struct ConnCustomizer {
     synchronous_level: DbSyncLevel,
 }
 
-impl Default for DbSyncLevel {
-    fn default() -> Self {
-        DbSyncLevel::Normal
-    }
-}
-
-impl Default for DbSyncStrategy {
-    fn default() -> Self {
-        DbSyncStrategy::Fast
-    }
-}
-
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
         initialize_connection(conn, self.synchronous_level)?;
@@ -124,9 +117,8 @@ pub(super) fn initialize_connection(
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
         }
         let _keyval = std::str::from_utf8(&hex).unwrap();
-        const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
         // conn.pragma_update(None, "key", &keyval)?;
-        conn.pragma_update(None, "key", &FAKE_KEY)?;
+        conn.pragma_update(None, "key", FAKE_KEY)?;
     }
 
     // this is recommended to always be off:

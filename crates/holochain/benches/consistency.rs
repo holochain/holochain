@@ -55,7 +55,7 @@ fn consistency(bench: &mut Criterion) {
         producer.run().await;
         producer.conductor.shutdown().await;
     });
-    group.bench_function(BenchmarkId::new("test", format!("test")), |b| {
+    group.bench_function(BenchmarkId::new("test", "test".to_string()), |b| {
         b.iter(|| {
             runtime.block_on(async { consumer.run(&cells[..]).await });
         });

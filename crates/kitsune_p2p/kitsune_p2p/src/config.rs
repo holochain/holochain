@@ -13,10 +13,12 @@ pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap-staging.holo.host
 pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 pub(crate) enum KitsuneP2pTx2Backend {
+    #[allow(dead_code)]
     #[cfg(feature = "tx2")]
     Mem,
     //#[cfg(feature = "tx2")]
     //Quic { bind_to: TxUrl },
+    #[allow(dead_code)]
     #[cfg(feature = "tx2")]
     Mock { mock_network: AdapterFactory },
 }
@@ -36,8 +38,8 @@ pub(crate) enum KitsuneP2pTx2ProxyConfig {
 
 #[cfg(feature = "tx2")]
 pub(crate) struct KitsuneP2pTx2Config {
-    pub backend: KitsuneP2pTx2Backend,
-    pub use_proxy: KitsuneP2pTx2ProxyConfig,
+    pub(crate) backend: KitsuneP2pTx2Backend,
+    pub(crate) use_proxy: KitsuneP2pTx2ProxyConfig,
 }
 
 /// Configure the kitsune actor.
@@ -59,6 +61,11 @@ pub struct KitsuneP2pConfig {
 
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
+
+    /// All tracing logs from kitsune tasks will be instrumented to contain this string,
+    /// so that logs from multiple instances in the same process can be disambiguated.
+    #[serde(default)]
+    pub tracing_scope: Option<String>,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -68,6 +75,7 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
+            tracing_scope: None,
         }
     }
 }
@@ -81,8 +89,9 @@ fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
 }
 
 impl KitsuneP2pConfig {
+    /// This config is making use of tx2 transport
     #[allow(dead_code)] // because of feature flipping
-    pub(crate) fn is_tx2(&self) -> bool {
+    pub fn is_tx2(&self) -> bool {
         #[cfg(feature = "tx2")]
         {
             #[cfg(feature = "tx5")]
@@ -123,42 +132,6 @@ impl KitsuneP2pConfig {
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         use KitsuneP2pTx2ProxyConfig::*;
         match self.transport_pool.get(0) {
-            /*
-            Some(TransportConfig::Proxy {
-                sub_transport,
-                proxy_config,
-            }) => {
-                let backend = match &**sub_transport {
-                    TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
-                    TransportConfig::Quic { bind_to, .. } => {
-                        let bind_to = cnv_bind_to(bind_to);
-                        KitsuneP2pTx2Backend::Quic { bind_to }
-                    }
-                    _ => return Err("kitsune tx2 backend must be mem or quic".into()),
-                };
-                let use_proxy = match proxy_config {
-                    ProxyConfig::RemoteProxyClient { proxy_url } => {
-                        Specific(proxy_url.clone().into())
-                    }
-                    ProxyConfig::RemoteProxyClientFromBootstrap {
-                        bootstrap_url,
-                        fallback_proxy_url,
-                    } => Bootstrap {
-                        bootstrap_url: bootstrap_url.clone().into(),
-                        fallback_proxy_url: fallback_proxy_url.clone().map(Into::into),
-                    },
-                    ProxyConfig::LocalProxyServer { .. } => NoProxy,
-                };
-                Ok(KitsuneP2pTx2Config { backend, use_proxy })
-            }
-            Some(TransportConfig::Quic { bind_to, .. }) => {
-                let bind_to = cnv_bind_to(bind_to);
-                Ok(KitsuneP2pTx2Config {
-                    backend: KitsuneP2pTx2Backend::Quic { bind_to },
-                    use_proxy: NoProxy,
-                })
-            }
-            */
             Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mock {
                     mock_network: mock_network.0.clone(),
@@ -197,39 +170,6 @@ pub enum TransportConfig {
     /// (this is mainly for testing)
     #[cfg(feature = "tx2")]
     Mem {},
-    /*
-    /// A transport that uses the QUIC protocol
-    #[cfg(feature = "tx2")]
-    Quic {
-        /// Network interface / port to bind to
-        /// Default: "kitsune-quic://0.0.0.0:0"
-        bind_to: Option<Url2>,
-
-        /// If you have port-forwarding set up,
-        /// or wish to apply a vanity domain name,
-        /// you may need to override the local NIC IP.
-        /// Default: None = use NIC IP
-        override_host: Option<String>,
-
-        /// If you have port-forwarding set up,
-        /// you may need to override the local NIC port.
-        /// Default: None = use NIC port
-        override_port: Option<u16>,
-    },
-    /// A transport that TLS tunnels through a sub-transport (ALPN kitsune-proxy/0)
-    #[cfg(feature = "tx2")]
-    Proxy {
-        /// The 'Proxy' transport is a wrapper around a sub-transport.
-        /// We also need to define the sub-transport.
-        sub_transport: Box<TransportConfig>,
-
-        /// Determines whether we wish to:
-        /// - proxy through a remote
-        /// - be a proxy server for others
-        /// - be directly addressable, but not proxy for others
-        proxy_config: ProxyConfig,
-    },
-    */
     /// A mock network for testing
     #[cfg(feature = "tx2")]
     #[serde(skip)]

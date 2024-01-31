@@ -125,10 +125,7 @@ mod tests {
         let chain = fact.clone().build(&mut g);
         fact.check(&chain).unwrap();
 
-        let hashes: Vec<_> = chain
-            .iter()
-            .map(|h| ActionHash::with_data_sync(h))
-            .collect();
+        let hashes: Vec<_> = chain.iter().map(ActionHash::with_data_sync).collect();
         let backlinks: Vec<_> = chain
             .iter()
             .filter_map(|h| h.prev_action())

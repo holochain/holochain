@@ -154,7 +154,7 @@ impl AppManifestV1 {
     // rather than simply updating the manifest. Let's hold off on that until
     // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
-        for mut role in self.roles.iter_mut() {
+        for role in self.roles.iter_mut() {
             // Only update the network seed for roles for which it makes sense to do so
             match role.provisioning.clone().unwrap_or_default() {
                 CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
@@ -221,10 +221,7 @@ impl AppManifestV1 {
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
-                            installed_hash: Self::require(
-                                installed_hash,
-                                "roles.dna.installed_hash",
-                            )?,
+                            installed_hash,
                             modifiers,
                         },
                     };

@@ -342,7 +342,7 @@ impl HolochainP2pMockMsg {
             HolochainP2pMockMsg::Wire { msg, .. } => match &msg {
                 crate::wire::WireMessage::CallRemote { .. }
                 | crate::wire::WireMessage::CallRemoteMulti { .. }
-                | crate::wire::WireMessage::ValidationReceipt { .. }
+                | crate::wire::WireMessage::ValidationReceipts { .. }
                 | crate::wire::WireMessage::Get { .. }
                 | crate::wire::WireMessage::GetMeta { .. }
                 | crate::wire::WireMessage::GetLinks { .. }
@@ -372,7 +372,7 @@ impl HolochainP2pMockMsg {
                 let call = match &msg {
                     crate::wire::WireMessage::CallRemote { .. }
                     | crate::wire::WireMessage::CallRemoteMulti { .. }
-                    | crate::wire::WireMessage::ValidationReceipt { .. }
+                    | crate::wire::WireMessage::ValidationReceipts { .. }
                     | crate::wire::WireMessage::Get { .. }
                     | crate::wire::WireMessage::GetMeta { .. }
                     | crate::wire::WireMessage::GetLinks { .. }

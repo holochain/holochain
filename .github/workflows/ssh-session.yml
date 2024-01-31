@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ github.event.inputs.runs-on }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Extend space
         uses: ./.github/actions/extend-space

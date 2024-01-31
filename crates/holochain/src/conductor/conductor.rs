@@ -59,6 +59,7 @@ use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
 use crate::conductor::cell::Cell;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
+use crate::conductor::metrics::create_p2p_event_duration_metric;
 use crate::conductor::p2p_agent_store::get_single_agent_info;
 use crate::conductor::p2p_agent_store::list_all_agent_info;
 use crate::conductor::p2p_agent_store::query_peer_density;
@@ -114,6 +115,7 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -276,13 +278,14 @@ mod startup_shutdown_impls {
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
         ) -> Self {
+            let tracing_scope = config.tracing_scope.clone().unwrap_or_default();
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
-                task_manager: TaskManagerClient::new(outcome_sender),
+                task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
                 // Must be initialized later, since it requires an Arc<Conductor>
                 outcomes_task: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),
@@ -884,17 +887,20 @@ mod network_impls {
                 let (current_number_of_peers, arc_size, total_network_peers) = db
                     .read_async({
                         let agent_pub_key = agent_pub_key.clone();
+                        let space = dna.clone().into_kitsune();
                         move |txn| -> DatabaseResult<(u32, f64, u32)> {
-                            let current_number_of_peers = txn.p2p_count_agents()?;
+                            let current_number_of_peers = txn.p2p_count_agents(space.clone())?;
 
                             // query arc size and extrapolated coverage and estimate total peers
                             let (arc_size, total_network_peers) = match txn.p2p_get_agent(
+                                space.clone(),
                                 &KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()),
                             )? {
                                 None => (0.0, 0),
                                 Some(agent) => {
                                     let arc_size = agent.storage_arc.coverage();
                                     let agents_in_arc = txn.p2p_gossip_query_agents(
+                                        space.clone(),
                                         u64::MIN,
                                         u64::MAX,
                                         agent.storage_arc.inner().into(),
@@ -1110,12 +1116,10 @@ mod network_impls {
                 } => {
                     let db = { self.p2p_agents_db(&dna_hash) };
                     let res = db
-                        .read_async(move |txn| {
-                            txn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                        })
-                        .await;
+                        .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
 
-                    let res = res.map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryAgentInfoSignedNearBasis {
@@ -1183,7 +1187,7 @@ mod network_impls {
                 | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
-                | ValidationReceiptReceived { .. } => {
+                | ValidationReceiptsReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
                     let cell = self.cell_by_id(&cell_id, true).await?;
@@ -1929,9 +1933,7 @@ mod app_status_impls {
                 .map(|(cell_id, cell)| async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.read_async(move |tx| {
-                        tx.p2p_get_agent(&kagent)
-                    }).await {
+                    let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
                         Ok(maybe_info) => maybe_info,
                         _ => None,
                     };
@@ -2071,7 +2073,7 @@ mod app_status_impls {
         {
             for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                    if let Some(cell) = cells.get_mut(cell_id.borrow()) {
                         cell.status = status;
                     }
                 });
@@ -2625,7 +2627,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_enabled_cells().into_iter().cloned().collect()
+                    app.all_enabled_cells().cloned().collect()
                 } else {
                     HashSet::new()
                 }
@@ -3077,15 +3079,19 @@ async fn p2p_event_task(
     const NUM_PARALLEL_EVTS: usize = 512;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let duration_metric = create_p2p_event_duration_metric();
     p2p_evt
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
             let handle = handle.clone();
             let num_tasks = num_tasks.clone();
             let max_time = max_time.clone();
+            let duration_metric = duration_metric.clone();
             async move {
-                let start = (num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
-                    >= NUM_PARALLEL_EVTS)
-                    .then(std::time::Instant::now);
+                // Track whether the concurrency limit has been reached and keep the start time for reporting if so.
+                let start = Instant::now();
+                let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+
+                let evt_dna_hash = evt.dna_hash().clone();
 
                 // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
                 match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
@@ -3101,19 +3107,23 @@ async fn p2p_event_task(
                     }
                 }
 
-                match start {
-                    Some(start) => {
-                        let el = start.elapsed();
-                        let us = el.as_micros() as u64;
-                        let max_us = max_time
-                            .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
-                            .max(us);
+                if current_num_tasks >= NUM_PARALLEL_EVTS {
+                    let el = start.elapsed();
+                    let us = el.as_micros() as u64;
+                    let max_us = max_time
+                        .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
+                        .max(us);
 
-                        let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
-                        s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
-                    }
-                    None => max_time.store(0, std::sync::atomic::Ordering::Relaxed),
+                    let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
+                    s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
+                } else {
+                    max_time.store(0, std::sync::atomic::Ordering::Relaxed);
                 }
+
+                duration_metric.record(start.elapsed().as_secs_f64(), &[
+                    opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", evt_dna_hash)),
+                ]);
+
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
                 .in_current_span()

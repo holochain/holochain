@@ -6,6 +6,7 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn block_agent(
     _ribosome: Arc<impl RibosomeT>,

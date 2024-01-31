@@ -1,11 +1,33 @@
 ---
-default_semver_increment_mode: !pre_patch beta-rc
+default_semver_increment_mode: !pre_patch rc
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.2.5
+
+## 0.2.5-rc.1
+
+## 0.2.5-rc.0
+
+- Provide a mechanism to automatically encrypt databases which are currently unencrypted. This is useful if you are switching from a Holochain built with the `sqlite` feature, to a Holochain built with `sqlite-encrypted`. In order to enable this mechanism you will need to set the environment variable `HOLOCHAIN_MIGRATE_UNENCRYPTED=true`. *DANGER*: If you switch your Holochain without this environment variable then on first startup it will recognise your cache, dht, peer and kitsune metrics databases will be recognised as corrupt and automatically wiped. These databases may be rebuilt, assuming that the same data is still available from other peers, but please consider making a backup before attempting to make the switch.
+
+## 0.2.4
+
+## 0.2.4-rc.0
+
+## 0.2.3
+
+## 0.2.3-rc.1
+
+## 0.2.3-rc.0
+
+## 0.2.3-beta-rc.0
+
+## 0.2.2
 
 ## 0.2.2-beta-rc.1
 

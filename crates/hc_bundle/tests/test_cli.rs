@@ -28,22 +28,22 @@ fn read_web_app(path: &Path) -> anyhow::Result<WebAppBundle> {
 async fn roundtrip() {
     {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
-        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/dnas/dna1"]);
+        let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna1"]);
         cmd.assert().success();
     }
     {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
-        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/dnas/dna2"]);
+        let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna2"]);
         cmd.assert().success();
     }
     {
         let mut cmd = Command::cargo_bin("hc-app").unwrap();
-        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/"]);
+        let cmd = cmd.args(["pack", "tests/fixtures/my-app/"]);
         cmd.assert().success();
     }
     {
         let mut cmd = Command::cargo_bin("hc-web-app").unwrap();
-        let cmd = cmd.args(&["pack", "tests/fixtures/web-app/"]);
+        let cmd = cmd.args(["pack", "tests/fixtures/web-app/"]);
         cmd.assert().success();
     }
 
@@ -64,14 +64,14 @@ async fn test_packed_hash_consistency() {
     let mut hash = None;
     while i < 5 {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
-        let cmd = cmd.args(&["pack", "tests/fixtures/my-app/dnas/dna1"]);
+        let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna1"]);
         cmd.assert().success();
 
         let cmd = Command::new("sha256sum")
             .args([r"./tests/fixtures/my-app/dnas/dna1/a dna.dna"])
             .unwrap();
         let sha_result = std::str::from_utf8(&cmd.stdout).unwrap().to_string();
-        let sha_result = sha_result.split(" ").collect::<Vec<_>>();
+        let sha_result = sha_result.split(' ').collect::<Vec<_>>();
         let new_hash = sha_result.first().unwrap().to_owned().to_owned();
 
         match hash {
@@ -89,7 +89,7 @@ async fn test_packed_hash_consistency() {
 async fn test_integrity() {
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
-        let cmd = cmd.args(&["pack", path]);
+        let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
@@ -160,7 +160,7 @@ async fn test_integrity() {
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
-        let cmd = cmd.args(&["pack", path]);
+        let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
@@ -375,7 +375,7 @@ fn load_schema(schema_name: &str) -> JSONSchema {
 }
 
 fn validate_schema(schema: &JSONSchema, manifest: &Value, context: &str) {
-    let result = schema.validate(&manifest);
+    let result = schema.validate(manifest);
     if let Err(errors) = result {
         for error in errors {
             println!("Validation error: {}", error);

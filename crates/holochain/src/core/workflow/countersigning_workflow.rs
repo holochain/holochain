@@ -124,7 +124,7 @@ pub(crate) async fn countersigning_workflow(
             incoming_dht_ops_workflow(
                 space.clone(),
                 sys_validation_trigger.clone(),
-                non_enzymatic_ops,
+                non_enzymatic_ops.into_iter().map(|(_h, o)| o).collect(),
                 false,
             )
             .await?;

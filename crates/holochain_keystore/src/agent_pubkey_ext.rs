@@ -81,7 +81,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         Self: Sized,
     {
         let f = keystore.new_sign_keypair_random();
-        MustBoxFuture::new(async move { f.await })
+        MustBoxFuture::new(f)
     }
 
     fn sign_raw(
@@ -90,7 +90,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         data: Arc<[u8]>,
     ) -> MustBoxFuture<'static, LairResult<Signature>> {
         let f = keystore.sign(self.clone(), data);
-        MustBoxFuture::new(async move { f.await })
+        MustBoxFuture::new(f)
     }
 
     fn verify_signature_raw(

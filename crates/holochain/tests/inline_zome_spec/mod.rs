@@ -305,7 +305,7 @@ fn simple_validation_zome() -> InlineZomeSet {
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
-            if &s.0 == "" {
+            if s.0.is_empty() {
                 Ok(ValidateResult::Invalid("No empty strings allowed".into()))
             } else {
                 Ok(ValidateResult::Valid)

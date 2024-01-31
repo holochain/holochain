@@ -5,6 +5,7 @@ use holochain_wasmer_host::prelude::*;
 use once_cell::unsync::Lazy;
 use std::sync::Arc;
 use tracing::*;
+use wasmer::RuntimeError;
 
 #[cfg(test)]
 use once_cell::sync::Lazy as SyncLazy;

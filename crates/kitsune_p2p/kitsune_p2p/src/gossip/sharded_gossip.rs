@@ -4,9 +4,9 @@
 
 use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
-use crate::meta_net::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
+use crate::{meta_net::*, KitsuneP2pConfig};
 use crate::{types::*, HostApi};
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
@@ -91,7 +91,7 @@ struct TimedBloomFilter {
 
 /// Gossip has two distinct variants which share a lot of similarities but
 /// are fundamentally different and serve different purposes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GossipType {
     /// The Recent gossip type is aimed at rapidly syncing the most recent
     /// data. It runs frequently and expects frequent diffs at each round.
@@ -160,7 +160,7 @@ impl ShardedGossip {
     /// Constructor
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         evt_sender: EventSender,
@@ -180,6 +180,8 @@ impl ShardedGossip {
 
         #[cfg(not(feature = "test"))]
         let state = Default::default();
+
+        let tuning_params = config.tuning_params.clone();
 
         let this = Arc::new(Self {
             ep_hnd,
@@ -201,7 +203,7 @@ impl ShardedGossip {
         let mut all_agents = vec![];
         let mut refresh_agent_list_timer = std::time::Instant::now();
 
-        metric_task({
+        metric_task_instrumented(config.tracing_scope.clone(), {
             let this = this.clone();
 
             async move {
@@ -375,7 +377,9 @@ impl ShardedGossip {
             let cert = outgoing.0.clone();
             if let Err(err) = self.process_outgoing(outgoing).await {
                 self.gossip.remove_state(&cert, true)?;
-                tracing::error!(
+
+                // TODO: track all connection attempts, if all of them fail within a certain period of time, then log as error
+                tracing::warn!(
                     "Gossip failed to send outgoing message because of: {:?}",
                     err
                 );
@@ -560,7 +564,15 @@ impl ShardedGossipLocalState {
                 Some(when_initiated)
                     if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
-                    tracing::error!("Tgt expired {:?}", cert);
+                    tracing::warn!(
+                        "Peer node timed out its gossip round. Cert: {:?}, Local agents: {:?}, Remote agents: {:?}",
+                        cert,
+                        self.local_agents,
+                        remote_agent_list
+                            .iter()
+                            .map(|i| i.agent())
+                            .collect::<Vec<_>>()
+                    );
                     {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, true);
@@ -1380,7 +1392,7 @@ impl ShardedRecentGossipFactory {
 impl AsGossipModuleFactory for ShardedRecentGossipFactory {
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
@@ -1389,7 +1401,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
-            tuning_params,
+            config,
             space,
             ep_hnd,
             evt_sender,
@@ -1415,7 +1427,7 @@ impl ShardedHistoricalGossipFactory {
 impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
     fn spawn_gossip_task(
         &self,
-        tuning_params: KitsuneP2pTuningParams,
+        config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
         ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
@@ -1424,7 +1436,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
-            tuning_params,
+            config,
             space,
             ep_hnd,
             evt_sender,
@@ -1461,6 +1473,15 @@ impl From<GossipType> for GossipModuleType {
         match g {
             GossipType::Recent => GossipModuleType::ShardedRecent,
             GossipType::Historical => GossipModuleType::ShardedHistorical,
+        }
+    }
+}
+
+impl From<GossipModuleType> for GossipType {
+    fn from(g: GossipModuleType) -> Self {
+        match g {
+            GossipModuleType::ShardedRecent => GossipType::Recent,
+            GossipModuleType::ShardedHistorical => GossipType::Historical,
         }
     }
 }

@@ -15,6 +15,7 @@ pub mod action;
 pub mod capability;
 pub mod chain;
 pub mod countersigning;
+pub mod dna_properties;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;

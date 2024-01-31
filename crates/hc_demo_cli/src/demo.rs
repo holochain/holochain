@@ -34,6 +34,7 @@ use std::sync::Arc;
 /// be published to the network. All files discovered on the network
 /// will be written to the inbox.
 #[derive(Debug, clap::Parser, serde::Serialize, serde::Deserialize)]
+#[command(version, about)]
 pub struct RunOpts {
     /// The subcommand to run.
     #[command(subcommand)]
@@ -48,7 +49,7 @@ impl RunOpts {
 }
 
 /// The default configured signal server url.
-pub const DEF_SIGNAL_URL: &str = "wss://signal.holotest.net";
+pub const DEF_SIGNAL_URL: &str = "wss://signal.holo.host";
 
 /// The default configured bootstrap server url.
 pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
@@ -254,14 +255,15 @@ async fn run(
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::rendezvous();
+    let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
-    let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults(
+    let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults_and_metrics(
         config,
         Some(keystore),
         Some(rendezvous),
+        true,
     )
     .await;
 

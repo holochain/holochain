@@ -150,14 +150,14 @@ fn to_zome_index_test_unit() {
     set_zome_types(&[], &[(0, 3)]);
 
     assert_eq!(zome_and_link_type(integrity_a::Unit::A), (0, 0));
-    assert_eq!(zome_and_link_type(&integrity_a::Unit::A), (0, 0));
+    assert_eq!(zome_and_link_type(integrity_a::Unit::A), (0, 0));
     assert_eq!(zome_and_link_type(integrity_a::Unit::B), (0, 1));
     assert_eq!(zome_and_link_type(integrity_a::Unit::C), (0, 2));
 
     set_zome_types(&[], &[(1, 3)]);
 
     assert_eq!(zome_and_link_type(integrity_b::Unit::A), (1, 0));
-    assert_eq!(zome_and_link_type(&integrity_b::Unit::A), (1, 0));
+    assert_eq!(zome_and_link_type(integrity_b::Unit::A), (1, 0));
     assert_eq!(zome_and_link_type(integrity_b::Unit::B), (1, 1));
     assert_eq!(zome_and_link_type(integrity_b::Unit::C), (1, 2));
 }

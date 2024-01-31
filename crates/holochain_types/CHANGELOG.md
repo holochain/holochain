@@ -1,11 +1,37 @@
 ---
-default_semver_increment_mode: !pre_patch beta-rc
+default_semver_increment_mode: !pre_patch rc
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.2.5
+
+## 0.2.5-rc.1
+
+## 0.2.5-rc.0
+
+Refactor: Wasmer-related items from holochain\_types have been moved to crate `holochain_wasmer_host::module`.
+
+## 0.2.4
+
+## 0.2.4-rc.0
+
+- **BREAKING CHANGE**: A `DnaManifest` and all its sub-fields will now reject unknown fields when deserialized. This will make it harder to provide an invalid DNA manifest to Holochain without realising. For example, coordinator zomes not appearing in your installed hApp because their field was indented to the wrong place. This is not a breaking change for valid manifests but Holochain will now reject more invalid manifests.
+
+## 0.2.3
+
+## 0.2.3-rc.1
+
+## 0.2.3-rc.0
+
+- In the CloneOnly provisioning strategy, `installed_hash` is no longer required (it’s now optional). [\#2600](https://github.com/holochain/holochain/pull/2600)
+
+## 0.2.3-beta-rc.0
+
+## 0.2.2
 
 ## 0.2.2-beta-rc.2
 

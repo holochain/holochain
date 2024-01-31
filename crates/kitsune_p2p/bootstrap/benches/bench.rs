@@ -41,7 +41,7 @@ fn bootstrap(bench: &mut Criterion) {
         println!("BOOTSTRAP CLOSED");
     });
     url.set_port(Some(addr.port())).unwrap();
-    group.bench_function(BenchmarkId::new("test", format!("now")), |b| {
+    group.bench_function(BenchmarkId::new("test", "now".to_string()), |b| {
         b.iter(|| {
             runtime.block_on(async {
                 let time: u64 = do_api(url.clone(), "now", (), &client)
@@ -53,7 +53,7 @@ fn bootstrap(bench: &mut Criterion) {
         });
     });
     let space: Arc<KitsuneSpace> = runtime.block_on(async { Arc::new(fixt!(KitsuneSpace)) });
-    group.bench_function(BenchmarkId::new("test", format!("put")), |b| {
+    group.bench_function(BenchmarkId::new("test", "put".to_string()), |b| {
         b.iter(|| {
             runtime.block_on(async {
                 let info = AgentInfoSigned::sign(
@@ -78,7 +78,7 @@ fn bootstrap(bench: &mut Criterion) {
         space,
         limit: RandomLimit(10),
     };
-    group.bench_function(BenchmarkId::new("test", format!("random")), |b| {
+    group.bench_function(BenchmarkId::new("test", "random".to_string()), |b| {
         b.iter(|| {
             runtime.block_on(async {
                 let peers: Vec<serde_bytes::ByteBuf> =

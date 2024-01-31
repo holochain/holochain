@@ -53,13 +53,17 @@ pub struct SignalBroadcaster {
 }
 
 impl SignalBroadcaster {
-    /// send the signal to the connected client
+    /// Send the signal to the connected client. Send error is logged but not
+    /// returned to the caller.
     pub(crate) fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
-        self.senders
-            .iter_mut()
-            .map(|tx| tx.send(sig.clone()))
-            .collect::<Result<Vec<_>, broadcast::error::SendError<Signal>>>()
-            .map_err(InterfaceError::SignalSend)?;
+        self.senders.iter_mut().for_each(|tx| {
+            if let Err(err) = tx.send(sig.clone()) {
+                tracing::info!(
+                    "{:?}: no app websocket connected",
+                    InterfaceError::SignalSend(err)
+                )
+            }
+        });
         Ok(())
     }
 

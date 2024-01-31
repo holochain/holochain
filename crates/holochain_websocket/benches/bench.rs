@@ -53,7 +53,7 @@ fn simple_bench(bench: &mut Criterion) {
     });
 }
 
-async fn client_request(send: &mut WebsocketSender) -> () {
+async fn client_request(send: &mut WebsocketSender) {
     let msg = TestMessage("test".to_string());
     // Make a request and get the echoed response
     let rsp: TestMessage = send.request(msg).await.unwrap();
@@ -61,13 +61,13 @@ async fn client_request(send: &mut WebsocketSender) -> () {
     assert_eq!("echo: test", &rsp.0,);
 }
 
-async fn client_signal(send: &mut WebsocketSender) -> () {
+async fn client_signal(send: &mut WebsocketSender) {
     let msg = TestMessage("test".to_string());
     // Make a signal
     send.signal(msg).await.unwrap();
 }
 
-async fn client_response(recv: &mut WebsocketReceiver) -> () {
+async fn client_response(recv: &mut WebsocketReceiver) {
     let (msg, resp) = recv.next().await.unwrap();
     let msg: TestMessage = msg.try_into().unwrap();
     if resp.is_request() {

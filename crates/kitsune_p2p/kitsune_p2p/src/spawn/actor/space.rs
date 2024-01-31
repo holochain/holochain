@@ -21,6 +21,7 @@ const HISTORICAL_METRIC_RECORD_FREQ_MS: u64 = 1000 * 60 * 60;
 mod metric_exchange;
 use metric_exchange::*;
 
+mod agent_info_update;
 mod bootstrap_task;
 mod rpc_multi_logic;
 
@@ -28,7 +29,7 @@ type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
-type WireConHnd = MetaNetCon;
+pub(crate) type WireConHnd = MetaNetCon;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
@@ -313,7 +314,6 @@ impl SpaceInternalHandler for Space {
         let agent_infos: Vec<AgentInfoSigned> = self
             .local_joined_agents
             .values()
-            .into_iter()
             .filter_map(|maybe_agent_info| maybe_agent_info.as_ref())
             .cloned()
             .collect();
@@ -352,7 +352,7 @@ impl SpaceInternalHandler for Space {
         // local agents.
         let mut local_notify_events = Vec::new();
         let mut local_agent_info_events = Vec::new();
-        match &data {
+        let broadcast_source = match &data {
             BroadcastData::User(data) => {
                 for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
@@ -368,6 +368,8 @@ impl SpaceInternalHandler for Space {
                         }
                     }
                 }
+
+                None
             }
             BroadcastData::AgentInfo(agent_info) => {
                 if self
@@ -387,13 +389,16 @@ impl SpaceInternalHandler for Space {
                         }
                     });
                 }
+
+                None
             }
-            BroadcastData::Publish { .. } => {
+            BroadcastData::Publish { source, .. } => {
                 // Don't do anything here. This case is handled by the actor
                 // invoking incoming_publish instead of
                 // incoming_delegate_broadcast.
+                Some(source.clone())
             }
-        }
+        };
 
         // next, gather a list of agents covering this data to be
         // published to.
@@ -412,10 +417,10 @@ impl SpaceInternalHandler for Space {
             // i.e. if `agent.get_loc() % mod_cnt == mod_idx` we know we are
             // responsible for delegating the broadcast to that agent.
             let mut all = Vec::new();
-            for info in info_list
-                .into_iter()
-                .filter(|info| info.agent.get_loc().as_u32() % mod_cnt == mod_idx)
-            {
+            for info in info_list.into_iter().filter(|info| {
+                info.agent.get_loc().as_u32() % mod_cnt == mod_idx
+                    && Some(info.agent()) != broadcast_source
+            }) {
                 let ro_inner = ro_inner.clone();
                 let space = space.clone();
                 let data = data.clone();
@@ -747,9 +752,9 @@ async fn update_single_agent_info(
     Ok(agent_info_signed)
 }
 
+use crate::spawn::actor::space::agent_info_update::AgentInfoUpdateTask;
 use crate::spawn::actor::space::bootstrap_task::BootstrapTask;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
-use ghost_actor::GhostControlSender;
 
 impl ghost_actor::GhostControlHandler for Space {
     fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
@@ -845,7 +850,7 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_leave(
@@ -938,7 +943,7 @@ impl KitsuneP2pHandler for Space {
         let local_joined_agents = self.local_joined_agents.keys().cloned().collect();
         let fut =
             rpc_multi_logic::handle_rpc_multi(input, self.ro_inner.clone(), local_joined_agents);
-        Ok(async move { fut.await }.boxed().into())
+        Ok(fut.boxed().into())
     }
 
     fn handle_broadcast(
@@ -1063,8 +1068,8 @@ impl KitsuneP2pHandler for Space {
 
                 let mut all = Vec::new();
 
-                // determine the total number of nodes we'll be publishing to
-                // we'll make each remote responsible for a subset of delegate
+                // Determine the total number of nodes we'll be publishing to.
+                // We'll make each remote responsible for a subset of delegate
                 // broadcasting by having them apply the formula:
                 // `agent.get_loc() % mod_cnt == mod_idx` -- if true,
                 // they'll be responsible for forwarding the data to that node.
@@ -1419,7 +1424,7 @@ impl Space {
                     (
                         module,
                         factory.spawn_gossip_task(
-                            config.tuning_params.clone(),
+                            config.clone(),
                             space.clone(),
                             ep_hnd.clone(),
                             evt_sender.clone(),
@@ -1432,25 +1437,12 @@ impl Space {
                 .collect()
         };
 
-        let i_s_c = i_s.clone();
-        let agent_info_update_interval_ms =
-            config.tuning_params.gossip_agent_info_update_interval_ms as u64;
-        tokio::task::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_millis(
-                    agent_info_update_interval_ms,
-                ))
-                .await;
-                if let Err(e) = i_s_c.update_agent_info().await {
-                    if !i_s_c.ghost_actor_is_active() {
-                        // Assume this task has been orphaned when the space was dropped and exit.
-                        break;
-                    } else {
-                        tracing::error!(failed_to_update_agent_info_for_space = ?e);
-                    }
-                }
-            }
-        });
+        AgentInfoUpdateTask::spawn(
+            i_s.clone(),
+            std::time::Duration::from_millis(
+                config.tuning_params.gossip_agent_info_update_interval_ms as u64,
+            ),
+        );
 
         if let NetworkType::QuicBootstrap = &config.network_type {
             // spawn the periodic bootstrap pull
@@ -1463,6 +1455,7 @@ impl Space {
                 config
                     .tuning_params
                     .bootstrap_check_delay_backoff_multiplier,
+                config.tuning_params.bootstrap_max_delay_s,
             );
         }
 

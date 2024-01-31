@@ -11,6 +11,7 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::inline_zome::error::InlineZomeError;
 use thiserror::Error;
 use tokio::task::JoinError;
+use wasmer::DeserializeError;
 
 /// Errors occurring during a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) call
 #[derive(Error, Debug)]
@@ -21,7 +22,7 @@ pub enum RibosomeError {
 
     /// Wasm runtime error while working with Ribosome.
     #[error("Wasm runtime error while working with Ribosome: {0}")]
-    WasmRuntimeError(#[from] RuntimeError),
+    WasmRuntimeError(#[from] wasmer::RuntimeError),
 
     /// Serialization error while working with Ribosome.
     #[error("Serialization error while working with Ribosome: {0}")]
@@ -100,7 +101,7 @@ pub enum RibosomeError {
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
 
     #[error(transparent)]
-    ModuleDeserializeError(#[from] holochain_wasmer_host::prelude::DeserializeError),
+    ModuleDeserializeError(#[from] DeserializeError),
 }
 
 /// Type alias

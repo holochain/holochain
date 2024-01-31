@@ -7,6 +7,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::CallInfo;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn call_info(
     _ribosome: Arc<impl RibosomeT>,

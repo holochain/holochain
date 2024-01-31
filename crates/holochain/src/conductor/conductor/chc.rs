@@ -14,7 +14,7 @@ impl Conductor {
         }
     }
 
-    #[cfg(any(test))]
+    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) async fn chc_sync(
         self: Arc<Self>,

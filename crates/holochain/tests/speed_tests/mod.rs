@@ -32,7 +32,7 @@ use tempfile::TempDir;
 use super::test_utils::*;
 use holochain::sweettest::*;
 use holochain_test_wasm_common::AnchorInput;
-use holochain_trace;
+
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketResult;
@@ -53,14 +53,14 @@ async fn speed_test_prep() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
-    let _g = holochain_trace::test_run_timed().unwrap();
+    holochain_trace::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
-    let _g = holochain_trace::test_run_timed_json().unwrap();
+    holochain_trace::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 

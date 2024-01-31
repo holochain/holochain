@@ -57,6 +57,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl KitsuneBinType for $name {
 
+                // TODO This actually allows mixups, for example a KitsuneAgent can be constructed with a 36 byte vector
                 fn new(mut bytes: Vec<u8>) -> Self {
                     if bytes.len() != 36 {
                         // If location bytes are not included, append them now.

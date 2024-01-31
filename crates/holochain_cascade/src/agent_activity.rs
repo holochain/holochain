@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use super::*;
 use holochain_p2p::actor::GetActivityOptions;
 
+#[allow(clippy::result_large_err)] // TODO - investigate this lint
 pub(crate) fn merge_activities(
     agent: AgentPubKey,
     options: &GetActivityOptions,

@@ -134,7 +134,36 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    /// and a metrics initialization.
+    pub async fn create_with_defaults_and_metrics<C, R>(
+        config: C,
+        keystore: Option<MetaLairClient>,
+        rendezvous: Option<R>,
+        with_metrics: bool,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous> + Clone,
+    {
         let rendezvous = rendezvous.map(|r| r.into());
+        let dir = TestDir::new(test_db_dir());
+
+        assert!(
+            dir.read_dir().unwrap().next().is_none(),
+            "Test dir not empty - {:?}",
+            dir.to_path_buf()
+        );
+
+        if with_metrics {
+            #[cfg(feature = "metrics_influxive")]
+            holochain_metrics::HolochainMetricsConfig::new(dir.as_ref())
+                .init()
+                .await;
+        }
 
         let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.into().into_conductor_config(&*r).await
@@ -142,13 +171,6 @@ impl SweetConductor {
             config.into().into()
         };
 
-        tracing::info!(?config);
-        let dir = TestDir::new(test_db_dir());
-        assert!(
-            dir.read_dir().unwrap().next().is_none(),
-            "Test dir not empty - {:?}",
-            dir.to_path_buf()
-        );
         let handle =
             Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
                 .await;
@@ -530,6 +552,21 @@ impl SweetConductor {
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Drop the specified agent keys from each conductor's peer table
+    pub async fn forget_peer_info(
+        conductors: impl IntoIterator<Item = &Self>,
+        agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
+    ) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+
+        crate::conductor::p2p_agent_store::forget_peer_info(all, agents_to_forget).await;
     }
 
     /// Let each conductor know about each others' agents so they can do networking

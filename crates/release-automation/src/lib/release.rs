@@ -28,6 +28,7 @@ use std::{
 };
 use structopt::StructOpt;
 
+use crate::crate_selection::flatten_forest;
 use crate::{
     changelog::{Changelog, WorkspaceCrateReleaseHeading},
     common::{increment_semver, SemverIncrementMode},
@@ -648,7 +649,7 @@ impl PublishError {
 
 /// Try to publish the given crates to crates.io.
 ///
-/// If dry-run is given, the following error conditoins are tolerated:
+/// If dry-run is given, the following error conditions are tolerated:
 /// - a dependency is not found but is part of the release
 /// - a version of a dependency is not found bu the dependency is part of the release
 ///

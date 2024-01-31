@@ -1,19 +1,19 @@
 //! An in-memory network for sharded kitsune tests.
 
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
-use crate::meta_net::*;
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
+use crate::{meta_net::*, KitsuneP2pConfig};
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
 use itertools::Itertools;
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
 use kitsune_p2p_proxy::tx2::{tx2_proxy, ProxyConfig};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMetaInfoEncode};
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
-use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht::prelude::power_and_count_from_length;
 use kitsune_p2p_types::dht::spacetime::Topology;
@@ -115,6 +115,8 @@ impl Switchboard {
         let proxy_config = ProxyConfig::default();
         // proxy_config.allow_proxy_fwd = true;
 
+        let config = KitsuneP2pConfig::default().tune(|_| (*tuning_params).clone());
+
         let f = tx2_mem_adapter(mem_config).await.unwrap();
         let f = tx2_pool_promote(f, tuning_params.clone());
         // Proxy wrapping is needed because sharded_gossip expects it
@@ -134,7 +136,7 @@ impl Switchboard {
         let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0, 10.0));
 
         let gossip = ShardedGossip::new(
-            tuning_params,
+            Arc::new(config),
             space.clone(),
             MetaNet::Tx2(ep_hnd.clone(), host_api.clone()),
             evt_sender,

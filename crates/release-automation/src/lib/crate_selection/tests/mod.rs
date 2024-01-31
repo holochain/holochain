@@ -74,15 +74,10 @@ fn release_selection() {
 
     // TODO: verify that a crate can be selected by being an unmatched, changed crate that's a dependency of a matched, unchanged crate.
 
-    let selection = workspace
-        .release_selection()
-        .unwrap()
-        .into_iter()
-        .map(|c| c.name())
-        .collect::<Vec<_>>();
-    let expected_selection = vec!["crate_g", "crate_b", "crate_a", "crate_e"];
+    let selection = workspace.release_selection().unwrap();
 
-    assert_eq!(expected_selection, selection);
+    assert_eq!(4, selection.len());
+    ensure_release_order_consistency(&selection).unwrap();
 }
 
 #[test]
@@ -218,21 +213,10 @@ fn members_sorted_ws1() {
     )
     .unwrap();
 
-    let result = workspace
-        .members()
-        .unwrap()
-        .iter()
-        .map(|crt| crt.name())
-        .collect::<Vec<_>>();
+    let result = workspace.members().unwrap();
 
-    let expected_result = [
-        "crate_g", "crate_b", "crate_a", "crate_c", "crate_e", "crate_f",
-    ]
-    .iter()
-    .map(std::string::ToString::to_string)
-    .collect::<Vec<_>>();
-
-    assert_eq!(expected_result, result);
+    assert_eq!(6, result.len());
+    ensure_release_order_consistency(result).unwrap();
 }
 
 #[test]

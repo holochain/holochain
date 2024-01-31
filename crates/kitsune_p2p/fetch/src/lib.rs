@@ -4,12 +4,15 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash, KSpace};
+use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
 
 mod error;
 mod pool;
 mod respond;
 mod rough_sized;
+
+#[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils;
 
 pub use error::*;
 pub use pool::*;
@@ -22,9 +25,6 @@ pub use rough_sized::*;
 )]
 #[serde(tag = "type", content = "key", rename_all = "camelCase")]
 pub enum FetchKey {
-    /// Fetch via region.
-    Region(RegionCoords),
-
     /// Fetch via op hash.
     Op(KOpHash),
 }

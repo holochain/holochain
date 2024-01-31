@@ -191,7 +191,7 @@ async fn sharded_4way_recent() {
     let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128);
     let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128);
 
-    let ops: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
+    let ops: Vec<_> = (0..256).step_by(8).map(Loc8::from).collect();
 
     sb.share(|sb| {
         sb.add_local_agent(&n1, &a1);
@@ -280,7 +280,7 @@ async fn sharded_4way_historical() {
     let a2 = SwitchboardAgent::from_start_and_len(&topo, 64, 128);
     let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128);
     let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128);
-    let ops_only: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
+    let ops_only: Vec<_> = (0..256).step_by(8).map(Loc8::from).collect();
     let ops_timed: Vec<_> = ops_only
         .clone()
         .into_iter()

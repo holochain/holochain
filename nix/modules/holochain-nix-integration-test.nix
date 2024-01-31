@@ -36,8 +36,8 @@
           EOF
 
           # regenerate the nix sources
-          git config --global user.email "devcore@holochain.org"
-          git config --global user.name "Holochain Core Dev Team"
+          ./scripts/ci-git-config.sh
+
           nix-shell \
             --pure \
             --keep VERSION_COMPAT \

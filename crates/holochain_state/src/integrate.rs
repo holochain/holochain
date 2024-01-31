@@ -107,8 +107,6 @@ fn insert_locally_validated_op(
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, holochain_zome_types::ValidationStatus::Valid)?;
 
-    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
-    // Set the stage to awaiting integration.
     if let Dependency::Null = dependency {
         // This set the validation stage to pending which is correct when
         // it's integrated.
@@ -117,6 +115,9 @@ fn insert_locally_validated_op(
     } else {
         set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
     }
+
+    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
+    // Set the stage to awaiting integration.
     if matches!(op_type, DhtOpType::RegisterAgentActivity) {
         Ok(Some(op))
     } else {

@@ -457,7 +457,7 @@ mod tests {
                                     return;
                                 }
                             } else {
-                                panic!("unexpected {}", String::from_utf8_lossy(&*buf));
+                                panic!("unexpected {}", String::from_utf8_lossy(&buf));
                             }
                         }
                     })

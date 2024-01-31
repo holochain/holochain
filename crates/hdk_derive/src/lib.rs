@@ -8,6 +8,7 @@ use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
 
+mod dna_properties;
 mod entry_def_registration;
 mod entry_defs;
 mod entry_defs_conversions;
@@ -283,4 +284,10 @@ pub fn hdk_dependent_link_types(attrs: TokenStream, code: TokenStream) -> TokenS
 #[proc_macro_attribute]
 pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_helper::build(attrs, code)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn dna_properties(attrs: TokenStream, code: TokenStream) -> TokenStream {
+    dna_properties::build(attrs, code)
 }

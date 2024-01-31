@@ -29,7 +29,7 @@ use holochain_p2p::{
     event::FetchOpDataQuery,
 };
 use holochain_sqlite::prelude::{
-    AsP2pStateTxExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    AsP2pStateReadExt, DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
     DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
     ReadAccess,
 };
@@ -176,11 +176,7 @@ impl Spaces {
         let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
         for dna in dnas {
             // @todo join_all for these awaits
-            agent_lists.push(
-                self.p2p_agents_db(&dna)?
-                    .read_async(|txn| txn.p2p_list_agents())
-                    .await?,
-            );
+            agent_lists.push(self.p2p_agents_db(&dna)?.p2p_list_agents().await?);
         }
 
         Ok(agent_lists
@@ -628,20 +624,20 @@ impl Spaces {
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        use futures::StreamExt;
-        let ops = futures::stream::iter(ops.into_iter().map(|op| {
-            let hash = DhtOpHash::with_data_sync(&op);
-            (hash, op)
-        }))
-        .collect()
-        .await;
-
         // If this is a countersigning session then
         // send it to the countersigning workflow otherwise
         // send it to the incoming ops workflow.
         if countersigning_session {
+            use futures::StreamExt;
+            let ops = futures::stream::iter(ops.into_iter().map(|op| {
+                let hash = DhtOpHash::with_data_sync(&op);
+                (hash, op)
+            }))
+            .collect()
+            .await;
+
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
                     space.countersigning_workspace.clone(),
@@ -664,7 +660,10 @@ impl Spaces {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 // Note this is not an error because only a validation receipt is proof of a publish.
-                None => return Ok(()),
+                None => {
+                    tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
+                    return Ok(());
+                }
             };
             incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }

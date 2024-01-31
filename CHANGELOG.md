@@ -6,6 +6,762 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20240131.130303
+
+## [holochain\_cli-0.2.5](crates/holochain_cli/CHANGELOG.md#0.2.5)
+
+## [holochain-0.2.5](crates/holochain/CHANGELOG.md#0.2.5)
+
+## [holochain\_cli\_bundle-0.2.5](crates/holochain_cli_bundle/CHANGELOG.md#0.2.5)
+
+## [holochain\_cli\_run\_local\_services-0.2.5](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.5)
+
+## [holochain\_cli\_sandbox-0.2.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.5)
+
+## [holochain\_cascade-0.2.5](crates/holochain_cascade/CHANGELOG.md#0.2.5)
+
+## [holochain\_conductor\_api-0.2.5](crates/holochain_conductor_api/CHANGELOG.md#0.2.5)
+
+## [holochain\_metrics-0.2.5](crates/holochain_metrics/CHANGELOG.md#0.2.5)
+
+## [holochain\_test\_wasm\_common-0.2.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.5)
+
+## [holochain\_wasm\_test\_utils-0.2.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.5)
+
+## [holochain\_websocket-0.2.5](crates/holochain_websocket/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_bootstrap-0.1.5](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.5)
+
+## [hdk-0.2.5](crates/hdk/CHANGELOG.md#0.2.5)
+
+## [holochain\_state-0.2.5](crates/holochain_state/CHANGELOG.md#0.2.5)
+
+## [hdi-0.3.5](crates/hdi/CHANGELOG.md#0.3.5)
+
+## [holochain\_p2p-0.2.5](crates/holochain_p2p/CHANGELOG.md#0.2.5)
+
+## [hdk\_derive-0.2.5](crates/hdk_derive/CHANGELOG.md#0.2.5)
+
+## [holochain\_types-0.2.5](crates/holochain_types/CHANGELOG.md#0.2.5)
+
+## [holochain\_keystore-0.2.5](crates/holochain_keystore/CHANGELOG.md#0.2.5)
+
+- Update Lair version to 0.4.2. This change just removes `#![deny(warnings)]` from Lair so that it won’t prevent builds when new versions of Clippy introduce new lint rules. There are no functional changes to Lair or its API.
+
+## [holochain\_sqlite-0.2.5](crates/holochain_sqlite/CHANGELOG.md#0.2.5)
+
+## [mr\_bundle-0.2.5](crates/mr_bundle/CHANGELOG.md#0.2.5)
+
+## [holochain\_zome\_types-0.2.5](crates/holochain_zome_types/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p-0.2.5](crates/kitsune_p2p/CHANGELOG.md#0.2.5)
+
+## [holochain\_integrity\_types-0.2.5](crates/holochain_integrity_types/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_fetch-0.2.5](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_mdns-0.2.5](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_proxy-0.2.5](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.5)
+
+## [holo\_hash-0.2.5](crates/holo_hash/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_transport\_quic-0.2.5](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.5)
+
+## [fixt-0.2.5](crates/fixt/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_types-0.2.5](crates/kitsune_p2p_types/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_block-0.2.5](crates/kitsune_p2p_block/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_dht-0.2.5](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_bin\_data-0.2.5](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_timestamp-0.2.5](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.5)
+
+## [holochain\_util-0.2.5](crates/holochain_util/CHANGELOG.md#0.2.5)
+
+## [kitsune\_p2p\_dht\_arc-0.2.5](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.5)
+
+## [holochain\_trace-0.2.5](crates/holochain_trace/CHANGELOG.md#0.2.5)
+
+# 20240125.194538
+
+## [holochain\_cli-0.2.5-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain-0.2.5-rc.1](crates/holochain/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cli\_bundle-0.2.5-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cli\_run\_local\_services-0.2.5-rc.1](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cli\_sandbox-0.2.5-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_cascade-0.2.5-rc.1](crates/holochain_cascade/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_conductor\_api-0.2.5-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.2.5-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_bootstrap-0.1.5-rc.1](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.5-rc.1)
+
+## [holochain\_state-0.2.5-rc.1](crates/holochain_state/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_p2p-0.2.5-rc.1](crates/holochain_p2p/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_types-0.2.5-rc.1](crates/holochain_types/CHANGELOG.md#0.2.5-rc.1)
+
+## [holochain\_keystore-0.2.5-rc.1](crates/holochain_keystore/CHANGELOG.md#0.2.5-rc.1)
+
+- Update Lair version to 0.4.1, see the Lair changelog [here](https://github.com/holochain/lair/blob/main/crates/lair_keystore/CHANGELOG.md#041).
+
+## [holochain\_sqlite-0.2.5-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.2.5-rc.1)
+
+## [mr\_bundle-0.2.5-rc.0](crates/mr_bundle/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p-0.2.5-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.2.5-rc.1)
+
+- Minor optimisation when delegate broadcasting ops, the delegated broadcasts will now avoid connecting back to the source. There is currently no way to prevent other agents that were delegated to from connecting to each other but this change takes care of one case.
+
+## [kitsune\_p2p\_fetch-0.2.5-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_proxy-0.2.5-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.2.5-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.5-rc.1)
+
+## [kitsune\_p2p\_types-0.2.5-rc.1](crates/kitsune_p2p_types/CHANGELOG.md#0.2.5-rc.1)
+
+# 20240120.122931
+
+## [holochain\_cli-0.2.5-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain-0.2.5-rc.0](crates/holochain/CHANGELOG.md#0.2.5-rc.0)
+
+- Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
+- Fix: Runtime engines to execute zome fns did not live long enough and were producing `RuntimeError: out of bounds memory access`. Engines are kept for the lifetime of the conductor process now.
+- Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
+- Make sqlite-encrypted a default feature
+- Sys validation will no longer check the integrity with the previous action for StoreRecord or StoreEntry ops. These ‘store record’ checks are now only done for RegisterAgentActivity ops which we are sent when we are responsible for validating an agents whole chain. This avoids fetching and caching ops that we don’t actually need.
+- Sys validation will now validate that a DeleteLink points to an action which is a CreateLink through the `link_add_address` of the delete.
+
+## [holochain\_cli\_bundle-0.2.5-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_cli\_run\_local\_services-0.2.5-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.5-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_cascade-0.2.5-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_conductor\_api-0.2.5-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.5-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.5-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_websocket-0.2.5-rc.0](crates/holochain_websocket/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.5-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.5-rc.0)
+
+## [hdk-0.2.5-rc.0](crates/hdk/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_state-0.2.5-rc.0](crates/holochain_state/CHANGELOG.md#0.2.5-rc.0)
+
+## [hdi-0.3.5-rc.0](crates/hdi/CHANGELOG.md#0.3.5-rc.0)
+
+## [holochain\_p2p-0.2.5-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.5-rc.0)
+
+## [hdk\_derive-0.2.5-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_types-0.2.5-rc.0](crates/holochain_types/CHANGELOG.md#0.2.5-rc.0)
+
+Refactor: Wasmer-related items from holochain\_types have been moved to crate `holochain_wasmer_host::module`.
+
+## [holochain\_keystore-0.2.5-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_sqlite-0.2.5-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.5-rc.0)
+
+- Provide a mechanism to automatically encrypt databases which are currently unencrypted. This is useful if you are switching from a Holochain built with the `sqlite` feature, to a Holochain built with `sqlite-encrypted`. In order to enable this mechanism you will need to set the environment variable `HOLOCHAIN_MIGRATE_UNENCRYPTED=true`. *DANGER*: If you switch your Holochain without this environment variable then on first startup it will recognise your cache, dht, peer and kitsune metrics databases will be recognised as corrupt and automatically wiped. These databases may be rebuilt, assuming that the same data is still available from other peers, but please consider making a backup before attempting to make the switch.
+
+## [holochain\_zome\_types-0.2.5-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p-0.2.5-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.5-rc.0)
+
+## [holochain\_integrity\_types-0.2.5-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.5-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_proxy-0.2.5-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.5-rc.0)
+
+## [holo\_hash-0.2.5-rc.0](crates/holo_hash/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.5-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.5-rc.0)
+
+## [fixt-0.2.5-rc.0](crates/fixt/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_types-0.2.5-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_block-0.2.5-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.5-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.5-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.5-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.5-rc.0)
+
+# 20231214.142611
+
+## [holochain\_cli-0.2.4](crates/holochain_cli/CHANGELOG.md#0.2.4)
+
+## [holochain-0.2.4](crates/holochain/CHANGELOG.md#0.2.4)
+
+## [holochain\_cli\_bundle-0.2.4](crates/holochain_cli_bundle/CHANGELOG.md#0.2.4)
+
+## [holochain\_cli\_run\_local\_services-0.2.4](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.4)
+
+## [holochain\_cli\_sandbox-0.2.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.4)
+
+## [holochain\_cascade-0.2.4](crates/holochain_cascade/CHANGELOG.md#0.2.4)
+
+## [holochain\_conductor\_api-0.2.4](crates/holochain_conductor_api/CHANGELOG.md#0.2.4)
+
+## [holochain\_metrics-0.2.4](crates/holochain_metrics/CHANGELOG.md#0.2.4)
+
+## [holochain\_test\_wasm\_common-0.2.4](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.4)
+
+## [holochain\_wasm\_test\_utils-0.2.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.4)
+
+## [holochain\_websocket-0.2.4](crates/holochain_websocket/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_bootstrap-0.1.4](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.4)
+
+## [hdk-0.2.4](crates/hdk/CHANGELOG.md#0.2.4)
+
+## [holochain\_state-0.2.4](crates/holochain_state/CHANGELOG.md#0.2.4)
+
+## [hdi-0.3.4](crates/hdi/CHANGELOG.md#0.3.4)
+
+## [holochain\_p2p-0.2.4](crates/holochain_p2p/CHANGELOG.md#0.2.4)
+
+## [hdk\_derive-0.2.4](crates/hdk_derive/CHANGELOG.md#0.2.4)
+
+## [holochain\_types-0.2.4](crates/holochain_types/CHANGELOG.md#0.2.4)
+
+## [holochain\_keystore-0.2.4](crates/holochain_keystore/CHANGELOG.md#0.2.4)
+
+## [holochain\_sqlite-0.2.4](crates/holochain_sqlite/CHANGELOG.md#0.2.4)
+
+## [mr\_bundle-0.2.4](crates/mr_bundle/CHANGELOG.md#0.2.4)
+
+## [holochain\_zome\_types-0.2.4](crates/holochain_zome_types/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p-0.2.4](crates/kitsune_p2p/CHANGELOG.md#0.2.4)
+
+## [holochain\_integrity\_types-0.2.4](crates/holochain_integrity_types/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_fetch-0.2.4](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_mdns-0.2.4](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_proxy-0.2.4](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.4)
+
+## [holo\_hash-0.2.4](crates/holo_hash/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_transport\_quic-0.2.4](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.4)
+
+## [fixt-0.2.4](crates/fixt/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_types-0.2.4](crates/kitsune_p2p_types/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_block-0.2.4](crates/kitsune_p2p_block/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_dht-0.2.4](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_bin\_data-0.2.4](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_timestamp-0.2.4](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.4)
+
+## [holochain\_util-0.2.4](crates/holochain_util/CHANGELOG.md#0.2.4)
+
+## [kitsune\_p2p\_dht\_arc-0.2.4](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.4)
+
+## [holochain\_trace-0.2.4](crates/holochain_trace/CHANGELOG.md#0.2.4)
+
+# 20231211.130935
+
+## [holochain\_cli-0.2.4-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain-0.2.4-rc.0](crates/holochain/CHANGELOG.md#0.2.4-rc.0)
+
+- Fix an issue where app validation for StoreRecord ops with a Delete or DeleteLink action were always passed to all zomes. These ops are now only passed to the zome which defined the entry type of the op that is being deleted. [\#3107](https://github.com/holochain/holochain/pull/3107)
+
+- Refactor: Remove shadowing glob re-exports that were shadowing other exports.
+
+- Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
+
+- Major refactor of the sys validation workflow to improve reliability and performance:
+  
+  - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
+  - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
+  - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
+  - Performance: In-memory caching for sys validation dependencies. When we have to wait to validate an op because it has a missing dependency, any other actions required by that op will be held in memory rather than being refetched from the database. This has a fairly small memory footprint because actions are relatively small but saves repeatedly hitting the cascade for the same data if it takes a bit of time to find a dependency on the network.
+
+- Added a new check to system validation to ensure that the `original_entry_address` of an update points to the same entry hash that the original action pointed to. [3023](https://github.com/holochain/holochain/pull/3023)
+
+- Fix: App validation would not be retriggered for ops that failed validation. The app validation workflow had only been retriggered when the number of concurrent ops to be validated (50) was reached. Now the workflow will be re-triggered after a 10 second delay whenever any ops could not be validated.
+
+## [holochain\_cli\_bundle-0.2.4-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_cli\_run\_local\_services-0.2.4-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.4-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_cascade-0.2.4-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_conductor\_api-0.2.4-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_metrics-0.2.4-rc.0](crates/holochain_metrics/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.4-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.4-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.4-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.4-rc.0)
+
+## [hdk-0.2.4-rc.0](crates/hdk/CHANGELOG.md#0.2.4-rc.0)
+
+- Remove access to `Timestamp::now()` which comes from `kitsune_p2p_timestamp` and was not supposed to be available in WASM. It would always panic in WASM calls so it should be safe to assume that nobody was actually using this in real apps. If you were trying to and this breaks your hApp then please consider using `sys_time` from the HDK instead which is safe to use for getting the current time.
+
+## [holochain\_state-0.2.4-rc.0](crates/holochain_state/CHANGELOG.md#0.2.4-rc.0)
+
+- Fix: Maximum one unrestricted cap grant was looked up from the source chain to authorize a remote call. Now all unrestricted cap grants are checked for validity.
+
+## [hdi-0.3.4-rc.0](crates/hdi/CHANGELOG.md#0.3.4-rc.0)
+
+## [holochain\_p2p-0.2.4-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.4-rc.0)
+
+## [hdk\_derive-0.2.4-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.4-rc.0)
+
+- Added a macro `#![dna_properties]` which when applied to a struct, exposes a function `try_from_dna_properties()` on that struct
+
+## [holochain\_types-0.2.4-rc.0](crates/holochain_types/CHANGELOG.md#0.2.4-rc.0)
+
+- **BREAKING CHANGE**: A `DnaManifest` and all its sub-fields will now reject unknown fields when deserialized. This will make it harder to provide an invalid DNA manifest to Holochain without realising. For example, coordinator zomes not appearing in your installed hApp because their field was indented to the wrong place. This is not a breaking change for valid manifests but Holochain will now reject more invalid manifests.
+
+## [holochain\_keystore-0.2.4-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_sqlite-0.2.4-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.4-rc.0)
+
+## [holochain\_zome\_types-0.2.4-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p-0.2.4-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.4-rc.0)
+
+- Fixed spammy “Recorded initiate|accept with current round already set” warning. [\#3060](https://github.com/holochain/holochain/pull/3060)
+
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity. [\#2974](https://github.com/holochain/holochain/pull/2974)
+
+## [holochain\_integrity\_types-0.2.4-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.4-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_proxy-0.2.4-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.4-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_types-0.2.4-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_block-0.2.4-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.4-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.4-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.4-rc.0)
+
+# 20231122.134012
+
+## [holochain\_cli-0.2.3](crates/holochain_cli/CHANGELOG.md#0.2.3)
+
+## [holochain\_cli\_sandbox-0.2.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.3)
+
+## [holochain\_cli\_run\_local\_services-0.2.3](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.3)
+
+## [holochain\_cli\_bundle-0.2.3](crates/holochain_cli_bundle/CHANGELOG.md#0.2.3)
+
+## [holochain-0.2.3](crates/holochain/CHANGELOG.md#0.2.3)
+
+## [holochain\_websocket-0.2.3](crates/holochain_websocket/CHANGELOG.md#0.2.3)
+
+## [holochain\_test\_wasm\_common-0.2.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.3)
+
+## [holochain\_conductor\_api-0.2.3](crates/holochain_conductor_api/CHANGELOG.md#0.2.3)
+
+## [holochain\_wasm\_test\_utils-0.2.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.3)
+
+## [holochain\_cascade-0.2.3](crates/holochain_cascade/CHANGELOG.md#0.2.3)
+
+## [holochain\_state-0.2.3](crates/holochain_state/CHANGELOG.md#0.2.3)
+
+## [holochain\_p2p-0.2.3](crates/holochain_p2p/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_bootstrap-0.1.3](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.3)
+
+## [holochain\_types-0.2.3](crates/holochain_types/CHANGELOG.md#0.2.3)
+
+## [holochain\_sqlite-0.2.3](crates/holochain_sqlite/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p-0.2.3](crates/kitsune_p2p/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_proxy-0.2.3](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_transport\_quic-0.2.3](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_mdns-0.2.3](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_fetch-0.2.3](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.3)
+
+## [holochain\_keystore-0.2.3](crates/holochain_keystore/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_types-0.2.3](crates/kitsune_p2p_types/CHANGELOG.md#0.2.3)
+
+## [mr\_bundle-0.2.3](crates/mr_bundle/CHANGELOG.md#0.2.3)
+
+## [hdk-0.2.3](crates/hdk/CHANGELOG.md#0.2.3)
+
+## [holochain\_zome\_types-0.2.3](crates/holochain_zome_types/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_block-0.2.3](crates/kitsune_p2p_block/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_bin\_data-0.2.3](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.3)
+
+## [hdi-0.3.3](crates/hdi/CHANGELOG.md#0.3.3)
+
+## [hdk\_derive-0.2.3](crates/hdk_derive/CHANGELOG.md#0.2.3)
+
+## [holochain\_integrity\_types-0.2.3](crates/holochain_integrity_types/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_dht-0.2.3](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_timestamp-0.2.3](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.3)
+
+## [holo\_hash-0.2.3](crates/holo_hash/CHANGELOG.md#0.2.3)
+
+## [kitsune\_p2p\_dht\_arc-0.2.3](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.3)
+
+## [holochain\_trace-0.2.3](crates/holochain_trace/CHANGELOG.md#0.2.3)
+
+## [holochain\_util-0.2.3](crates/holochain_util/CHANGELOG.md#0.2.3)
+
+## [fixt-0.2.3](crates/fixt/CHANGELOG.md#0.2.3)
+
+# 20231115.183324
+
+## [holochain\_cli-0.2.3-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_cli\_sandbox-0.2.3-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_cli\_run\_local\_services-0.2.3-rc.1](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_cli\_bundle-0.2.3-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain-0.2.3-rc.1](crates/holochain/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_websocket-0.2.3-rc.1](crates/holochain_websocket/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_test\_wasm\_common-0.2.3-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_conductor\_api-0.2.3-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.2.3-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_cascade-0.2.3-rc.1](crates/holochain_cascade/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_state-0.2.3-rc.1](crates/holochain_state/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_p2p-0.2.3-rc.1](crates/holochain_p2p/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_bootstrap-0.1.3-rc.1](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.3-rc.1)
+
+## [holochain\_types-0.2.3-rc.1](crates/holochain_types/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_sqlite-0.2.3-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p-0.2.3-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_proxy-0.2.3-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.2.3-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_fetch-0.2.3-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_keystore-0.2.3-rc.1](crates/holochain_keystore/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_types-0.2.3-rc.1](crates/kitsune_p2p_types/CHANGELOG.md#0.2.3-rc.1)
+
+## [hdk-0.2.3-rc.1](crates/hdk/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_zome\_types-0.2.3-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_block-0.2.3-rc.1](crates/kitsune_p2p_block/CHANGELOG.md#0.2.3-rc.1)
+
+## [hdi-0.3.3-rc.1](crates/hdi/CHANGELOG.md#0.3.3-rc.1)
+
+## [hdk\_derive-0.2.3-rc.1](crates/hdk_derive/CHANGELOG.md#0.2.3-rc.1)
+
+## [holochain\_integrity\_types-0.2.3-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_dht-0.2.3-rc.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.3-rc.1)
+
+## [kitsune\_p2p\_timestamp-0.2.3-rc.1](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.3-rc.1)
+
+## [holo\_hash-0.2.3-rc.1](crates/holo_hash/CHANGELOG.md#0.2.3-rc.1)
+
+## [fixt-0.2.3-rc.1](crates/fixt/CHANGELOG.md#0.2.3-rc.1)
+
+# 20231108.185648
+
+Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
+
+## [holochain\_cli-0.2.3-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.3-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_cli\_run\_local\_services-0.2.3-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_cli\_bundle-0.2.3-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain-0.2.3-rc.0](crates/holochain/CHANGELOG.md#0.2.3-rc.0)
+
+- Fix an issue where enough validation receipts being received would not prevent the publish workflow from continuing to run. This was a terrible waste of data and compute and would build up over time as Holochain is used. [2931](https://github.com/holochain/holochain/pull/2931)
+- Improve log output for op publishing to accurately reflect the number of ops to be published. The number published which is logged later is accurate and it was confusing to see more ops published than were supposed to be. [2922](https://github.com/holochain/holochain/pull/2922)
+- Fix an issue which prevented the publish loop for a cell from suspending if there was either 1. publish activity pending for other cells or 2. enough validation receipts received. [2922](https://github.com/holochain/holochain/pull/2922)
+- Fix an issue where receiving incoming ops can accidentally filter out some DHT data until Holochain is restarted. The state management for in-flight DHT ops is now guaranteed by a `Drop` implementation which will clean up state when the `incoming_dht_ops_workflow` finishes. [2913](https://github.com/holochain/holochain/pull/2913)
+- Performance improvement when sending validation receipts. When a batch of DHT ops is being processed and an author is unreachable it will no longer spend time trying to send more receipts to that author in serial and instead it sends receipts as a single batch per author. [2848](https://github.com/holochain/holochain/pull/2848)
+- Resilience improvement with handling keystore errors in the validation receipt workflow. Previously, all errors caused the workflow to restart from the beginning. This was good for transient errors such as the keystore being unavailable but it also meant that a single validation receipt failing to be signed (e.g. due to a local agent key being removed from the keystore) would prevent any more validation receipts being sent by that conductor. [2848](https://github.com/holochain/holochain/pull/2848)
+- **BREAKING CHANGE** Addressed an outstanding technical debt item to make the validation receipt workflow send a network notification (fire and forget) rather than waiting for a response. When the validation receipt workflow was written this functionality wasn’t available but now that it is, sending validation receipts can be sped up by not waiting for a peer to respond. The format has also been changed from sending one receipt at a time to sending batches so it was not possible to maintain backwards compatibility here. [2848](https://github.com/holochain/holochain/pull/2848)
+
+## [holochain\_websocket-0.2.3-rc.0](crates/holochain_websocket/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.3-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_conductor\_api-0.2.3-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.3-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_cascade-0.2.3-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_state-0.2.3-rc.0](crates/holochain_state/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_p2p-0.2.3-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.3-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.3-rc.0)
+
+## [holochain\_types-0.2.3-rc.0](crates/holochain_types/CHANGELOG.md#0.2.3-rc.0)
+
+- In the CloneOnly provisioning strategy, `installed_hash` is no longer required (it’s now optional). [\#2600](https://github.com/holochain/holochain/pull/2600)
+
+## [holochain\_sqlite-0.2.3-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p-0.2.3-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.3-rc.0)
+
+- Add additional configuration options to network\_tuning for setting the allowed ephemeral port range for tx5 connections: tx5\_min\_ephemeral\_udp\_port and tx5\_max\_ephemeral\_udp\_port
+- Adjust bootstrap max\_delay from 60 minutes -\> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
+
+## [kitsune\_p2p\_proxy-0.2.3-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.3-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_mdns-0.2.3-rc.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.3-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_keystore-0.2.3-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_types-0.2.3-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.3-rc.0)
+
+## [mr\_bundle-0.2.3-rc.0](crates/mr_bundle/CHANGELOG.md#0.2.3-rc.0)
+
+## [hdk-0.2.3-rc.0](crates/hdk/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_zome\_types-0.2.3-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_block-0.2.3-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_bin\_data-0.2.3-rc.0](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.3-rc.0)
+
+## [hdi-0.3.3-rc.0](crates/hdi/CHANGELOG.md#0.3.3-rc.0)
+
+## [hdk\_derive-0.2.3-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_integrity\_types-0.2.3-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.3-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.3-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.3-rc.0)
+
+## [holo\_hash-0.2.3-rc.0](crates/holo_hash/CHANGELOG.md#0.2.3-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.2.3-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_trace-0.2.3-rc.0](crates/holochain_trace/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_util-0.2.3-rc.0](crates/holochain_util/CHANGELOG.md#0.2.3-rc.0)
+
+## [fixt-0.2.3-rc.0](crates/fixt/CHANGELOG.md#0.2.3-rc.0)
+
+# 20230930.114759
+
+## [holochain\_cli-0.2.3-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.3-beta-rc.1)
+
+## [holochain\_cli\_sandbox-0.2.3-beta-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.3-beta-rc.1)
+
+## [holochain-0.2.3-beta-rc.1](crates/holochain/CHANGELOG.md#0.2.3-beta-rc.1)
+
+- Fix: App interfaces are persisted when shutting down conductor. After restart, app interfaces without connected receiver websocket had signal emission fail altogether. Send errors are only logged now instead.
+
+## [holochain\_conductor\_api-0.2.3-beta-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.2.3-beta-rc.1)
+
+# 20230926.121405
+
+## [holochain\_cli-0.2.3-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.3-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.3-beta-rc.0)
+
+- `hc sandbox generate` and `hc sandbox run` now exit when the conductor(s) failed to spawn. previously it would wait for the user to cancel manually. [\#2747](https://github.com/holochain/holochain/pull/2747)
+
+## [holochain\_cli\_run\_local\_services-0.2.3-beta-rc.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_cli\_bundle-0.2.3-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain-0.2.3-beta-rc.0](crates/holochain/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.3-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_conductor\_api-0.2.3-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.3-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_cascade-0.2.3-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_state-0.2.3-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_p2p-0.2.3-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.3-beta-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [holochain\_types-0.2.3-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_sqlite-0.2.3-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p-0.2.3-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.3-beta-rc.0)
+
+- Resolves several cases where the meta net task would not stop on fatal errors and would not correctly handle other errors [\#2762](https://github.com/holochain/holochain/pull/2762)
+- Resolves an issue where a `FetchOp` could skip processing op hashes if getting a topology for the space from the host failed [\#2737](https://github.com/holochain/holochain/pull/2737)
+- Adds a warning log if incoming op data pushes are dropped due to a hashing failure on the host [\#2737](https://github.com/holochain/holochain/pull/2737)
+- Fixes an issue where sending an unexpected request payload would cause the process to crash [\#2737](https://github.com/holochain/holochain/pull/2737)
+
+## [kitsune\_p2p\_proxy-0.2.3-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.3-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.3-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_keystore-0.2.3-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_types-0.2.3-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [hdk-0.2.3-beta-rc.0](crates/hdk/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_zome\_types-0.2.3-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_block-0.2.3-beta-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_bin\_data-0.2.3-beta-rc.0](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [hdi-0.3.3-beta-rc.0](crates/hdi/CHANGELOG.md#0.3.3-beta-rc.0)
+
+## [hdk\_derive-0.2.3-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holochain\_integrity\_types-0.2.3-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.3-beta-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.3-beta-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [holo\_hash-0.2.3-beta-rc.0](crates/holo_hash/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.2.3-beta-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.3-beta-rc.0)
+
+# 20230913.190722
+
+## [holochain\_cli-0.2.2](crates/holochain_cli/CHANGELOG.md#0.2.2)
+
+## [holochain\_cli\_sandbox-0.2.2](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.2)
+
+## [holochain\_cli\_run\_local\_services-0.2.2](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.2)
+
+## [holochain\_cli\_bundle-0.2.2](crates/holochain_cli_bundle/CHANGELOG.md#0.2.2)
+
+## [holochain-0.2.2](crates/holochain/CHANGELOG.md#0.2.2)
+
+## [holochain\_websocket-0.2.2](crates/holochain_websocket/CHANGELOG.md#0.2.2)
+
+## [holochain\_test\_wasm\_common-0.2.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.2)
+
+## [holochain\_conductor\_api-0.2.2](crates/holochain_conductor_api/CHANGELOG.md#0.2.2)
+
+## [holochain\_wasm\_test\_utils-0.2.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.2)
+
+## [holochain\_cascade-0.2.2](crates/holochain_cascade/CHANGELOG.md#0.2.2)
+
+## [holochain\_state-0.2.2](crates/holochain_state/CHANGELOG.md#0.2.2)
+
+## [holochain\_p2p-0.2.2](crates/holochain_p2p/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_bootstrap-0.1.2](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.2)
+
+## [holochain\_types-0.2.2](crates/holochain_types/CHANGELOG.md#0.2.2)
+
+## [holochain\_sqlite-0.2.2](crates/holochain_sqlite/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p-0.2.2](crates/kitsune_p2p/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_proxy-0.2.2](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_transport\_quic-0.2.2](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_mdns-0.2.2](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_fetch-0.2.2](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.2)
+
+## [holochain\_keystore-0.2.2](crates/holochain_keystore/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_types-0.2.2](crates/kitsune_p2p_types/CHANGELOG.md#0.2.2)
+
+## [mr\_bundle-0.2.2](crates/mr_bundle/CHANGELOG.md#0.2.2)
+
+## [hdk-0.2.2](crates/hdk/CHANGELOG.md#0.2.2)
+
+## [holochain\_zome\_types-0.2.2](crates/holochain_zome_types/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_block-0.2.2](crates/kitsune_p2p_block/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_bin\_data-0.2.2](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.2)
+
+## [hdi-0.3.2](crates/hdi/CHANGELOG.md#0.3.2)
+
+## [hdk\_derive-0.2.2](crates/hdk_derive/CHANGELOG.md#0.2.2)
+
+## [holochain\_integrity\_types-0.2.2](crates/holochain_integrity_types/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_dht-0.2.2](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_timestamp-0.2.2](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.2)
+
+## [holo\_hash-0.2.2](crates/holo_hash/CHANGELOG.md#0.2.2)
+
+## [kitsune\_p2p\_dht\_arc-0.2.2](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.2)
+
+## [holochain\_trace-0.2.2](crates/holochain_trace/CHANGELOG.md#0.2.2)
+
+## [holochain\_util-0.2.2](crates/holochain_util/CHANGELOG.md#0.2.2)
+
+## [fixt-0.2.2](crates/fixt/CHANGELOG.md#0.2.2)
+
 # 20230911.135238
 
 ## [holochain\_cli-0.2.2-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.2.2-beta-rc.2)
