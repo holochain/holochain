@@ -258,19 +258,13 @@ async fn sys_validation_workflow_inner(
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
         let (op, op_hash) = hashed_op.into_inner();
-        let op_type = op.get_type();
-        let action = op.action();
-
-        // This is an optimization to skip app validation and integration for ops that are
-        // rejected and don't have dependencies.
-        let dependency = op_type.sys_validation_dependency(&action);
 
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
         let r = validate_op(&op, &dna_def, current_validation_dependencies.clone()).await;
 
         match r {
-            Ok(outcome) => validation_outcomes.push((op_hash, outcome, dependency)),
+            Ok(outcome) => validation_outcomes.push((op_hash, outcome)),
             Err(e) => {
                 tracing::error!(error = ?e, "Error validating op");
             }
@@ -281,7 +275,7 @@ async fn sys_validation_workflow_inner(
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
-            for (op_hash, outcome, dependency) in validation_outcomes {
+            for (op_hash, outcome) in validation_outcomes {
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
@@ -298,11 +292,8 @@ async fn sys_validation_workflow_inner(
                     }
                     Outcome::Rejected(_) => {
                         summary.rejected += 1;
-                        if dependency.is_none() {
-                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                        } else {
-                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
-                        }
+                        // If the op is invalid, we can fully integrate it as such
+                        put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                     }
                 }
             }
