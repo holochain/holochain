@@ -111,7 +111,7 @@ impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
 
 /// The actual inner state of the FetchPool, from which items can be obtained
 #[derive(Debug, Default)]
-pub(crate) struct State {
+pub struct State {
     /// Items to be fetched, ordered by least recently considered for fetching.
     queue: MapQueue<FetchKey, FetchPoolItem>,
 
@@ -436,7 +436,6 @@ pub struct PendingItemResponse {
 mod tests {
     use crate::backoff::BACKOFF_RETRY_COUNT;
     use crate::test_utils::*;
-    use crate::TransferMethod;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use pretty_assertions::assert_eq;

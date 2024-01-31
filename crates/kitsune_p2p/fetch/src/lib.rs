@@ -4,8 +4,9 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{KOpHash, KSpace};
+use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
 
+mod error;
 mod backoff;
 mod pool;
 mod queue;

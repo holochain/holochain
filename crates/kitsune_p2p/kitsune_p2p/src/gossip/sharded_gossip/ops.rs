@@ -301,6 +301,7 @@ impl ShardedGossipLocal {
             let (hash, size) = op_hash.into_inner();
             let request = FetchPoolPush {
                 key: FetchKey::Op(hash),
+                author: None,
                 context: None,
                 space: self.space.clone(),
                 source: source.clone(),
