@@ -36,7 +36,7 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
             if let Some(ai) = config.admin_interfaces {
                 if let Some(AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port },
-                }) = ai.get(0)
+                }) = ai.first()
                 {
                     ports.push(*port)
                 }

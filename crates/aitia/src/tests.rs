@@ -323,7 +323,7 @@ mod recipes {
         }
 
         fn check(&self, ctx: &Self::Context) -> bool {
-            ctx.contains(&self)
+            ctx.contains(self)
         }
     }
 

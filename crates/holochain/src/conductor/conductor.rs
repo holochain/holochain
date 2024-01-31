@@ -104,7 +104,7 @@ use holochain_state::source_chain;
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use rusqlite::Transaction;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -122,26 +122,9 @@ pub use holochain_types::share;
 
 mod builder;
 
-pub use builder::*;
-
 mod chc;
 
-pub use chc::*;
-
 pub use holochain_conductor_services::*;
-
-pub use accessor_impls::*;
-pub use app_impls::*;
-pub use app_status_impls::*;
-pub use cell_impls::*;
-pub use clone_cell_impls::*;
-pub use dna_impls::*;
-pub use interface_impls::*;
-pub use misc_impls::*;
-pub use network_impls::*;
-pub use scheduler_impls::*;
-pub use startup_shutdown_impls::*;
-pub use state_impls::*;
 
 mod graft_records_onto_source_chain;
 
@@ -529,8 +512,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-    use std::borrow::BorrowMut;
-
     use super::*;
 
     impl Conductor {
@@ -1318,7 +1299,7 @@ mod network_impls {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
             let (nonce, expires_at) =
-                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
+                holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),

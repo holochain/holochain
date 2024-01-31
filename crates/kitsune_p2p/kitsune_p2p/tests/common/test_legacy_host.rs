@@ -183,7 +183,7 @@ impl TestLegacyHost {
                                 .iter()
                                 .filter_map(|agent: &AgentInfoSigned| {
                                     if agent.space == space && now < agent.expires_at_ms {
-                                        Some(agent.storage_arc.clone())
+                                        Some(agent.storage_arc)
                                     } else {
                                         None
                                     }
@@ -266,7 +266,7 @@ impl TestLegacyHost {
                                 .cloned()
                                 .collect();
 
-                            if selected_ops.len() > 0 {
+                            if !selected_ops.is_empty() {
                                 let low_time = selected_ops.first().unwrap().authored_at();
                                 let high_time = selected_ops.last().unwrap().authored_at();
 
@@ -309,7 +309,7 @@ impl TestLegacyHost {
                         }
                         KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                             let mut key = [0; 32];
-                            key.copy_from_slice(&input.agent.0.as_slice());
+                            key.copy_from_slice(input.agent.0.as_slice());
                             let sig = keystore
                                 .sign_by_pub_key(
                                     key.into(),
@@ -414,7 +414,7 @@ async fn record_event(
         KitsuneP2pEvent::QueryPeerDensity { space, dht_arc, .. } => {
             events.push(RecordedKitsuneP2pEvent::QueryPeerDensity {
                 space: space.clone(),
-                dht_arc: dht_arc.clone(),
+                dht_arc: *dht_arc,
             });
         }
         KitsuneP2pEvent::Call {
@@ -450,7 +450,7 @@ async fn record_event(
             events.push(RecordedKitsuneP2pEvent::ReceiveOps {
                 space: space.clone(),
                 ops: ops.clone(),
-                context: context.clone(),
+                context: *context,
             });
         }
         KitsuneP2pEvent::QueryOpHashes { input, .. } => {

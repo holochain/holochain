@@ -401,7 +401,7 @@ impl KitsuneP2pConfig {
         {
             #[cfg(feature = "tx5")]
             {
-                if let Some(t) = self.transport_pool.get(0) {
+                if let Some(t) = self.transport_pool.first() {
                     !matches!(t, TransportConfig::WebRTC { .. })
                 } else {
                     true
@@ -423,7 +423,7 @@ impl KitsuneP2pConfig {
     pub fn is_tx5(&self) -> bool {
         #[cfg(feature = "tx5")]
         {
-            if let Some(t) = self.transport_pool.get(0) {
+            if let Some(t) = self.transport_pool.first() {
                 return matches!(t, TransportConfig::WebRTC { .. });
             }
         }
@@ -436,7 +436,7 @@ impl KitsuneP2pConfig {
     #[cfg(feature = "tx2")]
     pub fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         use KitsuneP2pTx2ProxyConfig::*;
-        match self.transport_pool.get(0) {
+        match self.transport_pool.first() {
             Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mock {
                     mock_network: mock_network.0.clone(),

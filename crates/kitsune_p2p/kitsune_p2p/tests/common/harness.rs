@@ -149,5 +149,5 @@ pub async fn start_signal_srv() -> (SocketAddr, AbortHandle) {
 
     let abort_handle = tokio::spawn(sig_driver).abort_handle();
 
-    (addr_list.first().unwrap().clone(), abort_handle)
+    (*addr_list.first().unwrap(), abort_handle)
 }

@@ -2,16 +2,16 @@ mod common;
 
 use common::*;
 use fixt::prelude::*;
-use ghost_actor::GhostSender;
+
 use kitsune_p2p::actor::BroadcastData;
-use kitsune_p2p::actor::KitsuneP2p;
+
 use kitsune_p2p::actor::KitsuneP2pSender;
-use kitsune_p2p::fixt::KitsuneAgentFixturator;
+
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p::KitsuneBinType;
-use kitsune_p2p_bin_data::KitsuneAgent;
+
 use kitsune_p2p_bin_data::KitsuneBasis;
-use kitsune_p2p_bin_data::KitsuneSpace;
+
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
@@ -70,7 +70,7 @@ async fn minimise_p2p_agent_store_host_calls() {
 
     // Create and join multiple spaces
     let mut all_spaces = vec![];
-    for i in 0..num_spaces {
+    for _i in 0..num_spaces {
         let space = Arc::new(fixt!(KitsuneSpace));
         all_spaces.push(space.clone());
 
@@ -97,7 +97,7 @@ async fn minimise_p2p_agent_store_host_calls() {
             0 => (), // Skip, don't create data in every space
             1 => {
                 let use_space = &all_spaces[i % 10];
-                let test_data = TestHostOp::new(use_space.clone().into());
+                let test_data = TestHostOp::new(use_space.clone());
                 harness_a.op_store().write().push(test_data.clone());
 
                 sender_a
@@ -116,7 +116,7 @@ async fn minimise_p2p_agent_store_host_calls() {
             }
             2 => {
                 let use_space = &all_spaces[i % 10];
-                let test_data = TestHostOp::new(use_space.clone().into());
+                let test_data = TestHostOp::new(use_space.clone());
                 harness_b.op_store().write().push(test_data.clone());
 
                 sender_b

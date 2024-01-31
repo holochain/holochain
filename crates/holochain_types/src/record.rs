@@ -164,7 +164,7 @@ impl<'a> RecordGroup<'a> {
         self.actions
             .clone()
             .into_iter()
-            .chain(self.rejected.clone().into_iter())
+            .chain(self.rejected.clone())
             .map(|shh| shh.into_owned())
     }
 
