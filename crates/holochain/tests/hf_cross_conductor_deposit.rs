@@ -66,8 +66,8 @@ async fn hf_cross_conductor_deposit() {
 
     let joining_code_factory_role_name = "jcf".to_string();
     let joining_code_factory_dna_path =
-        Path::new("/Users/jost/Desktop/holochain/holofuel/dnas/joining-code-factory.dna");
-    let holofuel_dna_path = Path::new("/Users/jost/Desktop/holochain/holofuel/holofuel.dna");
+        Path::new("/home/thetasinner/source/holo/joining-code-happ/joining-code-factory.dna");
+    let holofuel_dna_path = Path::new("/home/thetasinner/source/holo/holofuel/holofuel.dna");
 
     // create membrane proof generator
     println!("creating membrane proof generator");
