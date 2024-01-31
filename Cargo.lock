@@ -3357,6 +3357,7 @@ dependencies = [
  "matches",
  "mockall",
  "nanoid 0.3.0",
+ "once_cell",
  "one_err",
  "parking_lot 0.10.2",
  "pretty_assertions",

@@ -24,6 +24,7 @@ use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainJsonRecord;
 use holochain_types::sql::AsSql;
+use once_cell::sync::Lazy;
 
 use crate::prelude::*;
 use crate::source_chain;
@@ -42,7 +43,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     dht_db_cache: DhtDbQueryCache,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
-    head_info: Option<HeadInfo>,
+    head_info: Arc<Lazy<SourceChainResult<Option<HeadInfo>>>>,
     public_only: bool,
     zomes_initialized: Arc<AtomicBool>,
 }
@@ -294,7 +295,7 @@ impl SourceChain {
 
         // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
-        let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
+        let persisted_head = (**self.head_info)?.as_ref().map(|h| h.action.clone());
         match self
             .vault
             .write_async(move |txn: &mut Transaction| {
@@ -304,20 +305,20 @@ impl SourceChain {
                 }
 
                 // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
-                let latest_head = head_info.as_ref().map(|h| h.action.clone());
+                let latest_head = chain_head_db(txn, author.clone())?;
+                let latest_head_action = latest_head.as_ref().map(|h| h.action.clone());
 
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
 
-                if persisted_head != latest_head {
+                if persisted_head != latest_head_action {
                     return Err(SourceChainError::HeadMoved(
                         actions,
                         entries,
                         persisted_head,
-                        head_info,
+                        latest_head,
                     ));
                 }
 
@@ -424,14 +425,14 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = Some(
+        let head_info = Arc::new(Lazy::new(|| {
             vault
                 .read_async({
                     let author = author.clone();
-                    move |txn| chain_head_db_nonempty(&txn, author)
+                    move |txn| chain_head_db(&txn, author)
                 })
-                .await?,
-        );
+                .await
+        }));
         Ok(Self {
             scratch,
             vault,

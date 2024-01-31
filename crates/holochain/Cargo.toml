@@ -55,7 +55,7 @@ nanoid = "0.3"
 num_cpus = "1.8"
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 holochain_metrics = { version = "^0.3.0-beta-dev.7", path = "../holochain_metrics", default_features = false }
-once_cell = "1.4.1"
+once_cell = { workspace = true }
 async-once-cell = "0.5"
 one_err = "0.0.8"
 parking_lot = "0.10"
