@@ -38,7 +38,7 @@ trybuild = "1.0"
 
 [features]
 default = []
-mock = ["hdk_derive/mock", "mockall"]
+mock = ["hdk_derive/mock", "mockall", "hdi/mock"]
 encoding = ["holo_hash/encoding"]
 fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
 test_utils = [

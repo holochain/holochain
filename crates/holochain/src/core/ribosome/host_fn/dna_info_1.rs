@@ -5,10 +5,13 @@ use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::info::DnaInfoV1;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
+#[cfg(not(feature = "mock"))]
+use holochain_zome_types::info::DnaInfoV1;
+
+#[cfg(not(feature = "mock"))]
 pub fn dna_info_1(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -78,6 +81,7 @@ pub mod test {
         (conductor, alice)
     }
 
+    #[cfg(not(feature = "mock"))]
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_info_test_1() {
         holochain_trace::test_run().ok();

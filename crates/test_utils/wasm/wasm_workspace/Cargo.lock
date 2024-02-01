@@ -963,6 +963,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_wasmer_guest",
+ "mockall",
  "paste",
  "serde",
  "serde_bytes",
