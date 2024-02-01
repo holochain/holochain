@@ -762,7 +762,7 @@ fn valid_chain_test() {
 
         // Test without dna at root gets rejected.
         let mut dna_not_at_root = actions.clone();
-        dna_not_at_root.push(actions[0]);
+        dna_not_at_root.push(actions[0].clone());
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(
             err,
