@@ -11,7 +11,6 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
 
-
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {
     channel_hash: EntryHash,

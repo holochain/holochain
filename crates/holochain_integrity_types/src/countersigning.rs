@@ -492,7 +492,8 @@ impl CounterSigningSessionData {
         responses: Vec<PreflightResponse>,
         optional_responses: Vec<PreflightResponse>,
     ) -> Result<Self, CounterSigningError> {
-        let preflight_request = responses.first()
+        let preflight_request = responses
+            .first()
             .ok_or(CounterSigningError::MissingResponse)?
             .to_owned()
             .request;

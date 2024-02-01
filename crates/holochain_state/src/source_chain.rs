@@ -1569,9 +1569,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .write_async(move |txn: &mut Transaction| {
-                chain_head_db_nonempty(txn, author_2.clone())
-            })
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2.clone()))
             .await?;
 
         // not equal since action hash change due to rebasing

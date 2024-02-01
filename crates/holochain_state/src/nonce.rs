@@ -89,18 +89,16 @@ pub mod test {
         let (nonce_0, expires_0) = super::fresh_nonce(now_0).unwrap();
 
         // First witnessing should be fresh.
-        let witness_0 =
-            super::witness_nonce(&db, agent_0.clone(), nonce_0, now_0, expires_0)
-                .await
-                .unwrap();
+        let witness_0 = super::witness_nonce(&db, agent_0.clone(), nonce_0, now_0, expires_0)
+            .await
+            .unwrap();
 
         assert_eq!(witness_0, WitnessNonceResult::Fresh);
 
         // Second witnessing stale.
-        let witness_1 =
-            super::witness_nonce(&db, agent_0.clone(), nonce_0, now_0, expires_0)
-                .await
-                .unwrap();
+        let witness_1 = super::witness_nonce(&db, agent_0.clone(), nonce_0, now_0, expires_0)
+            .await
+            .unwrap();
 
         assert_eq!(witness_1, WitnessNonceResult::Duplicate);
 
