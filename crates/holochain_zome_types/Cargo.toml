@@ -18,7 +18,7 @@ kitsune_p2p_block = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/blo
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.15", path = "../kitsune_p2p/bin_data" }
 holo_hash = { version = "^0.3.0-beta-dev.21", path = "../holo_hash", features = ["encoding"] }
 holochain_integrity_types = { version = "^0.3.0-beta-dev.25", path = "../holochain_integrity_types", features = ["tracing"] }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = { workspace = true }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
 holochain_nonce = {version = "^0.3.0-beta-dev.23", path = "../holochain_nonce"}
 paste = "1.0.12"
@@ -27,7 +27,7 @@ serde_bytes = "0.11"
 serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
-tracing = "0.1"
+tracing = { workspace = true }
 holochain_wasmer_common = { workspace = true }
 
 # fixturator dependencies
