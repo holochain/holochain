@@ -8,10 +8,8 @@ use crate::cell::{CellId, CloneId};
 /// The arguments to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellInput {
-    /// The app id that the DNA to clone belongs to
-    pub app_id: String,
-    /// The DNA's role name to clone
-    pub role_name: crate::call::RoleName,
+    /// The id of the cell to clone.
+    pub cell_id: CellId,
     /// Modifiers to set for the new cell.
     /// At least one of the modifiers must be set to obtain a distinct hash for
     /// the clone cell's DNA.
@@ -53,8 +51,6 @@ pub enum CloneCellId {
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DisableCloneCellInput {
-    /// The app id that the clone cell belongs to
-    pub app_id: String,
     /// The clone id or cell id of the clone cell
     pub clone_cell_id: CloneCellId,
 }

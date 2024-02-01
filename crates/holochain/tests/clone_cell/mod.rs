@@ -21,8 +21,7 @@ async fn create_clone_cell() {
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
-        app_id: app.installed_app_id().clone(),
-        role_name: dna_file.dna_hash().to_string(),
+        cell_id: cell.cell_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
         membrane_proof: None,
         name: Some("Clone 1".to_string()),

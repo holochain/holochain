@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
-use holochain_types::access::{HostFnAccess, Permission};
+use crate::core::ribosome::{
+    check_clone_access::check_clone_access, error::RibosomeError, CallContext, RibosomeT,
+};
+use holochain_types::{
+    access::{HostFnAccess, Permission},
+    app::CreateCloneCellPayload,
+};
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::wasm_error;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::clone::{ClonedCell, CreateCloneCellInput};
 use wasmer::RuntimeError;
-use holochain_wasmer_host::prelude::*;
-use crate::core::ribosome::{check_clone_access::check_clone_access, error::RibosomeError, CallContext, RibosomeT};
 
 #[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
 pub fn create_clone_cell<'a>(
@@ -22,12 +27,21 @@ pub fn create_clone_cell<'a>(
             let host_context = call_context.host_context();
 
             let conductor_handle = host_context.call_zome_handle();
-            check_clone_access(&input.app_id, conductor_handle)?;
+            let (installed_app_id, role_name) =
+                check_clone_access(&input.cell_id, conductor_handle)?;
 
             tokio_helper::block_forever_on(async move {
-                conductor_handle.create_clone_cell(input)
+                conductor_handle
+                    .create_clone_cell(CreateCloneCellPayload {
+                        app_id: installed_app_id,
+                        role_name: role_name,
+                        modifiers: input.modifiers,
+                        membrane_proof: input.membrane_proof,
+                        name: input.name,
+                    })
                     .await
-            }).map_err(|conductor_error| -> RuntimeError {
+            })
+            .map_err(|conductor_error| -> RuntimeError {
                 wasm_error!(WasmErrorInner::Host(conductor_error.to_string())).into()
             })
         }

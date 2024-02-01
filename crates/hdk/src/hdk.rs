@@ -650,7 +650,7 @@ impl HdkT for HostHdk {
     }
 
     fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
-        host_call::<EnableCloneCellInput, ()>(__hc__enable_clone_cell_1, input)
+        host_call::<EnableCloneCellInput, ClonedCell>(__hc__enable_clone_cell_1, input)
     }
 
     fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()> {

@@ -83,17 +83,37 @@ pub struct UpdateCoordinatorsPayload {
     pub source: CoordinatorSource,
 }
 
-/// Alias for [holochain_zome_types::clone::CreateCloneCellInput], to create a clone cell.
-pub type CreateCloneCellPayload = holochain_zome_types::clone::CreateCloneCellInput;
+/// The arguments to create a clone of an existing cell.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CreateCloneCellPayload {
+    /// The app id that the DNA to clone belongs to
+    pub app_id: InstalledAppId,
+    /// The DNA's role name to clone
+    pub role_name: RoleName,
+    /// Modifiers to set for the new cell.
+    /// At least one of the modifiers must be set to obtain a distinct hash for
+    /// the clone cell's DNA.
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
+    /// Optionally set a proof of membership for the clone cell
+    pub membrane_proof: Option<MembraneProof>,
+    /// Optionally a name for the DNA clone
+    pub name: Option<String>,
+}
 
 /// Arguments to specify the clone cell to be disabled.
-pub type DisableCloneCellPayload = DisableCloneCellInput;
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DisableCloneCellPayload {
+    /// The app id that the clone cell belongs to
+    pub app_id: InstalledAppId,
+    /// The clone id or cell id of the clone cell
+    pub clone_cell_id: CloneCellId,
+}
 
 /// Arguments to specify the clone cell to be enabled.
-pub type EnableCloneCellPayload = DisableCloneCellInput;
+pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
 /// Arguments to delete a disabled clone cell of an app.
-pub type DeleteCloneCellPayload = DisableCloneCellInput;
+pub type DeleteCloneCellPayload = DisableCloneCellPayload;
 
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

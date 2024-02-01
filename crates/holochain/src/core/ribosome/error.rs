@@ -95,8 +95,8 @@ pub enum RibosomeError {
     HostFnPermissions(ZomeName, FunctionName, String),
 
     /// An attempt to was made to perform a clone operation on a cell that is not provisioned or belongs to another app.
-    #[error("Invalid request to modify a cell in app {0} with a zome call to cell {1}")]
-    InvalidCloneTarget(InstalledAppId, CellId),
+    #[error("Invalid request to modify a cell which belongs to another app")]
+    InvalidCloneTarget,
 
     #[error(transparent)]
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
