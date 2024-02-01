@@ -34,7 +34,7 @@ pub fn create_clone_cell<'a>(
                 conductor_handle
                     .create_clone_cell(CreateCloneCellPayload {
                         app_id: installed_app_id,
-                        role_name: role_name,
+                        role_name,
                         modifiers: input.modifiers,
                         membrane_proof: input.membrane_proof,
                         name: input.name,

@@ -198,7 +198,7 @@ impl ConductorState {
     pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
         self.installed_apps
             .values()
-            .find(|app| app.all_cells().find(|id| id == &cell_id).is_some())
+            .find(|app| app.all_cells().any(|id| id == cell_id))
     }
 }
 
