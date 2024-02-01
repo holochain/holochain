@@ -41,9 +41,9 @@ pub fn check_clone_access(
     if let Some(role_name) = matched_app_role {
         Ok((installed_app.id().clone(), role_name.clone()))
     } else {
-        return Err(wasm_error!(WasmErrorInner::Host(
+        Err(wasm_error!(WasmErrorInner::Host(
             "Invalid request to modify a cell which belongs to another app".to_string(),
         ))
-        .into());
+        .into())
     }
 }
