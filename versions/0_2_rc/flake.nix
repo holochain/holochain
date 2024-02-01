@@ -2,12 +2,12 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.2.5-rc.1";
+        url = "github:holochain/holochain/holochain-0.2.6-rc.0";
         flake = false;
       };
 
       lair = {
-        url = "github:holochain/lair/lair_keystore-v0.4.1";
+        url = "github:holochain/lair/lair_keystore-v0.4.2";
         flake = false;
       };
 
