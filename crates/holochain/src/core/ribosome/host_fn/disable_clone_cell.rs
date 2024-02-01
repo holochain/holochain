@@ -26,13 +26,15 @@ pub fn disable_clone_cell<'a>(
         } => {
             let host_context = call_context.host_context();
 
+            tracing::info!("Starting disable clone cell");
+
             let conductor_handle = host_context.call_zome_handle();
             let (installed_app_id, _) =
                 check_clone_access(conductor_handle.cell_id(), conductor_handle)?;
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle
-                    .delete_clone_cell(DisableCloneCellPayload {
+                    .disable_clone_cell(DisableCloneCellPayload {
                         app_id: installed_app_id,
                         clone_cell_id: input.clone_cell_id,
                     })

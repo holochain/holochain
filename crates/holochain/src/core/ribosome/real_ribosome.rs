@@ -3,6 +3,9 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
+use super::host_fn::delete_clone_cell::delete_clone_cell;
+use super::host_fn::disable_clone_cell::disable_clone_cell;
+use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -548,9 +551,9 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
-            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", create_clone_cell)
-            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", create_clone_cell)
-            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", create_clone_cell);
+            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
+            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell);
 
         imports.register_namespace("env", ns);
 
