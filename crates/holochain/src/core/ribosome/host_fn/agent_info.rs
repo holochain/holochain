@@ -26,14 +26,14 @@ pub fn agent_info<'a>(
                 .expect("Must have source chain if agent_info access is given")
                 .agent_pubkey()
                 .clone();
+
             let head = call_context
                 .host_context
                 .workspace()
-                .source_chain()
-                .as_ref()
-                .expect("Must have source chain if agent_info access is given")
-                .chain_head_nonempty()
-                .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
+                .chain_head_precomputed()
+                .expect("Must have precomputed chain head info if agent_info access is given")
+                .expect("Precomputed chain head must not be None");
+
             Ok(AgentInfo {
                 agent_initial_pubkey: agent_pubkey.clone(),
                 agent_latest_pubkey: agent_pubkey,

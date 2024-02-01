@@ -247,7 +247,14 @@ mod tests {
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
-        assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
+        assert_eq!(
+            get_chain(&cell, keystore.clone())
+                .await
+                .len()
+                .await
+                .unwrap(),
+            3
+        );
         assert_eq!(
             get_chain(&cell, keystore.clone())
                 .await
@@ -279,19 +286,26 @@ mod tests {
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
-        assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
+        assert_eq!(
+            get_chain(&cell, keystore.clone())
+                .await
+                .len()
+                .await
+                .unwrap(),
+            3
+        );
 
         // - Ensure that the chain does not advance due to init failing
         let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
-        assert_eq!(source_chain.await.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().await.unwrap(), 3);
 
         // - Ensure idempotence of the above
         let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
-        assert_eq!(source_chain.await.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().await.unwrap(), 3);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -325,18 +339,25 @@ mod tests {
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
-        assert_eq!(get_chain(&cell, keystore.clone()).await.len().unwrap(), 3);
+        assert_eq!(
+            get_chain(&cell, keystore.clone())
+                .await
+                .len()
+                .await
+                .unwrap(),
+            3
+        );
 
         // - Ensure that the chain does not advance due to init failing
         let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
-        assert_eq!(source_chain.await.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().await.unwrap(), 3);
 
         // - Ensure idempotence of the above
         let r: Result<ActionHash, _> = conductor.call_fallible(&zome, "create_entry", ()).await;
         assert!(r.is_err());
         let source_chain = get_chain(&cell, keystore.clone());
-        assert_eq!(source_chain.await.len().unwrap(), 3);
+        assert_eq!(source_chain.await.len().await.unwrap(), 3);
     }
 }

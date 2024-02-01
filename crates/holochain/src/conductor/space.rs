@@ -743,7 +743,7 @@ impl Space {
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<SourceChain> {
-        SourceChain::raw_empty(
+        SourceChain::new(
             self.authored_db.clone(),
             self.dht_db.clone(),
             self.dht_query_cache.clone(),

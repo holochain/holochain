@@ -164,6 +164,7 @@ pub mod wasm_test {
                     .as_ref()
                     .unwrap()
                     .chain_head()
+                    .await
                     .unwrap()
                     .unwrap()
                     .action,

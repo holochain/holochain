@@ -2,7 +2,6 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::CallInfo;
@@ -66,13 +65,9 @@ pub fn call_info(
                 as_at: call_context
                     .host_context
                     .workspace()
-                    .source_chain()
-                    .as_ref()
-                    .expect("Must have source chain if bindings access is given")
-                    .persisted_head_info()
-                    .ok_or(wasm_error!(WasmErrorInner::Host(
-                        SourceChainError::ChainEmpty.to_string()
-                    )))?
+                    .chain_head_precomputed()
+                    .expect("Must have precomputed chain head info for call_info")
+                    .expect("Precomputed chain head must not be None")
                     .into_tuple(),
                 provenance,
                 cap_grant,

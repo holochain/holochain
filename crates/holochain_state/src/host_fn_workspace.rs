@@ -21,6 +21,11 @@ pub struct HostFnWorkspace<
     /// This is needed so that we don't run init recursively inside
     /// init calls.
     init_is_root: bool,
+    /// Some zome calls need to know the chain head, and we can't do async
+    /// operations in zome calls, so this needs to be awkwardly tacked on here.
+    /// The outer Option is for whether the head was precomputed at all,
+    /// and the inner Option signifies whether the chain is empty or not.
+    precomputed_chain_head: Option<Option<HeadInfo>>,
 }
 
 #[derive(Clone, shrinkwraprs::Shrinkwrap)]
@@ -98,30 +103,6 @@ impl SourceChainWorkspace {
         Self::new_inner(authored, dht, cache, source_chain, dna_def, true)
     }
 
-    /// Create a source chain with a blank chain head.
-    /// You probably don't want this.
-    /// This type is only useful for when a source chain
-    /// really needs to be constructed before genesis runs.
-    pub async fn raw_empty(
-        authored: DbWrite<DbKindAuthored>,
-        dht: DbWrite<DbKindDht>,
-        dht_db_cache: DhtDbQueryCache,
-        cache: DbWrite<DbKindCache>,
-        keystore: MetaLairClient,
-        author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
-    ) -> SourceChainResult<Self> {
-        let source_chain = SourceChain::raw_empty(
-            authored.clone(),
-            dht.clone(),
-            dht_db_cache.clone(),
-            keystore,
-            author,
-        )
-        .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
-    }
-
     fn new_inner(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
@@ -138,9 +119,16 @@ impl SourceChainWorkspace {
                 dna_def,
                 cache,
                 init_is_root,
+                precomputed_chain_head: None,
             },
             source_chain,
         })
+    }
+
+    pub async fn precompute_chain_head(&mut self) -> SourceChainResult<()> {
+        self.inner.precomputed_chain_head =
+            Some(self.source_chain.chain_head().await?.map(Into::into));
+        Ok(())
     }
 
     /// Did this zome call chain originate from within
@@ -184,6 +172,7 @@ where
             cache,
             dna_def,
             init_is_root: false,
+            precomputed_chain_head: None,
         })
     }
 
@@ -213,6 +202,10 @@ where
     ) {
         (self.authored.clone(), self.dht.clone(), self.cache.clone())
     }
+
+    pub fn chain_head_precomputed(&self) -> Option<Option<HeadInfo>> {
+        self.precomputed_chain_head.clone()
+    }
 }
 
 impl SourceChainWorkspace {
@@ -230,6 +223,7 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             cache: workspace.cache,
             dna_def: workspace.dna_def,
             init_is_root: workspace.init_is_root,
+            precomputed_chain_head: workspace.precomputed_chain_head,
         }
     }
 }
@@ -249,6 +243,7 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             cache: workspace.inner.cache,
             dna_def: workspace.inner.dna_def,
             init_is_root: workspace.inner.init_is_root,
+            precomputed_chain_head: workspace.inner.precomputed_chain_head,
         }
     }
 }

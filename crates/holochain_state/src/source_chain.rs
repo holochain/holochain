@@ -10,6 +10,7 @@ use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
+use futures::FutureExt;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -24,7 +25,8 @@ use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainJsonRecord;
 use holochain_types::sql::AsSql;
-use once_cell::sync::Lazy;
+use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::ghost_actor::dependencies::must_future::MustBoxFuture;
+use tokio::sync::Mutex;
 
 use crate::prelude::*;
 use crate::source_chain;
@@ -43,7 +45,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     dht_db_cache: DhtDbQueryCache,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
-    head_info: Arc<Lazy<SourceChainResult<Option<HeadInfo>>>>,
+    head_info: HeadMutex,
     public_only: bool,
     zomes_initialized: Arc<AtomicBool>,
 }
@@ -58,6 +60,60 @@ pub struct HeadInfo {
 impl HeadInfo {
     pub fn into_tuple(self) -> (ActionHash, u32, Timestamp) {
         (self.action, self.seq, self.timestamp)
+    }
+}
+
+impl From<HeadInfo> for ChainHead {
+    fn from(h: HeadInfo) -> Self {
+        ChainHead {
+            action_seq: h.seq,
+            hash: h.action,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct HeadMutex {
+    head: Arc<Mutex<Option<Option<HeadInfo>>>>,
+    getter: Arc<
+        dyn Fn() -> MustBoxFuture<'static, SourceChainResult<Option<HeadInfo>>>
+            + 'static
+            + Send
+            + Sync,
+    >,
+    // vault: DbRead<DbKindAuthored>,
+    // author: Arc<AgentPubKey>,
+    // allow_empty: bool,
+}
+
+impl HeadMutex {
+    pub fn new(
+        getter: impl 'static
+            + Send
+            + Sync
+            + Fn() -> MustBoxFuture<'static, SourceChainResult<Option<HeadInfo>>>,
+    ) -> Self {
+        Self {
+            head: Arc::new(Mutex::new(None)),
+            getter: Arc::new(getter),
+        }
+    }
+
+    pub async fn get_optional(&self) -> SourceChainResult<Option<HeadInfo>> {
+        let mut l = self.head.lock().await;
+        if let Some(head) = &*l {
+            Ok(head.clone())
+        } else {
+            let head = (self.getter)().await?;
+            *l = Some(head.clone());
+            Ok(head)
+        }
+    }
+
+    pub async fn get(&self) -> SourceChainResult<HeadInfo> {
+        self.get_optional()
+            .await?
+            .ok_or(SourceChainError::ChainEmpty)
     }
 }
 
@@ -187,7 +243,8 @@ impl SourceChain {
             action: prev_action,
             seq: chain_head_seq,
             timestamp: chain_head_timestamp,
-        } = self.chain_head_nonempty()?;
+        } = self.chain_head_nonempty().await?;
+
         let action_seq = chain_head_seq + 1;
 
         // Build the action.
@@ -295,7 +352,8 @@ impl SourceChain {
 
         // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
-        let persisted_head = (**self.head_info)?.as_ref().map(|h| h.action.clone());
+        let initial_head = self.chain_head().await?.map(|h| h.action);
+
         match self
             .vault
             .write_async(move |txn: &mut Transaction| {
@@ -313,11 +371,11 @@ impl SourceChain {
                     return Ok(Vec::new());
                 }
 
-                if persisted_head != latest_head_action {
+                if initial_head != latest_head_action {
                     return Err(SourceChainError::HeadMoved(
                         actions,
                         entries,
-                        persisted_head,
+                        initial_head,
                         latest_head,
                     ));
                 }
@@ -425,46 +483,24 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = Arc::new(Lazy::new(|| {
-            vault
-                .read_async({
-                    let author = author.clone();
-                    move |txn| chain_head_db(&txn, author)
-                })
-                .await
-        }));
-        Ok(Self {
-            scratch,
-            vault,
-            dht_db,
-            dht_db_cache,
-            keystore,
-            author,
-            head_info,
-            public_only: false,
-            zomes_initialized: Arc::new(AtomicBool::new(false)),
-        })
-    }
-
-    /// Create a source chain with a blank chain head.
-    /// You probably don't want this.
-    /// This type is only useful for when a source chain
-    /// really needs to be constructed before genesis runs.
-    pub async fn raw_empty(
-        vault: AuthorDb,
-        dht_db: DhtDb,
-        dht_db_cache: DhtDbQueryCache,
-        keystore: MetaLairClient,
-        author: AgentPubKey,
-    ) -> SourceChainResult<Self> {
-        let scratch = Scratch::new().into_sync();
-        let author = Arc::new(author);
-        let head_info = vault
-            .read_async({
+        let head_info = HeadMutex::new({
+            let vault = vault.clone();
+            let author = author.clone();
+            move || {
+                let vault = vault.clone();
                 let author = author.clone();
-                move |txn| chain_head_db(&txn, author)
-            })
-            .await?;
+
+                async move {
+                    let head_info = vault
+                        .read_async(move |txn| chain_head_db(&txn, author))
+                        .await?;
+                    Ok(head_info)
+                }
+                .boxed()
+                .into()
+            }
+        });
+
         Ok(Self {
             scratch,
             vault,
@@ -547,27 +583,29 @@ where
 
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
-    pub fn persisted_head_info(&self) -> Option<HeadInfo> {
-        self.head_info.clone()
+    pub async fn persisted_head_info(&self) -> SourceChainResult<Option<HeadInfo>> {
+        self.head_info.get_optional().await
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<Option<HeadInfo>> {
-        // Check scratch for newer head.
-        Ok(self
-            .scratch
-            .apply(|scratch| scratch.chain_head().or_else(|| self.persisted_head_info()))?)
+    pub async fn chain_head(&self) -> SourceChainResult<Option<HeadInfo>> {
+        if let Some(scratch_head) = self.scratch.apply(|scratch| scratch.chain_head())? {
+            // Check scratch for newer head.
+            Ok(Some(scratch_head))
+        } else {
+            self.persisted_head_info().await
+        }
     }
 
-    pub fn chain_head_nonempty(&self) -> SourceChainResult<HeadInfo> {
-        // Check scratch for newer head.
-        self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
+    pub async fn chain_head_nonempty(&self) -> SourceChainResult<HeadInfo> {
+        self.head_info.get().await
     }
 
     #[cfg(feature = "test_utils")]
-    pub fn len(&self) -> SourceChainResult<u32> {
+    pub async fn len(&self) -> SourceChainResult<u32> {
+        let persisted_max = self.head_info.get_optional().await?.map(|h| h.seq);
+
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = scratch.chain_head().map(|h| h.seq);
-            let persisted_max = self.head_info.as_ref().map(|h| h.seq);
             match (scratch_max, persisted_max) {
                 (None, None) => 0,
                 (Some(s), None) => s + 1,
@@ -578,8 +616,8 @@ where
     }
 
     #[cfg(feature = "test_utils")]
-    pub fn is_empty(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? == 0)
+    pub async fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len().await? == 0)
     }
 
     pub async fn valid_cap_grant(
