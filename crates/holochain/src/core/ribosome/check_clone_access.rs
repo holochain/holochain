@@ -5,7 +5,10 @@ use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use holochain_zome_types::{call::RoleName, cell::CellId};
 use wasmer::RuntimeError;
 
-pub fn check_clone_access(target_cell_id: &CellId, conductor_handle: &CellConductorReadHandle) -> Result<(InstalledAppId, RoleName), RuntimeError> {
+pub fn check_clone_access(
+    target_cell_id: &CellId,
+    conductor_handle: &CellConductorReadHandle,
+) -> Result<(InstalledAppId, RoleName), RuntimeError> {
     let current_cell_id = conductor_handle.cell_id();
 
     let installed_app: InstalledApp = tokio_helper::block_forever_on(async move {

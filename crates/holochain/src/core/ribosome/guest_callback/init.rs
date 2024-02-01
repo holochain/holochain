@@ -237,9 +237,9 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
-    use holochain_zome_types::clone::CloneCellId;
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::clone::CloneCellId;
     use holochain_zome_types::prelude::*;
     use std::time::Duration;
 

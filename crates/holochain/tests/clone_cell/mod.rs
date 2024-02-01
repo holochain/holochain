@@ -92,7 +92,10 @@ async fn disable_enable_and_delete_clone_cell() {
         membrane_proof: None,
         name: Some("Clone 2".to_string()),
     };
-    conductor.call_fallible::<_, ClonedCell>(&clone_zome, "create_clone", request).await.unwrap_err();
+    conductor
+        .call_fallible::<_, ClonedCell>(&clone_zome, "create_clone", request)
+        .await
+        .unwrap_err();
 
     // Re-enable the clone cell
     let request = EnableCloneCellInput {
@@ -107,7 +110,9 @@ async fn disable_enable_and_delete_clone_cell() {
         membrane_proof: None,
         name: Some("Clone 2".to_string()),
     };
-    conductor.call::<_, ClonedCell>(&clone_zome, "create_clone", request).await;
+    conductor
+        .call::<_, ClonedCell>(&clone_zome, "create_clone", request)
+        .await;
 
     // Now disable and delete the clone
     let request = DisableCloneCellInput {
@@ -189,13 +194,19 @@ async fn prevents_cross_app_clone_operations() {
         membrane_proof: None,
         name: Some("Other clone 1".to_string()),
     };
-    conductor.call_fallible::<_, ClonedCell>(&other_zome, "create_clone", other_request).await.unwrap_err();
+    conductor
+        .call_fallible::<_, ClonedCell>(&other_zome, "create_clone", other_request)
+        .await
+        .unwrap_err();
 
     // Should fail to disable the clone cell from the other app
     let other_request = DisableCloneCellInput {
         clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
     };
-    conductor.call_fallible::<_, ()>(&other_zome, "disable_clone", other_request).await.unwrap_err();
+    conductor
+        .call_fallible::<_, ()>(&other_zome, "disable_clone", other_request)
+        .await
+        .unwrap_err();
 
     // Actually disable the clone cell from the original app
     let request = DisableCloneCellInput {
@@ -207,13 +218,19 @@ async fn prevents_cross_app_clone_operations() {
     let other_request = EnableCloneCellInput {
         clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
     };
-    conductor.call_fallible::<_, ClonedCell>(&other_zome, "enable_clone", other_request).await.unwrap_err();
+    conductor
+        .call_fallible::<_, ClonedCell>(&other_zome, "enable_clone", other_request)
+        .await
+        .unwrap_err();
 
     // Try to delete the clone cell from the other app, should fail
     let other_request = DeleteCloneCellInput {
         clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
     };
-    conductor.call_fallible::<_, ()>(&other_zome, "delete_clone", other_request).await.unwrap_err();
+    conductor
+        .call_fallible::<_, ()>(&other_zome, "delete_clone", other_request)
+        .await
+        .unwrap_err();
 
     // Enable the cell again
     let request = EnableCloneCellInput {
