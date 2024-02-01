@@ -392,7 +392,7 @@ impl RealRibosome {
                 instance
                     .exports
                     .get_typed_function(&store_mut, "__hc__allocate_1")
-                    .map_err(|e: wasmer::ExportError| -> RuntimeError {
+                    .map_err(|e| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
                     })?,
             );
