@@ -274,8 +274,8 @@ pub enum MetaNetCon {
     #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
-        ep: tx5::Ep,
-        rem_url: tx5::Tx5Url,
+        ep: Arc<tx5::Ep3>,
+        rem_url: tx5::PeerUrl,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
     },
@@ -292,7 +292,7 @@ impl PartialEq for MetaNetCon {
             #[cfg(feature = "tx2")]
             (MetaNetCon::Tx2(a, _), MetaNetCon::Tx2(b, _)) => a == b,
             #[cfg(feature = "tx5")]
-            (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => a == b,
+            (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -586,8 +586,8 @@ pub enum MetaNet {
     #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
-        ep: tx5::Ep,
-        url: tx5::Tx5Url,
+        ep: Arc<tx5::Ep3>,
+        url: tx5::PeerUrl,
         res: ResStore,
         tun: KitsuneP2pTuningParams,
     },
@@ -811,63 +811,72 @@ impl MetaNet {
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
         let evt_sender = host.legacy.clone();
-        let mut tx5_config = tx5::DefConfig::default()
-            .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
-            .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
-            .with_max_conn_count(tuning_params.tx5_max_conn_count)
-            .with_max_conn_init(tuning_params.tx5_max_conn_init())
-            .with_conn_preflight(move |_, _| {
-                let i_s = kitsune_internal_sender.clone();
+        let tx5_config = tx5::Config3 {
+            /*
+            let mut tx5_config = tx5::DefConfig::default()
+                .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
+                .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
+                .with_max_conn_count(tuning_params.tx5_max_conn_count)
+                .with_max_conn_init(tuning_params.tx5_max_conn_init())
+                .with_conn_preflight(move |_, _| {
+            */
+            preflight: Some((
+                Arc::new(move |_| {
+                    let i_s = kitsune_internal_sender.clone();
 
-                Box::pin(async move {
-                    match i_s.get_all_local_joined_agent_infos().await {
-                        Ok(agent_list) => Ok(wire::Wire::peer_unsolicited(agent_list)
-                            .encode_vec()
-                            .ok()
-                            .map(|v| v.into())),
-                        Err(err) => {
-                            tracing::warn!(?err, "error getting local peer list");
-                            Ok(None)
-                        }
-                    }
+                    Box::pin(async move {
+                        let agent_list = i_s
+                            .get_all_local_joined_agent_infos()
+                            .await
+                            .unwrap_or_default();
+                        wire::Wire::peer_unsolicited(agent_list).encode_vec()
+                    })
+                }),
+                /*
                 })
-            })
-            .with_conn_validate(move |_, _, maybe_data| {
-                let e_s = evt_sender.clone();
-                Box::pin(async move {
-                    match maybe_data.map(|data| wire::Wire::decode_ref(&data)) {
-                        Some(Ok((
-                            _,
-                            wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
-                        ))) => {
-                            // @todo This loop only exists because we have to put a
-                            // space on PutAgentInfoSignedEvt, if the internal peer
-                            // space was used instead we could do this in a single
-                            // event with the whole list.
-                            for peer in peer_list {
-                                if let Err(err) = e_s
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: peer.space.clone(),
-                                        peer_data: vec![peer.clone()],
-                                    })
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        ?err,
-                                        "error processing incoming agent info unsolicited"
-                                    );
+                .with_conn_validate(move |_, _, maybe_data| {
+                */
+                Arc::new(move |_, data| {
+                    let e_s = evt_sender.clone();
+                    Box::pin(async move {
+                        match wire::Wire::decode_ref(&data) {
+                            Ok((
+                                _,
+                                wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
+                            )) => {
+                                // @todo This loop only exists because we have to
+                                // put a space on PutAgentInfoSignedEvt, if the
+                                // internal peer space was used instead we could
+                                // do this in a single event with the whole list.
+                                for peer in peer_list {
+                                    if let Err(err) = e_s
+                                        .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                            space: peer.space.clone(),
+                                            peer_data: vec![peer.clone()],
+                                        })
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            ?err,
+                                            "error processing incoming agent info unsolicited"
+                                        );
+                                    }
                                 }
                             }
+                            Err(err) => tracing::warn!(?err, "error decoding connection peers"),
+                            _ => {}
                         }
-                        Some(Err(err)) => tracing::warn!(?err, "error decoding connection peers"),
-                        _ => {}
-                    }
-                    Ok(())
-                })
-            });
+                        Ok(())
+                    })
+                    //});
+                }),
+            )),
+            ..Default::default()
+        };
 
         tracing::info!(/*?tx5_config,*/ "meta net startup tx5");
 
+        /*
         if let Some(lair_client) = host.lair_client() {
             tx5_config.set_lair_client(lair_client);
         }
@@ -875,6 +884,7 @@ impl MetaNet {
         if let Some(lair_tag) = host.lair_tag() {
             tx5_config.set_lair_tag(lair_tag);
         }
+        */
 
         if let Err(err) = (tx5::deps::tx5_core::Tx5InitConfig {
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
@@ -884,7 +894,9 @@ impl MetaNet {
         {
             tracing::warn!(?err, "Tx5InitConfig failed, you must be running multiple conductors in the same process. Be aware they will all share whichever Tx5InitConfig was first to be registered.");
         }
-        let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
+        //let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
+        let (ep_hnd, mut ep_evt) = tx5::Ep3::new(Arc::new(tx5_config)).await;
+        let ep_hnd = Arc::new(ep_hnd);
 
         let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
         tracing::info!(%cli_url, "tx5 listening at url");
@@ -897,23 +909,18 @@ impl MetaNet {
         let spawn_host = host.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
-                let evt = match evt {
-                    Ok(evt) => evt,
-                    Err(err) => {
-                        tracing::error!(?err, "tx5 err event");
-                        continue;
-                    }
-                };
-
                 match evt {
-                    tx5::EpEvt::Connected { rem_cli_url } => {
+                    tx5::Ep3Event::Error(err) => {
+                        panic!("Fatal tx5 error: {err:?}");
+                    }
+                    tx5::Ep3Event::Connected { peer_url } => {
                         if evt_send
                             .send(MetaNetEvt::Connected {
-                                remote_url: rem_cli_url.to_string(),
+                                remote_url: peer_url.to_string(),
                                 con: MetaNetCon::Tx5 {
                                     host: spawn_host.clone(),
                                     ep: ep_hnd2.clone(),
-                                    rem_url: rem_cli_url,
+                                    rem_url: peer_url,
                                     res: res_store2.clone(),
                                     tun: tuning_params2.clone(),
                                 },
@@ -924,14 +931,14 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx5::EpEvt::Disconnected { rem_cli_url } => {
+                    tx5::Ep3Event::Disconnected { peer_url } => {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
-                                remote_url: rem_cli_url.to_string(),
+                                remote_url: peer_url.to_string(),
                                 con: MetaNetCon::Tx5 {
                                     host: spawn_host.clone(),
                                     ep: ep_hnd2.clone(),
-                                    rem_url: rem_cli_url,
+                                    rem_url: peer_url,
                                     res: res_store2.clone(),
                                     tun: tuning_params2.clone(),
                                 },
@@ -942,25 +949,26 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx5::EpEvt::Data {
-                        rem_cli_url,
-                        data,
+                    tx5::Ep3Event::Message {
+                        peer_url,
+                        message,
                         permit,
                     } => {
-                        tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+                        tracing::trace!(%peer_url, byte_count=?message.len(), "received bytes");
 
-                        match WireWrap::decode(&mut bytes::Buf::reader(data)) {
+                        let mut message = std::io::Cursor::new(&message);
+                        match WireWrap::decode(&mut message) {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
                                         tracing::trace!(%msg_id, ?data, "received notify");
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
-                                                remote_url: rem_cli_url.to_string(),
+                                                remote_url: peer_url.to_string(),
                                                 con: MetaNetCon::Tx5 {
                                                     host: spawn_host.clone(),
                                                     ep: ep_hnd2.clone(),
-                                                    rem_url: rem_cli_url,
+                                                    rem_url: peer_url,
                                                     res: res_store2.clone(),
                                                     tun: tuning_params2.clone(),
                                                 },
@@ -982,7 +990,7 @@ impl MetaNet {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
                                         let ep_hnd = ep_hnd2.clone();
-                                        let rem_cli_url2 = rem_cli_url.clone();
+                                        let peer_url2 = peer_url.clone();
                                         let respond: Respond = Box::new(move |data| {
                                             let out: RespondFut = Box::pin(async move {
                                                 let wire = match data.encode_vec() {
@@ -995,19 +1003,18 @@ impl MetaNet {
                                                     Ok(data) => data,
                                                     Err(_) => return,
                                                 };
-                                                let _ = ep_hnd
-                                                    .send(rem_cli_url2, data.as_slice())
-                                                    .await;
+                                                let _ =
+                                                    ep_hnd.send(peer_url2, data.as_slice()).await;
                                             });
                                             out
                                         });
                                         if evt_send
                                             .send(MetaNetEvt::Request {
-                                                remote_url: rem_cli_url.to_string(),
+                                                remote_url: peer_url.to_string(),
                                                 con: MetaNetCon::Tx5 {
                                                     host: spawn_host.clone(),
                                                     ep: ep_hnd2.clone(),
-                                                    rem_url: rem_cli_url,
+                                                    rem_url: peer_url,
                                                     res: res_store2.clone(),
                                                     tun: tuning_params2.clone(),
                                                 },
@@ -1048,7 +1055,6 @@ impl MetaNet {
                             }
                         }
                     }
-                    tx5::EpEvt::Demo { rem_cli_url: _ } => (),
                 }
             }
         });
@@ -1125,9 +1131,7 @@ impl MetaNet {
                 let wrap = WireWrap::notify(msg_id, WireData(wire));
 
                 let data = wrap.encode_vec().map_err(KitsuneError::other)?;
-                ep.broadcast(data.as_slice())
-                    .await
-                    .map_err(KitsuneError::other)?;
+                ep.broadcast(data.as_slice()).await;
                 return Ok(());
             }
         }
@@ -1198,8 +1202,8 @@ impl MetaNet {
         #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
-                let fut = ep.get_stats();
-                return async move { fut.await.map_err(KitsuneError::other) }.boxed();
+                let ep = ep.clone();
+                return async move { Ok(ep.get_stats().await) }.boxed();
             }
         }
 
