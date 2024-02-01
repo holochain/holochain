@@ -73,7 +73,7 @@ impl AppBundle {
                 bundle.resolve_cell(dna_store, role_name, role).await?,
             ))
         });
-        
+
         let resolution = futures::future::join_all(tasks)
             .await
             .into_iter()
