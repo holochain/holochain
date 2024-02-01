@@ -7,7 +7,7 @@ use wasmer::RuntimeError;
 
 /// Check whether the current cell belongs to the app we're trying to perform a clone operation on.
 /// If so, return the app id and role name that match the target cell. Otherwise, return an error.
-/// 
+///
 /// This function takes the target cell to be cloned as an argument, and fetches the current cell from the call context
 /// so that the check cannot accidentally be called on the wrong cell, permitting access to the wrong app.
 pub fn check_clone_access(
