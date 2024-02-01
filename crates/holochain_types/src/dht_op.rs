@@ -420,8 +420,7 @@ impl DhtOp {
             if session_data.preflight_request().enzymatic {
                 session_data
                     .preflight_request()
-                    .signing_agents
-                    .get(0)
+                    .signing_agents.first()
                     .map(|(pubkey, _)| pubkey)
             } else {
                 None

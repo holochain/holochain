@@ -10,7 +10,7 @@ use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
-pub use holochain_zome_types::capability::CapSecret;
+
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct CreateMessageInput {

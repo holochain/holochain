@@ -59,7 +59,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
             target: target_address.clone().into(),
             zome_index,
             link_type,
-            timestamp: link_add.timestamp.clone().into(),
+            timestamp: link_add.timestamp,
             tag: tag.clone(),
         };
 
@@ -97,11 +97,11 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
 impl TestData {
     /// Create the same test data with a new timestamp
     fn with_same_keys(mut td: Self) -> Self {
-        td.link_add.timestamp = holochain_zome_types::Timestamp::now().into();
+        td.link_add.timestamp = holochain_zome_types::Timestamp::now();
         let link_add_hash =
             ActionHashed::from_content_sync(Action::CreateLink(td.link_add.clone())).into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();
-        td.expected_link.timestamp = td.link_add.timestamp.clone().into();
+        td.expected_link.timestamp = td.link_add.timestamp;
         td.expected_link.create_link_hash = link_add_hash;
         td
     }
@@ -417,7 +417,6 @@ impl TestData {
             })
             .await
             .unwrap()
-            .into_iter()
             .collect();
         assert_eq!(val, expected, "{}", test);
     }
@@ -590,7 +589,7 @@ async fn multiple_links() {
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
-    let mut td = fixtures(arc.clone().into(), 10);
+    let mut td = fixtures(arc.clone(), 10);
 
     // Add links
     {

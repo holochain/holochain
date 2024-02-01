@@ -308,7 +308,7 @@ impl ProxyEpInner {
         let inner_map = self
             .direct_to_final_peer_con_map
             .entry(direct_peer)
-            .or_insert_with(HashMap::new);
+            .or_default();
         let mut did_insert = false;
         let con = {
             let did_insert = &mut did_insert;

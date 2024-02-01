@@ -192,7 +192,7 @@ async fn insert_op_equivalence() {
     let op = DhtOp::StoreEntry(
         sig.clone(),
         NewEntryAction::Create(create_action.clone()),
-        create_entry.clone().into(),
+        create_entry.clone(),
     );
     let op = DhtOpHashed::from_content_sync(op);
 

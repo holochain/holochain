@@ -27,7 +27,7 @@ static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealR
     Lazy::new(|| {
         Mutex::new(
             holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
-                TestWasm::Bench.into(),
+                TestWasm::Bench,
             ]))
             .next()
             .unwrap(),
@@ -59,11 +59,9 @@ static HOST_ACCESS_FIXTURATOR: Lazy<
 pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
 
-    for n in vec![
-        1,         // 1 byte
+    for n in [1,         // 1 byte
         1_000,     // 1 kb
-        1_000_000, // 1 mb
-    ] {
+        1_000_000] {
         group.throughput(Throughput::Bytes(n as _));
 
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
@@ -77,7 +75,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                 let i = ZomeCallInvocation {
                     cell_id: CELL_ID.lock().unwrap().clone(),
                     zome: zome.clone(),
-                    cap_secret: Some(CAP.lock().unwrap().clone()),
+                    cap_secret: Some(*CAP.lock().unwrap()),
                     fn_name: "echo_bytes".into(),
                     payload: ExternIO::encode(&bytes).unwrap(),
                     provenance: AGENT_KEY.lock().unwrap().clone(),
