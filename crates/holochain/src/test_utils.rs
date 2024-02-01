@@ -59,7 +59,6 @@ pub mod hc_stress_test;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
-pub mod shared_values;
 
 mod wait_for;
 pub use wait_for::*;

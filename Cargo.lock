@@ -2838,7 +2838,6 @@ dependencies = [
  "derive_more",
  "diff",
  "directories",
- "dyn-clone",
  "ed25519-dalek",
  "either",
  "fallible-iterator",
@@ -3386,6 +3385,24 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "serde",
+]
+
+[[package]]
+name = "holochain_test_utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "dyn-clone",
+ "futures",
+ "holochain_serialized_bytes",
+ "holochain_websocket",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "url2",
+ "uuid 0.7.4",
 ]
 
 [[package]]

@@ -124,10 +124,6 @@ backtrace = "0.3"
 sd-notify = "0.3.0"
 
 
-# shared_values deps
-dyn-clone = { version = "1.0", optional = true }
-
-
 [dev-dependencies]
 holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "glacial_tests", "tx2", "tx5", "metrics_influxive"] }
 
@@ -206,7 +202,6 @@ test_utils = [
   "holochain_test_wasm_common",
   "unwrap_to",
   "contrafact",
-  "dyn-clone"
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI

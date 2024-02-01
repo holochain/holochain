@@ -1,0 +1,22 @@
+[package]
+name = "holochain_test_utils"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+holochain_websocket = { path = "../holochain_websocket", version = "^0.3.0-beta-dev.11"}
+
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+url2 = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+tracing = { workspace = true }
+
+dyn-clone = "1.0"

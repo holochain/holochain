@@ -12,6 +12,7 @@ use anyhow::Result as Fallible;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
+use std::iter::Iterator;
 use uuid::Uuid;
 
 pub type Data<T> = BTreeMap<String, T>;
@@ -176,6 +177,7 @@ pub(crate) mod remote_v1 {
     use anyhow::{bail, Context, Result as Fallible};
     use async_trait::async_trait;
     use futures::StreamExt;
+
     use serde::{Deserialize, Serialize};
     use std::borrow::Borrow;
     use std::sync::Arc;
@@ -184,8 +186,8 @@ pub(crate) mod remote_v1 {
 
     use holochain_websocket::{WebsocketConfig, WebsocketListener};
 
-    // TODO: this is only used to import the proc macro `SerializedBytes`. figure out how to import that selectively
-    use crate::prelude::*;
+    // TODO: deglob this
+    use holochain_serialized_bytes::prelude::*;
 
     use super::local_v1::LocalV1;
     use super::{Data, SharedValues};
