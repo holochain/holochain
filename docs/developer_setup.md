@@ -19,7 +19,7 @@ Now when you run `nix develop` or `nix build` commands, you should look out for 
 
 ### Build Holochain
 
-If using Nix, start by opening a developer shell using `nix develop --override-input versions ./versions/weekly --override-input holochain . .#coreDev` at the root of the repository. This will take a while the first time you run it.
+If using Nix, start by opening a developer shell using `nix develop --override-input versions ./versions/weekly .#coreDev` at the root of the repository. This will take a while the first time you run it.
 
 Now you can build the project with `cargo build`.
 
@@ -44,7 +44,7 @@ You'll want to read the next section for instructions to build all the tools you
 To get an environment which is similar to the Holonix environment you would use to develop a Holochain app, you can run
 
 ```shell
-nix develop --override-input versions ./versions/weekly --override-input holochain . .#holonix
+nix develop --override-input versions ./versions/weekly .#holonix
 ```
 
 Take care to check what binaries are available in your environment because if you've run `cargo install --path crates/holochain` then that may appear first
