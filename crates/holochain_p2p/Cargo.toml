@@ -12,7 +12,7 @@ edition = "2021"
 
 [dependencies]
 aitia = { version = "^0.2.0-beta-dev.3", path = "../aitia" }
-async-trait = "0.1"
+async-trait = { workspace = true }
 derive_more = { workspace = true }
 fixt = { path = "../fixt", version = "^0.3.0-beta-dev.0"}
 futures = "0.3"
@@ -20,7 +20,7 @@ ghost_actor = "0.3.0-alpha.6"
 hc_sleuth = { version = "^0.2.0-beta-dev.5", path = "../hc_sleuth" }
 holo_hash = { version = "^0.3.0-beta-dev.21", path = "../holo_hash" }
 holochain_keystore = { version = "^0.3.0-beta-dev.27", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.53"
+holochain_serialized_bytes = { workspace = true }
 holochain_types = { version = "^0.3.0-beta-dev.32", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.3.0-beta-dev.26", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.30", path = "../kitsune_p2p/kitsune_p2p" }
