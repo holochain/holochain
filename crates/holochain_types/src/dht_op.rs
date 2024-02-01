@@ -421,7 +421,7 @@ impl DhtOp {
                 session_data
                     .preflight_request()
                     .signing_agents
-                    .get(0)
+                    .first()
                     .map(|(pubkey, _)| pubkey)
             } else {
                 None

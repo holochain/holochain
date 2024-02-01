@@ -115,7 +115,7 @@ pub fn simple_crud_zome() -> InlineZomeSet {
             Ok(hash)
         })
         .function("create_bytes", move |api, bs: Bytes| {
-            let entry = Entry::app(UnsafeBytes::try_from(bs.to_vec()).unwrap().into()).unwrap();
+            let entry = Entry::app(UnsafeBytes::from(bs.to_vec()).into()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(2)),
                 EntryVisibility::Public,

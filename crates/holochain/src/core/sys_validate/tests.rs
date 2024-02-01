@@ -181,7 +181,7 @@ async fn record_with_deps_fixup(
                     let create =
                         matching_record(&mut g, |r| matches!(r.action(), Action::CreateLink(_)));
                     delete.base_address = base.action_address().clone().into();
-                    delete.link_add_address = create.action_address().clone().into();
+                    delete.link_add_address = create.action_address().clone();
                     deps.push(base);
                     deps.push(create);
                 }
@@ -329,7 +329,7 @@ async fn check_valid_if_dna_test() {
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
         db.clone().into(),
-        tmp_dht.to_db().into(),
+        tmp_dht.to_db(),
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
@@ -373,14 +373,9 @@ async fn check_valid_if_dna_test() {
 
     check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
 
-    fake_genesis_for_agent(
-        db.clone().into(),
-        tmp_dht.to_db(),
-        action.author.clone(),
-        keystore,
-    )
-    .await
-    .unwrap();
+    fake_genesis_for_agent(db.clone(), tmp_dht.to_db(), action.author.clone(), keystore)
+        .await
+        .unwrap();
 
     tmp_dht
         .to_db()
@@ -527,7 +522,7 @@ fn check_entry_hash_test() {
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
-        check_entry_hash(&eh, &entry),
+        check_entry_hash(eh, &entry),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryHash
         ))
@@ -537,7 +532,7 @@ fn check_entry_hash_test() {
     let action: Action = ec.clone().into();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
-    assert_matches!(check_entry_hash(&eh, &entry), Ok(()));
+    assert_matches!(check_entry_hash(eh, &entry), Ok(()));
     assert_matches!(
         check_new_entry_action(&CreateLink::arbitrary(&mut g).unwrap().into()),
         Err(SysValidationError::ValidationOutcome(
@@ -557,7 +552,7 @@ async fn check_entry_size_test() {
         record_with_cascade(&keystore, Create::arbitrary(&mut g).unwrap().into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
-        (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+        (0..5).map(|_| 0u8).collect::<Vec<_>>(),
     ))));
     *record.as_action_mut().entry_data_mut().unwrap().1 =
         EntryType::App(AppEntryDef::arbitrary(&mut g).unwrap());
@@ -566,7 +561,7 @@ async fn check_entry_size_test() {
     sys_validate_record(&record, cascade.clone()).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
-        (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+        (0..5_000_000).map(|_| 0u8).collect::<Vec<_>>(),
     ))));
     *record.as_entry_mut() = RecordEntry::Present(huge_entry);
     let record = rebuild_record(record, &keystore).await;
@@ -594,7 +589,7 @@ async fn check_update_reference_test() {
                 .unwrap_or(false)
     })
     .build(&mut g);
-    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
+    let (mut record, cascade) = record_with_cascade(&keystore, action).await;
 
     let entry_type = record.action().entry_type().unwrap().clone();
     let et2 = entry_type.clone();
@@ -634,7 +629,6 @@ async fn check_link_tag_size_test() {
 
     let bytes = (0..super::MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
-        .into_iter()
         .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
 

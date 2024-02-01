@@ -208,7 +208,7 @@ pub(crate) fn peer_connect(
     let agent = agent_info_signed.agent.clone();
     let url = agent_info_signed
         .url_list
-        .get(0)
+        .first()
         .cloned()
         .ok_or_else(|| KitsuneP2pError::from("no url - agent is likely offline"));
 

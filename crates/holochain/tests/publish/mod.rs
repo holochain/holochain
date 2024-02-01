@@ -11,7 +11,7 @@ use std::time::Duration;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn publish_termination() {
-    let _g = holochain_trace::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
 
     // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
     const NUM_CONDUCTORS: usize =

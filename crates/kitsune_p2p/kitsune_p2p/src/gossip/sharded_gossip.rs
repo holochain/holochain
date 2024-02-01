@@ -1017,7 +1017,7 @@ impl ShardedGossipLocal {
                     && !ops.is_empty()
                 {
                     if let Some(state) = state.as_ref() {
-                        if let Some(agent) = state.remote_agent_list.get(0) {
+                        if let Some(agent) = state.remote_agent_list.first() {
                             // there is at least 1 agent
                             let agent = agent.agent.clone();
                             let source = FetchSource::Agent(agent);

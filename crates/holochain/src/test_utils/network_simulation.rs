@@ -325,8 +325,8 @@ fn get_cached() -> Option<GeneratedData> {
             .query_map([], |row| Ok((Arc::new(row.get(0)?), Arc::new(row.get(1)?))))
             .unwrap()
             .map(Result::unwrap)
-            .fold(HashMap::new(), |mut map, (agent, hash)| {
-                map.entry(agent).or_insert_with(Vec::new).push(hash);
+            .fold(HashMap::<_, Vec<_>>::new(), |mut map, (agent, hash)| {
+                map.entry(agent).or_default().push(hash);
                 map
             });
 
@@ -362,7 +362,7 @@ async fn create_test_data(
     loop {
         let d: Vec<u8> = rand_entry.take(10).collect();
         let d = UnsafeBytes::from(d);
-        let entry = Entry::app(d.try_into().unwrap()).unwrap();
+        let entry = Entry::app(d.into()).unwrap();
         let hash = EntryHash::with_data_sync(&entry);
         let loc = hash.get_loc();
         if let Some(index) = buckets.iter().position(|b| b.contains(loc)) {
