@@ -232,7 +232,7 @@ impl ShardedGossip {
 
     async fn create_agent_info_session(&self) -> KitsuneResult<AgentInfoSession> {
         let all_agents =
-            match store::all_agent_info(&self.gossip.host_api, &self.gossip.space).await {
+            match store::all_agent_info(&self.gossip.evt_sender, &self.gossip.space).await {
                 Ok(a) => a,
                 Err(e) => {
                     tracing::error!("Failed to query for all agents - {:?}", e);

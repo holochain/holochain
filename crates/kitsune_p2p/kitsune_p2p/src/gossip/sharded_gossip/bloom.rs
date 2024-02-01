@@ -20,7 +20,7 @@ impl ShardedGossipLocal {
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
         let agents_within_arc: Vec<_> = agent_info_session
-            .agent_info_within_arc_set(&self.host_api, &self.space, common_arc_set)
+            .agent_info_within_arc_set(&self.evt_sender, &self.space, common_arc_set)
             .await?;
 
         // There was no agents so we don't create a bloom.

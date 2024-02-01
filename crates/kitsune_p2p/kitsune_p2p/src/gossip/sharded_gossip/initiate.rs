@@ -185,7 +185,7 @@ impl ShardedGossipLocal {
     pub(super) async fn query_agents_by_local_agents(&self) -> KitsuneResult<Vec<AgentInfoSigned>> {
         let local_agents = self.inner.share_mut(|i, _| Ok(i.local_agents.clone()))?;
 
-        Ok(store::all_agent_info(&self.host_api, &self.space)
+        Ok(store::all_agent_info(&self.evt_sender, &self.space)
             .await?
             .into_iter()
             .filter(|a| local_agents.contains(&a.agent))

@@ -83,7 +83,7 @@ impl AgentInfoSession {
 
     pub(super) async fn agent_info_within_arc_set(
         &mut self,
-        host_api: &HostApiLegacy,
+        host_api: &EventSender,
         space: &Arc<KitsuneSpace>,
         arc_set: Arc<DhtArcSet>,
     ) -> KitsuneResult<Vec<AgentInfoSigned>> {
@@ -91,7 +91,6 @@ impl AgentInfoSession {
             std::collections::hash_map::Entry::Occupied(o) => Ok(o.get().clone()),
             std::collections::hash_map::Entry::Vacant(v) => {
                 let agents = host_api
-                    .legacy
                     .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
                     .await
                     .map_err(KitsuneError::other)?;
