@@ -373,14 +373,9 @@ async fn check_valid_if_dna_test() {
 
     check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
 
-    fake_genesis_for_agent(
-        db.clone(),
-        tmp_dht.to_db(),
-        action.author.clone(),
-        keystore,
-    )
-    .await
-    .unwrap();
+    fake_genesis_for_agent(db.clone(), tmp_dht.to_db(), action.author.clone(), keystore)
+        .await
+        .unwrap();
 
     tmp_dht
         .to_db()

@@ -334,7 +334,7 @@ impl MetaNetCon {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
-        let result = (move || async move {
+        let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
                     #[cfg(test)]
@@ -390,7 +390,7 @@ impl MetaNetCon {
                     return Ok(());
                 }
             }
-        })()
+        }
         .await;
 
         let elapsed_s = start.elapsed().as_secs_f64();
@@ -410,7 +410,7 @@ impl MetaNetCon {
 
         tracing::trace!(?payload, "initiating request");
 
-        let result = (move || async move {
+        let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
                     #[cfg(feature = "tx2")]
@@ -467,7 +467,7 @@ impl MetaNetCon {
                     return Err(KitsuneErrorKind::Unauthorized.into());
                 }
             }
-        })()
+        }
         .await;
 
         let elapsed_s = start.elapsed().as_secs_f64();
