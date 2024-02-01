@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.26"
+version = "0.3.0-beta-dev.27"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,10 +13,10 @@ edition = "2021"
 [dependencies]
 base64 = "0.13.0"
 futures = "0.3.23"
-holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = "=0.0.53"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.25"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/types" }
+holo_hash = { version = "^0.3.0-beta-dev.21", path = "../holo_hash", features = ["full"] }
+holochain_serialized_bytes = { workspace = true }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.26"}
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/types" }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util" }
 lair_keystore = { workspace = true, default-features = false }
@@ -29,7 +29,7 @@ serde_bytes = "0.11"
 sodoken = "=0.0.9"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "full" ] }
-tracing = "0.1"
+tracing = { workspace = true }
 shrinkwraprs = "0.3"
 derive_more = "0.99"
 

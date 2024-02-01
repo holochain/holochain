@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.3.0-beta-dev.20"
+version = "0.3.0-beta-dev.21"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo", "hash", "blake", "blake2b"]
 categories = ["cryptography"]
@@ -24,7 +24,7 @@ fixt = { version = "^0.3.0-beta-dev.0", path = "../fixt", optional = true }
 futures = { version = "0.3", optional = true }
 holochain_serialized_bytes = { version = "=0.0.53", optional = true }
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", default-features = false }
-kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.13", path = "../kitsune_p2p/dht_arc" }
+kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.14", path = "../kitsune_p2p/dht_arc" }
 must_future = { version = "0.1", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }

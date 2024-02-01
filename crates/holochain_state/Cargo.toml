@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.3.0-beta-dev.33"
+version = "0.3.0-beta-dev.34"
 description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,28 +9,28 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
-aitia = { version = "^0.2.0-beta-dev.2", path = "../aitia" }
+aitia = { version = "^0.2.0-beta-dev.3", path = "../aitia" }
 byteorder = "1.3.4"
 cfg-if = "0.1"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = { workspace = true }
 either = "1.5"
-holochain_sqlite = { version = "^0.3.0-beta-dev.31", path = "../holochain_sqlite" }
-holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash", features = ["full"] }
+holochain_sqlite = { version = "^0.3.0-beta-dev.32", path = "../holochain_sqlite" }
+holo_hash = { version = "^0.3.0-beta-dev.21", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
 futures = "0.3"
-hc_sleuth = { version = "^0.2.0-beta-dev.4", path = "../hc_sleuth" }
-holochain_keystore = { version = "^0.3.0-beta-dev.26", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_p2p = { version = "^0.3.0-beta-dev.33", path = "../holochain_p2p" }
-holochain_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_types" }
+hc_sleuth = { version = "^0.2.0-beta-dev.5", path = "../hc_sleuth" }
+holochain_keystore = { version = "^0.3.0-beta-dev.27", path = "../holochain_keystore" }
+holochain_serialized_bytes = { workspace = true }
+holochain_p2p = { version = "^0.3.0-beta-dev.34", path = "../holochain_p2p" }
+holochain_types = { version = "^0.3.0-beta-dev.32", path = "../holochain_types" }
 holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util" }
-holochain_zome_types = { version = "^0.3.0-beta-dev.25", path = "../holochain_zome_types", features = [
+holochain_zome_types = { version = "^0.3.0-beta-dev.26", path = "../holochain_zome_types", features = [
     "full",
 ] }
-kitsune_p2p = { version = "^0.3.0-beta-dev.29", path = "../kitsune_p2p/kitsune_p2p" }
-holochain_state_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_state_types" }
-holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
+kitsune_p2p = { version = "^0.3.0-beta-dev.30", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_state_types = { version = "^0.3.0-beta-dev.32", path = "../holochain_state_types" }
+holochain_nonce = {version = "^0.3.0-beta-dev.23", path = "../holochain_nonce"}
 mockall = "0.11.3"
 once_cell = { workspace = true }
 one_err = "0.0.8"
@@ -39,7 +39,7 @@ shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = ["full"] }
+tokio = { workspace = true }
 tracing = "0.1.26"
 tracing-futures = "0.2.5"
 cron = "0.9"

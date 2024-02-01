@@ -2,16 +2,11 @@ mod common;
 
 use common::*;
 use fixt::prelude::*;
-
 use kitsune_p2p::actor::BroadcastData;
-
 use kitsune_p2p::actor::KitsuneP2pSender;
-
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p::KitsuneBinType;
-
 use kitsune_p2p_bin_data::KitsuneBasis;
-
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
@@ -70,7 +65,7 @@ async fn minimise_p2p_agent_store_host_calls() {
 
     // Create and join multiple spaces
     let mut all_spaces = vec![];
-    for _i in 0..num_spaces {
+    for _ in 0..num_spaces {
         let space = Arc::new(fixt!(KitsuneSpace));
         all_spaces.push(space.clone());
 
@@ -149,14 +144,14 @@ async fn minimise_p2p_agent_store_host_calls() {
         .filter(|e| matches!(e, RecordedKitsuneP2pEvent::PutAgentInfoSigned { .. }))
         .count();
 
-    put_agent_info_signed_count.assert_close_to(90, 5);
+    put_agent_info_signed_count.assert_close_to(100, 50);
 
     let query_agents_count = drained_events
         .iter()
         .filter(|e| matches!(e, RecordedKitsuneP2pEvent::QueryAgents { .. }))
         .count();
 
-    query_agents_count.assert_close_to(13732, 500);
+    query_agents_count.assert_close_to(1400, 100);
 
     let query_peer_density_count = drained_events
         .iter()

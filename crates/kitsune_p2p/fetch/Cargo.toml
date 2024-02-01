@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_fetch"
-version = "0.3.0-beta-dev.22"
+version = "0.3.0-beta-dev.23"
 description = "Kitsune P2p Fetch Queue Logic"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,8 +13,8 @@ edition = "2021"
 
 [dependencies]
 derive_more = { workspace = true }
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.5", path = "../timestamp"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../types" }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.6", path = "../timestamp"}
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.20", path = "../types" }
 serde = { version = "1.0", features = [ "derive" ] }
 tokio = { version = "1.27", features = [ "full" ] }
 tracing = "0.1.29"
