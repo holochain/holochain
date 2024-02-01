@@ -1,9 +1,9 @@
 //! Cells can be cloned to create new cells with the different properties.
 
+use crate::cell::{CellId, CloneId};
 use derive_more::Display;
 use holo_hash::DnaHash;
 use holochain_integrity_types::DnaModifiers;
-use crate::cell::{CellId, CloneId};
 
 /// The arguments to create a clone of an existing cell.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

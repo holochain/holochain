@@ -1,6 +1,9 @@
-use hdi::map_extern::ExternResult;
-use holochain_zome_types::clone::{ClonedCell, CreateCloneCellInput, DeleteCloneCellInput, DisableCloneCellInput, EnableCloneCellInput};
 use crate::prelude::HDK;
+use hdi::map_extern::ExternResult;
+use holochain_zome_types::clone::{
+    ClonedCell, CreateCloneCellInput, DeleteCloneCellInput, DisableCloneCellInput,
+    EnableCloneCellInput,
+};
 
 /// Create a new cell in the current app based on the DNA of an existing cell in this app.
 ///
@@ -29,4 +32,3 @@ pub fn enable_clone_cell(input: EnableCloneCellInput) -> ExternResult<ClonedCell
 pub fn delete_clone_cell(input: DeleteCloneCellInput) -> ExternResult<()> {
     HDK.with(|h| h.borrow().delete_clone_cell(input))
 }
-
