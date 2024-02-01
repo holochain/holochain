@@ -6,8 +6,8 @@
 
 use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
 
-mod error;
 mod backoff;
+mod error;
 mod pool;
 mod queue;
 mod respond;
