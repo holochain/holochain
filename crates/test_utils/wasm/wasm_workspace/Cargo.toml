@@ -64,6 +64,7 @@ opt-level = "z"
 [workspace.dependencies]
 derive_more = "0.99"
 serde = "1.0"
+tracing = "0.1"
 hdi = { path = "../../../hdi" }
 hdk = { path = "../../../hdk" }
 
