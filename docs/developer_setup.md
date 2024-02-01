@@ -48,7 +48,7 @@ nix develop --override-input versions ./versions/weekly --override-input holocha
 ```
 
 Take care to check what binaries are available in your environment because if you've run `cargo install --path crates/holochain` then that may appear first
-in your `PATH`. Your binaries should appear in paths starting with `/nix/store`, and not include a `.cargo` directory.
+in your `PATH`. Your binaries should appear in paths starting with `/nix/store`, and not include a `.cargo` directory. You can verify this yourself, e.g. via `which holochain`.
 
 Once you have this shell open, it's a great place to test a happ with a custom Holochain version. Please be aware that changes made to the Holochain source code won't be automatically rebuilt into binaries. If you make changes then you'll need to `exit` and re-open the shell by runnihng the command above to create new binaries.
 
