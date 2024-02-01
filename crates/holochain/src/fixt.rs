@@ -440,7 +440,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
         signature: SignatureFixturator::new(Empty).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()),
         expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
