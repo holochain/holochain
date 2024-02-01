@@ -165,7 +165,10 @@ mockall::mock! {
             &self,
             x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
         ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
-
+        fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
+        fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
+        fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
+        fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
     }
 
     impl HdiT for HdkT {
