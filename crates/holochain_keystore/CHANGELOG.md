@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.2.6-rc.0
+
 ## 0.2.5
 
 - Update Lair version to 0.4.2. This change just removes `#![deny(warnings)]` from Lair so that it won’t prevent builds when new versions of Clippy introduce new lint rules. There are no functional changes to Lair or its API.

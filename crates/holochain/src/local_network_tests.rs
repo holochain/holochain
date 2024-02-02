@@ -73,7 +73,6 @@ async fn conductors_call_remote(num_conductors: usize) {
             }
         })
         .await;
-    drop(keep);
 }
 
 // TODO - rewrite all these tests to use local sweettest

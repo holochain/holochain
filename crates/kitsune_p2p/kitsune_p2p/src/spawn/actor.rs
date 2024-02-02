@@ -237,7 +237,7 @@ async fn create_meta_net(
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
-        let signal_url = match config.transport_pool.get(0).unwrap() {
+        let signal_url = match config.transport_pool.first().unwrap() {
             TransportConfig::WebRTC { signal_url } => signal_url.clone(),
             _ => unreachable!(),
         };
@@ -838,7 +838,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
             for peer in all_peers {
                 for peer in peer? {
-                    if let Some(net_key) = peer.url_list.get(0).map(|u| {
+                    if let Some(net_key) = peer.url_list.first().map(|u| {
                         kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
                             .digest()
                             .to_string()

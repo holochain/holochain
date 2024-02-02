@@ -25,6 +25,9 @@ impl FetchTask {
             let this = this.clone();
             async move {
                 'task_loop: loop {
+                    // Drop sources that aren't responding to fetch requests, and any items that have no remaining sources to fetch from.
+                    fetch_pool.check_sources();
+
                     let list = fetch_pool.get_items_to_fetch();
 
                     for (key, space, source, context) in list {

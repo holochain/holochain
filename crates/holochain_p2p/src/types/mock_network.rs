@@ -171,7 +171,7 @@ impl HolochainP2pMockChannel {
             .into_iter()
             .map(|info| {
                 let agent = holo_hash::AgentPubKey::from_kitsune(&info.agent);
-                let url = info.url_list.get(0).cloned().unwrap();
+                let url = info.url_list.first().cloned().unwrap();
                 let cert = Tx2Cert::from(ProxyUrl::from_full(url.as_str()).unwrap().digest());
                 (agent, (cert, url))
             })

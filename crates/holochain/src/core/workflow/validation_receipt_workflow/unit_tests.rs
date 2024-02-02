@@ -137,7 +137,7 @@ async fn block_invalid_op_author() {
             let blocks = blocks.clone();
             move |block| -> BoxFuture<DatabaseResult<()>> {
                 blocks.write().push(block);
-                async move { Ok(()) }.boxed().into()
+                async move { Ok(()) }.boxed()
             }
         },
     )

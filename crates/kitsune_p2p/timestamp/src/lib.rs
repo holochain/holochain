@@ -229,7 +229,7 @@ mod tests {
 
     use super::*;
 
-    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431Z";
+    const TEST_TS: &str = "2020-05-05T19:16:04.266431Z";
 
     #[test]
     fn timestamp_distance() {
@@ -285,12 +285,12 @@ mod tests {
     #[test]
     fn inclusive_timestamp_interval_test_new() {
         // valids.
-        for (start, end) in vec![(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
+        for (start, end) in [(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
             InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end)).unwrap();
         }
 
         // invalids.
-        for (start, end) in vec![(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
+        for (start, end) in [(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
             assert!(
                 super::InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end))
                     .is_err()

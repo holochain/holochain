@@ -151,6 +151,7 @@ ghost_actor::ghost_chan! {
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
 
         /// We need to get previously stored agent info.
+        /// The optional `agents` parameter is an include filter. This can be thought of as a way to filter a held list of agents against the current state of the store.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.

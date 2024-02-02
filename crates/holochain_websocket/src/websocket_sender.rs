@@ -156,7 +156,7 @@ impl WebsocketSender {
         let mut rx_resp = self.listener_shutdown.wrap(rx_resp.into_stream());
         let resp = RegisterResponse::new(tx_resp);
         let msg = OutgoingMessage::Request(
-            hsb::UnsafeBytes::from(hsb::encode(&msg)?).try_into()?,
+            hsb::UnsafeBytes::from(hsb::encode(&msg)?).into(),
             resp,
             tx_stale_resp,
         );

@@ -6,7 +6,7 @@
         src = flake.config.srcCleanedHolochain;
         pkgs = config.rustHelper.mkRustPkgs {
           track = "stable";
-          version = "1.71.1";
+          version = "1.75.0";
         };
       };
     in

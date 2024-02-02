@@ -527,6 +527,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "backon"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c1a6197b2120bb2185a267f6515038558b019e92b832bb0320e96d66268dcf9"
+dependencies = [
+ "fastrand 1.9.0",
+ "futures-core",
+ "pin-project",
+ "tokio",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2627,7 +2639,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.3.5"
+version = "0.3.6-rc.0"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -2688,7 +2700,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -2793,7 +2805,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -2835,7 +2847,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2947,7 +2959,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2985,7 +2997,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "anyhow",
  "clap 4.4.18",
@@ -3000,7 +3012,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -3028,7 +3040,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_run_local_services"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "clap 4.4.18",
  "futures",
@@ -3042,7 +3054,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -3073,7 +3085,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "derive_more",
  "directories",
@@ -3114,7 +3126,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
  "derive_builder",
@@ -3153,7 +3165,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "assert_cmd 2.0.13",
  "base64 0.13.1",
@@ -3197,7 +3209,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -3254,7 +3266,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3307,7 +3319,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3355,7 +3367,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "hdk 0.2.5",
  "serde",
@@ -3385,7 +3397,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3478,7 +3490,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "holochain_types",
  "holochain_util 0.2.5",
@@ -3537,7 +3549,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "criterion",
  "futures",
@@ -4164,7 +4176,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4220,7 +4232,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -4249,7 +4261,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "kitsune_p2p_bin_data 0.2.5",
  "kitsune_p2p_timestamp 0.2.5",
@@ -4271,7 +4283,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.1.5"
+version = "0.1.6-rc.0"
 dependencies = [
  "clap 3.2.25",
  "criterion",
@@ -4293,7 +4305,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "colored 1.9.4",
  "derivative",
@@ -4346,7 +4358,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -4377,18 +4389,19 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
+ "backon",
  "derive_more",
  "futures",
  "holochain_serialized_bytes",
  "holochain_trace",
  "human-repr",
+ "indexmap 2.1.0",
  "kitsune_p2p_fetch",
  "kitsune_p2p_timestamp 0.2.5",
  "kitsune_p2p_types",
- "linked-hash-map",
  "must_future",
  "num-traits",
  "pretty_assertions 0.7.2",
@@ -4418,7 +4431,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "base64 0.13.1",
  "blake2b_simd 0.5.11",
@@ -4444,7 +4457,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -4468,7 +4481,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "blake2b_simd 1.0.2",
  "futures",
@@ -4486,7 +4499,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.2.5"
+version = "0.2.6-rc.0"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -4709,12 +4722,6 @@ checksum = "9d240c6f7e1ba3a28b0249f774e6a9dd0175054b52dfbb61b16eb8505c3785c9"
 dependencies = [
  "cc",
 ]
-
-[[package]]
-name = "linked-hash-map"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "linux-raw-sys"

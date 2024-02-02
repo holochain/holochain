@@ -6,10 +6,13 @@
 
 use kitsune_p2p_types::{KAgent, KOpHash, KSpace};
 
+mod backoff;
 mod error;
 mod pool;
+mod queue;
 mod respond;
 mod rough_sized;
+mod source;
 
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
@@ -18,6 +21,7 @@ pub use error::*;
 pub use pool::*;
 pub use respond::*;
 pub use rough_sized::*;
+pub use source::FetchSource;
 
 /// Determine what should be fetched.
 #[derive(

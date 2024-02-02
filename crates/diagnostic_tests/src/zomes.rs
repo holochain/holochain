@@ -7,7 +7,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
         .function(
             "create",
             |api, (base, bytes): (AnyLinkableHash, Vec<u8>)| {
-                let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
+                let entry: SerializedBytes = UnsafeBytes::from(bytes).into();
                 let hash = api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
@@ -31,8 +31,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                 let mut rng = seeded_rng(None);
                 for _ in 0..num {
                     let bytes = random_bytes(&mut rng, size as usize);
-                    let entry: SerializedBytes =
-                        UnsafeBytes::from(bytes.into_vec()).try_into().unwrap();
+                    let entry: SerializedBytes = UnsafeBytes::from(bytes.into_vec()).into();
                     let hash = api.create(CreateInput::new(
                         InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                         EntryVisibility::Public,
@@ -94,7 +93,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
 pub fn syn_zome() -> InlineIntegrityZome {
     InlineIntegrityZome::new_unique([EntryDef::default_from_id("a")], 0)
         .function("commit", |api, bytes: Vec<u8>| {
-            let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
+            let entry: SerializedBytes = UnsafeBytes::from(bytes).into();
             api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,

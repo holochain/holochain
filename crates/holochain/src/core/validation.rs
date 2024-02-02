@@ -86,7 +86,7 @@ impl<V> PartialEq for OrderedOp<V> {
 }
 impl<V> PartialOrd for OrderedOp<V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.order.partial_cmp(&other.order)
+        Some(self.cmp(other))
     }
 }
 impl<V> Eq for OrderedOp<V> {}

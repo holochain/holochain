@@ -38,7 +38,7 @@ impl Store {
 
     pub fn put(&self, info: AgentInfoSigned) {
         let mut lock = self.0.write();
-        let space_map = lock.entry(info.space.clone()).or_insert_with(HashMap::new);
+        let space_map = lock.entry(info.space.clone()).or_default();
         match space_map.entry(info.agent.clone()) {
             std::collections::hash_map::Entry::Occupied(mut e) => {
                 if info.signed_at_ms > e.get().signed_at_ms {

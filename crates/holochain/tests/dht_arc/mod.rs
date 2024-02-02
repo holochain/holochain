@@ -37,7 +37,7 @@ async fn test_arc_redundancy() {
         for _ in 0..40 {
             for i in 0..peers.len() {
                 let p = peers.clone();
-                let mut arc = peers.get_mut(i).unwrap();
+                let arc = peers.get_mut(i).unwrap();
                 let view =
                     PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
                 view.update_arc(arc);
@@ -86,7 +86,7 @@ async fn test_join_leave() {
     let converge = |peers: &mut Vec<DhtArc>| {
         for i in 0..peers.len() {
             let p = peers.clone();
-            let mut arc = peers.get_mut(i).unwrap();
+            let arc = peers.get_mut(i).unwrap();
             let view =
                 PeerStrat::default().view(Topology::standard_epoch_full(), *arc, p.as_slice());
             view.update_arc(arc);

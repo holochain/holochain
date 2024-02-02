@@ -192,7 +192,7 @@ mod tests {
         holochain_trace::test_run().ok();
 
         let env = crate::test_utils::test_dht_db().to_db();
-        let keystore = crate::test_utils::test_keystore();
+        let _keystore = crate::test_utils::test_keystore();
 
         // With no validators
         let pending = env
@@ -213,7 +213,7 @@ mod tests {
 
     async fn create_modified_op(
         vault: DbWrite<DbKindDht>,
-        keystore: &MetaLairClient,
+        _keystore: &MetaLairClient,
         modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {
         // The actual op does not matter, just some of the status fields

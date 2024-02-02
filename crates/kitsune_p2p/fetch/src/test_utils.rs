@@ -1,9 +1,27 @@
 //! Test utilities for the fetch crate.
 
-use crate::{FetchContext, FetchKey, FetchPoolPush, FetchSource};
+use crate::source::FetchSource;
+use crate::{FetchContext, FetchKey, FetchPoolConfig, FetchPoolPush};
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
 use kitsune_p2p_types::{KOpHash, KSpace};
 use std::sync::Arc;
+use std::time::Duration;
+
+pub(super) struct TestFetchConfig(pub u32, pub u32);
+
+impl FetchPoolConfig for TestFetchConfig {
+    fn item_retry_delay(&self) -> Duration {
+        Duration::from_secs(self.0 as u64)
+    }
+
+    fn source_retry_delay(&self) -> Duration {
+        Duration::from_secs(self.1 as u64)
+    }
+
+    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+        (a + b).min(1)
+    }
+}
 
 /// Create a sample op hash.
 pub fn test_key_hash(n: u8) -> KOpHash {

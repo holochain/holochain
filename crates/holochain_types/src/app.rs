@@ -736,7 +736,7 @@ impl InstalledAppCommon {
         // Get the agent key of the first cell
         // NB: currently this has no significance.
         let _agent_key = installed_cells
-            .get(0)
+            .first()
             .expect("Can't create app with 0 cells")
             .cell_id
             .agent_pubkey()

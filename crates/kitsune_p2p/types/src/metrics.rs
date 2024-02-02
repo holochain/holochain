@@ -1,7 +1,7 @@
 //! Utilities for helping with metric tracking.
 
 use crate::tracing;
-use futures::FutureExt;
+
 use holochain_trace::tracing::Instrument;
 use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
