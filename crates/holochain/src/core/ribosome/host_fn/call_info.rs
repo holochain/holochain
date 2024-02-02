@@ -66,7 +66,7 @@ pub fn call_info(
                     .host_context
                     .workspace()
                     .chain_head_precomputed()
-                    .expect("Must have precomputed chain head info for call_info")
+                    .expect("Must have precomputed chain head info for call_info. Run precompute_chain_head().")
                     .expect("Precomputed chain head must not be None")
                     .into_tuple(),
                 provenance,

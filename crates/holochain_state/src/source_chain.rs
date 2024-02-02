@@ -73,6 +73,8 @@ impl From<HeadInfo> for ChainHead {
 }
 
 /// Cache for the chain head info to reduce database reads.
+/// 
+/// This is all a bit hacky
 #[derive(Clone)]
 pub struct HeadMutex {
     head: Arc<Mutex<Option<Option<HeadInfo>>>>,

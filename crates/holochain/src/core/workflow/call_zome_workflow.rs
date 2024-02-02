@@ -200,12 +200,14 @@ where
 /// call the zome function.
 pub async fn call_zome_function_authorized<R>(
     ribosome: R,
-    host_access: ZomeCallHostAccess,
+    mut host_access: ZomeCallHostAccess,
     invocation: ZomeCallInvocation,
 ) -> WorkflowResult<(R, RibosomeResult<ZomeCallResponse>)>
 where
     R: RibosomeT + 'static,
 {
+    host_access.workspace.precompute_chain_head().await?;
+
     match invocation.is_authorized(&host_access).await? {
         ZomeCallAuthorization::Authorized => {
             tokio::task::spawn_blocking(|| {

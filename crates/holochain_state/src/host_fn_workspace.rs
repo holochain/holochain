@@ -97,12 +97,6 @@ impl SourceChainWorkspace {
             source_chain,
         })
     }
-
-    pub async fn precompute_chain_head(&mut self) -> SourceChainResult<()> {
-        self.inner.precomputed_chain_head =
-            Some(self.source_chain.chain_head().await?.map(Into::into));
-        Ok(())
-    }
 }
 
 impl<SourceChainDb, SourceChainDht> HostFnWorkspace<SourceChainDb, SourceChainDht>
@@ -171,6 +165,18 @@ where
 
     pub fn chain_head_precomputed(&self) -> Option<Option<HeadInfo>> {
         self.precomputed_chain_head.clone()
+    }
+
+    pub async fn precompute_chain_head(&mut self) -> SourceChainResult<()> {
+        self.precomputed_chain_head = Some(
+            self.source_chain
+                .as_ref()
+                .expect("source chain must be present in workspace")
+                .chain_head()
+                .await?
+                .map(Into::into),
+        );
+        Ok(())
     }
 }
 

@@ -31,7 +31,7 @@ pub fn agent_info<'a>(
                 .host_context
                 .workspace()
                 .chain_head_precomputed()
-                .expect("Must have precomputed chain head info if agent_info access is given")
+                .expect("Must have precomputed chain head info if agent_info access is given. Run precompute_chain_head().")
                 .expect("Precomputed chain head must not be None");
 
             Ok(AgentInfo {
