@@ -295,7 +295,10 @@ fn map_outcome(
     match outcome.map_err(SourceChainError::other)? {
         app_validation_workflow::Outcome::Accepted => {}
         app_validation_workflow::Outcome::Rejected(reason) => {
-            return Err(SourceChainError::InvalidCommit(reason).into());
+            return Err(SourceChainError::InvalidCommit(format!(
+                "Validation failed while committing: {reason}"
+            ))
+            .into());
         }
         // when the wasm is being called directly in a zome invocation any
         // state other than valid is not allowed for new entries

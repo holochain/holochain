@@ -125,6 +125,8 @@ pub struct IntegrityManifest {
     /// Conductor compatibility parameters. DNAs with different compatibility
     /// parameters will have different hashes and thus will not be able to communicate
     /// over the network.
+    // TODO: remove default
+    #[serde(default)]
     pub compatibility: DnaCompatParams,
 
     /// An array of zomes associated with your DNA.

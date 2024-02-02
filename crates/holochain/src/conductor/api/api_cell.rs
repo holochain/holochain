@@ -75,7 +75,9 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     fn conductor_services(&self) -> ConductorServices {
-        self.conductor_handle.services.share_ref(|s| s.clone())
+        self.conductor_handle
+            .running_services
+            .share_ref(|s| s.clone())
     }
 
     fn keystore(&self) -> &MetaLairClient {

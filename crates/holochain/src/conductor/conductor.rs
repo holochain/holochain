@@ -249,7 +249,7 @@ pub struct Conductor {
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
-    pub(crate) services: RwShare<ConductorServices>,
+    pub(crate) running_services: RwShare<ConductorServices>,
 }
 
 impl Conductor {
@@ -296,7 +296,7 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
-                services: RwShare::new(ConductorServices::default()),
+                running_services: RwShare::new(ConductorServices::default()),
             }
         }
 
@@ -2138,7 +2138,7 @@ mod service_impls {
     impl Conductor {
         /// Access the current conductor services
         pub fn services(&self) -> ConductorServices {
-            self.services.share_ref(|s| s.clone())
+            self.running_services.share_ref(|s| s.clone())
         }
 
         pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
@@ -2148,7 +2148,7 @@ mod service_impls {
 
         pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
-                self.services.share_mut(|s| {
+                self.running_services.share_mut(|s| {
                     s.dpki = Some(DeepkeyBuiltin::new(
                         self.clone(),
                         self.keystore().clone(),
@@ -2211,6 +2211,8 @@ mod service_impls {
                 Ok(state)
             })
             .await?;
+
+            self.initialize_service_dpki().await?;
 
             Ok(())
         }

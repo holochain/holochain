@@ -9,7 +9,6 @@ pub use holochain_conductor_api::*;
 use holochain_types::prelude::*;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "can't be written without real deepkey.dna"]
 async fn initialize_dpki() {
     holochain_trace::test_run().ok();
 
@@ -18,10 +17,11 @@ async fn initialize_dpki() {
 
     // Initialize dpki
     {
-        let dpki_dna =
-            DnaBundle::read_from_file(&PathBuf::from("./tests/conductor_services/deepkey.dna"))
-                .await
-                .unwrap();
+        // let deepkey_path = "./tests/conductor_services/deepkey.dna";
+        let deepkey_path = "/home/michael/Downloads/deepkey.dna";
+        let dpki_dna = DnaBundle::read_from_file(&PathBuf::from(deepkey_path))
+            .await
+            .unwrap();
         let response = admin_api
             .handle_admin_request(AdminRequest::InstallDpki { dpki_dna })
             .await;
