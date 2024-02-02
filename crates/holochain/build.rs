@@ -9,6 +9,7 @@ mod version_info {
         cargo_pkg_version: &'static str,
         hdk_version_req: &'static str,
         hdi_version_req: &'static str,
+        lair_keystore_version_req: &'static str,
 
         timestamp: DateTime<Utc>,
         hostname: String,
@@ -86,6 +87,7 @@ mod version_info {
                 git_info: GitInfo::maybe_retrieve(),
                 hdk_version_req: hdk::HDK_VERSION,
                 hdi_version_req: hdk::HDI_VERSION,
+                lair_keystore_version_req: lair_keystore::LAIR_VER,
 
                 timestamp: SystemTime::now().into(),
                 hostname,
@@ -106,8 +108,8 @@ mod version_info {
         }
     }
 
-    /// This will be used populate the VERSION_INFO environment variable,
-    /// which will be displayed as JSON when `holochain --version-info` is called.
+    /// This will be used populate the BUILD_INFO environment variable,
+    /// which will be displayed as JSON when `holochain --build-info` is called.
     pub(crate) fn populate_env() {
         let json = BuildInfo::retrieve().as_json_string();
         println!("cargo:rustc-env=BUILD_INFO={}", json);
