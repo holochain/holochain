@@ -57,7 +57,7 @@ async fn signed_zome_call() {
     };
 
     // request authorization of signing key for agent's own cell should succeed
-    conductor
+    let grant_action_hash = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),
@@ -70,7 +70,7 @@ async fn signed_zome_call() {
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
     let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
 
-    let source_chain_read = SourceChainRead::new(
+    let chain = SourceChainRead::new(
         authored_db.into(),
         dht_db.into(),
         dht_db_cache,
@@ -80,7 +80,29 @@ async fn signed_zome_call() {
     .await
     .unwrap();
 
-    let actual_cap_grant = source_chain_read
+    let head = chain.chain_head_nonempty().unwrap();
+    let dump = chain.dump().await.unwrap();
+
+    dump.records.into_iter().for_each(|r| {
+        let seq = r.action.action_seq();
+        let hash = r.action_address;
+        let ty = r.action.action_type();
+        if let Some(e) = r.entry {
+            println!("{seq:3} {ty:16 } {hash} {e:?}");
+        } else {
+            println!("{seq:3} {ty:16 } {hash}");
+        }
+    });
+
+    // Genesis entries are 0, 1, and 2. 
+    // 3 is the cap grant created during init in the test wasm.
+    // 4 is InitZomesComplete.
+    // 5 is this grant added via admin call.
+    // This checks that init ran before the grant was created.
+    assert_eq!(head.seq, 5);
+    assert_eq!(head.action, grant_action_hash);
+
+    let actual_cap_grant = chain
         .valid_cap_grant(
             granted_function.clone(),
             cap_access_public_key.clone(),
