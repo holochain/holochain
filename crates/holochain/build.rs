@@ -108,7 +108,7 @@ mod version_info {
         }
     }
 
-    /// This will be used populate the BUILD_INFO environment variable,
+    /// This will be used to populate the BUILD_INFO environment variable,
     /// which will be displayed as JSON when `holochain --build-info` is called.
     pub(crate) fn populate_env() {
         let json = BuildInfo::retrieve().as_json_string();
