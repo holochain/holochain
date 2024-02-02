@@ -38,7 +38,7 @@ where
     }
 }
 
-// #[instrument(skip(network, keystore, workspace, args))]
+#[tracing::instrument(skip_all)]
 pub async fn initialize_zomes_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,

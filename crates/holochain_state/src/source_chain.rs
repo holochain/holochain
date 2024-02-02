@@ -72,6 +72,7 @@ impl From<HeadInfo> for ChainHead {
     }
 }
 
+/// Cache for the chain head info to reduce database reads.
 #[derive(Clone)]
 pub struct HeadMutex {
     head: Arc<Mutex<Option<Option<HeadInfo>>>>,
@@ -81,9 +82,6 @@ pub struct HeadMutex {
             + Send
             + Sync,
     >,
-    // vault: DbRead<DbKindAuthored>,
-    // author: Arc<AgentPubKey>,
-    // allow_empty: bool,
 }
 
 impl HeadMutex {
@@ -99,6 +97,7 @@ impl HeadMutex {
         }
     }
 
+    /// Get or compute the cached head info, whether Some or None.
     pub async fn get_optional(&self) -> SourceChainResult<Option<HeadInfo>> {
         let mut l = self.head.lock().await;
         if let Some(head) = &*l {
@@ -110,10 +109,17 @@ impl HeadMutex {
         }
     }
 
+    /// Get or compute the cached head info.
+    /// This is an error if the chain is empty (has no head).
     pub async fn get(&self) -> SourceChainResult<HeadInfo> {
         self.get_optional()
             .await?
             .ok_or(SourceChainError::ChainEmpty)
+    }
+
+    /// Reset the cache so it will be recomputed next time.
+    pub async fn reset(&mut self) {
+        self.head.lock().await.take();
     }
 }
 
@@ -292,7 +298,7 @@ impl SourceChain {
     #[async_recursion]
     #[tracing::instrument(skip(self, network))]
     pub async fn flush(
-        &self,
+        mut self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
@@ -454,6 +460,9 @@ impl SourceChain {
                 }
             }
             Ok(actions) => {
+                // Invalidate the cached head info if there was a write,
+                // just in case this SourceChain is used again elsewhere
+                self.head_info.reset().await;
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
@@ -1669,6 +1678,14 @@ mod tests {
             (action, entry_hash)
         };
 
+        let chain = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
         // alice should find her own authorship with higher priority than the
         // committed grant even if she passes in the secret
         assert_eq!(
@@ -2155,10 +2172,23 @@ mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
+        let source_chain = SourceChain::new(
+            vault.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            (*author).clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(source_chain.len().await.unwrap(), 6);
+
         vault
             .read_async({
                 let check_h1 = h1.clone();
                 let check_h2 = h2.clone();
+
                 let check_author = author.clone();
 
                 move |txn| -> DatabaseResult<()> {
@@ -2453,9 +2483,15 @@ mod tests {
         .await
         .unwrap();
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
-            .await
-            .unwrap();
+        let chain = SourceChain::new(
+            vault.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await
+        .unwrap();
 
         // zomes initialized should be false after genesis
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
@@ -2476,6 +2512,9 @@ mod tests {
         mock.expect_chc().return_const(None);
         chain.flush(&mock).await.unwrap();
 
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert!(zomes_initialized);
