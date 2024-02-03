@@ -41,12 +41,12 @@ pub async fn app_bundle_from_dnas(dnas: impl IntoIterator<Item = &DnaFile>) -> A
 /// Get a "standard" InstallAppPayload from a single DNA
 pub async fn get_install_app_payload_from_dnas(
     installed_app_id: impl Into<InstalledAppId>,
-    agent_key: AgentPubKey,
+    agent_key: Option<AgentPubKey>,
     dnas: impl IntoIterator<Item = &DnaFile>,
 ) -> InstallAppPayload {
     let bundle = app_bundle_from_dnas(dnas).await;
     InstallAppPayload {
-        agent_key: Some(agent_key),
+        agent_key,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,

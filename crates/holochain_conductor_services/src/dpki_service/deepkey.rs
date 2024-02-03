@@ -55,7 +55,7 @@ impl DpkiService for DeepkeyBuiltin {
         let cell_id = self.installation.cell_id.clone();
         let provenance = cell_id.agent_pubkey().clone();
         let agent_anchor = key.get_raw_32();
-        let zome_name: ZomeName = "deepkey".into();
+        let zome_name: ZomeName = "deepkey_csr".into();
         let fn_name: FunctionName = "key_state".into();
         let payload = ExternIO::encode((agent_anchor, timestamp))?;
         let cap_secret = None;

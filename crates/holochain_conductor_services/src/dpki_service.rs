@@ -37,6 +37,10 @@ pub trait DpkiService: Send + Sync {
     fn cell_id(&self) -> &CellId;
 }
 
+#[async_trait::async_trait]
+pub trait DpkiServiceExt: DpkiService {}
+impl<T> DpkiServiceExt for T where T: DpkiService {}
+
 /// Mirrors the output type of the "key_state" zome function in dpki
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum KeyState {

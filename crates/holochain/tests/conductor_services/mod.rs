@@ -18,7 +18,8 @@ async fn initialize_dpki() {
     // Initialize dpki
     {
         // let deepkey_path = "./tests/conductor_services/deepkey.dna";
-        let deepkey_path = "/home/michael/Downloads/deepkey.dna";
+        // let deepkey_path = "/home/michael/Downloads/deepkey.dna";
+        let deepkey_path = "/home/michael/Holo/deepkey/dnas/deepkey/deepkey.dna";
         let dpki_dna = DnaBundle::read_from_file(&PathBuf::from(deepkey_path))
             .await
             .unwrap();

@@ -585,7 +585,11 @@ async fn validate_op_inner(
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     if let Some(dpki) = dpki {
-        check_dpki_agent_validity(op, dpki).await?;
+        let dpki = dpki.lock().await;
+        // Don't run DPKI agent validity checks on the DPKI service itself
+        if dpki.cell_id().dna_hash() != dna_def.as_hash() {
+            check_dpki_agent_validity(op, &*dpki).await?;
+        }
     }
     match op {
         DhtOp::StoreRecord(_, action, entry) => {

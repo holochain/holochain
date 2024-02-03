@@ -14,6 +14,8 @@ use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCh
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
+use crate::core::SysValidationError;
+use crate::core::ValidationOutcome;
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
 use holochain_p2p::ChcImpl;
@@ -114,14 +116,23 @@ where
 
     // Don't proceed if DPKI is initialized and the agent key is not valid
     if let Some(dpki) = api.conductor_services().dpki.as_ref() {
-        if !dpki
-            .lock()
-            .await
-            .key_state(agent_pubkey.clone(), Timestamp::now())
-            .await?
-            .is_valid()
-        {
-            return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
+        let dpki = dpki.lock().await;
+
+        dbg!(&dna_file.dna_def().name);
+        dbg!(dna_file.dna_def().all_zomes().collect::<Vec<_>>());
+
+        // When running genesis on DPKI itself, don't check the agent key
+        let is_dpki = dpki.cell_id().dna_hash() == dna_file.dna_hash();
+        if !is_dpki {
+            let now = Timestamp::now();
+
+            let is_valid = dpki.key_state(agent_pubkey.clone(), now).await?.is_valid();
+            if !is_dpki && !is_valid {
+                return Err(SysValidationError::ValidationOutcome(
+                    ValidationOutcome::DpkiAgentInvalid(agent_pubkey.clone(), now).into(),
+                )
+                .into());
+            }
         }
     }
 
