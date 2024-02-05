@@ -229,21 +229,20 @@ pub(crate) mod remote_v1 {
 
     impl RemoteV1Server {
         /// Creates a new server and starts it immediately.
-        pub async fn new(bind_socket: Option<&str>) -> Fallible<Self> {
+        pub async fn new(bind_socket: Option<String>) -> Fallible<Self> {
             let localv1 = LocalV1::default();
 
-            let original_url =
-                url2::Url2::try_parse(bind_socket.map(ToString::to_string).unwrap_or_else(|| {
-                    std::env::var(SHARED_VALUES_REMOTEV1_URL_ENV)
-                        .map_err(|e| {
-                            tracing::debug!(
-                                "could not read env var {SHARED_VALUES_REMOTEV1_URL_ENV}: {e}"
-                            );
-                            e
-                        })
-                        .ok()
-                        .unwrap_or(SHARED_VALUES_REMOTEV1_URL_DEFAULT.to_string())
-                }))?;
+            let original_url = url2::Url2::try_parse(bind_socket.unwrap_or_else(|| {
+                std::env::var(SHARED_VALUES_REMOTEV1_URL_ENV)
+                    .map_err(|e| {
+                        tracing::debug!(
+                            "could not read env var {SHARED_VALUES_REMOTEV1_URL_ENV}: {e}"
+                        );
+                        e
+                    })
+                    .ok()
+                    .unwrap_or(SHARED_VALUES_REMOTEV1_URL_DEFAULT.to_string())
+            }))?;
 
             tracing::debug!("binding server to {original_url}");
 
@@ -359,8 +358,9 @@ pub(crate) mod remote_v1 {
             }
         }
 
-        pub fn abort(self) {
+        pub async fn abort_and_join(self) -> Fallible<()> {
             self.server_handle.abort();
+            self.join().await
         }
 
         pub fn url(&self) -> &url2::Url2 {
@@ -491,24 +491,61 @@ pub(crate) mod remote_v1 {
     mod tests {
         use super::*;
 
+        // FIXME: this is racy as something else could bind the port in between
+        // dropping this listener and making use of the url
+        fn get_unused_ws_url() -> Fallible<String> {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+            let addr_bound = listener.local_addr()?;
+            Ok(format!("ws://{addr_bound}/"))
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn shared_values_remotev1_server_url_passing_fnarg() {
+            let url_to_use = get_unused_ws_url().unwrap();
+
+            let server = RemoteV1Server::new(Some(url_to_use.clone())).await.unwrap();
+
+            assert_eq!(server.url().to_string(), url_to_use);
+
+            server.abort_and_join().await.unwrap();
+        }
+
+        #[tokio::test(flavor = "multi_thread")]
+        async fn shared_values_remotev1_server_url_passing_env_var() {
+            let url_to_use = get_unused_ws_url().unwrap();
+
+            std::env::set_var(SHARED_VALUES_REMOTEV1_URL_ENV, url_to_use.clone());
+            let server = RemoteV1Server::new(None).await.unwrap();
+            assert_eq!(server.url().to_string(), url_to_use);
+
+            server.abort_and_join().await.unwrap();
+        }
+
         #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
+        #[cfg(feature = "slow_tests")]
         async fn shared_values_remotev1_server_message_test() {
             const NUM_MESSAGES: usize = 5_000;
 
-            let server = RemoteV1Server::new(None).await.unwrap();
+            let url_to_use = {
+                let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+                let addr_bound = listener.local_addr().unwrap();
+                Some(format!("ws://{addr_bound}/"))
+            };
+
+            let server = RemoteV1Server::new(url_to_use).await.unwrap();
+            let server_url = server.url().clone();
 
             let (tasks_tx, mut tasks_rx) = tokio::sync::mpsc::channel::<JoinHandle<_>>(100);
 
             {
-                let server = server.clone();
                 tokio::spawn(async move {
                     for i in 0..NUM_MESSAGES {
-                        let server = server.clone();
+                        let server_url = server_url.clone();
                         let sender_task = tokio::spawn(async move {
                             // TODO: make it work while reusing the sender
                             // Connect a client to the server
                             let (mut send, _recv) = holochain_websocket::connect(
-                                server.url().clone(),
+                                server_url,
                                 std::sync::Arc::new(WebsocketConfig::default()),
                             )
                             .await
@@ -543,8 +580,7 @@ pub(crate) mod remote_v1 {
 
             assert_eq!(NUM_MESSAGES, handled_tasks);
 
-            server.clone().abort();
-            server.join().await.unwrap();
+            server.abort_and_join().await.unwrap();
         }
     }
 }
