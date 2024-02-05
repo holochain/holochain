@@ -21,6 +21,9 @@ tracing = { workspace = true }
 
 dyn-clone = "1.0"
 
+strum = "0.26.1"
+strum_macros = "0.26.1"
+
 [features]
 
 "slow_tests" = []

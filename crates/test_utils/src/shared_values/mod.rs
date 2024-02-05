@@ -195,6 +195,19 @@ pub(crate) mod remote_v1 {
     pub const SHARED_VALUES_REMOTEV1_URL_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
     pub const SHARED_VALUES_REMOTEV1_URL_DEFAULT: &str = "ws://127.0.0.1:0";
 
+    // The value given to this env var is used to construct `RemoteV1Role`
+    pub const SHARED_VALUES_REMOTEV1_ROLE_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_ROLE";
+
+    #[derive(Debug, Default, strum_macros::EnumString)]
+    #[strum(serialize_all = "lowercase")]
+    enum RemoteV1Role {
+        #[default]
+        Both,
+
+        Server,
+        Client,
+    }
+
     /// Remote implementation using Websockets for data passing.
     #[derive(Clone)]
     pub struct RemoteV1Server {
@@ -489,6 +502,10 @@ pub(crate) mod remote_v1 {
     }
     #[cfg(test)]
     mod tests {
+        use std::str::FromStr;
+
+        use url2::Url2;
+
         use super::*;
 
         // FIXME: this is racy as something else could bind the port in between
@@ -521,18 +538,69 @@ pub(crate) mod remote_v1 {
             server.abort_and_join().await.unwrap();
         }
 
+        #[tokio::test(flavor = "multi_thread")]
+        async fn shared_values_remotev1_distributed() {
+            let role = std::env::var(SHARED_VALUES_REMOTEV1_ROLE_ENV)
+                .map(|role_env| RemoteV1Role::from_str(&role_env))
+                .unwrap_or_else(|_| Ok(RemoteV1Role::default()))
+                .unwrap();
+
+            println!("starting with role: {role:#?}");
+
+            match role {
+                RemoteV1Role::Both => {
+                    let server = RemoteV1Server::new(None).await.unwrap();
+                    println!("server listening on {}", server.url());
+
+                    let url_to_use = server.url();
+
+                    echo_msg("distributed", Url2::parse(url_to_use))
+                        .await
+                        .unwrap();
+                }
+                RemoteV1Role::Server => {
+                    let server = RemoteV1Server::new(None).await.unwrap();
+                    println!("server listening on {}", server.url());
+
+                    server.join().await.unwrap();
+                }
+
+                RemoteV1Role::Client => {
+                    let url_to_use = std::env::var(SHARED_VALUES_REMOTEV1_URL_ENV).unwrap();
+                    echo_msg("distributed", Url2::parse(url_to_use))
+                        .await
+                        .unwrap();
+                }
+            };
+        }
+
+        async fn echo_msg(i: impl std::fmt::Display, server_url: url2::Url2) -> Fallible<()> {
+            // TODO: make reusing the same sender work
+            // Connect a client to the server
+            let (mut send, _recv) = holochain_websocket::connect(
+                server_url.clone(),
+                std::sync::Arc::new(WebsocketConfig::default()),
+            )
+            .await
+            .context(format!("connecting to {server_url}"))?;
+
+            let s = format!("expecting this back {i}");
+
+            // Make a request and get the echoed response
+            match send.request(RequestMessage::Test(s.clone())).await {
+                Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
+                other => panic!("request {i}: {other:#?}"),
+            };
+
+            Ok(())
+        }
+
         #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
         #[cfg(feature = "slow_tests")]
         async fn shared_values_remotev1_server_message_test() {
             const NUM_MESSAGES: usize = 5_000;
 
-            let url_to_use = {
-                let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-                let addr_bound = listener.local_addr().unwrap();
-                Some(format!("ws://{addr_bound}/"))
-            };
-
-            let server = RemoteV1Server::new(url_to_use).await.unwrap();
+            let server = RemoteV1Server::new(None).await.unwrap();
             let server_url = server.url().clone();
 
             let (tasks_tx, mut tasks_rx) = tokio::sync::mpsc::channel::<JoinHandle<_>>(100);
@@ -541,24 +609,10 @@ pub(crate) mod remote_v1 {
                 tokio::spawn(async move {
                     for i in 0..NUM_MESSAGES {
                         let server_url = server_url.clone();
-                        let sender_task = tokio::spawn(async move {
-                            // TODO: make it work while reusing the sender
-                            // Connect a client to the server
-                            let (mut send, _recv) = holochain_websocket::connect(
-                                server_url,
-                                std::sync::Arc::new(WebsocketConfig::default()),
-                            )
-                            .await
-                            .unwrap();
-
-                            let s = format!("expecting this back {i}");
-
-                            // Make a request and get the echoed response
-                            match send.request(RequestMessage::Test(s.clone())).await {
-                                Ok(ResponseMessage::Test(r)) => assert_eq!(s, r),
-                                other => panic!("request {i}: {other:#?}"),
-                            };
-                        });
+                        let sender_task =
+                            tokio::spawn(
+                                async move { echo_msg(i, server_url.clone()).await.unwrap() },
+                            );
 
                         tasks_tx.send(sender_task).await.unwrap();
                     }
