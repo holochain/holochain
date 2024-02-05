@@ -94,7 +94,7 @@ async fn signed_zome_call() {
         }
     });
 
-    // Genesis entries are 0, 1, and 2. 
+    // Genesis entries are 0, 1, and 2.
     // 3 is the cap grant created during init in the test wasm.
     // 4 is InitZomesComplete.
     // 5 is this grant added via admin call.
