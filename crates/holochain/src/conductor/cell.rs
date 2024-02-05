@@ -943,7 +943,7 @@ impl Cell {
 
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[tracing::instrument(skip(self))]
-    async fn check_or_run_zome_init(&self) -> CellResult<()> {
+    pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
