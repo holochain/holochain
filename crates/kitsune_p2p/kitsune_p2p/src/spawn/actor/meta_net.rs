@@ -812,14 +812,15 @@ impl MetaNet {
 
         let evt_sender = host.legacy.clone();
         let tx5_config = tx5::Config3 {
-            /*
-            let mut tx5_config = tx5::DefConfig::default()
-                .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
-                .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
-                .with_max_conn_count(tuning_params.tx5_max_conn_count)
-                .with_max_conn_init(tuning_params.tx5_max_conn_init())
-                .with_conn_preflight(move |_, _| {
-            */
+            connection_count_max: tuning_params.tx5_connection_count_max,
+            send_buffer_bytes_max: tuning_params.tx5_send_buffer_bytes_max,
+            recv_buffer_bytes_max: tuning_params.tx5_recv_buffer_bytes_max,
+            incoming_message_bytes_max: tuning_params.tx5_incoming_message_bytes_max,
+            message_size_max: tuning_params.tx5_message_size_max,
+            internal_event_channel_size: tuning_params.tx5_internal_event_channel_size,
+            timeout: std::time::Duration::from_secs(tuning_params.tx5_timeout_s as u64),
+            backoff_start: std::time::Duration::from_secs(tuning_params.tx5_backoff_start_s as u64),
+            backoff_max: std::time::Duration::from_secs(tuning_params.tx5_backoff_max_s as u64),
             preflight: Some((
                 Arc::new(move |_| {
                     let i_s = kitsune_internal_sender.clone();
@@ -832,10 +833,6 @@ impl MetaNet {
                         wire::Wire::peer_unsolicited(agent_list).encode_vec()
                     })
                 }),
-                /*
-                })
-                .with_conn_validate(move |_, _, maybe_data| {
-                */
                 Arc::new(move |_, data| {
                     let e_s = evt_sender.clone();
                     Box::pin(async move {
@@ -844,10 +841,11 @@ impl MetaNet {
                                 _,
                                 wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
                             )) => {
-                                // @todo This loop only exists because we have to
-                                // put a space on PutAgentInfoSignedEvt, if the
-                                // internal peer space was used instead we could
-                                // do this in a single event with the whole list.
+                                // @todo This loop only exists because we have
+                                // to put a space on PutAgentInfoSignedEvt, if
+                                // the internal peer space was used instead we
+                                // could do this in a single event with the
+                                // whole list.
                                 for peer in peer_list {
                                     if let Err(err) = e_s
                                         .put_agent_info_signed(PutAgentInfoSignedEvt {
@@ -868,23 +866,12 @@ impl MetaNet {
                         }
                         Ok(())
                     })
-                    //});
                 }),
             )),
-            ..Default::default()
+            //..Default::default()
         };
 
-        tracing::info!(/*?tx5_config,*/ "meta net startup tx5");
-
-        /*
-        if let Some(lair_client) = host.lair_client() {
-            tx5_config.set_lair_client(lair_client);
-        }
-
-        if let Some(lair_tag) = host.lair_tag() {
-            tx5_config.set_lair_tag(lair_tag);
-        }
-        */
+        tracing::info!(?tx5_config, "meta net startup tx5");
 
         if let Err(err) = (tx5::deps::tx5_core::Tx5InitConfig {
             ephemeral_udp_port_min: tuning_params.tx5_min_ephemeral_udp_port,
@@ -894,7 +881,6 @@ impl MetaNet {
         {
             tracing::warn!(?err, "Tx5InitConfig failed, you must be running multiple conductors in the same process. Be aware they will all share whichever Tx5InitConfig was first to be registered.");
         }
-        //let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
         let (ep_hnd, mut ep_evt) = tx5::Ep3::new(Arc::new(tx5_config)).await;
         let ep_hnd = Arc::new(ep_hnd);
 
@@ -949,11 +935,7 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx5::Ep3Event::Message {
-                        peer_url,
-                        message,
-                        permit,
-                    } => {
+                    tx5::Ep3Event::Message { peer_url, message } => {
                         tracing::trace!(%peer_url, byte_count=?message.len(), "received bytes");
 
                         let mut message = std::io::Cursor::new(&message);
