@@ -96,7 +96,7 @@ impl SweetLocalRendezvous {
 
             let (sig_driver, sig_addr_list, _sig_err_list) =
                 tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
-            let sig_port = sig_addr_list.get(0).unwrap().port();
+            let sig_port = sig_addr_list.first().unwrap().port();
             let sig_addr: std::net::SocketAddr = (addr, sig_port).into();
             let sig_shutdown = tokio::task::spawn(sig_driver);
             let sig_addr = format!("ws://{sig_addr}");

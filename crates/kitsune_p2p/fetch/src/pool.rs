@@ -218,9 +218,7 @@ impl State {
         } = args;
 
         // Register sources once as they are discovered, with a default initial state
-        self.sources
-            .entry(source.clone())
-            .or_insert_with(SourceState::default);
+        self.sources.entry(source.clone()).or_default();
 
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
@@ -454,7 +452,7 @@ mod tests {
         context: Option<FetchContext>,
     ) -> FetchPoolItem {
         FetchPoolItem {
-            sources: Sources::new(sources.into_iter().map(|s| (s.clone()))),
+            sources: Sources::new(sources.into_iter()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
             size: None,

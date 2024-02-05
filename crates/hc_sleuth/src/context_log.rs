@@ -148,7 +148,7 @@ impl aitia::logging::Log for Context {
                 self.map_op_to_appval_dep_hash
                     .entry(op)
                     .or_default()
-                    .extend(deps.into_iter());
+                    .extend(deps);
             }
             Event::Fetched { .. } => {}
             Event::ReceivedHash { .. } => {}

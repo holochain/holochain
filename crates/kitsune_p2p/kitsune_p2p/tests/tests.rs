@@ -2,16 +2,12 @@ mod common;
 
 use common::*;
 use fixt::prelude::*;
-use ghost_actor::GhostSender;
 use kitsune_p2p::actor::BroadcastData;
-use kitsune_p2p::actor::KitsuneP2p;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::fixt::KitsuneAgentFixturator;
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p::KitsuneBinType;
-use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_bin_data::KitsuneBasis;
-use kitsune_p2p_bin_data::KitsuneSpace;
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
@@ -138,7 +134,7 @@ async fn two_nodes_publish_and_fetch() {
     // TODO This requires host code, does it make sense to construct valid values here?
     let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
 
-    let test_data = TestHostOp::new(space.clone().into());
+    let test_data = TestHostOp::new(space.clone());
     harness_a.op_store().write().push(test_data.clone());
 
     sender_a
@@ -205,7 +201,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
             harness_a
                 .op_store()
                 .write()
-                .push(TestHostOp::new(space.clone().into()));
+                .push(TestHostOp::new(space.clone()));
         }
     }
 
@@ -803,7 +799,7 @@ async fn publish_only_fetches_ops_once() {
     // TODO This requires host code, does it make sense to construct valid values here?
     let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
 
-    let test_data = TestHostOp::new(space.clone().into());
+    let test_data = TestHostOp::new(space.clone());
     harness_a.op_store().write().push(test_data.clone());
 
     sender_a
@@ -998,7 +994,7 @@ async fn delegate_publish() {
     // TODO This requires host code, does it make sense to construct valid values here?
     let basis = Arc::new(KitsuneBasis::new(vec![0; 32]));
 
-    let test_data = TestHostOp::new(space.clone().into());
+    let test_data = TestHostOp::new(space.clone());
     harness_a.op_store().write().push(test_data.clone());
 
     // Now A should just publish to B. B should delegate publish to C.

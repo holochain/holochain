@@ -72,10 +72,8 @@ impl TestHostOp {
             if loc < bounds.x.0 || loc > bounds.x.1 {
                 return false;
             }
-        } else {
-            if loc > bounds.x.0 && loc < bounds.x.1 {
-                return false;
-            }
+        } else if loc > bounds.x.0 && loc < bounds.x.1 {
+            return false;
         }
 
         if time < bounds.t.0 || time > bounds.t.1 {
@@ -86,15 +84,15 @@ impl TestHostOp {
     }
 }
 
-impl Into<RoughSized<KOpHash>> for TestHostOp {
-    fn into(self) -> RoughSized<KOpHash> {
-        RoughSized::new(self.kitsune_hash().into(), Some(36.into()))
+impl From<TestHostOp> for RoughSized<KOpHash> {
+    fn from(val: TestHostOp) -> Self {
+        RoughSized::new(val.kitsune_hash().into(), Some(36.into()))
     }
 }
 
-impl Into<KOp> for TestHostOp {
-    fn into(self) -> KOp {
-        let str = serde_json::to_string(&self).unwrap();
+impl From<TestHostOp> for KOp {
+    fn from(val: TestHostOp) -> Self {
+        let str = serde_json::to_string(&val).unwrap();
         KitsuneOpData::new(str.into_bytes())
     }
 }

@@ -706,10 +706,7 @@ impl Websocket {
     /// Try to deserialize the wire message and continue to next
     /// message if failure.
     fn deserialize_message(bytes: Vec<u8>) -> Loop<WireMessage> {
-        match SerializedBytes::try_from(UnsafeBytes::from(bytes))
-            .map_err(WebsocketError::from)
-            .and_then(|sb| Ok(WireMessage::try_from(sb)?))
-        {
+        match WireMessage::try_from(SerializedBytes::from(UnsafeBytes::from(bytes))) {
             Ok(msg) => Ok(msg),
             Err(e) => {
                 tracing::error!("Websocket failed to deserialize {:?}", e,);
@@ -719,19 +716,10 @@ impl Websocket {
             }
         }
     }
-    /// Try to deserialize the data and continue to next
-    /// message if failure.
+    /// Wrap the incoming bytes in `SerializedBytes`
     fn deserialize_bytes(data: Vec<u8>) -> Loop<SerializedBytes> {
-        let msg: Result<SerializedBytes, _> = UnsafeBytes::from(data).try_into();
-        match msg {
-            Ok(msg) => Ok(msg),
-            Err(e) => {
-                tracing::error!("Websocket failed to deserialize {:?}", e,);
-                // Should not kill the websocket just because a single message
-                // failed serialization.
-                Task::cont()
-            }
-        }
+        let msg: SerializedBytes = UnsafeBytes::from(data).into();
+        Ok(msg)
     }
 }
 

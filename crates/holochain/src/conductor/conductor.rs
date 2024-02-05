@@ -104,7 +104,7 @@ use holochain_state::source_chain;
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use parking_lot::{RwLock};
+use parking_lot::RwLock;
 use rusqlite::Transaction;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -122,26 +122,9 @@ pub use holochain_types::share;
 
 mod builder;
 
-pub use builder::*;
-
 mod chc;
 
-pub use chc::*;
-
 pub use holochain_conductor_services::*;
-
-pub use accessor_impls::*;
-pub use app_impls::*;
-pub use app_status_impls::*;
-pub use cell_impls::*;
-pub use clone_cell_impls::*;
-pub use dna_impls::*;
-pub use interface_impls::*;
-pub use misc_impls::*;
-pub use network_impls::*;
-pub use scheduler_impls::*;
-pub use startup_shutdown_impls::*;
-pub use state_impls::*;
 
 mod graft_records_onto_source_chain;
 
@@ -360,6 +343,8 @@ mod startup_shutdown_impls {
         ) -> ConductorResult<CellStartupErrors> {
             self.load_dnas().await?;
 
+            info!("Conductor startup: DNAs loaded.");
+
             // Start the task manager
             self.outcomes_task.share_mut(|lock| {
                 if lock.is_some() {
@@ -385,13 +370,21 @@ mod startup_shutdown_impls {
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;
+
+            info!("Conductor startup: admin interface(s) added.");
+
             self.clone().startup_app_interfaces().await?;
+
+            info!("Conductor startup: app interfaces started.");
 
             // We don't care what fx are returned here, since all cells need to
             // be spun up
             let _ = self.start_paused_apps().await?;
+            let res = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
-            self.process_app_status_fx(AppStatusFx::SpinUp, None).await
+            info!("Conductor startup: apps started.");
+
+            res
         }
     }
 }
@@ -529,8 +522,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-    
-
     use super::*;
 
     impl Conductor {
@@ -1318,7 +1309,7 @@ mod network_impls {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
             let (nonce, expires_at) =
-                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
+                holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),
@@ -1916,21 +1907,37 @@ mod app_status_impls {
                     let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    if cell
-                        .holochain_p2p_dna()
-                        .clone()
-                        .join(agent_pubkey, maybe_agent_info, maybe_initial_arc)
-                        .await
-                        .is_ok()
-                    {
-                        aitia::trace!(&hc_sleuth::Event::AgentJoined {
-                            node: sleuth_id,
-                            agent: cell_id.agent_pubkey().clone()
-                        });
-                    } else {
-                        tracing::error!(
-                            "Network join failed for {cell_id}. This should never happen."
-                        );
+                    let res = tokio::time::timeout(
+                        JOIN_NETWORK_WAITING_PERIOD,
+                        cell.holochain_p2p_dna().clone().join(
+                            agent_pubkey,
+                            maybe_agent_info,
+                            maybe_initial_arc,
+                        ),
+                    )
+                    .await;
+
+                    match res {
+                        Ok(r) => {
+                            match r {
+                                Ok(_) => {
+                                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
+                                        node: sleuth_id,
+                                        agent: cell_id.agent_pubkey().clone()
+                                    });
+                                },
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
+                                    );
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            tracing::warn!(
+                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
+                            );
+                        }
                     }
                 }
             }))

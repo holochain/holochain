@@ -433,8 +433,7 @@ mod test {
     // Blocks only block their span.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_not_block_is_not_blocked() {
-        for (start, check, end) in vec![
-            // before
+        for (start, check, end) in [
             (1, 0, 1),
             // after
             (0, 1, 0),
@@ -497,8 +496,7 @@ mod test {
     // no other target.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_is_blocked() {
-        for (start, mid, end) in vec![
-            // block is inclusive
+        for (start, mid, end) in [
             (0, 0, 0),
             (1, 1, 1),
             (-1, -1, -1),

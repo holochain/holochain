@@ -116,7 +116,7 @@ async fn app_validation_workflow_inner(
                     (
                         action.author().clone(),
                         action.action_seq(),
-                        matches!(dependency, None),
+                        dependency.is_none(),
                     )
                 });
 

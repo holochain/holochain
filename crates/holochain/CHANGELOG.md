@@ -6,15 +6,20 @@ default_semver_increment_mode: !pre_minor beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- There is no longer a notion of "joining the network". Previously, apps could fail to be enabled, accompanied by an error "Timed out trying to join the network" or "Error while trying to join the network". Now, apps never fail to start for this reason. If the network cannot be reached, the app starts anyway. It is up to the UI to determine whether the node is in an "online" state via `AppRequest::NetworkInfo` (soon-to-be improved with richer information).
-- CellStatus is deprecated and only remains in areas where deserialization would break if it were removed. The only valid CellStatus now is `CellStatus::Joined`. 
+
+- Added `lair_keystore_version_req` to the output of `--build-info` for Holochain.
+
+## 0.3.0-beta-dev.35
+
+- There is no longer a notion of “joining the network”. Previously, apps could fail to be enabled, accompanied by an error “Timed out trying to join the network” or “Error while trying to join the network”. Now, apps never fail to start for this reason. If the network cannot be reached, the app starts anyway. It is up to the UI to determine whether the node is in an “online” state via `AppRequest::NetworkInfo` (soon-to-be improved with richer information).
+- CellStatus is deprecated and only remains in areas where deserialization would break if it were removed. The only valid CellStatus now is `CellStatus::Joined`.
 
 ## 0.3.0-beta-dev.34
 
 - Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
 - Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
 - **BREAKING CHANGE:** Wasmer-related items from `holochain_types` have been moved to crate `holochain_wasmer_host::module`.
-- Refactor: Every ribosome used to create a separate wasmer module cache. During app installation of multiple agents on the same conductor, the caches weren't used, regardless of whether that DNA is already registered or not. The module cache is now moved to the conductor and kept there as a single instance.
+- Refactor: Every ribosome used to create a separate wasmer module cache. During app installation of multiple agents on the same conductor, the caches weren’t used, regardless of whether that DNA is already registered or not. The module cache is now moved to the conductor and kept there as a single instance.
 
 ## 0.3.0-beta-dev.33
 
