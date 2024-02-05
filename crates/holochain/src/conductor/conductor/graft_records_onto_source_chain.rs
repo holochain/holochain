@@ -138,7 +138,10 @@ async fn validate_records(
 
     // Create a raw source chain to validate against because
     // genesis may not have been run yet.
-    let workspace = SourceChainWorkspace::raw_empty(
+    //
+    // NOTE: this will cause problems if the chain head is ever checked,
+    // since the chain is empty at this point.
+    let workspace = SourceChainWorkspace::new(
         space.authored_db.clone(),
         space.dht_db.clone(),
         space.dht_query_cache.clone(),

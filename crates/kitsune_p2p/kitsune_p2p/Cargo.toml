@@ -33,7 +33,7 @@ must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../../holochain_trace" }
-once_cell = "1.4.1"
+once_cell = { workspace = true }
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 parking_lot = "0.12.1"
 rand = "0.8.5"

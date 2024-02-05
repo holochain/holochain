@@ -177,7 +177,7 @@ impl HostFnCaller {
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace_lock = HostFnWorkspace::new(
+        let mut workspace = HostFnWorkspace::new(
             authored_db,
             dht_db,
             dht_db_cache,
@@ -188,8 +188,13 @@ impl HostFnCaller {
         )
         .await
         .unwrap();
+
+        // We're about to enter a wasm context where we can't use async,
+        // so precompute the chain head now.
+        workspace.precompute_chain_head().await.unwrap();
+
         let host_access = ZomeCallHostAccess::new(
-            workspace_lock.clone(),
+            workspace.clone(),
             keystore,
             network,
             signal_tx,
@@ -204,7 +209,7 @@ impl HostFnCaller {
             // Auth as the author.
             InvocationAuth::Cap(cell_id.agent_pubkey().clone(), None),
         ));
-        (ribosome, call_context, workspace_lock)
+        (ribosome, call_context, workspace)
     }
 }
 

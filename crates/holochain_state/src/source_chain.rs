@@ -10,6 +10,7 @@ use crate::query::chain_head::ChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
+use futures::FutureExt;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -24,6 +25,8 @@ use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainJsonRecord;
 use holochain_types::sql::AsSql;
+use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::ghost_actor::dependencies::must_future::MustBoxFuture;
+use tokio::sync::Mutex;
 
 use crate::prelude::*;
 use crate::source_chain;
@@ -42,7 +45,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     dht_db_cache: DhtDbQueryCache,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
-    head_info: Option<HeadInfo>,
+    head_info: HeadMutex,
     public_only: bool,
     zomes_initialized: Arc<AtomicBool>,
 }
@@ -57,6 +60,68 @@ pub struct HeadInfo {
 impl HeadInfo {
     pub fn into_tuple(self) -> (ActionHash, u32, Timestamp) {
         (self.action, self.seq, self.timestamp)
+    }
+}
+
+impl From<HeadInfo> for ChainHead {
+    fn from(h: HeadInfo) -> Self {
+        ChainHead {
+            action_seq: h.seq,
+            hash: h.action,
+        }
+    }
+}
+
+/// Cache for the chain head info to reduce database reads.
+/// 
+/// This is all a bit hacky
+#[derive(Clone)]
+pub struct HeadMutex {
+    head: Arc<Mutex<Option<Option<HeadInfo>>>>,
+    getter: Arc<
+        dyn Fn() -> MustBoxFuture<'static, SourceChainResult<Option<HeadInfo>>>
+            + 'static
+            + Send
+            + Sync,
+    >,
+}
+
+impl HeadMutex {
+    pub fn new(
+        getter: impl 'static
+            + Send
+            + Sync
+            + Fn() -> MustBoxFuture<'static, SourceChainResult<Option<HeadInfo>>>,
+    ) -> Self {
+        Self {
+            head: Arc::new(Mutex::new(None)),
+            getter: Arc::new(getter),
+        }
+    }
+
+    /// Get or compute the cached head info, whether Some or None.
+    pub async fn get_optional(&self) -> SourceChainResult<Option<HeadInfo>> {
+        let mut l = self.head.lock().await;
+        if let Some(head) = &*l {
+            Ok(head.clone())
+        } else {
+            let head = (self.getter)().await?;
+            *l = Some(head.clone());
+            Ok(head)
+        }
+    }
+
+    /// Get or compute the cached head info.
+    /// This is an error if the chain is empty (has no head).
+    pub async fn get(&self) -> SourceChainResult<HeadInfo> {
+        self.get_optional()
+            .await?
+            .ok_or(SourceChainError::ChainEmpty)
+    }
+
+    /// Reset the cache so it will be recomputed next time.
+    pub async fn reset(&mut self) {
+        self.head.lock().await.take();
     }
 }
 
@@ -186,7 +251,8 @@ impl SourceChain {
             action: prev_action,
             seq: chain_head_seq,
             timestamp: chain_head_timestamp,
-        } = self.chain_head_nonempty()?;
+        } = self.chain_head_nonempty().await?;
+
         let action_seq = chain_head_seq + 1;
 
         // Build the action.
@@ -234,7 +300,7 @@ impl SourceChain {
     #[async_recursion]
     #[tracing::instrument(skip(self, network))]
     pub async fn flush(
-        &self,
+        mut self,
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
@@ -294,7 +360,8 @@ impl SourceChain {
 
         // Write the entries, actions and ops to the database in one transaction.
         let author = self.author.clone();
-        let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
+        let initial_head = self.chain_head().await?.map(|h| h.action);
+
         match self
             .vault
             .write_async(move |txn: &mut Transaction| {
@@ -304,20 +371,20 @@ impl SourceChain {
                 }
 
                 // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
-                let latest_head = head_info.as_ref().map(|h| h.action.clone());
+                let latest_head = chain_head_db(txn, author.clone())?;
+                let latest_head_action = latest_head.as_ref().map(|h| h.action.clone());
 
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
 
-                if persisted_head != latest_head {
+                if initial_head != latest_head_action {
                     return Err(SourceChainError::HeadMoved(
                         actions,
                         entries,
-                        persisted_head,
-                        head_info,
+                        initial_head,
+                        latest_head,
                     ));
                 }
 
@@ -395,6 +462,9 @@ impl SourceChain {
                 }
             }
             Ok(actions) => {
+                // Invalidate the cached head info if there was a write,
+                // just in case this SourceChain is used again elsewhere
+                self.head_info.reset().await;
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
@@ -424,46 +494,24 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = Some(
-            vault
-                .read_async({
-                    let author = author.clone();
-                    move |txn| chain_head_db_nonempty(&txn, author)
-                })
-                .await?,
-        );
-        Ok(Self {
-            scratch,
-            vault,
-            dht_db,
-            dht_db_cache,
-            keystore,
-            author,
-            head_info,
-            public_only: false,
-            zomes_initialized: Arc::new(AtomicBool::new(false)),
-        })
-    }
-
-    /// Create a source chain with a blank chain head.
-    /// You probably don't want this.
-    /// This type is only useful for when a source chain
-    /// really needs to be constructed before genesis runs.
-    pub async fn raw_empty(
-        vault: AuthorDb,
-        dht_db: DhtDb,
-        dht_db_cache: DhtDbQueryCache,
-        keystore: MetaLairClient,
-        author: AgentPubKey,
-    ) -> SourceChainResult<Self> {
-        let scratch = Scratch::new().into_sync();
-        let author = Arc::new(author);
-        let head_info = vault
-            .read_async({
+        let head_info = HeadMutex::new({
+            let vault = vault.clone();
+            let author = author.clone();
+            move || {
+                let vault = vault.clone();
                 let author = author.clone();
-                move |txn| chain_head_db(&txn, author)
-            })
-            .await?;
+
+                async move {
+                    let head_info = vault
+                        .read_async(move |txn| chain_head_db(&txn, author))
+                        .await?;
+                    Ok(head_info)
+                }
+                .boxed()
+                .into()
+            }
+        });
+
         Ok(Self {
             scratch,
             vault,
@@ -544,33 +592,31 @@ where
         self.zomes_initialized.store(value, Ordering::Relaxed);
     }
 
-    pub fn is_empty(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? == 0)
-    }
-
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
-    pub fn persisted_head_info(&self) -> Option<HeadInfo> {
-        self.head_info.clone()
+    pub async fn persisted_head_info(&self) -> SourceChainResult<Option<HeadInfo>> {
+        self.head_info.get_optional().await
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<Option<HeadInfo>> {
-        // Check scratch for newer head.
-        Ok(self
-            .scratch
-            .apply(|scratch| scratch.chain_head().or_else(|| self.persisted_head_info()))?)
+    pub async fn chain_head(&self) -> SourceChainResult<Option<HeadInfo>> {
+        if let Some(scratch_head) = self.scratch.apply(|scratch| scratch.chain_head())? {
+            // Check scratch for newer head.
+            Ok(Some(scratch_head))
+        } else {
+            self.persisted_head_info().await
+        }
     }
 
-    pub fn chain_head_nonempty(&self) -> SourceChainResult<HeadInfo> {
-        // Check scratch for newer head.
-        self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
+    pub async fn chain_head_nonempty(&self) -> SourceChainResult<HeadInfo> {
+        self.head_info.get().await
     }
 
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> SourceChainResult<u32> {
+    #[cfg(feature = "test_utils")]
+    pub async fn len(&self) -> SourceChainResult<u32> {
+        let persisted_max = self.head_info.get_optional().await?.map(|h| h.seq);
+
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = scratch.chain_head().map(|h| h.seq);
-            let persisted_max = self.head_info.as_ref().map(|h| h.seq);
             match (scratch_max, persisted_max) {
                 (None, None) => 0,
                 (Some(s), None) => s + 1,
@@ -579,6 +625,12 @@ where
             }
         })?)
     }
+
+    #[cfg(feature = "test_utils")]
+    pub async fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len().await? == 0)
+    }
+
     pub async fn valid_cap_grant(
         &self,
         check_function: GrantedFunction,
@@ -1628,6 +1680,14 @@ mod tests {
             (action, entry_hash)
         };
 
+        let chain = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
         // alice should find her own authorship with higher priority than the
         // committed grant even if she passes in the secret
         assert_eq!(
@@ -2114,10 +2174,23 @@ mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
+        let source_chain = SourceChain::new(
+            vault.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            (*author).clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(source_chain.len().await.unwrap(), 6);
+
         vault
             .read_async({
                 let check_h1 = h1.clone();
                 let check_h2 = h2.clone();
+
                 let check_author = author.clone();
 
                 move |txn| -> DatabaseResult<()> {
@@ -2412,9 +2485,15 @@ mod tests {
         .await
         .unwrap();
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
-            .await
-            .unwrap();
+        let chain = SourceChain::new(
+            vault.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await
+        .unwrap();
 
         // zomes initialized should be false after genesis
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
@@ -2435,6 +2514,9 @@ mod tests {
         mock.expect_chc().return_const(None);
         chain.flush(&mock).await.unwrap();
 
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert!(zomes_initialized);

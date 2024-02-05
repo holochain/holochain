@@ -36,6 +36,7 @@ pub enum Permission {
 
 impl HostFnAccess {
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "fixturators")]
     /// Constructor.
     pub fn new(
         agent_info: Permission,
@@ -62,6 +63,7 @@ impl HostFnAccess {
             keystore_deterministic,
         }
     }
+
     /// Allow all access
     pub fn all() -> Self {
         HostFnAccess {

@@ -885,30 +885,20 @@ impl Cell {
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from
         // an already running init call.
-        if workspace_lock
-            .as_ref()
-            .map_or(true, |w| !w.called_from_init())
-        {
-            // Check if init has run if not run it
-            self.check_or_run_zome_init().await?;
-        }
 
-        let keystore = self.conductor_api.keystore().clone();
-
-        let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster();
         let ribosome = self.get_ribosome()?;
-        let invocation =
-            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
-
-        let dna_def = ribosome.dna_def().as_content().clone();
+        let keystore = self.conductor_api.keystore().clone();
 
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
-        let workspace_lock = match workspace_lock {
-            Some(l) => l,
+
+        let workspace = match workspace_lock {
+            Some(w) => w,
             None => {
-                SourceChainWorkspace::new(
+                let dna_def = ribosome.dna_def().as_content().clone();
+
+                // Create the workspace
+                let workspace = SourceChainWorkspace::new(
                     self.authored_db().clone(),
                     self.dht_db().clone(),
                     self.space.dht_query_cache.clone(),
@@ -917,9 +907,17 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     Arc::new(dna_def),
                 )
-                .await?
+                .await?;
+
+                self.check_or_run_zome_init(workspace.clone()).await?;
+                workspace
             }
         };
+
+        let conductor_handle = self.conductor_handle.clone();
+        let signal_tx = self.signal_broadcaster();
+        let invocation =
+            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
@@ -930,7 +928,7 @@ impl Cell {
             is_root_zome_call,
         };
         Ok(call_zome_workflow(
-            workspace_lock,
+            workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
             args,
@@ -942,8 +940,8 @@ impl Cell {
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
-    #[tracing::instrument(skip(self))]
-    async fn check_or_run_zome_init(&self) -> CellResult<()> {
+    #[tracing::instrument(skip(self, workspace))]
+    async fn check_or_run_zome_init(&self, workspace: SourceChainWorkspace) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
@@ -952,32 +950,18 @@ impl Cell {
         .await
         .map_err(|_| CellError::InitTimeout)?;
 
+        // Check if initialization has run
+        if workspace.source_chain().zomes_initialized().await? {
+            return Ok(());
+        }
+
         // If not run it
         let keystore = self.conductor_api.keystore().clone();
-        let id = self.id.clone();
         let conductor_handle = self.conductor_handle.clone();
 
         // get the dna
         let ribosome = self.get_ribosome()?;
 
-        let dna_def = ribosome.dna_def().clone();
-
-        // Create the workspace
-        let workspace = SourceChainWorkspace::init_as_root(
-            self.authored_db().clone(),
-            self.dht_db().clone(),
-            self.space.dht_query_cache.clone(),
-            self.cache().clone(),
-            keystore.clone(),
-            id.agent_pubkey().clone(),
-            Arc::new(dna_def.into_content()),
-        )
-        .await?;
-
-        // Check if initialization has run
-        if workspace.source_chain().zomes_initialized().await? {
-            return Ok(());
-        }
         trace!("running init");
 
         let signal_tx = self.signal_broadcaster();

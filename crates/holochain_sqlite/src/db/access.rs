@@ -25,7 +25,7 @@ static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
 /// both implement read access.
-pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
+pub trait ReadAccess<Kind: DbKindT>: 'static + Send + Sync + Clone + Into<DbRead<Kind>> {
     /// Run an async read transaction on a background thread.
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where

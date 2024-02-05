@@ -241,10 +241,17 @@ impl ConductorBuilder {
                 let duration_metric = duration_metric.clone();
                 async move {
                     let PostCommitArgs {
-                        host_access,
+                        mut host_access,
                         invocation,
                         cell_id,
                     } = post_commit_args;
+
+                    host_access
+                        .workspace
+                        .precompute_chain_head()
+                        .await
+                        .expect("workspace must have source chain");
+
                     match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
                         Ok(ribosome) => {
                             if let Err(e) = tokio::task::spawn_blocking(move || {
