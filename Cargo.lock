@@ -8468,7 +8468,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56118fa9f9d16d66caf78f23faac825192ec5893974cd48684b500270e58a2a6"
 dependencies = [
  "bit_field",
  "bytes",
@@ -8491,7 +8493,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23f97a8029d045801651d2c00c1214226d8b3e1eda8d7da2a3f6e33e7f706565"
 dependencies = [
  "app_dirs2",
  "base64 0.13.1",
@@ -8508,7 +8512,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8893cfafc7ecb78df0d0c3f5c0302dcc3a83e9a2f43c9496be850165d074d3dc"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
@@ -8520,7 +8526,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7094b90be32dbc232f39168dd7a6b31ba236525c7374e1016b711ccaf93e509"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8537,7 +8545,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1c6e8200815e00a2ee46bba6bd5090e561d94e3245ceb2c5ec7aa89501e19ae"
 dependencies = [
  "base64 0.13.1",
  "dirs 5.0.1",
@@ -8553,7 +8563,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8f5f50fb29c21f11a183b744953dbaa5812b5ce6cbfccf513d971b00bf86e3"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8580,7 +8592,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal-srv"
-version = "0.0.6-alpha"
+version = "0.0.7-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "283dcaaa1f389612615fed7d1844d459862d771e2c31c2d3137a34ab584519b5"
 dependencies = [
  "clap 4.4.18",
  "dirs 5.0.1",
