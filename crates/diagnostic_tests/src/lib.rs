@@ -12,7 +12,7 @@ pub async fn setup_conductor_with_single_dna(
     dna: DnaFile,
 ) -> (SweetConductor, SweetZome) {
     let mut conductor = SweetConductor::from_config(config).await;
-    let app = conductor.setup_app("basic", &[dna]).await.unwrap();
+    let app = conductor.setup_app("basic", [&dna]).await.unwrap();
     let (cell,) = app.into_tuple();
     let zome = cell.zome("zome");
     (conductor, zome)
@@ -28,7 +28,7 @@ pub async fn setup_conductors_with_single_dna(
     let mut conductors = SweetConductorBatch::from_config(nodes, config).await;
     println!("Conductors created (t={:3.1?}).", start.elapsed());
 
-    let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
+    let apps = conductors.setup_app("basic", [&dna]).await.unwrap();
     let cells = apps.cells_flattened();
     println!("Apps setup (t={:3.1?}).", start.elapsed());
     println!(

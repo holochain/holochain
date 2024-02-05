@@ -42,15 +42,21 @@ pub async fn app_bundle_from_dnas(dnas: impl IntoIterator<Item = &DnaFile>) -> A
 pub async fn get_install_app_payload_from_dnas(
     installed_app_id: impl Into<InstalledAppId>,
     agent_key: AgentPubKey,
-    dnas: impl IntoIterator<Item = &DnaFile>,
+    data: &[(DnaFile, Option<MembraneProof>)],
 ) -> InstallAppPayload {
+    let data = data.into_iter().collect::<Vec<_>>();
+    let dnas: Vec<_> = data.iter().map(|(dna, _)| dna).collect();
+    let membrane_proofs = data
+        .iter()
+        .filter_map(|(dna, memproof)| Some((dna.dna_hash().to_string(), memproof.to_owned()?)))
+        .collect();
     let bundle = app_bundle_from_dnas(dnas).await;
     InstallAppPayload {
         agent_key,
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,
-        membrane_proofs: Default::default(),
+        membrane_proofs,
         #[cfg(feature = "chc")]
         ignore_genesis_failure: false,
     }

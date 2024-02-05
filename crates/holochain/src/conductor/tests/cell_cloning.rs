@@ -31,7 +31,7 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app_for_agent("app", alice.clone(), [&dna])
         .await
         .unwrap();
 
@@ -67,7 +67,7 @@ async fn create_clone_cell_creates_callable_cell() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
+        .setup_app_for_agent("app", alice.clone(), [&dna])
         .await
         .unwrap();
 
@@ -103,7 +103,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
+        .setup_app_for_agent("app", alice.clone(), [&dna])
         .await
         .unwrap();
 
@@ -143,11 +143,7 @@ async fn create_identical_clone_cell_twice_fails() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
-        .setup_app_for_agents(
-            "app",
-            &[alice.clone(), bob.clone()],
-            [&(role_name.clone(), dna.clone())],
-        )
+        .setup_app_for_agents("app", &[alice.clone(), bob.clone()], [&dna])
         .await
         .unwrap()
         .into_inner();
@@ -219,7 +215,7 @@ async fn clone_cell_deletion() {
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
     conductor
-        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app_for_agent(app_id, alice.clone(), [&dna])
         .await
         .unwrap();
     let clone_cell = conductor
@@ -348,7 +344,7 @@ async fn conductor_can_startup_with_cloned_cell() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app_for_agent("app", alice.clone(), [&dna])
         .await
         .unwrap();
 

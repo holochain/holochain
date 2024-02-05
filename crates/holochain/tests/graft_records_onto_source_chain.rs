@@ -211,7 +211,7 @@ async fn grafting() {
     let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
         "app",
         alice.agent_pubkey().clone(),
-        [&dna_file],
+        &[dna_file],
     )
     .await;
 

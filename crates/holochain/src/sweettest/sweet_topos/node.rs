@@ -107,7 +107,7 @@ impl NetworkTopologyNode {
                         .setup_app_for_agent(
                             &format!("{}", &cell_id),
                             key.clone(),
-                            [&dna_file.clone()],
+                            &[dna_file.clone()],
                         )
                         .await?;
                 }

@@ -18,15 +18,10 @@ async fn signed_zome_call() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let role_name: RoleName = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent(
-            "app",
-            agent_pub_key.clone(),
-            [&(role_name.clone(), dna.clone())],
-        )
+        .setup_app_for_agent("app", agent_pub_key.clone(), [&dna])
         .await
         .unwrap();
     let cell_id = app.cells()[0].cell_id();
@@ -94,7 +89,7 @@ async fn signed_zome_call() {
         }
     });
 
-    // Genesis entries are 0, 1, and 2. 
+    // Genesis entries are 0, 1, and 2.
     // 3 is the cap grant created during init in the test wasm.
     // 4 is InitZomesComplete.
     // 5 is this grant added via admin call.
@@ -178,15 +173,10 @@ async fn signed_zome_call_wildcard() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let role_name: RoleName = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent(
-            "app",
-            agent_pub_key.clone(),
-            [&(role_name.clone(), dna.clone())],
-        )
+        .setup_app_for_agent("app", agent_pub_key.clone(), [&dna])
         .await
         .unwrap();
     let cell_id = app.cells()[0].cell_id();

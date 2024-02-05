@@ -93,7 +93,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -273,7 +273,7 @@ async fn test_zero_arc_no_gossip_2way() {
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
@@ -363,7 +363,7 @@ async fn test_zero_arc_no_gossip_4way() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let cells = apps.cells_flattened();
     let zomes: Vec<_> = cells
         .iter()
@@ -471,7 +471,7 @@ async fn test_gossip_shutdown() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((cell_0,), (cell_1,)) = apps.into_tuples();
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
@@ -730,7 +730,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
         .unwrap();
 
     let (alice,) = alice.into_tuple();
-    let bobbo = conductor.setup_app("app2 ", &[dna_file]).await.unwrap();
+    let bobbo = conductor.setup_app("app2 ", [&dna_file]).await.unwrap();
 
     let (bobbo,) = bobbo.into_tuple();
 
