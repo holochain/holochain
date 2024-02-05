@@ -34,7 +34,7 @@ sysinfo = "0.29.7"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "full" ] }
 url = "2"
-url2 = "0.0.6"
+url2 = { workspace = true }
 
 fixt = { version = "^0.3.0-beta-dev.0", path = "../../fixt", optional = true }
 

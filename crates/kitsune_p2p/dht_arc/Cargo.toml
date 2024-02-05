@@ -29,7 +29,7 @@ holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../../holochain_trace
 pretty_assertions = "1.4.0"
 rand = "0.8.5"
 statrs = "0.16.0"
-tracing = "0.1"
+tracing = { workspace = true }
 
 [features]
 sqlite-encrypted = [

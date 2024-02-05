@@ -22,7 +22,7 @@ use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
-use holochain_state_types::SourceChainJsonRecord;
+use holochain_state_types::SourceChainDumpRecord;
 use holochain_types::sql::AsSql;
 
 use crate::prelude::*;
@@ -885,6 +885,10 @@ where
         })?;
         Ok(r)
     }
+
+    pub async fn dump(&self) -> SourceChainResult<SourceChainDump> {
+        dump_state(self.author_db().clone().into(), (*self.author).clone()).await
+    }
 }
 
 fn named_param_seq(base_name: &str, repeat: usize) -> String {
@@ -1228,7 +1232,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,
-) -> Result<SourceChainJsonDump, SourceChainError> {
+) -> Result<SourceChainDump, SourceChainError> {
     Ok(vault
         .read_async(move |txn| {
             let records = txn
@@ -1257,7 +1261,7 @@ pub async fn dump_state(
                             Some(entry) => Some(from_blob(entry)?),
                             None => None,
                         };
-                        StateQueryResult::Ok(SourceChainJsonRecord {
+                        StateQueryResult::Ok(SourceChainDumpRecord {
                             signature,
                             action_address,
                             action,
@@ -1280,7 +1284,7 @@ pub async fn dump_state(
                 },
                 |row| row.get(0),
             )?;
-            StateQueryResult::Ok(SourceChainJsonDump {
+            StateQueryResult::Ok(SourceChainDump {
                 records,
                 published_ops_count,
             })
