@@ -2153,7 +2153,7 @@ mod misc_impls {
                 entry_hash,
             };
 
-            source_chain
+            let action_hash = source_chain
                 .put_weightless(
                     action_builder,
                     Some(cap_grant_entry),
@@ -2162,10 +2162,9 @@ mod misc_impls {
                 .await?;
 
             let cell = self.cell_by_id(&cell_id).await?;
-            let actions = source_chain.flush(cell.holochain_p2p_dna()).await?;
-            assert_eq!(actions.len(), 1);
+            source_chain.flush(cell.holochain_p2p_dna()).await?;
 
-            Ok(actions[0].as_hash().clone())
+            Ok(action_hash)
         }
 
         /// Create a JSON dump of the cell's state
