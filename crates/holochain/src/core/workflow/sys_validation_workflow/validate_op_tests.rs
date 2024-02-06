@@ -8,48 +8,13 @@ use crate::core::workflow::sys_validation_workflow::validate_op;
 use crate::core::workflow::WorkflowResult;
 use crate::core::PrevActionErrorKind;
 use crate::core::ValidationOutcome;
-use crate::prelude::Action;
-use crate::prelude::ActionHashFixturator;
-use crate::prelude::ActionHashed;
-use crate::prelude::AgentPubKeyFixturator;
-use crate::prelude::AgentValidationPkgFixturator;
-use crate::prelude::AppEntryBytesFixturator;
-use crate::prelude::AppEntryDef;
-use crate::prelude::CreateLinkFixturator;
-use crate::prelude::DeleteFixturator;
-use crate::prelude::DeleteLinkFixturator;
-use crate::prelude::DhtOp;
-use crate::prelude::DnaDef;
-use crate::prelude::DnaDefHashed;
-use crate::prelude::DnaFixturator;
-use crate::prelude::DnaHashFixturator;
-use crate::prelude::Entry;
-use crate::prelude::EntryHashFixturator;
-use crate::prelude::EntryType;
-use crate::prelude::HoloHashed;
-use crate::prelude::SignedActionHashed;
-use crate::prelude::Timestamp;
-use crate::prelude::UpdateFixturator;
-use fixt::prelude::*;
+use crate::prelude::*;
+use ::fixt::prelude::*;
 use futures::FutureExt;
 use hdk::prelude::Dna as HdkDna;
-use holo_hash::hash_type::Agent;
-use holo_hash::HasHash;
-use holo_hash::HoloHash;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_serialized_bytes::prelude::SerializedBytes;
-use holochain_state::prelude::AppEntryBytes;
-use holochain_state::prelude::CreateFixturator;
-use holochain_state::prelude::SignatureFixturator;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::prelude::SignedActionHashedExt;
-use holochain_types::EntryHashed;
-use holochain_zome_types::prelude::AgentValidationPkg;
-use holochain_zome_types::prelude::EntryVisibility;
-use holochain_zome_types::record::Record;
-use holochain_zome_types::record::RecordEntry;
-use holochain_zome_types::record::SignedHashed;
 use parking_lot::Mutex;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -439,12 +404,12 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
     let common_timestamp = Timestamp::now();
 
     // Previous action
-    let mut validation_package_action = fixt!(AgentValidationPkg);
-    validation_package_action.author = test_case.agent.clone().into();
-    validation_package_action.action_seq = 10;
-    validation_package_action.timestamp = common_timestamp.clone().into();
+    let mut init_action = fixt!(InitZomesComplete);
+    init_action.author = test_case.agent.clone().into();
+    init_action.action_seq = 10;
+    init_action.timestamp = common_timestamp.clone().into();
     let previous_action = test_case
-        .sign_action(Action::AgentValidationPkg(validation_package_action))
+        .sign_action(Action::InitZomesComplete(init_action))
         .await;
 
     // Op to validate
@@ -467,19 +432,7 @@ async fn validate_create_op_with_timestamp_same_as_prev() {
         .await
         .unwrap();
 
-    assert_eq!(
-        Outcome::Rejected(
-            ValidationOutcome::PrevActionError(
-                (
-                    PrevActionErrorKind::Timestamp(common_timestamp.clone(), common_timestamp),
-                    Action::Create(create_action),
-                )
-                    .into(),
-            )
-            .to_string()
-        ),
-        outcome,
-    );
+    assert_eq!(Outcome::Accepted, outcome,);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -2238,7 +2191,7 @@ struct TestCase {
     cascade: MockCascade,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     dna_def: DnaDef,
-    agent: HoloHash<Agent>,
+    agent: AgentPubKey,
 }
 
 impl TestCase {
