@@ -12,7 +12,6 @@ use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::builder;
@@ -59,9 +58,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_actions = HostFnWorkspace::from(workspace.clone())
-            .flush(&network)
-            .await?;
+        let flushed_actions = workspace.source_chain().flush(&network).await?;
 
         send_post_commit(
             conductor_handle,
