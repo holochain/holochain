@@ -18,7 +18,6 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
 use holochain_zome_types::record::Record;
@@ -76,10 +75,7 @@ where
     // commit the workspace
     if should_write {
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        match HostFnWorkspace::from(workspace.clone())
-            .flush(&network)
-            .await
-        {
+        match workspace.source_chain().flush(&network).await {
             Ok(flushed_actions) => {
                 // Skip if nothing was written
                 if !flushed_actions.is_empty() {

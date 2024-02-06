@@ -40,16 +40,6 @@ pub struct HostFnStores {
 pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
 
 impl HostFnWorkspace {
-    pub async fn flush(
-        self,
-        network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<SignedActionHashed>> {
-        match self.source_chain {
-            Some(sc) => sc.flush(network).await,
-            None => Ok(Vec::with_capacity(0)),
-        }
-    }
-
     /// Get a reference to the host fn workspace's dna def.
     pub fn dna_def(&self) -> Arc<DnaDef> {
         self.dna_def.clone()

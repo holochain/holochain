@@ -299,18 +299,20 @@ impl SourceChain {
             .vault
             .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
+                // TODO: if the chain is locked, functions can still be scheduled.
+                //       Do we want that?
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
-
-                // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
-                let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
+
+                // As at check.
+                let head_info = chain_head_db(txn, author.clone())?;
+                let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
@@ -321,6 +323,7 @@ impl SourceChain {
                     ));
                 }
 
+                // TODO: should this be moved to the top of the function?
                 if is_chain_locked(txn, &lock, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
