@@ -44,7 +44,7 @@ pub async fn get_install_app_payload_from_dnas(
     agent_key: AgentPubKey,
     data: &[(DnaFile, Option<MembraneProof>)],
 ) -> InstallAppPayload {
-    let data = data.into_iter().collect::<Vec<_>>();
+    let data = data.iter().collect::<Vec<_>>();
     let dnas: Vec<_> = data.iter().map(|(dna, _)| dna).collect();
     let membrane_proofs = data
         .iter()
