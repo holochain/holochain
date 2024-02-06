@@ -70,7 +70,7 @@ serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
-sodoken = "=0.0.10"
+sodoken = { workspace = true }
 structopt = "0.3.11"
 strum = "0.18.0"
 subtle-encoding = "0.5"
