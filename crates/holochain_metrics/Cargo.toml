@@ -10,7 +10,7 @@ repository = "https://github.com/holochain/holochain"
 
 [dependencies]
 influxive = { version = "=0.0.2-alpha.1", optional = true }
-reqwest = "=0.11.17" # pinned until other libraries upgrade to ring 0.17
+reqwest = "=0.11.20" # pinned until other libraries upgrade to ring 0.17
 sct = "=0.7.0" # pinned until other libraries upgrade to ring 0.17
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 tracing = "0.1.37"
