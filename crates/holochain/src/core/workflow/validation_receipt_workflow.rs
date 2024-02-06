@@ -70,6 +70,8 @@ where
         .collect::<Vec<(AgentPubKey, Vec<ValidationReceipt>)>>();
 
     for (author, receipts) in grouped_by_author {
+        tracing::info!("Sending {:?} receipts to author {:?}", receipts.len(), author);
+
         // Try to send the validation receipts
         match sign_and_send_receipts_to_author(
             &dna_hash,
