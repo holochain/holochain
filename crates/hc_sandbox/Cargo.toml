@@ -32,7 +32,7 @@ once_cell = "1.13.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = { workspace = true }
-sodoken = "=0.0.9"
+sodoken = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 url2 = { workspace = true }
