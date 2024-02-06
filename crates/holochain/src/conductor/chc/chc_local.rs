@@ -268,7 +268,7 @@ mod tests {
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (c0,) = conductors[0]
-            .setup_app_for_agent("app", agent.clone(), &[dna_file])
+            .setup_app_for_agent("app", agent.clone(), &[dna_file.clone()])
             .await
             .unwrap()
             .into_tuple();
