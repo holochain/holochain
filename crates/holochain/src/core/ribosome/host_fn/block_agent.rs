@@ -111,10 +111,7 @@ mod test {
                 c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
             });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
-        let apps = conductors
-            .setup_app("create", &[dna_file.clone()])
-            .await
-            .unwrap();
+        let apps = conductors.setup_app("create", [&dna_file]).await.unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 

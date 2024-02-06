@@ -317,9 +317,9 @@ impl SweetConductor {
     ) -> ConductorApiResult<()> {
         let installed_app_id = installed_app_id.to_string();
 
-        let installed_cells: Vec<_> = dnas.into_iter().map(|d| (d.to_owned(), None)).collect();
+        let dnas_with_proof: Vec<_> = dnas.into_iter().map(|d| (d.to_owned(), None)).collect();
         self.raw_handle()
-            .install_app_legacy(installed_app_id.clone(), agent, &installed_cells)
+            .install_app_legacy(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
