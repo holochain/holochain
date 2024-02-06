@@ -897,7 +897,7 @@ impl MetaNet {
             while let Some(evt) = ep_evt.recv().await {
                 match evt {
                     tx5::Ep3Event::Error(err) => {
-                        panic!("Fatal tx5 error: {err:?}");
+                        tracing::error!(?err, "tx5 error");
                     }
                     tx5::Ep3Event::Connected { peer_url } => {
                         if evt_send
