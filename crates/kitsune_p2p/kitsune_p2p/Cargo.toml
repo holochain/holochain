@@ -44,7 +44,7 @@ thiserror = "1.0.22"
 tokio = { workspace = true }
 tracing = { workspace = true }
 tokio-stream = "0.1"
-tx5 = { version = "=0.0.6-alpha", optional = true }
+tx5 = { version = "=0.0.7-alpha", optional = true }
 url2 = { workspace = true }
 fixt = { path = "../../fixt", version = "^0.3.0-beta-dev.0"}
 
