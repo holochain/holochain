@@ -40,7 +40,7 @@ async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run().ok();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
-    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna]).await.unwrap();
     let cells: Vec<_> = apps
         .into_inner()
         .into_iter()

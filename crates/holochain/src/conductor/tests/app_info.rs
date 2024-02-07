@@ -17,14 +17,7 @@ async fn app_info_returns_all_cells_with_info() {
     let role_name_1: RoleName = "role_1".into();
     let role_name_2: RoleName = "role_2".into();
     conductor
-        .setup_app_for_agent(
-            &app_id,
-            agent_pub_key.clone(),
-            [
-                &(role_name_1.clone(), dna_1.clone()),
-                &(role_name_2.clone(), dna_2.clone()),
-            ],
-        )
+        .setup_app_for_agent(&app_id, agent_pub_key.clone(), [&dna_1, &dna_2])
         .await
         .unwrap();
 

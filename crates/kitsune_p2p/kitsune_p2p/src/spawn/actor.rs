@@ -988,7 +988,6 @@ mod tests {
     use kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
     use std::net::SocketAddr;
-    use tokio::task::AbortHandle;
     use url2::url2;
 
     #[cfg(feature = "tx2")]
@@ -1009,7 +1008,7 @@ mod tests {
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
@@ -1024,12 +1023,11 @@ mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_bootstrap_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
@@ -1044,7 +1042,6 @@ mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     async fn test_create_meta_net(
@@ -1072,22 +1069,17 @@ mod tests {
         .await
     }
 
-    fn start_signal_srv() -> (SocketAddr, AbortHandle) {
+    async fn start_signal_srv() -> (SocketAddr, tx5_signal_srv::SrvHnd) {
         let mut config = tx5_signal_srv::Config::default();
         config.interfaces = "127.0.0.1".to_string();
         config.port = 0;
         config.demo = false;
-        let (sig_driver, addr_list, err_list) =
-            tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+        let (sig_hnd, addr_list, err_list) =
+            tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
 
         assert!(err_list.is_empty());
         assert_eq!(1, addr_list.len());
 
-        let abort_handle = tokio::spawn(async move {
-            sig_driver.await;
-        })
-        .abort_handle();
-
-        (*addr_list.first().unwrap(), abort_handle)
+        (*addr_list.first().unwrap(), sig_hnd)
     }
 }

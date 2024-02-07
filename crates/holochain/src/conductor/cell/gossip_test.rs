@@ -1,12 +1,12 @@
 use crate::sweettest::*;
-use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_sqlite::store::AsP2pStateReadExt;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+use kitsune_p2p_types::config::TransportConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
@@ -43,16 +43,19 @@ async fn signature_smoke_test() {
 
     let rendezvous = SweetLocalRendezvous::new().await;
 
-    let mut network_config = KitsuneP2pConfig::default();
-    network_config.transport_pool = vec![TransportConfig::Mem {}];
+    let mut config = ConductorConfig::default();
+    config.network.transport_pool = vec![TransportConfig::Mem {}];
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
-    network_config.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
+    config.network.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
     let zomes = vec![TestWasm::Anchor];
-    let mut conductor_test =
-        ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(config, rendezvous).await;
+
+    conductor.setup_app("app", [&dna]).await.unwrap();
+
     // TODO should check that the app is running otherwise we don't know if bootstrap was called
-    conductor_test.shutdown_conductor().await;
+    conductor.shutdown().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

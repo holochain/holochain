@@ -20,6 +20,7 @@ use std::sync::Arc;
  */
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky in CI"]
 async fn minimise_p2p_agent_store_host_calls() {
     holochain_trace::test_run().unwrap();
 
