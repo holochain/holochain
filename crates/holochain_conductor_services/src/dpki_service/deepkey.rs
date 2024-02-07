@@ -1,3 +1,5 @@
+use self::zome_types::*;
+
 use super::*;
 
 use crate::CellRunner;
@@ -78,15 +80,14 @@ impl DpkiService for DeepkeyBuiltin {
     async fn derive_and_register_new_key(
         &self,
         app_name: InstalledAppId,
-        dna_hash: DnaHash,
+        dna_hashes: Vec<DnaHash>,
     ) -> DpkiServiceResult<AgentPubKey> {
-        let derivation_path: Vec<u32> = {
+        let derivation_details: DerivationDetailsInput = {
             let cell_id = self.installation.cell_id.clone();
             let provenance = cell_id.agent_pubkey().clone();
-            let zome_name: ZomeName = "deepkey".into();
-            let fn_name: FunctionName =
-                "TODO: get what the derivation path should be for the next key".into();
-            let payload = ExternIO::encode(dna_hash)?;
+            let zome_name: ZomeName = "deepkey_csr".into();
+            let fn_name: FunctionName = "next_derivation_details".into();
+            let payload = ExternIO::encode(app_name.clone())?;
             let cap_secret = None;
             self.runner
                 .call_zome(
@@ -101,6 +102,7 @@ impl DpkiService for DeepkeyBuiltin {
                 .map_err(DpkiServiceError::ZomeCallFailed)?
                 .decode()?
         };
+
         let info = self
             .keystore
             .lair_client()
@@ -109,19 +111,47 @@ impl DpkiService for DeepkeyBuiltin {
                 None,
                 nanoid::nanoid!().into(),
                 None,
-                derivation_path.into_boxed_slice(),
+                derivation_details.to_derivation_path().into_boxed_slice(),
             )
             .await
             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
         let agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
-        let signature = todo!("what signature is this?");
+
+        // This is the signature Deepkey requires
+        let signature = agent
+            .sign_raw(&self.keystore, agent.get_raw_39().into())
+            .await
+            .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+
+        #[cfg(test)]
+        assert_eq!(
+            hdk::prelude::verify_signature_raw(
+                agent.clone(),
+                signature.clone(),
+                agent.get_raw_39().to_vec()
+            ),
+            Ok(true)
+        );
+
+        let input = CreateKeyInput {
+            key_generation: KeyGeneration {
+                new_key: agent.clone(),
+                new_key_signing_of_author: signature,
+            },
+            app_binding: AppBindingInput {
+                app_name: app_name.clone(),
+                installed_app_id: app_name,
+                dna_hashes,
+            },
+            derivation_details,
+        };
 
         let _action_hash: ActionHash = {
             let cell_id = self.installation.cell_id.clone();
             let provenance = cell_id.agent_pubkey().clone();
-            let zome_name: ZomeName = "deepkey".into();
-            let fn_name: FunctionName = "register_key".into();
-            let payload = ExternIO::encode((agent.clone(), signature, dna_hash, app_name))?;
+            let zome_name: ZomeName = "deepkey_csr".into();
+            let fn_name: FunctionName = "create_key".into();
+            let payload = ExternIO::encode(input)?;
             let cap_secret = None;
             self.runner
                 .call_zome(

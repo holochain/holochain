@@ -3148,6 +3148,7 @@ dependencies = [
  "async-trait",
  "derive_more",
  "futures",
+ "hdk",
  "holochain_keystore",
  "holochain_types",
  "mockall",

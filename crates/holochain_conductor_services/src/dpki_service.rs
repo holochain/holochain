@@ -4,8 +4,14 @@ use holochain_types::prelude::*;
 
 pub mod derivation_paths;
 
+pub(crate) mod zome_types;
+
+pub use zome_types::KeyState;
+
 mod deepkey;
 pub use deepkey::*;
+
+use self::zome_types::*;
 
 /// This magic string, when used as the installed app id, denotes that the app
 /// is not actually an app, but the DPKI service! This is now a reserved app id,
@@ -30,7 +36,7 @@ pub trait DpkiService: Send + Sync {
     async fn derive_and_register_new_key(
         &self,
         app_name: InstalledAppId,
-        dna_hash: DnaHash,
+        dna_hashes: Vec<DnaHash>,
     ) -> DpkiServiceResult<AgentPubKey>;
 
     /// The CellId which backs this service
@@ -40,20 +46,6 @@ pub trait DpkiService: Send + Sync {
 #[async_trait::async_trait]
 pub trait DpkiServiceExt: DpkiService {}
 impl<T> DpkiServiceExt for T where T: DpkiService {}
-
-/// Mirrors the output type of the "key_state" zome function in dpki
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum KeyState {
-    NotFound,
-    Invalidated(SignedActionHashed),
-    Valid(SignedActionHashed),
-}
-
-impl KeyState {
-    pub fn is_valid(&self) -> bool {
-        matches!(self, KeyState::Valid(_))
-    }
-}
 
 /// The errors which can be produced by DPKI
 #[derive(thiserror::Error, Debug)]

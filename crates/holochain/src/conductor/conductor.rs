@@ -1385,7 +1385,6 @@ mod app_impls {
                     original_bundle
                 }
             };
-
             let manifest = bundle.manifest().clone();
 
             let installed_app_id =
@@ -1400,9 +1399,11 @@ mod app_impls {
                     agent_key
                 }
             } else if let Some(dpki) = self.running_services().dpki {
+                // TODO: record the DNAs installed, important for key restoration.
+                let dnas = vec![];
                 dpki.lock()
                     .await
-                    .derive_and_register_new_key(installed_app_id.clone(), todo!("which DNA?"))
+                    .derive_and_register_new_key(installed_app_id.clone(), dnas)
                     .await?
             } else {
                 self.keystore.new_sign_keypair_random().await?
