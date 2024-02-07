@@ -200,7 +200,7 @@ pub(crate) mod remote_v1 {
 
     #[derive(Debug, Default, strum_macros::EnumString)]
     #[strum(serialize_all = "lowercase")]
-    enum RemoteV1Role {
+    pub(crate) enum RemoteV1Role {
         #[default]
         Both,
 
@@ -642,10 +642,14 @@ pub(crate) mod remote_v1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::bail;
     use anyhow::Context;
     use tests::local_v1::*;
     use tests::remote_v1::*;
+    use url2::Url2;
 
+    use std::str::FromStr;
+    use std::thread::JoinHandle;
     use std::time::Duration;
 
     async fn inner_shared_values_trait_put_works(mut values: Box<dyn SharedValues>) {
@@ -869,5 +873,126 @@ mod tests {
         let values: Box<dyn SharedValues + Sync> =
             Box::new(RemoteV1Client::new(server.url(), None).await.unwrap());
         inner_shared_values_trait_simulate_agent_discovery(values).await;
+    }
+
+    fn shared_values_remotev1_simulate_agent_discovery_distributed_client(
+        mut values: Box<dyn SharedValues + Sync>,
+        required_agents: usize,
+        prefix: &'static str,
+    ) -> tokio::task::JoinHandle<Fallible<()>> {
+        tokio::spawn(async move {
+            let agent_dummy_info = AgentDummyInfo {
+                id: uuid::Uuid::new_v4(),
+            };
+
+            // register this client
+            values
+                .put_t(
+                    format!("{prefix}{}", &agent_dummy_info.id),
+                    serde_json::to_string(&agent_dummy_info).unwrap(),
+                )
+                .await?;
+
+            let mut all_agents: Data<AgentDummyInfo> = Default::default();
+            let mut num_agents = 0;
+
+            // wait for enough other clients to show up
+            tokio::select! {
+                result = async {
+                    while num_agents < required_agents {
+                        all_agents = values.get_pattern_t(prefix.to_string(), required_agents, None)
+                            .await.context(format!("getting all agents via pattern {prefix}")).unwrap()
+                            .into_iter()
+                            .map(|(key, value)| Ok((key.clone(), serde_json::from_str(&value).context(format!("deserializing value for {key}: {value:#?}"))?)))
+                            .collect::<Fallible<_>>().unwrap();
+
+                        num_agents =  all_agents.len();
+
+                        println!("{} agents {all_agents:#?}", num_agents);
+
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    };
+
+                    Fallible::<()>::Ok(())
+                } => result,
+                _ = tokio::time::sleep(Duration::from_secs(10)) => {
+                    bail!("not enough agents: {}", num_agents);
+                }
+            }
+        })
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn shared_values_remotev1_simulate_agent_discovery_distributed() {
+        let role = std::env::var(SHARED_VALUES_REMOTEV1_ROLE_ENV)
+            .map(|role_env| RemoteV1Role::from_str(&role_env))
+            .unwrap_or_else(|_| Ok(RemoteV1Role::default()))
+            .unwrap();
+
+        println!("starting with role: {role:#?}");
+
+        const PREFIX: &str = "shared_values_trait_simulate_agent_discovery_distributed_agent_";
+        const REQUIRED_AGENTS: usize = 3;
+
+        let mut handles: Vec<tokio::task::JoinHandle<Fallible<()>>> = Vec::new();
+
+        match role {
+            RemoteV1Role::Both => {
+                let server = RemoteV1Server::new(None).await.unwrap();
+                println!("server listening on {}", server.url());
+
+                let url_to_use = server.url();
+
+                let values: Box<dyn SharedValues + Sync> = Box::new(
+                    RemoteV1Client::new(&url_to_use, None)
+                        .await
+                        .expect("connecting remotev1 client"),
+                );
+
+                for _ in 0..REQUIRED_AGENTS {
+                    let handle = shared_values_remotev1_simulate_agent_discovery_distributed_client(
+                        values.clone(),
+                        REQUIRED_AGENTS,
+                        PREFIX,
+                    );
+
+                    handles.push(handle);
+                }
+
+                assert_eq!(handles.len(), REQUIRED_AGENTS);
+
+                for handle in handles {
+                    // consider client errors, this could be a timeout while waiting for all agents or something else
+                    // not sure why this needs double-unwrapping
+                    let _result = handle.await.unwrap().unwrap();
+                }
+            }
+            RemoteV1Role::Server => {
+                let server = RemoteV1Server::new(None).await.unwrap();
+                println!("server listening on {}", server.url());
+
+                server.join().await.unwrap();
+            }
+
+            RemoteV1Role::Client => {
+                let url_to_use =
+                    Url2::parse(std::env::var(SHARED_VALUES_REMOTEV1_URL_ENV).unwrap());
+
+                let values: Box<dyn SharedValues + Sync> = Box::new(
+                    RemoteV1Client::new(&url_to_use, None)
+                        .await
+                        .expect("connecting remotev1 client"),
+                );
+
+                let _result = shared_values_remotev1_simulate_agent_discovery_distributed_client(
+                    values.clone(),
+                    REQUIRED_AGENTS,
+                    PREFIX,
+                )
+                .await
+                .unwrap()
+                .unwrap();
+            }
+        };
     }
 }
