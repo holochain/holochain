@@ -30,7 +30,7 @@ async fn initialize_dpki() {
         assert!(matches!(response, AdminResponse::Ok));
     }
 
-    assert!(conductor.services().dpki.is_some());
+    assert!(conductor.running_services().dpki.is_some());
 
     // Install app
     {

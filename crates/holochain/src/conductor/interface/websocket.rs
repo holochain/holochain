@@ -296,7 +296,7 @@ pub mod test {
 
         conductor_handle
             .clone()
-            .install_app_legacy("test app".to_string(), agent, &dnas_with_proofs)
+            .install_app_legacy("test app".to_string(), Some(agent), &dnas_with_proofs)
             .await
             .unwrap();
 

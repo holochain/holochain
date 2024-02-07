@@ -1332,22 +1332,26 @@ mod app_impls {
 
     impl Conductor {
         #[cfg(feature = "test_utils")]
+        /// Install an app without needing to create a bundle.
+        ///
+        /// Returns the agent key of the installed app, (useful if you did
+        /// not specify an agent key to install with).
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            agent_key: AgentPubKey,
+            agent_key: Option<AgentPubKey>,
             data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<AgentPubKey> {
             let payload = crate::sweettest::get_install_app_payload_from_dnas(
                 installed_app_id,
-                Some(agent_key),
+                agent_key,
                 data,
             )
             .await;
 
-            self.install_app_bundle(payload).await?;
+            let app = self.install_app_bundle(payload).await?;
 
-            Ok(())
+            Ok(app.agent_key().clone())
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
@@ -1388,14 +1392,14 @@ mod app_impls {
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
             let agent_key = if let Some(agent_key) = agent_key {
-                if self.services().dpki.is_some() {
+                if self.running_services().dpki.is_some() {
                     return Err(ConductorError::Other(
                         "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
                     ));
                 } else {
                     agent_key
                 }
-            } else if let Some(dpki) = self.services().dpki {
+            } else if let Some(dpki) = self.running_services().dpki {
                 dpki.lock()
                     .await
                     .derive_and_register_new_key(installed_app_id.clone(), todo!("which DNA?"))
@@ -2076,7 +2080,7 @@ mod service_impls {
 
     impl Conductor {
         /// Access the current conductor services
-        pub fn services(&self) -> ConductorServices {
+        pub fn running_services(&self) -> ConductorServices {
             self.running_services.share_ref(|s| s.clone())
         }
 
@@ -2135,7 +2139,7 @@ mod service_impls {
             // Use app ID for role name as well, since this is pretty arbitrary
             let role_name = DPKI_APP_ID.into();
             self.clone()
-                .install_app_legacy(DPKI_APP_ID.into(), agent, &[((role_name, dna), None)])
+                .install_app_legacy(DPKI_APP_ID.into(), Some(agent), &[((role_name, dna), None)])
                 .await?;
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
 
@@ -2585,7 +2589,7 @@ mod accessor_impls {
         /// Construct the DnaCompatParams given the current setup
         pub async fn get_dna_compat(&self) -> DnaCompatParams {
             let f = self
-                .services()
+                .running_services()
                 .dpki
                 .clone()
                 .map(|c| async move { c.lock().await.cell_id().dna_hash().clone().into() })

@@ -345,21 +345,22 @@ impl SweetConductor {
     async fn setup_app_2_install_and_enable(
         &mut self,
         installed_app_id: &str,
-        agent: AgentPubKey,
+        agent: Option<AgentPubKey>,
         dnas_with_roles: &[impl DnaWithRole],
-    ) -> ConductorApiResult<()> {
+    ) -> ConductorApiResult<AgentPubKey> {
         let installed_app_id = installed_app_id.to_string();
 
         let dnas_with_proof: Vec<_> = dnas_with_roles
             .iter()
             .map(|dr| (dr.to_owned(), None))
             .collect();
-        self.raw_handle()
+        let agent = self
+            .raw_handle()
             .install_app_legacy(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
-        Ok(())
+        Ok(agent)
     }
 
     /// Build the SweetCells after `setup_cells` has been run
@@ -401,11 +402,12 @@ impl SweetConductor {
     }
 
     /// Opinionated app setup.
-    /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
-    pub async fn setup_app_for_agent<'a>(
+    /// Creates an app for the given agent, if specified, using the given DnaFiles,
+    /// with no extra configuration.
+    pub async fn setup_app_for_optional_agent<'a>(
         &mut self,
         installed_app_id: &str,
-        agent: AgentPubKey,
+        agent: Option<AgentPubKey>,
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
     ) -> ConductorApiResult<SweetApp> {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
@@ -414,12 +416,9 @@ impl SweetConductor {
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
         self.setup_app_1_register_dna(dnas.clone()).await?;
-        self.setup_app_2_install_and_enable(
-            installed_app_id,
-            agent.clone(),
-            dnas_with_roles.as_slice(),
-        )
-        .await?;
+        let agent = self
+            .setup_app_2_install_and_enable(installed_app_id, agent, dnas_with_roles.as_slice())
+            .await?;
 
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
@@ -431,6 +430,18 @@ impl SweetConductor {
     }
 
     /// Opinionated app setup.
+    /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
+    pub async fn setup_app_for_agent<'a>(
+        &mut self,
+        installed_app_id: &str,
+        agent: AgentPubKey,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
+    ) -> ConductorApiResult<SweetApp> {
+        self.setup_app_for_optional_agent(installed_app_id, Some(agent), dnas_with_roles)
+            .await
+    }
+
+    /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
     pub async fn setup_app<'a>(
@@ -438,9 +449,15 @@ impl SweetConductor {
         installed_app_id: &str,
         dnas: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetApp> {
-        let agent = SweetAgents::one(self.keystore()).await;
-        self.setup_app_for_agent(installed_app_id, agent, dnas)
-            .await
+        // If DPKI is in use, we must let DPKI generate the agent key
+        if self.running_services().dpki.is_some() {
+            self.setup_app_for_optional_agent(installed_app_id, None, dnas)
+                .await
+        } else {
+            let agent = SweetAgents::one(self.keystore()).await;
+            self.setup_app_for_optional_agent(installed_app_id, Some(agent), dnas)
+                .await
+        }
     }
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
@@ -466,7 +483,7 @@ impl SweetConductor {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             self.setup_app_2_install_and_enable(
                 &installed_app_id,
-                agent.to_owned(),
+                Some(agent.to_owned()),
                 &dnas_with_roles,
             )
             .await?;
