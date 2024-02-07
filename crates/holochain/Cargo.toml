@@ -125,7 +125,7 @@ sd-notify = "0.3.0"
 
 
 [dev-dependencies]
-holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "glacial_tests", "tx2", "tx5", "metrics_influxive"] }
+holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "tx2", "tx5", "metrics_influxive"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"

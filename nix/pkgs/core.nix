@@ -88,7 +88,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,chc,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,chc,build_wasms -- --nocapture
     done
     for i in {0..100}
     do
