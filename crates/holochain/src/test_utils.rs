@@ -53,7 +53,6 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
-pub mod conductor_setup;
 pub mod consistency;
 pub mod hc_stress_test;
 pub mod host_fn_caller;
@@ -64,7 +63,6 @@ mod wait_for;
 pub use wait_for::*;
 
 mod big_stack_test;
-pub use big_stack_test::*;
 
 mod generate_records;
 pub use generate_records::*;
@@ -316,16 +314,16 @@ where
 /// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
-    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    data: &[(DnaFile, Option<MembraneProof>)],
     conductor_handle: ConductorHandle,
 ) {
-    for dna in dnas {
-        conductor_handle.register_dna(dna).await.unwrap();
+    for (dna, _) in data.iter() {
+        conductor_handle.register_dna(dna.clone()).await.unwrap();
     }
     conductor_handle
         .clone()
-        .install_app_legacy(name.to_string(), cell_data)
+        .install_app_legacy(name.to_string(), agent, data)
         .await
         .unwrap();
 
@@ -344,13 +342,13 @@ pub async fn install_app(
 }
 
 /// Payload for installing cells
-pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
+pub type DnasWithProofs = Vec<(DnaFile, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
 pub async fn setup_app_in_new_conductor(
     installed_app_id: InstalledAppId,
-    dnas: Vec<DnaFile>,
-    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+    agent: AgentPubKey,
+    dnas: DnasWithProofs,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 
@@ -360,7 +358,7 @@ pub async fn setup_app_in_new_conductor(
         .await
         .unwrap();
 
-    install_app_in_conductor(conductor_handle.clone(), installed_app_id, dnas, cell_data).await;
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
 
     let handle = conductor_handle.clone();
 
@@ -375,16 +373,16 @@ pub async fn setup_app_in_new_conductor(
 pub async fn install_app_in_conductor(
     conductor_handle: ConductorHandle,
     installed_app_id: InstalledAppId,
-    dnas: Vec<DnaFile>,
-    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+    agent: AgentPubKey,
+    dnas_with_proofs: &[(DnaFile, Option<MembraneProof>)],
 ) {
-    for dna in dnas {
-        conductor_handle.register_dna(dna).await.unwrap();
+    for (dna, _) in dnas_with_proofs {
+        conductor_handle.register_dna(dna.clone()).await.unwrap();
     }
 
     conductor_handle
         .clone()
-        .install_app_legacy(installed_app_id.clone(), cell_data)
+        .install_app_legacy(installed_app_id.clone(), agent, dnas_with_proofs)
         .await
         .unwrap();
 
@@ -406,27 +404,27 @@ pub async fn install_app_in_conductor(
 /// Setup an app for testing
 /// apps_data is a vec of app nicknames with vecs of their cell data
 pub async fn setup_app_with_names(
-    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    apps_data: Vec<(&str, DnasWithProofs)>,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
     let (iface, handle) =
-        setup_app_inner(dir.path().to_path_buf().into(), apps_data, dnas, None).await;
+        setup_app_inner(dir.path().to_path_buf().into(), agent, apps_data, None).await;
     (dir, iface, handle)
 }
 
 /// Setup an app with a custom network config for testing
 /// apps_data is a vec of app nicknames with vecs of their cell data.
 pub async fn setup_app_with_network(
-    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    apps_data: Vec<(&str, DnasWithProofs)>,
     network: KitsuneP2pConfig,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
     let (iface, handle) = setup_app_inner(
         dir.path().to_path_buf().into(),
+        agent,
         apps_data,
-        dnas,
         Some(network),
     )
     .await;
@@ -436,8 +434,8 @@ pub async fn setup_app_with_network(
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
     data_root_path: DataRootPath,
-    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    apps_data: Vec<(&str, DnasWithProofs)>,
     network: Option<KitsuneP2pConfig>,
 ) -> (RealAppInterfaceApi, ConductorHandle) {
     let config = ConductorConfig {
@@ -455,7 +453,13 @@ pub async fn setup_app_inner(
         .unwrap();
 
     for (app_name, cell_data) in apps_data {
-        install_app(app_name, cell_data, dnas.clone(), conductor_handle.clone()).await;
+        install_app(
+            app_name,
+            agent.clone(),
+            &cell_data,
+            conductor_handle.clone(),
+        )
+        .await;
     }
 
     let handle = conductor_handle.clone();
@@ -733,7 +737,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.live_cell_ids() {
+    for cell_id in conductor.running_cell_ids() {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))

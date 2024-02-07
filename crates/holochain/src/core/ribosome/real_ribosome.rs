@@ -95,9 +95,7 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-use crate::conductor::paths::DataRootPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
-use holochain_conductor_api::conductor::paths::WasmRootPath;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
@@ -123,7 +121,7 @@ pub struct RealRibosome {
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
     /// File system and in-memory cache for wasm modules.
-    pub module_cache: Arc<RwLock<ModuleCache>>,
+    pub wasmer_module_cache: Arc<RwLock<ModuleCache>>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -210,20 +208,13 @@ impl RealRibosome {
     /// Create a new instance
     pub fn new(
         dna_file: DnaFile,
-        maybe_data_root_path: Option<DataRootPath>,
+        wasmer_module_cache: Arc<RwLock<ModuleCache>>,
     ) -> RibosomeResult<Self> {
-        let maybe_fs_dir = match maybe_data_root_path {
-            Some(data_root_path) => {
-                Some(WasmRootPath::try_from(data_root_path)?.as_ref().to_owned())
-            }
-            None => None,
-        };
-        // Create an empty ribosome.
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_fs_dir))),
+            wasmer_module_cache,
         };
 
         // Collect the number of entry and link types
@@ -259,7 +250,7 @@ impl RealRibosome {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
+        let map = GlobalZomeTypes::from_ordered_iterator(iter);
 
         ribosome.zome_types = Arc::new(map?);
 
@@ -315,14 +306,14 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
+            wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         }
     }
 
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = self.module_cache.write();
+        let module_cache = self.wasmer_module_cache.write();
         let module = module_cache.get(cache_key, wasm)?;
         Ok(module)
     }
@@ -430,7 +421,10 @@ impl RealRibosome {
             coordinator_zomes: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
-        let empty_ribosome = RealRibosome::new(empty_dna_file, None)?;
+        let empty_ribosome = RealRibosome::new(
+            empty_dna_file,
+            Arc::new(RwLock::new(ModuleCache::new(None))),
+        )?;
         let context_key = RealRibosome::next_context_key();
         let mut store = Store::default();
         // We just leave this Env uninitialized as default because we never make it
@@ -1094,7 +1088,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], &[dna_file])
             .await
             .unwrap();
 

@@ -108,6 +108,7 @@ impl KitsuneTestHarness {
         self.legacy_host_api.create_agent().await
     }
 
+    #[allow(dead_code)]
     pub fn agent_store(&self) -> Arc<parking_lot::RwLock<Vec<AgentInfoSigned>>> {
         self.agent_store.clone()
     }
@@ -120,6 +121,7 @@ impl KitsuneTestHarness {
         self.legacy_host_api.drain_events().await
     }
 
+    #[allow(dead_code)]
     pub fn duplicate_ops_received_count(&self) -> u32 {
         self.legacy_host_api.duplicate_ops_received_count()
     }
@@ -140,14 +142,13 @@ pub async fn start_bootstrap() -> (SocketAddr, AbortHandle) {
     (bs_addr, abort_handle)
 }
 
-pub async fn start_signal_srv() -> (SocketAddr, AbortHandle) {
+pub async fn start_signal_srv() -> (SocketAddr, tx5_signal_srv::SrvHnd) {
     let mut config = tx5_signal_srv::Config::default();
     config.interfaces = "127.0.0.1".to_string();
     config.port = 0;
     config.demo = false;
-    let (sig_driver, addr_list, _err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+    let (sig_hnd, addr_list, _err_list) =
+        tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
 
-    let abort_handle = tokio::spawn(sig_driver).abort_handle();
-
-    (addr_list.first().unwrap().clone(), abort_handle)
+    (*addr_list.first().unwrap(), sig_hnd)
 }

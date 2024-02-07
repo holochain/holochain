@@ -48,7 +48,7 @@ impl Eq for Loc8 {}
 
 impl PartialOrd for Loc8 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.val.partial_cmp(&other.val)
+        Some(self.cmp(other))
     }
 }
 

@@ -33,6 +33,8 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasmer_host::module::ModuleCache;
+use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -59,7 +61,8 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        let ribosome = RealRibosome::new(dna_file, None).unwrap();
+        let ribosome =
+            RealRibosome::new(dna_file, Arc::new(RwLock::new(ModuleCache::new(None)))).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
@@ -440,7 +443,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
         signature: SignatureFixturator::new(Empty).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()),
         expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
@@ -451,7 +454,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
         signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()),
         // @todo should this be less predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
@@ -475,7 +478,7 @@ fixturator!(
             .next()
             .unwrap(),
         signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
         // @todo should this be more predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };

@@ -1,4 +1,4 @@
-use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
+use super::{DnaWithRole, SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::{SweetCell, SweetLocalRendezvous};
 use ::fixt::prelude::StdRng;
@@ -134,19 +134,22 @@ impl SweetConductorBatch {
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each SweetApp.
-    pub async fn setup_app(
+    pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dna_files: &[DnaFile],
+        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
-            .map(|conductor| async move {
-                let agent = SweetAgents::one(conductor.keystore()).await;
-                conductor
-                    .setup_app_for_agent(installed_app_id, agent, dna_files)
-                    .await
+            .map(|conductor| {
+                let dna_files = dna_files.clone();
+                async move {
+                    let agent = SweetAgents::one(conductor.keystore()).await;
+                    conductor
+                        .setup_app_for_agent(installed_app_id, agent, dna_files)
+                        .await
+                }
             })
             .collect::<Vec<_>>();
 
@@ -166,13 +169,13 @@ impl SweetConductorBatch {
     ///
     /// Returns a batch of SweetApps, sorted in the same order as the Conductors in
     /// this batch.
-    pub async fn setup_app_for_zipped_agents(
+    pub async fn setup_app_for_zipped_agents<'a>(
         &mut self,
         installed_app_id: &str,
-        agents: &[AgentPubKey],
-        dna_files: &[DnaFile],
+        agents: impl IntoIterator<Item = &AgentPubKey> + Clone,
+        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
-        if agents.len() != self.0.len() {
+        if agents.clone().into_iter().count() != self.0.len() {
             panic!(
                 "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
             )
@@ -181,9 +184,9 @@ impl SweetConductorBatch {
         let apps = self
             .0
             .iter_mut()
-            .zip(agents.iter())
+            .zip(agents.into_iter())
             .map(|(conductor, agent)| {
-                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
+                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files.clone())
             })
             .collect::<Vec<_>>();
 
