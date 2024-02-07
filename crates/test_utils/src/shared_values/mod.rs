@@ -4,6 +4,11 @@
 
 /*
  * TODO: rewrite all the tests to use the same logic for testing all trait impls
+ *
+ * TODO: test case idea by ThetaSinner
+ *   1. run a network with more agents than the sharding limit
+ *   2. create an entry on the DHT
+ *   3. ensure that the entry reaches all agents
  */
 
 use std::{collections::BTreeMap, time::Duration};
