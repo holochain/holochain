@@ -115,27 +115,29 @@ impl DpkiService for DeepkeyBuiltin {
             )
             .await
             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-        let agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
+        let app_agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
+
+        let dpki_agent = self.cell_id().agent_pubkey().clone();
 
         // This is the signature Deepkey requires
-        let signature = agent
-            .sign_raw(&self.keystore, agent.get_raw_39().into())
+        let signature = app_agent
+            .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
             .await
             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
 
         #[cfg(test)]
         assert_eq!(
             hdk::prelude::verify_signature_raw(
-                agent.clone(),
+                app_agent.clone(),
                 signature.clone(),
-                agent.get_raw_39().to_vec()
+                dpki_agent.get_raw_39().to_vec()
             ),
             Ok(true)
         );
 
         let input = CreateKeyInput {
             key_generation: KeyGeneration {
-                new_key: agent.clone(),
+                new_key: app_agent.clone(),
                 new_key_signing_of_author: signature,
             },
             app_binding: AppBindingInput {
@@ -167,7 +169,7 @@ impl DpkiService for DeepkeyBuiltin {
                 .decode()?
         };
 
-        Ok(agent)
+        Ok(app_agent)
     }
 
     fn cell_id(&self) -> &CellId {
