@@ -133,9 +133,9 @@ pub fn call(
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
                                                     wasmer::RuntimeError::from(wasm_error!(
-                                                        WasmErrorInner::Host(
-                                                            "Role not found.".to_string()
-                                                        )
+                                                        WasmErrorInner::Host(format!(
+                                                            "Role not found: {role_name}"
+                                                        ))
                                                     ))
                                                 })
                                             })
@@ -251,7 +251,14 @@ pub mod wasm_test {
         let (alice_pubkey, _) = SweetAgents::alice_and_bob();
 
         let apps = conductor
-            .setup_app_for_agents("app-", [&alice_pubkey], [&dna_file_1, &dna_file_2])
+            .setup_app_for_agents(
+                "app-",
+                [&alice_pubkey],
+                [
+                    &("role1".to_string(), dna_file_1),
+                    &("role2".to_string(), dna_file_2),
+                ],
+            )
             .await
             .unwrap();
 
