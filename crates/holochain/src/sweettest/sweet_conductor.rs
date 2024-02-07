@@ -433,10 +433,10 @@ impl SweetConductor {
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
-    pub async fn setup_app(
+    pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dnas: impl IntoIterator<Item = &DnaFile> + Clone,
+        dnas: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetApp> {
         let agent = SweetAgents::one(self.keystore()).await;
         self.setup_app_for_agent(installed_app_id, agent, dnas)

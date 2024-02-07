@@ -267,7 +267,10 @@ async fn run(
     )
     .await;
 
-    let app = conductor.setup_app("hc_demo_cli", [&dna]).await.unwrap();
+    let app = conductor
+        .setup_app("hc_demo_cli", [&("hc_demo_cli".to_string(), dna.clone())])
+        .await
+        .unwrap();
 
     let cell = app.cells().first().unwrap().clone();
     tracing::info!(?cell);
