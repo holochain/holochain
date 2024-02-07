@@ -350,7 +350,10 @@ impl SweetConductor {
     ) -> ConductorApiResult<()> {
         let installed_app_id = installed_app_id.to_string();
 
-        let dnas_with_proof: Vec<_> = dnas_with_roles.into_iter().map(|dr| (dr.to_owned(), None)).collect();
+        let dnas_with_proof: Vec<_> = dnas_with_roles
+            .iter()
+            .map(|dr| (dr.to_owned(), None))
+            .collect();
         self.raw_handle()
             .install_app_legacy(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;

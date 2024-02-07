@@ -53,7 +53,7 @@ pub async fn get_install_app_payload_from_dnas(
     let bundle = app_bundle_from_dnas(dnas_with_roles).await;
     let membrane_proofs = data
         .into_iter()
-        .filter_map(|(dr, memproof)| Some((dr.role(), memproof.clone().unwrap_or_default())))
+        .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
         .collect();
     InstallAppPayload {
         agent_key,
