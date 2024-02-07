@@ -1336,15 +1336,13 @@ mod network_impls {
 mod app_impls {
     use super::*;
 
-    use crate::sweettest::DnaWithRole;
-
     impl Conductor {
         #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             agent_key: AgentPubKey,
-            data: &[(impl DnaWithRole, Option<MembraneProof>)],
+            data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<()> {
             let payload = crate::sweettest::get_install_app_payload_from_dnas(
                 installed_app_id,
