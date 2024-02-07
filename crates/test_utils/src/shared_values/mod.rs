@@ -204,6 +204,12 @@ pub(crate) mod remote_v1 {
     // The value given to this env var is used to construct `RemoteV1Role`
     pub const SHARED_VALUES_REMOTEV1_ROLE_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_ROLE";
 
+    pub const TEST_AGENT_READINESS_REQUIRED_AGENTS_ENV: &str =
+        "TEST_AGENT_READINESS_REQUIRED_AGENTS";
+    pub const TEST_AGENT_READINESS_REQUIRED_AGENTS_DEFAULT: usize = 3;
+    pub const TEST_AGENT_READINESS_TIMEOUT_SECS_ENV: &str = "TEST_AGENT_READINESS_TIMEOUT_SECS";
+    pub const TEST_AGENT_READINESS_TIMEOUT_SECS_DEFAULT: u64 = 360;
+
     #[derive(Debug, Default, strum_macros::EnumString)]
     #[strum(serialize_all = "lowercase")]
     pub(crate) enum RemoteV1Role {
@@ -909,7 +915,7 @@ mod tests {
             tokio::select! {
                 result = async {
                     while num_agents < required_agents {
-                        all_agents = values.get_pattern_t(prefix.to_string(), required_agents, None)
+                        all_agents = values.get_pattern_t(prefix.to_string(), required_agents, Some(timeout))
                             .await.context(format!("getting all agents via pattern {prefix}")).unwrap()
                             .into_iter()
                             .map(|(key, value)| Ok((key.clone(), serde_json::from_str(&value).context(format!("deserializing value for {key}: {value:#?}"))?)))
@@ -924,7 +930,7 @@ mod tests {
 
                     Ok(agent_dummy_info)
                 } => result,
-                _ = tokio::time::sleep(Duration::from_secs(10)) => {
+                _ = tokio::time::sleep(timeout) => {
                     bail!("not enough agents: {}", num_agents);
                 }
             }
@@ -933,6 +939,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn shared_values_remotev1_simulate_agent_discovery_distributed() {
+        const PREFIX: &str = "shared_values_trait_simulate_agent_discovery_distributed_agent_";
+
         let role = std::env::var(SHARED_VALUES_REMOTEV1_ROLE_ENV)
             .map(|role_env| RemoteV1Role::from_str(&role_env))
             .unwrap_or_else(|_| Ok(RemoteV1Role::default()))
@@ -940,8 +948,10 @@ mod tests {
 
         println!("starting with role: {role:#?}");
 
-        const PREFIX: &str = "shared_values_trait_simulate_agent_discovery_distributed_agent_";
-        const REQUIRED_AGENTS: usize = 3;
+        let required_agents = std::env::var_os(TEST_AGENT_READINESS_REQUIRED_AGENTS_ENV)
+            .map(|s| s.to_string_lossy().parse::<usize>().ok())
+            .flatten()
+            .unwrap_or(TEST_AGENT_READINESS_REQUIRED_AGENTS_DEFAULT);
 
         let mut handles: Vec<tokio::task::JoinHandle<Fallible<_>>> = Vec::new();
 
@@ -958,17 +968,18 @@ mod tests {
                         .expect("connecting remotev1 client"),
                 );
 
-                for _ in 0..REQUIRED_AGENTS {
+                for _ in 0..required_agents {
                     let handle = shared_values_remotev1_simulate_agent_discovery_distributed_client(
                         values.clone(),
-                        REQUIRED_AGENTS,
+                        required_agents,
                         PREFIX,
+                        std::time::Duration::from_millis(100),
                     );
 
                     handles.push(handle);
                 }
 
-                assert_eq!(handles.len(), REQUIRED_AGENTS);
+                assert_eq!(handles.len(), required_agents);
 
                 for handle in handles {
                     // consider client errors, this could be a timeout while waiting for all agents or something else
@@ -995,8 +1006,14 @@ mod tests {
 
                 let _result = shared_values_remotev1_simulate_agent_discovery_distributed_client(
                     values.clone(),
-                    REQUIRED_AGENTS,
+                    required_agents,
                     PREFIX,
+                    Duration::from_secs(
+                        std::env::var_os(TEST_AGENT_READINESS_TIMEOUT_SECS_ENV)
+                            .map(|s| u64::from_str(&s.to_string_lossy()).ok())
+                            .flatten()
+                            .unwrap_or(TEST_AGENT_READINESS_TIMEOUT_SECS_DEFAULT),
+                    ),
                 )
                 .await
                 .unwrap()
