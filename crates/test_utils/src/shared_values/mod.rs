@@ -37,9 +37,10 @@ pub(crate) trait SharedValues: DynClone + Sync + Send {
 }
 dyn_clone::clone_trait_object!(SharedValues);
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub(crate) struct AgentDummyInfo {
     id: Uuid,
+    online: bool,
 }
 
 pub(crate) mod local_v1 {
@@ -846,6 +847,7 @@ mod tests {
             let handle = tokio::spawn(async move {
                 let agent_dummy_info = AgentDummyInfo {
                     id: uuid::Uuid::new_v4(),
+                    ..Default::default()
                 };
                 values
                     .put_t(
@@ -884,10 +886,12 @@ mod tests {
         mut values: Box<dyn SharedValues + Sync>,
         required_agents: usize,
         prefix: &'static str,
-    ) -> tokio::task::JoinHandle<Fallible<()>> {
+        timeout: std::time::Duration,
+    ) -> tokio::task::JoinHandle<Fallible<AgentDummyInfo>> {
         tokio::spawn(async move {
             let agent_dummy_info = AgentDummyInfo {
                 id: uuid::Uuid::new_v4(),
+                ..Default::default()
             };
 
             // register this client
@@ -918,7 +922,7 @@ mod tests {
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     };
 
-                    Fallible::<()>::Ok(())
+                    Ok(agent_dummy_info)
                 } => result,
                 _ = tokio::time::sleep(Duration::from_secs(10)) => {
                     bail!("not enough agents: {}", num_agents);
@@ -939,7 +943,7 @@ mod tests {
         const PREFIX: &str = "shared_values_trait_simulate_agent_discovery_distributed_agent_";
         const REQUIRED_AGENTS: usize = 3;
 
-        let mut handles: Vec<tokio::task::JoinHandle<Fallible<()>>> = Vec::new();
+        let mut handles: Vec<tokio::task::JoinHandle<Fallible<_>>> = Vec::new();
 
         match role {
             RemoteV1Role::Both => {
