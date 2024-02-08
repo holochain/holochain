@@ -2134,8 +2134,12 @@ mod misc_impls {
         pub async fn grant_zome_call_capability(
             &self,
             payload: GrantZomeCallCapabilityPayload,
-        ) -> ConductorApiResult<()> {
+        ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
+
+            // Must init before committing a grant
+            let cell = self.cell_by_id(&cell_id).await?;
+            cell.check_or_run_zome_init().await?;
 
             let source_chain = SourceChain::new(
                 self.get_or_create_authored_db(cell_id.dna_hash())?,
@@ -2154,7 +2158,7 @@ mod misc_impls {
                 entry_hash,
             };
 
-            source_chain
+            let action_hash = source_chain
                 .put_weightless(
                     action_builder,
                     Some(cap_grant_entry),
@@ -2165,7 +2169,7 @@ mod misc_impls {
             let cell = self.cell_by_id(&cell_id).await?;
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
-            Ok(())
+            Ok(action_hash)
         }
 
         /// Create a JSON dump of the cell's state

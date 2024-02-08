@@ -22,7 +22,7 @@ use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
-use holochain_state_types::SourceChainJsonRecord;
+use holochain_state_types::SourceChainDumpRecord;
 use holochain_types::sql::AsSql;
 
 use crate::prelude::*;
@@ -299,18 +299,20 @@ impl SourceChain {
             .vault
             .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
+                // TODO: if the chain is locked, functions can still be scheduled.
+                //       Do we want that?
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
-
-                // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
-                let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
+
+                // As at check.
+                let head_info = chain_head_db(txn, author.clone())?;
+                let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
@@ -321,6 +323,7 @@ impl SourceChain {
                     ));
                 }
 
+                // TODO: should this be moved to the top of the function?
                 if is_chain_locked(txn, &lock, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
@@ -544,10 +547,6 @@ where
         self.zomes_initialized.store(value, Ordering::Relaxed);
     }
 
-    pub fn is_empty(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? == 0)
-    }
-
     /// Accessor for the chain head that will be used at flush time to check
     /// the "as at" for ordering integrity etc.
     pub fn persisted_head_info(&self) -> Option<HeadInfo> {
@@ -566,7 +565,7 @@ where
         self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
     }
 
-    #[allow(clippy::len_without_is_empty)]
+    #[cfg(feature = "test_utils")]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
             let scratch_max = scratch.chain_head().map(|h| h.seq);
@@ -579,6 +578,12 @@ where
             }
         })?)
     }
+
+    #[cfg(feature = "test_utils")]
+    pub fn is_empty(&self) -> SourceChainResult<bool> {
+        Ok(self.len()? == 0)
+    }
+
     pub async fn valid_cap_grant(
         &self,
         check_function: GrantedFunction,
@@ -884,6 +889,10 @@ where
                 })
         })?;
         Ok(r)
+    }
+
+    pub async fn dump(&self) -> SourceChainResult<SourceChainDump> {
+        dump_state(self.author_db().clone().into(), (*self.author).clone()).await
     }
 }
 
@@ -1228,7 +1237,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
 pub async fn dump_state(
     vault: DbRead<DbKindAuthored>,
     author: AgentPubKey,
-) -> Result<SourceChainJsonDump, SourceChainError> {
+) -> Result<SourceChainDump, SourceChainError> {
     Ok(vault
         .read_async(move |txn| {
             let records = txn
@@ -1257,7 +1266,7 @@ pub async fn dump_state(
                             Some(entry) => Some(from_blob(entry)?),
                             None => None,
                         };
-                        StateQueryResult::Ok(SourceChainJsonRecord {
+                        StateQueryResult::Ok(SourceChainDumpRecord {
                             signature,
                             action_address,
                             action,
@@ -1280,7 +1289,7 @@ pub async fn dump_state(
                 },
                 |row| row.get(0),
             )?;
-            StateQueryResult::Ok(SourceChainJsonDump {
+            StateQueryResult::Ok(SourceChainDump {
                 records,
                 published_ops_count,
             })
