@@ -1,10 +1,6 @@
-#![allow(missing_docs)] // TODO: remove this
-
 //! This module implements value sharing for out-of-band communication between test agents.
 
 /*
- * TODO: rewrite all the tests to use the same logic for testing all trait impls
- *
  * TODO: test case idea by ThetaSinner
  *   1. run a network with more agents than the sharding limit
  *   2. create an entry on the DHT
@@ -20,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::iter::Iterator;
 use uuid::Uuid;
 
-pub type Data<T> = BTreeMap<String, T>;
+pub(crate) type Data<T> = BTreeMap<String, T>;
 
 // type WaitUntilFn = dyn Fn(&'_ Data<String>) -> BoxFuture<'_, bool>;
 
@@ -55,7 +51,7 @@ pub(crate) mod local_v1 {
 
     /// Local implementation using a guarded BTreeMap as its datastore.
     #[derive(Clone, Default)]
-    pub struct LocalV1 {
+    pub(crate) struct LocalV1 {
         num_waiters: Arc<AtomicUsize>,
         data: Arc<tokio::sync::Mutex<BTreeMap<String, String>>>,
         notification: Arc<tokio::sync::Mutex<BTreeMap<String, Arc<tokio::sync::Notify>>>>,
@@ -66,7 +62,7 @@ pub(crate) mod local_v1 {
         /// `wait_until` lets the caller decide under which conditions to accept the result, or otherwise keep waiting.
         ///
         /// Please look at the tests for usage examples.
-        pub async fn get_pattern<F>(
+        pub(crate) async fn get_pattern<F>(
             &mut self,
             pattern: &str,
             mut wait_until: F,
@@ -119,12 +115,12 @@ pub(crate) mod local_v1 {
             }
         }
 
-        pub fn num_waiters(&self) -> usize {
+        pub(crate) fn num_waiters(&self) -> usize {
             self.num_waiters.load(Ordering::SeqCst)
         }
 
         /// Puts the `value` for `key` and notifies any waiters if there are any.
-        pub async fn put(&mut self, key: String, value: String) -> Fallible<Option<String>> {
+        pub(crate) async fn put(&mut self, key: String, value: String) -> Fallible<Option<String>> {
             let mut data_guard = self.data.lock().await;
 
             let maybe_previous = if let Some(previous) = data_guard.insert(key.clone(), value) {
@@ -185,7 +181,6 @@ pub(crate) mod remote_v1 {
     use futures::StreamExt;
 
     use serde::{Deserialize, Serialize};
-    use std::borrow::Borrow;
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::task::JoinHandle;
@@ -198,17 +193,18 @@ pub(crate) mod remote_v1 {
     use super::local_v1::LocalV1;
     use super::{Data, SharedValues};
 
-    pub const SHARED_VALUES_REMOTEV1_URL_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
-    pub const SHARED_VALUES_REMOTEV1_URL_DEFAULT: &str = "ws://127.0.0.1:0";
+    pub(crate) const SHARED_VALUES_REMOTEV1_URL_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_URL";
+    pub(crate) const SHARED_VALUES_REMOTEV1_URL_DEFAULT: &str = "ws://127.0.0.1:0";
 
     // The value given to this env var is used to construct `RemoteV1Role`
-    pub const SHARED_VALUES_REMOTEV1_ROLE_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_ROLE";
+    pub(crate) const SHARED_VALUES_REMOTEV1_ROLE_ENV: &str = "TEST_SHARED_VALUES_REMOTEV1_ROLE";
 
-    pub const TEST_AGENT_READINESS_REQUIRED_AGENTS_ENV: &str =
+    pub(crate) const TEST_AGENT_READINESS_REQUIRED_AGENTS_ENV: &str =
         "TEST_AGENT_READINESS_REQUIRED_AGENTS";
-    pub const TEST_AGENT_READINESS_REQUIRED_AGENTS_DEFAULT: usize = 3;
-    pub const TEST_AGENT_READINESS_TIMEOUT_SECS_ENV: &str = "TEST_AGENT_READINESS_TIMEOUT_SECS";
-    pub const TEST_AGENT_READINESS_TIMEOUT_SECS_DEFAULT: u64 = 360;
+    pub(crate) const TEST_AGENT_READINESS_REQUIRED_AGENTS_DEFAULT: usize = 3;
+    pub(crate) const TEST_AGENT_READINESS_TIMEOUT_SECS_ENV: &str =
+        "TEST_AGENT_READINESS_TIMEOUT_SECS";
+    pub(crate) const TEST_AGENT_READINESS_TIMEOUT_SECS_DEFAULT: u64 = 360;
 
     #[derive(Debug, Default, strum_macros::EnumString)]
     #[strum(serialize_all = "lowercase")]
@@ -222,14 +218,15 @@ pub(crate) mod remote_v1 {
 
     /// Remote implementation using Websockets for data passing.
     #[derive(Clone)]
-    pub struct RemoteV1Server {
+    pub(crate) struct RemoteV1Server {
         local_addr: url2::Url2,
 
         server_handle: Arc<JoinHandle<Fallible<()>>>,
     }
 
+    /// Payload for requests
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
-    pub enum RequestMessage {
+    pub(crate) enum RequestMessage {
         Test(String),
         Put {
             key: String,
@@ -243,8 +240,9 @@ pub(crate) mod remote_v1 {
         NumWaiters,
     }
 
+    /// Payload for responses
     #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
-    pub enum ResponseMessage {
+    pub(crate) enum ResponseMessage {
         StringErr(String),
         Test(String),
         Put(Result<Option<String>, String>),
@@ -254,7 +252,7 @@ pub(crate) mod remote_v1 {
 
     impl RemoteV1Server {
         /// Creates a new server and starts it immediately.
-        pub async fn new(bind_socket: Option<String>) -> Fallible<Self> {
+        pub(crate) async fn new(bind_socket: Option<String>) -> Fallible<Self> {
             let localv1 = LocalV1::default();
 
             let original_url = url2::Url2::try_parse(bind_socket.unwrap_or_else(|| {
@@ -367,7 +365,7 @@ pub(crate) mod remote_v1 {
             Ok(())
         }
 
-        pub async fn join(self) -> Fallible<()> {
+        pub(crate) async fn join(self) -> Fallible<()> {
             match Arc::into_inner(self.server_handle)
                 .ok_or_else(|| anyhow::anyhow!("couldn't get join handle"))?
                 .await
@@ -383,21 +381,19 @@ pub(crate) mod remote_v1 {
             }
         }
 
-        pub async fn abort_and_join(self) -> Fallible<()> {
+        pub(crate) async fn abort_and_join(self) -> Fallible<()> {
             self.server_handle.abort();
             self.join().await
         }
 
-        pub fn url(&self) -> &url2::Url2 {
+        pub(crate) fn url(&self) -> &url2::Url2 {
             &self.local_addr
         }
     }
 
-    use futures::lock::Mutex;
-
     /// Remote implementation using Websockets for data passing.
     #[derive(Clone)]
-    pub struct RemoteV1Client {
+    pub(crate) struct RemoteV1Client {
         url: url2::Url2,
         // TODO: figure out how to reuse an existing sender. the first attempt yielded errors for subsequent requests
         // sender: Arc<Mutex<holochain_websocket::WebsocketSender>>,
@@ -405,15 +401,15 @@ pub(crate) mod remote_v1 {
         maybe_request_timeout: Option<Duration>,
     }
 
-    pub const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 10;
+    pub(crate) const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 10;
 
     impl RemoteV1Client {
         /// Returns a new client.
-        pub async fn new(
+        pub(crate) async fn new(
             url: &url2::Url2,
             maybe_websocket_config: Option<WebsocketConfig>,
         ) -> Fallible<Self> {
-            let (sender, receiver) = holochain_websocket::connect(
+            let (_sender, _receiver) = holochain_websocket::connect(
                 url.clone(),
                 Arc::new(maybe_websocket_config.unwrap_or_default()),
             )
@@ -428,7 +424,7 @@ pub(crate) mod remote_v1 {
         }
 
         /// Sends a request to the connected server.
-        pub async fn request(
+        pub(crate) async fn request(
             &self,
             request: RequestMessage,
             maybe_timeout: Option<Duration>,
@@ -661,7 +657,6 @@ mod tests {
     use url2::Url2;
 
     use std::str::FromStr;
-    use std::thread::JoinHandle;
     use std::time::Duration;
 
     async fn inner_shared_values_trait_put_works(mut values: Box<dyn SharedValues>) {
@@ -973,7 +968,7 @@ mod tests {
                         values.clone(),
                         required_agents,
                         PREFIX,
-                        std::time::Duration::from_millis(100),
+                        std::time::Duration::from_secs(1),
                     );
 
                     handles.push(handle);
