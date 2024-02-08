@@ -18,8 +18,6 @@ use uuid::Uuid;
 
 pub(crate) type Data<T> = BTreeMap<String, T>;
 
-// type WaitUntilFn = dyn Fn(&'_ Data<String>) -> BoxFuture<'_, bool>;
-
 #[async_trait]
 pub(crate) trait SharedValues: DynClone + Sync + Send {
     async fn put_t(&mut self, key: String, value: String) -> Fallible<Option<String>>;
@@ -123,11 +121,7 @@ pub(crate) mod local_v1 {
         pub(crate) async fn put(&mut self, key: String, value: String) -> Fallible<Option<String>> {
             let mut data_guard = self.data.lock().await;
 
-            let maybe_previous = if let Some(previous) = data_guard.insert(key.clone(), value) {
-                Some(previous)
-            } else {
-                None
-            };
+            let maybe_previous = data_guard.insert(key.clone(), value);
 
             for (pattern, notifier) in self.notification.lock().await.iter() {
                 if key.matches(pattern).count() > 0 {
@@ -318,7 +312,7 @@ pub(crate) mod remote_v1 {
                         tracing::trace!("received {incoming_msg:#?}");
 
                         let response_msg: ResponseMessage = match incoming_msg {
-                            RequestMessage::Test(s) => ResponseMessage::Test(format!("{}", s)),
+                            RequestMessage::Test(s) => ResponseMessage::Test(s.to_string()),
 
                             RequestMessage::Put { key, value } => ResponseMessage::Put(
                                 localv1.put(key, value).await.map_err(|e| e.to_string()),
@@ -676,7 +670,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shared_values_localv1_put_works() {
-        inner_shared_values_trait_put_works(Box::new(LocalV1::default()) as Box<dyn SharedValues>)
+        inner_shared_values_trait_put_works(Box::<LocalV1>::default() as Box<dyn SharedValues>)
             .await;
     }
 
@@ -705,7 +699,7 @@ mod tests {
                         .await
                         .context("call to get_pattern_t")?
                         .into_values()
-                        .nth(0);
+                        .next();
 
                     eprintln!("got {got:#?}");
 
