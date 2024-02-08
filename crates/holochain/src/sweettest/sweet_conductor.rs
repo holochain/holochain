@@ -509,6 +509,11 @@ impl SweetConductor {
         Ok(SweetAppBatch(apps))
     }
 
+    /// Install DPKI a bit more concisely
+    pub async fn install_dpki(&self, dna: DnaFile) {
+        self.raw_handle().install_dpki(dna).await.unwrap()
+    }
+
     /// Call into the underlying create_clone_cell function, and register the
     /// created dna with SweetConductor so it will be reloaded on restart.
     pub async fn create_clone_cell(

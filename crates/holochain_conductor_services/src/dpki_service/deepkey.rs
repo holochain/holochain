@@ -1,4 +1,4 @@
-use self::zome_types::*;
+
 
 use super::*;
 
@@ -148,7 +148,7 @@ impl DpkiService for DeepkeyBuiltin {
             derivation_details,
         };
 
-        let _action_hash: ActionHash = {
+        let _: (ActionHash, KeyRegistration, KeyMeta) = {
             let cell_id = self.installation.cell_id.clone();
             let provenance = cell_id.agent_pubkey().clone();
             let zome_name: ZomeName = "deepkey_csr".into();

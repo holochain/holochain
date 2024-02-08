@@ -2103,7 +2103,8 @@ mod service_impls {
             Ok(())
         }
 
-        pub(crate) async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
+        /// Install the DPKI service using the given Deepkey DNA
+        pub async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
             self.register_dna(dna.clone()).await?;
 

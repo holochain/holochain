@@ -118,9 +118,6 @@ where
     if let Some(dpki) = api.conductor_services().dpki.as_ref() {
         let dpki = dpki.lock().await;
 
-        dbg!(&dna_file.dna_def().name);
-        dbg!(dna_file.dna_def().all_zomes().collect::<Vec<_>>());
-
         // When running genesis on DPKI itself, don't check the agent key
         let is_dpki = dpki.cell_id().dna_hash() == dna_file.dna_hash();
         if !is_dpki {

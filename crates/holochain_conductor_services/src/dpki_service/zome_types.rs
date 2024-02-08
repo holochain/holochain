@@ -10,6 +10,37 @@ pub enum KeyState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyMeta {
+    pub app_binding_addr: ActionHash,
+    pub key_index: u32,
+    pub key_registration_addr: ActionHash,
+    pub key_anchor_addr: ActionHash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum KeyRegistration {
+    // Creates a key under management of current KSR on this chain
+    Create(KeyGeneration),
+
+    // Unmanaged key. Keys for hosted web users may be of this type, cannot replace/revoke
+    CreateOnly(KeyGeneration),
+
+    // Revokes a key and replaces it with a newly generated one
+    Update(KeyRevocation, KeyGeneration),
+
+    // Permanently revokes a key (Note: still uses an update action.)
+    Delete(KeyRevocation),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyRevocation {
+    pub prior_key_registration: ActionHash,
+    pub revocation_authorization: Vec<Authorization>,
+}
+
+pub type Authorization = (u8, Signature);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyGeneration {
     pub new_key: AgentPubKey,
 

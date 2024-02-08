@@ -144,12 +144,7 @@ impl SweetConductorBatch {
             .iter_mut()
             .map(|conductor| {
                 let dna_files = dna_files.clone();
-                async move {
-                    let agent = SweetAgents::one(conductor.keystore()).await;
-                    conductor
-                        .setup_app_for_agent(installed_app_id, agent, dna_files)
-                        .await
-                }
+                async move { conductor.setup_app(installed_app_id, dna_files).await }
             })
             .collect::<Vec<_>>();
 
