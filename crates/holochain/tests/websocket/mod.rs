@@ -312,9 +312,9 @@ async fn remote_signals() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[ignore = "TODO: part of the next proof of concept"]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn agent_centric_remote_signals() -> anyhow::Result<()> {
     todo!("rewrite remote_signals with agent centricity");
 }
