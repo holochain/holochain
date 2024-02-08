@@ -272,3 +272,6 @@ sweetest = [
   "test_utils",
   "sqlite",
 ]
+
+[lints]
+workspace = true
