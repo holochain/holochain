@@ -318,3 +318,51 @@ async fn create_clone_cell_from_a_clone() {
             .count()
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn create_clone_of_another_cell_in_same_app() {
+    holochain_trace::test_run().unwrap();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
+    let (dna_file_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;
+    
+    let alice = SweetAgents::alice();
+
+    let app = conductor
+        .setup_app_for_agent("app", alice.clone(), [&dna_file_1, &dna_file_2])
+        .await
+        .unwrap();
+    let (cell_1, cell_2) = app.clone().into_tuple();
+
+    let zome = SweetZome::new(
+        cell_1.cell_id().clone(),
+        TestWasm::Clone.coordinator_zome_name(),
+    );
+    let request = CreateCloneCellInput {
+        // Try to clone cell 2 from cell 1
+        cell_id: cell_2.cell_id().clone(),
+        modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
+        membrane_proof: None,
+        name: Some("Clone 1".to_string()),
+    };
+    let _: ClonedCell = conductor.call(&zome, "create_clone", request).await;
+
+    let apps = conductor.list_apps(None).await.unwrap();
+    assert_eq!(1, apps.len());
+
+    let cell_infos = apps
+        .first()
+        .unwrap()
+        .cell_info
+        .get(&dna_file_2.dna_hash().to_string())
+        .unwrap();
+    assert_eq!(2, cell_infos.len());
+    assert_eq!(
+        1,
+        cell_infos
+            .into_iter()
+            .filter(|c| matches!(c, CellInfo::Cloned(_)))
+            .count()
+    );
+}
