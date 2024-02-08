@@ -718,7 +718,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shared_values_localv1_get_works() {
-        inner_shared_values_trait_get_works(Box::new(LocalV1::default()) as Box<dyn SharedValues>)
+        inner_shared_values_trait_get_works(Box::<LocalV1>::default() as Box<dyn SharedValues>)
             .await;
     }
 
@@ -750,7 +750,7 @@ mod tests {
                         .await
                         .unwrap()
                         .into_values()
-                        .nth(0)
+                        .next()
                         .unwrap();
                     println!("got {got}");
                     assert_eq!(s, got);
@@ -792,7 +792,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shared_values_localv1_get_waits() {
-        inner_shared_values_trait_get_waits(Box::new(LocalV1::default()) as Box<dyn SharedValues>)
+        inner_shared_values_trait_get_waits(Box::<LocalV1>::default() as Box<dyn SharedValues>)
             .await;
     }
 
@@ -864,7 +864,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn shared_values_localv1_simulate_agent_discovery() {
-        let values: Box<dyn SharedValues + Sync> = Box::new(LocalV1::default());
+        let values: Box<dyn SharedValues + Sync> = Box::<LocalV1>::default();
         inner_shared_values_trait_simulate_agent_discovery(values).await;
     }
 
@@ -938,8 +938,7 @@ mod tests {
         println!("starting with role: {role:#?}");
 
         let required_agents = std::env::var_os(TEST_AGENT_READINESS_REQUIRED_AGENTS_ENV)
-            .map(|s| s.to_string_lossy().parse::<usize>().ok())
-            .flatten()
+            .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
             .unwrap_or(TEST_AGENT_READINESS_REQUIRED_AGENTS_DEFAULT);
 
         let mut handles: Vec<tokio::task::JoinHandle<Fallible<_>>> = Vec::new();
@@ -952,7 +951,7 @@ mod tests {
                 let url_to_use = server.url();
 
                 let values: Box<dyn SharedValues + Sync> = Box::new(
-                    RemoteV1Client::new(&url_to_use, None)
+                    RemoteV1Client::new(url_to_use, None)
                         .await
                         .expect("connecting remotev1 client"),
                 );
@@ -999,8 +998,7 @@ mod tests {
                     PREFIX,
                     Duration::from_secs(
                         std::env::var_os(TEST_AGENT_READINESS_TIMEOUT_SECS_ENV)
-                            .map(|s| u64::from_str(&s.to_string_lossy()).ok())
-                            .flatten()
+                            .and_then(|s| u64::from_str(&s.to_string_lossy()).ok())
                             .unwrap_or(TEST_AGENT_READINESS_TIMEOUT_SECS_DEFAULT),
                     ),
                 )
