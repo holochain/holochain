@@ -325,8 +325,9 @@ async fn create_clone_of_another_cell_in_same_app() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Clone]).await;
-    let (dna_file_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;
-    
+    let (dna_file_2, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::DnaProperties]).await;
+
     let alice = SweetAgents::alice();
 
     let app = conductor
