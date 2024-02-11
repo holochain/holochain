@@ -4,7 +4,6 @@ use crate::sweettest::{SweetCell, SweetLocalRendezvous};
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
-use holochain_types::prelude::*;
 use std::path::PathBuf;
 use std::time::Duration;
 

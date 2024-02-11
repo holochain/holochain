@@ -1,4 +1,5 @@
 mod agent_scaling;
+mod authored_test;
 mod dht_arc;
 mod dna_properties;
 mod inline_zome_spec;
