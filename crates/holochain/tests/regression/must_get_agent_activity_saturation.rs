@@ -40,7 +40,7 @@ async fn must_get_agent_activity_saturation() {
     }
 
     // let conductors catch up
-    tokio::time::sleep(Duration::from_secs(200)).await;
+    tokio::time::sleep(Duration::from_secs(60)).await;
 
     let record: Option<Record> = conductors[1]
         .call(
