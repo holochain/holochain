@@ -3635,6 +3635,7 @@ dependencies = [
  "arbitrary",
  "contrafact",
  "derive_builder",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
