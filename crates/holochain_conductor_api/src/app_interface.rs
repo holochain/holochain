@@ -280,23 +280,6 @@ pub struct ProvisionedCell {
     pub name: String,
 }
 
-/// Cloned cell that was created from a provisioned cell at runtime.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ClonedCell {
-    /// The cell's identifying data
-    pub cell_id: CellId,
-    /// A conductor-local clone identifier
-    pub clone_id: CloneId,
-    /// The hash of the DNA that this cell was instantiated from
-    pub original_dna_hash: DnaHash,
-    /// The DNA modifiers that were used to instantiate this clone cell
-    pub dna_modifiers: DnaModifiers,
-    /// The name the cell was instantiated with
-    pub name: String,
-    /// Whether or not the cell is running
-    pub enabled: bool,
-}
-
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppInfo {

@@ -619,3 +619,9 @@ pub mod random;
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
 pub mod hdk;
+
+/// Create and manage clone cells in the current app.
+///
+/// Clone cells are a way to create a new cell that is a copy of an existing cell. They are based on the DNA of an existing cell, and run
+/// with the same agent key, but have a unique name or properties that distinguish them from the original cell.
+pub mod clone;

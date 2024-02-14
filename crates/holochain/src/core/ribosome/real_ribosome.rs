@@ -3,6 +3,9 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
+use super::host_fn::delete_clone_cell::delete_clone_cell;
+use super::host_fn::disable_clone_cell::disable_clone_cell;
+use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -34,6 +37,7 @@ use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
+use crate::core::ribosome::host_fn::create_clone_cell::create_clone_cell;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::delete::delete;
@@ -539,7 +543,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
+            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell);
 
         imports.register_namespace("env", ns);
 
@@ -1145,13 +1153,17 @@ pub mod wasm_test {
                 "__hc__capability_info_1",
                 "__hc__count_links_1",
                 "__hc__create_1",
+                "__hc__create_clone_cell_1",
                 "__hc__create_link_1",
                 "__hc__create_x25519_keypair_1",
                 "__hc__delete_1",
+                "__hc__delete_clone_cell_1",
                 "__hc__delete_link_1",
+                "__hc__disable_clone_cell_1",
                 "__hc__dna_info_1",
                 "__hc__dna_info_2",
                 "__hc__emit_signal_1",
+                "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
                 "__hc__get_details_1",
