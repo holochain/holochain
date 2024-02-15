@@ -17,7 +17,6 @@ pub fn decode<T: serde::de::DeserializeOwned>(compressed: &[u8]) -> MrBundleResu
     let mut gz = flate2::read::GzDecoder::new(compressed);
     let mut bytes = Vec::new();
     gz.read_to_end(&mut bytes)?;
-    rmp_serde::from_read_ref(&bytes).map_err(|e| {
-        MrBundleError::MsgpackDecodeError(std::any::type_name::<T>().to_string(), e)
-    })
+    rmp_serde::from_read_ref(&bytes)
+        .map_err(|e| MrBundleError::MsgpackDecodeError(std::any::type_name::<T>().to_string(), e))
 }
