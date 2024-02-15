@@ -2472,6 +2472,18 @@ mod accessor_impls {
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
         }
+
+        /// Find the app which contains the given cell by its [CellId].
+        pub async fn find_app_containing_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InstalledApp>> {
+            Ok(self
+                .get_state()
+                .await?
+                .find_app_containing_cell(cell_id)
+                .cloned())
+        }
     }
 }
 

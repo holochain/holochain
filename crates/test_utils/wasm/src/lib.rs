@@ -23,6 +23,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
+    Clone,
     CounterSigning,
     Create,
     Crd,
@@ -125,6 +126,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
@@ -194,6 +196,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
+            TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
                 "wasm32-unknown-unknown/release/test_wasm_countersigning.wasm"
             }

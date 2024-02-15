@@ -1,0 +1,22 @@
+[package]
+name = "test_wasm_clone"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+name = "test_wasm_clone"
+crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_clone"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { workspace = true }
+hdk = { path = "../../../../hdk", optional = true }
+hdi = { path = "../../../../hdi" }
+
+[features]
+default = ["hdk"]
+integrity = []

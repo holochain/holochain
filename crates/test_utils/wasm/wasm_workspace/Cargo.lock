@@ -1179,6 +1179,7 @@ name = "holochain_zome_types"
 version = "0.2.6"
 dependencies = [
  "derive_builder",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
@@ -2620,6 +2621,15 @@ dependencies = [
 name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_clone"
+version = "0.0.1"
+dependencies = [
+ "hdi",
  "hdk",
  "serde",
 ]

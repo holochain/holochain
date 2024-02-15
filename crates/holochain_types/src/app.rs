@@ -15,7 +15,7 @@ use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
-use derive_more::{Display, Into};
+use derive_more::Into;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
@@ -101,15 +101,8 @@ pub struct CreateCloneCellPayload {
     pub name: Option<String>,
 }
 
-/// Ways of specifying a clone cell.
-#[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
-pub enum CloneCellId {
-    /// Clone id consisting of role name and clone index.
-    CloneId(CloneId),
-    /// Cell id consisting of DNA hash and agent pub key.
-    CellId(CellId),
-}
+// Export moved type to avoid breaking the crate API here.
+pub use holochain_zome_types::clone::CloneCellId;
 
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -120,7 +113,7 @@ pub struct DisableCloneCellPayload {
     pub clone_cell_id: CloneCellId,
 }
 
-/// Argumtents to specify the clone cell to be enabled.
+/// Arguments to specify the clone cell to be enabled.
 pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
 /// Arguments to delete a disabled clone cell of an app.
