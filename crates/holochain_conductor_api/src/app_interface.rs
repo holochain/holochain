@@ -280,6 +280,9 @@ pub struct ProvisionedCell {
     pub name: String,
 }
 
+// Export moved type to avoid breaking the crate API here.
+pub use holochain_zome_types::prelude::ClonedCell;
+
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppInfo {

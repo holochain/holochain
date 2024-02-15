@@ -16,7 +16,6 @@ pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use derive_more::Into;
-pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
@@ -101,6 +100,9 @@ pub struct CreateCloneCellPayload {
     /// Optionally a name for the DNA clone
     pub name: Option<String>,
 }
+
+// Export moved type to avoid breaking the crate API here.
+pub use holochain_zome_types::clone::CloneCellId;
 
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

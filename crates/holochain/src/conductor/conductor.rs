@@ -82,6 +82,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -105,7 +106,6 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::{wasm, *};
-use holochain_zome_types::prelude::ClonedCell;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pError;
@@ -1633,7 +1633,7 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_zome_types::prelude::ClonedCell;
+    use holochain_conductor_api::ClonedCell;
 
     use super::*;
 

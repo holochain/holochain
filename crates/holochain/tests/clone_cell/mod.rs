@@ -93,7 +93,7 @@ async fn disable_enable_and_delete_clone_cell() {
         name: Some("Clone 2".to_string()),
     };
     conductor
-        .call_fallible::<_, ClonedCell>(&clone_zome, "create_clone", request)
+        .call_fallible::<_, ClonedCell, _>(&clone_zome, "create_clone", request)
         .await
         .unwrap_err();
 
@@ -111,7 +111,7 @@ async fn disable_enable_and_delete_clone_cell() {
         name: Some("Clone 2".to_string()),
     };
     conductor
-        .call::<_, ClonedCell>(&clone_zome, "create_clone", request)
+        .call::<_, ClonedCell, _>(&clone_zome, "create_clone", request)
         .await;
 
     // Now disable and delete the clone
@@ -195,7 +195,7 @@ async fn prevents_cross_app_clone_operations() {
         name: Some("Other clone 1".to_string()),
     };
     conductor
-        .call_fallible::<_, ClonedCell>(&other_zome, "create_clone", other_request)
+        .call_fallible::<_, ClonedCell, _>(&other_zome, "create_clone", other_request)
         .await
         .unwrap_err();
 
@@ -204,7 +204,7 @@ async fn prevents_cross_app_clone_operations() {
         clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
     };
     conductor
-        .call_fallible::<_, ()>(&other_zome, "disable_clone", other_request)
+        .call_fallible::<_, (), _>(&other_zome, "disable_clone", other_request)
         .await
         .unwrap_err();
 
@@ -219,7 +219,7 @@ async fn prevents_cross_app_clone_operations() {
         clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
     };
     conductor
-        .call_fallible::<_, ClonedCell>(&other_zome, "enable_clone", other_request)
+        .call_fallible::<_, ClonedCell, _>(&other_zome, "enable_clone", other_request)
         .await
         .unwrap_err();
 
@@ -228,7 +228,7 @@ async fn prevents_cross_app_clone_operations() {
         clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
     };
     conductor
-        .call_fallible::<_, ()>(&other_zome, "delete_clone", other_request)
+        .call_fallible::<_, (), _>(&other_zome, "delete_clone", other_request)
         .await
         .unwrap_err();
 
