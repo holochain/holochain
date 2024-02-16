@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20240216.150955
+
+## [holochain\_cli-0.2.7-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain-0.2.7-rc.0](crates/holochain/CHANGELOG.md#0.2.7-rc.0)
+
+- Added `lair_keystore_version_req` to the output of `--build-info` for Holochain.
+
+## [holochain\_cli\_bundle-0.2.7-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.7-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_cascade-0.2.7-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_conductor\_api-0.2.7-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.7-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.2.7-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.7-rc.0)
+
+## [hdk-0.2.7-rc.0](crates/hdk/CHANGELOG.md#0.2.7-rc.0)
+
+- Added `create_clone_cell`, `disable_clone_cell`, `enable_clone_cell` and `delete_clone_cell` functionality to the HDK. This was previously only available on the admin interface of Holochain which shouldn’t be used by apps. Exposing this functionality through the HDK allows happ developers to manage clones from their backend code without having to worry about their apps breaking when more security is added to the admin interface. The only restriction on the use of these methods is that they will not permit you to create clones in another app. You can create clones of any cell within the app you make the host function calls from.
+
+## [holochain\_state-0.2.7-rc.0](crates/holochain_state/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_p2p-0.2.7-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_types-0.2.7-rc.0](crates/holochain_types/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_keystore-0.2.7-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_sqlite-0.2.7-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.7-rc.0)
+
+## [holochain\_zome\_types-0.2.7-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.7-rc.0)
+
 # 20240206.184429
 
 ## [holochain\_cli-0.2.6](crates/holochain_cli/CHANGELOG.md#0.2.6)
