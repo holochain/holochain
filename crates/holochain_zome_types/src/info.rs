@@ -35,7 +35,7 @@ impl AgentInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CallInfo {
-    /// The provenance identifies the agent who made the call. 
+    /// The provenance identifies the agent who made the call.
     /// This is the author of the chain for local calls, and the assignee of a capability for remote calls.
     pub provenance: AgentPubKey,
     /// The function name that was the entrypoint into the wasm.
