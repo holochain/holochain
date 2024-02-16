@@ -131,6 +131,7 @@ serde_json = { version = "1.0.51" }
 toml = "0.5.6"
 chrono = { version = "0.4.6", features = [ "serde" ] }
 hostname = "0.3.1"
+lair_keystore = { version = "0.4.2", features = [ "rusqlite-bundled-sqlcipher-vendored-openssl" ] }
 
 [[bench]]
 name = "bench"
