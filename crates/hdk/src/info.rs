@@ -17,7 +17,7 @@ pub fn agent_info() -> ExternResult<AgentInfo> {
 /// Get the context for a zome call, including the provenance and chain head.
 ///
 /// See [CallInfo] for more details of what is returned.
-/// 
+///
 /// Call info input struct is `()` so the function call simply looks like this:
 ///
 /// ```ignore
