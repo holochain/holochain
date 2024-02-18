@@ -18,3 +18,4 @@ mod speed_tests;
 mod test_cli;
 mod test_utils;
 mod websocket;
+mod must_get_linked_entry;

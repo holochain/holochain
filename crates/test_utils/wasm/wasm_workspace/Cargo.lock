@@ -2871,6 +2871,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_must_get_linked_entry"
+version = "0.1.0"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [

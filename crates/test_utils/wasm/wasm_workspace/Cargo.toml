@@ -35,6 +35,7 @@ members = [
     "multiple_calls",
     "must_get",
     "must_get_agent_activity",
+    "must_get_linked_entry",
     "post_commit_success",
     "post_commit_volley",
     "query",

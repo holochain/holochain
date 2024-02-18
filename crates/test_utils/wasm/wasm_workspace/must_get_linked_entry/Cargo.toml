@@ -1,0 +1,18 @@
+[package]
+name = "test_wasm_must_get_linked_entry"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "test_wasm_must_get_linked_entry"
+crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_must_get_linked_entry"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { workspace = true }
+hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }
