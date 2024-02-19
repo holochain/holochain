@@ -1,12 +1,9 @@
-use std::convert::TryFrom;
 use std::time::Duration;
 
 use rusqlite::named_params;
 
 use holo_hash::AnyDhtHash;
-use holo_hash::EntryHash;
 use holochain::sweettest::*;
-use holochain::test_utils::host_fn_caller::*;
 use holochain::test_utils::wait_for_integration;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasm;
@@ -40,12 +37,15 @@ async fn authored_test() {
 
     let handle = conductor.raw_handle();
 
-    let entry = Post("Hi there".into());
-    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-
     let _: ActionHash = conductor
         .call(&alice.zome(TestWasm::Create), "create_entry", ())
         .await;
+
+    let record: Option<Record> = conductor
+        .call(&alice.zome(TestWasm::Create), "get_entry", ())
+        .await;
+
+    let entry_hash = record.unwrap().action().entry_hash().cloned().unwrap();
 
     // publish these commits
     let triggers = handle.get_cell_triggers(&alice.cell_id()).await.unwrap();
