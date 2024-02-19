@@ -323,7 +323,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app_legacy(name.to_string(), agent, data)
+        .install_app_minimal(name.to_string(), agent, data)
         .await
         .unwrap();
 
@@ -382,7 +382,7 @@ pub async fn install_app_in_conductor(
 
     conductor_handle
         .clone()
-        .install_app_legacy(installed_app_id.clone(), agent, dnas_with_proofs)
+        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs)
         .await
         .unwrap();
 

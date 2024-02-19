@@ -1337,8 +1337,11 @@ mod app_impls {
     use super::*;
 
     impl Conductor {
+        /// Install an app from minimal elements, without needing construct a whole AppBundle.
+        /// (This function constructs a bundle under the hood.)
+        /// This is just a convenience for testing.
         #[cfg(feature = "test_utils")]
-        pub(crate) async fn install_app_legacy(
+        pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             agent_key: AgentPubKey,

@@ -355,7 +355,7 @@ impl SweetConductor {
             .map(|dr| (dr.to_owned(), None))
             .collect();
         self.raw_handle()
-            .install_app_legacy(installed_app_id.clone(), agent, &dnas_with_proof)
+            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
