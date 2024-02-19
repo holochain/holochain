@@ -21,6 +21,7 @@ use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
 use holochain_state::prelude::{from_blob, StateQueryResult};
@@ -35,6 +36,7 @@ use holochain_zome_types::fixt::SignatureFixturator;
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
 use matches::assert_matches;
+use rusqlite::params;
 use rusqlite::{named_params, Transaction};
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
@@ -43,10 +45,7 @@ use std::time::Duration;
 #[cfg(test)]
 #[tokio::test(flavor = "multi_thread")]
 async fn main_loop_app_validation_workflow() {
-    use holochain_sqlite::error::DatabaseError;
-    use rusqlite::params;
-
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Validate]).await;
     let dna_hash = dna_file.dna_hash().clone();
@@ -68,6 +67,7 @@ async fn main_loop_app_validation_workflow() {
         Arc::new(dna_file.dna_def().clone()),
     ));
     // check there are no ops to app validate
+    // genesis entries have already been validated at this stage
     let ops_to_validate =
         validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
             .await
@@ -149,6 +149,13 @@ async fn main_loop_app_validation_workflow() {
         .await
         .unwrap();
     assert_eq!(num_pending_ops, 0);
+
+    // check ops to validate is also 0
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap();
+    assert_eq!(ops_to_validate.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
