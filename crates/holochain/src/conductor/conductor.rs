@@ -1337,27 +1337,24 @@ mod app_impls {
     use super::*;
 
     impl Conductor {
+        /// Install an app from minimal elements, without needing construct a whole AppBundle.
+        /// (This function constructs a bundle under the hood.)
+        /// This is just a convenience for testing.
         #[cfg(feature = "test_utils")]
-        // FIXME: can rewrite now in terms of `get_install_app_payload_from_dnas`
-        pub(crate) async fn install_app_legacy(
+        pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+            agent_key: AgentPubKey,
+            data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<()> {
-            crate::conductor::conductor::genesis_cells(
-                self.clone(),
-                cell_data
-                    .iter()
-                    .map(|(c, p)| (c.as_id().clone(), p.clone()))
-                    .collect(),
+            let payload = crate::sweettest::get_install_app_payload_from_dnas(
+                installed_app_id,
+                agent_key,
+                data,
             )
-            .await?;
+            .await;
 
-            let cell_data = cell_data.into_iter().map(|(c, _)| c);
-            let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
-
-            // Update the db
-            let _ = self.add_disabled_app_to_db(app).await?;
+            self.install_app_bundle(payload).await?;
 
             Ok(())
         }

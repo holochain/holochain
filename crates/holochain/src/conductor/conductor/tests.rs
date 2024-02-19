@@ -163,6 +163,9 @@ async fn can_set_fake_state() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This kind of cell sharing is no longer possible. 
+            Keeping the test here to highlight the intention, 
+            though it will have to be removed or totally rewritten some day."]
 async fn test_list_running_apps_for_dependent_cell_id() {
     holochain_trace::test_run().ok();
 
@@ -385,7 +388,7 @@ async fn test_signing_error_during_genesis() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor
-        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], &[dna])
+        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
         .await;
 
     // - Assert that we got an error during Genesis. However, this test is

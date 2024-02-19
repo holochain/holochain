@@ -172,7 +172,7 @@ async fn app_validation_workflow_test() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
-        .setup_app(&"test_app", &[dna_file.clone()])
+        .setup_app(&"test_app", [&dna_file])
         .await
         .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
@@ -276,7 +276,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
-        .setup_app(&"test_app", &[dna_file.clone()])
+        .setup_app(&"test_app", [&dna_file])
         .await
         .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();

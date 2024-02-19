@@ -1312,7 +1312,7 @@ pub mod wasm_test {
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
         let apps = conductors
-            .setup_app("countersigning", &[dna_file.clone()])
+            .setup_app("countersigning", [&dna_file])
             .await
             .unwrap();
 

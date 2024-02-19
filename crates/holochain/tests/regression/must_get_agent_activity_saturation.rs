@@ -19,7 +19,7 @@ async fn must_get_agent_activity_saturation() {
         SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous(true))
             .await;
     let apps = conductors
-        .setup_app("", &[dna])
+        .setup_app("", [&dna])
         .await
         .unwrap()
         .cells_flattened();
