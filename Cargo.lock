@@ -2860,7 +2860,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.36"
+version = "0.3.0-beta-dev.37"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3635,6 +3635,7 @@ dependencies = [
  "arbitrary",
  "contrafact",
  "derive_builder",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
