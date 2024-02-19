@@ -336,6 +336,7 @@ impl TestLegacyHost {
         std::mem::take(&mut *events)
     }
 
+    #[allow(dead_code)]
     pub fn duplicate_ops_received_count(&self) -> u32 {
         self.duplicate_ops_received_count.load(Ordering::Acquire)
     }

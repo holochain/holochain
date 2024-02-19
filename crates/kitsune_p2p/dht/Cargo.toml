@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.16"
+version = "0.3.0-beta-dev.17"
 description = "Kitsune P2p DHT definition"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,8 +15,8 @@ colored = { version = "2.0.4", optional = true }
 derivative = "2.2.0"
 derive_more = { workspace = true }
 futures = "0.3"
-kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.14", path = "../dht_arc"}
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.6", path = "../timestamp"}
+kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.15", path = "../dht_arc"}
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.7", path = "../timestamp"}
 must_future = "0.1"
 num-traits = "0.2.14"
 once_cell = "1.8"

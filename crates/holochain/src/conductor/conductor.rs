@@ -83,7 +83,6 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -102,6 +101,7 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_zome_types::prelude::ClonedCell;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use parking_lot::RwLock;
@@ -1621,7 +1621,7 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_conductor_api::ClonedCell;
+    use holochain_zome_types::prelude::ClonedCell;
 
     use super::*;
 
@@ -2456,6 +2456,18 @@ mod accessor_impls {
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
+        }
+
+        /// Find the app which contains the given cell by its [CellId].
+        pub async fn find_app_containing_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InstalledApp>> {
+            Ok(self
+                .get_state()
+                .await?
+                .find_app_containing_cell(cell_id)
+                .cloned())
         }
     }
 }

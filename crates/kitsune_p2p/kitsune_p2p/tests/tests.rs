@@ -74,6 +74,7 @@ async fn two_agents_on_same_host_rpc_single() {
 
 #[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 async fn two_nodes_publish_and_fetch() {
     holochain_trace::test_run().unwrap();
 

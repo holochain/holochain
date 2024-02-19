@@ -138,8 +138,13 @@ impl HcRunLocalServices {
             config.demo = false;
             tracing::info!(?config);
 
-            let (sig_driver, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config)?;
-            task_list.push(sig_driver);
+            let (sig_hnd, addr_list, err_list) =
+                tx5_signal_srv::exec_tx5_signal_srv(config).await?;
+            // there is no real task here... just fake it
+            task_list.push(Box::pin(async move {
+                let _sig_hnd = sig_hnd;
+                std::future::pending().await
+            }));
 
             for err in err_list {
                 println!("# HC SIGNAL - ERROR: {err:?}");
