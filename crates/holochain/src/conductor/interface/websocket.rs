@@ -235,7 +235,7 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::test_utils::conductor_setup::ConductorTestData;
+    use crate::sweettest::SweetConductor;
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
@@ -257,7 +257,7 @@ pub mod test {
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use std::convert::TryInto;
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -280,8 +280,8 @@ pub mod test {
     }
 
     async fn setup_admin_fake_cells(
-        dnas: Vec<DnaFile>,
-        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
+        agent: AgentPubKey,
+        dnas_with_proofs: Vec<(DnaFile, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
@@ -290,18 +290,13 @@ pub mod test {
             .await
             .unwrap();
 
-        for dna in dnas {
-            conductor_handle.register_dna(dna).await.unwrap();
+        for (dna, _) in dnas_with_proofs.iter() {
+            conductor_handle.register_dna(dna.clone()).await.unwrap();
         }
-
-        let cell_data = cell_ids_with_proofs
-            .into_iter()
-            .map(|(c, p)| (InstalledCell::new(c, nanoid::nanoid!()), p))
-            .collect();
 
         conductor_handle
             .clone()
-            .install_app_legacy("test app".to_string(), cell_data)
+            .install_app_minimal("test app".to_string(), agent, &dnas_with_proofs)
             .await
             .unwrap();
 
@@ -426,12 +421,11 @@ pub mod test {
 
         let dna_hash = dna.dna_hash().clone();
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
-        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
         let (_tmpdir, _, handle) = setup_app_in_new_conductor(
             "test app".to_string(),
-            vec![dna],
-            vec![(installed_cell, None)],
+            cell_id.agent_pubkey().clone(),
+            vec![(dna, None)],
         )
         .await;
 
@@ -470,17 +464,15 @@ pub mod test {
 
         let dna_hash = dna.dna_hash().clone();
         let agent_pub_key = fake_agent_pubkey_1();
-        let cell_id = CellId::from((dna_hash.clone(), agent_pub_key.clone()));
-        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
         let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
             "test app".to_string(),
-            vec![dna],
-            vec![(installed_cell, None)],
+            agent_pub_key.clone(),
+            vec![(dna, None)],
         )
         .await;
         let request = NetworkInfoRequestPayload {
-            agent_pub_key: agent_pub_key.clone(),
+            agent_pub_key,
             dnas: vec![dna_hash],
             last_time_queried: None,
         };
@@ -498,7 +490,7 @@ pub mod test {
                             current_number_of_peers: 1,
                             arc_size: 1.0,
                             total_network_peers: 1,
-                            bytes_since_last_time_queried: 1844,
+                            bytes_since_last_time_queried: 1848,
                             completed_rounds_since_last_time_queried: 0,
                         }]
                     )
@@ -536,35 +528,32 @@ pub mod test {
             .unwrap();
 
         let cell_id_1 = CellId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
-        let installed_cell_1 = InstalledCell::new(cell_id_1.clone(), "handle_1".into());
 
         let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
-        let installed_cell_2 = InstalledCell::new(cell_id_2.clone(), "handle_2".into());
 
         // Run the same DNA in cell 3 to check that grouping works correctly
         let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
-        let installed_cell_3 = InstalledCell::new(cell_id_3.clone(), "handle_3".into());
 
         let (_tmpdir, _, handle) = setup_app_in_new_conductor(
             "test app 1".to_string(),
-            vec![dna_1],
-            vec![(installed_cell_1, None)],
+            cell_id_1.agent_pubkey().clone(),
+            vec![(dna_1, None)],
         )
         .await;
 
         install_app_in_conductor(
             handle.clone(),
             "test app 2".to_string(),
-            vec![dna_2.clone()],
-            vec![(installed_cell_2, None)],
+            cell_id_2.agent_pubkey().clone(),
+            &[(dna_2.clone(), None)],
         )
         .await;
 
         install_app_in_conductor(
             handle.clone(),
             "test app 3".to_string(),
-            vec![dna_2.clone()],
-            vec![(installed_cell_3, None)],
+            cell_id_3.agent_pubkey().clone(),
+            &[(dna_2, None)],
         )
         .await;
 
@@ -627,20 +616,21 @@ pub mod test {
             let def = DnaDef::unique_from_zomes(integrity_zomes, coordinator_zomes);
             dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Link)).await);
         }
-        let dna_map = dnas
-            .iter()
-            .cloned()
-            .map(|dna| (dna.dna_hash().clone(), dna))
-            .collect::<HashMap<_, _>>();
-        let dna_hashes = dna_map.keys().cloned().collect::<Vec<_>>();
-        let cell_ids_with_proofs = dna_hashes
-            .iter()
-            .cloned()
-            .map(|hash| (CellId::from((hash, agent_key.clone())), None))
-            .collect::<Vec<_>>();
-        let cell_id_0 = cell_ids_with_proofs.first().cloned().unwrap().0;
+        let dna_hashes = dnas.iter().map(|d| d.dna_hash()).collect::<Vec<_>>();
+        let dnas_with_proofs = dnas.iter().cloned().map(|d| (d, None)).collect::<Vec<_>>();
+        let cell_id_0 = CellId::new(
+            dnas_with_proofs
+                .first()
+                .cloned()
+                .unwrap()
+                .0
+                .dna_hash()
+                .clone(),
+            agent_key.clone(),
+        );
 
-        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
+        let (_tmpdir, conductor_handle) =
+            setup_admin_fake_cells(agent_key.clone(), dnas_with_proofs).await;
 
         let app_id = "test app".to_string();
 
@@ -701,7 +691,7 @@ pub mod test {
         // Collect the expected result
         let expected = dna_hashes
             .into_iter()
-            .map(|hash| CellId::from((hash, agent_key.clone())))
+            .map(|hash| CellId::from((hash.clone(), agent_key.clone())))
             .collect::<HashSet<_>>();
 
         assert_eq!(expected, cell_ids);
@@ -828,10 +818,11 @@ pub mod test {
             &uuid.to_string(),
             vec![("zomey".into(), TestWasm::Foo.into())],
         );
-        let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
+        let agent_pubkey = fake_agent_pubkey_1();
+        let cell_id = CellId::from((dna.dna_hash().clone(), agent_pubkey.clone()));
 
         let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(vec![dna], vec![(cell_id.clone(), None)]).await;
+            setup_admin_fake_cells(agent_pubkey, vec![(dna, None)]).await;
         let conductor_handle = activate(conductor_handle).await;
 
         // Allow agents time to join
@@ -889,21 +880,17 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         holochain_trace::test_run().ok();
-        let test_db_dir = test_db_dir();
-        let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
-        let mut conductor_test = ConductorTestData::new(
-            test_db_dir,
-            dnas.clone(),
-            agents.clone(),
-            Default::default(),
-        )
-        .await
-        .0;
-        let handle = conductor_test.handle();
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let agent = conductor.setup_app("app", &dnas).await.unwrap().cells()[0]
+            .agent_pubkey()
+            .clone();
+
+        let handle = conductor.raw_handle();
         let spaces = handle.get_spaces();
         let dnas = dnas
             .into_iter()
@@ -920,7 +907,7 @@ pub mod test {
                 }
                 count
             },
-            4
+            2
         );
 
         // - Get agents and space
@@ -929,14 +916,10 @@ pub mod test {
             .collect::<Vec<_>>();
 
         let mut expect = to_key(agent_infos.clone());
-        let k00 = (dnas[0].to_kitsune(), agents[0].to_kitsune());
-        let k01 = (dnas[0].to_kitsune(), agents[1].to_kitsune());
-        let k10 = (dnas[1].to_kitsune(), agents[0].to_kitsune());
-        let k11 = (dnas[1].to_kitsune(), agents[1].to_kitsune());
-        expect.push(k00.clone());
-        expect.push(k01.clone());
-        expect.push(k10.clone());
-        expect.push(k11.clone());
+        let k0 = (dnas[0].to_kitsune(), agent.to_kitsune());
+        let k1 = (dnas[1].to_kitsune(), agent.to_kitsune());
+        expect.push(k0.clone());
+        expect.push(k1.clone());
         expect.sort();
 
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
@@ -952,43 +935,23 @@ pub mod test {
         let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
         assert_eq!(expect, results);
 
-        // - Request the dna 0 agent 0
+        // - Request the first cell
         let req = AdminRequest::AgentInfo {
-            cell_id: Some(CellId::new(dnas[0].clone(), agents[0].clone())),
+            cell_id: Some(CellId::new(dnas[0].clone(), agent.clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
         let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
 
-        assert_eq!(vec![k00], results);
+        assert_eq!(vec![k0], results);
 
-        // - Request the dna 0 agent 1
+        // - Request the second cell
         let req = AdminRequest::AgentInfo {
-            cell_id: Some(CellId::new(dnas[0].clone(), agents[1].clone())),
+            cell_id: Some(CellId::new(dnas[1].clone(), agent.clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
         let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
 
-        assert_eq!(vec![k01], results);
-
-        // - Request the dna 1 agent 0
-        let req = AdminRequest::AgentInfo {
-            cell_id: Some(CellId::new(dnas[1].clone(), agents[0].clone())),
-        };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
-
-        assert_eq!(vec![k10], results);
-
-        // - Request the dna 1 agent 1
-        let req = AdminRequest::AgentInfo {
-            cell_id: Some(CellId::new(dnas[1].clone(), agents[1].clone())),
-        };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
-
-        assert_eq!(vec![k11], results);
-
-        conductor_test.shutdown_conductor().await;
+        assert_eq!(vec![k1], results);
     }
 
     async fn make_req(

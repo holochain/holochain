@@ -405,7 +405,7 @@ async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
 
     // Install DNA and install and enable apps in conductor
     let app = conductor
-        .setup_app_for_agent("app1", agent.clone(), &[dna_file.clone()])
+        .setup_app_for_agent("app1", agent.clone(), [&dna_file])
         .await
         .unwrap();
 
