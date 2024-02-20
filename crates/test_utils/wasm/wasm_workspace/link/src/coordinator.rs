@@ -273,3 +273,12 @@ fn get_time(_: ()) -> ExternResult<Timestamp> {
 fn get_path_hash(s: String) -> ExternResult<AnyLinkableHash> {
     path(s.as_str())
 }
+
+#[hdk_extern]
+fn get_links_local_only(_: ()) -> ExternResult<Vec<Link>> {
+    let get_links_input = GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?
+        .get_options(GetStrategy::Content)
+        .build();
+    hdk::prelude::get_links(get_links_input)
+}
+

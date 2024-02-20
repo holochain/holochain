@@ -198,6 +198,9 @@ pub struct GetLinksOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
+    /// Whether to fetch links from the network or return only
+    /// locally available links. Defaults to fetching links from network.
+    pub get_options: holochain_zome_types::entry::GetOptions,
 }
 
 #[derive(Debug, Clone)]
