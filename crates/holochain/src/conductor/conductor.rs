@@ -530,8 +530,8 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.list())
         }
 
-        /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
-        pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
+        /// Get a [`DnaDefHashed`](holochain_types::prelude::DnaDefHashed) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDefHashed> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
         }
 

@@ -758,7 +758,7 @@ impl Space {
         &self,
         keystore: MetaLairClient,
         agent_pubkey: AgentPubKey,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
     ) -> ConductorResult<SourceChainWorkspace> {
         Ok(SourceChainWorkspace::new(
             self.authored_db.clone(),

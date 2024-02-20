@@ -94,7 +94,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
-use types::Outcome;
+pub(crate) use types::Outcome;
 
 use self::validation_deps::ValidationDependencies;
 use self::validation_deps::ValidationDependencyState;
@@ -243,7 +243,7 @@ async fn sys_validation_workflow_inner(
     tracing::debug!("Sys validating {} ops", num_ops_to_validate);
 
     let cascade = Arc::new(workspace.local_cascade());
-    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
+    let dna_def = workspace.dna_def().clone();
 
     retrieve_previous_actions_for_ops(
         current_validation_dependencies.clone(),
@@ -964,7 +964,7 @@ pub struct SysValidationWorkspace {
     dht_db: DbWrite<DbKindDht>,
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
-    pub(crate) dna_def: Arc<DnaDef>,
+    pub(crate) dna_def: Arc<DnaDefHashed>,
     sys_validation_retry_delay: Duration,
 }
 
@@ -974,7 +974,7 @@ impl SysValidationWorkspace {
         dht_db: DbWrite<DbKindDht>,
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
         sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {
@@ -1104,13 +1104,8 @@ impl SysValidationWorkspace {
     }
 
     /// Get a reference to the sys validation workspace's dna def.
-    pub fn dna_def(&self) -> Arc<DnaDef> {
+    pub fn dna_def(&self) -> Arc<DnaDefHashed> {
         self.dna_def.clone()
-    }
-
-    /// Get a reference to the sys validation workspace's dna def.
-    pub fn dna_def_hashed(&self) -> DnaDefHashed {
-        DnaDefHashed::from_content_sync((*self.dna_def).clone())
     }
 }
 

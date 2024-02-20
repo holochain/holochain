@@ -245,7 +245,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(DnaDefHashed::from_content_sync(fixt!(DnaDef)))
             ).await.unwrap()
         })
     };
@@ -263,7 +263,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(DnaDefHashed::from_content_sync(fixt!(DnaDef)))
             ).await.unwrap()
         })
     };
@@ -282,7 +282,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(agent),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(DnaDefHashed::from_content_sync(fixt!(DnaDef)))
             ).await.unwrap()
         })
     };
@@ -304,7 +304,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(DnaDefHashed::from_content_sync(fixt!(DnaDef)))
             ).await.unwrap()
         })
     };
@@ -322,7 +322,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef)),
+                Arc::new(DnaDefHashed::from_content_sync(fixt!(DnaDef)),)
             ).await.unwrap()
         })
     };
@@ -341,7 +341,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(agent),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(DnaDefHashed::from_content_sync(fixt!(DnaDef)))
             ).await.unwrap()
         })
     };

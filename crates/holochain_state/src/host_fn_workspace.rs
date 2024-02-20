@@ -14,7 +14,7 @@ pub struct HostFnWorkspace<
     authored: DbRead<DbKindAuthored>,
     dht: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
-    dna_def: Arc<DnaDef>,
+    dna_def: Arc<DnaDefHashed>,
     /// Did the root call that started this call chain
     /// come from an init callback.
     /// This is needed so that we don't run init recursively inside
@@ -40,7 +40,7 @@ pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<DbKindAuthored>, DbRead<Db
 
 impl HostFnWorkspace {
     /// Get a reference to the host fn workspace's dna def.
-    pub fn dna_def(&self) -> Arc<DnaDef> {
+    pub fn dna_def(&self) -> Arc<DnaDefHashed> {
         self.dna_def.clone()
     }
 }
@@ -53,7 +53,7 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
     ) -> SourceChainResult<Self> {
         let source_chain = SourceChain::new(
             authored.clone(),
@@ -74,7 +74,7 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
     ) -> SourceChainResult<Self> {
         let source_chain = SourceChain::new(
             authored.clone(),
@@ -98,7 +98,7 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
     ) -> SourceChainResult<Self> {
         let source_chain = SourceChain::raw_empty(
             authored.clone(),
@@ -116,7 +116,7 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         source_chain: SourceChain,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
         init_is_root: bool,
     ) -> SourceChainResult<Self> {
         Ok(Self {
@@ -151,7 +151,7 @@ where
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
             Some(author) => Some(

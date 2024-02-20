@@ -179,7 +179,7 @@ mod tests {
             .unwrap();
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
-        let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+        let dna_def = DnaDefHashed::from_content_sync(dna_def.clone());
 
         let workspace = SourceChainWorkspace::new(
             db.clone(),
@@ -188,7 +188,7 @@ mod tests {
             test_cache.to_db(),
             keystore,
             author.clone(),
-            Arc::new(dna_def),
+            Arc::new(dna_def.clone()),
         )
         .await
         .unwrap();
@@ -201,9 +201,7 @@ mod tests {
         ribosome
             .expect_run_validate()
             .returning(move |_, _| Ok(ValidateResult::Valid));
-        ribosome
-            .expect_dna_def()
-            .return_const(dna_def_hashed.clone());
+        ribosome.expect_dna_def().return_const(dna_def.clone());
 
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder()
@@ -217,7 +215,7 @@ mod tests {
             ribosome,
             conductor_handle,
             signal_tx: SignalBroadcaster::noop(),
-            cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
+            cell_id: CellId::new(dna_def.to_hash(), author.clone()),
             integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
         };
         let keystore = fixt!(MetaLairClient);

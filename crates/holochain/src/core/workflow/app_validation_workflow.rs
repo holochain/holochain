@@ -280,11 +280,10 @@ async fn app_validation_workflow_inner(
     })
 }
 
-pub async fn record_to_op(
+pub async fn record_to_dht_op(
     record: Record,
     op_type: DhtOpType,
-    cascade: Arc<impl Cascade>,
-) -> AppValidationOutcome<(Op, Option<Entry>)> {
+) -> AppValidationOutcome<(DhtOp, Option<Entry>)> {
     use DhtOpType::*;
 
     // Hide private data where appropriate
@@ -309,7 +308,7 @@ pub async fn record_to_op(
         hidden_entry = entry.take().or(hidden_entry);
     }
     let dht_op = DhtOp::from_type(op_type, action, entry)?;
-    Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
+    Ok((dht_op, hidden_entry))
 }
 
 pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
@@ -348,7 +347,7 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
+pub(crate) async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
@@ -783,7 +782,7 @@ pub struct AppValidationWorkspace {
     dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
-    dna_def: Arc<DnaDef>,
+    dna_def: Arc<DnaDefHashed>,
 }
 
 impl AppValidationWorkspace {
@@ -793,7 +792,7 @@ impl AppValidationWorkspace {
         dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
-        dna_def: Arc<DnaDef>,
+        dna_def: Arc<DnaDefHashed>,
     ) -> Self {
         Self {
             authored_db,

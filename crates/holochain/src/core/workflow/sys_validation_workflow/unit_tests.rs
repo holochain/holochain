@@ -273,8 +273,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 }
 
 struct TestCase {
-    dna_def: DnaDef,
-    dna_hash: DnaDefHashed,
+    dna_def: DnaDefHashed,
     test_space: TestSpace,
     keystore: MetaLairClient,
     agent: AgentPubKey,
@@ -287,16 +286,15 @@ struct TestCase {
 impl TestCase {
     async fn new() -> Self {
         let dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
-        let dna_hash = DnaDefHashed::from_content_sync(dna_def.clone());
+        let dna_def = DnaDefHashed::from_content_sync(dna_def.clone());
 
-        let test_space = TestSpace::new(dna_hash.hash.clone());
+        let test_space = TestSpace::new(dna_def.hash.clone());
 
         let keystore = holochain_keystore::test_keystore();
         let agent = keystore.new_sign_keypair_random().await.unwrap().into();
 
         Self {
             dna_def,
-            dna_hash,
             test_space,
             keystore,
             agent,
@@ -308,7 +306,7 @@ impl TestCase {
     }
 
     fn dna_hash(&self) -> DnaHash {
-        self.dna_hash.hash.clone()
+        self.dna_def.hash.clone()
     }
 
     fn dht_db_handle(&self) -> DbWrite<DbKindDht> {

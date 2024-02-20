@@ -4,6 +4,7 @@ use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
+use super::sys_validation_workflow;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
@@ -237,33 +238,37 @@ where
         &workspace,
         network.clone(),
     ));
+    let dna_def = workspace.dna_def().clone();
 
-    let to_app_validate = {
-        // collect all the records we need to validate in wasm
-        let scratch_records = workspace.source_chain().scratch_records()?;
-        let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
-        // Loop forwards through all the new records
-        for record in scratch_records {
-            sys_validate_record(&record, cascade.clone())
-                .await
-                // If the was en error exit
-                // If the validation failed, exit with an InvalidCommit
-                // If it was ok continue
-                .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
-            to_app_validate.push(record);
-        }
+    // collect all the records we need to validate in wasm
+    let scratch_records = workspace.source_chain().scratch_records()?;
 
-        to_app_validate
-    };
-
-    for mut chain_record in to_app_validate {
-        for op_type in action_to_op_types(chain_record.action()) {
-            let op =
-                app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
+    // Loop forwards through all the new records
+    for mut record in scratch_records {
+        for op_type in action_to_op_types(record.action()) {
+            let op = app_validation_workflow::record_to_dht_op(record, op_type).await;
 
             let (op, omitted_entry) = match op {
                 Ok(op) => op,
-                Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
+                Err(outcome_or_err) => return map_app_outcome(Outcome::try_from(outcome_or_err)),
+            };
+
+            // TODO: should clone this from the main workflow loop
+            let current_validation_dependencies = Arc::new(parking_lot::Mutex::new(
+                super::sys_validation_workflow::validation_deps::ValidationDependencies::new(),
+            ));
+
+            let outcome = super::sys_validation_workflow::validate_op(
+                &op,
+                &dna_def,
+                current_validation_dependencies,
+            )
+            .await?;
+            map_sys_outcome(outcome)?;
+
+            let op = match app_validation_workflow::dhtop_to_op(op, cascade.clone()).await {
+                Ok(op) => op,
+                Err(e) => return map_app_outcome(Outcome::try_from(e)),
             };
 
             let outcome = app_validation_workflow::validate_op(
@@ -275,15 +280,39 @@ where
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
-            map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, omitted_entry);
+            map_app_outcome(outcome)?;
+            record = app_validation_workflow::op_to_record(op, omitted_entry);
         }
     }
 
     Ok(())
 }
 
-fn map_outcome(
+fn map_sys_outcome(outcome: sys_validation_workflow::Outcome) -> WorkflowResult<()> {
+    match outcome {
+        sys_validation_workflow::Outcome::Accepted => {}
+        sys_validation_workflow::Outcome::Rejected(reason) => {
+            return Err(SourceChainError::InvalidCommit(reason).into());
+        }
+        // when the wasm is being called directly in a zome invocation any
+        // state other than valid is not allowed for new entries
+        // e.g. we require that all dependencies are met when committing an
+        // entry to a local source chain
+        // this is different to the case where we are validating data coming in
+        // from the network where unmet dependencies would need to be
+        // rescheduled to attempt later due to partitions etc.
+        sys_validation_workflow::Outcome::MissingDhtDep(hash) => {
+            return Err(SourceChainError::InvalidCommit(format!(
+                "Awaiting sys validation dep {:?} but this is not allowed when committing entries to the source chain",
+                hash
+            ))
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn map_app_outcome(
     outcome: Result<app_validation_workflow::Outcome, AppValidationError>,
 ) -> WorkflowResult<()> {
     match outcome.map_err(SourceChainError::other)? {
@@ -300,7 +329,7 @@ fn map_outcome(
         // rescheduled to attempt later due to partitions etc.
         app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
             return Err(SourceChainError::InvalidCommit(format!(
-                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
+                "Awaiting app validation deps {:?} but this is not allowed when committing entries to the source chain",
                 hashes
             ))
             .into());

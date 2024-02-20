@@ -330,8 +330,8 @@ async fn check_valid_if_dna_test() {
     // Test data
     let _activity_return = vec![ActionHash::arbitrary(&mut g).unwrap()];
 
-    let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
-    dna_def.modifiers.origin_time = Timestamp::MIN;
+    let mut dna_def = DnaDefHashed::from_content_sync(DnaDef::arbitrary(&mut g).unwrap());
+    dna_def.content.modifiers.origin_time = Timestamp::MIN;
 
     // Empty store not dna
     let action = CreateLink::arbitrary(&mut g).unwrap();
@@ -349,25 +349,25 @@ async fn check_valid_if_dna_test() {
     cache.get_state().await;
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def()),
         Ok(())
     );
     let mut action = Dna::arbitrary(&mut g).unwrap();
     action.hash = DnaHash::with_data_sync(&dna_def);
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def()),
         Ok(())
     );
 
     // - Test that an origin_time in the future leads to invalid Dna action commit
     let dna_def_original = workspace.dna_def();
-    dna_def.modifiers.origin_time = Timestamp::MAX;
+    dna_def.content.modifiers.origin_time = Timestamp::MAX;
     action.hash = DnaHash::with_data_sync(&dna_def);
     workspace.dna_def = Arc::new(dna_def);
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevActionError(PrevActionError {
                 source: PrevActionErrorKind::InvalidRootOriginTime,
@@ -380,7 +380,7 @@ async fn check_valid_if_dna_test() {
     action.author = fake_agent_pubkey_1();
     workspace.dna_def = dna_def_original;
 
-    check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
+    check_valid_if_dna(&action.clone().into(), &workspace.dna_def()).unwrap();
 
     fake_genesis_for_agent(
         db.clone().into(),
