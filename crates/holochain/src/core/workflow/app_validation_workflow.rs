@@ -216,9 +216,9 @@ async fn app_validation_workflow_inner(
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
                             }
                         }
-                        Outcome::AwaitingDeps(deps) => {
+                        Outcome::AwaitingDeps(_) => {
                             awaiting += 1;
-                            let status = ValidationStage::AwaitingAppDeps(deps);
+                            let status = ValidationStage::AwaitingAppDeps;
                             put_validation_limbo(txn, &op_hash, status)?;
                         }
                         Outcome::Rejected(_) => {

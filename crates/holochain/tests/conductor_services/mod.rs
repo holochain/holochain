@@ -8,6 +8,7 @@ use holochain::{
     },
 };
 pub use holochain_conductor_api::*;
+use holochain_conductor_services::KeyState;
 use holochain_types::prelude::*;
 
 async fn dpki_dna_bundle() -> DnaBundle {
@@ -78,6 +79,36 @@ async fn validate_with_dpki() {
         .unwrap()
         .into_tuples();
 
+    async fn key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeyState {
+        conductor
+            .running_services()
+            .dpki
+            .as_ref()
+            .unwrap()
+            .lock()
+            .await
+            .key_state(agent.clone(), Timestamp::now())
+            .await
+            .unwrap()
+    }
+
+    assert!(matches!(
+        key_state(&conductors[0], alice.agent_pubkey()).await,
+        KeyState::Valid(_)
+    ));
+    assert!(matches!(
+        key_state(&conductors[0], bob.agent_pubkey()).await,
+        KeyState::NotFound
+    ));
+    assert!(matches!(
+        key_state(&conductors[1], alice.agent_pubkey()).await,
+        KeyState::NotFound
+    ));
+    assert!(matches!(
+        key_state(&conductors[1], bob.agent_pubkey()).await,
+        KeyState::Valid(_)
+    ));
+
     conductors.exchange_peer_info().await;
 
     let hash: ActionHash = conductors[0]
@@ -85,6 +116,26 @@ async fn validate_with_dpki() {
         .await;
 
     consistency_10s([&alice, &bob]).await;
+
+    // Both see each other in DPKI
+    assert!(matches!(
+        key_state(&conductors[0], bob.agent_pubkey()).await,
+        KeyState::Valid(_)
+    ));
+    assert!(matches!(
+        key_state(&conductors[1], alice.agent_pubkey()).await,
+        KeyState::Valid(_)
+    ));
+
+    // Carol is nowhere to be found since she never installed DPKI
+    assert!(matches!(
+        key_state(&conductors[0], carol.agent_pubkey()).await,
+        KeyState::NotFound
+    ));
+    assert!(matches!(
+        key_state(&conductors[1], carol.agent_pubkey()).await,
+        KeyState::NotFound
+    ));
 
     let record_bob: Option<Record> = conductors[1]
         .call(&bob.zome("simple"), "read", hash.clone())
@@ -98,5 +149,8 @@ async fn validate_with_dpki() {
     // Carol can't get the record. This doesn't necessarily prove that DPKI
     // is working, but it at least demonstrates something basic about validation.
     // A better test would check the *reason* why the record couldn't be fetched.
-    assert!(record_carol.is_none());
+    assert!(
+        record_carol.is_none(),
+        "Carol should not be able to communicate with the other two"
+    );
 }

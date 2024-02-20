@@ -112,10 +112,10 @@ pub enum ValidationOutcome {
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
-    DpkiAgentInvalid(AgentPubKey, Timestamp),
     #[error("The agent {0:?} could not be found in DPKI")]
     DpkiAgentMissing(AgentPubKey),
+    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
+    DpkiAgentInvalid(AgentPubKey, Timestamp),
     #[error("The entry def index for {0:?} was out of range")]
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
@@ -167,6 +167,16 @@ impl ValidationOutcome {
     /// and exit early
     pub fn into_outcome<T>(self) -> SysValidationOutcome<T> {
         Err(OutcomeOrError::Outcome(self))
+    }
+
+    /// The outcome is pending further information, so no determination can be made at this time.
+    /// If this is false, then the outcome is determinate, meaning we can reject validation now.
+    pub fn is_indeterminate(&self) -> bool {
+        if let ValidationOutcome::Counterfeit(_, _) = self {
+            // Just a helpful assertion for us
+            unreachable!("Counterfeit ops are dropped before sys validation")
+        }
+        matches!(self, Self::DepMissingFromDht(_) | Self::DpkiAgentMissing(_))
     }
 }
 

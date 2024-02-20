@@ -299,9 +299,9 @@ async fn sys_validation_workflow_inner(
                             op: op_hash
                         });
                     }
-                    Outcome::MissingDhtDep(missing_dep) => {
+                    Outcome::MissingDhtDep => {
                         summary.missing += 1;
-                        let status = ValidationStage::AwaitingSysDeps(missing_dep);
+                        let status = ValidationStage::AwaitingSysDeps;
                         put_validation_limbo(txn, &op_hash, status)?;
                     }
                     Outcome::Rejected(_) => {
@@ -506,48 +506,22 @@ pub(crate) async fn validate_op(
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
-            match e {
+            if e.is_indeterminate() {
                 // This is expected if the dependency isn't held locally and needs to be fetched from the network
                 // so downgrade the logging to trace.
-                ValidationOutcome::DepMissingFromDht(_) => {
-                    tracing::trace!(
-                        msg = "DhtOp has a missing dependency",
-                        ?op,
-                        error = ?e,
-                        error_msg = %e
-                    );
-                }
-                _ => {
-                    info!(
-                        msg = "DhtOp did not pass system validation. (If rejected, a warning will follow.)",
-                        ?op,
-                        error = ?e,
-                        error_msg = %e
-                    );
-                }
+                tracing::debug!(
+                    msg = "DhtOp has a missing dependency",
+                    ?op,
+                    error = ?e,
+                    error_msg = %e
+                );
+                Ok(Outcome::MissingDhtDep)
+            } else {
+                tracing::warn!(msg = "DhtOp was rejected during system validation.", ?op, error = ?e, error_msg = %e);
+                Ok(Outcome::Rejected(e.to_string()))
             }
-            let outcome = handle_failed(&e);
-            if let Outcome::Rejected(_) = outcome {
-                warn!(msg = "DhtOp was rejected during system validation.", ?op, error = ?e, error_msg = %e)
-            }
-            Ok(outcome)
         }
         Err(e) => Err(e.into()),
-    }
-}
-
-/// For now errors result in an outcome but in the future
-/// we might find it useful to include the reason something
-/// was rejected etc.
-/// This is why the errors contain data but is currently unread.
-fn handle_failed(error: &ValidationOutcome) -> Outcome {
-    use Outcome::*;
-    match error {
-        ValidationOutcome::Counterfeit(_, _) => {
-            unreachable!("Counterfeit ops are dropped before sys validation")
-        }
-        ValidationOutcome::DepMissingFromDht(dep) => MissingDhtDep(dep.clone()),
-        reason => Rejected(reason.to_string()),
     }
 }
 

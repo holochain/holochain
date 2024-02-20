@@ -275,7 +275,7 @@ async fn validate_create_op_with_prev_from_network() {
 
     let outcome = test_case.with_op(op).run().await.unwrap();
 
-    assert!(matches!(outcome, Outcome::MissingDhtDep(_)));
+    assert!(matches!(outcome, Outcome::MissingDhtDep));
 
     // Simulate the dep being found on the network
     test_case
@@ -329,7 +329,7 @@ async fn validate_create_op_with_prev_action_not_found() {
     let outcome = test_case.with_op(op).run().await.unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep(_)),
+        matches!(outcome, Outcome::MissingDhtDep),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );
@@ -1637,7 +1637,7 @@ async fn validate_register_updated_content_missing_updates_ref() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep(_)),
+        matches!(outcome, Outcome::MissingDhtDep),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );
@@ -1744,7 +1744,7 @@ async fn validate_register_updated_record_missing_updates_ref() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep(_)),
+        matches!(outcome, Outcome::MissingDhtDep),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );
@@ -1826,7 +1826,7 @@ async fn validate_register_deleted_by_with_missing_deletes_ref() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep(_)),
+        matches!(outcome, Outcome::MissingDhtDep),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );
@@ -1940,7 +1940,7 @@ async fn validate_register_deleted_entry_action_with_missing_deletes_ref() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep(_)),
+        matches!(outcome, Outcome::MissingDhtDep),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );
@@ -2083,7 +2083,7 @@ async fn validate_remove_link_missing_link_add_ref() {
         .unwrap();
 
     assert!(
-        matches!(outcome, Outcome::MissingDhtDep(_)),
+        matches!(outcome, Outcome::MissingDhtDep),
         "Expected MissingDhtDep but actual outcome was {:?}",
         outcome
     );
