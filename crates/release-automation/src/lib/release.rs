@@ -28,6 +28,7 @@ use std::{
 };
 use structopt::StructOpt;
 
+use crate::crate_selection::flatten_forest;
 use crate::{
     changelog::{Changelog, WorkspaceCrateReleaseHeading},
     common::{increment_semver, SemverIncrementMode},
@@ -185,6 +186,9 @@ fn bump_release_versions<'a>(
             true,
             true,
             false,
+            // If dependencies (especially pinned) have changed in source control but mismatch with dependencies that are already published to crates.io at the same version
+            // then cargo will correctly complain about mismatched dependencies when attempting a publish before bumping versions.
+            true,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -228,7 +232,7 @@ fn bump_release_versions<'a>(
                     crt.set_version(cmd_args.dry_run, &incremented_version)?;
                     incremented_version.clone()
                 } else {
-                    bail!("neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", &current_version, &incremented_version, previous_release_version);
+                    bail!("[{}] neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", crt.name(), &current_version, &incremented_version, previous_release_version);
                 }
             }
 
@@ -313,6 +317,7 @@ fn bump_release_versions<'a>(
             true,
             true,
             false,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -392,6 +397,7 @@ pub fn publish_to_crates_io<'a>(
         cmd_args.dry_run,
         false,
         cmd_args.no_verify,
+        false,
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
@@ -648,7 +654,7 @@ impl PublishError {
 
 /// Try to publish the given crates to crates.io.
 ///
-/// If dry-run is given, the following error conditoins are tolerated:
+/// If dry-run is given, the following error conditions are tolerated:
 /// - a dependency is not found but is part of the release
 /// - a version of a dependency is not found bu the dependency is part of the release
 ///
@@ -659,14 +665,18 @@ pub fn do_publish_to_crates_io<'a>(
     dry_run: bool,
     allow_dirty: bool,
     no_verify: bool,
+    no_publish: bool,
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
     ensure_release_order_consistency(&crates).context("release ordering is broken")?;
 
-    let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
-
-    debug!("attempting to publish {:?}", crate_names);
+    let crate_names: Vec<String> = crates.iter().map(|crt| crt.name()).collect();
+    if !no_publish {
+        debug!("attempting to publish {:?}", crate_names);
+    } else {
+        debug!("check but not publishing {:?}", crate_names);
+    }
 
     let mut queue = crates.iter().collect::<std::collections::LinkedList<_>>();
     let mut errors: Vec<PublishError> = vec![];
@@ -712,7 +722,8 @@ pub fn do_publish_to_crates_io<'a>(
         let name = crt.name().to_owned();
         let ver = crt.version().to_owned();
 
-        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)?;
+        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)
+            .context(format!("looking up {name}-{ver} on local crate index"))?;
 
         if !state_changed && is_version_published {
             debug!(
@@ -766,114 +777,116 @@ pub fn do_publish_to_crates_io<'a>(
             }
         }
 
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.args(
-            [
-                vec![
-                    "publish",
-                    "--locked",
-                    "--verbose",
-                    "--no-verify",
-                    "--registry",
-                    "crates-io",
-                    &format!("--manifest-path={}", manifest_path.to_string_lossy()),
-                ],
-                if dry_run { vec!["--dry-run"] } else { vec![] },
-                if allow_dirty {
-                    vec!["--allow-dirty"]
+        if !no_publish {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.args(
+                [
+                    vec![
+                        "publish",
+                        "--locked",
+                        "--verbose",
+                        "--no-verify",
+                        "--registry",
+                        "crates-io",
+                        &format!("--manifest-path={}", manifest_path.to_string_lossy()),
+                    ],
+                    if dry_run { vec!["--dry-run"] } else { vec![] },
+                    if allow_dirty {
+                        vec!["--allow-dirty"]
+                    } else {
+                        vec![]
+                    },
+                    if let Some(target_dir) = cargo_target_dir_string.as_ref() {
+                        vec![target_dir]
+                    } else {
+                        vec![]
+                    },
+                ]
+                .concat(),
+            );
+    
+            debug!("Running command: {:?}", cmd);
+    
+            let output = cmd.output().context("process exitted unsuccessfully")?;
+            if !output.status.success() {
+                let mut details = String::new();
+                for line in output.stderr.lines_with_terminator() {
+                    let line = line.to_str_lossy();
+                    details += &line;
+                }
+    
+                let error = PublishError::with_str(crt.name(), crt.version().to_string(), details);
+    
+                if match &error {
+                    PublishError::Other(..) => true,
+                    PublishError::PackageNotFound { dependency, .. }
+                    | PublishError::PackageVersionNotFound { dependency, .. } => {
+                        !((dry_run
+                            && crate_names.contains(dependency)
+                            && published_or_tolerated.contains(dependency))
+                            || allowed_missing_dependencies.contains(dependency))
+                    }
+                    PublishError::AlreadyUploaded { version, .. } => {
+                        crt.version().to_string() != *version
+                    }
+                    PublishError::PublishLimitExceeded { retry_after, .. } => {
+                        let wait = *retry_after - chrono::offset::Utc::now();
+                        warn!("waiting for {:?} to adhere to the rate limit...", wait);
+                        std::thread::sleep(wait.to_std()?);
+                        queue.push_front(crt);
+                        continue;
+                    }
+                    PublishError::CheckFailure { .. } => true,
+                } {
+                    error!("{}", error);
+                    errors.push(error);
                 } else {
-                    vec![]
-                },
-                if let Some(target_dir) = cargo_target_dir_string.as_ref() {
-                    vec![target_dir]
-                } else {
-                    vec![]
-                },
-            ]
-            .concat(),
-        );
-
-        debug!("Running command: {:?}", cmd);
-
-        let output = cmd.output().context("process exitted unsuccessfully")?;
-        if !output.status.success() {
-            let mut details = String::new();
-            for line in output.stderr.lines_with_terminator() {
-                let line = line.to_str_lossy();
-                details += &line;
-            }
-
-            let error = PublishError::with_str(crt.name(), crt.version().to_string(), details);
-
-            if match &error {
-                PublishError::Other(..) => true,
-                PublishError::PackageNotFound { dependency, .. }
-                | PublishError::PackageVersionNotFound { dependency, .. } => {
-                    !((dry_run
-                        && crate_names.contains(dependency)
-                        && published_or_tolerated.contains(dependency))
-                        || allowed_missing_dependencies.contains(dependency))
+                    tolerated_cntr += 1;
+                    debug!("tolerating error: '{:#?}'", &error);
+    
+                    published_or_tolerated.insert(crt.name());
                 }
-                PublishError::AlreadyUploaded { version, .. } => {
-                    crt.version().to_string() != *version
-                }
-                PublishError::PublishLimitExceeded { retry_after, .. } => {
-                    let wait = *retry_after - chrono::offset::Utc::now();
-                    warn!("waiting for {:?} to adhere to the rate limit...", wait);
-                    std::thread::sleep(wait.to_std()?);
-                    queue.push_front(crt);
-                    continue;
-                }
-                PublishError::CheckFailure { .. } => true,
-            } {
-                error!("{}", error);
-                errors.push(error);
+            } else if dry_run {
+                publish_cntr_inc(&crt.name_version());
+                published_or_tolerated.insert(crt.name());
             } else {
-                tolerated_cntr += 1;
-                debug!("tolerating error: '{:#?}'", &error);
-
+                // wait until the published version is live
+    
+                let mut found = false;
+    
+                for delay_secs in &[56, 28, 14, 7, 14, 28, 56] {
+                    let duration = std::time::Duration::from_secs(*delay_secs);
+                    std::thread::sleep(duration);
+    
+                    if crates_index_helper::is_version_published(&crt.name(), &crt.version(), true)? {
+                        debug!(
+                            "Found recently published {} on crates.io!",
+                            crt.name_version()
+                        );
+                        found = true;
+                        break;
+                    }
+    
+                    warn!(
+                        "Did not find {} on crates.io, retrying in {:?}...",
+                        crt.name_version(),
+                        duration
+                    );
+                }
+    
+                if !found {
+                    errors.push(PublishError::Other(
+                        crt.name_version(),
+                        "recently published version not found in time on the crates_io index"
+                            .to_string(),
+                    ));
+    
+                    return do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr);
+                }
+    
+                publish_cntr_inc(&crt.name_version());
                 published_or_tolerated.insert(crt.name());
             }
-        } else if dry_run {
-            publish_cntr_inc(&crt.name_version());
-            published_or_tolerated.insert(crt.name());
-        } else {
-            // wait until the published version is live
-
-            let mut found = false;
-
-            for delay_secs in &[56, 28, 14, 7, 14, 28, 56] {
-                let duration = std::time::Duration::from_secs(*delay_secs);
-                std::thread::sleep(duration);
-
-                if crates_index_helper::is_version_published(&crt.name(), &crt.version(), true)? {
-                    debug!(
-                        "Found recently published {} on crates.io!",
-                        crt.name_version()
-                    );
-                    found = true;
-                    break;
-                }
-
-                warn!(
-                    "Did not find {} on crates.io, retrying in {:?}...",
-                    crt.name_version(),
-                    duration
-                );
-            }
-
-            if !found {
-                errors.push(PublishError::Other(
-                    crt.name_version(),
-                    "recently published version not found in time on the crates_io index"
-                        .to_string(),
-                ));
-
-                return do_return(errors, check_cntr, publish_cntr, skip_cntr, tolerated_cntr);
-            }
-
-            publish_cntr_inc(&crt.name_version());
-            published_or_tolerated.insert(crt.name());
         }
     }
 

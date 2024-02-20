@@ -3,12 +3,9 @@
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use error::WorkflowResult;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
 
 use tracing::*;
 
@@ -25,11 +22,11 @@ pub async fn integrate_dht_ops_workflow(
     network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
-    let time = holochain_zome_types::Timestamp::now();
+    let time = holochain_zome_types::prelude::Timestamp::now();
     // Get any activity from the cache that is ready to be integrated.
     let activity_to_integrate = dht_query_cache.get_activity_to_integrate().await?;
     let (changed, activity_integrated) = vault
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             let mut total = 0;
             if !activity_to_integrate.is_empty() {
                 let mut stmt = txn.prepare_cached(
@@ -98,7 +95,7 @@ pub async fn integrate_dht_ops_workflow(
     if changed > 0 {
         trigger_receipt.trigger(&"integrate_dht_ops_workflow");
         network.new_integrated_data().await?;
-        Ok(WorkComplete::Incomplete)
+        Ok(WorkComplete::Incomplete(None))
     } else {
         Ok(WorkComplete::Complete)
     }

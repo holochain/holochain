@@ -22,8 +22,8 @@ pub use holochain_integrity_types::entry::*;
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 /// Either an [`EntryDefIndex`] or one of:
-/// - [`EntryType::CapGrant`](crate::prelude::EntryType::CapGrant)
-/// - [`EntryType::CapClaim`](crate::prelude::EntryType::CapClaim)
+/// - [EntryType::CapGrant]
+/// - [EntryType::CapClaim]
 /// Which don't have an index.
 pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index

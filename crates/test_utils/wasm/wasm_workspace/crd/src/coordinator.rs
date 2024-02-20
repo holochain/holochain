@@ -31,7 +31,7 @@ fn delete_via_input(delete_input: DeleteInput) -> ExternResult<ActionHash> {
 
 #[cfg(all(test, feature = "mock"))]
 pub mod test {
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk::prelude::*;
 
     #[test]

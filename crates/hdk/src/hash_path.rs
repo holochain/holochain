@@ -1,4 +1,4 @@
-/// The anchor pattern implemented in terms of [ `path::Path` ]
+/// The anchor pattern implemented in terms of [Path](hdi::prelude::Path).
 ///
 /// The anchor pattern predates the path crate.
 ///
@@ -10,9 +10,9 @@
 /// - The second level is optional as `Option<String>`
 pub mod anchor;
 
-/// The generic [ `path::Path` ] pattern.
+/// The generic [Path](hdi::prelude::Path) pattern.
 ///
-/// As explained in the parent module documentation the [ `path::Path` ] defines a tree structure.
+/// As explained in the parent module documentation the [Path](hdi::prelude::Path) defines a tree structure.
 ///
 /// The path is _not_ an entire tree but simply one path from the root to the current depth of the tree.
 ///
@@ -29,10 +29,10 @@ pub mod anchor;
 ///
 /// Note:
 ///
-/// - The path must always start at the root
-/// - [ `path::Path` ] are sequential and contigious
-/// - [ `path::Path` ] may be empty
-/// - [ `path::Path` ] only track one branch
+/// - The [Path](hdi::prelude::Path) must always start at the root
+/// - [Path](hdi::prelude::Path)s are sequential and contigious
+/// - [Path](hdi::prelude::Path)s may be empty
+/// - [Path](hdi::prelude::Path)s only track one branch
 ///
 /// Applications can discover all links from a path to all children by constructing the known path components.
 ///
@@ -40,16 +40,3 @@ pub mod anchor;
 ///
 /// If an application knows `[ A B ]` then a link to `C` will be discoverable.
 pub mod path;
-
-/// A [ `String` ] based DSL for [ `path::Path` ] that builds trees based on lexical granularity.
-///
-/// The basic form is `width:depth#` in the string with `.` separators for each component.
-///
-/// For example `foo.2:3#holochain` would expand to a path with string components:
-///
-/// `[ "foo" ho lo ch holochain]`
-///
-/// The widths of strings are normalised as UTF32 as path components so multibyte characters count as 1.
-///
-/// The tests in the shard module include several examples of the DSL including multibyte characters.
-pub mod shard;

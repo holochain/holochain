@@ -3,15 +3,9 @@ use arbitrary::Unstructured;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_state::validation_db::ValidationLimboStatus;
-use holochain_state::{mutations, prelude::test_in_mem_db};
-use holochain_types::db_cache::*;
-use holochain_types::dht_op::{DhtOpLight, DhtOpType, OpOrder};
-use holochain_zome_types::Create;
-use holochain_zome_types::ValidationStatus;
-use holochain_zome_types::{
-    Action, ActionHashed, Dna, Signature, SignedActionHashed, Timestamp, NOISE,
-};
+use holochain_state::mutations;
+use holochain_state::prelude::*;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -28,7 +22,7 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
     mutations::insert_action(txn, &action).unwrap();
     mutations::insert_op_lite(
         txn,
-        &DhtOpLight::RegisterAgentActivity(hash, basis_hash.clone()),
+        &DhtOpLite::RegisterAgentActivity(hash, basis_hash.clone()),
         &op_hash,
         &op_order,
         &timestamp,
@@ -38,18 +32,31 @@ fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Ac
     op_hash
 }
 
-fn set_integrated(db: &DbWrite<DbKindDht>, u: &mut Unstructured, op_hash: &DhtOpHash) {
-    db.test_commit(|txn| {
-        mutations::set_validation_stage(txn, op_hash, ValidationLimboStatus::Pending).unwrap();
-        mutations::set_when_integrated(txn, op_hash, Timestamp::arbitrary(u).unwrap()).unwrap();
+fn set_integrated(
+    db: &DbWrite<DbKindDht>,
+    u: Arc<Mutex<Unstructured<'static>>>,
+    op_hash: DhtOpHash,
+) {
+    db.test_write({
+        let u = u.clone();
+        let op_hash = op_hash.clone();
+        move |txn| {
+            mutations::set_validation_stage(txn, &op_hash, ValidationStage::Pending).unwrap();
+            mutations::set_when_integrated(
+                txn,
+                &op_hash,
+                Timestamp::arbitrary(&mut u.lock()).unwrap(),
+            )
+            .unwrap();
+        }
     });
 }
 
-fn set_ready_to_integrate(db: &DbWrite<DbKindDht>, op_hash: &DhtOpHash) {
-    db.test_commit(|txn| {
-        mutations::set_validation_stage(txn, op_hash, ValidationLimboStatus::AwaitingIntegration)
+fn set_ready_to_integrate(db: &DbWrite<DbKindDht>, op_hash: DhtOpHash) {
+    db.test_write(move |txn| {
+        mutations::set_validation_stage(txn, &op_hash, ValidationStage::AwaitingIntegration)
             .unwrap();
-        mutations::set_validation_status(txn, op_hash, ValidationStatus::Valid).unwrap();
+        mutations::set_validation_status(txn, &op_hash, ValidationStatus::Valid).unwrap();
     });
 }
 
@@ -62,22 +69,26 @@ async fn check_state(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cache_inits_correctly() {
-    let mut u = Unstructured::new(&NOISE);
+    let u = Arc::new(Mutex::new(Unstructured::new(&NOISE)));
 
     let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| assert!(activity.is_empty())).await;
 
-    let action = Action::Dna(Dna::arbitrary(&mut u).unwrap());
+    let action = Action::Dna(Dna::arbitrary(&mut u.lock()).unwrap());
     let author = action.author().clone();
     let hash = ActionHash::with_data_sync(&action);
-    let op_hash = db.test_commit(|txn| insert_action_and_op(txn, &mut u, &action));
+    let op_hash = db.test_write({
+        let u = u.clone();
+        let action = action.clone();
+        move |txn| insert_action_and_op(txn, &mut u.lock(), &action)
+    });
 
     let cache = DhtDbQueryCache::new(db.clone().into());
 
     check_state(&cache, |activity| assert!(activity.is_empty())).await;
 
-    set_ready_to_integrate(&db, &op_hash);
+    set_ready_to_integrate(&db, op_hash.clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -92,7 +103,7 @@ async fn cache_inits_correctly() {
     assert_eq!(*to_integrate[0].0, *action.author());
     assert_eq!(to_integrate[0].1, 0..=0);
 
-    set_integrated(&db, &mut u, &op_hash);
+    set_integrated(&db, u.clone(), op_hash.clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -105,12 +116,16 @@ async fn cache_inits_correctly() {
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
     assert_eq!(to_integrate.len(), 0);
 
-    let mut action = Create::arbitrary(&mut u).unwrap();
+    let mut action = Create::arbitrary(&mut u.lock()).unwrap();
     action.prev_action = hash.clone();
     action.action_seq = 1;
     action.author = author.clone();
     let action: Action = action.into();
-    let op_hash = db.test_commit(|txn| insert_action_and_op(txn, &mut u, &action));
+    let op_hash = db.test_write({
+        let u = u.clone();
+        let action = action.clone();
+        move |txn| insert_action_and_op(txn, &mut u.lock(), &action)
+    });
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -123,7 +138,7 @@ async fn cache_inits_correctly() {
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
     assert_eq!(to_integrate.len(), 0);
 
-    set_ready_to_integrate(&db, &op_hash);
+    set_ready_to_integrate(&db, op_hash.clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -138,7 +153,7 @@ async fn cache_inits_correctly() {
     assert_eq!(*to_integrate[0].0, *action.author());
     assert_eq!(to_integrate[0].1, 1..=1);
 
-    set_integrated(&db, &mut u, &op_hash);
+    set_integrated(&db, u.clone(), op_hash.clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -154,41 +169,48 @@ async fn cache_inits_correctly() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cache_init_catches_gaps() {
-    let mut u = Unstructured::new(&NOISE);
+    let u = Arc::new(Mutex::new(Unstructured::new(&NOISE)));
     let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
 
-    let action = Action::Dna(Dna::arbitrary(&mut u).unwrap());
+    let action = Action::Dna(Dna::arbitrary(&mut u.lock()).unwrap());
     let hash = ActionHash::with_data_sync(&action);
     let author = action.author().clone();
 
     // Create the missing action so we can get the hash.
-    let mut missing_action = Create::arbitrary(&mut u).unwrap();
+    let mut missing_action = Create::arbitrary(&mut u.lock()).unwrap();
     missing_action.prev_action = hash;
     missing_action.action_seq = 1;
     missing_action.author = author.clone();
     let missing_action: Action = missing_action.into();
     let missing_hash = ActionHash::with_data_sync(&missing_action);
 
-    let mut op_hashes = db.test_commit(|txn| {
-        let mut op_hashes = Vec::new();
-        op_hashes.push(insert_action_and_op(txn, &mut u, &action));
+    let mut op_hashes = db.test_write({
+        let u = u.clone();
+        let action = action.clone();
+        move |txn| {
+            let mut op_hashes = Vec::new();
+            op_hashes.push(insert_action_and_op(txn, &mut u.lock(), &action));
 
-        let mut action = Create::arbitrary(&mut u).unwrap();
-        action.prev_action = missing_hash;
-        action.action_seq = 2;
-        action.author = author.clone();
-        let action: Action = action.into();
-        op_hashes.push(insert_action_and_op(txn, &mut u, &action));
-        op_hashes
+            let mut action = Create::arbitrary(&mut u.lock()).unwrap();
+            action.prev_action = missing_hash;
+            action.action_seq = 2;
+            action.author = author.clone();
+            let action: Action = action.into();
+            op_hashes.push(insert_action_and_op(txn, &mut u.lock(), &action));
+            op_hashes
+        }
     });
 
-    set_ready_to_integrate(&db, &op_hashes[0]);
+    set_ready_to_integrate(&db, op_hashes[0].clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
-    check_state(&cache, |activity| {
-        let b = activity.get(action.author()).unwrap();
-        assert_eq!(b.integrated, None);
-        assert_eq!(b.ready_to_integrate, Some(0));
+    check_state(&cache, {
+        let author = action.author().clone();
+        move |activity| {
+            let b = activity.get(&author).unwrap();
+            assert_eq!(b.integrated, None);
+            assert_eq!(b.ready_to_integrate, Some(0));
+        }
     })
     .await;
 
@@ -197,8 +219,8 @@ async fn cache_init_catches_gaps() {
     assert_eq!(*to_integrate[0].0, *action.author());
     assert_eq!(to_integrate[0].1, 0..=0);
 
-    set_integrated(&db, &mut u, &op_hashes[0]);
-    set_ready_to_integrate(&db, &op_hashes[1]);
+    set_integrated(&db, u.clone(), op_hashes[0].clone());
+    set_ready_to_integrate(&db, op_hashes[1].clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -211,7 +233,8 @@ async fn cache_init_catches_gaps() {
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
     assert_eq!(to_integrate.len(), 0);
 
-    op_hashes.push(db.test_commit(|txn| insert_action_and_op(txn, &mut u, &missing_action)));
+    op_hashes
+        .push(db.test_write(move |txn| insert_action_and_op(txn, &mut u.lock(), &missing_action)));
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -224,7 +247,7 @@ async fn cache_init_catches_gaps() {
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
     assert_eq!(to_integrate.len(), 0);
 
-    set_ready_to_integrate(&db, &op_hashes[2]);
+    set_ready_to_integrate(&db, op_hashes[2].clone());
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -247,7 +270,7 @@ async fn cache_set_integrated() {
 
     let action = Action::Dna(Dna::arbitrary(&mut u).unwrap());
     let author = action.author().clone();
-    db.test_commit(|txn| insert_action_and_op(txn, &mut u, &action));
+    db.test_write(move |txn| insert_action_and_op(txn, &mut u, &action));
 
     let cache = DhtDbQueryCache::new(db.clone().into());
 

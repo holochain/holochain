@@ -1,0 +1,28 @@
+[package]
+name = "test_wasm_dna_properties"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+name = "test_wasm_dna_properties"
+crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_dna_properties"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { path = "../../../../hdk", optional = true }
+serde = { workspace = true }
+hdi = { path = "../../../../hdi" }
+holochain_test_wasm_common = { path = "../../../wasm_common" }
+
+[dev-dependencies]
+hdk = { path = "../../../../hdk", features = ["fixturators"] }
+fixt = { path = "../../../../fixt" }
+
+[features]
+default = ["hdk"]
+integrity = []
+mock = ["hdk/mock"]

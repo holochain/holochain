@@ -40,10 +40,17 @@ pub fn get_file(hash: ActionHash) -> ExternResult<Option<File>> {
 #[hdk_extern]
 pub fn get_all_files(_: ()) -> ExternResult<Vec<ActionHash>> {
     let path = Path::from("all_files");
-    let links = get_links(path.path_entry_hash()?, LinkTypes::AllFiles, None)?;
+    let links = get_links(
+        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::AllFiles)?.build(),
+    )?;
     let get_input: Vec<GetInput> = links
         .into_iter()
-        .map(|link| GetInput::new(ActionHash::from(link.target).into(), GetOptions::default()))
+        .map(|link| {
+            GetInput::new(
+                ActionHash::try_from(link.target).unwrap().into(),
+                GetOptions::default(),
+            )
+        })
         .collect();
     let records = HDK.with(|hdk| hdk.borrow().get(get_input))?;
     let hashes: Vec<ActionHash> = records

@@ -467,24 +467,28 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
 
     /// Get an existing connection.
     /// If one is not available, establish a new connection.
-    pub fn get_connection<U: Into<TxUrl>>(
+    pub fn get_connection<U: TryInto<TxUrl, Error = KitsuneError>>(
         &self,
         remote: U,
         timeout: KitsuneTimeout,
     ) -> impl std::future::Future<Output = KitsuneResult<Tx2ConHnd<C>>> + 'static + Send {
-        let remote = remote.into();
+        let ep_hnd = self.0.clone();
         let rmap = self.1.clone();
         let metrics = self.2.clone();
         let local_cert = self.3.clone();
-        let fut = self.0.get_connection(remote.clone(), timeout);
-        async move {
-            let con = fut.await?;
-            Ok(Tx2ConHnd::new(local_cert, con, remote, rmap, metrics))
+
+        match remote.try_into() {
+            Ok(remote) => async move {
+                let con = ep_hnd.get_connection(remote.clone(), timeout).await?;
+                Ok(Tx2ConHnd::new(local_cert, con, remote, rmap, metrics))
+            }
+            .boxed(),
+            Err(err) => async move { Err(err) }.boxed(),
         }
     }
 
     /// Write a notify to this connection.
-    pub fn notify<U: Into<TxUrl>>(
+    pub fn notify<U: TryInto<TxUrl, Error = KitsuneError>>(
         &self,
         remote: U,
         data: &C,
@@ -495,14 +499,14 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
-        let con_fut = self.get_connection(remote.into(), timeout);
+        let con_fut = self.get_connection(remote, timeout);
         futures::future::FutureExt::boxed(async move {
             con_fut.await?.priv_notify(buf, timeout, dbg_name).await
         })
     }
 
     /// Write a request to this connection.
-    pub fn request<U: Into<TxUrl>>(
+    pub fn request<U: TryInto<TxUrl, Error = KitsuneError>>(
         &self,
         remote: U,
         data: &C,
@@ -513,7 +517,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
         if let Err(e) = data.encode(&mut buf) {
             return async move { Err(KitsuneError::other(e)) }.boxed();
         }
-        let con_fut = self.get_connection(remote.into(), timeout);
+        let con_fut = self.get_connection(remote, timeout);
         futures::future::FutureExt::boxed(async move {
             con_fut.await?.priv_request(buf, timeout, dbg_name).await
         })
@@ -943,7 +947,7 @@ mod tests {
             let f = tx2_pool_promote(f, Default::default());
             let f = tx2_api(f, Default::default());
 
-            f.bind("none:", t).await.unwrap()
+            f.bind(TxUrl::from_str_panicking("none:"), t).await.unwrap()
         };
 
         let ep1 = mk_ep().await;
@@ -958,7 +962,7 @@ mod tests {
 
         println!("addr2: {}", addr2);
 
-        let con = ep1_hnd.get_connection(addr2, t).await.unwrap();
+        let con = ep1_hnd.get_connection(addr2.as_str(), t).await.unwrap();
         let res = con.request(&Test::one(42), t).await.unwrap();
 
         assert_eq!(&Test::one(43), &res);

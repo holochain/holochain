@@ -5,7 +5,8 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-
+use holochain_nonce::Nonce256Bits;
+use holochain_zome_types::fixt::ActionFixturator;
 struct StubNetwork;
 
 impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
@@ -47,7 +48,7 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
-    fn handle_remote_signal(
+    fn handle_send_remote_signal(
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
@@ -140,11 +141,11 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
-    fn handle_send_validation_receipt(
+    fn handle_send_validation_receipts(
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        receipt: SerializedBytes,
+        receipts: ValidationReceiptBundle,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -230,16 +231,15 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holochain_keystore::test_keystore;
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
     use crate::HolochainP2pSender;
-    use holochain_types::prelude::AgentPubKeyExt;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
-    use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p::KitsuneP2pConfig;
+    use holochain_types::prelude::*;
     use kitsune_p2p::*;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
+    use kitsune_p2p_types::tls::TlsConfig;
     use std::sync::Mutex;
 
     macro_rules! newhash {
@@ -321,10 +321,10 @@ mod tests {
                     cell_id: CellId::new(dna.clone(), a2.clone()),
                     zome_name: zome_name.clone(),
                     fn_name: fn_name.clone(),
-                    cap_secret: cap_secret.clone(),
+                    cap_secret,
                     payload: payload.clone(),
-                    nonce: nonce.clone(),
-                    expires_at: expires_at.clone(),
+                    nonce,
+                    expires_at,
                 }
                 .data_to_sign()
                 .unwrap(),
@@ -363,11 +363,10 @@ mod tests {
             while let Some(evt) = evt.next().await {
                 use crate::types::event::HolochainP2pEvent::*;
                 match evt {
-                    ValidationReceiptReceived {
-                        respond, receipt, ..
+                    ValidationReceiptsReceived {
+                        respond, receipts, ..
                     } => {
-                        let receipt: Vec<u8> = UnsafeBytes::from(receipt).into();
-                        assert_eq!(b"receipt-test".to_vec(), receipt);
+                        assert_eq!(1, receipts.into_iter().count());
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     SignNetworkData { respond, .. } => {
@@ -388,7 +387,16 @@ mod tests {
         p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
         p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
-        p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
+        let receipts = vec![SignedValidationReceipt {
+            receipt: ValidationReceipt {
+                dht_op_hash: fixt!(DhtOpHash),
+                validation_status: ValidationStatus::Valid,
+                validators: vec![],
+                when_integrated: Timestamp::now(),
+            },
+            validators_signatures: vec![],
+        }];
+        p2p.send_validation_receipts(dna, a1, receipts.into())
             .await
             .unwrap();
 
@@ -656,6 +664,9 @@ mod tests {
             base: hash.into(),
             type_query: LinkTypeFilter::single_dep(0.into()),
             tag: None,
+            after: None,
+            before: None,
+            author: None,
         };
 
         let res = p2p

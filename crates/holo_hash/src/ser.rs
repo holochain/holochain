@@ -152,6 +152,28 @@ mod tests {
     }
 
     #[test]
+    fn test_json_roundtrip() {
+        let h_orig = AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
+        let json = serde_json::to_string(&h_orig).unwrap();
+        let h: AgentPubKey = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(h_orig, h);
+        assert_eq!(*h.hash_type(), hash_type::Agent::new());
+
+        // Make sure that the representation is a raw 39-byte array
+        let array: TestByteArray = serde_json::from_str(&json).unwrap();
+        assert_eq!(array.0.len(), HOLO_HASH_FULL_LEN);
+        assert_eq!(
+            array.0,
+            vec![
+                132, 32, 36, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219,
+            ]
+        );
+    }
+
+    #[test]
     fn test_composite_hashtype_roundtrips() {
         {
             let h_orig = AnyDhtHash::from_raw_36_and_type(
@@ -258,7 +280,7 @@ mod tests {
         let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
         assert_eq!(hash_type_from_sb, hash_type::AnyDht::Action);
 
-        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(&hash_type_json).unwrap();
+        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(hash_type_json).unwrap();
         assert_eq!(hash_type_from_json, hash_type::AnyDht::Action);
     }
 

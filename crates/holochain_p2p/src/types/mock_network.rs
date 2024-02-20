@@ -1,7 +1,7 @@
 //! Tools for simulating a network around real holochain nodes.
 //! This is a very early prototype and subject to change.
 
-use fixt::prelude::Distribution;
+use ::fixt::prelude::Distribution;
 use futures::stream::Stream;
 use kitsune_p2p::actor::BroadcastData;
 use std::collections::HashMap;
@@ -171,7 +171,7 @@ impl HolochainP2pMockChannel {
             .into_iter()
             .map(|info| {
                 let agent = holo_hash::AgentPubKey::from_kitsune(&info.agent);
-                let url = info.url_list.get(0).cloned().unwrap();
+                let url = info.url_list.first().cloned().unwrap();
                 let cert = Tx2Cert::from(ProxyUrl::from_full(url.as_str()).unwrap().digest());
                 (agent, (cert, url))
             })
@@ -342,7 +342,7 @@ impl HolochainP2pMockMsg {
             HolochainP2pMockMsg::Wire { msg, .. } => match &msg {
                 crate::wire::WireMessage::CallRemote { .. }
                 | crate::wire::WireMessage::CallRemoteMulti { .. }
-                | crate::wire::WireMessage::ValidationReceipt { .. }
+                | crate::wire::WireMessage::ValidationReceipts { .. }
                 | crate::wire::WireMessage::Get { .. }
                 | crate::wire::WireMessage::GetMeta { .. }
                 | crate::wire::WireMessage::GetLinks { .. }
@@ -372,7 +372,7 @@ impl HolochainP2pMockMsg {
                 let call = match &msg {
                     crate::wire::WireMessage::CallRemote { .. }
                     | crate::wire::WireMessage::CallRemoteMulti { .. }
-                    | crate::wire::WireMessage::ValidationReceipt { .. }
+                    | crate::wire::WireMessage::ValidationReceipts { .. }
                     | crate::wire::WireMessage::Get { .. }
                     | crate::wire::WireMessage::GetMeta { .. }
                     | crate::wire::WireMessage::GetLinks { .. }

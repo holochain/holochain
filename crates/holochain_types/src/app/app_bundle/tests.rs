@@ -26,7 +26,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
     )
     .await;
 
-    let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).await.unwrap())];
+    let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).unwrap())];
 
     let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await

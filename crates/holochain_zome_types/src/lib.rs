@@ -22,6 +22,7 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod chain;
+pub mod clone;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
@@ -78,35 +79,19 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-#[cfg(all(any(test, feature = "test_utils"), feature = "arbitrary"))]
+#[cfg(all(any(test, feature = "test_utils"), feature = "fuzzing"))]
 pub mod entropy;
+
+#[cfg(feature = "fuzzing")]
+pub mod facts;
 
 pub use action::Action;
 pub use entry::Entry;
-pub use prelude::*;
+
 /// Re-exported dependencies
 pub mod dependencies {
     pub use ::holochain_integrity_types;
     pub use ::subtle;
-}
-use holochain_wasmer_common::WasmError;
-
-#[allow(missing_docs)]
-pub trait CallbackResult: Sized {
-    /// if a callback result is definitive we should halt any further iterations over remaining
-    /// calls e.g. over sparse names or subsequent zomes
-    /// typically a clear failure is definitive but success and missing dependencies are not
-    /// in the case of success or missing deps, a subsequent callback could give us a definitive
-    /// answer like a fail, and we don't want to over-optimise wasm calls and miss a clear failure
-    fn is_definitive(&self) -> bool;
-    /// when a WasmError is returned from a callback (e.g. via `?` operator) it might mean either:
-    ///
-    /// - There was an error that prevented the callback from coming to a CallbackResult (e.g. failing to connect to database)
-    /// - There was an error that should be interpreted as a CallbackResult::Fail (e.g. data failed to deserialize)
-    ///
-    /// Typically this can be split as host/wasm errors are the former, and serialization/guest errors the latter.
-    /// This function allows each CallbackResult to explicitly map itself.
-    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError>;
 }
 
 /// Helper macro for implementing ToSql, when using rusqlite as a dependency

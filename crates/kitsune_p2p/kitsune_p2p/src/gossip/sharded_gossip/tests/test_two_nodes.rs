@@ -2,6 +2,7 @@ use super::common::*;
 use super::*;
 use crate::NOISE;
 use arbitrary::Arbitrary;
+use itertools::Itertools;
 
 #[tokio::test(flavor = "multi_thread")]
 /// Runs through a happy path gossip round between two agents.
@@ -11,6 +12,7 @@ async fn sharded_sanity_test() {
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let mut iter = agents.clone().into_iter();
     let alice_agent = iter.next().unwrap().0;
     let bob_agent = iter.next().unwrap().0;
@@ -33,8 +35,17 @@ async fn sharded_sanity_test() {
     )
     .await;
 
+    let mut agent_info_session = AgentInfoSession::new(
+        bob.query_agents_by_local_agents().await.unwrap(),
+        all_agents.clone(),
+    );
+
     // - Bob tries to initiate.
-    let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
+    let (_, _, bob_outgoing) = bob
+        .try_initiate(&mut agent_info_session)
+        .await
+        .unwrap()
+        .unwrap();
     let alices_cert = bob
         .inner
         .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().cert.clone()))
@@ -42,7 +53,11 @@ async fn sharded_sanity_test() {
 
     // - Send initiate to alice.
     let alice_outgoing = alice
-        .process_incoming(bob_cert.clone().into(), bob_outgoing)
+        .process_incoming(
+            bob_cert.clone().into(),
+            bob_outgoing,
+            &mut agent_info_session,
+        )
         .await
         .unwrap();
 
@@ -62,7 +77,7 @@ async fn sharded_sanity_test() {
     // - Send the above to bob.
     for incoming in alice_outgoing {
         let outgoing = bob
-            .process_incoming(alices_cert.clone(), incoming)
+            .process_incoming(alices_cert.clone(), incoming, &mut agent_info_session)
             .await
             .unwrap();
         bob_outgoing.extend(outgoing);
@@ -83,7 +98,7 @@ async fn sharded_sanity_test() {
     // - Send the above to alice.
     for incoming in bob_outgoing {
         let outgoing = alice
-            .process_incoming(bob_cert.clone().into(), incoming)
+            .process_incoming(bob_cert.clone().into(), incoming, &mut agent_info_session)
             .await
             .unwrap();
         alice_outgoing.extend(outgoing);
@@ -107,7 +122,7 @@ async fn sharded_sanity_test() {
     // - Send alice's missing ops messages to bob.
     for incoming in alice_outgoing {
         let outgoing = bob
-            .process_incoming(alices_cert.clone(), incoming)
+            .process_incoming(alices_cert.clone(), incoming, &mut agent_info_session)
             .await
             .unwrap();
         bob_outgoing.extend(outgoing);
@@ -168,8 +183,11 @@ async fn partial_missing_doesnt_finish() {
         finished: MissingOpsStatus::ChunkComplete as u8,
     });
 
+    let mut agent_info_session =
+        AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
+
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming)
+        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 0);
@@ -224,8 +242,11 @@ async fn missing_ops_finishes() {
         finished: MissingOpsStatus::AllComplete as u8,
     });
 
+    let mut agent_info_session =
+        AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
+
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming)
+        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 0);
@@ -281,8 +302,11 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
         finished: MissingOpsStatus::AllComplete as u8,
     });
 
+    let mut agent_info_session =
+        AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
+
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming)
+        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 0);
@@ -338,8 +362,11 @@ async fn bloom_response_finishes() {
         finished: true,
     });
 
+    let mut agent_info_session =
+        AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
+
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming)
+        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 1);
@@ -395,8 +422,11 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
         finished: true,
     });
 
+    let mut agent_info_session =
+        AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
+
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming)
+        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 1);
@@ -421,6 +451,7 @@ async fn no_data_still_finishes() {
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
+    let all_agents = agents.iter().map(|(_, info)| info.clone()).collect_vec();
     // - Alice is expecting no responses and is expecting blooms.
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -484,7 +515,14 @@ async fn no_data_still_finishes() {
     });
 
     let outgoing = alice
-        .process_incoming(bob_cert.clone().into(), incoming)
+        .process_incoming(
+            bob_cert.clone().into(),
+            incoming,
+            &mut AgentInfoSession::new(
+                alice.query_agents_by_local_agents().await.unwrap(),
+                all_agents.clone(),
+            ),
+        )
         .await
         .unwrap();
 
@@ -496,6 +534,10 @@ async fn no_data_still_finishes() {
         .process_incoming(
             alice_cert.clone().into(),
             outgoing.into_iter().next().unwrap(),
+            &mut AgentInfoSession::new(
+                bob.query_agents_by_local_agents().await.unwrap(),
+                all_agents.clone(),
+            ),
         )
         .await
         .unwrap();
@@ -526,6 +568,7 @@ async fn no_data_still_finishes() {
 /// initiate a round it is handled correctly.
 async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     // - Set up two players with themselves as local agents.
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -546,21 +589,49 @@ async fn double_initiate_is_handled() {
     .await;
 
     // - Both players try to initiate and only have the other as a remote agent.
-    let (bob_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
-    let (alice_cert, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
+    let (bob_cert, _, alice_initiate) = alice
+        .try_initiate(&mut AgentInfoSession::new(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
+        .await
+        .unwrap()
+        .unwrap();
+    let (alice_cert, _, bob_initiate) = bob
+        .try_initiate(&mut AgentInfoSession::new(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
+        .await
+        .unwrap()
+        .unwrap();
 
     // - Both players process the initiate.
     let alice_outgoing = alice
-        .process_incoming(bob_cert, bob_initiate)
+        .process_incoming(
+            bob_cert,
+            bob_initiate,
+            &mut AgentInfoSession::new(
+                alice.query_agents_by_local_agents().await.unwrap(),
+                all_agents.clone(),
+            ),
+        )
         .await
         .unwrap();
     let bob_outgoing = bob
-        .process_incoming(alice_cert, alice_initiate)
+        .process_incoming(
+            alice_cert,
+            alice_initiate,
+            &mut AgentInfoSession::new(
+                bob.query_agents_by_local_agents().await.unwrap(),
+                all_agents.clone(),
+            ),
+        )
         .await
         .unwrap();
 
     // - Check we always have at least one node not proceeding with initiate.
-    assert!((bob_outgoing.len() == 0 || alice_outgoing.len() == 0));
+    assert!((bob_outgoing.is_empty() || alice_outgoing.is_empty()));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -568,6 +639,7 @@ async fn double_initiate_is_handled() {
 /// a node is already in progress does not initiate a new round.
 async fn initiate_after_target_is_set() {
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let alice = setup_empty_player(
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
@@ -587,12 +659,26 @@ async fn initiate_after_target_is_set() {
     .await;
 
     // - Alice successfully initiates a round with bob.
-    let (cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    let (cert, _, alice_initiate) = alice
+        .try_initiate(&mut AgentInfoSession::new(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
+        .await
+        .unwrap()
+        .unwrap();
     dbg!(&cert);
     dbg!(&agents);
     // - Bob accepts the round.
     let bob_outgoing = bob
-        .process_incoming(cert.clone(), alice_initiate)
+        .process_incoming(
+            cert.clone(),
+            alice_initiate,
+            &mut AgentInfoSession::new(
+                bob.query_agents_by_local_agents().await.unwrap(),
+                all_agents.clone(),
+            ),
+        )
         .await
         .unwrap();
     assert_eq!(bob_outgoing.len(), 2);
@@ -605,7 +691,13 @@ async fn initiate_after_target_is_set() {
         })
         .unwrap();
     // - Bob tries to initiate a round with alice.
-    let bob_initiate = bob.try_initiate().await.unwrap();
+    let bob_initiate = bob
+        .try_initiate(&mut AgentInfoSession::new(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
+        .await
+        .unwrap();
     bob.inner
         .share_mut(|i, _| {
             dbg!(&i.initiate_tgt);
@@ -621,7 +713,10 @@ async fn initiate_after_target_is_set() {
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 /// Test the initiates timeout after the round timeout has elapsed.
 async fn initiate_times_out() {
+    holochain_trace::test_run().unwrap();
+
     let agents = agents_with_infos(3).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let alice_cert = cert_from_info(agents[0].1.clone());
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -642,7 +737,10 @@ async fn initiate_times_out() {
 
     // Trying to initiate a round should succeed.
     let (tgt_cert, _, _) = alice
-        .try_initiate()
+        .try_initiate(&mut AgentInfoSession::new(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -653,7 +751,13 @@ async fn initiate_times_out() {
             Ok(())
         })
         .unwrap();
-    let r = alice.try_initiate().await.unwrap();
+    let r = alice
+        .try_initiate(&mut AgentInfoSession::new(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
+        .await
+        .unwrap();
 
     // Doesn't re-initiate.
     assert!(r.is_none());
@@ -672,7 +776,10 @@ async fn initiate_times_out() {
     .await;
 
     let (tgt2_cert, _, alice_initiate) = alice
-        .try_initiate()
+        .try_initiate(&mut AgentInfoSession::new(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -689,14 +796,28 @@ async fn initiate_times_out() {
 
     // Process the initiate with Bob.
     let bob_outgoing = bob
-        .process_incoming(alice_cert.clone().into(), alice_initiate)
+        .process_incoming(
+            alice_cert.clone().into(),
+            alice_initiate,
+            &mut AgentInfoSession::new(
+                bob.query_agents_by_local_agents().await.unwrap(),
+                all_agents.clone(),
+            ),
+        )
         .await
         .unwrap();
 
     // Process the Bob's accept with Alice.
     for bo in bob_outgoing {
         alice
-            .process_incoming(tgt2_cert.clone().into(), bo)
+            .process_incoming(
+                tgt2_cert.clone(),
+                bo,
+                &mut AgentInfoSession::new(
+                    alice.query_agents_by_local_agents().await.unwrap(),
+                    all_agents.clone(),
+                ),
+            )
             .await
             .unwrap();
     }
@@ -730,7 +851,13 @@ async fn initiate_times_out() {
 
     // Check that initiating again doesn't do anything.
 
-    let r = alice.try_initiate().await.unwrap();
+    let r = alice
+        .try_initiate(&mut AgentInfoSession::new(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            all_agents.clone(),
+        ))
+        .await
+        .unwrap();
     // Doesn't re-initiate.
     assert!(r.is_none());
     alice

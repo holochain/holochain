@@ -1,23 +1,30 @@
 #![cfg(feature = "test_utils")]
+#![cfg(feature = "chc")]
 
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetInlineZomes};
+use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
-use holochain_state::prelude::{fresh_reader_test, StateMutationError, Store, Txn};
+use holochain_sqlite::db::{DbKindAuthored, DbWrite};
+use holochain_sqlite::error::DatabaseResult;
+use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::record::SignedActionHashedExt;
 
-#[tokio::test(flavor = "multi_thread")]
 /// Test that records can be manually grafted onto a source chain.
+#[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let apps = conductor
-        .setup_app("app", &[dna_file.clone()])
-        .await
-        .unwrap();
+    let mut config = ConductorConfig::default();
+    config.chc_url = Some(url2::Url2::parse(
+        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
+    ));
+    let mut conductor = SweetConductor::from_config(config.clone()).await;
+    let keystore = conductor.keystore();
+
+    let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
 
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
@@ -32,8 +39,8 @@ async fn grafting() {
         .await;
 
     // Get the current chain source chain.
-    let get_chain = |env| {
-        fresh_reader_test(env, |txn| {
+    let get_chain = |env: DbWrite<DbKindAuthored>| async move {
+        env.read_async(move |txn| -> DatabaseResult<Vec<(ActionHash, u32)>> {
             let chain: Vec<(ActionHash, u32)> = txn
                 .prepare("SELECT hash, seq FROM Action ORDER BY seq")
                 .unwrap()
@@ -41,19 +48,29 @@ async fn grafting() {
                 .unwrap()
                 .collect::<Result<_, _>>()
                 .unwrap();
-            chain
+            Ok(chain)
         })
+        .await
+        .unwrap()
     };
 
     // Get the source chain.
-    let chain = get_chain(alice.authored_db().clone());
-    let original_records: Vec<_> = fresh_reader_test(alice.authored_db().clone(), |txn| {
-        let txn: Txn = (&txn).into();
-        chain
-            .iter()
-            .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
-            .collect()
-    });
+    let chain = get_chain(alice.authored_db().clone()).await;
+    let original_records: Vec<_> = alice
+        .authored_db()
+        .read_async({
+            let query_chain = chain.clone();
+
+            move |txn| -> DatabaseResult<Vec<_>> {
+                let txn: Txn = (&txn).into();
+                Ok(query_chain
+                    .iter()
+                    .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
+                    .collect())
+            }
+        })
+        .await
+        .unwrap();
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.
@@ -102,7 +119,7 @@ async fn grafting() {
         .await
         .expect("Should pass with valid agent");
 
-    let chain = get_chain(alice.authored_db().clone());
+    let chain = get_chain(alice.authored_db().clone()).await;
     // Chain should be 5 long.
     assert_eq!(chain.len(), 5);
     // Last action should be the one we just grafted.
@@ -122,7 +139,7 @@ async fn grafting() {
     // Validation is off so forking is possible.
     assert!(result.is_ok());
 
-    let chain = get_chain(alice.authored_db().clone());
+    let chain = get_chain(alice.authored_db().clone()).await;
     // Chain should be 4 long, since the previous fork was cut off
     assert_eq!(chain.len(), 4);
     // The new action will be in the chain
@@ -138,7 +155,7 @@ async fn grafting() {
     // Note this cell is now in an invalid state.
     assert!(result.is_ok());
 
-    let chain2 = get_chain(alice.authored_db().clone());
+    let chain2 = get_chain(alice.authored_db().clone()).await;
     // The chain is unchanged from adding the same action back in.
     assert_eq!(chain, chain2);
 
@@ -149,7 +166,7 @@ async fn grafting() {
         .await;
 
     assert!(result.is_ok());
-    let chain = get_chain(alice.authored_db().clone());
+    let chain = get_chain(alice.authored_db().clone()).await;
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.
@@ -181,10 +198,25 @@ async fn grafting() {
         .expect("Should restore original chain");
 
     // Start a second conductor.
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let conductor =
+        SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
+            .await;
 
     // The dna needs to be installed first.
     conductor.register_dna(dna_file.clone()).await.unwrap();
+
+    let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
+        "app",
+        alice.agent_pubkey().clone(),
+        &[(dna_file, None)],
+    )
+    .await;
+
+    // This results in an error since the CHC already contains genesis, but this
+    // is just to create the necessary cell for grafting onto.
+    payload.ignore_genesis_failure = true;
+    let install_result = conductor.raw_handle().install_app_bundle(payload).await;
+    assert!(install_result.is_err());
 
     // Insert the chain from the original conductor.
     conductor
@@ -193,12 +225,7 @@ async fn grafting() {
         .await
         .expect("Can cold start");
 
-    let apps = conductor
-        .setup_app_for_agent("cold_start", alice.agent_pubkey().clone(), &[dna_file])
-        .await
-        .unwrap();
-    let (alice_backup,) = apps.into_tuple();
-    let chain = get_chain(alice_backup.authored_db().clone());
+    let chain = get_chain(alice.authored_db().clone()).await;
     // Chain should be 4 long.
     assert_eq!(chain.len(), 4);
     // Last seq should be 3.
@@ -206,12 +233,9 @@ async fn grafting() {
 }
 
 async fn make_record(keystore: &MetaLairClient, action: Action) -> Record {
-    let sah = SignedActionHashed::sign(
-        keystore,
-        ActionHashed::from_content_sync(action.clone().into()),
-    )
-    .await
-    .unwrap();
+    let sah = SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action.clone()))
+        .await
+        .unwrap();
     let entry = Entry::app(().try_into().unwrap()).unwrap();
     Record::new(sah, Some(entry.clone()))
 }

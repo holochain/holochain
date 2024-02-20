@@ -72,7 +72,7 @@
 //! # pub struct A;
 //! # #[hdk_entry_helper]
 //! # pub struct B;
-//! # #[hdk_entry_defs(skip_hdk_extern = true)]
+//! # #[hdk_entry_types(skip_hdk_extern = true)]
 //! # #[unit_enum(UnitEntryTypes)]
 //! # pub enum EntryTypes {
 //! #     A(A),
@@ -139,8 +139,8 @@
 /// Current HDI rust crate version.
 pub const HDI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub use hdk_derive::hdk_entry_defs;
 pub use hdk_derive::hdk_entry_helper;
+pub use hdk_derive::hdk_entry_types;
 pub use hdk_derive::hdk_extern;
 pub use hdk_derive::hdk_link_types;
 
@@ -178,6 +178,54 @@ pub use hdk_derive::hdk_link_types;
 pub mod entry;
 
 pub mod hash;
+
+/// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).
+///
+/// This has lots of benefits but can make discoverability difficult.
+///
+/// When agents have the hash for some content they can directly fetch it but they need a way to discover the hash.
+/// For example, Alice can create new usernames or chat messages while Bob is offline.
+/// Unless there is a registry at a known location for Bob to lookup new usernames and chat messages he will never discover them.
+///
+/// The most basic solution is to create a single entry with constant content, e.g. "chat-messages" and link all messages from this.
+///
+/// The basic solution has two main issues:
+///
+/// - Fetching _all_ chat messages may be something like fetching _all_ tweets (impossible, too much data)
+/// - Holochain neighbourhoods (who needs to hold the data) center around the content address so the poor nodes closest to "chat-messages" will be forced to hold _all_ messages (DHT hotspots)
+///
+/// To address this problem we can introduce a tree structure.
+/// Ideally the tree structure embeds some domain specific _granularity_ into each "hop".
+/// For example the root level for chat messages could link to years, each year can link to months, then days and minutes.
+/// The "minutes" level will link to all chat messages in that exact minute.
+/// Any minutes with no chat messages will simply never be linked to.
+/// A GUI can poll from as deep in the tree as makes sense, for example it could start at the current day when the application first loads and then poll the past 5 minutes in parallel every 2 minutes (just a conceptual example).
+///
+/// If the tree embeds granularity then it can replace the need for 'pagination' which is a problematic concept in a partitioned p2p network.
+/// If the tree cannot embed meaningful granularity, for example maybe the only option is to build a tree based on the binary representation of the hash of the content, then we solve DHT hotspots but our applications will have no way to narrow down polling, other than to brute force the tree.
+///
+/// Examples of granularity include:
+///
+/// - Latitude/longitude for geo data
+/// - Timestamps
+/// - Lexical (alphabetical) ordering
+/// - Orders of magnitude
+/// - File system paths
+/// - Etc.
+///
+/// When modelling your data into open sets/collections that need to be looked up, try to find a way to create buckets of granularity that don't need to be brute forced.
+///
+/// In the case that granularity can be defined the tree structure solves both our main issues:
+///
+/// - We never need to fetch _all_ messages because we can start as deeply down the tree as is appropriate and
+/// - We avoid DHT hotspots because each branch of the tree has its own hash and set of links, therefore a different neighbourhood of agents
+///
+/// The [`hash_path`] module includes 3 submodules to help build and navigate these tree structures efficiently:
+///
+/// - [`hash_path::path`] is the basic general purpose implementation of tree structures as `Vec<Vec<u8>>`
+/// - [`hash_path::shard`] is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
+/// - [`hash_path::anchor`] implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
+pub mod hash_path;
 
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.
 ///

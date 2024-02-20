@@ -54,7 +54,7 @@ gh-config = "0.2"
 [dev-dependencies]
 ctor = "0.1"
 prettydiff = "0.4"
-pretty_assertions = "1.3"
+pretty_assertions = "1.4"
 tempfile = "3"
 cargo-test-support = { git = "https://github.com/rust-lang/cargo", branch = "rust-1.66.0" }
 assert_cmd = "1.0"

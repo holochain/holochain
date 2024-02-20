@@ -2,21 +2,8 @@ use std::sync::Arc;
 
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::db::DbKindCache;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::ReadAccess;
-use holochain_types::db::DbRead;
-use holochain_types::db::DbWrite;
-use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_zome_types::DnaDef;
-use holochain_zome_types::SignedActionHashed;
 
-use crate::prelude::SourceChain;
-use crate::prelude::SourceChainError;
-use crate::prelude::SourceChainResult;
-use crate::scratch::SyncScratch;
+use crate::prelude::*;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace<
@@ -52,16 +39,6 @@ pub struct HostFnStores {
 pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
 
 impl HostFnWorkspace {
-    pub async fn flush(
-        self,
-        network: &(dyn HolochainP2pDnaT + Send + Sync),
-    ) -> SourceChainResult<Vec<SignedActionHashed>> {
-        match self.source_chain {
-            Some(sc) => sc.flush(network).await,
-            None => Ok(Vec::with_capacity(0)),
-        }
-    }
-
     /// Get a reference to the host fn workspace's dna def.
     pub fn dna_def(&self) -> Arc<DnaDef> {
         self.dna_def.clone()
@@ -86,7 +63,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
@@ -107,7 +84,7 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, true).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, true)
     }
 
     /// Create a source chain with a blank chain head.
@@ -131,10 +108,10 @@ impl SourceChainWorkspace {
             author,
         )
         .await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false).await
+        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
     }
 
-    async fn new_inner(
+    fn new_inner(
         authored: DbWrite<DbKindAuthored>,
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,

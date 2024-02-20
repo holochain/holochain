@@ -3,6 +3,7 @@ use crate::*;
 use std::future::Future;
 
 use futures::future::FutureExt;
+use tokio::sync::mpsc::error::SendTimeoutError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 /// tokio::sync::mpsc::Sender is cheaply clonable,
@@ -46,7 +47,16 @@ impl<T: 'static + Send> TSender<T> {
             Err(_) => return async move { Err(t) }.boxed(),
             Ok(s) => s,
         };
-        async move { sender.send(t).await.map_err(|e| e.0) }.boxed()
+        async move {
+            sender
+                .send_timeout(t, std::time::Duration::from_secs(30))
+                .await
+                .map_err(|e| match e {
+                    SendTimeoutError::Timeout(e) => e,
+                    SendTimeoutError::Closed(e) => e,
+                })
+        }
+        .boxed()
     }
 
     /// Close this channel from the sender side.

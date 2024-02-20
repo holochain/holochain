@@ -4,16 +4,8 @@ use holo_hash::ActionHash;
 use holochain_p2p::event::GetOptions;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
-use holochain_state::query::prelude::*;
+use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
-use holochain_types::action::WireUpdateRelationship;
-use holochain_types::dht_op::DhtOpType;
-use holochain_types::record::WireRecordOps;
-use holochain_zome_types::HasValidationStatus;
-use holochain_zome_types::Judged;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::TryFrom;
-use holochain_zome_types::TryInto;
 
 #[derive(Debug, Clone)]
 pub struct GetRecordOpsQuery(ActionHash, GetOptions);
@@ -121,7 +113,7 @@ impl Query for GetRecordOpsQuery {
                 .entry_data()
                 .map(|(hash, et)| (hash, et.visibility()))
         });
-        if let Some((entry_hash, holochain_zome_types::EntryVisibility::Public)) = entry_hash {
+        if let Some((entry_hash, EntryVisibility::Public)) = entry_hash {
             let entry = stores.get_entry(entry_hash)?;
             state.entry = entry;
         }

@@ -1,7 +1,14 @@
 use super::*;
-use crate::KitsuneHostDefaultError;
+use crate::event::KitsuneP2pEvent;
+use crate::test_util::data::mk_agent_info;
+use crate::{KitsuneBinType, KitsuneHostDefaultError};
+use futures::FutureExt;
+use kitsune_p2p_block::{Block, BlockTarget, BlockTargetId};
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::bin_types::KitsuneOpHash;
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -32,6 +39,9 @@ impl FetchPoolConfig for HostStubErr {
 pub struct HostStub {
     err: HostStubErr,
     check_op_data_impl: Option<CheckOpDataImpl>,
+    fail_next_request: Arc<AtomicBool>,
+    fail_count: Arc<AtomicUsize>,
+    blocks: Arc<parking_lot::Mutex<HashSet<Block>>>,
 }
 
 /// Manual implementation of debug to skip over underivable Debug field.
@@ -47,6 +57,9 @@ impl HostStub {
         std::sync::Arc::new(Self {
             err: HostStubErr,
             check_op_data_impl: None,
+            fail_next_request: Arc::new(AtomicBool::new(false)),
+            fail_count: Arc::new(AtomicUsize::new(0)),
+            blocks: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         })
     }
 
@@ -55,17 +68,44 @@ impl HostStub {
         std::sync::Arc::new(Self {
             err: HostStubErr,
             check_op_data_impl: Some(check_op_data_impl),
+            fail_next_request: Arc::new(AtomicBool::new(false)),
+            fail_count: Arc::new(AtomicUsize::new(0)),
+            blocks: Arc::new(parking_lot::Mutex::new(HashSet::new())),
         })
+    }
+
+    /// Request that the next request will fail and respond with an error
+    pub fn fail_next_request(&self) {
+        self.fail_next_request.store(true, Ordering::SeqCst);
+    }
+
+    /// Get the count of requests that have failed due to `fail_next_request`.
+    pub fn get_fail_count(&self) -> usize {
+        self.fail_count.load(Ordering::SeqCst)
+    }
+
+    /// Wrap it up with a legacy sender
+    pub fn legacy(
+        self: Arc<Self>,
+        sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    ) -> HostApiLegacy {
+        HostApiLegacy::new(self, sender)
     }
 }
 
 impl KitsuneHost for HostStub {
-    fn block(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
-        KitsuneHostDefaultError::block(&self.err, input)
+    fn block(&self, input: Block) -> KitsuneHostResult<()> {
+        let mut blocks = self.blocks.lock();
+        blocks.insert(input);
+
+        async move { Ok(()) }.boxed().into()
     }
 
-    fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
-        KitsuneHostDefaultError::unblock(&self.err, input)
+    fn unblock(&self, input: Block) -> KitsuneHostResult<()> {
+        let mut blocks = self.blocks.lock();
+        blocks.remove(&input);
+
+        async move { Ok(()) }.boxed().into()
     }
 
     fn is_blocked(
@@ -73,14 +113,45 @@ impl KitsuneHost for HostStub {
         input: kitsune_p2p_block::BlockTargetId,
         timestamp: Timestamp,
     ) -> crate::KitsuneHostResult<bool> {
-        KitsuneHostDefaultError::is_blocked(&self.err, input, timestamp)
+        let blocks = self.blocks.lock();
+
+        let blocked = match &input {
+            BlockTargetId::Node(check_node_id) => {
+                let maybe_matched_block = blocks.iter().find(|b| match b.target() {
+                    BlockTarget::Node(node_id, _) => node_id == check_node_id,
+                    _ => false,
+                });
+
+                if let Some(block) = maybe_matched_block {
+                    timestamp.0 > block.start().0 && timestamp.0 < block.end().0
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+
+        async move { Ok(blocked) }.boxed().into()
     }
 
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        KitsuneHostDefaultError::get_agent_info_signed(&self.err, input)
+        if let Ok(true) =
+            self.fail_next_request
+                .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            self.fail_count.fetch_add(1, Ordering::SeqCst);
+            return KitsuneHostDefaultError::get_agent_info_signed(&self.err, input);
+        }
+
+        async move {
+            let signed = mk_agent_info(*input.agent.0.to_vec().first().unwrap()).await;
+            Ok(Some(signed))
+        }
+        .boxed()
+        .into()
     }
 
     fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
@@ -95,12 +166,12 @@ impl KitsuneHost for HostStub {
         KitsuneHostDefaultError::peer_extrapolated_coverage(&self.err, space, dht_arc_set)
     }
 
-    fn record_metrics(
+    fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        records: Vec<MetricRecord>,
-    ) -> KitsuneHostResult<()> {
-        KitsuneHostDefaultError::record_metrics(&self.err, space, records)
+        dht_arc_set: Arc<DhtArcSet>,
+    ) -> KitsuneHostResult<RegionSetLtcs> {
+        KitsuneHostDefaultError::query_region_set(&self.err, space, dht_arc_set)
     }
 
     fn query_size_limited_regions(
@@ -112,12 +183,20 @@ impl KitsuneHost for HostStub {
         KitsuneHostDefaultError::query_size_limited_regions(&self.err, space, size_limit, regions)
     }
 
-    fn query_region_set(
+    fn query_op_hashes_by_region(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
-    ) -> KitsuneHostResult<RegionSetLtcs> {
-        KitsuneHostDefaultError::query_region_set(&self.err, space, dht_arc_set)
+        region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
+        KitsuneHostDefaultError::query_op_hashes_by_region(&self.err, space, region)
+    }
+
+    fn record_metrics(
+        &self,
+        space: Arc<KitsuneSpace>,
+        records: Vec<MetricRecord>,
+    ) -> KitsuneHostResult<()> {
+        KitsuneHostDefaultError::record_metrics(&self.err, space, records)
     }
 
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
@@ -125,15 +204,21 @@ impl KitsuneHost for HostStub {
     }
 
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
-        KitsuneHostDefaultError::op_hash(&self.err, op_data)
-    }
+        if let Ok(true) =
+            self.fail_next_request
+                .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+        {
+            self.fail_count.fetch_add(1, Ordering::SeqCst);
+            return KitsuneHostDefaultError::op_hash(&self.err, op_data);
+        }
 
-    fn query_op_hashes_by_region(
-        &self,
-        space: Arc<KitsuneSpace>,
-        region: RegionCoords,
-    ) -> KitsuneHostResult<Vec<OpHashSized>> {
-        KitsuneHostDefaultError::query_op_hashes_by_region(&self.err, space, region)
+        async move {
+            // Probably not important but we could compute a real hash here if a test needs it
+            let hash_byte = op_data.0.first().cloned().unwrap_or(0);
+            Ok(Arc::new(KitsuneOpHash::new(vec![hash_byte; 36])))
+        }
+        .boxed()
+        .into()
     }
 
     fn check_op_data(

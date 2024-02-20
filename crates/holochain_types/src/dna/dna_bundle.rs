@@ -40,7 +40,10 @@ impl DnaBundle {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
 
-        Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
+        Ok((
+            DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
+            original_hash,
+        ))
     }
 
     /// Construct from raw bytes
@@ -135,7 +138,7 @@ impl DnaBundle {
 
     /// Build a bundle from a DnaFile. Useful for tests.
     #[cfg(feature = "test_utils")]
-    pub async fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
+    pub fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
         let DnaFile { dna, code, .. } = dna_file;
         let manifest = Self::manifest_from_dna_def(dna.into_content())?;
         let resources = code

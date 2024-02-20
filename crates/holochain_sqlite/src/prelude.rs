@@ -3,7 +3,7 @@
 pub use crate::db::*;
 pub use crate::error::*;
 pub use crate::exports::*;
-pub use crate::fresh_reader_test;
+#[cfg(not(loom))]
+pub use crate::store::*;
 
-#[cfg(any(test, feature = "test_utils"))]
-pub use crate::test_utils::*;
+pub use rusqlite::{OptionalExtension, Transaction};

@@ -25,14 +25,16 @@ use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::WasmHash;
+use holochain_keystore::test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
-use holochain_state::test_utils::test_keystore;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasmer_host::module::ModuleCache;
+use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -59,7 +61,8 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
 
-        let ribosome = RealRibosome::new(dna_file).unwrap();
+        let ribosome =
+            RealRibosome::new(dna_file, Arc::new(RwLock::new(ModuleCache::new(None)))).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
@@ -196,13 +199,13 @@ fixturator!(
     curve Empty {
         tokio_helper::block_forever_on(async {
             // an empty keystore
-            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
+            holochain_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     curve Unpredictable {
         // TODO: Make this unpredictable
         tokio_helper::block_forever_on(async {
-            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
+            holochain_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     // a prepopulate keystore with hardcoded agents in it
@@ -232,7 +235,7 @@ fixturator!(
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_db();
-        let keystore = holochain_state::test_utils::test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspace::new(
@@ -250,7 +253,7 @@ fixturator!(
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_db();
-        let keystore = holochain_state::test_utils::test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspace::new(
@@ -269,7 +272,7 @@ fixturator!(
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
-        let keystore = holochain_state::test_utils::test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
             HostFnWorkspace::new(
@@ -291,7 +294,7 @@ fixturator!(
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_db();
-        let keystore = holochain_state::test_utils::test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
@@ -309,7 +312,7 @@ fixturator!(
         let authored_db = holochain_state::test_utils::test_authored_db_with_id(get_fixt_index!() as u8);
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_db();
-        let keystore = holochain_state::test_utils::test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             fake_genesis(authored_db.to_db(), dht_db.to_db(), keystore.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
@@ -328,7 +331,7 @@ fixturator!(
         let dht_db = holochain_state::test_utils::test_dht_db_with_id(get_fixt_index!() as u8);
         let cache = holochain_state::test_utils::test_cache_db_with_id(get_fixt_index!() as u8);
         let agent = fixt!(AgentPubKey, Predictable, get_fixt_index!());
-        let keystore = holochain_state::test_utils::test_keystore();
+        let keystore = holochain_keystore::test_keystore();
         tokio_helper::block_forever_on(async {
             crate::test_utils::fake_genesis_for_agent(authored_db.to_db(), dht_db.to_db(), agent.clone(), keystore.clone()).await.unwrap();
             HostFnWorkspaceRead::new(
@@ -440,7 +443,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
         signature: SignatureFixturator::new(Empty).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()),
         expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
@@ -451,7 +454,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
         signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()),
         // @todo should this be less predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
@@ -475,7 +478,7 @@ fixturator!(
             .next()
             .unwrap(),
         signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
         // @todo should this be more predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };

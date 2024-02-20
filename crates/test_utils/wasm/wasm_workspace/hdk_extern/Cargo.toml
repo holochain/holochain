@@ -14,7 +14,7 @@ path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-serde = "1.0"
+serde = { workspace = true }
 holochain_test_wasm_common = { path = "../../../wasm_common" }
 hdk = { path = "../../../../hdk" }
 

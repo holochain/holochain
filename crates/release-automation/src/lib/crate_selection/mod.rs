@@ -25,6 +25,9 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod forest;
+pub use forest::flatten_forest;
+
 pub mod aliases {
     pub use cargo::core::dependency::DepKind as CargoDepKind;
     pub use cargo::core::package::Package as CargoPackage;
@@ -163,16 +166,32 @@ impl<'a> Crate<'a> {
                         .expect("manifest is already verified")
                         .contains_key(name)
                 {
-                    let existing_version_req = if let Some(Ok(existing_version_req)) =
-                        manifest[key][name]["version"].as_str().map(|version| {
-                            VersionReq::parse(version).context(anyhow::anyhow!(
-                                "parsing version {:?} for dependency {} ",
-                                version,
-                                self.name()
-                            ))
-                        }) {
+                    let extracted_version_req = match &manifest[key][name] {
+                        toml_edit::Item::Value(toml_edit::Value::String(_)) => {
+                            bail!("{} has a dependency on {} with a version req that is simple but must be detailed and include a path.", self.name(), name);
+                        }
+                        toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
+                            if t.get("path").is_none() {
+                                bail!("{} has a dependency on {} that doesn't include a path.", self.name(), name);
+                            }
+
+                            t.get("version").and_then(|v| v.as_str()).map(|version| {
+                                VersionReq::parse(version).context(anyhow::anyhow!(
+                                    "parsing version {:?} for dependency {} ",
+                                    version,
+                                    self.name()
+                                ))
+                            })
+                        }
+                        _ => {
+                            bail!("{} has a dependency on {} with a version req that is in a format that wasn't recognised.", self.name(), name);
+                        }
+                    };
+
+                    let existing_version_req = if let Some(Ok(existing_version_req)) = extracted_version_req {
                         existing_version_req
                     } else {
+                        // TODO We've already checked the key and name are present so hitting this is actually serious and shouldn't just log and continue
                         debug!(
                             "could not parse {}'s {} version req to string: {:?}",
                             name, key, manifest[key][name]["version"]
@@ -334,6 +353,28 @@ impl<'a> Crate<'a> {
             }
             Ok(dependencies)
         })
+    }
+
+    fn direct_workspace_dependencies(
+        &'a self,
+        workspace_packages: &HashSet<String>,
+    ) -> Vec<cargo::core::Dependency> {
+        self.package()
+            .dependencies()
+            .iter()
+            .filter_map(|dep| {
+                let dep_name = dep.package_name().to_string();
+                if self.name() == dep_name {
+                    None // Ignore self
+                } else if !workspace_packages.contains(&dep_name) {
+                    None // Ignore deps that aren't part of the workspace
+                } else if !dep.specified_req() || dep.version_req().to_string() == "*" {
+                    None // Ignore deps without a version or with a "*" version
+                } else {
+                    Some(dep.clone())
+                }
+            })
+            .collect()
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
@@ -897,7 +938,7 @@ impl<'a> ReleaseWorkspace<'a> {
                                     insert_state!(CrateStateFlags::HasPreviousRelease);
 
                                     // todo: make comparison ref configurable
-                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD")?;
+                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD").context(format!("evaluating changes between {git_tag} and HEAD"))?;
                                     if !changed_files.is_empty()
                                     {
                                         debug!("[{}] changed files since {git_tag}: {changed_files:?}", member.name());
@@ -1077,70 +1118,8 @@ impl<'a> ReleaseWorkspace<'a> {
     /// Returns all non-excluded workspace members.
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            let mut members = self
-                .members_unsorted()?
-                .iter()
-                .enumerate()
-                .collect::<Vec<_>>();
-
-            let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
-                LinkedHashMap::<String, LinkedHashSet<String>>::new(),
-                |mut acc, elem| -> Fallible<_> {
-                    acc.insert(
-                        elem.name(),
-                        elem.dependencies_in_workspace()?
-                            .into_iter()
-                            .filter_map(|(dep_name, deps)| {
-                                deps.into_iter()
-                                    .find(|dep| {
-                                        dep.specified_req() && dep.version_req().to_string() != "*"
-                                    })
-                                    .map(|_| dep_name.clone())
-                            })
-                            .collect(),
-                    );
-
-                    Ok(acc)
-                },
-            )?;
-
-            // ensure members are ordered respecting their dependency tree
-            members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
-                use std::cmp::Ordering::{Equal, Greater, Less};
-
-                let a_deps = workspace_dependencies
-                    .get(&a.name())
-                    .unwrap_or_else(|| panic!("dependencies for {} not found", a.name()));
-                let b_deps = workspace_dependencies
-                    .get(&b.name())
-                    .unwrap_or_else(|| panic!("dependencies for {} not found", b.name()));
-
-                // understand whether one is a direct dependency of the other
-                let comparison = (a_deps.contains(&b.name()), b_deps.contains(&a.name()));
-                let result = match comparison {
-                    (true, true) => {
-                        panic!("cyclic dependency between {} and {}", a.name(), b.name())
-                    }
-                    (true, false) => Greater,
-                    (false, true) => Less,
-                    (false, false) => a_i.cmp(b_i),
-                };
-
-                trace!(
-                    "comparing \n{} ({:?}) with \n{} ({:?})\n{:?} => {:?}",
-                    a.name(),
-                    a_deps,
-                    b.name(),
-                    b_deps,
-                    comparison,
-                    result
-                );
-                result
-            });
-
-            Ok(members.into_iter().map(|(_, member)| member).collect())
-        })
+        self.members_sorted
+            .get_or_try_init(|| -> Fallible<_> { flatten_forest(self.members_unsorted()?) })
     }
 
     /// Return the root path of the workspace.
@@ -1154,7 +1133,11 @@ impl<'a> ReleaseWorkspace<'a> {
 
     /// Tries to resolve the git HEAD to its corresponding branch.
     pub fn git_head_branch(&'a self) -> Fallible<(git2::Branch, git2::BranchType)> {
-        for branch in self.git_repo.branches(None)? {
+        for branch in self
+            .git_repo
+            .branches(None)
+            .context("getting repo branches")?
+        {
             let branch = branch?;
             if branch.0.is_head() {
                 return Ok(branch);
@@ -1168,7 +1151,8 @@ impl<'a> ReleaseWorkspace<'a> {
     pub fn git_head_branch_name(&'a self) -> Fallible<String> {
         self.git_head_branch().map(|(branch, _)| {
             branch
-                .name()?
+                .name()
+                .context("looking for head branch")?
                 .map(String::from)
                 .ok_or_else(|| anyhow::anyhow!("the current git branch has no name"))
         })?
@@ -1447,4 +1431,4 @@ pub fn ensure_release_order_consistency<'a>(
 }
 
 #[cfg(test)]
-pub mod tests;
+mod tests;

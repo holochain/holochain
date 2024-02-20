@@ -4,17 +4,7 @@ use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
-use holochain_state::prelude::test_authored_db;
-use holochain_state::prelude::test_cache_db;
-use holochain_state::prelude::test_dht_db;
-use holochain_state::scratch::Scratch;
-use holochain_zome_types::ChainTopOrdering;
-use holochain_zome_types::Details;
-use holochain_zome_types::EntryDetails;
-use holochain_zome_types::EntryDhtStatus;
-use holochain_zome_types::GetOptions;
-use holochain_zome_types::RecordDetails;
-use holochain_zome_types::ValidationStatus;
+use holochain_state::prelude::*;
 
 async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
@@ -233,8 +223,8 @@ async fn entry_not_authority_or_authoring() {
     // Data
     let td_entry = EntryTestData::create();
     let td_record = RecordTestData::create();
-    fill_db(&authority.to_db(), td_entry.store_entry_op.clone());
-    fill_db(&authority.to_db(), td_record.any_store_record_op.clone());
+    fill_db(&authority.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db(&authority.to_db(), td_record.any_store_record_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
@@ -294,8 +284,8 @@ async fn entry_authority() {
     // Data
     let td_entry = EntryTestData::create();
     let td_record = RecordTestData::create();
-    fill_db(&vault.to_db(), td_entry.store_entry_op.clone());
-    fill_db(&vault.to_db(), td_record.any_store_record_op.clone());
+    fill_db(&vault.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db(&vault.to_db(), td_record.any_store_record_op.clone()).await;
 
     // Network
     // - Not expecting any calls to the network.
@@ -322,8 +312,8 @@ async fn content_not_authority_or_authoring() {
     // Data
     let td_entry = EntryTestData::create();
     let td_record = RecordTestData::create();
-    fill_db(&vault.to_db(), td_entry.store_entry_op.clone());
-    fill_db(&vault.to_db(), td_record.any_store_record_op.clone());
+    fill_db(&vault.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db(&vault.to_db(), td_record.any_store_record_op.clone()).await;
 
     // Network
     // - Not expecting any calls to the network.
@@ -414,8 +404,8 @@ async fn rejected_ops() {
     // Data
     let td_entry = EntryTestData::create();
     let td_record = RecordTestData::create();
-    fill_db_rejected(&authority.to_db(), td_entry.store_entry_op.clone());
-    fill_db_rejected(&authority.to_db(), td_record.any_store_record_op.clone());
+    fill_db_rejected(&authority.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db_rejected(&authority.to_db(), td_record.any_store_record_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
@@ -436,8 +426,8 @@ async fn check_can_handle_rejected_ops_in_cache() {
     // Data
     let td_entry = EntryTestData::create();
     let td_record = RecordTestData::create();
-    fill_db_rejected(&cache.to_db(), td_entry.store_entry_op.clone());
-    fill_db_rejected(&cache.to_db(), td_record.any_store_record_op.clone());
+    fill_db_rejected(&cache.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db_rejected(&cache.to_db(), td_record.any_store_record_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
@@ -481,12 +471,12 @@ async fn test_pending_data_isnt_returned() {
     // Data
     let td_entry = EntryTestData::create();
     let td_record = RecordTestData::create();
-    fill_db_pending(&authority.to_db(), td_entry.store_entry_op.clone());
-    fill_db_pending(&authority.to_db(), td_record.any_store_record_op.clone());
-    fill_db_pending(&vault.to_db(), td_entry.store_entry_op.clone());
-    fill_db_pending(&vault.to_db(), td_record.any_store_record_op.clone());
-    fill_db_pending(&cache.to_db(), td_entry.store_entry_op.clone());
-    fill_db_pending(&cache.to_db(), td_record.any_store_record_op.clone());
+    fill_db_pending(&authority.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db_pending(&authority.to_db(), td_record.any_store_record_op.clone()).await;
+    fill_db_pending(&vault.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db_pending(&vault.to_db(), td_record.any_store_record_op.clone()).await;
+    fill_db_pending(&cache.to_db(), td_entry.store_entry_op.clone()).await;
+    fill_db_pending(&cache.to_db(), td_record.any_store_record_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);

@@ -1,38 +1,19 @@
-# { self, inputs, lib, ... }@flake: {
-#   perSystem = { config, self', inputs', system, pkgs, ... }: {
-#     packages = {
-#       release-automation =
-#         pkgs.callPackage ../../crates/release-automation/default.nix {
-#           crate2nixSrc = inputs.crate2nix;
-#         };
-
-#       release-automation-regenerate-readme =
-#         pkgs.writeShellScriptBin "release-automation-regenerate-readme" ''
-#           set -x
-#           ${pkgs.cargo-readme}/bin/cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
-#         '';
-#     };
-#   };
-# }
-
 # Definitions can be imported from a separate file like this one
 
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "latest";
+        version = "1.67.0";
       };
+
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
         pname = "release-automation";
         version = "workspace";
         src = flake.config.srcCleanedReleaseAutomationRepo;
-
-        cargoExtraArgs = "--all-targets";
 
         buildInputs = (with pkgs; [ openssl ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
@@ -61,6 +42,7 @@
       });
 
       tests = craneLib.cargoNextest (commonArgs // {
+        src = flake.config.srcCleanedReleaseAutomationWithTestsRepo;
         pname = "${commonArgs.pname}-tests";
         __noChroot = pkgs.stdenv.isLinux;
 
@@ -105,76 +87,52 @@
       packages = {
         release-automation = package;
 
-        build-release-automation-tests = tests;
+        build-release-automation-tests-unit = tests;
 
         # check the state of the repository
-        # TODO: to get the actual .git repo we could be something like this:
-        # using a dummy input like this:
+        # this is using a dummy input like this:
         # ```nix
         #     repo-git.url = "file+file:/dev/null";
         #     repo-git.flake = false;
         # ```
-        # and then when i run the test derivations that rely on that input, i can temporarily lock that input to a local path like this:
-        # ```
-        # tmpgit=$(mktemp -d)
-        # git clone --bare --single-branch . $tmpgit
-        # nix flake lock --update-input repo-git --override-input repo-git "path:$tmpdir"
-        # rm -rf $tmpgit
-        # ```
-        build-release-automation-tests-repo = pkgs.runCommand
-          "release-automation-tests-repo"
-          {
-            __noChroot = pkgs.stdenv.isLinux;
-            nativeBuildInputs = self'.packages.holochain.nativeBuildInputs ++ [
-              package
+        # and then the test derivation is built it relies on that input being the local repo path. see the "holochain-build-and-test.yml" workflow.
+        build-release-automation-tests-repo =
+          let
+            release-script = self'.packages.scripts-release-automation-check-and-bump;
+            readmes-script = self'.packages.scripts-ci-generate-readmes;
+          in
+          pkgs.runCommand
+            "release-automation-tests-repo"
+            {
+              __noChroot = pkgs.stdenv.isLinux;
+              nativeBuildInputs = self'.packages.holochain.nativeBuildInputs ++ [
+                pkgs.coreutils
+                pkgs.gitFull
+              ];
+              buildInputs = self'.packages.holochain.buildInputs ++ [
+                pkgs.cacert
+              ];
+            } ''
+            set -xeuo pipefail
 
-              pkgs.coreutils
-              pkgs.gitFull
-            ];
-            buildInputs = self'.packages.holochain.buildInputs ++ [
-              pkgs.cacert
-            ];
-          } ''
-          set -euo pipefail
+            export HOME="$(mktemp -d)"
+            export TEST_WORKSPACE="''${HOME:?}/src"
 
-          export HOME="$(mktemp -d)"
-          export TEST_WORKSPACE="''${HOME:?}/src"
+            git clone --single-branch ${inputs.repo-git} ''${TEST_WORKSPACE}
 
-          cp -r --no-preserve=mode,ownership ${flake.config.srcCleanedRepo} ''${TEST_WORKSPACE:?}
-          cp --no-preserve=mode,ownership ${self}/CHANGELOG.md ''${TEST_WORKSPACE:?}/CHANGELOG.md
-          cd ''${TEST_WORKSPACE:?}
+            cd ''${TEST_WORKSPACE:?}
+            ${../../scripts/ci-git-config.sh}
+            git status
+            git switch -c repo-test
 
-          git init
-          git switch -c main
-          git add .
-          git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
-          git commit -am "main"
+            ${readmes-script}/bin/${readmes-script.name}
+            ${release-script}/bin/${release-script.name} ''${TEST_WORKSPACE}
 
-          release-automation \
-            --workspace-path=''${TEST_WORKSPACE:?} \
-            --log-level=debug \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-            release \
-              --no-verify \
-              --force-tag-creation \
-              --force-branch-creation \
-              --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-              --disallowed-version-reqs=">=0.4" \
-              --steps=CreateReleaseBranch,BumpReleaseVersions
-
-          release-automation \
-              --workspace-path=''${TEST_WORKSPACE:?} \
-              --log-level=debug \
-              release \
-                --dry-run \
-                --no-verify \
-                --steps=PublishToCratesIo
-
-
-          rm -rf target
-          mv ''${TEST_WORKSPACE:?} $out
-        '';
+            set +e
+            git clean -ffdx
+            mv ''${TEST_WORKSPACE} $out
+            echo use "nix-store --realise $out" to retrieve the result.
+          '';
       };
     };
 }

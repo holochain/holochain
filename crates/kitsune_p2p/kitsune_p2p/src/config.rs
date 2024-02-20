@@ -72,14 +72,6 @@ impl Default for KitsuneP2pConfig {
     }
 }
 
-#[allow(dead_code)]
-fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
-    match bind_to {
-        Some(bind_to) => bind_to.clone().into(),
-        None => "kitsune-quic://0.0.0.0:0".into(),
-    }
-}
-
 impl KitsuneP2pConfig {
     #[allow(dead_code)] // because of feature flipping
     pub(crate) fn is_tx2(&self) -> bool {
@@ -104,8 +96,9 @@ impl KitsuneP2pConfig {
         }
     }
 
+    /// This config is making use of tx5 transport
     #[allow(dead_code)] // because of feature flipping
-    pub(crate) fn is_tx5(&self) -> bool {
+    pub fn is_tx5(&self) -> bool {
         #[cfg(feature = "tx5")]
         {
             if let Some(t) = self.transport_pool.get(0) {
@@ -122,42 +115,6 @@ impl KitsuneP2pConfig {
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         use KitsuneP2pTx2ProxyConfig::*;
         match self.transport_pool.get(0) {
-            /*
-            Some(TransportConfig::Proxy {
-                sub_transport,
-                proxy_config,
-            }) => {
-                let backend = match &**sub_transport {
-                    TransportConfig::Mem {} => KitsuneP2pTx2Backend::Mem,
-                    TransportConfig::Quic { bind_to, .. } => {
-                        let bind_to = cnv_bind_to(bind_to);
-                        KitsuneP2pTx2Backend::Quic { bind_to }
-                    }
-                    _ => return Err("kitsune tx2 backend must be mem or quic".into()),
-                };
-                let use_proxy = match proxy_config {
-                    ProxyConfig::RemoteProxyClient { proxy_url } => {
-                        Specific(proxy_url.clone().into())
-                    }
-                    ProxyConfig::RemoteProxyClientFromBootstrap {
-                        bootstrap_url,
-                        fallback_proxy_url,
-                    } => Bootstrap {
-                        bootstrap_url: bootstrap_url.clone().into(),
-                        fallback_proxy_url: fallback_proxy_url.clone().map(Into::into),
-                    },
-                    ProxyConfig::LocalProxyServer { .. } => NoProxy,
-                };
-                Ok(KitsuneP2pTx2Config { backend, use_proxy })
-            }
-            Some(TransportConfig::Quic { bind_to, .. }) => {
-                let bind_to = cnv_bind_to(bind_to);
-                Ok(KitsuneP2pTx2Config {
-                    backend: KitsuneP2pTx2Backend::Quic { bind_to },
-                    use_proxy: NoProxy,
-                })
-            }
-            */
             Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mock {
                     mock_network: mock_network.0.clone(),

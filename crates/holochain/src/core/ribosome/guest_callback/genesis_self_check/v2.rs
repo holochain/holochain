@@ -86,7 +86,7 @@ pub(crate) mod slow_tests {
 
     use super::GenesisSelfCheckInvocationV2;
     use crate::sweettest::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm};
 
@@ -109,7 +109,7 @@ pub(crate) mod slow_tests {
         )
         .await;
 
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let cells = app.into_cells();
 
         let _: EntryHashed = conductor

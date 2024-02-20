@@ -72,6 +72,10 @@ impl RangeBounds<u32> for ArcRange {
 /// Contrast to [`DhtArcRange`], which is used for cases where the arc is not
 /// associated with any particular Agent, and so the agent's Location cannot be known.
 #[derive(Copy, Clone, Debug, derive_more::Deref, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct DhtArc(#[deref] DhtArcRange, Option<DhtLocation>);
 
 impl DhtArc {
@@ -181,6 +185,10 @@ impl From<&DhtArc> for DhtArcRange {
 /// This type exists to make sure we don't accidentally intepret the starting
 /// point of such a "derived" arc as a legitimate agent location.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum DhtArcRange<T = DhtLocation> {
     Empty,
     Full,
@@ -477,6 +485,7 @@ pub fn half_to_full_len(half_len: u32) -> u64 {
     if half_len == 0 {
         0
     } else if half_len >= MAX_HALF_LENGTH {
+        // TODO questionable check or should people who want the full length just pass in MAX_HALF_LENGTH rather than computing u32::MAX / 2 themselves?
         U32_LEN
     } else {
         (half_len as u64 * 2).wrapping_sub(1)

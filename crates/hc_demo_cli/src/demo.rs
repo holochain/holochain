@@ -34,6 +34,7 @@ use std::sync::Arc;
 /// be published to the network. All files discovered on the network
 /// will be written to the inbox.
 #[derive(Debug, clap::Parser, serde::Serialize, serde::Deserialize)]
+#[command(version, about)]
 pub struct RunOpts {
     /// The subcommand to run.
     #[command(subcommand)]
@@ -48,7 +49,7 @@ impl RunOpts {
 }
 
 /// The default configured signal server url.
-pub const DEF_SIGNAL_URL: &str = "wss://signal.holotest.net";
+pub const DEF_SIGNAL_URL: &str = "wss://signal.holo.host";
 
 /// The default configured bootstrap server url.
 pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
@@ -184,7 +185,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     let dna_file = DnaFile::new(dna_def, vec![i_wasm.into_content(), c_wasm.into_content()]).await;
 
     let dna_file: SerializedBytes = dna_file.try_into().unwrap();
-    let dna_file: UnsafeBytes = dna_file.try_into().unwrap();
+    let dna_file: UnsafeBytes = dna_file.into();
     let dna_file: Vec<u8> = dna_file.into();
 
     let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
@@ -230,7 +231,7 @@ async fn run(
     .unwrap();
 
     let dna: UnsafeBytes = dna.into();
-    let dna: SerializedBytes = dna.try_into().unwrap();
+    let dna: SerializedBytes = dna.into();
     let dna: DnaFile = dna.try_into().unwrap();
 
     let rendezvous = match rendezvous {
@@ -254,25 +255,24 @@ async fn run(
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::rendezvous();
+    let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
-    let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults(
+    let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults_and_metrics(
         config,
         Some(keystore),
         Some(rendezvous),
+        true,
     )
     .await;
 
-    let dna_with_role = holochain::sweettest::DnaWithRole::from(("hc_demo_cli".into(), dna));
-
     let app = conductor
-        .setup_app("hc_demo_cli", vec![&dna_with_role])
+        .setup_app("hc_demo_cli", [&("hc_demo_cli".to_string(), dna.clone())])
         .await
         .unwrap();
 
-    let cell = app.cells().get(0).unwrap().clone();
+    let cell = app.cells().first().unwrap().clone();
     tracing::info!(?cell);
 
     // PRINT to stdout instead of trace
@@ -311,7 +311,7 @@ async fn run(
                         "create_file",
                         File {
                             desc: name.clone(),
-                            data: UnsafeBytes::from(data).try_into().unwrap(),
+                            data: UnsafeBytes::from(data).into(),
                         },
                     )
                     .await;
@@ -346,7 +346,7 @@ async fn run(
 
             path.push(&data.desc);
 
-            let bytes: UnsafeBytes = data.data.try_into().unwrap();
+            let bytes: UnsafeBytes = data.data.into();
             let bytes: Vec<u8> = bytes.into();
             tokio::fs::write(&path, &bytes).await.unwrap();
 

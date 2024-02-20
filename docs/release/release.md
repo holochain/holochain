@@ -215,3 +215,13 @@ semver_increment_mode: !minor
 EOF
 )
 ```
+
+### Example: initiate a one-time patch version bump
+
+```console
+nix run .#release-automation -- --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+default_semver_increment_mode: !pre_patch beta-rc
+semver_increment_mode: !patch
+EOF
+)
+```

@@ -65,6 +65,10 @@ pub struct RpcMultiResponse {
 /// Data to broadcast to the remote.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum BroadcastData {
     /// User broadcast.
     User(#[serde(with = "serde_bytes")] Vec<u8>),

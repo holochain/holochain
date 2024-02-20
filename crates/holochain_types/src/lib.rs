@@ -25,8 +25,6 @@ pub mod db_cache;
 pub mod dht_op;
 pub mod dna;
 pub mod entry;
-pub mod fixt;
-pub mod inline_zome;
 pub mod link;
 mod macros;
 pub mod metadata;
@@ -37,10 +35,18 @@ pub mod share;
 pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
-pub mod wasmer_types;
+pub mod validation_receipt;
 pub mod web_app;
 pub mod zome_types;
 
+#[cfg(feature = "fixturators")]
+pub mod fixt;
+
+#[cfg(feature = "fuzzing")]
+pub mod facts;
+
+#[cfg(feature = "test_utils")]
+pub mod inline_zome;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 

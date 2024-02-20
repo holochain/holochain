@@ -56,12 +56,12 @@ on:
         required: true
 
     outputs:
-      latest_holochain_tag:
+      latest_holochain_release_tag:
         description: "which holochain tag, if one, will be released"
-        value: ${{ jobs.prepare.outputs.latest_holochain_tag }}
-      latest_holochain_version:
+        value: ${{ jobs.prepare.outputs.latest_holochain_release_tag }}
+      latest_holochain_release_version:
         description: "which holochain version, if one, will be released"
-        value: ${{ jobs.prepare.outputs.latest_holochain_version }}
+        value: ${{ jobs.prepare.outputs.latest_holochain_release_version }}
       release_branch:
         description: "the branch that contains the changes made during this action"
         value: ${{ jobs.prepare.outputs.release_branch }}
@@ -79,15 +79,15 @@ jobs:
       CACHIX_REV: ${{ inputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     outputs:
-      latest_holochain_tag: ${{ steps.write-env-and-tag.outputs.latest_holochain_tag }}
-      latest_holochain_version: ${{ steps.write-env-and-tag.outputs.latest_holochain_version }}
+      latest_holochain_release_tag: ${{ steps.write-env-and-tag.outputs.latest_holochain_release_tag }}
+      latest_holochain_release_version: ${{ steps.write-env-and-tag.outputs.latest_holochain_release_version }}
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
       repo_nix_store_path: ${{ steps.write-env-and-tag.outputs.repo_nix_store_path }}
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install nix
         uses: cachix/install-nix-action@v20
       - name: Setup cachix
@@ -169,28 +169,7 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Detect missing release headings
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          set -exu
-          cd "${HOLOCHAIN_REPO}"
-
-          nix develop .#release --ignore-environment --command release-automation \
-              --workspace-path=$PWD \
-              --log-level=debug \
-              crate detect-missing-releaseheadings
-
-      - name: Generate crate READMEs from doc comments
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          cd "${HOLOCHAIN_REPO}"
-          nix develop .#release --ignore-environment --command bash ./scripts/generate_readmes.sh
-
-      - name: Bump the crate versions for the release
+      - name: Generate READMEs and bump the crate versions
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         env:
@@ -201,32 +180,10 @@ jobs:
 
           cd ${HOLOCHAIN_REPO}
 
-          nix develop .#release --ignore-environment --command bash -c '
-            set -e
-            cargo sweep -s
-
-            release-automation \
-              --workspace-path=$PWD \
-              --log-level=debug \
-              --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-              release \
-                --no-verify \
-                --force-tag-creation \
-                --force-branch-creation \
-                --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-                --allowed-semver-increment-modes="!pre_minor beta-dev" \
-                --steps=CreateReleaseBranch,BumpReleaseVersions
-
-            release-automation \
-                --workspace-path=$PWD \
-                --log-level=debug \
-                release \
-                  --dry-run \
-                  --no-verify \
-                  --steps=PublishToCratesIo
-
-            cargo sweep -f
-            '
+          nix run .#cargo-sweep -- sweep -s
+          nix run .#scripts-release-automation-check-and-bump -- $PWD
+          nix run .#scripts-ci-generate-readmes
+          nix run .#cargo-sweep -- sweep -f
 
           if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
             echo "releasable_crates=true" >> $GITHUB_OUTPUT
@@ -259,18 +216,19 @@ jobs:
 
           cd "${HOLOCHAIN_REPO}"
 
-          git tag --sort=-taggerdate | grep holochain-
-
-          export LATEST_HOLOCHAIN_TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export LATEST_HOLOCHAIN_VERSION=${LATEST_HOLOCHAIN_TAG/holochain-/}
           export RELEASE_BRANCH=$(git branch --show-current)
+
+          git tag --sort=-taggerdate --merged "${RELEASE_BRANCH}" | grep holochain-
+
+          export LATEST_HOLOCHAIN_RELEASE_TAG=$(git tag --sort=-taggerdate --merged "${RELEASE_BRANCH}" | grep holochain- | head -n1)
+          export LATEST_HOLOCHAIN_RELEASE_VERSION=${LATEST_HOLOCHAIN_RELEASE_TAG/holochain-/}
 
           # clean the repo before adding it to the store
           git clean -ffdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
-          echo "latest_holochain_tag=${LATEST_HOLOCHAIN_TAG}" >> $GITHUB_OUTPUT
-          echo "latest_holochain_version=${LATEST_HOLOCHAIN_VERSION}" >> $GITHUB_OUTPUT
+          echo "latest_holochain_release_tag=${LATEST_HOLOCHAIN_RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "latest_holochain_release_version=${LATEST_HOLOCHAIN_RELEASE_VERSION}" >> $GITHUB_OUTPUT
           echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
           echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
 

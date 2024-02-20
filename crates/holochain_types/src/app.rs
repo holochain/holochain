@@ -9,13 +9,14 @@
 
 mod app_bundle;
 mod app_manifest;
+mod error;
 
-pub mod error;
-use crate::{dna::DnaBundle, prelude::CoordinatorBundle};
+use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
-use derive_more::{Display, Into};
+use derive_more::Into;
+pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
@@ -23,8 +24,6 @@ use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
-
-use self::error::{AppError, AppResult};
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
@@ -101,16 +100,6 @@ pub struct CreateCloneCellPayload {
     pub name: Option<String>,
 }
 
-/// Ways of specifying a clone cell.
-#[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
-pub enum CloneCellId {
-    /// Clone id consisting of role name and clone index.
-    CloneId(CloneId),
-    /// Cell id consisting of DNA hash and agent pub key.
-    CellId(CellId),
-}
-
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DisableCloneCellPayload {
@@ -120,7 +109,7 @@ pub struct DisableCloneCellPayload {
     pub clone_cell_id: CloneCellId,
 }
 
-/// Argumtents to specify the clone cell to be enabled.
+/// Arguments to specify the clone cell to be enabled.
 pub type EnableCloneCellPayload = DisableCloneCellPayload;
 
 /// Arguments to delete a disabled clone cell of an app.
@@ -148,6 +137,13 @@ pub struct InstallAppPayload {
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     pub network_seed: Option<NetworkSeed>,
+
+    /// Optional: If app installation fails due to genesis failure, normally the app will be
+    /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
+    /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
+    #[cfg(feature = "chc")]
+    #[serde(default)]
+    pub ignore_genesis_failure: bool,
 }
 
 /// The possible locations of an AppBundle
@@ -729,7 +725,7 @@ impl InstalledAppCommon {
         // Get the agent key of the first cell
         // NB: currently this has no significance.
         let _agent_key = installed_cells
-            .get(0)
+            .first()
             .expect("Can't create app with 0 cells")
             .cell_id
             .agent_pubkey()

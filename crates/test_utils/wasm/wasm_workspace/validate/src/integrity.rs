@@ -3,9 +3,9 @@ use hdi::prelude::*;
 /// an example inner value that can be serialized into the contents of Entry::App()
 #[derive(Deserialize, Serialize, SerializedBytes, Debug, EntryDefRegistration)]
 pub enum ThisWasmEntry {
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     AlwaysValidates,
-    #[entry_def(required_validations = 5)]
+    #[entry_type(required_validations = 5)]
     NeverValidates,
 }
 
@@ -13,11 +13,11 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     type Error = WasmError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
-            Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))
-                .map_err(|e| wasm_error!(e))?),
-            _ => Err(wasm_error!(
-                "failed to deserialize ThisWasmEntry"
-            )),
+            Entry::App(eb) => {
+                Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))
+                    .map_err(|e| wasm_error!(e))?)
+            }
+            _ => Err(wasm_error!("failed to deserialize ThisWasmEntry")),
         }
     }
 }
@@ -95,7 +95,11 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 },
             entry,
         }) => match action.app_entry_def() {
-            Some(AppEntryDef { entry_index, zome_index, .. }) => {
+            Some(AppEntryDef {
+                entry_index,
+                zome_index,
+                ..
+            }) => {
                 if zome_info()?
                     .zome_types
                     .entries

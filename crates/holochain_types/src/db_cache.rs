@@ -3,7 +3,6 @@
 
 use crate::dht_op::DhtOpType;
 use crate::share::RwShare;
-use error::*;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
 use rusqlite::named_params;
@@ -15,7 +14,8 @@ use std::sync::Arc;
 mod tests;
 
 #[allow(missing_docs)]
-pub mod error;
+mod error;
+pub use error::*;
 
 #[derive(Clone)]
 /// This cache allows us to track selected database queries that
@@ -85,7 +85,7 @@ impl DhtDbQueryCache {
                 let db = self.dht_db.clone();
                 async move {
                     let (activity_integrated, mut all_activity) = db
-                        .async_reader(|txn| {
+                        .read_async(|txn| {
                             // Get the highest integrated sequence number for each agent.
                             let activity_integrated: Vec<(AgentPubKey, u32)> = txn
                             .prepare_cached(

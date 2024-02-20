@@ -16,4 +16,6 @@ pub enum AppManifestError {
     SerializationError(#[from] SerializedBytesError),
 }
 
+/// A result that returns a generic type T in case of success and an
+/// [`AppManifestError`]` otherwise.
 pub type AppManifestResult<T> = Result<T, AppManifestError>;

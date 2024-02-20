@@ -3,7 +3,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
+use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -69,6 +69,10 @@ pub enum AppRequest {
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Info about networking processes
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::NetworkInfo`]
     NetworkInfo(Box<NetworkInfoRequestPayload>),
 
     /// List all host functions available to wasm on this conductor.
@@ -276,23 +280,6 @@ pub struct ProvisionedCell {
     pub name: String,
 }
 
-/// Cloned cell that was created from a provisioned cell at runtime.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ClonedCell {
-    /// The cell's identifying data
-    pub cell_id: CellId,
-    /// A conductor-local clone identifier
-    pub clone_id: CloneId,
-    /// The hash of the DNA that this cell was instantiated from
-    pub original_dna_hash: DnaHash,
-    /// The DNA modifiers that were used to instantiate this clone cell
-    pub dna_modifiers: DnaModifiers,
-    /// The name the cell was instantiated with
-    pub name: String,
-    /// Whether or not the cell is running
-    pub enabled: bool,
-}
-
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppInfo {
@@ -446,9 +433,62 @@ pub struct NetworkInfo {
     pub completed_rounds_since_last_time_queried: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub enum ScottyPanel {
+    GossipInfo { last_round: Option<Timestamp> },
+}
+
+#[test]
+fn app_request_serialization() {
+    use rmp_serde::Deserializer;
+
+    // make sure requests are serialized as expected
+    let request = AppRequest::AppInfo {
+        installed_app_id: "some_id".to_string(),
+    };
+    let serialized_request = holochain_serialized_bytes::encode(&request).unwrap();
+    assert_eq!(
+        serialized_request,
+        vec![
+            130, 164, 116, 121, 112, 101, 129, 168, 97, 112, 112, 95, 105, 110, 102, 111, 192, 164,
+            100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100, 95, 97, 112,
+            112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
+        ]
+    );
+
+    let json_expected = r#"{"type":{"app_info":null},"data":{"installed_app_id":"some_id"}}"#;
+    let mut deserializer = Deserializer::new(&*serialized_request);
+    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+    let json_actual = serde_json::to_string(&json_value).unwrap();
+
+    assert_eq!(json_actual, json_expected);
+
+    // make sure responses are serialized as expected
+    let response =
+        AppResponse::ListWasmHostFunctions(vec!["host_fn_1".to_string(), "host_fn_2".to_string()]);
+    let serialized_response = holochain_serialized_bytes::encode(&response).unwrap();
+    assert_eq!(
+        serialized_response,
+        vec![
+            130, 164, 116, 121, 112, 101, 129, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
+            104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 192, 164, 100, 97,
+            116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115, 116,
+            95, 102, 110, 95, 50
+        ]
+    );
+
+    let json_expected =
+        r#"{"type":{"list_wasm_host_functions":null},"data":["host_fn_1","host_fn_2"]}"#;
+    let mut deserializer = Deserializer::new(&*serialized_response);
+    let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
+    let json_actual = serde_json::to_string(&json_value).unwrap();
+
+    assert_eq!(json_actual, json_expected);
+}
+
 #[test]
 fn status_serialization() {
-    use kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::serde_json;
+    use serde_json;
 
     let status: AppInfoStatus =
         AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();

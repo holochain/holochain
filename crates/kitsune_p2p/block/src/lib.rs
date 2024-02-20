@@ -7,7 +7,7 @@ pub enum AgentSpaceBlockReason {
     BadCrypto,
 }
 
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
 pub enum NodeBlockReason {
     /// The node did some bad cryptography.
     BadCrypto,
@@ -15,20 +15,20 @@ pub enum NodeBlockReason {
     DOS,
 }
 
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
 pub enum NodeSpaceBlockReason {
     BadWire,
 }
 
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
 pub enum IpBlockReason {
     /// Classic DOS.
     DOS,
 }
 
-pub type NodeId = Arc<[u8; 32]>;
+pub type NodeId = kitsune_p2p_bin_data::NodeCert;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum BlockTarget {
     Node(NodeId, NodeBlockReason),
     NodeSpace(
@@ -39,6 +39,7 @@ pub enum BlockTarget {
     Ip(std::net::Ipv4Addr, IpBlockReason),
 }
 
+#[derive(Eq, PartialEq)]
 pub enum BlockTargetId {
     Node(NodeId),
     NodeSpace(NodeId, Arc<kitsune_p2p_bin_data::KitsuneSpace>),
@@ -55,7 +56,7 @@ impl From<BlockTarget> for BlockTargetId {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Block {
     target: BlockTarget,
     interval: InclusiveTimestampInterval,

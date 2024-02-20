@@ -1,15 +1,9 @@
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::query::prelude::*;
-use holochain_types::db::DbRead;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::dht_op::DhtOpType;
-use holochain_zome_types::Entry;
-use holochain_zome_types::SignedAction;
+use holochain_state::prelude::*;
 
 pub use crate::core::validation::DhtOpOrder;
-use crate::core::workflow::error::WorkflowResult;
+use crate::core::workflow::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
@@ -79,7 +73,7 @@ async fn get_ops_to_validate(
         LIMIT 10000
         ",
     );
-    db.async_reader(move |txn| {
+    db.read_async(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
@@ -103,22 +97,12 @@ async fn get_ops_to_validate(
 
 #[cfg(test)]
 mod tests {
-    use arbitrary::Arbitrary;
-    use arbitrary::Unstructured;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::HasHash;
-    use holo_hash::HashableContentExtSync;
-    use holochain_sqlite::db::WriteManager;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
-    use holochain_state::validation_db::ValidationLimboStatus;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::dht_op::OpOrder;
-    use holochain_zome_types::fixt::*;
-    use holochain_zome_types::Action;
-    use holochain_zome_types::Signature;
-    use holochain_zome_types::ValidationStatus;
-    use holochain_zome_types::NOISE;
+    use holochain_state::validation_db::ValidationStage;
+    use std::collections::HashSet;
 
     use super::*;
 
@@ -126,43 +110,179 @@ mod tests {
     struct Facts {
         pending: bool,
         awaiting_sys_deps: bool,
+        sys_validated: bool,
+        awaiting_app_deps: bool,
+        awaiting_integration: bool,
         has_validation_status: bool,
+        num_attempts: usize,
     }
 
     struct Expected {
-        results: Vec<DhtOpHashed>,
+        to_sys_validate: Vec<DhtOpHashed>,
+        to_app_validate: Vec<DhtOpHashed>,
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
         holochain_trace::test_run().ok();
         let db = test_dht_db();
-        let expected = test_data(&db.to_db().into());
-        let r = get_ops_to_validate(&db.to_db().into(), true).await.unwrap();
-        let mut r_sorted = r.clone();
-        // Sorted by OpOrder
-        r_sorted.sort_by_key(|d| {
-            let op_type = d.as_content().get_type();
-            let timestamp = d.as_content().action().timestamp();
-            OpOrder::new(op_type, timestamp)
-        });
-        assert_eq!(r, r_sorted);
-        for op in r {
-            assert!(expected.results.iter().any(|i| *i == op));
+        let expected = create_test_data(&db.to_db().into()).await;
+        let ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
+
+        assert_sorted_by_op_order(&ops).await;
+        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops).await;
+
+        // Check all the expected ops were returned
+        for op in ops {
+            assert!(expected.to_sys_validate.iter().any(|i| *i == op));
         }
     }
 
-    fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn app_validation_query() {
+        holochain_trace::test_run().ok();
+        let db = test_dht_db();
+        let expected = create_test_data(&db.to_db().into()).await;
+        let ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
+
+        assert_sorted_by_op_order(&ops).await;
+        assert_sorted_by_validation_attempts(&db.to_db().into(), &ops).await;
+
+        // Check all the expected ops were returned
+        for op in ops {
+            assert!(expected.to_app_validate.iter().any(|i| *i == op));
+        }
+    }
+
+    /// Make sure both workflows can't pull in the same ops.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn workflows_are_exclusive() {
+        holochain_trace::test_run().ok();
+        let db = test_dht_db();
+        create_test_data(&db.to_db().into()).await;
+        let app_validation_ops = get_ops_to_app_validate(&db.to_db().into()).await.unwrap();
+        let sys_validation_ops = get_ops_to_sys_validate(&db.to_db().into()).await.unwrap();
+
+        let app_hashes = app_validation_ops
+            .into_iter()
+            .map(|o| o.hash)
+            .collect::<HashSet<_>>();
+        let sys_hashes = sys_validation_ops
+            .into_iter()
+            .map(|o| o.hash)
+            .collect::<HashSet<_>>();
+
+        let overlap = app_hashes.intersection(&sys_hashes).collect::<HashSet<_>>();
+        assert!(overlap.is_empty());
+    }
+
+    async fn create_test_data(db: &DbWrite<DbKindDht>) -> Expected {
+        let mut to_sys_validate = Vec::with_capacity(40);
+        let mut to_app_validate = Vec::with_capacity(40);
+
+        // We **do** expect any of these in the sys validation results but **do not** expect them in the app validation results:
+        let facts = Facts {
+            pending: true, // Should appear in sys validation if no validation stage is set
+            awaiting_sys_deps: false,
+            sys_validated: false,
+            awaiting_app_deps: false,
+            awaiting_integration: false,
+            has_validation_status: false,
+            num_attempts: 1,
+        };
+        for _ in 0..20 {
+            let op = create_and_insert_op(db, facts).await;
+            to_sys_validate.push(op);
+        }
+
+        let facts = Facts {
+            pending: false,
+            awaiting_sys_deps: true, // Should appear in sys validation and be retried if awaiting deps
+            sys_validated: false,
+            awaiting_app_deps: false,
+            awaiting_integration: false,
+            has_validation_status: false,
+            num_attempts: 0,
+        };
+        for _ in 0..20 {
+            let op = create_and_insert_op(db, facts).await;
+            to_sys_validate.push(op);
+        }
+
+        // We **don't** expect any of these in the sys validation results but **do** expect them in app the validation results:
+        let facts = Facts {
+            pending: false,
+            awaiting_sys_deps: false,
+            sys_validated: true, // Should appear in app validation if sys validation has already been done
+            awaiting_app_deps: false,
+            awaiting_integration: false,
+            has_validation_status: true,
+            num_attempts: 6,
+        };
+        for _ in 0..20 {
+            let op = create_and_insert_op(db, facts).await;
+            to_app_validate.push(op);
+        }
+
+        let facts = Facts {
+            pending: false,
+            awaiting_sys_deps: false,
+            sys_validated: false,
+            awaiting_app_deps: true, // Should appear in app validation and be retried if awaiting deps
+            awaiting_integration: false,
+            has_validation_status: true,
+            num_attempts: 2,
+        };
+        for _ in 0..20 {
+            let op = create_and_insert_op(db, facts).await;
+            to_app_validate.push(op);
+        }
+
+        // We **don't** expect any of these to appear in either sys validation or app validation
+        let facts = Facts {
+            pending: false,
+            awaiting_sys_deps: false,
+            sys_validated: false,
+            awaiting_app_deps: true,
+            awaiting_integration: true, // Should not appear once sys and app validation has finished and waiting for integration
+            has_validation_status: true,
+            num_attempts: 5,
+        };
+        for _ in 0..20 {
+            create_and_insert_op(db, facts).await;
+        }
+
+        let facts = Facts {
+            pending: false,
+            awaiting_sys_deps: false,
+            sys_validated: false,
+            awaiting_app_deps: false,
+            awaiting_integration: false,
+            has_validation_status: true, // Should not appear if there is already a validation outcome
+            num_attempts: 10,
+        };
+        for _ in 0..20 {
+            create_and_insert_op(db, facts).await;
+        }
+
+        Expected {
+            to_sys_validate,
+            to_app_validate,
+        }
+    }
+
+    async fn create_and_insert_op(db: &DbWrite<DbKindDht>, facts: Facts) -> DhtOpHashed {
         let state = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
             fixt!(Action),
         ));
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                let hash = state.as_hash().clone();
-                insert_op(txn, &state).unwrap();
+        db.write_async({
+            let query_state = state.clone();
+
+            move |txn| -> DatabaseResult<()> {
+                let hash = query_state.as_hash().clone();
+                insert_op(txn, &query_state).unwrap();
                 if facts.has_validation_status {
                     set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 }
@@ -172,94 +292,73 @@ mod tests {
                     set_validation_stage(
                         txn,
                         &hash,
-                        ValidationLimboStatus::AwaitingSysDeps(fixt!(AnyDhtHash)),
+                        ValidationStage::AwaitingSysDeps(fixt!(AnyDhtHash)),
                     )
                     .unwrap();
+                } else if facts.sys_validated {
+                    set_validation_stage(txn, &hash, ValidationStage::SysValidated).unwrap();
+                } else if facts.awaiting_app_deps {
+                    set_validation_stage(
+                        txn,
+                        &hash,
+                        ValidationStage::AwaitingAppDeps(vec![fixt!(AnyDhtHash)]),
+                    )
+                    .unwrap();
+                } else if facts.awaiting_integration {
+                    set_validation_stage(txn, &hash, ValidationStage::AwaitingIntegration).unwrap();
                 }
-                txn.execute("UPDATE DhtOp SET num_validation_attempts = 0", [])?;
-                DatabaseResult::Ok(())
-            })
-            .unwrap();
-        state
-    }
-
-    fn test_data(db: &DbWrite<DbKindDht>) -> Expected {
-        let mut results = Vec::new();
-        // We **do** expect any of these in the results:
-        let facts = Facts {
-            pending: true,
-            awaiting_sys_deps: false,
-            has_validation_status: false,
-        };
-        for _ in 0..20 {
-            let op = create_and_insert_op(db, facts);
-            results.push(op);
-        }
-
-        let facts = Facts {
-            pending: false,
-            awaiting_sys_deps: true,
-            has_validation_status: false,
-        };
-        for _ in 0..20 {
-            let op = create_and_insert_op(db, facts);
-            results.push(op);
-        }
-
-        // We **don't** expect any of these in the results:
-        let facts = Facts {
-            pending: false,
-            awaiting_sys_deps: false,
-            has_validation_status: true,
-        };
-        for _ in 0..20 {
-            create_and_insert_op(db, facts);
-        }
-
-        Expected { results }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    /// Make sure both workflows can't pull in the same ops.
-    async fn workflows_are_exclusive() {
-        holochain_trace::test_run().ok();
-        let mut u = Unstructured::new(&NOISE);
-
-        let db = test_dht_db();
-        let db = db.to_db();
-        let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
-            Signature::arbitrary(&mut u).unwrap(),
-            Action::arbitrary(&mut u).unwrap(),
-        ));
-
-        db.async_commit(move |txn| {
-            insert_op(txn, &op)?;
-            StateMutationResult::Ok(())
+                txn.execute(
+                    "UPDATE DhtOp SET num_validation_attempts = :num_attempts",
+                    named_params! {
+                        ":num_attempts": facts.num_attempts,
+                    },
+                )?;
+                Ok(())
+            }
         })
         .await
         .unwrap();
+        state
+    }
 
-        let read: DbRead<_> = db.clone().into();
-        let mut read_ops = std::collections::HashSet::new();
-        let hashes: Vec<_> = get_ops_to_app_validate(&read)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|op| op.to_hash())
-            .collect();
-        for h in &hashes {
-            read_ops.insert(h.clone());
-        }
-        let hashes: Vec<_> = get_ops_to_sys_validate(&read)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|op| op.to_hash())
-            .collect();
-        for h in &hashes {
-            if !read_ops.insert(h.clone()) {
-                panic!("Duplicate op");
-            }
-        }
+    async fn assert_sorted_by_op_order(ops: &Vec<DhtOpHashed>) {
+        let mut ops_sorted = ops.clone();
+        ops_sorted.sort_by_key(|d| {
+            let op_type = d.as_content().get_type();
+            let timestamp = d.as_content().action().timestamp();
+            OpOrder::new(op_type, timestamp)
+        });
+        assert_eq!(ops, &ops_sorted);
+    }
+
+    async fn assert_sorted_by_validation_attempts(db: &DbWrite<DbKindDht>, ops: &Vec<DhtOpHashed>) {
+        assert!(
+            get_num_validation_attempts(db, ops.iter().map(|op| op.hash.clone()).collect())
+                .await
+                .windows(2)
+                .all(|w| { w[0] <= w[1] })
+        );
+    }
+
+    async fn get_num_validation_attempts(
+        db: &DbWrite<DbKindDht>,
+        hashes: Vec<DhtOpHash>,
+    ) -> Vec<usize> {
+        db.read_async(|txn| -> DatabaseResult<Vec<usize>> {
+            hashes
+                .into_iter()
+                .map(|h| -> DatabaseResult<usize> {
+                    Ok(txn.query_row(
+                        "SELECT num_validation_attempts FROM DhtOp WHERE hash = :op_hash",
+                        named_params! {
+                            ":op_hash": h
+                        },
+                        |r| r.get(0),
+                    )?)
+                })
+                .collect()
+        })
+        .await
+        .unwrap()
     }
 }

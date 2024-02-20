@@ -144,7 +144,8 @@ pub(crate) async fn handle_rpc_multi_as_single(
             // fall back to self-get
             for agent in local_joined_agents {
                 match ro_inner
-                    .evt_sender
+                    .host_api
+                    .legacy
                     .call(space.clone(), agent.clone(), payload.clone())
                     .await
                 {

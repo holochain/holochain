@@ -32,17 +32,16 @@ use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_conductor_api::ZomeCall;
+use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
-use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
-use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;
@@ -241,10 +240,10 @@ impl Cell {
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let author = self.id.agent_pubkey().clone();
-        let lives = self
+        let live_fns = self
             .space
             .authored_db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -258,20 +257,23 @@ impl Cell {
             })
             .await;
 
-        match lives {
+        match live_fns {
             // Cannot proceed if we don't know what to run.
             Err(e) => {
-                error!("{}", e.to_string());
+                error!("error calling scheduled fn: {:?}", e);
             }
-            Ok(lives) => {
+            Ok(live_fns) => {
                 let mut tasks = vec![];
-                for (scheduled_fn, schedule) in &lives {
+                for (scheduled_fn, schedule) in &live_fns {
                     // Failing to encode a schedule should never happen.
                     // If it does log the error and bail.
                     let payload = match ExternIO::encode(schedule) {
                         Ok(payload) => payload,
                         Err(e) => {
-                            error!("{}", e.to_string());
+                            error!(
+                                "error encoding scheduled fn: {:?} error: {:?}",
+                                scheduled_fn, e
+                            );
                             continue;
                         }
                     };
@@ -279,7 +281,10 @@ impl Cell {
                     let (nonce, expires_at) = match fresh_nonce(now) {
                         Ok(v) => v,
                         Err(e) => {
-                            error!("{}", e.to_string());
+                            error!(
+                                "error creating nonce for fn: {:?} error: {:?}",
+                                scheduled_fn, e
+                            );
                             continue;
                         }
                     };
@@ -304,7 +309,7 @@ impl Cell {
                             {
                                 Ok(zome_call) => zome_call,
                                 Err(e) => {
-                                    error!("{}", e.to_string());
+                                    error!("scheduled zome call error in try_from_unsigned_zome_call: {:?}", e);
                                     continue;
                                 }
                             },
@@ -320,8 +325,8 @@ impl Cell {
                 let _ = self
                     .space
                     .authored_db
-                    .async_commit(move |txn: &mut Transaction| {
-                        for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                    .write_async(move |txn: &mut Transaction| {
+                        for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
                                     let next_schedule: Schedule = match extern_io.decode() {
@@ -330,7 +335,7 @@ impl Cell {
                                             continue;
                                         }
                                         Err(e) => {
-                                            error!("{}", e.to_string());
+                                            error!("scheduled zome call error in ExternIO::decode: {:?}", e);
                                             continue;
                                         }
                                     };
@@ -344,11 +349,11 @@ impl Cell {
                                         Some(next_schedule),
                                         now,
                                     ) {
-                                        error!("{}", e.to_string());
+                                        error!("scheduled zome call error in schedule_fn: {:?}", e);
                                         continue;
                                     }
                                 }
-                                errorish => error!("{:?}", errorish),
+                                errorish => error!("scheduled zome call error: {:?}", errorish),
                             }
                         }
                         Result::<(), DatabaseError>::Ok(())
@@ -360,6 +365,11 @@ impl Cell {
 
     #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
+    //
+    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
+    // we would disallow zome calls for cells which had not joined. If we want that behavior,
+    // we can do that check at the time of this function call, rather than at the time of trying
+    // to access the Cell itself, as it was previously done.
     pub async fn handle_holochain_p2p_event(
         &self,
         evt: holochain_p2p::event::HolochainP2pEvent,
@@ -513,15 +523,15 @@ impl Cell {
                 .await;
             }
 
-            ValidationReceiptReceived {
+            ValidationReceiptsReceived {
                 span_context: _,
                 respond,
-                receipt,
+                receipts,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_validation_receipt(receipt)
+                        .handle_validation_receipts(receipts)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -721,84 +731,106 @@ impl Cell {
             .map_err(Into::into)
     }
 
-    /// a remote agent is sending us a validation receipt.
-    #[tracing::instrument(skip(self, receipt))]
-    async fn handle_validation_receipt(&self, receipt: SerializedBytes) -> CellResult<()> {
-        let receipt: SignedValidationReceipt = receipt.try_into()?;
-        tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+    /// A remote agent is sending us a validation receipt bundle.
+    #[tracing::instrument(skip(self, receipts))]
+    async fn handle_validation_receipts(
+        &self,
+        receipts: ValidationReceiptBundle,
+    ) -> CellResult<()> {
+        for receipt in receipts.into_iter() {
+            tracing::debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
-        // Get the action for this op so we can check the entry type.
-        let hash = receipt.receipt.dht_op_hash.clone();
-        let action: Option<SignedAction> = self
-            .space
-            .authored_db
-            .async_reader(move |txn| {
-                let h: Option<Vec<u8>> = txn
-                    .query_row(
-                        "SELECT Action.blob as action_blob
+            // Get the action for this op so we can check the entry type.
+            let hash = receipt.receipt.dht_op_hash.clone();
+            let action: Option<SignedAction> = self
+                .space
+                .authored_db
+                .read_async(move |txn| {
+                    let h: Option<Vec<u8>> = txn
+                        .query_row(
+                            "SELECT Action.blob as action_blob
                     FROM DhtOp
                     JOIN Action ON Action.hash = DhtOp.action_hash
                     WHERE DhtOp.hash = :hash",
-                        named_params! {
-                            ":hash": hash,
-                        },
-                        |row| row.get("action_blob"),
-                    )
-                    .optional()?;
-                match h {
-                    Some(h) => from_blob(h),
-                    None => Ok(None),
-                }
-            })
-            .await?;
+                            named_params! {
+                                ":hash": hash,
+                            },
+                            |row| row.get("action_blob"),
+                        )
+                        .optional()?;
+                    match h {
+                        Some(h) => from_blob(h),
+                        None => Ok(None),
+                    }
+                })
+                .await?;
 
-        // If the action has an app entry type get the entry def
-        // from the conductor.
-        let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(AppEntryDef {
-                zome_index,
-                entry_index,
-                ..
-            })) => {
-                let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                let zome = ribosome.get_integrity_zome(zome_index);
-                match zome {
-                    Some(zome) => self
-                        .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *entry_index))
-                        .map(|e| u8::from(e.required_validations)),
-                    None => None,
+            // If the action has an app entry type get the entry def
+            // from the conductor.
+            let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
+                Some(EntryType::App(AppEntryDef {
+                    zome_index,
+                    entry_index,
+                    ..
+                })) => {
+                    let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                    let zome = ribosome.get_integrity_zome(zome_index);
+                    match zome {
+                        Some(zome) => self
+                            .conductor_api
+                            .get_entry_def(&EntryDefBufferKey::new(
+                                zome.into_inner().1,
+                                *entry_index,
+                            ))
+                            .map(|e| u8::from(e.required_validations)),
+                        None => None,
+                    }
                 }
+                _ => None,
+            };
+
+            // If no required receipt count was found then fallback to the default.
+            let required_validation_count = required_receipt_count.unwrap_or(
+                crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+            );
+
+            let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
+
+            let receipt_count = self
+                .space
+                .dht_db
+                .write_async({
+                    let receipt_op_hash = receipt_op_hash.clone();
+                    move |txn| -> StateMutationResult<usize> {
+                        // Add the new receipts to the db
+                        add_if_unique(txn, receipt)?;
+
+                        // Get the current count for this DhtOp.
+                        let receipt_count: usize = txn.query_row(
+                            "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
+                            named_params! {
+                                ":op_hash": receipt_op_hash,
+                            },
+                            |row| row.get(0),
+                        )?;
+
+                        Ok(receipt_count)
+                    }
+                })
+                .await?;
+
+            // If we have enough receipts then set receipts to complete.
+            if receipt_count >= required_validation_count as usize {
+                // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
+                // whether to republish the op for more validation receipts.
+                self.space
+                    .authored_db
+                    .write_async(move |txn| -> StateMutationResult<()> {
+                        set_receipts_complete(txn, &receipt_op_hash, true)
+                    })
+                    .await?;
             }
-            _ => None,
-        };
-
-        // If no required receipt count was found then fallback to the default.
-        let required_validation_count = required_receipt_count.unwrap_or(
-            crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
-        );
-
-        self.space
-            .dht_db
-            .async_commit(move |txn| {
-                // Get the current count for this dhtop.
-                let receipt_count: usize = txn.query_row(
-                    "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
-                    named_params! {
-                        ":op_hash": receipt.receipt.dht_op_hash,
-                    },
-                    |row| row.get(0),
-                )?;
-
-                // If we have enough receipts then set receipts to complete.
-                if receipt_count >= required_validation_count as usize {
-                    set_receipts_complete(txn, &receipt.receipt.dht_op_hash, true)?;
-                }
-
-                // Add to receipts db
-                validation_receipts::add_if_unique(txn, receipt)
-            })
-            .await?;
+        }
 
         Ok(())
     }
@@ -841,7 +873,11 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    // #[instrument(skip(self, call, workspace_lock))]
+    //
+    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
+    // we would disallow zome calls for cells which had not joined. If we want that behavior,
+    // we can do that check at the time of the zome call, rather than at the time of trying
+    // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
         call: ZomeCall,
@@ -907,7 +943,7 @@ impl Cell {
 
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[tracing::instrument(skip(self))]
-    async fn check_or_run_zome_init(&self) -> CellResult<()> {
+    pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
@@ -952,6 +988,7 @@ impl Cell {
             conductor_handle,
             signal_tx,
             cell_id: self.id.clone(),
+            integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
         let init_result =
             initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
@@ -1009,6 +1046,12 @@ impl Cell {
 
     pub(crate) fn cache(&self) -> &DbWrite<DbKindCache> {
         &self.space.cache_db
+    }
+
+    pub(crate) fn notify_authored_ops_moved_to_limbo(&self) {
+        self.queue_triggers
+            .integrate_dht_ops
+            .trigger(&"notify_authored_ops_moved_to_limbo");
     }
 
     #[cfg(any(test, feature = "test_utils"))]

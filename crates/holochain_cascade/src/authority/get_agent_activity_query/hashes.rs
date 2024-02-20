@@ -2,12 +2,8 @@ use holo_hash::*;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
 use holochain_state::{prelude::*, query::QueryData};
-use holochain_zome_types::Judged;
-use holochain_zome_types::*;
 use std::fmt::Debug;
 use std::sync::Arc;
-
-use crate::authority::*;
 
 #[derive(Debug, Clone)]
 pub struct GetAgentActivityQuery {

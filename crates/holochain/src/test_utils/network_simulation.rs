@@ -11,15 +11,16 @@ use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
-use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
+use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
-use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
+use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
 use rand::Rng;
@@ -288,7 +289,7 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
         }
     }
     for agent in data.agent_to_info.values() {
-        p2p_put_single(&mut txn, agent).unwrap();
+        p2p_put_single(agent.space.clone(), &mut txn, agent).unwrap();
     }
     txn.commit().unwrap();
     conn
@@ -315,15 +316,17 @@ fn get_cached() -> Option<GeneratedData> {
             .ok()
             .flatten()?;
         let ops = get_ops(&mut txn);
-        let peer_data = txn.p2p_list_agents().unwrap();
+        let peer_data = txn
+            .p2p_list_agents(Arc::new(KitsuneSpace::new(vec![0; 36])))
+            .unwrap();
         let authored = txn
             .prepare("SELECT agent, dht_op_hash FROM Authored")
             .unwrap()
             .query_map([], |row| Ok((Arc::new(row.get(0)?), Arc::new(row.get(1)?))))
             .unwrap()
             .map(Result::unwrap)
-            .fold(HashMap::new(), |mut map, (agent, hash)| {
-                map.entry(agent).or_insert_with(Vec::new).push(hash);
+            .fold(HashMap::<_, Vec<_>>::new(), |mut map, (agent, hash)| {
+                map.entry(agent).or_default().push(hash);
                 map
             });
 
@@ -355,11 +358,11 @@ async fn create_test_data(
     let rng = rand::thread_rng();
     let mut rand_entry = rng.sample_iter(&Standard);
     let rand_entry = rand_entry.by_ref();
-    let start = std::time::Instant::now();
+
     loop {
         let d: Vec<u8> = rand_entry.take(10).collect();
         let d = UnsafeBytes::from(d);
-        let entry = Entry::app(d.try_into().unwrap()).unwrap();
+        let entry = Entry::app(d.into()).unwrap();
         let hash = EntryHash::with_data_sync(&entry);
         let loc = hash.get_loc();
         if let Some(index) = buckets.iter().position(|b| b.contains(loc)) {
@@ -375,23 +378,24 @@ async fn create_test_data(
             break;
         }
     }
-    dbg!(bucket_counts);
-    dbg!(start.elapsed());
 
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
     tuning.disable_publish = true;
 
+    // This is gonna get dropped at the end of this fn.
+    let tmpdir = tempfile::TempDir::new().unwrap();
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        network: Some(network),
+        network,
+        data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
     let mut agents = Vec::new();
-    dbg!("generating agents");
+
     for i in 0..num_agents {
         eprintln!("generating agent {}", i);
         let agent = conductor
@@ -403,10 +407,8 @@ async fn create_test_data(
         agents.push(agent);
     }
 
-    dbg!("Installing apps");
-
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file.clone()])
+        .setup_app_for_agents("app", &agents, [&dna_file])
         .await
         .unwrap();
 
@@ -417,7 +419,7 @@ async fn create_test_data(
         eprintln!("Calling {}", i);
         let e = entries.take(approx_num_ops_held).collect::<Vec<_>>();
         conductor
-            .call::<_, (), _>(&cell.zome("zome1"), "create_many", e)
+            .call::<_, ()>(&cell.zome("zome1"), "create_many", e)
             .await;
     }
     let mut authored = HashMap::new();
@@ -425,16 +427,22 @@ async fn create_test_data(
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Extracting data {}", i);
         let db = cell.authored_db().clone();
-        let data = fresh_reader_test(db, |mut txn| {
-            get_authored_ops(&mut txn, cell.agent_pubkey())
-        });
+        let data = db
+            .read_async({
+                let agent_pk = cell.agent_pubkey().clone();
+                move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, DhtOpHashed>> {
+                    Ok(get_authored_ops(&txn, &agent_pk))
+                }
+            })
+            .await
+            .unwrap();
         let hashes = data.keys().cloned().collect::<Vec<_>>();
         authored.insert(Arc::new(cell.agent_pubkey().clone()), hashes);
         ops.extend(data);
     }
-    dbg!("Getting agent info");
+
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
-    dbg!("Done");
+
     GeneratedData {
         integrity_uuid,
         coordinator_uuid,
@@ -503,7 +511,7 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
 }
 
 fn get_authored_ops(
-    txn: &mut Transaction<'_>,
+    txn: &Transaction<'_>,
     author: &AgentPubKey,
 ) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     txn.prepare(

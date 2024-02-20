@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::{KitsuneError, KitsuneErrorKind, KitsuneResult};
+
 /// New-type for sync ref-counted Urls
 /// to make passing around tx2 more efficient.
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -9,6 +11,12 @@ impl TxUrl {
     /// reference this txurl as a Url2.
     pub fn as_url2(&self) -> &url2::Url2 {
         &self.0
+    }
+
+    /// Construct from a string which is known to be a valid URL.
+    /// Panics if the URL is not parseable.
+    pub fn from_str_panicking(s: &str) -> Self {
+        url2::Url2::parse(s).into()
     }
 }
 
@@ -56,20 +64,57 @@ impl From<url2::Url2> for TxUrl {
     }
 }
 
-impl From<String> for TxUrl {
-    fn from(r: String) -> Self {
-        Self(Arc::new(url2::Url2::parse(r)))
+impl TryFrom<String> for TxUrl {
+    type Error = KitsuneError;
+
+    fn try_from(r: String) -> KitsuneResult<Self> {
+        Ok(Self(Arc::new(url2::Url2::try_parse(r.clone()).map_err(
+            |e| KitsuneError::from(KitsuneErrorKind::BadInput(Box::new(e), r)),
+        )?)))
     }
 }
 
-impl From<&String> for TxUrl {
-    fn from(r: &String) -> Self {
-        Self(Arc::new(url2::Url2::parse(r)))
+impl TryFrom<&String> for TxUrl {
+    type Error = KitsuneError;
+
+    fn try_from(r: &String) -> KitsuneResult<Self> {
+        Ok(Self(Arc::new(url2::Url2::try_parse(r).map_err(|e| {
+            KitsuneError::from(KitsuneErrorKind::BadInput(Box::new(e), r.clone()))
+        })?)))
     }
 }
 
-impl From<&str> for TxUrl {
-    fn from(r: &str) -> Self {
-        Self(Arc::new(url2::Url2::parse(r)))
+impl TryFrom<&str> for TxUrl {
+    type Error = KitsuneError;
+
+    fn try_from(r: &str) -> KitsuneResult<Self> {
+        Ok(Self(Arc::new(url2::Url2::try_parse(r).map_err(|e| {
+            KitsuneError::from(KitsuneErrorKind::BadInput(Box::new(e), r.to_string()))
+        })?)))
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl<'a> arbitrary::Arbitrary<'a> for TxUrl {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // XXX: not the best implementation, it doesn't exercise other protocols
+        let s = String::arbitrary(u)?;
+        Ok(TxUrl::from_str_panicking(&format!("http://{s}")))
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+impl proptest::arbitrary::Arbitrary for TxUrl {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<TxUrl>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        // XXX: not the best implementation, it doesn't exercise other protocols
+        proptest::string::string_regex(r"http://\w+")
+            .unwrap()
+            .prop_map(|s| TxUrl::from_str_panicking(&s))
+            .boxed()
     }
 }

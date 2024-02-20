@@ -1,0 +1,5 @@
+error[E0599]: no function or associated item named `now` found for struct `hdk::prelude::Timestamp` in the current scope
+ --> tests/samples/no_timestamp_now.rs:6:16
+  |
+6 |     Timestamp::now();
+  |                ^^^ function or associated item not found in `Timestamp`

@@ -7,4 +7,6 @@
   -D clippy::complexity \
   -D clippy::perf \
   -D clippy::correctness \
+  \
+  -D clippy::dbg_macro \
 ''

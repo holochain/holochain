@@ -1,13 +1,19 @@
 { self, lib, ... }: {
   perSystem = { config, self', inputs', pkgs, ... }:
     let
-      holonixPackages = with self'.packages; [ holochain lair-keystore hc-launch hc-scaffold ];
+      holonixPackages = { holochainOverrides ? { } }:
+        with self'.packages; [
+          (holochain.override holochainOverrides)
+          lair-keystore
+          hc-launch
+          hc-scaffold
+        ];
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
             (package: ''
               echo ${package.pname} \($(${package}/bin/${package.pname} -V)\): ${package.src.rev or "na"}'')
-            holonixPackages
+            (holonixPackages { })
         );
       hn-introspect =
         pkgs.writeShellScriptBin "hn-introspect" versionsFileText;
@@ -19,14 +25,18 @@
 
       devShells = {
         default = self'.devShells.holonix;
-        holonix = pkgs.mkShell {
-          inputsFrom = [ self'.devShells.rustDev ];
-          packages = holonixPackages ++ [ hn-introspect ];
-          shellHook = ''
-            echo Holochain development shell spawned. Type 'exit' to leave.
-            export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
-          '';
-        };
+        holonix = pkgs.lib.makeOverridable
+          ({ holochainOverrides }: pkgs.mkShell {
+            inputsFrom = [ self'.devShells.rustDev ];
+            packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
+            shellHook = ''
+              echo Holochain development shell spawned. Type 'exit' to leave.
+              export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
+            '';
+          })
+          {
+            holochainOverrides = { };
+          };
 
         holochainBinaries = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
@@ -122,14 +132,10 @@
 
             packages = with pkgs; [
               cargo-nextest
+              graph-easy
 
-              (pkgs.writeShellScriptBin "script-cargo-regen-lockfiles" ''
-                cargo fetch --locked
-                cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
-                cargo generate-lockfile --offline
-                cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
-              '')
-
+              self'.packages.scripts-cargo-regen-lockfiles
+              self'.packages.scripts-cargo-update
             ]
 
             # generate one script for each of the "holochain-tests-" prefixed derivations by reusing their checkPhase
@@ -150,26 +156,48 @@
             '';
           };
 
-        rustDev =
+        rustDev = pkgs.mkShell {
+          inputsFrom = [
+            self'.packages.holochain
+          ];
+
+          packages = (lib.lists.optionals pkgs.stdenv.isLinux [
+            pkgs.mold
+            pkgs.pkgsStatic.openssl
+          ]);
+
+          shellHook = ''
+            export HOLOCHAIN_DEVSHELL="rustDev"
+            export CARGO_HOME="$PWD/.cargo"
+            export CARGO_INSTALL_ROOT="$PWD/.cargo"
+            export CARGO_TARGET_DIR="$PWD/target"
+            export CARGO_CACHE_RUSTC_INFO=1
+            export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
+            export NIX_PATH="nixpkgs=${pkgs.path}"
+            export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+            echo Rust development shell spawned. Type 'exit' to leave.
+          ''
+          + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
+            export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+          '')
+          + (lib.strings.optionalString pkgs.stdenv.isLinux ''
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="$CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -Clink-arg=-fuse-ld=mold"
+          '')
+          ;
+        };
+
+        nixDev =
           pkgs.mkShell
             {
               inputsFrom = [
-                self'.packages.holochain
+                self'.devShells.rustDev
               ];
 
-              shellHook = ''
-                export CARGO_HOME="$PWD/.cargo"
-                export CARGO_INSTALL_ROOT="$PWD/.cargo"
-                export CARGO_TARGET_DIR="$PWD/target"
-                export CARGO_CACHE_RUSTC_INFO=1
-                export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
-                export NIX_PATH="nixpkgs=${pkgs.path}"
-              '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
-                export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
-              '');
+              packages = [
+                (pkgs.callPackage self.inputs.crate2nix.outPath { })
+                pkgs.llvmPackages.bintools
+              ];
             };
       };
     };
 }
-
-

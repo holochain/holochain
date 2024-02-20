@@ -2,109 +2,85 @@
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::counterfeit_check;
-use crate::{
-    conductor::{conductor::RwShare, space::Space},
-    core::queue_consumer::TriggerSender,
-};
+use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::prelude::*;
+use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
 use tracing::instrument;
 
+mod incoming_ops_batch;
+
+pub use incoming_ops_batch::IncomingOpsBatch;
+
 #[cfg(test)]
-mod test;
+mod tests;
 
-type InOpBatchSnd = tokio::sync::oneshot::Sender<WorkflowResult<()>>;
-type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
-
-#[derive(Debug)]
-struct InOpBatchEntry {
-    snd: InOpBatchSnd,
-    request_validation_receipt: bool,
-    ops: Vec<(DhtOpHash, DhtOp)>,
+struct OpsClaim {
+    incoming_op_hashes: IncomingOpHashes,
+    working_hashes: Vec<DhtOpHash>,
 }
 
-/// A batch of incoming ops memory.
-#[derive(Clone)]
-pub struct IncomingOpsBatch(RwShare<InOpBatch>);
+impl OpsClaim {
+    fn acquire(
+        incoming_op_hashes: IncomingOpHashes,
+        ops: Vec<DhtOpHashed>,
+    ) -> (Self, Vec<DhtOpHashed>) {
+        let keep_incoming_op_hashes = incoming_op_hashes.clone();
 
-#[derive(Default)]
-struct InOpBatch {
-    is_running: bool,
-    pending: Vec<InOpBatchEntry>,
-}
+        // Lock the shared state while we claim the ops we're going to work on
+        let mut set = incoming_op_hashes.0.lock();
 
-impl Default for IncomingOpsBatch {
-    fn default() -> Self {
-        Self(RwShare::new(InOpBatch::default()))
+        // Track the hashes that we're going to work on, and should be removed from the shared state
+        // when this claim is dropped.
+        let mut working_hashes = Vec::with_capacity(ops.len());
+        let mut working_ops = Vec::with_capacity(ops.len());
+
+        for op in ops {
+            if !set.contains(&op.hash) {
+                set.insert(op.hash.clone());
+                working_hashes.push(op.hash.clone());
+                working_ops.push(op);
+            }
+        }
+
+        (
+            Self {
+                incoming_op_hashes: keep_incoming_op_hashes,
+                working_hashes,
+            },
+            working_ops,
+        )
     }
 }
 
-/// if result.0.is_none() -- we queued it to send later
-/// if result.0.is_some() -- the batch should be run now
-fn batch_check_insert(
-    batch: &IncomingOpsBatch,
-    request_validation_receipt: bool,
-    ops: Vec<(DhtOpHash, DhtOp)>,
-) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
-    let (snd, rcv) = tokio::sync::oneshot::channel();
-    let entry = InOpBatchEntry {
-        snd,
-        request_validation_receipt,
-        ops,
-    };
-    batch.0.share_mut(|batch| {
-        if batch.is_running {
-            // there is already a batch running, just queue this
-            batch.pending.push(entry);
-            (None, rcv)
-        } else {
-            // no batch running, run this (and assert we never collect straglers
-            assert!(batch.pending.is_empty());
-            batch.is_running = true;
-            (Some(vec![entry]), rcv)
-        }
-    })
-}
+impl Drop for OpsClaim {
+    fn drop(&mut self) {
+        // Lock the shared state while we remove the ops we're finished working with
+        let incoming_op_hashes = self.incoming_op_hashes.clone();
+        let mut set = incoming_op_hashes.0.lock();
 
-/// if result.is_none() -- we are done, end the loop for now
-/// if result.is_some() -- we got more items to process
-fn batch_check_end(batch: &IncomingOpsBatch) -> Option<Vec<InOpBatchEntry>> {
-    batch.0.share_mut(|batch| {
-        assert!(batch.is_running);
-        let out: Vec<InOpBatchEntry> = batch.pending.drain(..).collect();
-        if out.is_empty() {
-            // pending was empty, we can end the loop for now
-            batch.is_running = false;
-            None
-        } else {
-            // we have some more pending, continue the running loop
-            Some(out)
+        for hash in &self.working_hashes {
+            set.remove(hash);
         }
-    })
+    }
 }
 
 #[instrument(skip(txn, ops))]
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
     request_validation_receipt: bool,
-    ops: Vec<(DhtOpHash, DhtOp)>,
+    ops: Vec<DhtOpHashed>,
 ) -> WorkflowResult<()> {
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
-    for (hash, op) in ops {
-        if !op_exists_inner(txn, &hash)? {
-            let op = DhtOpHashed::from_content_sync(op);
+    for op in ops {
+        if !op_exists_inner(txn, &op.hash)? {
             to_pending.push(op);
-        } else {
-            // Check if we should set receipt to send.
-            if request_validation_receipt {
-                set_send_receipt(txn, &hash)?;
-            }
+        } else if request_validation_receipt {
+            set_require_receipt(txn, &op.hash, true)?;
         }
     }
 
@@ -121,7 +97,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
-    mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    ops: Vec<DhtOp>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let Space {
@@ -130,48 +106,54 @@ pub async fn incoming_dht_ops_workflow(
         dht_db,
         ..
     } = space;
-    let mut filter_ops = Vec::new();
-    let mut hashes_to_remove = Vec::with_capacity(ops.len());
 
-    // Filter out ops that are already being tracked, so we don't do duplicate work
-    {
-        let mut set = incoming_op_hashes.0.lock();
-        let mut o = Vec::with_capacity(ops.len());
-        for (hash, op) in ops {
-            if !set.contains(&hash) {
-                set.insert(hash.clone());
-                hashes_to_remove.push(hash.clone());
-                o.push((hash, op));
-            }
-        }
-        ops = o;
-    }
+    // Compute hashes for all the ops
+    let ops = ops
+        .into_iter()
+        .map(DhtOpHashed::from_content_sync)
+        .collect();
 
+    // Filter out ops that are already being tracked, to avoid doing duplicate work
+    let (_claim, ops) = OpsClaim::acquire(incoming_op_hashes, ops);
+
+    // If everything we've been sent is already being worked on then this workflow run can be skipped
     if ops.is_empty() {
         return Ok(());
     }
 
-    if !request_validation_receipt {
-        ops = filter_existing_ops(&dht_db, ops).await?;
-    }
-
-    for (hash, op) in ops {
-        // It's cheaper to check if the op exists before trying
-        // to check the signature or open a write transaction.
-        match should_keep(&op).await {
-            Ok(()) => filter_ops.push((hash, op)),
+    let num_ops = ops.len();
+    let mut filter_ops = Vec::with_capacity(num_ops);
+    for op in ops {
+        // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
+        match should_keep(&op.content).await {
+            Ok(()) => filter_ops.push(op),
             Err(e) => {
                 tracing::warn!(
-                    msg = "Dropping op because it failed counterfeit checks",
-                    ?op
+                    ?op,
+                    "Dropping batch of {} ops because the current op failed counterfeit checks",
+                    num_ops,
                 );
+                // TODO we are returning here without blocking this author?
                 return Err(e);
             }
         }
     }
 
+    if !request_validation_receipt {
+        // Filter the list of ops to only include those that are not already in the database.
+        filter_ops = filter_existing_ops(&dht_db, filter_ops).await?;
+    }
+
+    // Check again whether everything has been filtered out and avoid launching a Tokio task if so
+    if filter_ops.is_empty() {
+        tracing::trace!(
+            "Skipping the rest of the incoming_dht_ops_workflow because all ops were filtered out"
+        );
+        return Ok(());
+    }
+
     let (mut maybe_batch, rcv) =
-        batch_check_insert(&incoming_ops_batch, request_validation_receipt, filter_ops);
+        incoming_ops_batch.check_insert(request_validation_receipt, filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
     if maybe_batch.is_some() {
@@ -183,7 +165,7 @@ pub async fn incoming_dht_ops_workflow(
                     let senders = Arc::new(parking_lot::Mutex::new(Vec::new()));
                     let senders2 = senders.clone();
                     if let Err(err) = dht_db
-                        .async_commit(move |txn| {
+                        .write_async(move |txn| {
                             for entry in entries {
                                 let InOpBatchEntry {
                                     snd,
@@ -193,7 +175,7 @@ pub async fn incoming_dht_ops_workflow(
                                 let res = batch_process_entry(txn, request_validation_receipt, ops);
 
                                 // we can't send the results here...
-                                // we haven't comitted
+                                // we haven't committed
                                 senders2.lock().push((snd, res));
                             }
 
@@ -209,25 +191,19 @@ pub async fn incoming_dht_ops_workflow(
                     }
 
                     // trigger validation of queued ops
+                    tracing::debug!(
+                        "Incoming dht ops workflow is now triggering the sys_validation_trigger"
+                    );
                     sys_validation_trigger.trigger(&"incoming_dht_ops_workflow");
 
-                    maybe_batch = batch_check_end(&incoming_ops_batch);
+                    maybe_batch = incoming_ops_batch.check_end();
                 }
             }
         });
     }
 
-    let r = rcv
-        .await
-        .map_err(|_| super::error::WorkflowError::RecvError)?;
-
-    {
-        let mut set = incoming_op_hashes.0.lock();
-        for hash in hashes_to_remove {
-            set.remove(&hash);
-        }
-    }
-    r
+    rcv.await
+        .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
 #[instrument(skip(op))]
@@ -247,11 +223,12 @@ fn add_to_pending(
         insert_op(txn, op)?;
         set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
     }
-    StateMutationResult::Ok(())
+
+    Ok(())
 }
 
 fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> DatabaseResult<bool> {
-    DatabaseResult::Ok(txn.query_row(
+    Ok(txn.query_row(
         "
         SELECT EXISTS(
             SELECT
@@ -270,26 +247,18 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
-        .async_reader(move |txn| op_exists_inner(&txn, &hash))
+        .read_async(move |txn| op_exists_inner(&txn, &hash))
         .await
 }
 
 pub async fn filter_existing_ops(
     vault: &DbWrite<DbKindDht>,
-    mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-) -> DatabaseResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+    mut ops: Vec<DhtOpHashed>,
+) -> DatabaseResult<Vec<DhtOpHashed>> {
     vault
-        .async_reader(move |txn| {
-            ops.retain(|(hash, _)| !op_exists_inner(&txn, hash).unwrap_or(true));
+        .read_async(move |txn| {
+            ops.retain(|op| !op_exists_inner(&txn, &op.hash).unwrap_or(true));
             Ok(ops)
         })
         .await
-}
-
-fn set_send_receipt(
-    txn: &mut rusqlite::Transaction<'_>,
-    hash: &DhtOpHash,
-) -> StateMutationResult<()> {
-    set_require_receipt(txn, hash, true)?;
-    StateMutationResult::Ok(())
 }

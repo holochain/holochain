@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
-use holochain_p2p::kitsune_p2p::TransportConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
+use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
 
 // This creates a new Holochain sandbox
@@ -140,7 +140,7 @@ impl Existing {
         let sandboxes = crate::save::load(std::env::current_dir()?)?;
         if self.all {
             // Get all the sandboxes
-            self.existing_paths.extend(sandboxes.into_iter())
+            self.existing_paths.extend(sandboxes)
         } else if self.last && sandboxes.last().is_some() {
             // Get just the last sandbox
             self.existing_paths
@@ -202,7 +202,7 @@ impl From<Network> for KitsuneP2pConfig {
             NetworkType::Mem => (),
             /*
             NetworkType::Mdns => {
-                kit.network_type = holochain_p2p::kitsune_p2p::NetworkType::QuicMdns;
+                kit.network_type = kitsune_p2p_types::config::NetworkType::QuicMdns;
                 kit.transport_pool = vec![TransportConfig::Quic {
                     bind_to: None,
                     override_host: None,

@@ -4,13 +4,13 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::interface::error::InterfaceError;
 use holo_hash::AnyDhtHash;
 use holochain_cascade::error::CascadeError;
+use holochain_secure_primitive::SecurePrimitiveError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::inline_zome::error::InlineZomeError;
 use thiserror::Error;
 use tokio::task::JoinError;
+use wasmer::DeserializeError;
 
 /// Errors occurring during a [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome) call
 #[derive(Error, Debug)]
@@ -21,7 +21,7 @@ pub enum RibosomeError {
 
     /// Wasm runtime error while working with Ribosome.
     #[error("Wasm runtime error while working with Ribosome: {0}")]
-    WasmRuntimeError(#[from] RuntimeError),
+    WasmRuntimeError(#[from] wasmer::RuntimeError),
 
     /// Serialization error while working with Ribosome.
     #[error("Serialization error while working with Ribosome: {0}")]
@@ -88,19 +88,24 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    SecurePrimitive(
-        #[from] holochain_zome_types::dependencies::holochain_integrity_types::SecurePrimitiveError,
-    ),
+    SecurePrimitive(#[from] SecurePrimitiveError),
 
     /// Zome function doesn't have permissions to call a Host function.
     #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]
     HostFnPermissions(ZomeName, FunctionName, String),
 
+    /// An attempt to was made to perform a clone operation on a cell that is not provisioned or belongs to another app.
+    #[error("Invalid request to modify a cell which belongs to another app")]
+    InvalidCloneTarget,
+
     #[error(transparent)]
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
 
     #[error(transparent)]
-    ModuleDeserializeError(#[from] holochain_wasmer_host::prelude::DeserializeError),
+    ModuleDeserializeError(#[from] DeserializeError),
+
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
 
 /// Type alias

@@ -14,12 +14,16 @@ use holo_hash::ActionHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
+use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
 
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct Record<A = SignedActionHashed> {
     /// The signed action for this record
     pub signed_action: A,
@@ -35,9 +39,12 @@ impl<A> AsRef<A> for Record<A> {
 }
 
 /// Represents the different ways the entry_address reference within an action
-/// can be intepreted
+/// can be interpreted
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
     Present(E),
@@ -68,6 +75,7 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
             (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
             (None, None) => RecordEntry::NA,
             (Some(_), None) => {
+                // TODO this is a problem case but it is reachable
                 unreachable!("Entry is present for an action type which has no entry reference")
             }
             (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
@@ -270,14 +278,15 @@ impl<A> Record<A> {
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "hashing")]
 impl<T> SignedHashed<T>
 where
     T: HashableContent,
     <T as holo_hash::HashableContent>::HashType: holo_hash::hash_type::HashTypeSync,
 {
-    /// Create a new signed and hashed content by hashing the content.
-    pub fn new(content: T, signature: Signature) -> Self {
+    /// Create a new signed and hashed content by hashing the content, but without checking
+    /// the signature.
+    pub fn new_unchecked(content: T, signature: Signature) -> Self {
         let hashed = HoloHashed::from_content_sync(content);
         Self { hashed, signature }
     }
@@ -356,6 +365,19 @@ impl SignedActionHashed {
     }
 }
 
+impl<C: HashableContent<HashType = T>, T: PrimitiveHashType> HashableContent for SignedHashed<C> {
+    type HashType = C::HashType;
+
+    fn hash_type(&self) -> Self::HashType {
+        T::new()
+    }
+
+    fn hashable_content(&self) -> holo_hash::HashableContentBytes {
+        use holo_hash::HasHash;
+        holo_hash::HashableContentBytes::Prehashed39(self.hashed.as_hash().get_raw_39().to_vec())
+    }
+}
+
 impl<T> From<SignedHashed<T>> for HoloHashed<T>
 where
     T: HashableContent,
@@ -409,7 +431,7 @@ impl TryFrom<Record> for DeleteLink {
     }
 }
 
-#[cfg(feature = "test_utils")]
+#[cfg(feature = "fuzzing")]
 impl<'a, T> arbitrary::Arbitrary<'a> for SignedHashed<T>
 where
     T: HashableContent,

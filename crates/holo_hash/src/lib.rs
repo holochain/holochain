@@ -3,12 +3,13 @@
 #![deny(missing_docs)]
 
 mod aliases;
-pub mod error;
+mod error;
 mod has_hash;
 mod hash;
 pub mod hash_type;
 
 pub use aliases::*;
+pub use error::*;
 pub use has_hash::HasHash;
 pub use hash::*;
 pub use hash_type::HashType;

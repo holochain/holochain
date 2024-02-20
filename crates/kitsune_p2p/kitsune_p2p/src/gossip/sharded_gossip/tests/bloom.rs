@@ -239,8 +239,7 @@ async fn make_node_inner(data: Option<(usize, TimeWindow)>) -> ShardedGossipLoca
 
     ShardedGossipLocal::test(
         GossipType::Historical,
-        evt_sender,
-        host,
+        HostApiLegacy::new(host, evt_sender),
         ShardedGossipLocalState::default(),
     )
 }

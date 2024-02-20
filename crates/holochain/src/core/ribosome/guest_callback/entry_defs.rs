@@ -90,8 +90,6 @@ mod test {
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_types::prelude::*;
-    use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-    use holochain_zome_types::ExternIO;
     use std::collections::BTreeMap;
 
     #[test]

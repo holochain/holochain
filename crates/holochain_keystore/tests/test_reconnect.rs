@@ -41,7 +41,7 @@ fn run_test_keystore(dir: &std::path::Path) -> (Proc, url2::Url2) {
 
     let mut yaml = String::new();
     let mut lines = std::io::BufReader::new(cmd.stdout.take().unwrap()).lines();
-    while let Some(line) = lines.next() {
+    for line in lines.by_ref() {
         let line = line.unwrap();
         if line == "OK" {
             break;

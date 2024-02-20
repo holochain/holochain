@@ -12,7 +12,7 @@ use holochain::{
 };
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
-    core::workflow::error::WorkflowError,
+    core::workflow::WorkflowError,
 };
 use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
@@ -175,7 +175,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas());
-    tracing::debug!(cell_ids = ?conductor.running_cell_ids(None));
+    tracing::debug!(cell_ids = ?conductor.running_cell_ids());
     tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
     display_agent_infos(&conductor).await;
@@ -305,7 +305,7 @@ fn simple_validation_zome() -> InlineZomeSet {
                 }) => AppString::try_from(bytes.into_sb()).unwrap(),
                 _ => return Ok(ValidateResult::Valid),
             };
-            if &s.0 == "" {
+            if s.0.is_empty() {
                 Ok(ValidateResult::Invalid("No empty strings allowed".into()))
             } else {
                 Ok(ValidateResult::Valid)
@@ -405,7 +405,7 @@ async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
 
     // Install DNA and install and enable apps in conductor
     let app = conductor
-        .setup_app_for_agent("app1", agent.clone(), &[dna_file.clone()])
+        .setup_app_for_agent("app1", agent.clone(), [&dna_file])
         .await
         .unwrap();
 

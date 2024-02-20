@@ -6,15 +6,15 @@ use contrafact::Fact;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_keystore::test_keystore;
 use holochain_p2p::dht::hash::RegionHash;
 use holochain_p2p::dht::prelude::Dimension;
 use holochain_p2p::dht::region::RegionData;
 use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_p2p::dht_arc::DhtArcSet;
-use holochain_types::dht_op::facts::valid_dht_op;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
+use holochain_types::facts::valid_dht_op;
 use holochain_types::prelude::*;
-use holochain_zome_types::{DnaDef, DnaDefHashed};
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
 
@@ -39,12 +39,15 @@ async fn test_region_queries() {
     let mut g = random_generator();
 
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let path = temp_dir.path().to_path_buf();
+    let data_root_path = temp_dir.path().to_path_buf().into();
 
-    let spaces = Spaces::new(&ConductorConfig {
-        environment_path: path.into(),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(data_root_path),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();
@@ -70,7 +73,7 @@ async fn test_region_queries() {
         let mut op = DhtOp::arbitrary(&mut g).unwrap();
         *op.author_mut() = agent.clone();
         let mut fact = valid_dht_op(keystore.clone(), agent.clone(), true);
-        op = fact.satisfy(op, &mut g).unwrap();
+        op = fact.satisfy(&mut g, op).unwrap();
         *op.timestamp_mut() = timestamp;
         op
     };
@@ -94,7 +97,7 @@ async fn test_region_queries() {
                 .unwrap(),
         );
         let op = DhtOpHashed::from_content_sync(op);
-        fill_db(&db, op.clone());
+        fill_db(&db, op.clone()).await;
         ops.push(op.clone());
 
         // also construct ops which are in the recent time window,
@@ -105,7 +108,7 @@ async fn test_region_queries() {
             .unwrap(),
         );
         let op2 = DhtOpHashed::from_content_sync(op2);
-        fill_db(&db, op2);
+        fill_db(&db, op2).await;
     }
     let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
         .await

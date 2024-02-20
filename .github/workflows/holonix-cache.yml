@@ -1,0 +1,92 @@
+name: "Holonix cache"
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs: { }
+
+jobs:
+  # ensures the cache is regularly updated for the supported versions on multiple platforms
+  cache-update:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - "github:holochain/holochain#packages.{0}.build-holonix-tests-integration"
+          - "github:holochain/holochain#devShells.{0}.holonix"
+        extra_args:
+          - ''
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_1'
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_2'
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc'
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/weekly'
+        platform:
+          - x86_64-darwin
+          - aarch64-darwin
+          - x86_64-linux
+
+    runs-on: [ self-hosted, multi-arch ]
+    steps:
+      - name: Print matrix
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
+        run: echo ${MATRIX}
+
+      - name: "Cache packages ${{ matrix.extra_args }}"
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN_HOLOCHAIN_CI }}"
+        run: |
+          set -xe
+
+          target=${{ matrix.target }}
+
+          # See https://docs.cachix.org/pushing#id1
+          nix develop --build -L --profile result-develop \
+            ${{ matrix.extra_args }} \
+            ${{ format(matrix.target, matrix.platform) }}
+
+          nix build -L --profile result-build \
+            ${{ matrix.extra_args }} \
+            ${{ format(matrix.target, matrix.platform) }}
+
+          # Don't exit if this fails so we can clean up the profile
+          for i in result-*; do
+            cachix push holochain-ci $i || true
+          done
+
+          rm result*
+  cache-check:
+    needs:
+      - cache-update
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - "github:holochain/holochain#devShells.{0}.holonix"
+          - "github:holochain/holochain#packages.{0}.hc-scaffold"
+        extra_args:
+          - ''
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_1'
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_2'
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc'
+          - '--refresh --override-input versions github:holochain/holochain?dir=versions/weekly'
+        platform:
+          - x86_64-darwin
+          - aarch64-darwin
+          - x86_64-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: cachix/install-nix-action@v22
+      - uses: cachix/cachix-action@v12
+        with:
+          name: holochain-ci
+      - name: Check the Holonix cache
+        uses: holochain/nix-cache-check@v1
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+        with:
+          derivation: ${{ format(matrix.target, matrix.platform) }}
+          extra_build_args: ${{ matrix.extra_args }}

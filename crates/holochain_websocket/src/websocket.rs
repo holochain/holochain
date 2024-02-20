@@ -456,7 +456,10 @@ impl Websocket {
 
                         // Forward the incoming message to the WebsocketReceiver.
                         if from_websocket
-                            .send(IncomingMessage::Msg(msg, resp))
+                            .send_timeout(
+                                IncomingMessage::Msg(msg, resp),
+                                std::time::Duration::from_secs(30),
+                            )
                             .await
                             .is_err()
                         {
@@ -488,7 +491,13 @@ impl Websocket {
                     }
                     tungstenite::Message::Ping(data) => {
                         // Received a ping, immediately respond with a pong.
-                        send_response.send(OutgoingMessage::Pong(data)).await.ok();
+                        send_response
+                            .send_timeout(
+                                OutgoingMessage::Pong(data),
+                                std::time::Duration::from_secs(30),
+                            )
+                            .await
+                            .ok();
                         Task::cont()
                     }
                     m => {
@@ -534,7 +543,7 @@ impl Websocket {
 
                     // Send the response to the to_socket task
                     send_response
-                        .send(msg)
+                        .send_timeout(msg, std::time::Duration::from_secs(10))
                         .await
                         .map_err(|_| WebsocketError::FailedToSendResp)?;
                     // Response sent, don't send cancel.
@@ -697,10 +706,7 @@ impl Websocket {
     /// Try to deserialize the wire message and continue to next
     /// message if failure.
     fn deserialize_message(bytes: Vec<u8>) -> Loop<WireMessage> {
-        match SerializedBytes::try_from(UnsafeBytes::from(bytes))
-            .map_err(WebsocketError::from)
-            .and_then(|sb| Ok(WireMessage::try_from(sb)?))
-        {
+        match WireMessage::try_from(SerializedBytes::from(UnsafeBytes::from(bytes))) {
             Ok(msg) => Ok(msg),
             Err(e) => {
                 tracing::error!("Websocket failed to deserialize {:?}", e,);
@@ -710,19 +716,10 @@ impl Websocket {
             }
         }
     }
-    /// Try to deserialize the data and continue to next
-    /// message if failure.
+    /// Wrap the incoming bytes in `SerializedBytes`
     fn deserialize_bytes(data: Vec<u8>) -> Loop<SerializedBytes> {
-        let msg: Result<SerializedBytes, _> = UnsafeBytes::from(data).try_into();
-        match msg {
-            Ok(msg) => Ok(msg),
-            Err(e) => {
-                tracing::error!("Websocket failed to deserialize {:?}", e,);
-                // Should not kill the websocket just because a single message
-                // failed serialization.
-                Task::cont()
-            }
-        }
+        let msg: SerializedBytes = UnsafeBytes::from(data).into();
+        Ok(msg)
     }
 }
 

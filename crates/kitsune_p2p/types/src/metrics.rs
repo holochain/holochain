@@ -1,9 +1,12 @@
 //! Utilities for helping with metric tracking.
 
 use crate::tracing;
+use holochain_trace::tracing::Instrument;
+use kitsune_p2p_bin_data::KitsuneAgent;
+use kitsune_p2p_timestamp::Timestamp;
 use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
-    Once,
+    Arc, Once,
 };
 use sysinfo::{NetworkExt, NetworksExt, ProcessExt, SystemExt};
 
@@ -141,15 +144,33 @@ where
     E: 'static + Send + std::fmt::Debug,
     F: 'static + Send + std::future::Future<Output = Result<T, E>>,
 {
+    metric_task_instrumented(None, f)
+}
+
+/// Spawns a tokio task with given future/async block.
+/// Captures a new TaskCounter instance to track task count.
+pub fn metric_task_instrumented<T, E, F>(
+    scope: Option<String>,
+    f: F,
+) -> tokio::task::JoinHandle<Result<T, E>>
+where
+    T: 'static + Send,
+    E: 'static + Send + std::fmt::Debug,
+    F: 'static + Send + std::future::Future<Output = Result<T, E>>,
+{
     let counter = MetricTaskCounter::new();
-    tokio::task::spawn(async move {
+    let task = async move {
         let _counter = counter;
-        let res = f.await;
+        let res = f
+            .instrument(tracing::error_span!("kitsune metric task", scope = scope))
+            .await;
         if let Err(e) = &res {
             ghost_actor::dependencies::tracing::error!(?e, "METRIC TASK ERROR");
         }
         res
-    })
+    };
+
+    tokio::task::spawn(task)
 }
 
 /// System Info.
@@ -306,26 +327,99 @@ impl MetricTaskCounter {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "flakey. https://app.circleci.com/jobs/github/holochain/holochain/12604"]
-async fn test_metric_task() {
-    for _ in 0..20 {
-        metric_task(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(3)).await;
-            <Result<(), ()>>::Ok(())
-        });
-    }
-    let gt_task_count = TASK_COUNT.load(Ordering::Relaxed);
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    let lt_task_count = TASK_COUNT.load(Ordering::Relaxed);
-    assert!(lt_task_count < gt_task_count);
+const METRIC_KIND_UNKNOWN: &str = "Unknown";
+const METRIC_KIND_REACHABILITY_QUOTIENT: &str = "ReachabilityQuotient";
+const METRIC_KIND_LATENCY_MICROS: &str = "LatencyMicros";
+const METRIC_KIND_AGG_EXTRAP_COV: &str = "AggExtrapCov";
+
+/// An individual metric record
+#[derive(Debug)]
+pub struct MetricRecord {
+    /// kind of this record
+    pub kind: MetricRecordKind,
+
+    /// agent associated with this metric (if applicable)
+    pub agent: Option<Arc<KitsuneAgent>>,
+
+    /// timestamp this metric was recorded at
+    pub recorded_at_utc: Timestamp,
+
+    /// timestamp this metric will expire and be available for pruning
+    pub expires_at_utc: Timestamp,
+
+    /// additional data associated with this metric
+    pub data: serde_json::Value,
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_sys_info() {
-    holochain_trace::test_run().ok();
-    init_sys_info_poll();
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    let sys_info = get_sys_info();
-    ghost_actor::dependencies::tracing::info!(?sys_info);
+/// The type of metric recorded
+#[derive(Debug)]
+pub enum MetricRecordKind {
+    /// Failure to parse metric kind
+    Unknown,
+
+    /// ReachabilityQuotient metric kind
+    ReachabilityQuotient,
+
+    /// LatencyMicros metric kind
+    LatencyMicros,
+
+    /// AggExtrapCov metric kind
+    AggExtrapCov,
+}
+
+impl MetricRecordKind {
+    /// database format of this kind variant
+    pub fn to_db(&self) -> &'static str {
+        use MetricRecordKind::*;
+        match self {
+            Unknown => METRIC_KIND_UNKNOWN,
+            ReachabilityQuotient => METRIC_KIND_REACHABILITY_QUOTIENT,
+            LatencyMicros => METRIC_KIND_LATENCY_MICROS,
+            AggExtrapCov => METRIC_KIND_AGG_EXTRAP_COV,
+        }
+    }
+
+    /// parse a database kind into a rust enum variant
+    pub fn from_db(input: &str) -> Self {
+        use MetricRecordKind::*;
+        if input == METRIC_KIND_REACHABILITY_QUOTIENT {
+            ReachabilityQuotient
+        } else if input == METRIC_KIND_LATENCY_MICROS {
+            LatencyMicros
+        } else if input == METRIC_KIND_AGG_EXTRAP_COV {
+            AggExtrapCov
+        } else {
+            Unknown
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{get_sys_info, init_sys_info_poll, metric_task, TASK_COUNT};
+    use std::sync::atomic::Ordering;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flakey. https://app.circleci.com/jobs/github/holochain/holochain/12604"]
+    async fn test_metric_task() {
+        for _ in 0..20 {
+            metric_task(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(3)).await;
+                <Result<(), ()>>::Ok(())
+            });
+        }
+        let gt_task_count = TASK_COUNT.load(Ordering::Relaxed);
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let lt_task_count = TASK_COUNT.load(Ordering::Relaxed);
+        assert!(lt_task_count < gt_task_count);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sys_info() {
+        holochain_trace::test_run().ok();
+        init_sys_info_poll();
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let sys_info = get_sys_info();
+        ghost_actor::dependencies::tracing::info!(?sys_info);
+    }
 }

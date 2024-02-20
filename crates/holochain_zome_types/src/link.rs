@@ -1,10 +1,10 @@
-use crate::record::SignedActionHashed;
-use crate::ChainTopOrdering;
-use holo_hash::ActionHash;
+use crate::prelude::*;
+use holo_hash::{ActionHash, AgentPubKey};
 use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(
     Debug,
@@ -21,10 +21,12 @@ pub use holochain_integrity_types::link::*;
 pub struct Link {
     /// The author of this link
     pub author: holo_hash::AgentPubKey,
-    /// The [`Entry`](crate::entry::Entry) or [`Action`](holochain_integrity_types::action::Action) being linked to
+    /// The [AnyLinkableHash] being linked from
+    pub base: holo_hash::AnyLinkableHash,
+    /// The [AnyLinkableHash] being linked to
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
-    pub timestamp: crate::Timestamp,
+    pub timestamp: Timestamp,
     /// The [`ZomeIndex`] for where this link is defined.
     pub zome_index: ZomeIndex,
     /// The [`LinkType`] for this link.
@@ -85,24 +87,23 @@ impl DeleteLinkInput {
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
+    /// The base to get links from.
     pub base_address: holo_hash::AnyLinkableHash,
+
     /// The link types to include in this get.
     pub link_type: LinkTypeFilter,
-    pub tag_prefix: Option<crate::link::LinkTag>,
-}
 
-impl GetLinksInput {
-    pub fn new(
-        base_address: holo_hash::AnyLinkableHash,
-        link_type: LinkTypeFilter,
-        tag_prefix: Option<crate::link::LinkTag>,
-    ) -> Self {
-        Self {
-            base_address,
-            link_type,
-            tag_prefix,
-        }
-    }
+    /// The tag prefix to filter by.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
 type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;

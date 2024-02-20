@@ -6,14 +6,14 @@
 
 // TODO: move entire module to `holochain_types`
 
-use self::error::InlineZomeResult;
 use crate::prelude::*;
+pub use error::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-pub mod error;
+mod error;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 

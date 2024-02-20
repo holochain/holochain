@@ -1,8 +1,8 @@
 [package]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.5"
+version = "0.3.0-beta-dev.28"
 description = "keystore for libsodium keypairs"
-license = "CAL-1.0"
+license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_keystore"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -13,21 +13,25 @@ edition = "2021"
 [dependencies]
 base64 = "0.13.0"
 futures = "0.3.23"
-holo_hash = { version = "^0.3.0-beta-dev.3", path = "../holo_hash", features = ["full"] }
-holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.4"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.4", path = "../kitsune_p2p/types" }
-lair_keystore = { version = "0.2.4", default-features = false }
+holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["full"] }
+holochain_serialized_bytes = { workspace = true }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.27"}
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/types" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
+holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
+lair_keystore = { workspace = true, default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4.0"
 one_err = "0.0.8"
 parking_lot = "0.11"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
-sodoken = "=0.0.9"
+sodoken = { workspace = true }
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [ "full" ] }
-tracing = "0.1"
+tracing = { workspace = true }
+shrinkwraprs = "0.3"
+derive_more = "0.99"
 
 [dev-dependencies]
 assert_cmd = "2.0.4"
@@ -37,10 +41,13 @@ tempdir = "0.3.7"
 [features]
 default = [ "sqlite" ]
 
+test_utils = []
+
 sqlite-encrypted = [
     "holo_hash/sqlite-encrypted",
     "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
 ]
+
 sqlite = [
     "holo_hash/sqlite",
     "lair_keystore/rusqlite-bundled",

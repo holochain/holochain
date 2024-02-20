@@ -1,7 +1,8 @@
+#![allow(missing_docs)]
+
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::action::conversions::WrongActionError;
-use holochain_zome_types::Action;
-use holochain_zome_types::ActionType;
+use holochain_zome_types::prelude::*;
 use thiserror::Error;
 
 use super::DhtOpType;

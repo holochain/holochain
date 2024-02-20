@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_proxy"
-version = "0.3.0-beta-dev.4"
+version = "0.3.0-beta-dev.21"
 description = "Proxy transport module for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,27 +11,20 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-base64 = "0.13"
-blake2b_simd = "0.5.10"
-derive_more = "0.99.7"
+base64 = "0.21.2"
+derive_more = { workspace = true }
 futures = "0.3"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.4", path = "../types" }
-kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.4", path = "../transport_quic" }
-nanoid = "0.3"
-holochain_trace = { version = "^0.3.0-beta-dev.1", path = "../../holochain_trace" }
-parking_lot = "0.11"
-rmp-serde = "0.15"
-rustls = { version = "0.20.4", features = [ "dangerous_configuration" ] }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../types" }
+kitsune_p2p_transport_quic = { version = "^0.3.0-beta-dev.21", path = "../transport_quic" }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../../holochain_trace" }
 serde = { version = "1", features = [ "derive" ] }
 serde_bytes = "0.11"
 structopt = "0.3"
 tokio = { version = "1.27", features = [ "full" ] }
-tracing-subscriber = "0.3.16"
-webpki = "0.21.2"
 
 [dev-dependencies]
-criterion = "0.3.4"
-crossterm = "0.19"
+criterion = "0.5.1"
+crossterm = "0.27.0"
 
 [[bench]]
 name = "thru"
@@ -46,4 +39,3 @@ sqlite = [
     "kitsune_p2p_types/sqlite",
     "kitsune_p2p_transport_quic/sqlite",
 ]
-

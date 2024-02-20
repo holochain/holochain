@@ -1,8 +1,9 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use holochain_types::db::DbSyncStrategy;
-use kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use crate::conductor::process::ERROR_CODE;
+use holochain_types::prelude::DbSyncStrategy;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -12,10 +13,11 @@ mod dpki_config;
 #[allow(missing_docs)]
 mod error;
 mod keystore_config;
+/// Defines subdirectories of the config directory.
 pub mod paths;
+pub mod process;
 //mod logger_config;
 //mod signal_config;
-pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -25,17 +27,21 @@ pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
 
+use crate::config::conductor::paths::DataRootPath;
+
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
     pub tracing_override: Option<String>,
 
-    /// The path to the database for this conductor;
-    /// if omitted, chooses a default path.
-    pub environment_path: DatabaseRootPath,
+    /// The path to the data root for this conductor;
+    /// This can be `None` while building up the config programatically but MUST
+    /// be set by the time the config is used to build a conductor.
+    /// The database and compiled wasm directories are derived from this path.
+    pub data_root_path: Option<DataRootPath>,
 
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
@@ -49,13 +55,15 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
-
-    /// **PLACEHOLDER**: Optional specification of the Cloudflare namespace to use in Chain Head Coordination
-    /// service URLs. This is a placeholder for future work and may even go away.
-    /// Setting this to anything other than `None` will surely lead to no good.
     #[serde(default)]
-    pub chc_namespace: Option<String>,
+    pub network: KitsuneP2pConfig,
+
+    /// Optional specification of Chain Head Coordination service URL.
+    /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
+    /// If you don't know what this means, leave this setting alone (as `None`)
+    #[serde(default)]
+    #[cfg(feature = "chc")]
+    pub chc_url: Option<url2::Url2>,
 
     /// Override the default database synchronous strategy.
     ///
@@ -67,11 +75,10 @@ pub struct ConductorConfig {
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
-    //
-    //
-    // Which signals to emit
-    // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
-    // pub signals: SignalConfig,
+
+    /// Tuning parameters to adjust the behaviour of the conductor.
+    #[serde(default)]
+    pub tuning_params: Option<ConductorTuningParams>,
 }
 
 /// Helper function to load a config from a YAML string.
@@ -96,16 +103,78 @@ impl ConductorConfig {
 
     /// Get tuning params for this config (default if not set)
     pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
-        self.network
-            .as_ref()
-            .map(|c| c.tuning_params.clone())
-            .unwrap_or_default()
+        self.network.tuning_params.clone()
+    }
+
+    /// Get the tracing scope from the network config
+    pub fn tracing_scope(&self) -> Option<String> {
+        self.network.tracing_scope.clone()
+    }
+
+    /// Get the string used for hc_sleuth logging
+    pub fn sleuth_id(&self) -> String {
+        self.tracing_scope().unwrap_or("<NONE>".to_string())
+    }
+
+    /// Get the data directory for this config or say something nice and die.
+    pub fn data_root_path_or_die(&self) -> DataRootPath {
+        match &self.data_root_path {
+            Some(path) => path.clone(),
+            None => {
+                println!(
+                    "
+                    The conductor config does not contain a data_root_path. Please check and fix the
+                    config file. Details:
+
+                        Missing field `data_root_path`",
+                );
+                std::process::exit(ERROR_CODE);
+            }
+        }
+    }
+
+    /// Get the conductor tuning params for this config (default if not set)
+    pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
+        self.tuning_params.clone().unwrap_or_default()
+    }
+}
+
+/// Tuning parameters to adjust the behaviour of the conductor.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ConductorTuningParams {
+    /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
+    /// Default: 10 seconds
+    pub sys_validation_retry_delay: Option<std::time::Duration>,
+}
+
+impl ConductorTuningParams {
+    /// Create a new [`ConductorTuningParams`] with all values missing, which will cause the defaults to be used.
+    pub fn new() -> Self {
+        Self {
+            sys_validation_retry_delay: None,
+        }
+    }
+
+    /// Get the current value of `sys_validation_retry_delay` or its default value.
+    pub fn sys_validation_retry_delay(&self) -> std::time::Duration {
+        self.sys_validation_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(10))
+    }
+}
+
+impl Default for ConductorTuningParams {
+    fn default() -> Self {
+        let empty = Self::new();
+        Self {
+            sys_validation_retry_delay: Some(empty.sys_validation_retry_delay()),
+        }
     }
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
+    use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
@@ -131,7 +200,7 @@ pub mod tests {
     #[test]
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
 
     keystore:
       type: danger_test_keystore
@@ -141,13 +210,15 @@ pub mod tests {
             result,
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
-                network: None,
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
+                network: Default::default(),
                 dpki: None,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
-                chc_namespace: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
+                tuning_params: None,
             }
         );
     }
@@ -157,7 +228,7 @@ pub mod tests {
         holochain_trace::test_run().ok();
 
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
     signing_service_uri: ws://localhost:9001
     encryption_service_uri: ws://localhost:9002
     decryption_service_uri: ws://localhost:9003
@@ -188,19 +259,20 @@ pub mod tests {
         tls_in_mem_session_storage: 42
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
+        tx5_min_ephemeral_udp_port: 40000
+        tx5_max_ephemeral_udp_port: 40255
       network_type: quic_bootstrap
 
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://signal.holotest.net".into(),
         });
         let mut tuning_params =
-            kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
         tuning_params.default_rpc_single_timeout_ms = 42;
         tuning_params.default_rpc_multi_remote_agent_count = 42;
@@ -209,12 +281,14 @@ pub mod tests {
         tuning_params.tls_in_mem_session_storage = 42;
         tuning_params.proxy_keepalive_ms = 42;
         tuning_params.proxy_to_expire_ms = 42;
+        tuning_params.tx5_min_ephemeral_udp_port = 40000;
+        tuning_params.tx5_max_ephemeral_udp_port = 40255;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
@@ -223,9 +297,11 @@ pub mod tests {
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
-                network: Some(network_config),
+                network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                chc_namespace: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
+                tuning_params: None,
             }
         );
     }
@@ -233,7 +309,7 @@ pub mod tests {
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
-    environment_path: /path/to/env
+    data_root_path: /path/to/env
     keystore_path: /path/to/keystore
 
     keystore:
@@ -245,15 +321,17 @@ pub mod tests {
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
-                environment_path: PathBuf::from("/path/to/env").into(),
-                network: None,
+                data_root_path: Some(PathBuf::from("/path/to/env").into()),
+                network: Default::default(),
                 dpki: None,
                 keystore: KeystoreConfig::LairServer {
-                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
+                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
-                chc_namespace: None,
+                #[cfg(feature = "chc")]
+                chc_url: None,
+                tuning_params: None,
             }
         );
     }

@@ -7,6 +7,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Added `create_clone_cell`, `disable_clone_cell`, `enable_clone_cell` and `delete_clone_cell` functionality to the HDK. This was previously only available on the admin interface of Holochain which shouldn't be used by apps. Exposing this functionality through the HDK allows happ developers to manage clones from their backend code without having to worry about their apps breaking when more security is added to the admin interface. The only restriction on the use of these methods is that they will not permit you to create clones in another app. You can create clones of any cell within the app you make the host function calls from.
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+- **BREAKING CHANGE** Rename `remote_signal` to `send_remote_signal` to match the grammar of other HDK functions. [\#3113](https://github.com/holochain/holochain/pull/3113)
+
+- Remove access to `Timestamp::now()` which comes from `kitsune_p2p_timestamp` and was not supposed to be available in WASM. It would always panic in WASM calls so it should be safe to assume that nobody was actually using this in real apps. If you were trying to and this breaks your hApp then please consider using `sys_time` from the HDK instead which is safe to use for getting the current time.
+
+## 0.3.0-beta-dev.22
+
+## 0.3.0-beta-dev.21
+
+- Remove types for hash paths (migrated to hdi crate). Add HdkPathExt trait to implement TypedPath functionality that requires hdk. Add TryFromPath trait to implement conversion of Path into Anchor. [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## 0.3.0-beta-dev.20
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+## 0.3.0-beta-dev.14
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+## 0.3.0-beta-dev.10
+
+- **BREAKING CHANGE** `get_links` no longer takes `base`, `link_type` and `link_tag` as separate inputs and now takes `GetLinksInput` instead. This can be built using a `GetLinksInputBuilder`. Links can then be filtered by `author` and created timestamp `after` and `before`. This change has been made both to make the `get_links` function consistent with what you see if you use `HDK.with`, which is always supposed to be the case, and also to increase the options for filtering getting links.
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+- Add String<TryInto> for Path for easy conversion of Path to string representation
+
+## 0.3.0-beta-dev.6
+
 ## 0.3.0-beta-dev.5
 
 - New v2 of dna info returns full modifiers not just properties. Removed from genesis self check in favour of hdk call. [\#2366](https://github.com/holochain/holochain/pull/2366).

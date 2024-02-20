@@ -4,11 +4,7 @@ use std::{
 };
 
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
-use holochain_zome_types::{
-    op::*, Action, ActionType, AppEntryDef, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef,
-    EntryDefIndex, EntryVisibility, TryInto, ZomeIndex,
-};
+use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 
 use crate::{
     core::ribosome::guest_callback::validate::ValidateResult, sweettest::*,

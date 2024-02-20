@@ -27,7 +27,7 @@ pub trait AgentPubKeyExt {
         &self,
         signature: &Signature,
         data: Arc<[u8]>,
-    ) -> MustBoxFuture<'static, bool>;
+    ) -> MustBoxFuture<'static, KeystoreResult<bool>>;
 
     // -- provided -- //
 
@@ -53,7 +53,11 @@ pub trait AgentPubKeyExt {
     }
 
     /// verify a signature for given data with this agent public_key is valid
-    fn verify_signature<D>(&self, signature: &Signature, data: D) -> MustBoxFuture<'static, bool>
+    fn verify_signature<D>(
+        &self,
+        signature: &Signature,
+        data: D,
+    ) -> MustBoxFuture<'static, KeystoreResult<bool>>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
@@ -62,7 +66,7 @@ pub trait AgentPubKeyExt {
         let data = match data.try_into() {
             Err(e) => {
                 tracing::error!("Serialization Error: {:?}", e);
-                return async move { false }.boxed().into();
+                return async move { Err(e.into()) }.boxed().into();
             }
             Ok(data) => data,
         };
@@ -81,7 +85,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         Self: Sized,
     {
         let f = keystore.new_sign_keypair_random();
-        MustBoxFuture::new(async move { f.await })
+        MustBoxFuture::new(f)
     }
 
     fn sign_raw(
@@ -90,32 +94,24 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         data: Arc<[u8]>,
     ) -> MustBoxFuture<'static, LairResult<Signature>> {
         let f = keystore.sign(self.clone(), data);
-        MustBoxFuture::new(async move { f.await })
+        MustBoxFuture::new(f)
     }
 
     fn verify_signature_raw(
         &self,
         signature: &Signature,
         data: Arc<[u8]>,
-    ) -> MustBoxFuture<'static, bool> {
+    ) -> MustBoxFuture<'static, KeystoreResult<bool>> {
         let mut pub_key = [0; 32];
         pub_key.copy_from_slice(self.get_raw_32());
         let pub_key = <lair_keystore_api::prelude::BinDataSized<32>>::from(pub_key);
         let sig = signature.0;
 
         MustBoxFuture::new(async move {
-            match pub_key.verify_detached(sig.into(), data).await {
-                Ok(b) => b,
-                Err(e) => {
-                    tracing::error!(
-                        "Signature failed to verify: {:?}. Signature: {:?}, Pub key: {}",
-                        e,
-                        sig,
-                        pub_key
-                    );
-                    false
-                }
-            }
+            pub_key
+                .verify_detached(sig.into(), data)
+                .await
+                .map_err(KeystoreError::LairError)
         })
     }
 }

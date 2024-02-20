@@ -15,8 +15,6 @@ use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
 use holochain_trace;
-use holochain_zome_types::ActionHashed;
-use holochain_zome_types::Entry;
 use tracing::*;
 
 use super::OpBasis;
@@ -273,7 +271,7 @@ fn get_type_op() {
         let ops = produce_ops_from_record(&record).unwrap();
         let check_type = |op: DhtOp| {
             let op_type = op.get_type();
-            assert_eq!(op.to_light().get_type(), op_type);
+            assert_eq!(op.to_lite().get_type(), op_type);
             match op {
                 DhtOp::StoreRecord(_, _, _) => assert_eq!(op_type, DhtOpType::StoreRecord),
                 DhtOp::StoreEntry(_, _, _) => assert_eq!(op_type, DhtOpType::StoreEntry),
@@ -330,12 +328,12 @@ fn from_type_op() {
 #[test]
 fn from_type_op_light() {
     let check_all_ops = |record| {
-        let ops = produce_op_lights_from_records(vec![&record]).unwrap();
-        let check_identity = |light: DhtOpLight, action| {
+        let ops = produce_op_lites_from_records(vec![&record]).unwrap();
+        let check_identity = |lite: DhtOpLite, action| {
             let action_hash = ActionHash::with_data_sync(action);
             assert_eq!(
-                DhtOpLight::from_type(light.get_type(), action_hash, action).unwrap(),
-                light
+                DhtOpLite::from_type(lite.get_type(), action_hash, action).unwrap(),
+                lite
             )
         };
         for op in ops {
@@ -438,7 +436,7 @@ fn test_all_ops_basis() {
             }
         };
         for op in ops {
-            assert_eq!(*op.to_light().dht_basis(), op.dht_basis());
+            assert_eq!(*op.to_lite().dht_basis(), op.dht_basis());
             check_basis(op);
         }
     };

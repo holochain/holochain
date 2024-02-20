@@ -1,7 +1,10 @@
 //! Kitsune Config Tuning Params
+#![allow(missing_docs)]
 
-/// How long kitsune should wait before timing out when joining the network.
-pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+use crate::tx2::tx2_adapter::AdapterFactory;
+use crate::tx2::tx2_utils::TxUrl;
+use crate::KitsuneResult;
+use url2::Url2;
 
 /// Fifteen minutes
 pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 15);
@@ -224,24 +227,51 @@ pub mod tuning_params_struct {
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
 
-        /// Tx5 max pending send byte count limit.
+        /// Maximum count of open connections.
+        /// [Default: 4096]
+        tx5_connection_count_max: u32 = 4096,
+
+        /// Max backend send buffer bytes (per connection).
+        /// [Default: 64 KiB]
+        tx5_send_buffer_bytes_max: u32 = 64 * 1024,
+
+        /// Max backend recv buffer bytes (per connection).
+        /// [Default: 64 KiB]
+        tx5_recv_buffer_bytes_max: u32 = 64 * 1024,
+
+        /// Maximum receive message reconstruction bytes in memory
+        /// (accross entire endpoint).
+        /// [Default: 512 MiB]
+        tx5_incoming_message_bytes_max: u32 = 512 * 1024 * 1024,
+
+        /// Maximum size of an individual message.
         /// [Default: 16 MiB]
-        tx5_max_send_bytes: u32 = 16 * 1024 * 1024,
+        tx5_message_size_max: u32 = 16 * 1024 * 1024,
 
-        /// Tx5 max pending recv byte count limit.
-        /// [Default: 16 MiB]
-        tx5_max_recv_bytes: u32 = 16 * 1024 * 1024,
+        /// Internal event channel size.
+        /// [Default: 1024]
+        tx5_internal_event_channel_size: u32 = 1024,
 
-        /// Tx5 max concurrent connection limit.
-        /// [Default: 255]
-        tx5_max_conn_count: u32 = 255,
-
-        /// Tx5 max init (connect) time for a connection in seconds.
+        /// Default timeout for network operations.
         /// [Default: 60]
-        tx5_max_conn_init_s: u32 = 60,
+        tx5_timeout_s: u32 = 60,
+
+        /// Starting backoff duration for retries.
+        /// [Default: 60]
+        tx5_backoff_start_s: u32 = 5,
+
+        /// Max backoff duration for retries.
+        /// [Default: 60]
+        tx5_backoff_max_s: u32 = 60,
 
         /// Tx5 ban time in seconds.
         tx5_ban_time_s: u32 = 10,
+
+        /// Tx5 min ephemeral port
+        tx5_min_ephemeral_udp_port: u16 = 1,
+
+        /// Tx5 max ephemeral port
+        tx5_max_ephemeral_udp_port: u16 = 65535,
 
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
@@ -275,6 +305,11 @@ pub mod tuning_params_struct {
         /// The default value of `2` causes the delay to grow quickly up to the max time of 1 hour.
         /// For testing consider using `1` to prevent the delay from growing.
         bootstrap_check_delay_backoff_multiplier: u32 = 2,
+
+        /// Set the bootstrap fetch maximum backoff time.
+        /// The default value is 60 * 5 s = five minutes.
+        /// The minimum value is 60 s = one minute.
+        bootstrap_max_delay_s: u32 = 60 * 5,
     }
 
     impl KitsuneP2pTuningParams {
@@ -287,11 +322,6 @@ pub mod tuning_params_struct {
         /// Get the gossip recent threshold param as a proper Duration
         pub fn danger_gossip_recent_threshold(&self) -> std::time::Duration {
             std::time::Duration::from_secs(self.danger_gossip_recent_threshold_secs)
-        }
-
-        /// Get the tx5_max_conn_init_s param as a Duration.
-        pub fn tx5_max_conn_init(&self) -> std::time::Duration {
-            std::time::Duration::from_secs(self.tx5_max_conn_init_s as u64)
         }
 
         /// get the tx5_ban_time_s param as a Duration.
@@ -333,3 +363,258 @@ pub mod tuning_params_struct {
 /// We don't want to clone these tuning params over-and-over.
 /// They should normally be passed around as an Arc.
 pub type KitsuneP2pTuningParams = std::sync::Arc<tuning_params_struct::KitsuneP2pTuningParams>;
+
+/// Configure the kitsune actor.
+#[non_exhaustive]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct KitsuneP2pConfig {
+    /// List of sub-transports to be included in this pool
+    pub transport_pool: Vec<TransportConfig>,
+
+    /// The service used for peers to discover each before they are peers.
+    pub bootstrap_service: Option<Url2>,
+
+    /// Network tuning parameters. These are managed loosely,
+    /// as they are subject to change. If you specify a tuning parameter
+    /// that no longer exists, or a value that does not parse,
+    /// a warning will be printed in the tracing log.
+    #[serde(default)]
+    pub tuning_params: KitsuneP2pTuningParams,
+
+    /// The network used for connecting to other peers
+    pub network_type: NetworkType,
+
+    /// All tracing logs from kitsune tasks will be instrumented to contain this string,
+    /// so that logs from multiple instances in the same process can be disambiguated.
+    #[serde(default)]
+    pub tracing_scope: Option<String>,
+}
+
+impl Default for KitsuneP2pConfig {
+    fn default() -> Self {
+        Self {
+            transport_pool: Vec::new(),
+            bootstrap_service: None,
+            tuning_params: KitsuneP2pTuningParams::default(),
+            network_type: NetworkType::QuicBootstrap,
+            tracing_scope: None,
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
+    match bind_to {
+        Some(bind_to) => bind_to.clone().into(),
+        None => TxUrl::from_str_panicking("kitsune-quic://0.0.0.0:0"),
+    }
+}
+
+impl KitsuneP2pConfig {
+    #[allow(dead_code)] // because of feature flipping
+    pub fn is_tx2(&self) -> bool {
+        #[cfg(feature = "tx2")]
+        {
+            #[cfg(feature = "tx5")]
+            {
+                if let Some(t) = self.transport_pool.first() {
+                    !matches!(t, TransportConfig::WebRTC { .. })
+                } else {
+                    true
+                }
+            }
+            #[cfg(not(feature = "tx5"))]
+            {
+                true
+            }
+        }
+        #[cfg(not(feature = "tx2"))]
+        {
+            false
+        }
+    }
+
+    /// This config is making use of tx5 transport
+    #[allow(dead_code)] // because of feature flipping
+    pub fn is_tx5(&self) -> bool {
+        #[cfg(feature = "tx5")]
+        {
+            if let Some(t) = self.transport_pool.first() {
+                return matches!(t, TransportConfig::WebRTC { .. });
+            }
+        }
+        false
+    }
+
+    /// `tx2` is currently designed to use exactly one proxy wrapped transport,
+    /// so convert a bunch of the options from the previous transport
+    /// paradigm into that pattern.
+    #[cfg(feature = "tx2")]
+    pub fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
+        use KitsuneP2pTx2ProxyConfig::*;
+        match self.transport_pool.first() {
+            Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
+                backend: KitsuneP2pTx2Backend::Mock {
+                    mock_network: mock_network.0.clone(),
+                },
+                use_proxy: NoProxy,
+            }),
+            #[cfg(feature = "tx5")]
+            Some(TransportConfig::WebRTC { .. }) => {
+                Err("Cannot convert tx5 config into tx2".into())
+            }
+            None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
+                backend: KitsuneP2pTx2Backend::Mem,
+                use_proxy: NoProxy,
+            }),
+        }
+    }
+
+    /// Return a copy with the tuning params altered
+    pub fn tune(
+        mut self,
+        f: impl Fn(
+            tuning_params_struct::KitsuneP2pTuningParams,
+        ) -> tuning_params_struct::KitsuneP2pTuningParams,
+    ) -> Self {
+        let tp = (*self.tuning_params).clone();
+        self.tuning_params = std::sync::Arc::new(f(tp));
+        self
+    }
+}
+
+/// Configure the network bindings for underlying kitsune transports.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TransportConfig {
+    /// A transport that uses the local memory transport protocol
+    /// (this is mainly for testing)
+    #[cfg(feature = "tx2")]
+    Mem {},
+    /// A mock network for testing
+    #[cfg(feature = "tx2")]
+    #[serde(skip)]
+    Mock {
+        /// The adaptor for mocking the network
+        mock_network: AdapterFactoryMock,
+    },
+    /// Configure to use Tx5 WebRTC for kitsune networking.
+    #[cfg(feature = "tx5")]
+    #[serde(rename = "webrtc", alias = "web_r_t_c", alias = "web_rtc")]
+    WebRTC {
+        /// The url of the signal server to connect to for addressability.
+        signal_url: String,
+    },
+}
+
+pub enum KitsuneP2pTx2Backend {
+    #[allow(dead_code)]
+    #[cfg(feature = "tx2")]
+    Mem,
+    //#[cfg(feature = "tx2")]
+    //Quic { bind_to: TxUrl },
+    #[allow(dead_code)]
+    #[cfg(feature = "tx2")]
+    Mock { mock_network: AdapterFactory },
+}
+
+#[cfg(feature = "tx2")]
+pub enum KitsuneP2pTx2ProxyConfig {
+    NoProxy,
+    #[allow(dead_code)]
+    Specific(TxUrl),
+    #[allow(dead_code)]
+    Bootstrap {
+        #[allow(dead_code)]
+        bootstrap_url: TxUrl,
+        fallback_proxy_url: Option<TxUrl>,
+    },
+}
+
+#[cfg(feature = "tx2")]
+pub struct KitsuneP2pTx2Config {
+    pub backend: KitsuneP2pTx2Backend,
+    pub use_proxy: KitsuneP2pTx2ProxyConfig,
+}
+
+/// Proxy configuration options
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[cfg(feature = "tx2")]
+pub enum ProxyConfig {
+    /// We want to be hosted at a remote proxy location.
+    RemoteProxyClient {
+        /// The remote proxy url to be hosted at
+        proxy_url: Url2,
+    },
+
+    /// We want to be hosted at a remote proxy location.
+    /// We'd like to fetch a proxy list from a bootstrap server,
+    /// with an optional fallback to a specific proxy.
+    RemoteProxyClientFromBootstrap {
+        /// The bootstrap server from which to fetch the proxy_list
+        bootstrap_url: Url2,
+
+        /// The optional fallback specific proxy server
+        fallback_proxy_url: Option<Url2>,
+    },
+
+    /// We want to be a proxy server for others.
+    /// (We can also deny all proxy requests for something in-between.)
+    LocalProxyServer {
+        /// Accept proxy request options
+        /// Default: None = reject all proxy requests
+        proxy_accept_config: Option<ProxyAcceptConfig>,
+    },
+}
+
+/// Whether we are willing to proxy on behalf of others
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+#[cfg(feature = "tx2")]
+pub enum ProxyAcceptConfig {
+    /// We will accept all requests to proxy for remotes
+    AcceptAll,
+
+    /// We will reject all requests to proxy for remotes
+    RejectAll,
+}
+
+/// Method for connecting to other peers and broadcasting our AgentInfo
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkType {
+    /// Via bootstrap server to the WAN
+    // MAYBE: Remove the "Quic" from this?
+    QuicBootstrap,
+    /// Via MDNS to the LAN
+    // MAYBE: Remove the "Quic" from this?
+    QuicMdns,
+}
+
+#[cfg(feature = "tx2")]
+#[derive(Clone)]
+/// A simple wrapper around the [`AdaptorFactory`](tx2::tx2_adapter::AdapterFactory)
+/// to allow implementing Debug and PartialEq.
+pub struct AdapterFactoryMock(pub AdapterFactory);
+
+#[cfg(feature = "tx2")]
+impl std::fmt::Debug for AdapterFactoryMock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AdapterFactoryMock").finish()
+    }
+}
+
+#[cfg(feature = "tx2")]
+impl std::cmp::PartialEq for AdapterFactoryMock {
+    fn eq(&self, _: &Self) -> bool {
+        unimplemented!()
+    }
+}
+
+#[cfg(feature = "tx2")]
+impl From<AdapterFactory> for AdapterFactoryMock {
+    fn from(adaptor_factory: AdapterFactory) -> Self {
+        Self(adaptor_factory)
+    }
+}

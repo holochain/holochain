@@ -1,7 +1,7 @@
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::CellError;
 use crate::conductor::ConductorHandle;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use crate::core::SourceChainError;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_names;
@@ -39,13 +39,9 @@ async fn direct_validation_test() {
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-    let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let (_tmpdir, _app_api, handle) = setup_app_with_names(
-        vec![("test_app", vec![(alice_installed_cell, None)])],
-        vec![dna_file.clone()],
-    )
-    .await;
+    let (_tmpdir, _app_api, handle) =
+        setup_app_with_names(alice_agent_id, vec![("test_app", vec![(dna_file, None)])]).await;
 
     run_test(alice_cell_id, handle.clone()).await;
 

@@ -2,8 +2,9 @@ use clap::Parser;
 use tokio::io::AsyncWriteExt;
 use tx5_signal_srv::{Error, Result};
 
-#[derive(Debug, Parser)]
 /// Helper for running local Holochain bootstrap and WebRTC signal servers.
+#[derive(Debug, Parser)]
+#[command(version, about)]
 pub struct HcRunLocalServices {
     /// If set, write the bound address list to a new file, separated by
     /// newlines. If the file exists, an error will be returned.
@@ -76,6 +77,29 @@ impl AOut {
 }
 
 impl HcRunLocalServices {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        bootstrap_address_path: Option<std::path::PathBuf>,
+        bootstrap_interface: String,
+        bootstrap_port: u16,
+        disable_bootstrap: bool,
+        signal_address_path: Option<std::path::PathBuf>,
+        signal_interfaces: String,
+        signal_port: u16,
+        disable_signal: bool,
+    ) -> Self {
+        Self {
+            bootstrap_address_path,
+            bootstrap_interface,
+            bootstrap_port,
+            disable_bootstrap,
+            signal_address_path,
+            signal_interfaces,
+            signal_port,
+            disable_signal,
+        }
+    }
+
     pub async fn run(self) {
         if let Err(err) = self.run_err().await {
             eprintln!("run-local-services error");
@@ -114,8 +138,13 @@ impl HcRunLocalServices {
             config.demo = false;
             tracing::info!(?config);
 
-            let (sig_driver, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config)?;
-            task_list.push(sig_driver);
+            let (sig_hnd, addr_list, err_list) =
+                tx5_signal_srv::exec_tx5_signal_srv(config).await?;
+            // there is no real task here... just fake it
+            task_list.push(Box::pin(async move {
+                let _sig_hnd = sig_hnd;
+                std::future::pending().await
+            }));
 
             for err in err_list {
                 println!("# HC SIGNAL - ERROR: {err:?}");

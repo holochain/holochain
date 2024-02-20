@@ -10,9 +10,13 @@ pub struct SweetConductorHandle(pub(crate) ConductorHandle);
 impl SweetConductorHandle {
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
     /// No capability is necessary, since the authorship capability is automatically granted.
-    pub async fn call<I, O, F>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O
+    pub async fn call<I, O>(
+        &self,
+        zome: &SweetZome,
+        fn_name: impl Into<FunctionName>,
+        payload: I,
+    ) -> O
     where
-        FunctionName: From<F>,
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
@@ -20,14 +24,13 @@ impl SweetConductorHandle {
     }
 
     /// Like `call`, but without the unwrap
-    pub async fn call_fallible<I, O, F>(
+    pub async fn call_fallible<I, O>(
         &self,
         zome: &SweetZome,
-        fn_name: F,
+        fn_name: impl Into<FunctionName>,
         payload: I,
     ) -> ConductorApiResult<O>
     where
-        FunctionName: From<F>,
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
@@ -36,16 +39,15 @@ impl SweetConductorHandle {
     }
     /// Make a zome call to a Cell, as if some other Cell were the caller. More general case.
     /// Can optionally provide a capability.
-    pub async fn call_from<I, O, F>(
+    pub async fn call_from<I, O>(
         &self,
         provenance: &AgentPubKey,
         cap_secret: Option<CapSecret>,
         zome: &SweetZome,
-        fn_name: F,
+        fn_name: impl Into<FunctionName>,
         payload: I,
     ) -> O
     where
-        FunctionName: From<F>,
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
@@ -55,16 +57,15 @@ impl SweetConductorHandle {
     }
 
     /// Like `call_from`, but without the unwrap
-    pub async fn call_from_fallible<I, O, F>(
+    pub async fn call_from_fallible<I, O>(
         &self,
         provenance: &AgentPubKey,
         cap_secret: Option<CapSecret>,
         zome: &SweetZome,
-        fn_name: F,
+        fn_name: impl Into<FunctionName>,
         payload: I,
     ) -> ConductorApiResult<O>
     where
-        FunctionName: From<F>,
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {

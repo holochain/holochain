@@ -20,7 +20,7 @@ pub type ResourceMap = BTreeMap<PathBuf, ResourceBytes>;
 ///
 /// The manifest may describe locations of resources not included in the Bundle.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Bundle<M>
 where
     M: Manifest,
@@ -206,7 +206,7 @@ where
 /// The manifest may be of any format. This is useful for deserializing a bundle of
 /// an outdated format, so that it may be modified to fit the supported format.
 #[derive(Debug, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct RawBundle<M> {
     /// The manifest describing the resources that compose this bundle.
     #[serde(bound(deserialize = "M: DeserializeOwned"))]

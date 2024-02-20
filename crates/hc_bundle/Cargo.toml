@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_bundle"
-version = "0.3.0-beta-dev.5"
+version = "0.3.0-beta-dev.34"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,19 +19,20 @@ name = "hc-dna"
 path = "src/bin/hc-dna.rs"
 
 [dependencies]
-holochain_wasmer_host = "=0.0.84"
+holochain_wasmer_host = { workspace = true }
+wasmer = { workspace = true }
 futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = [ "derive" ] }
-holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.2.0"}
-holochain_serialized_bytes = "=0.0.51"
-holochain_types = { version = "^0.3.0-beta-dev.5", path = "../holochain_types" }
-mr_bundle = {version = "^0.2.0", path = "../mr_bundle"}
+holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.3.0-beta-dev.4"}
+holochain_serialized_bytes = { workspace = true }
+holochain_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_types" }
+mr_bundle = {version = "^0.3.0-beta-dev.5", path = "../mr_bundle"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_yaml = "0.9"
 thiserror = "1.0.22"
-tracing = "0.1"
+tracing = { workspace = true }
 tokio = { version = "1.27", features = [ "full" ] }
 
 [dev-dependencies]
@@ -39,7 +40,7 @@ assert_cmd = "1.0"
 matches = "0.1"
 predicates = "1.0"
 tempfile = "3"
-serde_json = "1.0"
+serde_json = { workspace = true }
 jsonschema = "0.17"
 walkdir = "2"
 

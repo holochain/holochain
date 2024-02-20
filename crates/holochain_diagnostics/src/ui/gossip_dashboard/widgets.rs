@@ -1,5 +1,4 @@
 use holochain::prelude::metrics::PeerAgentHistory;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
 
 use super::*;
 

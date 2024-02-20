@@ -37,7 +37,7 @@ pub enum SourceChainError {
     ChcHeadMoved(String, ChcError),
 
     #[error(transparent)]
-    TimestampError(#[from] holochain_zome_types::TimestampError),
+    TimestampError(#[from] holochain_zome_types::prelude::TimestampError),
 
     #[error(transparent)]
     ScratchError(#[from] ScratchError),

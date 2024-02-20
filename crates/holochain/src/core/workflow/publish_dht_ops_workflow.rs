@@ -23,7 +23,10 @@ use std::time;
 use tracing::*;
 
 mod publish_query;
-pub use publish_query::get_ops_to_publish;
+pub use publish_query::{get_ops_to_publish, num_still_needing_publish};
+
+#[cfg(test)]
+mod unit_tests;
 
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
@@ -42,10 +45,14 @@ pub async fn publish_dht_ops_workflow(
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
+    let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
+
+    if to_publish_count > 0 {
+        info!("publishing {} ops", to_publish_count);
+    }
 
     // Commit to the network
-    tracing::info!("publishing {} ops", to_publish.len());
-    let mut success = Vec::new();
+    let mut success = Vec::with_capacity(to_publish.len());
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
         match network
@@ -63,9 +70,10 @@ pub async fn publish_dht_ops_workflow(
             Err(e) => {
                 // If we get a routing error it means the space hasn't started yet and we should try publishing again.
                 if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
-                    complete = WorkComplete::Incomplete;
+                    // TODO if this doesn't change what is the loop terminate condition?
+                    complete = WorkComplete::Incomplete(None);
                 }
-                tracing::warn!(failed_to_send_publish = ?e);
+                warn!(failed_to_send_publish = ?e);
             }
             Ok(()) => {
                 success.extend(op_hash_list);
@@ -73,16 +81,19 @@ pub async fn publish_dht_ops_workflow(
         }
     }
 
-    tracing::info!("published {} ops", success.len());
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+    if to_publish_count > 0 {
+        info!("published {}/{} ops", success.len(), to_publish_count);
+    }
+
+    let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
     let continue_publish = db
-        .async_commit(move |writer| {
+        .write_async(move |txn| {
             for hash in success {
                 use holochain_p2p::DhtOpHashExt;
                 let hash = DhtOpHash::from_kitsune(hash.data_ref());
-                mutations::set_last_publish_time(writer, &hash, now)?;
+                set_last_publish_time(txn, &hash, now)?;
             }
-            WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
+            WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
         })
         .await?;
 
@@ -93,7 +104,8 @@ pub async fn publish_dht_ops_workflow(
         trigger_self.pause_loop();
     }
 
-    tracing::debug!("committed published ops");
+    debug!("committed published ops");
+
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(complete)
@@ -107,7 +119,7 @@ pub async fn publish_dht_ops_workflow_inner(
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in publish_query::get_ops_to_publish(agent, &db).await? {
+    for (basis, op_hash, op) in get_ops_to_publish(agent, &db).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -132,12 +144,10 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_state::mutations;
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
-    use holochain_types::prelude::*;
-    use rusqlite::Transaction;
     use std::collections::HashMap;
-    use std::convert::TryInto;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
@@ -166,23 +176,26 @@ mod tests {
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
-        db.conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
+        db.write_async({
+            let query_author = author.clone();
+
+            move |txn| -> StateMutationResult<()> {
                 for _ in 0..num_hash {
                     // Create data for op
                     let sig = sig_fixt.next().unwrap();
                     let mut link_add = link_add_fixt.next().unwrap();
-                    link_add.author = author.clone();
+                    link_add.author = query_author.clone();
                     // Create DhtOp
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
                     mutations::insert_op(txn, &op_hashed)?;
                 }
-                StateMutationResult::Ok(())
-            })
-            .unwrap();
+                Ok(())
+            }
+        })
+        .await
+        .unwrap();
 
         // Create cell data
         let dna = fixt!(DnaHash);
@@ -294,65 +307,24 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                fresh_reader_test!(db, |txn: Transaction| {
-                    let unpublished_ops: bool = txn
-                        .query_row(
-                            "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
-                            [],
-                            |row| row.get(0),
-                        )
-                        .unwrap();
+                db.read_async(move |txn| -> DatabaseResult<()> {
+                    let unpublished_ops: bool = txn.query_row(
+                        "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
+                        [],
+                        |row| row.get(0),
+                    )?;
                     assert!(!unpublished_ops);
+
+                    Ok(())
                 })
+                .await
+                .unwrap()
             };
 
             // Shutdown
             tokio::time::timeout(Duration::from_secs(10), check)
                 .await
                 .ok();
-        });
-    }
-
-    /// There is a test that shows that if the receipt is set to complete
-    /// for a DHTOp we don't re-publish it
-    #[test_case(1, 1)]
-    #[test_case(1, 10)]
-    #[test_case(1, 100)]
-    #[test_case(10, 1)]
-    #[test_case(10, 10)]
-    #[test_case(10, 100)]
-    #[test_case(100, 1)]
-    #[test_case(100, 10)]
-    #[test_case(100, 100)]
-    fn test_no_republish(num_agents: u32, num_hash: u32) {
-        tokio_helper::block_forever_on(async {
-            holochain_trace::test_run().ok();
-
-            // Create test db
-            let test_db = test_authored_db();
-            let db = test_db.to_db();
-
-            // Setup
-            let (_network, dna_network, author, _, _) =
-                setup(db.clone(), num_agents, num_hash, true).await;
-
-            // Update the authored to have complete receipts
-            db.conn()
-                .unwrap()
-                .with_commit_test(|txn| {
-                    txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
-                        .unwrap();
-                })
-                .unwrap();
-
-            // Call the workflow
-            call_workflow(db.clone().into(), dna_network, author).await;
-
-            // If we can wait a while without receiving any publish, we have succeeded
-            tokio::time::sleep(Duration::from_millis(
-                std::cmp::min(50, std::cmp::max(2000, 10 * num_agents * num_hash)).into(),
-            ))
-            .await;
         });
     }
 
@@ -363,10 +335,10 @@ mod tests {
     /// - No StoreEntry
     /// - This workflow does not have access to private entries
     /// - Add / Remove links: Currently publish all.
-    /// ## Explication
+    /// ## Explanation
     /// This test is a little big so a quick run down:
     /// 1. All ops that can contain entries are created with entries (StoreRecord, StoreEntry and RegisterUpdatedContent)
-    /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
+    /// 2. Then we create identical versions of these ops without the entries (set to None) (except StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
@@ -383,7 +355,7 @@ mod tests {
 
                 // Create test db
                 let test_db = test_authored_db();
-                let keystore = holochain_state::test_utils::test_keystore();
+                let keystore = holochain_keystore::test_keystore();
                 let dht_db = test_dht_db();
                 let db = test_db.to_db();
 
@@ -420,10 +392,9 @@ mod tests {
                 fake_genesis(db.clone(), dht_db.to_db(), keystore.clone())
                     .await
                     .unwrap();
-                db.conn()
-                    .unwrap()
-                    .execute("UPDATE DhtOp SET receipts_complete = 1", [])
-                    .unwrap();
+                db.write_async(move |txn| -> DatabaseResult<usize> {
+                    Ok(txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])?)
+                }).await.unwrap();
                 let author = fake_agent_pubkey_1();
 
                 // Put data in records
@@ -465,15 +436,13 @@ mod tests {
                     .unwrap();
 
                 source_chain.flush(&dna_network).await.unwrap();
-                let (entry_create_action, entry_update_action) = db
-                    .conn()
-                    .unwrap()
-                    .with_commit_test(|writer| {
+                let (entry_create_action, entry_update_action) = db.write_async(move |writer| -> StateQueryResult<(SignedActionHashed, SignedActionHashed)> {
                         let store = Txn::from(writer);
                         let ech = store.get_action(&original_action_address).unwrap().unwrap();
                         let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
-                        (ech, euh)
+                        Ok((ech, euh))
                     })
+                    .await
                     .unwrap();
 
                 // Gather the expected op hashes, ops and basis

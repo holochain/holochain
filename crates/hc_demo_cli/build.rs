@@ -17,9 +17,20 @@ fn main() {
 }
 
 #[cfg(build_wasm)]
+fn find_target_dir() -> std::path::PathBuf {
+    let mut target_dir =
+        std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("failed getting out_dir"));
+    target_dir.pop(); // "out"
+    target_dir.pop(); // "crate-[hash]"
+    target_dir.pop(); // "build"
+    target_dir.pop(); // "debug"
+    println!("cargo:warning=TARGET_DIR: {target_dir:?}");
+    target_dir
+}
+
+#[cfg(build_wasm)]
 fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str) {
-    let target_dir =
-        std::env::var_os("CARGO_TARGET_DIR").expect("failed to locate cargo target directory");
+    let target_dir = find_target_dir();
     let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").unwrap();
 
     let mut cmd = std::process::Command::new(cargo_cmd);

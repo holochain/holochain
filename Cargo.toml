@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/aitia",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk",
@@ -20,18 +21,26 @@ members = [
   "crates/holochain_keystore",
   "crates/holochain_sqlite",
   "crates/holochain_state",
+  "crates/holochain_state_types",
   "crates/holochain_sqlite",
   "crates/holochain_trace",
   "crates/holochain_websocket",
   "crates/holochain_util",
+  "crates/holochain_metrics",
+  "crates/holochain_nonce",
+  "crates/holochain_secure_primitive",
+  "crates/holochain_conductor_services",
 
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_sleuth",
   "crates/hc_run_local_services",
   "crates/hc_demo_cli",
+  "crates/holochain_terminal",
 
   "crates/kitsune_p2p/bootstrap",
+  "crates/kitsune_p2p/bootstrap_client",
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",
   "crates/kitsune_p2p/fetch",
@@ -53,6 +62,32 @@ exclude = ["crates/release-automation"]
 
 resolver = "2"
 
+[workspace.dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+derive_more = "0.99"
+futures = "0.3"
+holochain_wasmer_common = "=0.0.92"
+holochain_wasmer_guest = "=0.0.92"
+holochain_wasmer_host = "=0.0.92"
+holochain_serialized_bytes = "=0.0.53"
+mockall = "0.11"
+must_future = "0.1"
+lair_keystore = { version = "0.4.3", default-features = false }
+lair_keystore_api = "=0.4.3"
+rmp-serde = "=0.15.5"
+serde = "1.0"
+serde_json = "1.0"
+sodoken = "=0.0.10"
+thiserror = "1.0"
+tx5-signal-srv = "=0.0.7-alpha"
+url2 = "0.0.6"
+wasmer = "=4.2.4"
+wasmer-middlewares = "=4.2.4"
+uuid = { version = "0.7", features = [ "serde", "v4" ] }
+tokio = { version = "1.27", features = ["full"] }
+tracing = "0.1"
+
 [profile.fast-test]
 inherits = "dev"
 debug = 1
@@ -65,20 +100,32 @@ overflow-checks = false
 incremental = false
 codegen-units = 16
 
+[profile.release]
+opt-level = "z"
+lto = true
+
+
 [patch.crates-io]
-# contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "main" }
+# task-motel = { path = "../task-motel" }
+# proptest = { path = "/home/michael/gitfork/proptest/proptest" }
+# proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
+
+# influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
+# influxive-otel = { path = "../influxive/crates/influxive-otel" }
+# contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
 # tx5 = { path = "../tx5/crates/tx5" }
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }
 # tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
-# tx5 = { git = "https://github.com/holochain/tx5.git", rev = "954c8b901993b8a60deaca99528373f5eb42fb82" }
-# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "954c8b901993b8a60deaca99528373f5eb42fb82" }
-# tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "954c8b901993b8a60deaca99528373f5eb42fb82" }
+# tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
+# tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
+# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
+# tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
-# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
+# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
+# holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
+# holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
+# holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 #ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }

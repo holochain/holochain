@@ -1,44 +1,23 @@
 { self, lib, inputs, ... } @ flake: {
   perSystem = { config, self', inputs', pkgs, system, ... }:
     let
-      crate2nixTools = import "${inputs.crate2nix}/tools.nix" {
-        inherit pkgs;
-      };
-      customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
-        defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-          tx5-go-pion-sys = _: { nativeBuildInputs = with pkgs; [ go ]; };
-          tx5-go-pion-turn = _: { nativeBuildInputs = with pkgs; [ go ]; };
-          holochain = attrs: {
-            codegenUnits = 8;
-          };
-        };
-      };
-      generated = crate2nixTools.generatedCargoNix {
+      cargoNix = config.rustHelper.mkCargoNix {
         name = "holochain-generated-crate2nix";
         src = flake.config.srcCleanedHolochain;
-      };
-      cargoNix = pkgs.callPackage "${generated}/default.nix" {
-        buildRustCrateForPkgs = customBuildRustCrateForPkgs;
-      };
-
-      # `nix flake show` is incompatible with IFD by default
-      # This works around the issue by making the name of the package
-      #   discoverable without IFD.
-      mkNoIfdPackage = name: pkg: {
-        inherit name;
-        inherit (pkg) drvPath outPath;
-        type = "derivation";
-        orig = pkg;
+        pkgs = config.rustHelper.mkRustPkgs {
+          track = "stable";
+          version = "1.75.0";
+        };
       };
     in
     {
       packages = {
         build-holochain-build-crates-standalone =
-          mkNoIfdPackage "holochain" cargoNix.allWorkspaceMembers;
+          config.rustHelper.mkNoIfdPackage "holochain" cargoNix.allWorkspaceMembers;
 
         # exposed just for manual debugging
         holochain-crate2nix =
-          mkNoIfdPackage "holochain" cargoNix.workspaceMembers.holochain.build;
+          config.rustHelper.mkNoIfdPackage "holochain" cargoNix.workspaceMembers.holochain.build;
       };
     };
 }

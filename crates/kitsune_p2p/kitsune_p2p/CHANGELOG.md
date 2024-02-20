@@ -7,6 +7,82 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.31
+
+- *BREAKING* Updates tx5 to a version using new endpoint state logic and a new incompatible protocol. [\#3287](https://github.com/holochain/holochain/pull/3287)
+
+## 0.3.0-beta-dev.30
+
+- Performance improvement by reducing the number of `query_agents` calls used by Kitsune. The host (Holochain conductor) responds to these queries using an in-memory store which is fast but all the queries go through the `ghost_actor` so making an excessive number of calls for the same information reduces the availability of the host for other calls. For a test which sets up 10 spaces (equivalent to a happ running on the host) this change takes the number of host queries for agent info from ~13k to ~1.4k. The removed calls were largely redundant since Kitsune refreshes agent info every 1s anyway so it shouldn’t need to make many further calls between refreshes.
+
+- Minor optimisation when delegate broadcasting ops, the delegated broadcasts will now avoid connecting back to the source. There is currently no way to prevent other agents that were delegated to from connecting to each other but this change takes care of one case.
+
+## 0.3.0-beta-dev.29
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
+
+## 0.3.0-beta-dev.25
+
+## 0.3.0-beta-dev.24
+
+## 0.3.0-beta-dev.23
+
+- Gossip send failures and target expired events are now logged as warnings rather than errors, and have additional text for clarity. [\#2974](https://github.com/holochain/holochain/pull/2974)
+
+## 0.3.0-beta-dev.22
+
+- Update to a tx5 version that includes go code that is statically linked for all platform that support it. Windows and Android will remain dynamically linked. [\#2967](https://github.com/holochain/holochain/pull/2967)
+- Change the license from Apache-2.0 to CAL-1.0.
+- Fixed spammy “Recorded initiate|accept with current round already set” warning. [\#3060](https://github.com/holochain/holochain/pull/3060)
+
+## 0.3.0-beta-dev.21
+
+- There were some places where parsing an invalid URL would crash kitsune. This is now fixed. [\#2689](https://github.com/holochain/holochain/pull/2689)
+
+## 0.3.0-beta-dev.20
+
+- Augment network stats with holochain agent info correlation [\#2953](https://github.com/holochain/holochain/pull/2953)
+- Adjust bootstrap max\_delay from 60 minutes -\> 5 minutes [\#2948](https://github.com/holochain/holochain/pull/2948)
+
+## 0.3.0-beta-dev.19
+
+## 0.3.0-beta-dev.18
+
+## 0.3.0-beta-dev.17
+
+- Add additional configuration options to network\_tuning for setting the allowed ephemeral port range for tx5 connections: tx5\_min\_ephemeral\_udp\_port and tx5\_max\_ephemeral\_udp\_port
+
+## 0.3.0-beta-dev.16
+
+## 0.3.0-beta-dev.15
+
+## 0.3.0-beta-dev.14
+
+- Resolves several cases where the meta net task would not stop on fatal errors and would not correctly handle other errors [\#2762](https://github.com/holochain/holochain/pull/2762)
+- Resolves an issue where a `FetchOp` could skip processing op hashes if getting a topology for the space from the host failed [\#2737](https://github.com/holochain/holochain/pull/2737)
+- Adds a warning log if incoming op data pushes are dropped due to a hashing failure on the host [\#2737](https://github.com/holochain/holochain/pull/2737)
+- Fixes an issue where sending an unexpected request payload would cause the process to crash [\#2737](https://github.com/holochain/holochain/pull/2737)
+
+## 0.3.0-beta-dev.13
+
+## 0.3.0-beta-dev.12
+
+## 0.3.0-beta-dev.11
+
+## 0.3.0-beta-dev.10
+
+## 0.3.0-beta-dev.9
+
+## 0.3.0-beta-dev.8
+
+## 0.3.0-beta-dev.7
+
+## 0.3.0-beta-dev.6
+
 ## 0.3.0-beta-dev.5
 
 ## 0.3.0-beta-dev.4

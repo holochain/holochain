@@ -1,8 +1,11 @@
 use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
+use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
+use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
@@ -23,7 +26,7 @@ pub struct ConductorBuilder {
 }
 
 impl ConductorBuilder {
-    /// Default ConductorBuilder
+    /// Default ConductorBuilder.
     pub fn new() -> Self {
         Self::default()
     }
@@ -48,9 +51,15 @@ impl ConductorBuilder {
         self
     }
 
+    /// Set the data root path for the conductor that will be built.
+    pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
+        self.config.data_root_path = Some(data_root_path);
+        self
+    }
+
     /// Initialize a "production" Conductor
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
-        tracing::info!(?self.config);
+        tracing::debug!(?self.config);
 
         let keystore = if let Some(keystore) = self.keystore {
             keystore
@@ -73,25 +82,50 @@ impl ConductorBuilder {
                 }
             };
             match &self.config.keystore {
-                KeystoreConfig::DangerTestKeystore => spawn_test_keystore().await?,
+                KeystoreConfig::DangerTestKeystore => {
+                    holochain_keystore::spawn_test_keystore().await?
+                }
                 KeystoreConfig::LairServer { connection_url } => {
                     warn_no_encryption();
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore(connection_url.clone(), passphrase).await?
+                    match spawn_lair_keystore(connection_url.clone(), passphrase).await {
+                        Ok(keystore) => keystore,
+                        Err(err) => {
+                            tracing::error!(?err, "Failed to spawn Lair keystore");
+                            return Err(err.into());
+                        }
+                    }
                 }
                 KeystoreConfig::LairServerInProc { lair_root } => {
                     warn_no_encryption();
-                    let mut keystore_config_path = lair_root.clone().unwrap_or_else(|| {
-                        let mut p: std::path::PathBuf = self.config.environment_path.clone().into();
-                        p.push("keystore");
-                        p
-                    });
-                    keystore_config_path.push("lair-keystore-config.yaml");
+
+                    let keystore_root_path: KeystorePath = match lair_root {
+                        Some(lair_root) => lair_root.clone(),
+                        None => self
+                            .config
+                            .data_root_path
+                            .as_ref()
+                            .ok_or(ConductorError::NoDataRootPath)?
+                            .clone()
+                            .try_into()?,
+                    };
+                    let keystore_config_path = keystore_root_path
+                        .as_ref()
+                        .join("lair-keystore-config.yaml");
                     let passphrase = get_passphrase()?;
-                    spawn_lair_keystore_in_proc(keystore_config_path, passphrase).await?
+
+                    match spawn_lair_keystore_in_proc(&keystore_config_path, passphrase).await {
+                        Ok(keystore) => keystore,
+                        Err(err) => {
+                            tracing::error!(?err, "Failed to spawn Lair keystore in process");
+                            return Err(err.into());
+                        }
+                    }
                 }
             }
         };
+
+        info!("Conductor startup: passphrase obtained.");
 
         let Self {
             ribosome_store,
@@ -99,9 +133,11 @@ impl ConductorBuilder {
             ..
         } = self;
 
+        let config = Arc::new(config);
+
         let ribosome_store = RwShare::new(ribosome_store);
 
-        let spaces = Spaces::new(&config)?;
+        let spaces = Spaces::new(config.clone())?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -110,7 +146,7 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone().unwrap_or_default();
+        let network_config = config.network.clone();
         let (cert_digest, cert, cert_priv_key) = keystore
             .get_or_create_tls_cert_by_tag(tag.0.clone())
             .await?;
@@ -120,12 +156,15 @@ impl ConductorBuilder {
                 cert_priv_key,
                 cert_digest,
             };
+
+        info!("Conductor startup: TLS cert created.");
+
         let strat = network_config.tuning_params.to_arq_strat();
 
         let host = KitsuneHostImpl::new(
             spaces.clone(),
+            config.clone(),
             ribosome_store.clone(),
-            network_config.tuning_params.clone(),
             strat,
             Some(tag_ed),
             Some(keystore.lair_client()),
@@ -139,6 +178,8 @@ impl ConductorBuilder {
                     return Err(err.into());
                 }
             };
+
+        info!("Conductor startup: networking started.");
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -190,11 +231,14 @@ impl ConductorBuilder {
         conductor_handle: ConductorHandle,
         receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         stop: StopReceiver,
+        duration_metric: PostCommitDurationMetric,
     ) {
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
         stop.fuse_with(receiver_stream)
             .for_each_concurrent(POST_COMMIT_CONCURRENT_LIMIT, move |post_commit_args| {
+                let start = Instant::now();
                 let conductor_handle = conductor_handle.clone();
+                let duration_metric = duration_metric.clone();
                 async move {
                     let PostCommitArgs {
                         host_access,
@@ -217,6 +261,20 @@ impl ConductorBuilder {
                             tracing::error!(?e);
                         }
                     }
+
+                    duration_metric.record(
+                        start.elapsed().as_secs_f64(),
+                        &[
+                            opentelemetry_api::KeyValue::new(
+                                "dna_hash",
+                                format!("{:?}", cell_id.dna_hash()),
+                            ),
+                            opentelemetry_api::KeyValue::new(
+                                "agent",
+                                format!("{:?}", cell_id.agent_pubkey()),
+                            ),
+                        ],
+                    );
                 }
             })
             .await;
@@ -224,7 +282,7 @@ impl ConductorBuilder {
 
     pub(crate) async fn finish(
         conductor: ConductorHandle,
-        conductor_config: ConductorConfig,
+        config: Arc<ConductorConfig>,
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
@@ -235,15 +293,26 @@ impl ConductorBuilder {
             .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
             .await;
 
+        info!("Conductor startup: scheduler task started.");
+
         tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
+
+        info!("Conductor startup: p2p event task started.");
 
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
+        let post_commit_duration_metric = create_post_commit_duration_metric();
         tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
-            Self::spawn_post_commit(conductor2, post_commit_receiver, stop).map(Ok)
+            Self::spawn_post_commit(
+                conductor2,
+                post_commit_receiver,
+                stop,
+                post_commit_duration_metric,
+            )
+            .map(Ok)
         });
 
-        let configs = conductor_config.admin_interfaces.unwrap_or_default();
+        let configs = config.admin_interfaces.clone().unwrap_or_default();
         let cell_startup_errors = conductor
             .clone()
             .initialize_conductor(outcome_receiver, configs)
@@ -291,17 +360,13 @@ impl ConductorBuilder {
 
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
-    pub async fn test(
-        mut self,
-        env_path: &std::path::Path,
-        extra_dnas: &[DnaFile],
-    ) -> ConductorResult<ConductorHandle> {
+    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
         let keystore = self
             .keystore
-            .unwrap_or_else(holochain_types::prelude::test_keystore);
-        self.config.environment_path = env_path.to_path_buf().into();
+            .unwrap_or_else(holochain_keystore::test_keystore);
 
-        let spaces = Spaces::new(&self.config)?;
+        let config = Arc::new(self.config);
+        let spaces = Spaces::new(config.clone())?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -310,15 +375,14 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = self.config.network.clone().unwrap_or_default();
-        let tuning_params = network_config.tuning_params.clone();
-        let strat = tuning_params.to_arq_strat();
+        let network_config = config.network.clone();
+        let strat = network_config.tuning_params.to_arq_strat();
 
         let ribosome_store = RwShare::new(self.ribosome_store);
         let host = KitsuneHostImpl::new(
             spaces.clone(),
+            config.clone(),
             ribosome_store.clone(),
-            tuning_params,
             strat,
             Some(tag_ed),
             Some(keystore.lair_client()),
@@ -334,7 +398,7 @@ impl ConductorBuilder {
         let (outcome_tx, outcome_rx) = futures::channel::mpsc::channel(8);
 
         let conductor = Conductor::new(
-            self.config.clone(),
+            config.clone(),
             ribosome_store,
             keystore,
             holochain_p2p,
@@ -361,7 +425,7 @@ impl ConductorBuilder {
 
         Self::finish(
             handle,
-            self.config,
+            config,
             p2p_evt,
             post_commit_receiver,
             outcome_rx,

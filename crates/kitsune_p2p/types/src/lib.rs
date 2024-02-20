@@ -14,6 +14,11 @@ pub mod dependencies {
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;
+
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest;
+    #[cfg(feature = "fuzzing")]
+    pub use ::proptest_derive;
 }
 
 /// Typedef for result of `proc_count_now()`.
@@ -88,13 +93,13 @@ impl CertDigestExt for CertDigest {
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
-impl From<Tx2Cert> for Arc<[u8; 32]> {
+impl From<Tx2Cert> for bin_types::NodeCert {
     fn from(f: Tx2Cert) -> Self {
-        f.0 .0 .0.clone()
+        f.0 .0 .0.clone().into()
     }
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self::from(u.bytes(32)?.to_vec()))
@@ -142,7 +147,7 @@ impl Eq for Tx2Cert {}
 
 impl PartialOrd for Tx2Cert {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0 .0.partial_cmp(&other.0 .0)
+        Some(self.cmp(other))
     }
 }
 
@@ -198,7 +203,7 @@ impl From<Arc<Vec<u8>>> for Tx2Cert {
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(*c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(*c);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -226,6 +231,7 @@ impl From<&Tx2Cert> for CertDigest {
     }
 }
 
+use base64::Engine;
 use config::KitsuneP2pTuningParams;
 use std::sync::Arc;
 
@@ -248,6 +254,11 @@ pub enum KitsuneErrorKind {
     /// The operation is unauthorized by the host.
     #[error("Unauthorized")]
     Unauthorized,
+
+    /// Bad external input.
+    /// Can't proceed, but we don't have to shut everything down, either.
+    #[error("Bad external input. Error: {0}  Input: {1}")]
+    BadInput(Box<dyn std::error::Error + Send + Sync>, String),
 
     /// Unspecified error.
     #[error(transparent)]
@@ -281,6 +292,11 @@ impl KitsuneError {
     /// the "kind" of this KitsuneError
     pub fn kind(&self) -> &KitsuneErrorKind {
         &self.0
+    }
+
+    /// Create a bad_input error
+    pub fn bad_input(e: impl Into<Box<dyn std::error::Error + Send + Sync>>, i: String) -> Self {
+        Self(Arc::new(KitsuneErrorKind::BadInput(e.into(), i)))
     }
 
     /// promote a custom error type to a KitsuneError
@@ -333,18 +349,18 @@ pub use timeout::*;
 
 pub mod agent_info;
 pub mod async_lazy;
-mod auto_stream_select;
-pub use auto_stream_select::*;
 pub mod bootstrap;
 pub mod codec;
 pub mod combinators;
 pub mod config;
 pub mod consistency;
+pub mod fetch_pool;
 pub mod metrics;
-pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+#[cfg(feature = "fixt")]
+pub mod fixt;
 
 #[cfg(feature = "tx2")]
 pub mod tx2;

@@ -1,11 +1,12 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::RibosomeError;
+use wasmer::RuntimeError;
 
 pub fn verify_signature(
     _ribosome: Arc<impl RibosomeT>,
@@ -16,14 +17,16 @@ pub fn verify_signature(
         HostFnAccess {
             keystore_deterministic: Permission::Allow,
             ..
-        } => Ok(tokio_helper::block_forever_on(async move {
+        } => tokio_helper::block_forever_on(async move {
             let VerifySignature {
                 key,
                 signature,
                 data,
             } = input;
-            key.verify_signature_raw(&signature, data.into()).await
-        })),
+            key.verify_signature_raw(&signature, data.into())
+                .await
+                .map_err(|e| wasmer::RuntimeError::user(Box::new(e)))
+        }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),

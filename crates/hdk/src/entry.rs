@@ -63,7 +63,7 @@ where
 /// #[hdk_entry_helper]
 /// pub struct Foo(u32);
 ///
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -102,7 +102,7 @@ where
 /// #[hdk_entry_helper]
 /// struct Foo(u32);
 ///
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -125,7 +125,7 @@ where
 
 /// Update an app entry. Also see [`update`].
 ///
-/// The hash is the [`ActionHash`] of the deleted record, the input is a [`TryInto<CreateInput>`].
+/// The hash is the [`ActionHash`] of the updated record, the input is a [`TryInto<CreateInput>`].
 ///
 /// Updates can reference Records which contain Entry data -- namely, Creates and other Updates -- but
 /// not Deletes or system Records.
@@ -142,7 +142,7 @@ where
 /// #[hdk_entry_helper]
 /// pub struct Foo(u32);
 ///
-/// #[hdk_entry_defs]
+/// #[hdk_entry_types]
 /// pub enum EntryTypes {
 ///    Foo(Foo)
 /// }
@@ -296,10 +296,10 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 
 /// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry.
 /// All the entry def fields are available as dedicated methods on the type and matching From impls
-/// are provided for each. This allows for both Foo::entry_def() and EntryDef::from(Foo::new())
+/// are provided for each. This allows for both Foo::entry_types() and EntryDef::from(Foo::new())
 /// style logic which are both useful in different scenarios.
 ///
-/// For example, the Foo::entry_def() style works best in the entry_defs callback as it doesn't
+/// For example, the Foo::entry_types() style works best in the entry_types callback as it doesn't
 /// require an instantiated Foo in order to get the definition.
 /// On the other hand, EntryDef::from(Foo::new()) works better when e.g. using create_entry() as
 /// an instance of Foo already exists and we need the entry def id back for creates and updates.
@@ -333,7 +333,7 @@ pub fn get_details<H: Into<AnyDhtHash>>(
 /// });
 /// ```
 #[macro_export]
-macro_rules! entry_def {
+macro_rules! entry_type {
     ( $t:ident $def:expr ) => {
         $crate::prelude::hdi::app_entry!($t);
         $crate::prelude::hdi::register_entry!($t $def);

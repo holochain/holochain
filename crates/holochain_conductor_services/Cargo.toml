@@ -1,0 +1,23 @@
+[package]
+name = "holochain_conductor_services"
+version = "0.2.0-beta-dev.7"
+description = "Holochain Conductor Services types"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_conductor_services"
+readme = "README.md"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+mockall = { workspace = true }
+must_future = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+holochain_keystore = { version = "^0.3.0-beta-dev.28", path = "../holochain_keystore" }
+holochain_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_types" }

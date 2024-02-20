@@ -23,9 +23,9 @@
 //!
 #![warn(missing_docs)]
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Instant;
 
 use error::CascadeResult;
 use holo_hash::ActionHash;
@@ -40,6 +40,9 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::mutations::insert_action;
+use holochain_state::mutations::insert_entry;
+use holochain_state::mutations::insert_op_lite;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
@@ -50,22 +53,25 @@ use holochain_state::query::live_record::GetLiveRecordQuery;
 use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
-use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
-use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
-use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
-use mutations::insert_action;
-use mutations::insert_entry;
-use mutations::insert_op_lite;
+use metrics::create_cascade_duration_metric;
+use metrics::CascadeDurationMetric;
 use tracing::*;
+
+#[cfg(feature = "test_utils")]
+use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
+#[cfg(feature = "test_utils")]
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
+#[cfg(feature = "test_utils")]
+use std::collections::HashMap;
 
 pub mod authority;
 pub mod error;
 
 mod agent_activity;
+mod metrics;
 
-#[cfg(any(test, feature = "test_utils"))]
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 /// Get an item from an option
@@ -86,6 +92,7 @@ macro_rules! some_or_return {
 }
 
 /// Marks whether data came from a local store or another node on the network
+#[derive(Debug, Clone)]
 pub enum CascadeSource {
     /// Data came from a local store
     Local,
@@ -104,6 +111,7 @@ pub struct CascadeImpl<Network: Send + Sync = HolochainP2pDna> {
     scratch: Option<SyncScratch>,
     network: Option<Network>,
     private_data: Option<Arc<AgentPubKey>>,
+    duration_metric: &'static CascadeDurationMetric,
 }
 
 impl<Network> CascadeImpl<Network>
@@ -151,7 +159,7 @@ where
     }
 
     /// Add the network and cache to the cascade.
-    pub fn with_network<N: HolochainP2pDnaT + Clone>(
+    pub fn with_network<N: HolochainP2pDnaT>(
         self,
         network: N,
         cache_db: DbWrite<DbKindCache>,
@@ -163,6 +171,7 @@ where
             private_data: self.private_data,
             cache: Some(cache_db),
             network: Some(network),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 }
@@ -177,6 +186,7 @@ impl CascadeImpl<HolochainP2pDna> {
             cache: None,
             scratch: None,
             private_data: None,
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 
@@ -204,6 +214,7 @@ impl CascadeImpl<HolochainP2pDna> {
             private_data,
             scratch,
             network: Some(network),
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 
@@ -222,13 +233,14 @@ impl CascadeImpl<HolochainP2pDna> {
             scratch,
             network: None,
             private_data: author,
+            duration_metric: create_cascade_duration_metric(),
         }
     }
 }
 
 /// TODO
 #[async_trait::async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait Cascade {
     /// Retrieve [`Entry`] either locally or from an authority.
     /// Data might not have been validated yet by the authority.
@@ -368,6 +380,7 @@ impl<Network> CascadeImpl<Network>
 where
     Network: HolochainP2pDnaT + Clone + 'static + Send,
 {
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
             op_light,
@@ -388,6 +401,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
         let RenderedOps { ops, entry } = ops;
         if let Some(entry) = entry {
@@ -400,6 +414,7 @@ where
     }
 
     /// Insert a set of agent activity into the Cache.
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_activity(
         txn: &mut Transaction,
         ops: Vec<RegisterAgentActivity>,
@@ -426,7 +441,7 @@ where
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
-            .async_commit(|txn| {
+            .write_async(|txn| {
                 for response in responses {
                     let ops = response.render()?;
                     Self::insert_rendered_ops(txn, &ops)?;
@@ -444,7 +459,7 @@ where
     ) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 for response in responses {
                     let ops = response.render(&key)?;
                     Self::insert_rendered_ops(txn, &ops)?;
@@ -489,7 +504,7 @@ where
             Some(MustGetAgentActivityResponse::Activity(activity)) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
-                    .async_commit({
+                    .write_async({
                         let activity = activity.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
@@ -563,22 +578,17 @@ where
         self.add_activity_into_cache(results).await
     }
 
-    /// Get all available databases.
-    async fn get_databases(
-        &self,
-    ) -> CascadeResult<Vec<(PConnPermit, Box<dyn PermittedConn + Send>)>> {
-        let mut conns: Vec<(_, Box<dyn PermittedConn + Send>)> = Vec::with_capacity(3);
-        if let Some(cache) = self.cache.clone() {
-            conns.push((cache.conn_permit::<DatabaseError>().await?, Box::new(cache)));
+    /// Get transactions for available databases.
+    async fn get_txn_guards(&self) -> CascadeResult<Vec<PTxnGuard>> {
+        let mut conns: Vec<_> = Vec::with_capacity(3);
+        if let Some(cache) = &self.cache {
+            conns.push(cache.get_read_txn().await?);
         }
-        if let Some(dht) = self.dht.clone() {
-            conns.push((dht.conn_permit::<DatabaseError>().await?, Box::new(dht)));
+        if let Some(dht) = &self.dht {
+            conns.push(dht.get_read_txn().await?);
         }
-        if let Some(authored) = self.authored.clone() {
-            conns.push((
-                authored.conn_permit::<DatabaseError>().await?,
-                Box::new(authored),
-            ));
+        if let Some(authored) = &self.authored {
+            conns.push(authored.get_read_txn().await?);
         }
         Ok(conns)
     }
@@ -586,18 +596,20 @@ where
     async fn cascading<Q>(&self, query: Q) -> CascadeResult<Q::Output>
     where
         Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
-        <Q as holochain_state::prelude::Query>::Output: Send + 'static,
+        <Q as Query>::Output: Send + 'static,
     {
-        let conns = self.get_databases().await?;
+        let start = Instant::now();
+        let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
+        // TODO We may already be on a blocking thread here because this is accessible from a zome call. Ideally we'd have
+        //      a way to check this situation and avoid spawning a new thread if we're already on an appropriate thread.
         let results = tokio::task::spawn_blocking(move || {
-            let mut conns = conns
-                .into_iter()
-                .map(|(permit, conn)| conn.with_permit(permit))
-                .collect::<DatabaseResult<Vec<_>>>()?;
-            let mut txns = Vec::with_capacity(conns.len());
-            for conn in &mut conns {
-                let txn = conn.transaction().map_err(StateQueryError::from)?;
+            let mut txns = Vec::with_capacity(txn_guards.len());
+            for conn in &mut txn_guards {
+                // TODO The transaction does not actually start here. We're asking for a deferred transaction which is the
+                //      right thing to do, but SQLite won't launch that until we do a read operation. If we want a stricter
+                //      'point in time' view across databases it might make sense to issue a lightweight read op to each txn here?
+                let txn = conn.transaction()?;
                 txns.push(txn);
             }
             let txns_ref: Vec<_> = txns.iter().collect();
@@ -609,6 +621,10 @@ where
             CascadeResult::Ok(results)
         })
         .await??;
+
+        self.duration_metric
+            .record(start.elapsed().as_secs_f64(), &[]);
+
         Ok(results)
     }
 
@@ -616,49 +632,55 @@ where
     async fn find_map<F, T>(&self, mut f: F) -> CascadeResult<Option<T>>
     where
         T: Send + 'static,
-        F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + 'static,
+        F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + Clone + 'static,
     {
-        let find = |permit, conn: Box<dyn PermittedConn + Send>, mut f: F| async move {
-            tokio::task::spawn_blocking(move || {
-                let mut conn = conn.with_permit(permit)?;
-                let txn = conn.transaction().map_err(StateQueryError::from)?;
-                let txn = Txn::from(&txn);
-                let r = f(&txn)?;
-                CascadeResult::Ok((r, f))
-            })
-            .await?
-        };
         if let Some(cache) = self.cache.clone() {
-            let permit = cache.conn_permit::<DatabaseError>().await?;
-            let (r, f1) = find(permit, Box::new(cache), f).await?;
-            f = f1;
+            let r = cache
+                .read_async({
+                    let mut f = f.clone();
+                    move |raw_txn| f(&Txn::from(&raw_txn))
+                })
+                .await?;
 
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         if let Some(dht) = self.dht.clone() {
-            let permit = dht.conn_permit::<DatabaseError>().await?;
-            let (r, f1) = find(permit, Box::new(dht), f).await?;
-            f = f1;
+            let r = dht
+                .read_async({
+                    let mut f = f.clone();
+                    move |raw_txn| f(&Txn::from(&raw_txn))
+                })
+                .await?;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         if let Some(authored) = self.authored.clone() {
-            let permit = authored.conn_permit::<DatabaseError>().await?;
-            let (r, f1) = find(permit, Box::new(authored), f).await?;
-            f = f1;
+            let r = authored
+                .read_async({
+                    let mut f = f.clone();
+                    move |raw_txn| f(&Txn::from(&raw_txn))
+                })
+                .await?;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         if let Some(scratch) = &self.scratch {
             let r = scratch.apply_and_then(|scratch| f(scratch))?;
+
             if r.is_some() {
                 return Ok(r);
             }
         }
+
         Ok(None)
     }
 
@@ -895,8 +917,17 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query =
-            GetLinksQuery::new(key.base, key.type_query, key.tag, GetLinksFilter::default());
+        let query = GetLinksQuery::new(
+            key.base,
+            key.type_query,
+            key.tag,
+            GetLinksFilter {
+                after: key.after,
+                before: key.before,
+                author: key.author,
+            },
+        );
+
         let results = self.cascading(query).await?;
         Ok(results)
     }
@@ -957,7 +988,7 @@ where
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         // Get the available databases.
-        let conns = self.get_databases().await?;
+        let mut txn_guards = self.get_txn_guards().await?;
         let scratch = self.scratch.clone();
 
         // For each store try to get the bounded activity.
@@ -965,10 +996,9 @@ where
             let author = author.clone();
             let filter = filter.clone();
             move || {
-                let mut results = Vec::with_capacity(conns.len() + 1);
-                for (permit, conn) in conns {
-                    let mut conn = conn.with_permit(permit)?;
-                    let mut txn = conn.transaction().map_err(StateQueryError::from)?;
+                let mut results = Vec::with_capacity(txn_guards.len() + 1);
+                for txn_guard in &mut txn_guards {
+                    let mut txn = txn_guard.transaction()?;
                     let r = match &scratch {
                         Some(scratch) => {
                             scratch.apply_and_then(|scratch| {
@@ -984,17 +1014,21 @@ where
         })
             .await??;
 
-        // For each response run the chain filter and check the invariants hold.
-        for response in results {
-            let result =
-                authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
-                    response,
-                )?;
+        let merged_results = results.iter().fold(
+            // It's sort of arbitrary what the initial value is as long as it's
+            // not an activity response.
+            BoundedMustGetAgentActivityResponse::EmptyRange,
+            holochain_types::chain::merge_bounded_agent_activity_responses,
+        );
 
-            // Short circuit if we have a result.
-            if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
-                return Ok(result);
-            }
+        let result =
+            authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
+                merged_results,
+            );
+
+        // Short circuit if we have a result.
+        if matches!(result, MustGetAgentActivityResponse::Activity(_)) {
+            return Ok(result);
         }
 
         // If we are the authority then don't go to the network.
@@ -1135,6 +1169,7 @@ where
         Ok(r)
     }
 
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn am_i_authoring(&self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
@@ -1156,6 +1191,7 @@ where
     }
 }
 
+#[cfg(feature = "test_utils")]
 impl MockCascade {
     /// Construct a mock which acts as if the given records were part of local storage
     pub fn with_records(records: Vec<Record>) -> Self {

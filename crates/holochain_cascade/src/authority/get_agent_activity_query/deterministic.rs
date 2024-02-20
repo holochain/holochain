@@ -20,7 +20,6 @@ use holochain_state::{
     prelude::*,
     query::{row_blob_and_hash_to_action, QueryData},
 };
-use holochain_types::prelude::*;
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, Clone)]
@@ -169,9 +168,9 @@ mod tests {
                     action.into()
                 };
                 chain.push(ActionHash::with_data_sync(&action));
-                let op = DhtOp::RegisterAgentActivity(fixt!(Signature), action.into());
+                let op = DhtOp::RegisterAgentActivity(fixt!(Signature), action);
                 let op = DhtOpHashed::from_content_sync(op);
-                fill_db(&db, op);
+                fill_db(&db, op).await;
             }
             chains.push(chain);
         }

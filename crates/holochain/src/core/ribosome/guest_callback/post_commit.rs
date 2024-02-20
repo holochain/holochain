@@ -124,7 +124,6 @@ mod test {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use holochain_types::prelude::*;
-    use holochain_zome_types::ExternIO;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn post_commit_invocation_access() {
@@ -238,9 +237,9 @@ mod slow_tests {
             ..
         } = RibosomeTestFixture::new(TestWasm::PostCommitVolley).await;
 
-        let _set_access: () = conductor.call::<_, (), _>(&alice, "set_access", ()).await;
+        let _set_access: () = conductor.call::<_, ()>(&alice, "set_access", ()).await;
 
-        let _set_access: () = conductor.call::<_, (), _>(&bob, "set_access", ()).await;
+        let _set_access: () = conductor.call::<_, ()>(&bob, "set_access", ()).await;
 
         let _ping: ActionHash = conductor.call(&alice, "ping", bob_pubkey).await;
 

@@ -3,7 +3,7 @@ use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::conductor::{api::error::ConductorApiError, error::ConductorError};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use crate::core::SourceChainError;
 use holochain_cascade::error::CascadeError;
 use holochain_p2p::HolochainP2pError;

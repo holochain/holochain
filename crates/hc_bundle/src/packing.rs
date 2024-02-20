@@ -3,8 +3,8 @@
 //! Defines the CLI commands for packing/unpacking DNA, hApp, and web-hApp bundles.
 
 use crate::error::{HcBundleError, HcBundleResult};
-use holochain_types::wasmer_types::build_ios_module;
 use holochain_util::ffs;
+use holochain_wasmer_host::module::build_ios_module;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
@@ -180,13 +180,13 @@ integrity:
 
         // Create files in working directory
         std::fs::create_dir(dir.join("nested")).unwrap();
-        std::fs::write(dir.join("zome-1.wasm"), &[1, 2, 3]).unwrap();
-        std::fs::write(dir.join("nested/zome-2.wasm"), &[4, 5, 6]).unwrap();
+        std::fs::write(dir.join("zome-1.wasm"), [1, 2, 3]).unwrap();
+        std::fs::write(dir.join("nested/zome-2.wasm"), [4, 5, 6]).unwrap();
         std::fs::write(dir.join("dna.yaml"), manifest_yaml.as_bytes()).unwrap();
 
         // Create a local file that's not actually part of the bundle,
         // in the parent directory
-        std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
+        std::fs::write(tmpdir.path().join("zome-3.wasm"), [7, 8, 9]).unwrap();
 
         let (bundle_path, bundle) =
             pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string(), false)

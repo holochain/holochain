@@ -65,9 +65,6 @@ pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
     ))
 }
 
-mod switchboard;
-pub use switchboard::*;
-
 mod harness_event;
 pub(crate) use harness_event::*;
 
@@ -82,3 +79,5 @@ pub(crate) mod scenario_def_local;
 
 #[cfg(feature = "mock_network")]
 pub mod mock_network;
+
+pub mod data;

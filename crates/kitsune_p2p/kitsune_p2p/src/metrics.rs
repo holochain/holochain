@@ -1,21 +1,43 @@
 //! metrics tracked by kitsune_p2p spaces
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::time::Instant;
 
+use crate::gossip::sharded_gossip::GossipType;
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;
-use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use num_traits::*;
+
+use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
+use once_cell::sync::Lazy;
+
+pub(crate) static METRIC_MSG_OUT_BYTE: Lazy<opentelemetry_api::metrics::Histogram<u64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .u64_histogram("kitsune.peer.send.byte.count")
+            .with_description("Outgoing p2p network messages byte count")
+            .with_unit(opentelemetry_api::metrics::Unit::new("By"))
+            .init()
+    });
+
+pub(crate) static METRIC_MSG_OUT_TIME: Lazy<opentelemetry_api::metrics::Histogram<f64>> =
+    Lazy::new(|| {
+        opentelemetry_api::global::meter("kitsune")
+            .f64_histogram("kitsune.peer.send.duration")
+            .with_description("Outgoing p2p network messages seconds")
+            .with_unit(opentelemetry_api::metrics::Unit::new("s"))
+            .init()
+    });
 
 /// how long historical metric records should be kept
 /// (currently set to 1 week)
@@ -126,7 +148,7 @@ pub struct PeerAgentHistory {
     /// Times we recorded errors for this node.
     pub errors: VecDeque<RoundMetric>,
     /// Is this node currently in an active round?
-    pub current_round: bool,
+    pub current_rounds: HashSet<GossipType>,
 }
 
 /// Detailed info about the history of gossip with this node
@@ -452,10 +474,11 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut history.initiates, round);
-            if history.current_round {
-                tracing::info!("Recorded initiate with current round already set");
+            if history.current_rounds.contains(&gossip_type.into()) {
+                tracing::warn!("Recorded initiate with current round already set");
+            } else {
+                history.current_rounds.insert(gossip_type.into());
             }
-            history.current_round = true;
         }
     }
 
@@ -475,10 +498,11 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut history.accepts, round);
-            if history.current_round {
-                tracing::info!("Recorded accept with current round already set");
+            if history.current_rounds.contains(&gossip_type.into()) {
+                tracing::warn!("Recorded accept with current round already set");
+            } else {
+                history.current_rounds.insert(gossip_type.into());
             }
-            history.current_round = true;
         }
     }
 
@@ -501,7 +525,12 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut history.successes, round);
-            history.current_round = false;
+
+            let removed = history.current_rounds.remove(&gossip_type.into());
+            if !removed {
+                tracing::warn!("Recorded success without record of gossip round");
+            }
+
             if history.is_initiate_round() {
                 should_dec_force_initiates = true;
             }
@@ -534,7 +563,11 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut history.errors, round);
-            history.current_round = false;
+
+            let removed = history.current_rounds.remove(&gossip_type.into());
+            if !removed {
+                tracing::warn!("Recorded error without record of gossip round");
+            }
         }
         tracing::debug!(
             "recorded error in metrics. force_initiates={}",
@@ -604,7 +637,7 @@ impl Metrics {
         remote_agent_list
             .into_iter()
             .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
-            .any(|info| info.current_round)
+            .any(|info| !info.current_rounds.is_empty())
     }
 
     /// What was the last outcome for this node's gossip round?
@@ -762,7 +795,7 @@ impl std::fmt::Display for Metrics {
                     last_completion,
                     completion_frequency
                 )?;
-                write!(f, "\n\t\tCurrent Round: {:?}", info.current_round)?;
+                write!(f, "\n\t\tCurrent Rounds: {:?}", info.current_rounds)?;
             }
         }
         write!(

@@ -92,7 +92,7 @@ fn verify_signature(agent_pub_key: AgentPubKey) -> ExternResult<()> {
 }
 
 #[cfg(all(test, feature = "mock"))]
-pub mod tests {
+mod tests {
     use ::fixt::prelude::{fixt, Predictable};
     use hdk::prelude::*;
 

@@ -14,16 +14,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-use crate::prelude::Store;
-use crate::prelude::Txn;
-
 pub mod mutations_helpers;
 
 #[cfg(test)]
-pub mod tests {
-    use holochain_sqlite::conn::PConn;
+mod tests {
+    use holochain_sqlite::error::DatabaseResult;
+    use holochain_sqlite::rusqlite::Transaction;
 
-    fn _dbg_db_schema(db_name: &str, conn: PConn) {
+    fn _dbg_db_schema(db_name: &str, conn: Transaction) {
         #[derive(Debug)]
         pub struct Schema {
             pub ty: String,
@@ -53,10 +51,25 @@ pub mod tests {
         println!("~~~ {} END ~~~", &db_name);
     }
 
-    #[test]
-    pub fn dbg_db_schema() {
-        _dbg_db_schema("conductor", super::test_conductor_db().db.conn().unwrap());
-        _dbg_db_schema("p2p_agents", super::test_p2p_agents_db().db.conn().unwrap());
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn dbg_db_schema() {
+        super::test_conductor_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("conductor", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        super::test_p2p_agents_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("p2p_agents", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
     }
 }
 
@@ -155,21 +168,6 @@ pub fn test_dbs_in(path: impl AsRef<Path>) -> TestDbs {
     TestDbs::new(tempdir)
 }
 
-/// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> holochain_keystore::MetaLairClient {
-    tokio_helper::block_on(
-        async move {
-            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
-                .await
-                .unwrap();
-
-            keystore
-        },
-        std::time::Duration::from_secs(1),
-    )
-    .expect("timeout elapsed")
-}
-
 /// A test database in a temp directory
 #[derive(Shrinkwrap)]
 pub struct TestDb<Kind: DbKindT> {
@@ -210,8 +208,8 @@ impl<Kind: DbKindT> TestDb<Kind> {
     }
 
     /// Dump db into `/tmp/test_dbs`.
-    pub fn dump_tmp(&self) {
-        dump_tmp(&self.db);
+    pub async fn dump_tmp(&self) {
+        dump_tmp(&self.db).await;
     }
 
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
@@ -223,18 +221,18 @@ impl<Kind: DbKindT> TestDb<Kind> {
 }
 
 /// Dump db into `/tmp/test_dbs`.
-pub fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
+pub async fn dump_tmp<Kind: DbKindT>(env: &DbWrite<Kind>) {
     let mut tmp = std::env::temp_dir();
     tmp.push("test_dbs");
     std::fs::create_dir(&tmp).ok();
     tmp.push("backup.sqlite");
     println!("dumping db to {}", tmp.display());
     std::fs::write(&tmp, b"").unwrap();
-    env.conn()
-        .unwrap()
-        .execute("VACUUM main into ?", [tmp.to_string_lossy()])
-        // .backup(DatabaseName::Main, tmp, None)
-        .unwrap();
+    env.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.execute("VACUUM main into ?", [tmp.to_string_lossy()])?)
+    })
+    .await
+    .unwrap();
 }
 
 /// A container for all three non-cell environments
@@ -297,6 +295,7 @@ impl TestDir {
         let old = std::mem::replace(self, Self::Blank);
         match old {
             Self::Temp(d) => {
+                println!("Made temp dir permanent at {:?}", d);
                 tracing::info!("Made temp dir permanent at {:?}", d);
                 *self = Self::Perm(d.into_path());
             }
@@ -325,7 +324,7 @@ impl TestDbs {
 
     /// Create all three non-cell environments at once with a test keystore
     pub fn new(tempdir: TempDir) -> Self {
-        Self::with_keystore(tempdir, test_keystore())
+        Self::with_keystore(tempdir, holochain_keystore::test_keystore())
     }
 
     pub fn conductor(&self) -> DbWrite<DbKindConductor> {
@@ -370,38 +369,6 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
-}
-
-/// Helper to get a [`Store`] from an [`DbRead`].
-pub fn fresh_store_test<F, R, K>(env: &DbRead<K>, f: F) -> R
-where
-    F: FnOnce(&dyn Store) -> R,
-    K: DbKindT,
-{
-    fresh_reader_test!(env, |txn| {
-        let store = Txn::from(&txn);
-        f(&store)
-    })
-}
-
-/// Function to help avoid needing to specify types.
-pub fn fresh_reader_test<E, F, R, K>(env: E, f: F) -> R
-where
-    E: Into<DbRead<K>>,
-    F: FnOnce(Transaction) -> R,
-    K: DbKindT,
-{
-    fresh_reader_test!(&env.into(), f)
-}
-
-/// Function to help avoid needing to specify types.
-pub fn print_stmts_test<E, F, R, K>(env: E, f: F) -> R
-where
-    E: Into<DbRead<K>>,
-    F: FnOnce(Transaction) -> R,
-    K: DbKindT,
-{
-    holochain_sqlite::print_stmts_test!(&env.into(), f)
 }
 
 #[tracing::instrument(skip(txn))]

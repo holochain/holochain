@@ -38,37 +38,13 @@ fixturator_unsigned!(usize);
 basic_test!(
     u8,
     vec![0; 40],
-    (0_u8..=255_u8)
-        .into_iter()
-        .cycle()
-        .take(1000)
-        .collect::<Vec<u8>>()
+    (0_u8..=255_u8).cycle().take(1000).collect::<Vec<u8>>()
 );
-basic_test!(
-    u16,
-    vec![0; 40],
-    (0..1000).into_iter().collect::<Vec<u16>>()
-);
-basic_test!(
-    u32,
-    vec![0; 40],
-    (0..1000).into_iter().collect::<Vec<u32>>()
-);
-basic_test!(
-    u64,
-    vec![0; 40],
-    (0..1000).into_iter().collect::<Vec<u64>>()
-);
-basic_test!(
-    u128,
-    vec![0; 40],
-    (0..1000).into_iter().collect::<Vec<u128>>()
-);
-basic_test!(
-    usize,
-    vec![0; 40],
-    (0..1000).into_iter().collect::<Vec<usize>>()
-);
+basic_test!(u16, vec![0; 40], (0..1000).collect::<Vec<u16>>());
+basic_test!(u32, vec![0; 40], (0..1000).collect::<Vec<u32>>());
+basic_test!(u64, vec![0; 40], (0..1000).collect::<Vec<u64>>());
+basic_test!(u128, vec![0; 40], (0..1000).collect::<Vec<u128>>());
+basic_test!(usize, vec![0; 40], (0..1000).collect::<Vec<usize>>());
 
 macro_rules! fixturator_signed {
     ( $t:ident ) => {
@@ -108,7 +84,6 @@ basic_test!(
     i8,
     vec![0; 40],
     (0_i8..=127_i8)
-        .into_iter()
         .map(|i| if i % 2 == 0 { i } else { -i })
         .take(127)
         .collect::<Vec<i8>>()
@@ -117,7 +92,6 @@ basic_test!(
     i16,
     vec![0; 40],
     (0..1000)
-        .into_iter()
         .map(|i| if i % 2 == 0 { i } else { -i })
         .take(1000)
         .collect::<Vec<i16>>()
@@ -126,7 +100,6 @@ basic_test!(
     i32,
     vec![0; 40],
     (0..1000)
-        .into_iter()
         .map(|i| if i % 2 == 0 { i } else { -i })
         .take(1000)
         .collect::<Vec<i32>>()
@@ -135,7 +108,6 @@ basic_test!(
     i64,
     vec![0; 40],
     (0..1000)
-        .into_iter()
         .map(|i| if i % 2 == 0 { i } else { -i })
         .take(1000)
         .collect::<Vec<i64>>()
@@ -144,7 +116,6 @@ basic_test!(
     i128,
     vec![0; 40],
     (0..1000)
-        .into_iter()
         .map(|i| if i % 2 == 0 { i } else { -i })
         .take(1000)
         .collect::<Vec<i128>>()
@@ -153,7 +124,6 @@ basic_test!(
     isize,
     vec![0; 40],
     (0..1000)
-        .into_iter()
         .map(|i| if i % 2 == 0 { i } else { -i })
         .take(1000)
         .collect::<Vec<isize>>()
@@ -202,7 +172,6 @@ basic_test!(
     f32,
     vec![0.0; 40],
     (0_usize..1000)
-        .into_iter()
         .map(|u| {
             let f = u as f32;
             if u % 2 == 0 {
@@ -218,7 +187,6 @@ basic_test!(
     f64,
     vec![0.0; 40],
     (0_usize..1000)
-        .into_iter()
         .map(|u| {
             let f = u as f64;
             if u % 2 == 0 {

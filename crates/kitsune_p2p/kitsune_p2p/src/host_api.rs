@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod};
 use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use kitsune_p2p_types::{
     KOpData, KOpHash,
 };
 
-use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
+use crate::event::GetAgentInfoSignedEvt;
 
 /// A boxed future result with dynamic error type
 pub type KitsuneHostResult<'a, T> =
@@ -104,6 +104,28 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
         .into()
     }
 
+    /// Do something whenever a batch of op hashes was received and stored in the FetchPool
+    // NOTE: currently only needed for aitia, could be removed and the aitia log could be created
+    // directly in kitsune.
+    fn handle_op_hash_received(
+        &self,
+        _space: &KitsuneSpace,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
+    ) {
+    }
+
+    /// Do something whenever a batch of op hashes was sent to another node
+    // NOTE: currently only needed for aitia, could be removed and the aitia log could be created
+    // directly in kitsune.
+    fn handle_op_hash_transmitted(
+        &self,
+        _space: &KitsuneSpace,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
+    ) {
+    }
+
     /// Get the lair "tag" identifying the id seed to use for crypto signing.
     /// (this is currently only used in tx5/WebRTC if that feature is enabled.)
     fn lair_tag(&self) -> Option<Arc<str>> {
@@ -120,6 +142,18 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
 /// Trait object for the host interface
 pub type HostApi = std::sync::Arc<dyn KitsuneHost>;
 
+/// A HostApi paired with a ghost_actor sender (legacy)
+/// When all legacy functions have been moved to the API,
+/// this type can be replaced by `HostApi`.
+#[derive(Clone, Debug, derive_more::Constructor, derive_more::Deref, derive_more::Into)]
+pub struct HostApiLegacy {
+    /// The new API
+    #[deref]
+    pub api: HostApi,
+    /// The old ghost_actor sender based API
+    pub legacy: futures::channel::mpsc::Sender<crate::event::KitsuneP2pEvent>,
+}
+
 // Test-only stub which mostly panics
 #[cfg(any(test, feature = "test_utils"))]
 mod host_stub;
@@ -130,3 +164,4 @@ pub use host_stub::*;
 mod host_default_error;
 #[cfg(any(test, feature = "test_utils"))]
 pub use host_default_error::*;
+use kitsune_p2p_types::metrics::MetricRecord;

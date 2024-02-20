@@ -28,6 +28,10 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: DbKind) -> rus
         DbKind::Cache(_) => {
             crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
         }
+        #[cfg(feature = "test_utils")]
+        DbKind::Test(_) => {
+            // Nothing to do
+        }
     }
     Ok(())
 }

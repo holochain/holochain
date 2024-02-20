@@ -7,14 +7,17 @@ use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
+#[tracing::instrument(skip(_ribosome, call_context))]
 pub fn must_get_entry<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: MustGetEntryInput,
 ) -> Result<EntryHashed, RuntimeError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    tracing::debug!("begin must_get_entry");
+    let ret = match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
             ..
@@ -88,7 +91,9 @@ pub fn must_get_entry<'a>(
             .to_string(),
         ))
         .into()),
-    }
+    };
+    tracing::debug!(?ret);
+    ret
 }
 
 #[cfg(test)]
@@ -97,7 +102,6 @@ pub mod test {
     use crate::test_entry_impl;
     use hdk::prelude::*;
     use holochain_state::prelude::*;
-    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use unwrap_to::unwrap_to;
 
@@ -153,13 +157,13 @@ pub mod test {
             record_entry,
         ));
         dht_db
-            .conn()
-            .unwrap()
-            .with_commit_sync(|txn| {
-                set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)
-                    .unwrap();
-                set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)
+            .write_async(move |txn| -> StateMutationResult<()> {
+                set_validation_status(txn, record_state.as_hash(), ValidationStatus::Rejected)?;
+                set_validation_status(txn, entry_state.as_hash(), ValidationStatus::Rejected)?;
+
+                Ok(())
             })
+            .await
             .unwrap();
 
         // Must get entry returns the entry if it exists regardless of the

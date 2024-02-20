@@ -3,7 +3,7 @@ use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
-use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::WorkflowError;
 use holo_hash::DnaHash;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
@@ -58,7 +58,7 @@ pub enum ConductorApiError {
 
     /// ZomeError
     #[error("ZomeError: {0}")]
-    ZomeError(#[from] holochain_zome_types::zome::error::ZomeError),
+    ZomeError(#[from] holochain_zome_types::zome::ZomeError),
 
     /// DnaError
     #[error("DnaError: {0}")]

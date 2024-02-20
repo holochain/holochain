@@ -54,6 +54,8 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
+mod check_clone_access;
+
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
@@ -78,11 +80,12 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
+use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
-use holochain_state::nonce::*;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_zome_types::block::BlockTargetId;
@@ -361,7 +364,7 @@ impl ZomeCallInvocation {
                     &self.signature,
                     ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
                 )
-                .await
+                .await?
             {
                 ZomeCallAuthorization::Authorized
             } else {
@@ -759,7 +762,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holo_hash::AgentPubKey;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_state::nonce::fresh_nonce;
+    use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallUnsigned;
 
@@ -870,11 +873,7 @@ pub mod wasm_test {
             let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
             let apps = conductor
-                .setup_app_for_agents(
-                    "app-",
-                    &[alice_pubkey.clone(), bob_pubkey.clone()],
-                    [&dna_file],
-                )
+                .setup_app_for_agents("app-", [&alice_pubkey, &bob_pubkey], [&dna_file])
                 .await
                 .unwrap();
 

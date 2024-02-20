@@ -19,7 +19,8 @@ use crate::core::{
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
-use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_conductor_api::conductor::paths::DatabasesRootPath;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
@@ -28,38 +29,22 @@ use holochain_p2p::{
     dht_arc::{DhtArcRange, DhtArcSet},
     event::FetchOpDataQuery,
 };
-use holochain_sqlite::{
-    conn::{DbSyncLevel, DbSyncStrategy},
-    db::{
-        DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
-        DbKindWasm, DbWrite, ReadAccess,
-    },
-    prelude::DatabaseResult,
+use holochain_sqlite::prelude::{
+    DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents,
+    DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite, ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
     mutations,
-    prelude::{from_blob, StateQueryResult},
+    prelude::*,
     query::{map_sql_dht_op_common, StateQueryError},
-    source_chain::{SourceChain, SourceChainResult},
 };
-use holochain_types::db::AsP2pStateTxExt;
-use holochain_types::prelude::CellId;
-use holochain_types::{
-    db_cache::DhtDbQueryCache,
-    dht_op::{DhtOp, DhtOpType},
-};
-use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTargetId;
-use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
-use kitsune_p2p::{
-    event::{TimeWindow, TimeWindowInclusive},
-    KitsuneP2pConfig,
-};
+use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
+use std::path::PathBuf;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -71,13 +56,12 @@ mod tests;
 /// installed on this conductor.
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
-    pub(crate) db_dir: Arc<DatabaseRootPath>,
-    pub(crate) db_sync_strategy: DbSyncStrategy,
+    pub(crate) db_dir: Arc<DatabasesRootPath>,
+    pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
-    network_config: KitsuneP2pConfig,
 }
 
 #[derive(Clone)]
@@ -140,8 +124,12 @@ pub struct TestSpace {
 
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(config: &ConductorConfig) -> ConductorResult<Self> {
-        let root_db_dir = config.environment_path.clone();
+    pub fn new(config: Arc<ConductorConfig>) -> ConductorResult<Self> {
+        let root_db_dir: DatabasesRootPath = config
+            .data_root_path
+            .clone()
+            .ok_or(ConductorError::NoDataRootPath)?
+            .try_into()?;
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
@@ -154,11 +142,10 @@ impl Spaces {
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             db_dir: Arc::new(root_db_dir),
-            db_sync_strategy,
+            config,
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
-            network_config: config.network.clone().unwrap_or_default(),
         })
     }
 
@@ -180,11 +167,7 @@ impl Spaces {
         let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
         for dna in dnas {
             // @todo join_all for these awaits
-            agent_lists.push(
-                self.p2p_agents_db(&dna)?
-                    .async_reader(|txn| txn.p2p_list_agents())
-                    .await?,
-            );
+            agent_lists.push(self.p2p_agents_db(&dna)?.p2p_list_agents().await?);
         }
 
         Ok(agent_lists
@@ -195,7 +178,7 @@ impl Spaces {
                     kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
                         .digest()
                         .0
-                        == node_id
+                        == *node_id
                 })
             })
             .map(|agent_info| {
@@ -233,8 +216,16 @@ impl Spaces {
             }
         };
 
+        // If node_agents_in_spaces is not yet initialized, we can't know anything about
+        // which cells are blocked, so avoid the race condition by returning false
+        // TODO: actually fix the preflight, because this could be a loophole for someone
+        //       to evade a block in some circumstances
+        if cell_ids.is_empty() {
+            return Ok(false);
+        }
+
         self.conductor_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 Ok(
                     // If the target_id is directly blocked then we always return true.
                     holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
@@ -260,7 +251,7 @@ impl Spaces {
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         let state = self
             .conductor_db
-            .async_reader(|txn| {
+            .read_async(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -301,7 +292,7 @@ impl Spaces {
     {
         let output = self
             .conductor_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -344,7 +335,7 @@ impl Spaces {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
                             &self.db_dir,
-                            self.db_sync_strategy,
+                            self.config.db_sync_strategy,
                         )?;
 
                         let r = f(&space);
@@ -450,7 +441,7 @@ impl Spaces {
             )
         };
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(&sql)?;
                 let hashes = stmt
                     .query_map(
@@ -517,7 +508,7 @@ impl Spaces {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
         Ok(self
             .dht_db(dna_hash)?
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
                 let results = regions
                     .into_iter()
@@ -580,7 +571,7 @@ impl Spaces {
 
         let db = self.dht_db(dna_hash)?;
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 for hash in op_hashes {
                     let mut stmt = txn.prepare_cached(&sql)?;
@@ -624,20 +615,20 @@ impl Spaces {
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        use futures::StreamExt;
-        let ops = futures::stream::iter(ops.into_iter().map(|op| {
-            let hash = DhtOpHash::with_data_sync(&op);
-            (hash, op)
-        }))
-        .collect()
-        .await;
-
         // If this is a countersigning session then
         // send it to the countersigning workflow otherwise
         // send it to the incoming ops workflow.
         if countersigning_session {
+            use futures::StreamExt;
+            let ops = futures::stream::iter(ops.into_iter().map(|op| {
+                let hash = DhtOpHash::with_data_sync(&op);
+                (hash, op)
+            }))
+            .collect()
+            .await;
+
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
                     space.countersigning_workspace.clone(),
@@ -660,7 +651,10 @@ impl Spaces {
                 Some(t) => t,
                 // If the workflow has not been spawned yet we can't handle incoming messages.
                 // Note this is not an error because only a validation receipt is proof of a publish.
-                None => return Ok(()),
+                None => {
+                    tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
+                    return Ok(());
+                }
             };
             incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }
@@ -669,7 +663,8 @@ impl Spaces {
 
     /// Get the recent_threshold based on the kitsune network config
     pub fn recent_threshold(&self) -> Duration {
-        self.network_config
+        self.config
+            .network
             .tuning_params
             .danger_gossip_recent_threshold()
     }
@@ -678,7 +673,7 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
-        root_db_dir: &DatabaseRootPath,
+        root_db_dir: &PathBuf,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
@@ -797,10 +792,13 @@ impl TestSpaces {
             .prefix("holochain-test-environments")
             .tempdir()
             .unwrap();
-        let spaces = Spaces::new(&ConductorConfig {
-            environment_path: temp_dir.path().to_path_buf().into(),
-            ..Default::default()
-        })
+        let spaces = Spaces::new(
+            ConductorConfig {
+                data_root_path: Some(temp_dir.path().to_path_buf().into()),
+                ..Default::default()
+            }
+            .into(),
+        )
         .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(

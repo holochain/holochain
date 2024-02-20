@@ -117,6 +117,7 @@ impl ArqStart for SpaceOffset {
 /// In this case, there is no definite location associated, so we want to forget
 /// about the original Location data associated with each Arq.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct Arq<S: ArqStart = Loc> {
     /// The "start" defines the left edge of the arq
     pub start: S,
@@ -755,7 +756,7 @@ mod tests {
             let strat = ArqStrat::default();
             let arq = approximate_arq(&topo, &strat, center.into(), length).to_bounds(&topo);
             let interval = arq.to_dht_arc_range(&topo);
-            let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval.clone()).unwrap();
+            let arq2 = ArqBounds::from_interval(&topo, arq.power(), interval).unwrap();
             assert!(ArqBounds::equivalent(&topo, &arq, &arq2));
         }
     }

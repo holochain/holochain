@@ -3,10 +3,10 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::*;
-
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 /// create record
 #[allow(clippy::extra_unused_lifetimes)]
@@ -108,16 +108,24 @@ pub mod wasm_test {
     use super::create;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::fixt::*;
+    use crate::sweettest::fact::density::DenseNetworkFact;
+    use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
+    use crate::sweettest::fact::rng_from_generator;
+    use crate::sweettest::fact::size::SizedNetworkFact;
+    use crate::sweettest::sweet_topos::network::NetworkTopology;
     use crate::sweettest::*;
     use ::fixt::prelude::*;
+    use contrafact::facts;
+    use contrafact::Fact;
+    use contrafact::Generator;
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;
     use holochain_state::source_chain::SourceChainResult;
+    use holochain_trace;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestWasmPair;
-    use holochain_trace;
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -193,6 +201,107 @@ pub mod wasm_test {
         assert_eq!(round_twice, vec![round.clone(), round],);
     }
 
+    #[test]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
+    fn ribosome_create_entry_network_test() {
+        crate::big_stack_test!(
+            async move {
+                holochain_trace::test_run().ok();
+
+                let mut network_topology = NetworkTopology::default();
+
+                let (dna_file, _, _) =
+                    SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+
+                network_topology.add_dnas(vec![dna_file.clone()]);
+
+                let size_fact = SizedNetworkFact {
+                    nodes: 7,
+                    agents: 1..=3,
+                };
+                let partition_fact = StrictlyPartitionedNetworkFact {
+                    partitions: 1,
+                    efficiency: 1.0,
+                };
+                let density_fact = DenseNetworkFact { density: 0.8 };
+
+                let mut facts = facts![size_fact, partition_fact, density_fact];
+
+                let mut g: Generator = unstructured_noise().into();
+                let mut rng = rng_from_generator(&mut g);
+                network_topology = facts.mutate(&mut g, network_topology).unwrap();
+
+                network_topology.apply().await.unwrap();
+
+                let alice_node = network_topology.random_node(&mut rng).unwrap();
+                let alice_cell = alice_node
+                    .cells()
+                    .into_iter()
+                    .filter(|cell| cell.dna_hash() == dna_file.dna_hash())
+                    .choose(&mut rng)
+                    .unwrap();
+                let alice = alice_node
+                    .conductor()
+                    .lock()
+                    .await
+                    .read()
+                    .await
+                    .get_sweet_cell(alice_cell)
+                    .unwrap();
+
+                let bob_node = network_topology.random_node(&mut rng).unwrap();
+                let bob_cell = bob_node
+                    .cells()
+                    .into_iter()
+                    .filter(|cell| cell.dna_hash() == dna_file.dna_hash())
+                    .choose(&mut rng)
+                    .unwrap();
+                let bob = bob_node
+                    .conductor()
+                    .lock()
+                    .await
+                    .read()
+                    .await
+                    .get_sweet_cell(bob_cell)
+                    .unwrap();
+
+                let action_hash: ActionHash = alice_node
+                    .conductor()
+                    .lock()
+                    .await
+                    .write()
+                    .await
+                    .call(&alice.zome(TestWasm::Create), "create_entry", ())
+                    .await;
+
+                crate::wait_for_10s!(
+                    bob_node
+                        .conductor()
+                        .lock()
+                        .await
+                        .write()
+                        .await
+                        .call::<_, Option<Record>>(&bob.zome(TestWasm::Create), "get_entry", ())
+                        .await,
+                    |x: &Option<Record>| x.is_some(),
+                    |_| true
+                );
+
+                let record: Option<Record> = bob_node
+                    .conductor()
+                    .lock()
+                    .await
+                    .write()
+                    .await
+                    .call(&bob.zome(TestWasm::Create), "get_entry", ())
+                    .await;
+
+                assert_eq!(record.unwrap().action_address(), &action_hash);
+            },
+            4_000_000
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     // TODO: rewrite with sweettest and check if still flaky.
     // maackle: this consistently passes for me with n = 37
@@ -205,7 +314,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
 
         let _: () = conductor
@@ -243,20 +352,20 @@ pub mod wasm_test {
         let entry: Entry = (&Post("foo".into())).try_into().unwrap();
         let entry_hash = EntryHash::with_data_sync(&entry);
         assert_eq!(
-            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
             &entry_hash.to_string()
         );
         let sb: SerializedBytes = entry_hash.try_into().unwrap();
         let entry_hash: EntryHash = sb.try_into().unwrap();
         assert_eq!(
-            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
             &entry_hash.to_string()
         );
 
         // Now I can convert to AnyDhtHash
         let any_hash: AnyDhtHash = entry_hash.clone().into();
         assert_eq!(
-            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
             &entry_hash.to_string()
         );
 
@@ -265,14 +374,14 @@ pub mod wasm_test {
         tracing::debug!(any_sb = ?sb);
         let any_hash: AnyDhtHash = sb.try_into().unwrap();
         assert_eq!(
-            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
             &any_hash.to_string()
         );
 
         // Converting directly works
         let any_hash: AnyDhtHash = entry_hash.clone().try_into().unwrap();
         assert_eq!(
-            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            "uhCEkBh-9u8jkmvhguGWPKQLm-9jhoOg_JJyRC6qwEWW4B0IRPjyr",
             &any_hash.to_string()
         );
     }

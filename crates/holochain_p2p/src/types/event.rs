@@ -7,8 +7,10 @@ use kitsune_p2p::{agent_store::AgentInfoSigned, dht::region::RegionBounds, event
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
+#[derive(Default)]
 pub enum GetRequest {
     /// Get all the integrated data.
+    #[default]
     All,
     /// Get only the integrated content.
     Content,
@@ -39,12 +41,6 @@ impl From<&actor::GetOptions> for GetOptions {
             all_live_actions_with_metadata: a.all_live_actions_with_metadata,
             request_type: a.request_type.clone(),
         }
-    }
-}
-
-impl Default for GetRequest {
-    fn default() -> Self {
-        GetRequest::All
     }
 }
 
@@ -155,6 +151,7 @@ ghost_actor::ghost_chan! {
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
 
         /// We need to get previously stored agent info.
+        /// The optional `agents` parameter is an include filter. This can be thought of as a way to filter a held list of agents against the current state of the store.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.
@@ -244,10 +241,10 @@ ghost_actor::ghost_chan! {
         ) -> MustGetAgentActivityResponse;
 
         /// A remote node has sent us a validation receipt.
-        fn validation_receipt_received(
+        fn validation_receipts_received(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            receipt: SerializedBytes,
+            receipts: ValidationReceiptBundle,
         ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
@@ -298,7 +295,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::CountLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
-            HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
+            HolochainP2pEvent::ValidationReceiptsReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }
             $($t2)*

@@ -16,12 +16,18 @@ pub(crate) fn put(
 }
 
 async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
+    #[derive(Debug)]
+    struct BadDecode(String);
+    impl warp::reject::Reject for BadDecode {}
     let peer: AgentInfoSigned =
-        rmp_decode(&mut AsRef::<[u8]>::as_ref(&peer)).map_err(|_| warp::reject())?;
-    // TODO: Return rejection if agent info was invalid?
-    if valid(&peer) {
-        store.put(peer);
+        rmp_decode(&mut AsRef::<[u8]>::as_ref(&peer)).map_err(|e| BadDecode(format!("{e:?}")))?;
+    if !valid(&peer) {
+        #[derive(Debug)]
+        struct Invalid;
+        impl warp::reject::Reject for Invalid {}
+        return Err(Invalid.into());
     }
+    store.put(peer);
     PUT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let mut buf = Vec::with_capacity(1);
     rmp_encode(&mut buf, ()).map_err(|_| warp::reject())?;
@@ -29,7 +35,10 @@ async fn put_info(peer: Bytes, store: Store) -> Result<impl warp::Reply, warp::R
 }
 
 fn valid(peer: &AgentInfoSigned) -> bool {
-    // TODO: verify signature
+    // TODO: actually verify signature... just checking size for now
+    if peer.signature.len() != 64 {
+        return false;
+    }
     // Verify time
     peer.expires_at_ms as u128
         > std::time::UNIX_EPOCH
@@ -43,8 +52,9 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use fixt::prelude::*;
-    use kitsune_p2p::fixt::*;
+    use ::fixt::prelude::*;
+    use kitsune_p2p_bin_data::fixt::*;
+    use kitsune_p2p_types::fixt::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {

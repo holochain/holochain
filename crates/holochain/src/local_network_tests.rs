@@ -18,7 +18,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestZomes;
 use holochain_zome_types::ZomeCallResponse;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
 use tempfile::TempDir;
@@ -35,21 +35,30 @@ use test_case::test_case;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
     holochain_trace::test_run().ok();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
-    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna]).await.unwrap();
     let cells: Vec<_> = apps
         .into_inner()
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
+
     conductors.exchange_peer_info().await;
+
+    // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
+    // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
+    consistency_60s(cells.iter()).await;
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
-    let iter = cells.into_iter().zip(conductors.into_inner().into_iter());
+    let iter = cells
+        .clone()
+        .into_iter()
+        .zip(conductors.into_inner().into_iter());
     let keep = std::sync::Mutex::new(Vec::new());
     let keep = &keep;
     futures::stream::iter(iter)
@@ -72,7 +81,9 @@ async fn conductors_call_remote(num_conductors: usize) {
             }
         })
         .await;
-    drop(keep);
+
+    // Ensure that all the create requests were received and published.
+    consistency_60s(cells.iter()).await;
 }
 
 // TODO - rewrite all these tests to use local sweettest
@@ -90,7 +101,7 @@ async fn conductors_call_remote(num_conductors: usize) {
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+    network.transport_pool = vec![TransportConfig::Quic {
         bind_to: None,
         override_host: None,
         override_port: None,
@@ -118,7 +129,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
 fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+    network.transport_pool = vec![TransportConfig::Quic {
         bind_to: None,
         override_host: None,
         override_port: None,
@@ -150,7 +161,7 @@ fn conductors_local_boot_gossip(
 ) {
     let mut network = KitsuneP2pConfig::default();
     network.bootstrap_service = Some(url2::url2!("http://localhost:8787"));
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+    network.transport_pool = vec![TransportConfig::Quic {
         bind_to: None,
         override_host: None,
         override_port: None,
@@ -177,7 +188,7 @@ fn conductors_local_boot_gossip(
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
-    let transport = kitsune_p2p::TransportConfig::Quic {
+    let transport = TransportConfig::Quic {
         bind_to: None,
         override_port: None,
         override_host: None,
@@ -198,7 +209,7 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
         }
     };
 
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Proxy {
+    network.transport_pool = vec![TransportConfig::Proxy {
         sub_transport: transport.into(),
         proxy_config,
     }];
@@ -228,7 +239,7 @@ fn conductors_remote_boot_gossip(
     new_conductors: usize,
 ) {
     let mut network = KitsuneP2pConfig::default();
-    let transport = kitsune_p2p::TransportConfig::Quic {
+    let transport = TransportConfig::Quic {
         bind_to: None,
         override_port: None,
         override_host: None,
@@ -237,7 +248,7 @@ fn conductors_remote_boot_gossip(
     let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
         proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
     };
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Proxy {
+    network.transport_pool = vec![TransportConfig::Proxy {
         sub_transport: transport.into(),
         proxy_config,
     }];

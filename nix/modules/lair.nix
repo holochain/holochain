@@ -3,9 +3,9 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.66.1";
+        version = "1.75.0";
       };
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
@@ -39,7 +39,7 @@
       deps = craneLib.buildDepsOnly (commonArgs // { });
 
       # derivation with the main crates
-      package = craneLib.buildPackage (commonArgs // {
+      package = lib.makeOverridable craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
       });
 

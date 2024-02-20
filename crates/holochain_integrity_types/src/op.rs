@@ -9,7 +9,7 @@ use holochain_serialized_bytes::prelude::*;
 use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// These are the operations that can be applied to Holochain data.
 /// Every [`Action`] produces a set of operations.
 /// These operations are each sent to an authority for validation.
@@ -119,7 +119,7 @@ pub enum Op {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Stores a new [`Record`] in the DHT.
 /// This is the act of creating a new [`Action`]
 /// and publishing it to the DHT.
@@ -130,7 +130,7 @@ pub struct StoreRecord {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Stores a new [`Entry`] in the DHT.
 /// This is the act of creating a either a [`Action::Create`] or
 /// a [`Action::Update`] and publishing it to the DHT.
@@ -144,7 +144,7 @@ pub struct StoreEntry {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers an update from an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Update`] and
 /// publishing it to the DHT.
@@ -170,7 +170,7 @@ pub struct RegisterUpdate {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers a deletion of an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Delete`] and
 /// publishing it to the DHT.
@@ -187,7 +187,7 @@ pub struct RegisterDelete {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers a new [`Action`] on an agent source chain.
 /// This is the act of creating any [`Action`] and
 /// publishing it to the DHT.
@@ -208,7 +208,7 @@ impl AsRef<SignedActionHashed> for RegisterAgentActivity {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers a link between two [`Entry`]s.
 /// This is the act of creating a [`Action::CreateLink`] and
 /// publishing it to the DHT.
@@ -219,7 +219,7 @@ pub struct RegisterCreateLink {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Deletes a link between two [`Entry`]s.
 /// This is the act of creating a [`Action::DeleteLink`] and
 /// publishing it to the DHT.
@@ -338,7 +338,7 @@ impl Op {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Either a [`Action::Create`] or a [`Action::Update`].
 /// These actions both create a new instance of an [`Entry`].
 pub enum EntryCreationAction {
@@ -476,4 +476,45 @@ impl TryFrom<Action> for EntryCreationAction {
             _ => Err(crate::WrongActionError(format!("{:?}", value))),
         }
     }
+}
+
+/// A utility trait for associating a data enum
+/// with a unit enum that has the same variants.
+pub trait UnitEnum {
+    /// An enum with the same variants as the implementor
+    /// but without any data.
+    type Unit: core::fmt::Debug
+        + Clone
+        + Copy
+        + PartialEq
+        + Eq
+        + PartialOrd
+        + Ord
+        + core::hash::Hash;
+
+    /// Turn this type into it's unit enum.
+    fn to_unit(&self) -> Self::Unit;
+
+    /// Iterate over the unit variants.
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>>;
+}
+
+/// Needed as a base case for ignoring types.
+impl UnitEnum for () {
+    type Unit = ();
+
+    fn to_unit(&self) -> Self::Unit {}
+
+    fn unit_iter() -> Box<dyn Iterator<Item = Self::Unit>> {
+        Box::new([].into_iter())
+    }
+}
+
+/// A full UnitEnum, or just the unit type of that UnitEnum
+#[derive(Clone, Debug)]
+pub enum UnitEnumEither<E: UnitEnum> {
+    /// The full enum
+    Enum(E),
+    /// Just the unit enum
+    Unit(E::Unit),
 }

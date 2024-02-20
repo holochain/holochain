@@ -5,6 +5,7 @@ pub use crate::action::*;
 pub use crate::capability::*;
 pub use crate::chain::*;
 pub use crate::countersigning::*;
+pub use crate::dna_properties::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
@@ -25,5 +26,5 @@ pub use crate::x_salsa20_poly1305::x25519::*;
 pub use crate::x_salsa20_poly1305::*;
 pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
-pub use crate::zome_io::*;
-pub use crate::*;
+
+pub use holo_hash::*;

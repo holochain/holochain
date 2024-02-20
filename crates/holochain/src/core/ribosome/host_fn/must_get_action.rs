@@ -7,14 +7,17 @@ use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
+#[tracing::instrument(skip(_ribosome, call_context))]
 pub fn must_get_action<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: MustGetActionInput,
 ) -> Result<SignedActionHashed, RuntimeError> {
-    match HostFnAccess::from(&call_context.host_context()) {
+    tracing::debug!("begin must_get_action");
+    let ret = match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             read_workspace_deterministic: Permission::Allow,
             ..
@@ -89,5 +92,7 @@ pub fn must_get_action<'a>(
             .to_string(),
         ))
         .into()),
-    }
+    };
+    tracing::debug!(?ret);
+    ret
 }

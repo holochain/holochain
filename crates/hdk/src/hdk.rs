@@ -58,7 +58,7 @@ pub trait HdkT: HdiT {
     fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
-    fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
+    fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
     // Random
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
@@ -87,6 +87,11 @@ pub trait HdkT: HdiT {
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    // Cloning
+    fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
+    fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
+    fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
+    fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
 }
 
 #[cfg(feature = "mock")]
@@ -131,7 +136,7 @@ mockall::mock! {
         fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
         fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
         fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
-        fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
+        fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
         // Random
         fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
         // Time
@@ -160,7 +165,10 @@ mockall::mock! {
             &self,
             x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
         ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
-
+        fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
+        fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
+        fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
+        fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
     }
 
     impl HdiT for HdkT {
@@ -345,7 +353,7 @@ impl HdkT for ErrHdk {
     fn emit_signal(&self, _: AppSignal) -> ExternResult<()> {
         Self::err()
     }
-    fn remote_signal(&self, _: RemoteSignal) -> ExternResult<()> {
+    fn send_remote_signal(&self, _: RemoteSignal) -> ExternResult<()> {
         Self::err()
     }
     // Random
@@ -402,6 +410,23 @@ impl HdkT for ErrHdk {
         &self,
         _x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
+    // Cloning
+    fn create_clone_cell(&self, _input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
+        Self::err()
+    }
+
+    fn disable_clone_cell(&self, _input: DisableCloneCellInput) -> ExternResult<()> {
+        Self::err()
+    }
+
+    fn enable_clone_cell(&self, _input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
+        Self::err()
+    }
+
+    fn delete_clone_cell(&self, _input: DeleteCloneCellInput) -> ExternResult<()> {
         Self::err()
     }
 }
@@ -549,8 +574,8 @@ impl HdkT for HostHdk {
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
         host_call::<AppSignal, ()>(__hc__emit_signal_1, app_signal)
     }
-    fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
-        host_call::<RemoteSignal, ()>(__hc__remote_signal_1, remote_signal)
+    fn send_remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
+        host_call::<RemoteSignal, ()>(__hc__send_remote_signal_1, remote_signal)
     }
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
         host_call::<u32, Bytes>(__hc__random_bytes_1, number_of_bytes)
@@ -617,6 +642,22 @@ impl HdkT for HostHdk {
             __hc__x_25519_x_salsa20_poly1305_encrypt_1,
             x_25519_x_salsa20_poly1305_encrypt,
         )
+    }
+
+    fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
+        host_call::<CreateCloneCellInput, ClonedCell>(__hc__create_clone_cell_1, input)
+    }
+
+    fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()> {
+        host_call::<DisableCloneCellInput, ()>(__hc__disable_clone_cell_1, input)
+    }
+
+    fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
+        host_call::<EnableCloneCellInput, ClonedCell>(__hc__enable_clone_cell_1, input)
+    }
+
+    fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()> {
+        host_call::<DeleteCloneCellInput, ()>(__hc__delete_clone_cell_1, input)
     }
 }
 

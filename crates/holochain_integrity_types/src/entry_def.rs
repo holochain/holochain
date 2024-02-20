@@ -8,21 +8,25 @@ const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum EntryDefId {
     App(AppEntryName),
     CapClaim,
     CapGrant,
 }
 
+/// Identifier for an entry definition.
+/// This may be removed.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-/// Identifier for an entry definition.
-/// This may be removed.
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct AppEntryName(pub Cow<'static, str>);
 
-#[cfg(feature = "arbitrary")]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for AppEntryName {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self(Cow::Owned(String::arbitrary(u)?)))
@@ -34,7 +38,7 @@ impl<'a> arbitrary::Arbitrary<'a> for AppEntryName {
 /// at compile time.
 ///
 /// # Derivable
-/// This trait can be used with `#[derive]` or by using the attribute macro `hdk_derive::hdk_entry_defs`.
+/// This trait can be used with `#[derive]` or by using the attribute macro `hdk_derive::hdk_entry_types`.
 pub trait EntryDefRegistration {
     /// The list of [`EntryDef`] properties for the implementing type.
     /// This must be in the same order as the
@@ -46,13 +50,19 @@ pub trait EntryDefRegistration {
 )]
 /// The number of validations required for an entry to
 /// be considered published.
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct RequiredValidations(pub u8);
 
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
     pub id: EntryDefId,
@@ -84,7 +94,10 @@ pub struct EntryDefs(pub Vec<EntryDef>);
     Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum EntryVisibility {
     Public,
     Private,

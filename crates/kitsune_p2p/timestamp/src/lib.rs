@@ -21,6 +21,9 @@ pub(crate) use chrono_ext::*;
 #[cfg(feature = "chrono")]
 mod chrono_ext;
 
+#[cfg(feature = "fuzzing")]
+pub mod noise;
+
 /// One million
 pub const MM: i64 = 1_000_000;
 
@@ -43,7 +46,10 @@ pub const MM: i64 = 1_000_000;
 /// Supports +/- `chrono::Duration` directly.  There is no `Timestamp::now()` method, since this is not
 /// supported by WASM; however, `holochain_types` provides a `Timestamp::now()` method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 #[cfg_attr(not(feature = "chrono"), derive(Debug))]
 pub struct Timestamp(
     /// Microseconds from UNIX Epoch, positive or negative
@@ -196,7 +202,7 @@ impl rusqlite::types::FromSql for Timestamp {
 }
 
 /// It's an interval bounded by timestamps that are not infinite.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq, Hash)]
 pub struct InclusiveTimestampInterval {
     start: Timestamp,
     end: Timestamp,
@@ -229,7 +235,7 @@ mod tests {
 
     use super::*;
 
-    const TEST_TS: &'static str = "2020-05-05T19:16:04.266431Z";
+    const TEST_TS: &str = "2020-05-05T19:16:04.266431Z";
 
     #[test]
     fn timestamp_distance() {
@@ -274,14 +280,23 @@ mod tests {
     }
 
     #[test]
+    fn test_timestamp_alternate_forms() {
+        use holochain_serialized_bytes::prelude::*;
+
+        decode::<_, Timestamp>(&encode(&(0u64)).unwrap()).unwrap();
+        decode::<_, Timestamp>(&encode(&(i64::MAX as u64)).unwrap()).unwrap();
+        assert!(decode::<_, Timestamp>(&encode(&(i64::MAX as u64 + 1)).unwrap()).is_err());
+    }
+
+    #[test]
     fn inclusive_timestamp_interval_test_new() {
         // valids.
-        for (start, end) in vec![(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
+        for (start, end) in [(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
             InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end)).unwrap();
         }
 
         // invalids.
-        for (start, end) in vec![(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
+        for (start, end) in [(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
             assert!(
                 super::InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end))
                     .is_err()

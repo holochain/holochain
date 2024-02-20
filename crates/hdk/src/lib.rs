@@ -50,20 +50,20 @@
 //! HDK implements several key features:
 //!
 //! - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
-//! - Capabilities and function level access control: [`capability`](crate::capability) module
-//! - [Holochain Deterministic Integrity (HDI)](crate::hdi)
-//! - Application data and entry definitions for the source chain and DHT: [`entry`](crate::entry)
-//! module and [`entry_defs`](crate::prelude::entry_defs) callback
-//! - Referencing/linking entries on the DHT together into a graph structure: [`link`](crate::link) module
-//! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`](crate::hash_path) module
+//! - Capabilities and function level access control: [`capability`] module
+//! - [Holochain Deterministic Integrity (HDI)]
+//! - Application data and entry definitions for the source chain and DHT: [`entry`]
+//! module and [entry_types] callback
+//! - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
+//! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
 //! - Create, read, update, delete (CRUD) operations on the above
-//! - Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: [`x_salsa20_poly1305`](crate::x_salsa20_poly1305) module
-//! - Ed25519 signing and verification of data: [`ed25519`](crate::ed25519) module
-//! - Exposing information about the current execution context such as zome name: [`info`](crate::info) module
+//! - Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: [`x_salsa20_poly1305`] module
+//! - Ed25519 signing and verification of data: [`ed25519`] module
+//! - Exposing information about the current execution context such as zome name: [`info`] module
 //! - Other utility functions provided by the host such as generating randomness and timestamps that are impossible in WASM: utility module
 //! - Exposing functions to external processes and callbacks to the host: [`hdk_extern!`](macro@crate::prelude::hdk_extern) and [`map_extern!`](macro@crate::prelude::map_extern) macros
 //! - Integration with the Rust [tracing](https://docs.rs/tracing/0.1.23/tracing/) crate
-//! - Exposing a [`prelude`](crate::prelude) of common types and functions for convenience
+//! - Exposing a [`prelude`] of common types and functions for convenience
 //!
 //! Generally these features are structured logically into modules but there are some affordances to the layering of abstractions.
 //!
@@ -173,7 +173,6 @@
 //!   - Allows the guest to pass/fail/retry any operation.
 //!   - Only the originating zome is called.
 //!   - Failure overrides retry.
-//!   - See [`validate`](crate::hdi::prelude::validate) for more details.
 //!
 //! # HDK has layers 🧅
 //!
@@ -398,56 +397,10 @@ pub mod countersigning;
 pub mod entry;
 
 pub use hdi;
-pub use hdi::entry_defs;
+pub use hdi::entry_types;
 
 pub mod hash;
 
-/// Distributed Hash Tables (DHTs) are fundamentally all key/value stores (content addressable).
-///
-/// This has lots of benefits but can make discoverability difficult.
-///
-/// When agents have the hash for some content they can directly fetch it but they need a way to discover the hash.
-/// For example, Alice can create new usernames or chat messages while Bob is offline.
-/// Unless there is a registry at a known location for Bob to lookup new usernames and chat messages he will never discover them.
-///
-/// The most basic solution is to create a single entry with constant content, e.g. "chat-messages" and link all messages from this.
-///
-/// The basic solution has two main issues:
-///
-/// - Fetching _all_ chat messages may be something like fetching _all_ tweets (impossible, too much data)
-/// - Holochain neighbourhoods (who needs to hold the data) center around the content address so the poor nodes closest to "chat-messages" will be forced to hold _all_ messages (DHT hotspots)
-///
-/// To address this problem we can introduce a tree structure.
-/// Ideally the tree structure embeds some domain specific _granularity_ into each "hop".
-/// For example the root level for chat messages could link to years, each year can link to months, then days and minutes.
-/// The "minutes" level will link to all chat messages in that exact minute.
-/// Any minutes with no chat messages will simply never be linked to.
-/// A GUI can poll from as deep in the tree as makes sense, for example it could start at the current day when the application first loads and then poll the past 5 minutes in parallel every 2 minutes (just a conceptual example).
-///
-/// If the tree embeds granularity then it can replace the need for 'pagination' which is a problematic concept in a partitioned p2p network.
-/// If the tree cannot embed meaningful granularity, for example maybe the only option is to build a tree based on the binary representation of the hash of the content, then we solve DHT hotspots but our applications will have no way to narrow down polling, other than to brute force the tree.
-///
-/// Examples of granularity include:
-///
-/// - Latitude/longitude for geo data
-/// - Timestamps
-/// - Lexical (alphabetical) ordering
-/// - Orders of magnitude
-/// - File system paths
-/// - Etc.
-///
-/// When modelling your data into open sets/collections that need to be looked up, try to find a way to create buckets of granularity that don't need to be brute forced.
-///
-/// In the case that granularity can be defined the tree structure solves both our main issues:
-///
-/// - We never need to fetch _all_ messages because we can start as deeply down the tree as is appropriate and
-/// - We avoid DHT hotspots because each branch of the tree has its own hash and set of links, therefore a different neighbourhood of agents
-///
-/// The [`hash_path`] module includes 3 submodules to help build and navigate these tree structures efficiently:
-///
-/// - [`hash_path::path`] is the basic general purpose implementation of tree structures as `Vec<Vec<u8>>`
-/// - [`hash_path::shard`] is a string based DSL for creating lexical shards out of strings as utf-32 (e.g. usernames)
-/// - [`hash_path::anchor`] implements the "anchor" pattern (two level string based tree, "type" and "text") in terms of paths
 pub mod hash_path;
 
 /// Maps a Rust function to an extern that WASM can expose to the Holochain host.
@@ -619,3 +572,9 @@ pub mod random;
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
 pub mod hdk;
+
+/// Create and manage clone cells in the current app.
+///
+/// Clone cells are a way to create a new cell that is a copy of an existing cell. They are based on the DNA of an existing cell, and run
+/// with the same agent key, but have a unique name or properties that distinguish them from the original cell.
+pub mod clone;

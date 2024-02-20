@@ -1,11 +1,14 @@
 //! Implements TestChainItem, a type used with isotest
 
+// for isotest, TODO add to isotest macro itself
+#![allow(non_snake_case)]
+
 use std::ops::Range;
 
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use holo_hash::*;
-use holochain_zome_types::*;
+use holochain_zome_types::prelude::*;
 
 use crate::prelude::ChainItem;
 
@@ -104,6 +107,10 @@ impl ChainItem for TestChainItem {
 
     fn prev_hash(&self) -> Option<&Self::Hash> {
         self.prev.as_ref()
+    }
+
+    fn to_display(&self) -> String {
+        String::from("test chain item")
     }
 }
 
@@ -236,7 +243,7 @@ pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedA
 
 /// Produce a sequence of AgentActivity ops from a Vec of ChainItems
 pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
-    let mut u = Unstructured::new(&holochain_zome_types::NOISE);
+    let mut u = Unstructured::new(&holochain_zome_types::prelude::NOISE);
     chain
         .into_iter()
         .map(|i| {
@@ -249,7 +256,7 @@ pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
 
 isotest::iso! {
     TestChainItem => |i| {
-        let mut u = Unstructured::new(&holochain_zome_types::NOISE);
+        let mut u = Unstructured::new(&holochain_zome_types::prelude::NOISE);
         chain_item_to_action(&mut u, &i)
     },
     SignedActionHashed => |a| {

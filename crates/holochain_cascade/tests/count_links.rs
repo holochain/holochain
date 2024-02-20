@@ -1,15 +1,8 @@
-use hdk::prelude::Timestamp;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_state::mutations::insert_op_scratch;
-use holochain_state::prelude::test_authored_db;
-use holochain_state::prelude::test_cache_db;
-use holochain_state::prelude::test_dht_db;
-use holochain_state::scratch::Scratch;
-use holochain_types::link::{CountLinksResponse, WireLinkQuery};
+use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::action_hash;
-use holochain_zome_types::{fake_agent_pub_key, ChainTopOrdering};
 
 // Checks that links can be counted by asking a remote peer who is an authority on the base for the count
 #[tokio::test(flavor = "multi_thread")]
@@ -22,8 +15,8 @@ async fn count_links_not_authority() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&authority.to_db(), td.store_entry_op.clone());
-    fill_db(&authority.to_db(), td.create_link_op.clone());
+    fill_db(&authority.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&authority.to_db(), td.create_link_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
@@ -38,7 +31,7 @@ async fn count_links_not_authority() {
 
     assert_eq!(count, td.links.len());
 
-    fill_db(&authority.to_db(), td.delete_link_op.clone());
+    fill_db(&authority.to_db(), td.delete_link_op.clone()).await;
 
     let count = cascade
         .dht_count_links(td.link_query.clone())
@@ -59,8 +52,8 @@ async fn count_links_authority() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&vault.to_db(), td.store_entry_op.clone());
-    fill_db(&vault.to_db(), td.create_link_op.clone());
+    fill_db(&vault.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&vault.to_db(), td.create_link_op.clone()).await;
 
     // Network
     // - Not expecting any calls to the network.
@@ -80,7 +73,7 @@ async fn count_links_authority() {
 
     assert_eq!(count, td.links.len());
 
-    fill_db(&vault.to_db(), td.delete_link_op.clone());
+    fill_db(&vault.to_db(), td.delete_link_op.clone()).await;
 
     let count = cascade
         .dht_count_links(td.link_query.clone())
@@ -165,8 +158,8 @@ async fn count_links_with_filters() {
 
     // Data
     let td = EntryTestData::create();
-    fill_db(&authority.to_db(), td.store_entry_op.clone());
-    fill_db(&authority.to_db(), td.create_link_op.clone());
+    fill_db(&authority.to_db(), td.store_entry_op.clone()).await;
+    fill_db(&authority.to_db(), td.create_link_op.clone()).await;
 
     // Network
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);

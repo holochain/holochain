@@ -117,7 +117,10 @@ async fn inner() -> KitsuneResult<()> {
     let f = tx2_proxy(f, conf)?;
 
     let ep = f
-        .bind(opt.bind_to.into(), KitsuneTimeout::from_millis(60 * 1000))
+        .bind(
+            opt.bind_to.try_into().unwrap(),
+            KitsuneTimeout::from_millis(60 * 1000),
+        )
         .await?;
     println!("{}", ep.handle().local_addr()?);
 

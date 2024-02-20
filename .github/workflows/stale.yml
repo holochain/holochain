@@ -1,0 +1,29 @@
+name: Stale
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 2 * * *"
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v8
+        with:
+          days-before-issue-stale: 30
+          days-before-issue-close: 14
+          stale-issue-label: "stale"
+          stale-issue-message: "This item has been open for 30 days with no activity."
+          close-issue-message: "This item has been inactive for 14 days since being marked as stale."
+          exempt-issue-labels: "permanent"
+          days-before-pr-stale: 30
+          days-before-pr-close: 14
+          stale-pr-label: "stale"
+          stale-pr-message: "This item has been open for 30 days with no activity."
+          close-pr-message: "This item has been inactive for 14 days since being marked as stale."
+          exempt-pr-labels: "permanent"
+          operations-per-run: 330
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

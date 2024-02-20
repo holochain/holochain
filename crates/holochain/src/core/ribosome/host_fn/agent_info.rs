@@ -5,6 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
@@ -59,7 +60,7 @@ pub mod test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn agent_info_test() {
+    async fn host_fn_agent_info_test() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,

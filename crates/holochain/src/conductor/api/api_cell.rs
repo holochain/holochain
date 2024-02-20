@@ -127,7 +127,7 @@ impl CellConductorApiT for CellConductorApi {
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
@@ -173,7 +173,7 @@ pub trait CellConductorApiT: Send + Sync {
 }
 
 #[async_trait]
-#[mockall::automock]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
 pub trait CellConductorReadHandleT: Send + Sync {
@@ -217,6 +217,30 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Expose is_blocked functionality to zomes.
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
+
+    /// Find an installed app by one of its [CellId]s.
+    async fn find_app_containing_cell(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Option<InstalledApp>>;
+
+    /// Expose create_clone_cell functionality to zomes.
+    async fn create_clone_cell(
+        &self,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose disable_clone_cell functionality to zomes.
+    async fn disable_clone_cell(&self, payload: DisableCloneCellPayload) -> ConductorResult<()>;
+
+    /// Expose enable_clone_cell functionality to zomes.
+    async fn enable_clone_cell(
+        &self,
+        payload: EnableCloneCellPayload,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose delete_clone_cell functionality to zomes.
+    async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()>;
 }
 
 #[async_trait]
@@ -279,5 +303,48 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
+    }
+
+    async fn find_app_containing_cell(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Option<InstalledApp>> {
+        self.conductor_handle
+            .find_app_containing_cell(cell_id)
+            .await
+    }
+
+    async fn create_clone_cell(
+        &self,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle
+            .clone()
+            .create_clone_cell(payload)
+            .await
+    }
+
+    async fn disable_clone_cell(&self, payload: DisableCloneCellPayload) -> ConductorResult<()> {
+        self.conductor_handle
+            .clone()
+            .disable_clone_cell(&payload)
+            .await
+    }
+
+    async fn enable_clone_cell(
+        &self,
+        payload: EnableCloneCellPayload,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle
+            .clone()
+            .enable_clone_cell(&payload)
+            .await
+    }
+
+    async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()> {
+        self.conductor_handle
+            .clone()
+            .delete_clone_cell(&payload)
+            .await
     }
 }

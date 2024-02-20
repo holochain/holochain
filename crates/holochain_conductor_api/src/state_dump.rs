@@ -1,7 +1,8 @@
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
-use holochain_state::source_chain::SourceChainJsonDump;
+use holochain_state_types::SourceChainDump;
 use holochain_types::dht_op::DhtOp;
+use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -9,14 +10,14 @@ use std::sync::Arc;
 #[derive(Serialize, Deserialize)]
 pub struct JsonDump {
     pub peer_dump: P2pAgentsDump,
-    pub source_chain_dump: SourceChainJsonDump,
+    pub source_chain_dump: SourceChainDump,
     pub integration_dump: IntegrationStateDump,
 }
 
 #[derive(Serialize, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct FullStateDump {
     pub peer_dump: P2pAgentsDump,
-    pub source_chain_dump: SourceChainJsonDump,
+    pub source_chain_dump: SourceChainDump,
     pub integration_dump: FullIntegrationStateDump,
 }
 
@@ -68,10 +69,10 @@ pub struct FullIntegrationStateDump {
 pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
-    /// The dna as a [`DnaHash`] and [`kitsune_p2p::KitsuneSpace`].
-    pub this_dna: Option<(DnaHash, kitsune_p2p::KitsuneSpace)>,
-    /// The agent as [`AgentPubKey`] and [`kitsune_p2p::KitsuneAgent`].
-    pub this_agent: Option<(AgentPubKey, kitsune_p2p::KitsuneAgent)>,
+    /// The dna as a [`DnaHash`] and [`kitsune_p2p_types::KitsuneSpace`].
+    pub this_dna: Option<(DnaHash, KitsuneSpace)>,
+    /// The agent as [`AgentPubKey`] and [`kitsune_p2p_types::KitsuneAgent`].
+    pub this_agent: Option<(AgentPubKey, KitsuneAgent)>,
     /// All other agent info.
     pub peers: Vec<AgentInfoDump>,
 }
@@ -81,8 +82,8 @@ pub struct P2pAgentsDump {
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
 pub struct AgentInfoDump {
-    pub kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
-    pub kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+    pub kitsune_agent: Arc<KitsuneAgent>,
+    pub kitsune_space: Arc<KitsuneSpace>,
     pub dump: String,
 }
 

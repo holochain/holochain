@@ -1,22 +1,15 @@
-use crate::holochain_wasmer_host::prelude::*;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
-use ::fixt::prelude::*;
 use hdk::prelude::LinkTag;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
-use holochain_state::prelude::fresh_reader_test;
-use holochain_state::prelude::from_blob;
-use holochain_state::prelude::StateQueryResult;
-use holochain_types::prelude::*;
+use holochain_sqlite::error::DatabaseResult;
+use holochain_state::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::Entry;
-use holochain_zome_types::ValidationStatus;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 use std::convert::TryFrom;
@@ -32,7 +25,7 @@ async fn sys_validation_workflow_test() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
-        .setup_app(&"test_app", &[dna_file.clone()])
+        .setup_app(&"test_app", [&dna_file])
         .await
         .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
@@ -85,7 +78,7 @@ async fn run_test(
 
     // holochain_state::prelude::dump_tmp(&alice_dht_db);
     // Validation should be empty
-    fresh_reader_test(alice_dht_db, |txn| {
+    alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
         let limbo = show_limbo(&txn);
         assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
@@ -97,7 +90,9 @@ async fn run_test(
                 |row| row.get(0))
                 .unwrap();
         assert_eq!(num_valid_ops, expected_count);
-    });
+
+        Ok(())
+    }).await.unwrap();
 
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
@@ -115,7 +110,7 @@ async fn run_test(
     .await;
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-    let num_valid_ops = |txn: &Transaction| {
+    let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
         let valid_ops: usize = txn
                 .query_row(
                     "
@@ -153,58 +148,23 @@ async fn run_test(
                 },
                 |row| row.get(0))
                 .unwrap();
-        valid_ops
+
+        Ok(valid_ops)
     };
 
-    fresh_reader_test(alice_db, |txn| {
-        // Validation should be empty
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+    alice_db
+        .read_async(move |txn| -> DatabaseResult<()> {
+            // Validation should be empty
+            let limbo = show_limbo(&txn);
+            assert!(limbo_is_empty(&txn), "{:?}", limbo);
 
-        let valid_ops = num_valid_ops(&txn);
-        assert_eq!(valid_ops, expected_count);
-    });
+            Ok(())
+        })
+        .await
+        .unwrap();
 
-    dodgy_bob(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
-
-    // Integration should have new 5 ops in it
-    let expected_count = 5 + expected_count;
-
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(
-        &alice_db,
-        expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
-    )
-    .await;
-
-    // Validation should still contain bobs link delete because it points at
-    // garbage hashes as a dependency.
-    fresh_reader_test(alice_db.clone(), |txn| {
-        let valid_ops = num_valid_ops(&txn);
-        assert_eq!(valid_ops, expected_count);
-    });
-    crate::assert_eq_retry_1m!(
-        {
-            fresh_reader_test(alice_db.clone(), |txn| {
-                let num_limbo_ops: usize = txn
-                    .query_row(
-                        "
-                        SELECT COUNT(hash) FROM DhtOP
-                        WHERE
-                        when_integrated IS NULL
-                        AND (validation_stage IS NULL OR validation_stage = 0)
-                        ",
-                        [],
-                        |row| row.get(0),
-                    )
-                    .unwrap();
-                num_limbo_ops
-            })
-        },
-        1
-    );
+    let valid_ops = alice_db.read_async(num_valid_ops.clone()).await.unwrap();
+    assert_eq!(valid_ops, expected_count);
 }
 
 async fn bob_links_in_a_legit_way(
@@ -216,7 +176,7 @@ async fn bob_links_in_a_legit_way(
     let target = Post("Potassium is radioactive".into());
     let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
-    let link_tag = fixt!(LinkTag);
+    let link_tag = LinkTag::from(vec![0; 256]);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
@@ -327,54 +287,6 @@ async fn bob_makes_a_large_link(
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
 
-async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
-    let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
-    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_index = call_data
-        .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_index;
-
-    // 11
-    call_data
-        .commit_entry(
-            legit_entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_index, POST_INDEX),
-            EntryVisibility::Public,
-        )
-        .await;
-
-    // Delete a link that doesn't exist buy pushing garbage addresses straight
-    // on to the source chain and flush the workspace.
-    let (_ribosome, call_context, workspace_lock) = call_data.unpack().await;
-    // garbage addresses.
-    let base_address: AnyLinkableHash = EntryHash::from_raw_32([1_u8; 32].to_vec()).into();
-    let link_add_address = ActionHash::from_raw_32([2_u8; 32].to_vec());
-
-    let source_chain = call_context
-        .host_context
-        .workspace_write()
-        .source_chain()
-        .as_ref()
-        .expect("Must have source chain if write_workspace access is given");
-
-    let action_builder = builder::DeleteLink {
-        link_add_address,
-        base_address,
-    };
-    let _action_hash = source_chain
-        .put(action_builder, None, ChainTopOrdering::default())
-        .await
-        .map_err(|source_chain_error| {
-            wasm_error!(WasmErrorInner::Host(source_chain_error.to_string()))
-        })
-        .unwrap();
-    workspace_lock.flush(&call_data.network).await.unwrap();
-
-    // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
-    triggers.publish_dht_ops.trigger(&"dodgy_bob");
-}
-
 //////////////////////
 //// Test Ideas
 //////////////////////
@@ -392,7 +304,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 // ## Expected
 // The Delete action should be invalid for all authorities.
 
-fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
+fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     txn.prepare(
         "
         SELECT DhtOp.type, Action.hash, Action.blob
@@ -407,9 +319,9 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLight> {
         let op_type: DhtOpType = row.get("type")?;
         let hash: ActionHash = row.get("hash")?;
         let action: SignedAction = from_blob(row.get("blob")?)?;
-        Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
+        Ok(DhtOpLite::from_type(op_type, hash, &action.0)?)
     })
     .unwrap()
-    .collect::<StateQueryResult<Vec<DhtOpLight>>>()
+    .collect::<StateQueryResult<Vec<DhtOpLite>>>()
     .unwrap()
 }

@@ -9,7 +9,7 @@ name = "test_wasm_integrity_zome"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-serde = "1.0"
+serde = { workspace = true }
 hdi = { path = "../../../../hdi" }
 holochain_mock_hdi = { path = "../../../../mock_hdi", optional = true }
 

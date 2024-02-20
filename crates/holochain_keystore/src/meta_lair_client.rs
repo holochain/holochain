@@ -1,7 +1,7 @@
 use holo_hash::AgentPubKey;
-use holochain_zome_types::Signature;
+use holochain_zome_types::prelude::*;
 use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
-use lair_keystore_api::prelude::*;
+use lair_keystore_api::prelude::{X25519PubKey, *};
 use parking_lot::Mutex;
 use std::future::Future;
 use std::sync::Arc;

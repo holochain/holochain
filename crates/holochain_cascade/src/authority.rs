@@ -35,9 +35,7 @@ pub async fn handle_get_entry(
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
     let query = GetEntryOpsQuery::new(hash);
-    let results = db
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
-        .await?;
+    let results = db.read_async(move |txn| query.run(Txn::from(&txn))).await?;
     Ok(results)
 }
 
@@ -50,7 +48,7 @@ pub async fn handle_get_record(
 ) -> CascadeResult<WireRecordOps> {
     let query = GetRecordOpsQuery::new(hash, options);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -65,7 +63,7 @@ pub async fn handle_get_agent_activity(
 ) -> CascadeResult<AgentActivityResponse<ActionHash>> {
     let query = GetAgentActivityQuery::new(agent, query, options);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -90,7 +88,7 @@ pub async fn handle_get_agent_activity_deterministic(
 ) -> CascadeResult<DeterministicGetAgentActivityResponse> {
     let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -104,7 +102,7 @@ pub async fn handle_get_links(
 ) -> CascadeResult<WireLinkOps> {
     let query = GetLinksOpsQuery::new(link_key);
     let results = env
-        .async_reader(move |txn| query.run(Txn::from(&txn)))
+        .read_async(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
 }
@@ -122,6 +120,6 @@ pub async fn handle_get_links_query(
         query.into(),
     );
     Ok(db
-        .async_reader(move |txn| get_links_query.run(Txn::from(&txn)))
+        .read_async(move |txn| get_links_query.run(Txn::from(&txn)))
         .await?)
 }

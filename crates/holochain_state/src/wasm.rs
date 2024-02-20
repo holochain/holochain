@@ -52,13 +52,11 @@ pub fn put(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holo_hash::HasHash;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
-        use holochain_sqlite::prelude::*;
         holochain_trace::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
@@ -70,17 +68,24 @@ mod tests {
                 .await;
 
         // Put wasm
-        db.conn()?
-            .with_commit_sync(|txn| put(txn, wasm.clone()))
-            .unwrap();
-        fresh_reader_test!(db, |txn| {
-            assert!(contains(&txn, &wasm.as_hash()).unwrap());
+        db.write_async({
+            let put_wasm = wasm.clone();
+
+            move |txn| put(txn, put_wasm.clone())
+        })
+        .await
+        .unwrap();
+        db.read_async(move |txn| -> DatabaseResult<()> {
+            assert!(contains(&txn, wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
-            let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
+            let ret = get(&txn, wasm.as_hash()).unwrap().unwrap();
 
             // assert the round trip
             assert_eq!(ret, wasm);
-        });
+
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }

@@ -75,8 +75,6 @@ rec {
     ]);
   });
 
-
-
   ci = hcMkShell {
     inputsFrom = [
       (builtins.removeAttrs coreDev [ "shellHook" ])

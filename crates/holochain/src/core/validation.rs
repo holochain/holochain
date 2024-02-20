@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use holo_hash::DhtOpHash;
 use holochain_types::dht_op::DhtOp;
 
-use super::workflow::error::WorkflowResult;
+use super::workflow::WorkflowResult;
 use super::SourceChainError;
 use super::SysValidationError;
 use super::ValidationOutcome;
@@ -86,7 +86,7 @@ impl<V> PartialEq for OrderedOp<V> {
 }
 impl<V> PartialOrd for OrderedOp<V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.order.partial_cmp(&other.order)
+        Some(self.cmp(other))
     }
 }
 impl<V> Eq for OrderedOp<V> {}

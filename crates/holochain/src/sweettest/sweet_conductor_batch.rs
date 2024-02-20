@@ -1,12 +1,10 @@
-use std::path::PathBuf;
-
-use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
+use super::{DnaWithRole, SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::{SweetCell, SweetLocalRendezvous};
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
-use holochain_types::prelude::*;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -18,12 +16,17 @@ impl SweetConductorBatch {
     pub fn new(conductors: Vec<SweetConductor>) -> Self {
         let paths: HashSet<PathBuf> = conductors
             .iter()
-            .map(|c| c.config.environment_path.clone().into())
+            .filter_map(|c| {
+                c.config
+                    .data_root_path
+                    .as_ref()
+                    .map(|data_path| data_path.as_ref().clone())
+            })
             .collect();
         assert_eq!(
             conductors.len(),
             paths.len(),
-            "Some conductors in a SweetConductorBatch share the same database path!"
+            "Some conductors in a SweetConductorBatch share the same data path (or don't have a path)!"
         );
         Self(conductors)
     }
@@ -61,6 +64,7 @@ impl SweetConductorBatch {
         num: usize,
         config: C,
     ) -> SweetConductorBatch {
+        let config = config.into();
         Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
@@ -70,6 +74,7 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig> + Clone,
     {
         let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
+        let config = config.into();
         Self::new(
             future::join_all(
                 std::iter::repeat(config)
@@ -128,19 +133,22 @@ impl SweetConductorBatch {
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each SweetApp.
-    pub async fn setup_app(
+    pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dna_files: &[DnaFile],
+        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
-            .map(|conductor| async move {
-                let agent = SweetAgents::one(conductor.keystore()).await;
-                conductor
-                    .setup_app_for_agent(installed_app_id, agent, dna_files)
-                    .await
+            .map(|conductor| {
+                let dna_files = dna_files.clone();
+                async move {
+                    let agent = SweetAgents::one(conductor.keystore()).await;
+                    conductor
+                        .setup_app_for_agent(installed_app_id, agent, dna_files)
+                        .await
+                }
             })
             .collect::<Vec<_>>();
 
@@ -160,13 +168,13 @@ impl SweetConductorBatch {
     ///
     /// Returns a batch of SweetApps, sorted in the same order as the Conductors in
     /// this batch.
-    pub async fn setup_app_for_zipped_agents(
+    pub async fn setup_app_for_zipped_agents<'a>(
         &mut self,
         installed_app_id: &str,
-        agents: &[AgentPubKey],
-        dna_files: &[DnaFile],
+        agents: impl IntoIterator<Item = &AgentPubKey> + Clone,
+        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
-        if agents.len() != self.0.len() {
+        if agents.clone().into_iter().count() != self.0.len() {
             panic!(
                 "setup_app_for_zipped_agents must take as many Agents as there are Conductors in this batch."
             )
@@ -175,9 +183,9 @@ impl SweetConductorBatch {
         let apps = self
             .0
             .iter_mut()
-            .zip(agents.iter())
+            .zip(agents.into_iter())
             .map(|(conductor, agent)| {
-                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files)
+                conductor.setup_app_for_agent(installed_app_id, agent.clone(), dna_files.clone())
             })
             .collect::<Vec<_>>();
 
@@ -191,6 +199,11 @@ impl SweetConductorBatch {
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
         SweetConductor::exchange_peer_info(&self.0).await
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
+        SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
     }
 
     /// Let each conductor know about each others' agents so they can do networking
@@ -226,6 +239,13 @@ impl SweetConductorBatch {
     pub async fn force_all_publish_dht_ops(&self) {
         for c in self.0.iter() {
             c.force_all_publish_dht_ops().await;
+        }
+    }
+
+    /// Make the temp db dir persistent
+    pub fn persist_dbs(&mut self) {
+        for c in self.0.iter_mut() {
+            let _ = c.persist_dbs();
         }
     }
 

@@ -14,8 +14,8 @@ path = "src/integrity.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-serde = "1.0"
-tracing = "0.1"
+serde = { workspace = true }
+tracing = { workspace = true }
 tracing-core = "0.1"
 hdi = { path = "../../../../hdi", features = ["trace"] }
 hdk = { path = "../../../../hdk" }

@@ -6,6 +6,7 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
 use holochain_types::prelude::*;
+use wasmer::RuntimeError;
 
 pub fn unblock_agent(
     _ribosome: Arc<impl RibosomeT>,

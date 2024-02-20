@@ -7,15 +7,8 @@ use holochain_cascade::CascadeImpl;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
-use holochain_state::prelude::test_cache_db;
-use holochain_state::prelude::test_dht_db;
-use holochain_state::scratch::Scratch;
-use holochain_types::activity::*;
-use holochain_types::chain::MustGetAgentActivityResponse;
+use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
-use holochain_zome_types::ChainFilter;
-use holochain_zome_types::ChainQueryFilter;
-use holochain_zome_types::ChainStatus;
 use test_case::test_case;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -30,13 +23,13 @@ async fn get_activity() {
     let td = ActivityTestData::valid_chain_scenario();
 
     for hash_op in td.hash_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op);
+        fill_db(&authority.to_db(), hash_op).await;
     }
     for hash_op in td.noise_ops.iter().cloned() {
-        fill_db(&authority.to_db(), hash_op);
+        fill_db(&authority.to_db(), hash_op).await;
     }
     for hash_op in td.store_ops.iter().cloned() {
-        fill_db(&cache.to_db(), hash_op);
+        fill_db(&cache.to_db(), hash_op).await;
     }
 
     let options = holochain_p2p::actor::GetActivityOptions {

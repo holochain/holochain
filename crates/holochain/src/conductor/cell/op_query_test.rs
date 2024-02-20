@@ -1,12 +1,12 @@
+use ::fixt::prelude::*;
 use chrono::Duration;
 use chrono::Utc;
-use fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
 use holochain_state::mutations;
 use holochain_state::prelude::test_cell_db;
-use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::DhtOpLite;
 use holochain_zome_types::fixt::*;
-use holochain_zome_types::Timestamp;
+use holochain_zome_types::prelude::Timestamp;
 use holochain_zome_types::ValidationStatus;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -27,7 +27,7 @@ async fn test_dht_op_query() {
     let values = times.into_iter().map(|when_integrated| {
         (
             ValidationStatus::Valid,
-            DhtOpLight::RegisterAgentActivity(fixt!(ActionHash), basis.next().unwrap()),
+            DhtOpLite::RegisterAgentActivity(fixt!(ActionHash), basis.next().unwrap()),
             Timestamp::from(when_integrated),
         )
     });
@@ -42,7 +42,7 @@ async fn test_dht_op_query() {
                 .unwrap();
             buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
             expected.push(value.clone());
-            value.op = DhtOpLight::RegisterAgentActivity(fixt!(ActionHash), same_basis.clone());
+            value.op = DhtOpLite::RegisterAgentActivity(fixt!(ActionHash), same_basis.clone());
             buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
             expected.push(value.clone());
         }

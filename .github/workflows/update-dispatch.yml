@@ -37,10 +37,16 @@ jobs:
             cmd: "nix run .#scripts-repo-flake-update 0_1"
           - source: "versions/0_2"
             cmd: "nix run .#scripts-repo-flake-update 0_2"
+          - source: "versions/0_2_rc"
+            cmd: "nix run .#scripts-repo-flake-update 0_2_rc"
+          - source: "versions/weekly"
+            cmd: "nix run .#scripts-repo-flake-update weekly"
           - source: "rust-overlay"
             cmd: "nix flake lock --update-input rust-overlay"
           - source: "nixpkgs"
             cmd: "nix flake lock --update-input nixpkgs"
+          - source: "crates-io"
+            cmd: "nix develop .#coreDev --command scripts-cargo-update"
 
     runs-on: "ubuntu-latest"
     steps:
@@ -55,7 +61,7 @@ jobs:
         run: echo
       - name: Checkout repository
         if: ${{ steps.skip.outcome != 'skipped' }}
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v4
       - name: Call the update action
         if: ${{ steps.skip.outcome != 'skipped' }}
         uses: ./.github/actions/update

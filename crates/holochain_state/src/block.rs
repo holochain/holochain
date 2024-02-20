@@ -10,12 +10,14 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
-    db.async_commit(move |txn| mutations::insert_block(txn, input))
+    tracing::warn!(?input, "blocking node!");
+
+    db.write_async(move |txn| mutations::insert_block(txn, input))
         .await
 }
 
 pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
-    db.async_commit(move |txn| mutations::insert_unblock(txn, input))
+    db.write_async(move |txn| mutations::insert_unblock(txn, input))
         .await
 }
 
@@ -36,15 +38,8 @@ pub fn query_is_blocked(
 
 #[cfg(test)]
 mod test {
+    use crate::prelude::*;
     use crate::test_utils::test_conductor_db;
-    use hdk::prelude::Timestamp;
-    use holochain_types::prelude::CellIdFixturator;
-    use holochain_zome_types::block::Block;
-    use holochain_zome_types::block::BlockTarget;
-    use holochain_zome_types::block::BlockTargetId;
-    use holochain_zome_types::block::CellBlockReason;
-    use holochain_zome_types::InclusiveTimestampInterval;
-    use holochain_zome_types::TimestampFixturator;
 
     // More complex setups.
     #[tokio::test(flavor = "multi_thread")]
@@ -118,8 +113,8 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             for (start, end, op) in &setup {
                 let block = Block::new(
@@ -137,7 +132,7 @@ mod test {
             for (check, expected) in checks {
                 let control0 = control.clone();
                 assert!(!db
-                    .async_reader(move |txn| super::query_is_blocked(
+                    .read_async(move |txn| super::query_is_blocked(
                         &txn,
                         control0.into(),
                         Timestamp(check)
@@ -147,7 +142,7 @@ mod test {
                 let target0 = target.clone();
                 assert_eq!(
                     expected,
-                    db.async_reader(move |txn| super::query_is_blocked(
+                    db.read_async(move |txn| super::query_is_blocked(
                         &txn,
                         target0.into(),
                         Timestamp(check)
@@ -168,7 +163,7 @@ mod test {
     async fn block_unblock_per_reason() {
         let db = test_conductor_db();
 
-        let cell_id = fixt::fixt!(CellId);
+        let cell_id = ::fixt::fixt!(CellId);
         let target0 = BlockTarget::Cell(cell_id.clone(), CellBlockReason::BadCrypto);
         let target1 = BlockTarget::Cell(cell_id, CellBlockReason::App(vec![1, 2, 3]));
 
@@ -185,7 +180,7 @@ mod test {
 
         let target01 = target0.clone();
         assert!(db
-            .async_reader(move |txn| super::query_is_blocked(&txn, target01.into(), Timestamp(0)))
+            .read_async(move |txn| super::query_is_blocked(&txn, target01.into(), Timestamp(0)))
             .await
             .unwrap());
 
@@ -201,7 +196,7 @@ mod test {
 
         let target02 = target0.clone();
         assert!(db
-            .async_reader(move |txn| super::query_is_blocked(&txn, target02.into(), Timestamp(0)))
+            .read_async(move |txn| super::query_is_blocked(&txn, target02.into(), Timestamp(0)))
             .await
             .unwrap());
 
@@ -218,7 +213,7 @@ mod test {
 
         // Even though the app block was unblocked the bad crypto block remains.
         assert!(db
-            .async_reader(move |txn| super::query_is_blocked(
+            .read_async(move |txn| super::query_is_blocked(
                 &txn,
                 target0.clone().into(),
                 Timestamp(0)
@@ -242,12 +237,12 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             let control0 = control.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     control0.into(),
                     Timestamp(check)
@@ -256,7 +251,7 @@ mod test {
                 .unwrap());
             let target0 = target.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     target0.into(),
                     Timestamp(check)
@@ -294,7 +289,7 @@ mod test {
 
             let control0 = control.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     control0.into(),
                     Timestamp(check)
@@ -303,7 +298,7 @@ mod test {
                 .unwrap());
             let target0 = target.clone();
             assert!(
-                db.async_reader(move |txn| super::query_is_blocked(
+                db.read_async(move |txn| super::query_is_blocked(
                     &txn,
                     target0.into(),
                     Timestamp(check)
@@ -344,12 +339,12 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             let control0 = control.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     control0.into(),
                     Timestamp(check)
@@ -358,7 +353,7 @@ mod test {
                 .unwrap());
             let target0 = target.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     target0.into(),
                     Timestamp(check)
@@ -395,7 +390,7 @@ mod test {
             .unwrap();
 
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     control.clone().into(),
                     Timestamp(check)
@@ -403,7 +398,7 @@ mod test {
                 .await
                 .unwrap());
             assert!(
-                !db.async_reader(move |txn| super::query_is_blocked(
+                !db.read_async(move |txn| super::query_is_blocked(
                     &txn,
                     target.clone().into(),
                     Timestamp(check)
@@ -423,13 +418,13 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn block_empty_db_is_not_blocked() {
         let db = test_conductor_db();
-        let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+        let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
         assert!(!db
-            .async_reader(move |txn| super::query_is_blocked(
+            .read_async(move |txn| super::query_is_blocked(
                 &txn,
                 target.into(),
-                fixt::fixt!(Timestamp)
+                ::fixt::fixt!(Timestamp)
             ))
             .await
             .unwrap());
@@ -438,20 +433,19 @@ mod test {
     // Blocks only block their span.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_not_block_is_not_blocked() {
-        for (start, check, end) in vec![
-            // before
+        for (start, check, end) in [
             (1, 0, 1),
             // after
             (0, 1, 0),
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             let control0 = control.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     control0.into(),
                     Timestamp(check)
@@ -460,7 +454,7 @@ mod test {
                 .unwrap());
             let target0 = target.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     target0.into(),
                     Timestamp(check)
@@ -480,7 +474,7 @@ mod test {
 
             let control0 = control.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     control0.into(),
                     Timestamp(check)
@@ -488,7 +482,7 @@ mod test {
                 .await
                 .unwrap());
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     target.clone().into(),
                     Timestamp(check)
@@ -502,8 +496,7 @@ mod test {
     // no other target.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_is_blocked() {
-        for (start, mid, end) in vec![
-            // block is inclusive
+        for (start, mid, end) in [
             (0, 0, 0),
             (1, 1, 1),
             (-1, -1, -1),
@@ -515,13 +508,13 @@ mod test {
             let db = test_conductor_db();
 
             // control
-            let target0 = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target0 = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
             // to block
-            let target1 = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target1 = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             let target00 = target0.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     BlockTargetId::from(target00),
                     Timestamp(mid)
@@ -530,7 +523,7 @@ mod test {
                 .unwrap());
             let target10 = target1.clone();
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     BlockTargetId::from(target10),
                     Timestamp(mid)
@@ -549,7 +542,7 @@ mod test {
             .unwrap();
 
             assert!(!db
-                .async_reader(move |txn| super::query_is_blocked(
+                .read_async(move |txn| super::query_is_blocked(
                     &txn,
                     BlockTargetId::from(target0),
                     Timestamp(mid)
@@ -557,7 +550,7 @@ mod test {
                 .await
                 .unwrap());
             assert!(
-                db.async_reader(move |txn| super::query_is_blocked(
+                db.read_async(move |txn| super::query_is_blocked(
                     &txn,
                     BlockTargetId::from(target1),
                     Timestamp(mid)

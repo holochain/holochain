@@ -1,7 +1,6 @@
 //! Some common testing helpers.
 
 use crate::dna::wasm::DnaWasm;
-use crate::fixt::*;
 use crate::prelude::*;
 use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
@@ -73,7 +72,7 @@ pub fn fake_dna_zomes_named(
 
 /// Save a Dna to a file and return the path and tempdir that contains it
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempfile::TempDir)> {
-    let bundle = DnaBundle::from_dna_file(dna).await?;
+    let bundle = DnaBundle::from_dna_file(dna)?;
     let tmp_dir = tempfile::Builder::new()
         .prefix("fake_dna")
         .tempdir()
@@ -131,19 +130,4 @@ pub async fn fake_unique_record(
         SignedActionHashed::sign(keystore, action_1.into_hashed()).await?,
         entry,
     ))
-}
-
-/// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> MetaLairClient {
-    tokio_helper::block_on(
-        async move {
-            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
-                .await
-                .unwrap();
-
-            keystore
-        },
-        std::time::Duration::from_secs(1),
-    )
-    .expect("timeout elapsed")
 }

@@ -4,6 +4,7 @@ members = [
     "anchor",
     "bench",
     "capability",
+    "clone",
     "coordinator_zome",
     "coordinator_zome_update",
     "countersigning",
@@ -11,6 +12,7 @@ members = [
     "crd",
     "crud",
     "debug",
+    "dna_properties",
     "emit_signal",
     "entry_defs",
     "hash_entry",
@@ -19,6 +21,9 @@ members = [
     "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
+    "genesis_self_check_requires_properties",
+    "hc-stress-test-integrity",
+    "hc-stress-test-coordinator",
     "hash_path",
     "hdk_extern",
     "init_fail",
@@ -29,6 +34,7 @@ members = [
     "migrate_agent_pass",
     "multiple_calls",
     "must_get",
+    "must_get_agent_activity",
     "post_commit_success",
     "post_commit_volley",
     "query",
@@ -46,13 +52,25 @@ members = [
     "validate_link_add_invalid",
     "validate_link_add_valid",
     "validate_valid",
+    "validate_reject_app_types",
     "whoami",
     "zome_info",
 ]
 
+resolver = "2"
+
 [profile.release]
 opt-level = "z"
 
+[workspace.dependencies]
+derive_more = "0.99"
+serde = "1.0"
+tracing = "0.1"
+hdi = { path = "../../../hdi" }
+hdk = { path = "../../../hdk" }
+
+# workaround to make it slightly easier to import hc-scress-test zomes
+files_integrity = { path = "hc-stress-test-integrity" }
 
 [patch.crates-io]
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "develop" }

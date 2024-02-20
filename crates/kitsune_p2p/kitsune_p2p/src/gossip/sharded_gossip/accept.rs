@@ -6,9 +6,10 @@ impl ShardedGossipLocal {
     /// - Only send the agent bloom if this is a recent gossip type.
     pub(super) async fn incoming_accept(
         &self,
-        peer_cert: Arc<[u8; 32]>,
+        peer_cert: NodeCert,
         remote_arc_set: Vec<DhtArcRange>,
         remote_agent_list: Vec<AgentInfoSigned>,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
             self.inner.share_mut(|i, _| {
@@ -47,12 +48,17 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_agent_arcs: Vec<_> =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
-                .await?
-                .into_iter()
-                .map(|(_, a)| a.into())
-                .collect();
+        let local_agent_arcs: Vec<_> = agent_info_session
+            .local_agent_arcs()
+            .into_iter()
+            .filter_map(|(agent, arc)| {
+                if local_agents.contains(&agent) {
+                    Some(arc.into())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let mut gossip = Vec::new();
 
@@ -63,6 +69,7 @@ impl ShardedGossipLocal {
                 local_agent_arcs,
                 remote_arc_set,
                 &mut gossip,
+                agent_info_session,
             )
             .await?;
 

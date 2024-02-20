@@ -7,6 +7,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-beta-dev.27
+
+## 0.4.0-beta-dev.26
+
+## 0.4.0-beta-dev.25
+
+## 0.4.0-beta-dev.24
+
+## 0.4.0-beta-dev.23
+
+## 0.4.0-beta-dev.22
+
+## 0.4.0-beta-dev.21
+
+## 0.4.0-beta-dev.20
+
+## 0.4.0-beta-dev.19
+
+## 0.4.0-beta-dev.18
+
+## 0.4.0-beta-dev.17
+
+- Migrate types for hash paths from hdk crate and include in prelude: Anchor, Path, Component, TypedPath [\#2980](https://github.com/holochain/holochain/pull/2980)
+
+## 0.4.0-beta-dev.16
+
+- Change the license from Apache-2.0 to CAL-1.0 to match the HDK.
+
+## 0.4.0-beta-dev.15
+
+## 0.4.0-beta-dev.14
+
+## 0.4.0-beta-dev.13
+
+## 0.4.0-beta-dev.12
+
+## 0.4.0-beta-dev.11
+
+## 0.4.0-beta-dev.10
+
+## 0.4.0-beta-dev.9
+
+## 0.4.0-beta-dev.8
+
+## 0.4.0-beta-dev.7
+
+## 0.4.0-beta-dev.6
+
+## 0.4.0-beta-dev.5
+
 ## 0.4.0-beta-dev.4
 
 ## 0.4.0-beta-dev.3

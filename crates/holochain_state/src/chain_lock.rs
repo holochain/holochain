@@ -2,7 +2,7 @@ use crate::prelude::StateMutationResult;
 use holo_hash::AgentPubKey;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::{named_params, Transaction};
-use holochain_zome_types::Timestamp;
+use holochain_zome_types::prelude::*;
 
 /// True if the chain is currently locked for the given lock id.
 /// The chain is never locked for the id that created it.
@@ -27,7 +27,7 @@ pub fn is_chain_locked(
             named_params! {
                 ":lock": lock,
                 ":author": author,
-                ":now": holochain_zome_types::Timestamp::now()
+                ":now": holochain_zome_types::prelude::Timestamp::now()
             },
             |row| row.get::<_, u32>(0),
         )
@@ -59,7 +59,7 @@ pub fn is_lock_expired(
             },
             |row| {
                 Ok(row.get::<_, Timestamp>("expires_at_timestamp")?
-                    < holochain_zome_types::Timestamp::now())
+                    < holochain_zome_types::prelude::Timestamp::now())
             },
         )
         .optional()?;

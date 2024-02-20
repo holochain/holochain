@@ -64,6 +64,16 @@ fn create_back_link(_: ()) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
+fn create_tagged_link(tag: String) -> ExternResult<ActionHash> {
+    hdk::prelude::create_link(
+        base()?,
+        target()?,
+        LinkTypes::SomeLinks,
+        tag.as_bytes().to_vec(),
+    )
+}
+
+#[hdk_extern]
 fn delete_link(input: ActionHash) -> ExternResult<ActionHash> {
     hdk::prelude::delete_link(input)
 }
@@ -71,86 +81,95 @@ fn delete_link(input: ActionHash) -> ExternResult<ActionHash> {
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Vec<Link>> {
     // Include just `SomeLinks`
-    hdk::prelude::get_links(base()?, LinkTypes::SomeLinks, None)?;
+    hdk::prelude::get_links(GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?.build())?;
     // Include all links from within this zome.
-    hdk::prelude::get_links(base()?, .., None)?;
+    hdk::prelude::get_links(GetLinksInputBuilder::try_new(base()?, ..)?.build())?;
     // Include types in this vec.
     hdk::prelude::get_links(
-        base()?,
-        vec![LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks],
-        None,
+        GetLinksInputBuilder::try_new(
+            base()?,
+            vec![LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks],
+        )?
+        .build(),
     )?;
     // Include types in this array.
     hdk::prelude::get_links(
-        base()?,
-        [LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks],
-        None,
+        GetLinksInputBuilder::try_new(base()?, [LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks])?
+            .build(),
     )?;
     // Include types in this ref to array.
     hdk::prelude::get_links(
-        base()?,
-        &[LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks],
-        None,
+        GetLinksInputBuilder::try_new(base()?, &[LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks])?
+            .build(),
     )?;
     let t = [LinkTypes::SomeLinks, LinkTypes::SomeOtherLinks];
     // Include types in this slice.
-    hdk::prelude::get_links(base()?, &t[..], None)
+    hdk::prelude::get_links(GetLinksInputBuilder::try_new(base()?, &t[..])?.build())
 }
 
 #[hdk_extern]
 fn get_links_nested(_: ()) -> ExternResult<Vec<Link>> {
     // Include just `SomeLinks`
     hdk::prelude::get_links(
-        base()?,
-        LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
-        None,
+        GetLinksInputBuilder::try_new(base()?, LinkZomes::IntegrityLink(LinkTypes::SomeLinks))?
+            .build(),
     )?;
     // Include all links from within this zome.
-    hdk::prelude::get_links(base()?, .., None)?;
+    hdk::prelude::get_links(GetLinksInputBuilder::try_new(base()?, ..)?.build())?;
     // Include types in this vec.
     hdk::prelude::get_links(
-        base()?,
-        vec![
-            LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
-            LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
-        ],
-        None,
+        GetLinksInputBuilder::try_new(
+            base()?,
+            vec![
+                LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
+                LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
+            ],
+        )?
+        .build(),
     )?;
     // Include types in this array.
     hdk::prelude::get_links(
-        base()?,
-        [
-            LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
-            LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
-        ],
-        None,
+        GetLinksInputBuilder::try_new(
+            base()?,
+            [
+                LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
+                LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
+            ],
+        )?
+        .build(),
     )?;
     // Include types in this ref to array.
     hdk::prelude::get_links(
-        base()?,
-        &[
-            LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
-            LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
-        ],
-        None,
+        GetLinksInputBuilder::try_new(
+            base()?,
+            &[
+                LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
+                LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
+            ],
+        )?
+        .build(),
     )?;
     let t = [
         LinkZomes::IntegrityLink(LinkTypes::SomeLinks),
         LinkZomes::IntegrityLink(LinkTypes::SomeOtherLinks),
     ];
     // Include types in this slice.
-    hdk::prelude::get_links(base()?, &t[..], None)
+    hdk::prelude::get_links(GetLinksInputBuilder::try_new(base()?, &t[..])?.build())
     // Include all link types defined in any zome.
 }
 
 #[hdk_extern]
 fn get_baseless_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(baseless()?, LinkTypes::SomeLinks, None)
+    hdk::prelude::get_links(
+        GetLinksInputBuilder::try_new(baseless()?, LinkTypes::SomeLinks)?.build(),
+    )
 }
 
 #[hdk_extern]
 fn get_external_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(external()?, LinkTypes::SomeLinks, None)
+    hdk::prelude::get_links(
+        GetLinksInputBuilder::try_new(external()?, LinkTypes::SomeLinks)?.build(),
+    )
 }
 
 #[hdk_extern]
@@ -160,7 +179,7 @@ fn get_link_details(_: ()) -> ExternResult<LinkDetails> {
 
 #[hdk_extern]
 fn get_back_links(_: ()) -> ExternResult<Vec<Link>> {
-    hdk::prelude::get_links(target()?, LinkTypes::SomeLinks, None)
+    hdk::prelude::get_links(GetLinksInputBuilder::try_new(target()?, LinkTypes::SomeLinks)?.build())
 }
 
 #[hdk_extern]
@@ -172,8 +191,8 @@ fn get_back_link_details(_: ()) -> ExternResult<LinkDetails> {
 fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
     HDK.with(|h| {
         h.borrow().get_links(vec![
-            GetLinksInput::new(base()?, LinkTypes::SomeLinks.try_into()?, None),
-            GetLinksInput::new(target()?, LinkTypes::SomeLinks.try_into()?, None),
+            GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?.build(),
+            GetLinksInputBuilder::try_new(target()?, LinkTypes::SomeLinks)?.build(),
         ])
     })
 }
@@ -182,15 +201,17 @@ fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
 fn get_link_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
     HDK.with(|h| {
         h.borrow().get_link_details(vec![
-            GetLinksInput::new(base()?, LinkTypes::SomeLinks.try_into()?, None),
-            GetLinksInput::new(target()?, LinkTypes::SomeLinks.try_into()?, None),
+            GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?.build(),
+            GetLinksInputBuilder::try_new(target()?, LinkTypes::SomeLinks)?.build(),
         ])
     })
 }
 
 #[hdk_extern]
 fn delete_all_links(_: ()) -> ExternResult<()> {
-    for link in hdk::prelude::get_links(base()?, LinkTypes::SomeLinks, None)? {
+    for link in hdk::prelude::get_links(
+        GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?.build(),
+    )? {
         hdk::prelude::delete_link(link.create_link_hash)?;
     }
     Ok(())
@@ -229,11 +250,26 @@ fn get_long_path(_: ()) -> ExternResult<Vec<Link>> {
 }
 
 #[hdk_extern]
-fn get_count_base(_: ()) -> ExternResult<AnyLinkableHash> {
+fn get_base_hash(_: ()) -> ExternResult<AnyLinkableHash> {
     base()
 }
 
 #[hdk_extern]
 fn get_count(link_query: LinkQuery) -> ExternResult<usize> {
     hdk::prelude::count_links(link_query)
+}
+
+#[hdk_extern]
+fn get_links_with_query(input: GetLinksInput) -> ExternResult<Vec<Link>> {
+    Ok(hdk::prelude::get_links(input)?)
+}
+
+#[hdk_extern]
+fn get_time(_: ()) -> ExternResult<Timestamp> {
+    sys_time()
+}
+
+#[hdk_extern]
+fn get_path_hash(s: String) -> ExternResult<AnyLinkableHash> {
+    path(s.as_str())
 }

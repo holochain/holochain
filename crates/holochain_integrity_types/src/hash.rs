@@ -2,14 +2,14 @@ use crate::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holo_hash::ExternalHash;
-
+use holochain_secure_primitive::secure_primitive;
 /// 256 Bit generic hash.
 pub struct Hash256Bits([u8; 32]);
-crate::secure_primitive!(Hash256Bits, 32);
+secure_primitive!(Hash256Bits, 32);
 
 /// 512 Bit generic hash.
 pub struct Hash512Bits([u8; 64]);
-crate::secure_primitive!(Hash512Bits, 64);
+secure_primitive!(Hash512Bits, 64);
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]

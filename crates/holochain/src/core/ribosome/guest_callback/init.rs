@@ -115,8 +115,6 @@ mod test {
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_types::prelude::*;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternIO;
 
     #[test]
     fn init_callback_result_fold() {
@@ -227,7 +225,6 @@ mod test {
 mod slow_tests {
     use super::InitResult;
     use crate::conductor::api::error::ConductorApiResult;
-    use crate::conductor::conductor::CellStatus;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
@@ -239,9 +236,10 @@ mod slow_tests {
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
     use holo_hash::ActionHash;
-    use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
+    use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::clone::CloneCellId;
     use holochain_zome_types::prelude::*;
     use std::time::Duration;
 
@@ -361,12 +359,9 @@ mod slow_tests {
 
             match create_post_result {
                 Err(crate::conductor::api::error::ConductorApiError::ConductorError(
-                    crate::conductor::error::ConductorError::CellNetworkNotReady(
-                        CellStatus::Joining,
-                    )
-                    | crate::conductor::error::ConductorError::CellDisabled(_),
+                    crate::conductor::error::ConductorError::CellDisabled(_),
                 )) => {
-                    // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
+                    // Expected errors
                 }
                 Ok(_) => {
                     had_successful_zome_call = true;

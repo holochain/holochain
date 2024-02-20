@@ -6,11 +6,10 @@
 //! are structured to ensure validity, and are used internally by Holochain.
 
 use holo_hash::DnaHashB64;
-use holochain_zome_types::DnaModifiersOpt;
 
 use super::error::{AppManifestError, AppManifestResult};
 use crate::app::app_manifest::current::DnaLocation;
-use crate::prelude::RoleName;
+use crate::prelude::*;
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.
@@ -80,6 +79,6 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        installed_hash: DnaHashB64,
+        installed_hash: Option<DnaHashB64>,
     },
 }

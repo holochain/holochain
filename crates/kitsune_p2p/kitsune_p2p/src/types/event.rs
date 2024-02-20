@@ -6,13 +6,14 @@ use kitsune_p2p_types::{
     bin_types::KOp,
     dht::region::RegionBounds,
     dht_arc::{DhtArcSet, DhtLocation},
+    KOpHash,
 };
 use std::{collections::HashSet, sync::Arc};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 /// Also get the start and end times for ops within a time window
 /// up to a maximum number.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -27,7 +28,7 @@ pub struct QueryOpHashesEvt {
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -36,7 +37,7 @@ pub struct FetchOpDataEvt {
 }
 
 /// Multiple ways to fetch op data
-#[derive(Debug, derive_more::From)]
+#[derive(Debug, derive_more::From, Clone)]
 pub enum FetchOpDataEvtQuery {
     /// Fetch all ops with the hashes specified
     Hashes {
@@ -52,7 +53,7 @@ pub enum FetchOpDataEvtQuery {
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignNetworkDataEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -64,7 +65,7 @@ pub struct SignNetworkDataEvt {
 }
 
 /// Store the AgentInfo as signed by the agent themselves.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -82,7 +83,7 @@ pub struct GetAgentInfoSignedEvt {
 }
 
 /// Get agent info which satisfies a query.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryAgentsEvt {
     /// The "space" context.
     pub space: KSpace,
@@ -162,77 +163,9 @@ pub fn full_time_window_inclusive() -> TimeWindowInclusive {
     Timestamp::MIN..=Timestamp::MAX
 }
 
-const METRIC_KIND_UNKNOWN: &str = "Unknown";
-const METRIC_KIND_REACHABILITY_QUOTIENT: &str = "ReachabilityQuotient";
-const METRIC_KIND_LATENCY_MICROS: &str = "LatencyMicros";
-const METRIC_KIND_AGG_EXTRAP_COV: &str = "AggExtrapCov";
-
-/// The type of metric recorded
-#[derive(Debug)]
-pub enum MetricRecordKind {
-    /// Failure to parse metric kind
-    Unknown,
-
-    /// ReachabilityQuotient metric kind
-    ReachabilityQuotient,
-
-    /// LatencyMicros metric kind
-    LatencyMicros,
-
-    /// AggExtrapCov metric kind
-    AggExtrapCov,
-}
-
-impl MetricRecordKind {
-    /// database format of this kind variant
-    pub fn to_db(&self) -> &'static str {
-        use MetricRecordKind::*;
-        match self {
-            Unknown => METRIC_KIND_UNKNOWN,
-            ReachabilityQuotient => METRIC_KIND_REACHABILITY_QUOTIENT,
-            LatencyMicros => METRIC_KIND_LATENCY_MICROS,
-            AggExtrapCov => METRIC_KIND_AGG_EXTRAP_COV,
-        }
-    }
-
-    /// parse a database kind into a rust enum variant
-    pub fn from_db(input: &str) -> Self {
-        use MetricRecordKind::*;
-        if input == METRIC_KIND_REACHABILITY_QUOTIENT {
-            ReachabilityQuotient
-        } else if input == METRIC_KIND_LATENCY_MICROS {
-            LatencyMicros
-        } else if input == METRIC_KIND_AGG_EXTRAP_COV {
-            AggExtrapCov
-        } else {
-            Unknown
-        }
-    }
-}
-
-/// An individual metric record
-#[derive(Debug)]
-pub struct MetricRecord {
-    /// kind of this record
-    pub kind: MetricRecordKind,
-
-    /// agent associated with this metric (if applicable)
-    pub agent: Option<KAgent>,
-
-    /// timestamp this metric was recorded at
-    pub recorded_at_utc: Timestamp,
-
-    /// timestamp this metric will expire and be available for pruning
-    pub expires_at_utc: Timestamp,
-
-    /// additional data associated with this metric
-    pub data: serde_json::Value,
-}
-
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
-type KOpHash = Arc<super::KitsuneOpHash>;
-type Payload = Vec<u8>;
+pub(crate) type Payload = Vec<u8>;
 type Ops = Vec<KOp>;
 type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
 

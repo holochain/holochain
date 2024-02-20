@@ -9,6 +9,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
+use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
@@ -16,49 +17,21 @@ use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
-use holochain_sqlite::db::DbKindAuthored;
-use holochain_sqlite::db::DbKindDht;
-use holochain_sqlite::db::DbKindOp;
-use holochain_sqlite::db::DbKindT;
-use holochain_sqlite::db::WriteManager;
-use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_state::mutations::insert_op;
-use holochain_state::mutations::set_validation_status;
-use holochain_state::mutations::set_when_integrated;
-use holochain_state::prelude::insert_action;
-use holochain_state::prelude::insert_op_lite;
-use holochain_state::prelude::test_in_mem_db;
-use holochain_state::prelude::Query;
-use holochain_state::prelude::Txn;
-use holochain_state::scratch::SyncScratch;
-use holochain_types::activity::AgentActivityResponse;
-use holochain_types::chain::MustGetAgentActivityResponse;
-use holochain_types::db::DbRead;
-use holochain_types::db::DbWrite;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::dht_op::OpOrder;
-use holochain_types::dht_op::UniqueForm;
-use holochain_types::dht_op::WireOps;
-use holochain_types::link::WireLinkOps;
-use holochain_types::link::{WireLinkKey, WireLinkQuery};
-use holochain_types::metadata::MetadataSet;
-use holochain_types::prelude::{CountLinksResponse, WireEntryOps};
-use holochain_types::record::WireRecordOps;
-use holochain_types::test_utils::chain::*;
-use holochain_zome_types::zome_io::Nonce256Bits;
-use holochain_zome_types::ActionRefMut;
-use holochain_zome_types::QueryFilter;
-use holochain_zome_types::Signature;
-use holochain_zome_types::Timestamp;
-use holochain_zome_types::ValidationStatus;
+use holochain_state::prelude::*;
+use holochain_types::test_utils::chain::chain_to_ops;
+use holochain_types::test_utils::chain::entry_hash;
+use holochain_types::test_utils::chain::TestChainItem;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashSet;
+use QueryFilter;
+use Signature;
+use ValidationStatus;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
+use holochain_types::validation_receipt::ValidationReceiptBundle;
 pub use record_test_data::*;
 
 mod activity_test_data;
@@ -200,7 +173,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn must_get_agent_activity(
         &self,
         agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         let mut out = Vec::new();
         for env in &self.envs {
@@ -227,14 +200,14 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn remote_signal(
+    async fn send_remote_signal(
         &self,
         _from_agent: AgentPubKey,
         _to_agent_list: Vec<(Signature, AgentPubKey)>,
-        _zome_name: holochain_zome_types::ZomeName,
-        _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
-        _payload: holochain_zome_types::ExternIO,
+        _zome_name: ZomeName,
+        _fn_name: FunctionName,
+        _cap: Option<CapSecret>,
+        _payload: ExternIO,
         _nonce: Nonce256Bits,
         _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
@@ -263,10 +236,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
-        _receipt: holochain_serialized_bytes::SerializedBytes,
+        _receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -301,10 +274,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _from_agent: AgentPubKey,
         _from_signature: Signature,
         _to_agent: AgentPubKey,
-        _zome_name: holochain_zome_types::ZomeName,
-        _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
-        _payload: holochain_zome_types::ExternIO,
+        _zome_name: ZomeName,
+        _fn_name: FunctionName,
+        _cap: Option<CapSecret>,
+        _payload: ExternIO,
         _nonce: Nonce256Bits,
         _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
@@ -317,55 +290,51 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
-pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = op.as_hash();
-            insert_op(txn, &op).unwrap();
-            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.as_hash();
+        insert_op(txn, &op).unwrap();
+        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
-pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = op.as_hash();
-            insert_op(txn, &op).unwrap();
-            set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
-            set_when_integrated(txn, hash, Timestamp::now()).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.as_hash();
+        insert_op(txn, &op).unwrap();
+        set_validation_status(txn, hash, ValidationStatus::Rejected).unwrap();
+        set_when_integrated(txn, hash, Timestamp::now()).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
-pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            let hash = op.as_hash();
-            insert_op(txn, &op).unwrap();
-            set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        let hash = op.as_hash();
+        insert_op(txn, &op).unwrap();
+        set_validation_status(txn, hash, ValidationStatus::Valid).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 /// Insert ops into the authored database
-pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
-    env.conn()
-        .unwrap()
-        .with_commit_sync(|txn| {
-            insert_op(txn, &op).unwrap();
-            DatabaseResult::Ok(())
-        })
-        .unwrap();
+pub async fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
+    env.write_async(move |txn| -> DatabaseResult<()> {
+        insert_op(txn, &op).unwrap();
+        Ok(())
+    })
+    .await
+    .unwrap();
 }
 
 #[async_trait::async_trait]
@@ -417,7 +386,7 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn must_get_agent_activity(
         &self,
         agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
+        filter: ChainFilter,
     ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         self.0
             .lock()
@@ -437,14 +406,14 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn remote_signal(
+    async fn send_remote_signal(
         &self,
         _from_agent: AgentPubKey,
         _to_agent_list: Vec<(Signature, AgentPubKey)>,
-        _zome_name: holochain_zome_types::ZomeName,
-        _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
-        _payload: holochain_zome_types::ExternIO,
+        _zome_name: ZomeName,
+        _fn_name: FunctionName,
+        _cap: Option<CapSecret>,
+        _payload: ExternIO,
         _nonce: Nonce256Bits,
         _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
@@ -473,10 +442,10 @@ impl HolochainP2pDnaT for MockNetwork {
         todo!()
     }
 
-    async fn send_validation_receipt(
+    async fn send_validation_receipts(
         &self,
         _to_agent: AgentPubKey,
-        _receipt: holochain_serialized_bytes::SerializedBytes,
+        _receipts: ValidationReceiptBundle,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -511,10 +480,10 @@ impl HolochainP2pDnaT for MockNetwork {
         _from_agent: AgentPubKey,
         _from_signature: Signature,
         _to_agent: AgentPubKey,
-        _zome_name: holochain_zome_types::ZomeName,
-        _fn_name: holochain_zome_types::FunctionName,
-        _cap: Option<holochain_zome_types::CapSecret>,
-        _payload: holochain_zome_types::ExternIO,
+        _zome_name: ZomeName,
+        _fn_name: FunctionName,
+        _cap: Option<CapSecret>,
+        _payload: ExternIO,
         _nonce: Nonce256Bits,
         _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
@@ -581,10 +550,10 @@ pub fn commit_chain<Kind: DbKindT>(
         .collect();
     let db = test_in_mem_db(db_kind);
 
-    db.test_commit(|txn| {
+    db.test_write(move |txn| {
         for data in &data {
             for op in data {
-                let op_light = DhtOpLight::RegisterAgentActivity(
+                let op_light = DhtOpLite::RegisterAgentActivity(
                     op.action.action_address().clone(),
                     op.action
                         .hashed
@@ -607,8 +576,7 @@ pub fn commit_chain<Kind: DbKindT>(
                     &timestamp,
                 )
                 .unwrap();
-                set_validation_status(txn, &hash, holochain_zome_types::ValidationStatus::Valid)
-                    .unwrap();
+                set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
             }
         }

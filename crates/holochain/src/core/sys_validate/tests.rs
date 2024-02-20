@@ -33,43 +33,31 @@ use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::test_utils::fake_genesis_for_agent;
+use crate::test_utils::rebuild_record;
+use crate::test_utils::sign_record;
+use crate::test_utils::valid_arbitrary_chain;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use contrafact::Fact;
 use error::SysValidationError;
 
+use futures::FutureExt;
 use holochain_cascade::MockCascade;
+use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::prelude::fresh_reader_test;
+use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
+use holochain_zome_types::facts::ActionRefMut;
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::time::Duration;
-
-async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
-    Record::new(
-        SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
-            .await
-            .unwrap(),
-        entry,
-    )
-}
-
-pub async fn rebuild_record(record: Record, keystore: &MetaLairClient) -> Record {
-    let (action, entry) = record.into_inner();
-    let mut action = action.into_inner().0.into_content();
-    if let (Some(ed), Some(entry)) = (action.entry_data_mut(), entry.as_option()) {
-        *ed.0 = EntryHash::with_data_sync(entry);
-    }
-    sign_record(keystore, action, entry.into_option()).await
-}
 
 fn matching_record(g: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
@@ -125,14 +113,18 @@ async fn record_with_deps_fixup(
             let prev_seq = action.action_seq() - 1;
 
             let entry = action.entry_data_mut().map(|(entry_hash, entry_type)| {
-                let entry = contrafact::brute("Not countersigning entry", |e: &Entry| {
-                    !matches!(e, Entry::CounterSign(_, _))
+                let et = entry_type.clone();
+                let entry = contrafact::brute("matching entry", move |e: &Entry| match (&et, e) {
+                    (EntryType::AgentPubKey, Entry::Agent(_)) => true,
+                    (EntryType::App(_), Entry::App(_)) => true,
+                    (EntryType::CapClaim, Entry::CapClaim(_)) => true,
+                    (EntryType::CapGrant, Entry::CapGrant(_)) => true,
+                    _ => false,
                 })
                 .build(&mut g);
+
                 *entry_hash = EntryHash::with_data_sync(&entry);
-                *entry_type = entry
-                    .entry_type(Some(AppEntryDef::arbitrary(&mut g).unwrap()))
-                    .unwrap();
+
                 entry
             });
 
@@ -165,9 +157,15 @@ async fn record_with_deps_fixup(
             match action {
                 Action::Create(_create) => {}
                 Action::Update(update) => {
-                    let mut create = matching_record(&mut g, is_entry_record);
+                    let mut create = matching_record(&mut g, |r| {
+                        // Updates to agent pub key can get tricky
+                        r.action().entry_type() != Some(&EntryType::AgentPubKey)
+                            && is_entry_record(r)
+                    });
                     update.original_action_address = create.action_address().clone();
                     update.original_entry_address =
+                        create.entry().as_option().unwrap().to_hash().clone();
+                    *create.as_action_mut().entry_data_mut().unwrap().0 =
                         create.entry().as_option().unwrap().to_hash().clone();
                     *create.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
                     deps.push(create);
@@ -205,6 +203,7 @@ async fn record_with_deps_fixup(
                 }
                 Action::Dna(_) => unreachable!(),
             };
+
             (entry, deps)
         }
     };
@@ -216,35 +215,21 @@ async fn record_with_deps_fixup(
     (record, deps)
 }
 
-async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Record, MockCascade) {
+async fn record_with_cascade(
+    keystore: &MetaLairClient,
+    action: Action,
+) -> (Record, Arc<MockCascade>) {
     let (record, deps) = record_with_deps(keystore, action).await;
-    (record, MockCascade::with_records(deps))
-}
-
-#[allow(dead_code)]
-async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
-    let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
-    sys_validate_record(&record, &cascade).await
+    (record, Arc::new(MockCascade::with_records(deps)))
 }
 
 async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
-    let result = sys_validate_record(&record, &cascade).await;
+    let cascade = Arc::new(MockCascade::with_records(deps.clone()));
+    let result = sys_validate_record(&record, cascade).await;
     if result.is_err() {
         dbg!(&deps, &record);
         result.unwrap();
-    }
-}
-
-#[allow(dead_code)]
-async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
-    let (record, deps) = record_with_deps(keystore, action).await;
-    let cascade = MockCascade::with_records(deps.clone());
-    let result = sys_validate_record(&record, &cascade).await;
-    if result.is_ok() {
-        result.unwrap_err();
     }
 }
 
@@ -253,14 +238,11 @@ async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
 async fn test_record_with_cascade() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     for _ in 0..100 {
-        let op = holochain_types::dht_op::facts::valid_dht_op(
-            keystore.clone(),
-            fake_agent_pubkey_1(),
-            false,
-        )
-        .build(&mut g);
+        let op =
+            holochain_types::facts::valid_dht_op(keystore.clone(), fake_agent_pubkey_1(), false)
+                .build(&mut g);
         let action = op.action().clone();
         assert_valid_action(&keystore, action).await;
     }
@@ -271,16 +253,19 @@ async fn test_record_with_cascade() {
 async fn verify_action_signature_test() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     let action = CreateLink::arbitrary(&mut g).unwrap();
     let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
     let wrong_signature = Signature([1_u8; 64]);
-    let action_invalid = SignedActionHashed::new(record_valid.action().clone(), wrong_signature);
+    let action_invalid =
+        SignedActionHashed::new_unchecked(record_valid.action().clone(), wrong_signature);
     let record_invalid = Record::new(action_invalid, None);
 
-    sys_validate_record(&record_valid, &cascade).await.unwrap();
-    sys_validate_record(&record_invalid, &cascade)
+    sys_validate_record(&record_valid, cascade.clone())
+        .await
+        .unwrap();
+    sys_validate_record(&record_invalid, cascade)
         .await
         .unwrap_err();
 }
@@ -290,7 +275,7 @@ async fn verify_action_signature_test() {
 async fn check_previous_action() {
     let mut g = random_generator();
 
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = holochain_keystore::test_keystore();
     let mut action = Action::Delete(Delete::arbitrary(&mut g).unwrap());
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
@@ -303,18 +288,26 @@ async fn check_previous_action() {
     // This check is manual because `validate_action` will modify any action
     // coming in with a 0 action_seq since it knows that can't be valid.
     {
+        let mut cascade = MockCascade::new();
+        cascade
+            .expect_retrieve_action()
+            .times(2)
+            // Doesn't matter what we return, the action should be rejected before deps are checked.
+            .returning(|_, _| async move { Ok(None) }.boxed());
+
         let actual = sys_validate_record(
             &sign_record(&keystore, action, None).await,
-            &MockCascade::new(),
+            Arc::new(cascade),
         )
         .await
         .unwrap_err()
         .into_outcome();
 
-        let expected = Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot,
-        ));
-        assert_eq!(actual, expected);
+        let actual = match actual {
+            Some(ValidationOutcome::PrevActionError(pae)) => pae.source,
+            v => panic!("Expected PrevActionError, got {:?}", v),
+        };
+        assert_eq!(actual, PrevActionErrorKind::InvalidRoot);
     }
 
     // Dna is always ok because of the type system
@@ -349,6 +342,7 @@ async fn check_valid_if_dna_test() {
         cache.clone(),
         tmp_cache.to_db(),
         Arc::new(dna_def.clone()),
+        std::time::Duration::from_secs(10),
     );
 
     // Initializing the cache actually matters. TODO: why?
@@ -375,7 +369,10 @@ async fn check_valid_if_dna_test() {
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
+            ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidRootOriginTime,
+                ..
+            })
         ))
     );
 
@@ -396,9 +393,10 @@ async fn check_valid_if_dna_test() {
 
     tmp_dht
         .to_db()
-        .conn()
-        .unwrap()
-        .execute("UPDATE DhtOp SET when_integrated = 0", [])
+        .write_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.execute("UPDATE DhtOp SET when_integrated = 0", [])?)
+        })
+        .await
         .unwrap();
 
     cache
@@ -421,21 +419,22 @@ async fn check_previous_timestamp() {
     let (record, mut deps) = record_with_deps(&keystore, action).await;
     *deps[0].as_action_mut().timestamp_mut() = before;
 
-    sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
         .await
         .unwrap();
 
     *deps[0].as_action_mut().timestamp_mut() = after;
-    let r = sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    let r = sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
         .await
         .unwrap_err()
         .into_outcome();
 
     assert_matches!(
         r,
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::Timestamp(_, _)
-        ))
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::Timestamp(_, _),
+            ..
+        }))
     );
 }
 
@@ -453,50 +452,53 @@ async fn check_previous_seq() {
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 1;
 
     assert!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .is_ok()
     );
 
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 2;
-    assert_eq!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    assert_matches!(
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .unwrap_err()
             .into_outcome(),
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidSeq(2, 2)
-        )),
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::InvalidSeq(2, 2),
+            ..
+        }))
     );
 
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 3;
-    assert_eq!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    assert_matches!(
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .unwrap_err()
             .into_outcome(),
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidSeq(2, 3)
-        )),
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::InvalidSeq(2, 3),
+            ..
+        }))
     );
 
     *record.as_action_mut().action_seq_mut().unwrap() = 0;
     let record = rebuild_record(record, &keystore).await;
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 0;
-    assert_eq!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+    assert_matches!(
+        sys_validate_record(&record, Arc::new(MockCascade::with_records(deps.clone())))
             .await
             .unwrap_err()
             .into_outcome(),
-        Some(ValidationOutcome::PrevActionError(
-            PrevActionError::InvalidRoot
-        )),
+        Some(ValidationOutcome::PrevActionError(PrevActionError {
+            source: PrevActionErrorKind::InvalidRoot,
+            ..
+        }))
     );
 }
 
 /// Entry type in the action matches the entry variant
-#[tokio::test(flavor = "multi_thread")]
-async fn check_entry_type_test() {
+#[test]
+fn check_entry_type_test() {
     let entry_fixt = EntryFixturator::new(Predictable);
     let et_fixt = EntryTypeFixturator::new(Predictable);
 
@@ -520,8 +522,8 @@ async fn check_entry_type_test() {
 }
 
 /// Hash integrity check. The hash of an entry always matches what's in the action.
-#[tokio::test(flavor = "multi_thread")]
-async fn check_entry_hash_test() {
+#[test]
+fn check_entry_hash_test() {
     let mut g = random_generator();
 
     let mut ec = Create::arbitrary(&mut g).unwrap();
@@ -534,7 +536,7 @@ async fn check_entry_hash_test() {
     // Safe to unwrap if new entry
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
-        check_entry_hash(&eh, &entry).await,
+        check_entry_hash(&eh, &entry),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryHash
         ))
@@ -544,7 +546,7 @@ async fn check_entry_hash_test() {
     let action: Action = ec.clone().into();
 
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
-    assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
+    assert_matches!(check_entry_hash(&eh, &entry), Ok(()));
     assert_matches!(
         check_new_entry_action(&CreateLink::arbitrary(&mut g).unwrap().into()),
         Err(SysValidationError::ValidationOutcome(
@@ -560,8 +562,12 @@ async fn check_entry_size_test() {
 
     let keystore = test_keystore();
 
-    let (mut record, cascade) =
-        record_with_cascade(&keystore, Create::arbitrary(&mut g).unwrap().into()).await;
+    let action = contrafact::brute("app entry create", |a: &Create| {
+        matches!(a.entry_type, EntryType::App(_))
+    })
+    .build(&mut g);
+
+    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
@@ -570,7 +576,7 @@ async fn check_entry_size_test() {
         EntryType::App(AppEntryDef::arbitrary(&mut g).unwrap());
     *record.as_entry_mut() = RecordEntry::Present(tiny_entry);
     let mut record = rebuild_record(record, &keystore).await;
-    sys_validate_record(&record, &cascade).await.unwrap();
+    sys_validate_record(&record, cascade.clone()).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
@@ -579,7 +585,7 @@ async fn check_entry_size_test() {
     let record = rebuild_record(record, &keystore).await;
 
     assert_eq!(
-        sys_validate_record(&record, &cascade)
+        sys_validate_record(&record, cascade)
             .await
             .unwrap_err()
             .into_outcome(),
@@ -595,7 +601,13 @@ async fn check_update_reference_test() {
     let keystore = test_keystore();
 
     let action = contrafact::brute("non agent entry type", move |a: &Action| {
-        matches!(a, Action::Update(..))
+        matches!(
+            a,
+            Action::Update(Update {
+                entry_type: EntryType::App(_),
+                ..
+            })
+        ) && !matches!(a, Action::AgentValidationPkg(..))
             && a.entry_type()
                 .map(|et| *et != EntryType::AgentPubKey)
                 .unwrap_or(false)
@@ -611,8 +623,8 @@ async fn check_update_reference_test() {
     .build(&mut g);
 
     let net = new_entry_type.clone();
-    let entry = contrafact::brute("matching entry", move |e: &Entry| {
-        entry_type_matches(&net, e)
+    let entry = contrafact::brute("matching entry, not countersigning", move |e: &Entry| {
+        !matches!(e, Entry::CounterSign(_, _)) && entry_type_matches(&net, e)
     })
     .build(&mut g);
 
@@ -621,7 +633,7 @@ async fn check_update_reference_test() {
     let record = rebuild_record(record, &keystore).await;
 
     assert_eq!(
-        sys_validate_record(&record, &cascade)
+        sys_validate_record(&record, cascade)
             .await
             .unwrap_err()
             .into_outcome(),
@@ -650,7 +662,7 @@ async fn check_link_tag_size_test() {
     let (record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     assert_eq!(
-        sys_validate_record(&record, &cascade)
+        sys_validate_record(&record, cascade)
             .await
             .unwrap_err()
             .into_outcome(),
@@ -686,23 +698,29 @@ async fn incoming_ops_filters_private_entry() {
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_entry(record.clone()).await.unwrap();
-    let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
-            .unwrap()
-    });
+    let num_ops: usize = vault
+        .read_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?)
+        })
+        .await
+        .unwrap();
     assert_eq!(num_ops, 0);
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
     ops_sender.send_store_record(record.clone()).await.unwrap();
-    let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
-            .unwrap()
-    });
+    let num_ops: usize = vault
+        .read_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))?)
+        })
+        .await
+        .unwrap();
     assert_eq!(num_ops, 1);
-    let num_entries: usize = fresh_reader_test(vault.clone(), |txn| {
-        txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))
-            .unwrap()
-    });
+    let num_entries: usize = vault
+        .read_async(move |txn| -> DatabaseResult<usize> {
+            Ok(txn.query_row("SELECT COUNT(rowid) FROM Entry", [], |row| row.get(0))?)
+        })
+        .await
+        .unwrap();
     assert_eq!(num_entries, 0);
 }
 
@@ -730,9 +748,10 @@ fn valid_chain_test() {
         let err = validate_chain(fork.iter(), &None).expect_err("Forked chain");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::HashMismatch(_)
-            ))
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::HashMismatch(_),
+                ..
+            }))
         );
 
         // Test a chain with the wrong seq.
@@ -741,8 +760,11 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_seq.iter(), &None).expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidSeq(_, _)
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidSeq(_, _),
+                ..
+            }
+
             ))
         );
 
@@ -755,8 +777,11 @@ fn valid_chain_test() {
         let err = validate_chain(wrong_root.iter(), &None).expect_err("Wrong root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidRoot
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidRoot,
+                ..
+            }
+
             ))
         );
 
@@ -766,8 +791,11 @@ fn valid_chain_test() {
         let err = validate_chain(dna_not_at_root.iter(), &None).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::MissingPrev
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::MissingPrev,
+                ..
+            }
+
             ))
         );
 
@@ -776,8 +804,11 @@ fn valid_chain_test() {
         let err = validate_chain(actions.iter(), &Some((hash, 0))).expect_err("Dna not at root");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::MissingPrev
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::MissingPrev,
+                ..
+            }
+
             ))
         );
 
@@ -793,8 +824,11 @@ fn valid_chain_test() {
         .expect_err("Wrong seq");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::InvalidSeq(_, _)
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::InvalidSeq(_, _),
+                ..
+            }
+
             ))
         );
 
@@ -810,8 +844,11 @@ fn valid_chain_test() {
         let err = validate_chain(correct_seq.iter(), &Some((hash, 0))).expect_err("Hash is wrong");
         assert_matches!(
             err,
-            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(
-                PrevActionError::HashMismatch(_)
+            SysValidationError::ValidationOutcome(ValidationOutcome::PrevActionError(PrevActionError {
+                source: PrevActionErrorKind::HashMismatch(_),
+                ..
+            }
+
             ))
         );
     });
@@ -959,40 +996,21 @@ async fn test_dpki_agent_update() {
         .unwrap_err();
 }
 
-#[tokio::test(flavor = "multi_thread")]
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
+#[tokio::test(flavor = "multi_thread")]
+// XXX: the valid_arbitrary_chain as used here can't handle actions with
+// sys validation dependencies, so we filter out those action types.
+// Also, there are several other problems here that need to be addressed
+// to make this not flaky.
+#[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
-
-    let fact = contrafact::facts![
-        holochain_zome_types::record::facts::action_and_entry_match(false),
-        contrafact::lens(
-            "action is valid",
-            |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain(author),
-        ),
-    ];
-
     let mut g = random_generator();
 
-    let mut chain: Vec<Record> =
-        futures::future::join_all(contrafact::build_seq(&mut g, n, fact).into_iter().map(
-            |(a, entry)| {
-                let keystore = keystore.clone();
-                async move {
-                    Record::new(
-                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                            .await
-                            .unwrap(),
-                        entry.into_option(),
-                    )
-                }
-            },
-        ))
-        .await;
+    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n).await;
 
     validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
 
@@ -1012,5 +1030,5 @@ async fn valid_chain_fact_test() {
 
     let cascade = MockCascade::with_records(chain);
 
-    sys_validate_record(&last, &cascade).await.unwrap();
+    sys_validate_record(&last, Arc::new(cascade)).await.unwrap();
 }

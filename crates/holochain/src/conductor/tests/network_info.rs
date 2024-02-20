@@ -1,7 +1,7 @@
 use holo_hash::ActionHash;
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::Timestamp;
+use holochain_zome_types::prelude::Timestamp;
 
 use crate::sweettest::{consistency_10s, SweetConductorBatch, SweetDnaFile, SweetZome};
 

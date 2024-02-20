@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use holochain_diagnostics::{
     gossip::sharded_gossip::NodeId,
     holochain::{
@@ -38,20 +40,18 @@ fn config() -> ConductorConfig {
     // config_standard()
 
     let mut config = config_standard();
-    config.network.as_mut().map(|c| {
-        *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
-            tp.disable_recent_gossip = false;
-            tp.danger_gossip_recent_threshold_secs = 5;
+    config.network = config.network.clone().tune(|mut tp| {
+        tp.disable_publish = true;
+        tp.disable_recent_gossip = false;
+        tp.danger_gossip_recent_threshold_secs = 5;
 
-            tp.gossip_inbound_target_mbps = 1000000.0;
-            tp.gossip_outbound_target_mbps = 1000000.0;
-            tp.gossip_historic_outbound_target_mbps = 1000000.0;
-            tp.gossip_historic_inbound_target_mbps = 1000000.0;
+        tp.gossip_inbound_target_mbps = 1000000.0;
+        tp.gossip_outbound_target_mbps = 1000000.0;
+        tp.gossip_historic_outbound_target_mbps = 1000000.0;
+        tp.gossip_historic_inbound_target_mbps = 1000000.0;
 
-            tp.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 5;
-            tp
-        });
+        tp.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 5;
+        tp
     });
     config
 }
@@ -154,10 +154,10 @@ async fn setup_app(mut rng: StdRng) -> App {
 async fn construct_node(dna: DnaFile) -> Node {
     let (mut conductor, zome) =
         diagnostic_tests::setup_conductor_with_single_dna(config(), dna).await;
-    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist());
+    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist_dbs());
     let conductor = Arc::new(conductor);
-    let node = Node::new(conductor.clone(), zome).await;
-    node
+
+    Node::new(conductor.clone(), zome).await
 }
 
 async fn introduce_node_to_peers(node: &Node, peers: &[Node]) {
@@ -255,7 +255,7 @@ impl ClientState for State {
 
 impl State {
     fn new(commits: [usize; BASES], rng: StdRng) -> Self {
-        let state = Self {
+        Self {
             time: Instant::now(),
             commits,
             rng,
@@ -263,8 +263,7 @@ impl State {
             link_counts: Default::default(),
             node_cert_index: Default::default(),
             done_time: Default::default(),
-        };
-        state
+        }
     }
 
     fn add_node(&mut self, node: Node) {
@@ -324,11 +323,9 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
                     } else {
                         last_zero = Some(i);
                     }
-                } else {
-                    if last_zero.is_some() {
-                        state.done_time = None;
-                        last_zero = None;
-                    }
+                } else if last_zero.is_some() {
+                    state.done_time = None;
+                    last_zero = None;
                 }
             });
 
@@ -394,12 +391,10 @@ async fn commit(app: &App, node: &Node, base_index: usize) -> usize {
         )
         .await;
 
-    let total = app.state.share_mut(|state| {
+    app.state.share_mut(|state| {
         state.commits[base_index] += ENTRIES_PER_COMMIT as usize;
         state.total_commits()
-    });
-
-    total
+    })
 }
 
 fn spawn_commit_task(app: App) -> tokio::task::JoinHandle<()> {
@@ -452,7 +447,7 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
             None => (),
         };
 
-        let _ = app.state.share_mut(|state| state.time = Instant::now());
+        app.state.share_mut(|state| state.time = Instant::now());
         let _ = app
             .state
             .share_ref(|state| terminal.draw(|f| app.ui.render(f, state)).unwrap());

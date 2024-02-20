@@ -1,10 +1,8 @@
 use crate as zt;
-use crate::cell::CellId;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 pub use holochain_integrity_types::zome_io::*;
-use holochain_serialized_bytes::prelude::*;
+use holochain_nonce::Nonce256Bits;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
@@ -53,7 +51,7 @@ wasm_io_types! {
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
 
-    fn call (Vec<zt::call::Call>) -> Vec<zt::ZomeCallResponse>;
+    fn call (Vec<zt::call::Call>) -> Vec<zt::prelude::ZomeCallResponse>;
 
     // @todo List all the local capability claims.
     fn capability_claims (()) -> ();
@@ -110,18 +108,18 @@ wasm_io_types! {
     fn must_get_entry (zt::entry::MustGetEntryInput) -> zt::entry::EntryHashed;
 
     // Retrieve an action from the DHT or short circuit.
-    fn must_get_action (zt::entry::MustGetActionInput) -> zt::SignedActionHashed;
+    fn must_get_action (zt::entry::MustGetActionInput) -> zt::prelude::SignedActionHashed;
 
     fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::RegisterAgentActivity>;
 
     // Query the source chain for data.
-    fn query (zt::query::ChainQueryFilter) -> Vec<crate::Record>;
+    fn query (zt::query::ChainQueryFilter) -> Vec<crate::prelude::Record>;
 
     // the length of random bytes to create
     fn random_bytes (u32) -> zt::bytes::Bytes;
 
     // Remotely signal many agents without waiting for responses
-    fn remote_signal (zt::signal::RemoteSignal) -> ();
+    fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
     // // @todo
     // fn send (()) -> ();
@@ -182,6 +180,18 @@ wasm_io_types! {
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
     fn zome_info (()) -> zt::info::ZomeInfo;
+
+    // Create a clone of an existing cell.
+    fn create_clone_cell(zt::clone::CreateCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Disable a clone cell.
+    fn disable_clone_cell(zt::clone::DisableCloneCellInput) -> ();
+
+    // Enable a clone cell.
+    fn enable_clone_cell(zt::clone::EnableCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Delete a clone cell.
+    fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
 }
 
 /// Anything that can go wrong while calling a HostFnApi method
@@ -217,7 +227,7 @@ impl ZomeCallAuthorization {
 pub enum ZomeCallResponse {
     /// Arbitrary response from zome fns to the outside world.
     /// Something like a 200 http response.
-    Ok(crate::ExternIO),
+    Ok(ExternIO),
     /// Cap grant failure.
     /// Something like a 401 http response.
     Unauthorized(
@@ -233,18 +243,6 @@ pub enum ZomeCallResponse {
     /// A countersigning session has failed to start.
     CountersigningSession(String),
 }
-
-/// 256 Bit generic nonce.
-#[derive(Clone, Copy)]
-pub struct Nonce256Bits([u8; 32]);
-holochain_integrity_types::secure_primitive!(Nonce256Bits, 32);
-
-impl Nonce256Bits {
-    pub fn into_inner(self) -> [u8; 32] {
-        self.0
-    }
-}
-
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -258,13 +256,13 @@ pub struct ZomeCallUnsigned {
     /// Function name to sign.
     pub fn_name: FunctionName,
     /// Cap secret to sign.
-    pub cap_secret: Option<crate::CapSecret>,
+    pub cap_secret: Option<CapSecret>,
     /// Payload to sign.
     pub payload: ExternIO,
     /// Nonce to sign.
     pub nonce: Nonce256Bits,
     /// Time after which this zome call MUST NOT be accepted.
-    pub expires_at: crate::Timestamp,
+    pub expires_at: Timestamp,
 }
 
 impl ZomeCallUnsigned {

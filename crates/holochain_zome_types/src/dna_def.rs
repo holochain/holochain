@@ -1,13 +1,12 @@
 //! Defines DnaDef struct
 
-use super::zome;
 use crate::prelude::*;
 
 #[cfg(feature = "full-dna-def")]
 use holochain_integrity_types::info::DnaModifiersBuilder;
 
 #[cfg(feature = "full-dna-def")]
-use crate::zome::error::ZomeError;
+use crate::zome::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
@@ -15,10 +14,10 @@ use holo_hash::*;
 use kitsune_p2p_dht::spacetime::Dimension;
 
 /// Ordered list of integrity zomes in this DNA.
-pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
+pub type IntegrityZomes = Vec<(ZomeName, IntegrityZomeDef)>;
 
 /// Ordered list of coordinator zomes in this DNA.
-pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
+pub type CoordinatorZomes = Vec<(ZomeName, CoordinatorZomeDef)>;
 
 /// The definition of a DNA: the hash of this data is what produces the DnaHash.
 ///
@@ -28,7 +27,7 @@ pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 /// Hence, this type can basically be thought of as a fully validated, normalized
 /// `DnaManifest`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
 pub struct DnaDef {
@@ -79,7 +78,7 @@ impl DnaDef {
 
 impl DnaDef {
     /// Get all zomes including the integrity and coordinator zomes.
-    pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &zome::ZomeDef)> {
+    pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &ZomeDef)> {
         self.integrity_zomes
             .iter()
             .map(|(n, def)| (n, def.as_any_zome_def()))
@@ -94,10 +93,7 @@ impl DnaDef {
 #[cfg(feature = "full-dna-def")]
 impl DnaDef {
     /// Find an integrity zome from a [`ZomeName`].
-    pub fn get_integrity_zome(
-        &self,
-        zome_name: &ZomeName,
-    ) -> Result<zome::IntegrityZome, ZomeError> {
+    pub fn get_integrity_zome(&self, zome_name: &ZomeName) -> Result<IntegrityZome, ZomeError> {
         self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
@@ -114,10 +110,7 @@ impl DnaDef {
     }
 
     /// Find a coordinator zome from a [`ZomeName`].
-    pub fn get_coordinator_zome(
-        &self,
-        zome_name: &ZomeName,
-    ) -> Result<zome::CoordinatorZome, ZomeError> {
+    pub fn get_coordinator_zome(&self, zome_name: &ZomeName) -> Result<CoordinatorZome, ZomeError> {
         self.coordinator_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
@@ -127,7 +120,7 @@ impl DnaDef {
     }
 
     /// Find a any zome from a [`ZomeName`].
-    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<Zome, ZomeError> {
         self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
@@ -144,7 +137,7 @@ impl DnaDef {
     }
 
     /// Get all the [`CoordinatorZome`]s for this dna
-    pub fn get_all_coordinators(&self) -> Vec<zome::CoordinatorZome> {
+    pub fn get_all_coordinators(&self) -> Vec<CoordinatorZome> {
         self.coordinator_zomes
             .iter()
             .cloned()
@@ -153,7 +146,7 @@ impl DnaDef {
     }
 
     /// Return a Zome, error if not a WasmZome
-    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
+    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&WasmZome, ZomeError> {
         self.all_zomes()
             .find(|(name, _)| *name == zome_name)
             .map(|(_, def)| def)

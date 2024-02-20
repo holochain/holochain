@@ -4,7 +4,6 @@ use super::InterfaceApi;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
-use crate::conductor::conductor::CellStatus;
 use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
@@ -176,7 +175,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle
-                    .running_cell_ids(Some(CellStatus::Joined))
+                    .running_cell_ids()
                     .into_iter()
                     .collect();
                 Ok(AdminResponse::CellIdsListed(cell_ids))
@@ -236,6 +235,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
+            }
+            DumpConductorState => {
+                let state = self.conductor_handle.dump_conductor_state().await?;
+                Ok(AdminResponse::ConductorStateDumped(state))
             }
             DumpFullState {
                 cell_id,
@@ -335,7 +338,10 @@ mod test {
     async fn register_list_dna_app() -> Result<()> {
         holochain_trace::test_run().ok();
         let env_dir = test_db_dir();
-        let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
+        let handle = Conductor::builder()
+            .with_data_root_path(env_dir.path().to_path_buf().into())
+            .test(&[])
+            .await?;
 
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let network_seed = Uuid::new_v4();

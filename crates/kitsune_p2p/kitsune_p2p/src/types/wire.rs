@@ -22,11 +22,19 @@ use std::sync::Arc;
     serde::Serialize,
     serde::Deserialize,
 )]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Enum containing the individual metric exchange messages used by clients
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
 pub enum MetricExchangeMsg {
     /// To start off, let's use a naive single message sending
     /// everything we care about.
@@ -46,6 +54,7 @@ pub enum MetricExchangeMsg {
 /// An individual op item within a "PushOpData" wire message.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct PushOpItem {
     /// The payload of this op.
     pub op_data: Arc<KitsuneOpData>,

@@ -4,8 +4,9 @@ use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::consistency_10s;
+use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
-use holochain_state::prelude::fresh_reader_test;
+use holochain_sqlite::prelude::DatabaseResult;
 use unwrap_to::unwrap_to;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -21,7 +22,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use std::sync::Arc;
 
     use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
-    use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
 
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
@@ -33,7 +34,11 @@ async fn test_publish() -> anyhow::Result<()> {
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
-    config.network = Some(network);
+    config.network = network;
+    config.tuning_params = Some(ConductorTuningParams {
+        sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
+        ..Default::default()
+    });
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
@@ -74,12 +79,17 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    let _g = holochain_trace::test_run().ok();
+    holochain_trace::test_run().unwrap();
+
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::standard();
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|config| {
+        // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
+        // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
+        config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+    });
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -112,7 +122,11 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // See if we can fetch metric data from bobbo
     let metrics = conductors[1].dump_network_metrics(None).await?;
-    println!("@!@! - metrics: {}", metrics);
+    tracing::info!(target: "TEST", "@!@! - metrics: {metrics}");
+
+    // See if we can fetch network stats from bobbo
+    let stats = conductors[1].dump_network_stats().await?;
+    tracing::info!(target: "TEST", "@!@! - stats: {stats}");
 
     Ok(())
 }
@@ -129,12 +143,10 @@ async fn sharded_consistency() {
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.gossip_dynamic_arcs = true;
-
-    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
+    let config = SweetConductorConfig::standard().tune(|tuning| {
+        tuning.gossip_strategy = "sharded-gossip".to_string();
+        tuning.gossip_dynamic_arcs = true;
+    });
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
@@ -277,21 +289,20 @@ async fn private_entries_dont_leak() {
     )
     .await;
 
-    check_for_private_entries(alice.dht_db().clone());
-    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap());
-    check_for_private_entries(bobbo.dht_db().clone());
-    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap());
+    check_for_private_entries(alice.dht_db().clone()).await;
+    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap()).await;
+    check_for_private_entries(bobbo.dht_db().clone()).await;
+    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
 }
 
-fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
-    let count: usize = fresh_reader_test(env, |txn| {
-        txn.query_row(
+async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
+    let count: usize = env.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.query_row(
             "select count(action.rowid) from action join entry on action.entry_hash = entry.hash where private_entry = 1",
             [],
             |row| row.get(0),
-        )
-        .unwrap()
-    });
+        )?)
+    }).await.unwrap();
     assert_eq!(count, 0);
 }
 
@@ -316,7 +327,7 @@ async fn check_all_gets_for_private_entry(
             .into_iter()
             .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
     );
-    let records = records.into_iter().filter_map(|a| a).collect();
+    let records = records.into_iter().flatten().collect();
     check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))

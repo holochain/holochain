@@ -12,13 +12,10 @@ use holochain_p2p::{
     dht_arc::{DhtArc, DhtLocation},
     AgentPubKeyExt, DhtOpHashExt,
 };
-use holochain_sqlite::{
-    db::{AsP2pStateTxExt, DbKindAuthored, DbKindDht, DbKindP2pAgents},
-    prelude::{DatabaseResult, ReadAccess},
+use holochain_sqlite::prelude::{
+    DatabaseResult, DbKindAuthored, DbKindDht, DbKindP2pAgents, ReadAccess,
 };
-use holochain_state::{prelude::StateQueryResult, query::from_blob};
-use holochain_types::{db::DbRead, dht_op::DhtOpType, prelude::DhtOp};
-use holochain_zome_types::{Entry, EntryVisibility, SignedAction};
+use holochain_state::prelude::*;
 use kitsune_p2p::{KitsuneAgent, KitsuneOpHash};
 use kitsune_p2p_types::consistency::*;
 use rusqlite::named_params;
@@ -42,7 +39,7 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
     // For each space get all the cells, their db and the p2p envs.
     let mut spaces = HashMap::new();
     for (i, c) in conductors.iter().enumerate() {
-        for cell_id in c.running_cell_ids(None) {
+        for cell_id in c.running_cell_ids() {
             let space = spaces
                 .entry(cell_id.dna_hash().clone())
                 .or_insert_with(|| vec![None; conductors.len()]);
@@ -116,7 +113,7 @@ pub async fn local_machine_session_with_hashes(
     // Grab the environments and cells for each conductor in this space.
     let mut conductors = vec![None; handles.len()];
     for (i, c) in handles.iter().enumerate() {
-        for cell_id in c.running_cell_ids(None) {
+        for cell_id in c.running_cell_ids() {
             if cell_id.dna_hash() != space {
                 continue;
             }
@@ -584,15 +581,11 @@ async fn check_agents<'iter>(
 ) -> DatabaseResult<impl Iterator<Item = &'iter Arc<KitsuneAgent>> + 'iter> {
     // Poll the peer database for the currently held agents.
     let agents_held: HashSet<_> = p2p_agents_db
-        .async_reader(|txn| {
-            DatabaseResult::Ok(
-                txn.p2p_list_agents()?
-                    .into_iter()
-                    .map(|a| a.agent.clone())
-                    .collect(),
-            )
-        })
-        .await?;
+        .p2p_list_agents()
+        .await?
+        .into_iter()
+        .map(|a| a.agent.clone())
+        .collect();
 
     // Filter out the currently held agents from the expected agents to return any missing.
     Ok(expected_agents
@@ -616,7 +609,7 @@ async fn check_hashes(
 
     // Poll the vault database for each expected hashes existence.
     let mut r = dht_db
-                .async_reader(move |txn| {
+                .read_async(move |txn| {
                     for hash in &expected {
                         // TODO: This might be too slow, could instead save the holochain hash versions.
                         let h_hash: DhtOpHash = DhtOpHashExt::from_kitsune_raw(hash.clone());
@@ -683,7 +676,7 @@ pub async fn request_published_ops<AuthorDb>(
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
 {
-    db.async_reader(|txn| {
+    db.read_async(|txn| {
         // Collect all ops except StoreEntry's that are private.
         let sql_common = "
         SELECT
@@ -776,6 +769,5 @@ async fn request_arc(
     db: &DbRead<DbKindP2pAgents>,
     agent: KitsuneAgent,
 ) -> StateQueryResult<Option<DhtArc>> {
-    db.async_reader(move |txn| Ok(txn.p2p_get_agent(&agent)?.map(|info| info.storage_arc)))
-        .await
+    Ok(db.p2p_get_agent(&agent).await?.map(|info| info.storage_arc))
 }

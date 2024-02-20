@@ -5,6 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(

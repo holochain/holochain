@@ -1,4 +1,4 @@
-use kitsune_p2p::dht::{
+use kitsune_p2p_dht::{
     hash::{hash_slice_32, Hash32},
     region::slice_xor,
 };

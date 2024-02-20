@@ -184,7 +184,13 @@ impl Drop for CancelResponse {
             let tx = self.1.clone();
             let id = self.2;
             tokio::spawn(async move {
-                if let Err(e) = tx.send(OutgoingMessage::Response(None, id)).await {
+                if let Err(e) = tx
+                    .send_timeout(
+                        OutgoingMessage::Response(None, id),
+                        std::time::Duration::from_secs(30),
+                    )
+                    .await
+                {
                     tracing::warn!("Failed to cancel response on drop {:?}", e);
                 }
             });

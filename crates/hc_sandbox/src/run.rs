@@ -2,8 +2,11 @@
 
 use anyhow::anyhow;
 use std::path::Path;
-use std::{path::PathBuf, process::Stdio};
+use std::process::Stdio;
 
+use holochain_conductor_api::conductor::paths::ConfigFilePath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use holochain_trace::Output;
 use tokio::io::AsyncBufReadExt;
@@ -36,7 +39,7 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 /// a random free port will be chosen.
 pub async fn run(
     holochain_path: &Path,
-    sandbox_path: PathBuf,
+    sandbox_path: ConfigRootPath,
     conductor_index: usize,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
@@ -90,18 +93,19 @@ pub async fn run(
 /// a random free port will be chosen.
 pub async fn run_async(
     holochain_path: &Path,
-    sandbox_path: PathBuf,
+    config_root_path: ConfigRootPath,
     force_admin_port: Option<u16>,
     structured: Output,
 ) -> anyhow::Result<(u16, Child, Option<Child>)> {
-    let mut config = match read_config(sandbox_path.clone())? {
+    let mut config = match read_config(config_root_path.clone())? {
         Some(c) => c,
         None => {
-            let mut keystore_dir = sandbox_path.clone();
-            keystore_dir.push("keystore");
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(&keystore_dir, passphrase)?;
-            create_config(sandbox_path.clone(), Some(con_url))
+            let con_url = crate::generate::init_lair(
+                &config_root_path.is_also_data_root_path().try_into()?,
+                passphrase,
+            )?;
+            create_config(config_root_path.clone(), Some(con_url))?
         }
     };
     match force_admin_port {
@@ -110,10 +114,16 @@ pub async fn run_async(
         }
         None => random_admin_port(&mut config),
     }
-    let config_path = write_config(sandbox_path.clone(), &config);
+    let _config_file_path = write_config(config_root_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (child, lair) =
-        start_holochain(holochain_path, &config, config_path, structured, tx_config).await?;
+    let (child, lair) = start_holochain(
+        holochain_path,
+        &config,
+        config_root_path,
+        structured,
+        tx_config,
+    )
+    .await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
@@ -130,20 +140,20 @@ pub async fn run_async(
 async fn start_holochain(
     holochain_path: &Path,
     config: &ConductorConfig,
-    config_path: PathBuf,
+    config_root_path: ConfigRootPath,
     structured: Output,
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Option<Child>)> {
     use tokio::io::AsyncWriteExt;
     let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
 
-    let mut lair_path = config_path.clone();
-    lair_path.pop();
-    lair_path.push("keystore");
-
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
-            let lair = start_lair(passphrase.as_slice(), lair_path).await?;
+            let lair = start_lair(
+                passphrase.as_slice(),
+                config_root_path.is_also_data_root_path().try_into()?,
+            )
+            .await?;
             Some(lair)
         }
         _ => None,
@@ -154,7 +164,7 @@ async fn start_holochain(
     cmd.arg("--piped")
         .arg(format!("--structured={}", structured))
         .arg("--config-path")
-        .arg(config_path)
+        .arg(ConfigFilePath::from(config_root_path).as_ref())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -172,13 +182,13 @@ async fn start_holochain(
     Ok((holochain, lair))
 }
 
-async fn start_lair(passphrase: &[u8], lair_path: PathBuf) -> anyhow::Result<Child> {
+async fn start_lair(passphrase: &[u8], lair_path: KeystorePath) -> anyhow::Result<Child> {
     use tokio::io::AsyncWriteExt;
 
     tracing::info!("\n\n----\nstarting lair\n----\n\n");
     let mut cmd = Command::new("lair-keystore");
     cmd.arg("--lair-root")
-        .arg(lair_path)
+        .arg(lair_path.as_ref())
         .arg("server")
         .arg("--piped")
         .stdin(Stdio::piped())

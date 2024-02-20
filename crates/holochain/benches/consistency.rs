@@ -55,7 +55,7 @@ fn consistency(bench: &mut Criterion) {
         producer.run().await;
         producer.conductor.shutdown().await;
     });
-    group.bench_function(BenchmarkId::new("test", format!("test")), |b| {
+    group.bench_function(BenchmarkId::new("test", "test".to_string()), |b| {
         b.iter(|| {
             runtime.block_on(async { consumer.run(&cells[..]).await });
         });
@@ -163,7 +163,7 @@ async fn setup() -> (Producer, Consumer, Others) {
     let config = SweetConductorConfig::standard().no_publish();
     let configs = vec![config; 5];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
-    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+    let apps = conductors.setup_app("app", [&dna]).await.unwrap();
     let mut cells = apps
         .into_inner()
         .into_iter()

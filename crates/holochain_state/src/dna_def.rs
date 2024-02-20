@@ -30,6 +30,7 @@ pub fn get(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<Option<Dna
     }
 }
 
+#[allow(clippy::let_and_return)] // required to drop temporary
 pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<DnaDefHashed>> {
     let mut stmt = txn.prepare(
         "

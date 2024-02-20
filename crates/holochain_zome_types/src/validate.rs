@@ -1,4 +1,4 @@
-use crate::CallbackResult;
+use crate::prelude::*;
 use holochain_wasmer_common::*;
 
 pub use holochain_integrity_types::validate::*;

@@ -8,6 +8,7 @@ use holochain_p2p::actor::GetLinksOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn get_link_details<'a>(
@@ -27,12 +28,16 @@ pub fn get_link_details<'a>(
                             base_address,
                             link_type,
                             tag_prefix,
+                            ..
                         } = input;
 
                         let key = WireLinkKey {
                             base: base_address,
                             type_query: link_type,
                             tag: tag_prefix,
+                            after: None,
+                            before: None,
+                            author: None,
                         };
                         Ok(CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),

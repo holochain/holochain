@@ -1,22 +1,26 @@
 //! Utils for Holochain tests
 use crate::conductor::api::RealAppInterfaceApi;
-use crate::conductor::conductor::CellStatus;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
+use crate::conductor::integration_dump;
 use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
+use aitia::Fact;
+use hc_sleuth::SleuthId;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
+use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
+use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht::prelude::Topology;
 use holochain_p2p::dht::ArqStrat;
@@ -28,21 +32,20 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::source_chain;
-use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_types::test_utils::fake_dna_file;
+use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -50,14 +53,19 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
-pub mod conductor_setup;
 pub mod consistency;
+pub mod hc_stress_test;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
 
 mod wait_for;
 pub use wait_for::*;
+
+mod big_stack_test;
+
+mod generate_records;
+pub use generate_records::*;
 
 pub use crate::sweettest::sweet_consistency::*;
 
@@ -225,7 +233,7 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
-    let mut config = holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default();
+    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::default();
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.tx2_implicit_timeout_ms = 500;
@@ -306,16 +314,16 @@ where
 /// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
-    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    data: &[(DnaFile, Option<MembraneProof>)],
     conductor_handle: ConductorHandle,
 ) {
-    for dna in dnas {
-        conductor_handle.register_dna(dna).await.unwrap();
+    for (dna, _) in data.iter() {
+        conductor_handle.register_dna(dna.clone()).await.unwrap();
     }
     conductor_handle
         .clone()
-        .install_app_legacy(name.to_string(), cell_data)
+        .install_app_minimal(name.to_string(), agent, data)
         .await
         .unwrap();
 
@@ -334,22 +342,23 @@ pub async fn install_app(
 }
 
 /// Payload for installing cells
-pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
+pub type DnasWithProofs = Vec<(DnaFile, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
 pub async fn setup_app_in_new_conductor(
     installed_app_id: InstalledAppId,
-    dnas: Vec<DnaFile>,
-    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+    agent: AgentPubKey,
+    dnas: DnasWithProofs,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let db_dir = test_db_dir();
 
     let conductor_handle = ConductorBuilder::new()
-        .test(db_dir.path(), &[])
+        .with_data_root_path(db_dir.path().to_path_buf().into())
+        .test(&[])
         .await
         .unwrap();
 
-    install_app_in_conductor(conductor_handle.clone(), installed_app_id, dnas, cell_data).await;
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
 
     let handle = conductor_handle.clone();
 
@@ -364,16 +373,16 @@ pub async fn setup_app_in_new_conductor(
 pub async fn install_app_in_conductor(
     conductor_handle: ConductorHandle,
     installed_app_id: InstalledAppId,
-    dnas: Vec<DnaFile>,
-    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+    agent: AgentPubKey,
+    dnas_with_proofs: &[(DnaFile, Option<MembraneProof>)],
 ) {
-    for dna in dnas {
-        conductor_handle.register_dna(dna).await.unwrap();
+    for (dna, _) in dnas_with_proofs {
+        conductor_handle.register_dna(dna.clone()).await.unwrap();
     }
 
     conductor_handle
         .clone()
-        .install_app_legacy(installed_app_id.clone(), cell_data)
+        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs)
         .await
         .unwrap();
 
@@ -395,47 +404,62 @@ pub async fn install_app_in_conductor(
 /// Setup an app for testing
 /// apps_data is a vec of app nicknames with vecs of their cell data
 pub async fn setup_app_with_names(
-    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    apps_data: Vec<(&str, DnasWithProofs)>,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, None).await;
+    let (iface, handle) =
+        setup_app_inner(dir.path().to_path_buf().into(), agent, apps_data, None).await;
     (dir, iface, handle)
 }
 
 /// Setup an app with a custom network config for testing
 /// apps_data is a vec of app nicknames with vecs of their cell data.
 pub async fn setup_app_with_network(
-    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dnas: Vec<DnaFile>,
+    agent: AgentPubKey,
+    apps_data: Vec<(&str, DnasWithProofs)>,
     network: KitsuneP2pConfig,
 ) -> (TempDir, RealAppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(dir.path(), apps_data, dnas, Some(network)).await;
+    let (iface, handle) = setup_app_inner(
+        dir.path().to_path_buf().into(),
+        agent,
+        apps_data,
+        Some(network),
+    )
+    .await;
     (dir, iface, handle)
 }
 
 /// Setup an app with full configurability
 pub async fn setup_app_inner(
-    db_dir: &Path,
-    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dnas: Vec<DnaFile>,
+    data_root_path: DataRootPath,
+    agent: AgentPubKey,
+    apps_data: Vec<(&str, DnasWithProofs)>,
     network: Option<KitsuneP2pConfig>,
 ) -> (RealAppInterfaceApi, ConductorHandle) {
+    let config = ConductorConfig {
+        data_root_path: Some(data_root_path.clone()),
+        admin_interfaces: Some(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket { port: 0 },
+        }]),
+        network: network.unwrap_or_default(),
+        ..Default::default()
+    };
     let conductor_handle = ConductorBuilder::new()
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            network,
-            ..Default::default()
-        })
-        .test(db_dir, &[])
+        .config(config)
+        .test(&[])
         .await
         .unwrap();
 
     for (app_name, cell_data) in apps_data {
-        install_app(app_name, cell_data, dnas.clone(), conductor_handle.clone()).await;
+        install_app(
+            app_name,
+            agent.clone(),
+            &cell_data,
+            conductor_handle.clone(),
+        )
+        .await;
     }
 
     let handle = conductor_handle.clone();
@@ -456,7 +480,7 @@ pub fn warm_wasm_tests() {
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
-    all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
+    all_cell_dbs: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     num_attempts: usize,
     delay: Duration,
 ) where
@@ -464,7 +488,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     DhtDb: ReadAccess<DbKindDht>,
 {
     let mut published = HashSet::new();
-    for (author, db, _) in all_cell_dbs.iter() {
+    for (_, author, db, _) in all_cell_dbs.iter() {
         published.extend(
             request_published_ops(*db, Some((*author).to_owned()))
                 .await
@@ -474,16 +498,28 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
         );
     }
     let published = published.into_iter().collect::<Vec<_>>();
-    for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
-        wait_for_integration_diff(db, &published, num_attempts, delay).await
+    let all_node_ids: HashSet<_> = all_cell_dbs
+        .iter()
+        .map(|(node_id, _, _, _)| node_id)
+        .collect();
+    for (&db, node_id) in all_cell_dbs
+        .iter()
+        .flat_map(|(node_id, _, _, d)| Some((d.as_ref()?, node_id)))
+    {
+        let others: Vec<String> = all_node_ids
+            .difference(&[node_id].into_iter().collect())
+            .map(|n| n.to_string())
+            .collect();
+        wait_for_integration_diff(&others, db, &published, num_attempts, delay).await
     }
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
 /// If the timeout is reached, print a report including a diff of all published ops
 /// which were not integrated.
-#[tracing::instrument(skip(db))]
+#[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
+    node_ids: &[SleuthId],
     db: &Db,
     published: &[DhtOp],
     num_attempts: usize,
@@ -505,7 +541,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     let num_published = published.len();
     let mut num_integrated = 0;
     for i in 0..num_attempts {
-        num_integrated = get_integrated_count(db);
+        num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
@@ -521,12 +557,17 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     // Timeout has been reached at this point, so print a helpful report
 
-    let mut published: Vec<_> = published.iter().map(display_op).collect();
-    let mut integrated: Vec<_> = get_integrated_ops(db).iter().map(display_op).collect();
-    published.sort();
+    // Otherwise just print a report of which ops were not integrated
+    let mut published_displays: Vec<_> = published.iter().map(display_op).collect();
+    let mut integrated: Vec<_> = get_integrated_ops(db)
+        .await
+        .iter()
+        .map(display_op)
+        .collect();
+    published_displays.sort();
     integrated.sort();
 
-    let unintegrated = diff::slice(&published, &integrated)
+    let unintegrated = diff::slice(&published_displays, &integrated)
         .into_iter()
         .filter_map(|d| match d {
             diff::Result::Left(l) => Some(l),
@@ -540,16 +581,42 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         "consistency should only fail if items were published but not integrated"
     );
 
+    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
+        // If hc_sleuth has been initialized, print a sleuthy report
+
+        let ctx = s.lock();
+        for fact in published
+            .iter()
+            .map(DhtOpHash::with_data_sync)
+            .flat_map(|hash| {
+                node_ids
+                    .iter()
+                    .map(move |node_id| hc_sleuth::Event::Integrated {
+                        by: node_id.clone(),
+                        op: hash.clone(),
+                    })
+            })
+        {
+            let tr = fact.clone().traverse(&ctx);
+            if let Some(report) = aitia::simple_report(&tr) {
+                println!("aitia report for {fact:#?}:\n\n{report}")
+            }
+        }
+    }
+
     let timeout = delay * num_attempts as u32;
 
+    let integration_dump = integration_dump(db).await.unwrap();
+
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n",
-        timeout.as_millis(),
-        num_published,
-        num_integrated,
-        header,
-        unintegrated.join("\n"),
-    );
+            "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n\n{:?}",
+            timeout.as_millis(),
+            num_published,
+            num_integrated,
+            header,
+            unintegrated.join("\n"),
+            integration_dump,
+        );
 }
 
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
@@ -560,19 +627,8 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     num_attempts: usize,
     delay: Duration,
 ) {
-    fn display_op(op: &DhtOp) -> String {
-        format!(
-            "{} {:>3}  {} ({})",
-            op.action().author(),
-            op.action().action_seq(),
-            // op.to_light().action_hash().clone(),
-            op.get_type(),
-            op.action().action_type(),
-        )
-    }
-
     for i in 0..num_attempts {
-        let num_integrated = get_integrated_count(db);
+        let num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
@@ -591,9 +647,9 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
 
 #[tracing::instrument(skip(envs))]
 /// Show authored data for each cell environment
-pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
+pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {
-        fresh_reader_test(db.clone(), |txn| {
+        db.read_async(move |txn| -> DatabaseResult<()> {
             txn.prepare("SELECT DISTINCT Action.seq, Action.type, Action.entry_hash FROM Action JOIN DhtOp ON Action.hash = DhtOp.hash")
             .unwrap()
             .query_map([], |row| {
@@ -607,7 +663,9 @@ pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
                 let (action_type, seq, entry) = r.unwrap();
                 tracing::debug!(chain = %i, %seq, ?action_type, ?entry);
             });
-        });
+
+            Ok(())
+        }).await.unwrap();
     }
 }
 
@@ -630,20 +688,21 @@ pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> Integratio
         .unwrap()
 }
 
-fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
-    fresh_reader_test(db.clone(), |txn| {
-        txn.query_row(
+async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+    db.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
             [],
             |row| row.get(0),
-        )
-        .unwrap()
+        )?)
     })
+    .await
+    .unwrap()
 }
 
 /// Get all [`DhtOps`] integrated by this node
-pub fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
-    fresh_reader_test(db.clone(), |txn| {
+pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
+    db.read_async(move |txn| -> StateQueryResult<Vec<DhtOp>> {
         txn.prepare(
             "
             SELECT
@@ -671,13 +730,14 @@ pub fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
         })
         .unwrap()
         .collect::<StateQueryResult<_>>()
-        .unwrap()
     })
+    .await
+    .unwrap()
 }
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.running_cell_ids(Some(CellStatus::Joined)) {
+    for cell_id in conductor.running_cell_ids() {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))
@@ -810,7 +870,7 @@ pub async fn force_publish_dht_ops(
     publish_trigger: &mut TriggerSender,
 ) -> DatabaseResult<()> {
     vault
-        .async_commit(|txn| {
+        .write_async(|txn| {
             DatabaseResult::Ok(txn.execute(
                 "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
                 [],

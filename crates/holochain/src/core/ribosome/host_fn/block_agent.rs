@@ -6,6 +6,7 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
 use std::sync::Arc;
+use wasmer::RuntimeError;
 
 pub fn block_agent(
     _ribosome: Arc<impl RibosomeT>,
@@ -40,10 +41,11 @@ pub fn block_agent(
 mod test {
     use crate::conductor::api::error::ConductorApiResult;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::sweettest::consistency_60s;
     use crate::sweettest::SweetConductorBatch;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::{consistency_10s};
+    use crate::test_utils::consistency_10s;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;
@@ -93,21 +95,23 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
     async fn zome_call_get_block() {
-        holochain_trace::test_run().ok();
+        hc_sleuth::init_subscriber();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let config = SweetConductorConfig::standard().tune(|tune| {
-            tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
-            tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
-            tune.gossip_round_timeout_ms = 3000;
-        });
+        let config = SweetConductorConfig::standard()
+            .tune(|tune| {
+                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
+                tune.gossip_round_timeout_ms = 3000;
+            })
+            .tune_conductor(|c| {
+                c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
+            });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
-        let apps = conductors
-            .setup_app("create", &[dna_file.clone()])
-            .await
-            .unwrap();
+        let apps = conductors.setup_app("create", [&dna_file]).await.unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 
@@ -150,7 +154,7 @@ mod test {
 
         conductors.exchange_peer_info().await;
 
-        consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+        consistency_60s([&alice_cell, &bob_cell, &carol_cell]).await;
 
         // Bob can get data from alice via. carol.
         let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;

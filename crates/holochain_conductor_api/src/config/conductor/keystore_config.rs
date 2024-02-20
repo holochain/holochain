@@ -1,3 +1,4 @@
+use crate::conductor::paths::KeystorePath;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -28,9 +29,9 @@ pub enum KeystoreConfig {
         /// The "lair_root" path, i.e. the directory containing the
         /// "lair-keystore-config.yaml" file.
         /// If not specified, will default to the ConductorConfig
-        /// `[environment_path]/keystore`.
+        /// `[environment_path]/ks`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        lair_root: Option<std::path::PathBuf>,
+        lair_root: Option<KeystorePath>,
     },
 }
 

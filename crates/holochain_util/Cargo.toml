@@ -1,6 +1,6 @@
 [package]
 name = "holochain_util"
-version = "0.2.0"
+version = "0.3.0-beta-dev.4"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 description = "This crate is a collection of various utility functions that are used in the other crates in the holochain repository."
@@ -15,11 +15,13 @@ num_cpus = "1.8"
 futures = "0.3"
 backtrace = { version = "0.3", optional = true }
 cfg-if = "0.1"
-derive_more = "0.99"
+derive_more = { workspace = true }
 dunce = "1.0"
 rpassword = { version = "7.0.0", optional = true }
-sodoken = { version = "0.0.9", optional = true }
+sodoken = { workspace = true, optional = true }
+getrandom = "0.2.7"
 
 [features]
-default = [ "tokio" ]
+default = [ "fs", "tokio" ]
 pw = [ "rpassword", "sodoken" ]
+fs = []
