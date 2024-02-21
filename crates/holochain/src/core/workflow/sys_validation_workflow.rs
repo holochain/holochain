@@ -77,7 +77,6 @@
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::*;
-use crate::core::validation::*;
 use crate::core::workflow::error::WorkflowResult;
 use futures::FutureExt;
 use futures::StreamExt;
@@ -383,7 +382,7 @@ fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> 
 
 /// Examine the list of provided actions and create a list of actions which are sys validation dependencies for those actions.
 /// The actions are merged into `current_validation_dependencies`.
-async fn fetch_previous_actions(
+pub(crate) async fn fetch_previous_actions(
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
     cascade: Arc<impl Cascade + Send + Sync>,
     actions: impl Iterator<Item = Action>,
@@ -667,98 +666,6 @@ async fn validate_op_inner(
         DhtOp::RegisterRemoveLink(_, action) => {
             register_delete_link(action, validation_dependencies)
         }
-    }
-}
-
-/// Run system validation for a single [`Record`] instead of the usual [`DhtOp`] input for the system validation workflow.
-/// It is expected that the provided cascade will include a network so that dependencies which we either do not hold yet, or
-/// should not hold, can be fetched and cached for use in validation.
-///
-/// Note that the conditions on the action being validated are slightly stronger than the usual system validation workflow. This is because
-/// it is intended to be used for validation of records which have been authored locally so we should always be able to check the previous action.
-pub async fn sys_validate_record(
-    record: &Record,
-    cascade: Arc<impl Cascade + Send + Sync>,
-) -> SysValidationOutcome<()> {
-    match sys_validate_record_inner(record, cascade).await {
-        // Validation succeeded
-        Ok(_) => Ok(()),
-        // Validation failed so exit with that outcome
-        Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-            error!(
-                msg = "Direct validation failed",
-                ?validation_outcome,
-                ?record,
-            );
-            validation_outcome.into_outcome()
-        }
-        // An error occurred so return it
-        Err(e) => Err(OutcomeOrError::Err(e)),
-    }
-}
-
-async fn sys_validate_record_inner(
-    record: &Record,
-    cascade: Arc<impl Cascade + Send + Sync>,
-) -> SysValidationResult<()> {
-    let signature = record.signature();
-    let action = record.action();
-    let maybe_entry = record.entry().as_option();
-    counterfeit_check(signature, action).await?;
-
-    async fn validate(
-        action: &Action,
-        maybe_entry: Option<&Entry>,
-        cascade: Arc<impl Cascade + Send + Sync>,
-    ) -> SysValidationResult<()> {
-        let validation_dependencies = Arc::new(Mutex::new(ValidationDependencies::new()));
-        fetch_previous_actions(
-            validation_dependencies.clone(),
-            cascade.clone(),
-            vec![action.clone()].into_iter(),
-        )
-        .await;
-
-        store_record(action, validation_dependencies.clone())?;
-        if let Some(maybe_entry) = maybe_entry {
-            store_entry(
-                action
-                    .try_into()
-                    .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
-                maybe_entry,
-                validation_dependencies.clone(),
-            )
-            .await?;
-        }
-        match action {
-            Action::Update(action) => {
-                register_updated_content(action, validation_dependencies.clone())
-            }
-            Action::Delete(action) => {
-                register_deleted_entry_action(action, validation_dependencies.clone())
-            }
-            Action::CreateLink(action) => register_add_link(action),
-            Action::DeleteLink(action) => {
-                register_delete_link(action, validation_dependencies.clone())
-            }
-            _ => Ok(()),
-        }
-    }
-
-    match maybe_entry {
-        Some(Entry::CounterSign(session, _)) => {
-            if let Some(weight) = action.entry_rate_data() {
-                let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
-                for action in session.build_action_set(entry_hash, weight)? {
-                    validate(&action, maybe_entry, cascade.clone()).await?;
-                }
-                Ok(())
-            } else {
-                tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
-                validate(action, maybe_entry, cascade.clone()).await
-            }
-        }
-        _ => validate(action, maybe_entry, cascade).await,
     }
 }
 

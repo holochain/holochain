@@ -5,7 +5,6 @@ use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
 use super::error::WorkflowResult;
 use super::sys_validation_workflow;
-use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
@@ -21,8 +20,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::record::Record;
-
 use holochain_types::prelude::*;
 use tracing::instrument;
 
@@ -243,6 +240,24 @@ where
     // collect all the records we need to validate in wasm
     let scratch_records = workspace.source_chain().scratch_records()?;
 
+    let actions_iter = scratch_records.iter().map(|record| record.action().clone());
+
+    for r in scratch_records.iter() {
+        sys_validation_workflow::counterfeit_check(r.signature(), r.action()).await?;
+    }
+
+    // TODO: should clone this from the main workflow loop
+    let validation_dependencies = Arc::new(parking_lot::Mutex::new(
+        super::sys_validation_workflow::validation_deps::ValidationDependencies::new(),
+    ));
+
+    sys_validation_workflow::fetch_previous_actions(
+        validation_dependencies.clone(),
+        cascade.clone(),
+        actions_iter,
+    )
+    .await;
+
     // Loop forwards through all the new records
     for mut record in scratch_records {
         for op_type in action_to_op_types(record.action()) {
@@ -253,15 +268,10 @@ where
                 Err(outcome_or_err) => return map_app_outcome(Outcome::try_from(outcome_or_err)),
             };
 
-            // TODO: should clone this from the main workflow loop
-            let current_validation_dependencies = Arc::new(parking_lot::Mutex::new(
-                super::sys_validation_workflow::validation_deps::ValidationDependencies::new(),
-            ));
-
             let outcome = super::sys_validation_workflow::validate_op(
                 &op,
                 &dna_def,
-                current_validation_dependencies,
+                validation_dependencies.clone(),
             )
             .await?;
             map_sys_outcome(outcome)?;
