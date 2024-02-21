@@ -267,10 +267,8 @@ async fn run(
     )
     .await;
 
-    let dna_with_role = holochain::sweettest::DnaWithRole::from(("hc_demo_cli".into(), dna));
-
     let app = conductor
-        .setup_app("hc_demo_cli", vec![&dna_with_role])
+        .setup_app("hc_demo_cli", [&("hc_demo_cli".to_string(), dna.clone())])
         .await
         .unwrap();
 

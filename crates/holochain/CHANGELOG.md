@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Some of the function signatures around SweetConductor app installation have changed slightly. You may need to use a slice (`&[x]`) instead of a collection of references (`[&x]`), or vice versa, in some places. If this is cumbersome please open an issue. [#3310](https://github.com/holochain/holochain/pull/3310)
+
+## 0.3.0-beta-dev.37
+
 ## 0.3.0-beta-dev.36
 
 - Added `lair_keystore_version_req` to the output of `--build-info` for Holochain.

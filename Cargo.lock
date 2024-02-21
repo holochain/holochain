@@ -2708,6 +2708,7 @@ version = "0.4.0-beta-dev.27"
 dependencies = [
  "arbitrary",
  "fixt",
+ "getrandom 0.2.12",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
@@ -2860,7 +2861,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.3.0-beta-dev.36"
+version = "0.3.0-beta-dev.37"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3635,6 +3636,7 @@ dependencies = [
  "arbitrary",
  "contrafact",
  "derive_builder",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",

@@ -83,7 +83,6 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -102,6 +101,7 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_zome_types::prelude::ClonedCell;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use parking_lot::RwLock;
@@ -1337,27 +1337,24 @@ mod app_impls {
     use super::*;
 
     impl Conductor {
+        /// Install an app from minimal elements, without needing construct a whole AppBundle.
+        /// (This function constructs a bundle under the hood.)
+        /// This is just a convenience for testing.
         #[cfg(feature = "test_utils")]
-        // FIXME: can rewrite now in terms of `get_install_app_payload_from_dnas`
-        pub(crate) async fn install_app_legacy(
+        pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+            agent_key: AgentPubKey,
+            data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<()> {
-            crate::conductor::conductor::genesis_cells(
-                self.clone(),
-                cell_data
-                    .iter()
-                    .map(|(c, p)| (c.as_id().clone(), p.clone()))
-                    .collect(),
+            let payload = crate::sweettest::get_install_app_payload_from_dnas(
+                installed_app_id,
+                agent_key,
+                data,
             )
-            .await?;
+            .await;
 
-            let cell_data = cell_data.into_iter().map(|(c, _)| c);
-            let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
-
-            // Update the db
-            let _ = self.add_disabled_app_to_db(app).await?;
+            self.install_app_bundle(payload).await?;
 
             Ok(())
         }
@@ -1621,7 +1618,7 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_conductor_api::ClonedCell;
+    use holochain_zome_types::prelude::ClonedCell;
 
     use super::*;
 
@@ -2456,6 +2453,18 @@ mod accessor_impls {
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
+        }
+
+        /// Find the app which contains the given cell by its [CellId].
+        pub async fn find_app_containing_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InstalledApp>> {
+            Ok(self
+                .get_state()
+                .await?
+                .find_app_containing_cell(cell_id)
+                .cloned())
         }
     }
 }

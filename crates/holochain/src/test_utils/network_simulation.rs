@@ -408,7 +408,7 @@ async fn create_test_data(
     }
 
     let apps = conductor
-        .setup_app_for_agents("app", &agents, &[dna_file.clone()])
+        .setup_app_for_agents("app", &agents, [&dna_file])
         .await
         .unwrap();
 
