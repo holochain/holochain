@@ -174,7 +174,7 @@ fn get_external_links(_: ()) -> ExternResult<Vec<Link>> {
 
 #[hdk_extern]
 fn get_link_details(_: ()) -> ExternResult<LinkDetails> {
-    hdk::prelude::get_link_details(base()?, LinkTypes::SomeLinks, None)
+    hdk::prelude::get_link_details(base()?, LinkTypes::SomeLinks, None, GetOptions::default())
 }
 
 #[hdk_extern]
@@ -184,7 +184,7 @@ fn get_back_links(_: ()) -> ExternResult<Vec<Link>> {
 
 #[hdk_extern]
 fn get_back_link_details(_: ()) -> ExternResult<LinkDetails> {
-    hdk::prelude::get_link_details(target()?, LinkTypes::SomeLinks, None)
+    hdk::prelude::get_link_details(target()?, LinkTypes::SomeLinks, None, GetOptions::default())
 }
 
 #[hdk_extern]
@@ -282,3 +282,15 @@ fn get_links_local_only(_: ()) -> ExternResult<Vec<Link>> {
     hdk::prelude::get_links(get_links_input)
 }
 
+#[hdk_extern]
+fn get_link_details_local_only(_: ()) -> ExternResult<LinkDetails> {
+    hdk::prelude::get_link_details(base()?, LinkTypes::SomeLinks, None, GetOptions::content())
+}
+
+#[hdk_extern]
+fn get_links_from_network(_: ()) -> ExternResult<Vec<Link>> {
+    let get_links_input = GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?
+        .get_options(GetStrategy::Latest)
+        .build();
+    hdk::prelude::get_links(get_links_input)
+}

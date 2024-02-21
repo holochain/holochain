@@ -181,6 +181,7 @@ pub fn get_link_details(
     base: impl Into<AnyLinkableHash>,
     link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
+    get_options: GetOptions,
 ) -> ExternResult<LinkDetails> {
     Ok(HDK
         .with(|h| {
@@ -188,6 +189,7 @@ pub fn get_link_details(
             if let Some(link_tag) = link_tag {
                 input = input.tag_prefix(link_tag);
             }
+            input = input.get_options(get_options.strategy);
             h.borrow().get_link_details(vec![input.build()])
         })?
         .into_iter()

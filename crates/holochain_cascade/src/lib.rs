@@ -945,9 +945,13 @@ where
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
-        let authority = self.am_i_an_authority(key.base.clone()).await?;
-        if !authority {
-            self.fetch_links(key.clone(), options).await?;
+        // only fetch link details from network if i am not an authority and
+        // GetStrategy is Latest
+        if let GetStrategy::Latest = options.get_options.strategy {
+            let authority = self.am_i_an_authority(key.base.clone()).await?;
+            if !authority {
+                self.fetch_links(key.clone(), options).await?;
+            }
         }
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
         let results = self.cascading(query).await?;
