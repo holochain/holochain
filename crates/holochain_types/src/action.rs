@@ -151,6 +151,14 @@ impl NewEntryAction {
             | NewEntryAction::Update(Update { timestamp, .. }) => *timestamp,
         }
     }
+
+    /// Get the author of this action
+    pub fn author(&self) -> &AgentPubKey {
+        match self {
+            NewEntryAction::Create(Create { author, .. })
+            | NewEntryAction::Update(Update { author, .. }) => author,
+        }
+    }
 }
 
 impl From<NewEntryAction> for Action {

@@ -9,6 +9,7 @@ use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
+use crate::core::check_dpki_agent_validity;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
@@ -238,7 +239,7 @@ where
         network.clone(),
     ));
 
-    let to_app_validate = {
+    let records = {
         // collect all the records we need to validate in wasm
         let scratch_records = workspace.source_chain().scratch_records()?;
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
@@ -256,7 +257,25 @@ where
         to_app_validate
     };
 
-    for mut chain_record in to_app_validate {
+    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
+        // Check the validity of the author as-at the first and the last record to be committed.
+        // If these are valid, then the author is valid for the entire commit.
+        let author = workspace.source_chain().agent_pubkey().clone();
+        let first = records.first();
+        let last = records.last();
+        if let Some(r) = first {
+            check_dpki_agent_validity(&*dpki.lock().await, author.clone(), r.action().timestamp())
+                .await?;
+        }
+        if let Some(r) = last {
+            if first != last {
+                check_dpki_agent_validity(&*dpki.lock().await, author, r.action().timestamp())
+                    .await?;
+            }
+        }
+    }
+
+    for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;

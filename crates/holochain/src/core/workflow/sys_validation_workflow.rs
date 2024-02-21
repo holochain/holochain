@@ -562,7 +562,7 @@ async fn validate_op_inner(
         let dpki = dpki.lock().await;
         // Don't run DPKI agent validity checks on the DPKI service itself
         if dpki.cell_id().dna_hash() != dna_def.as_hash() {
-            check_dpki_agent_validity(op, &*dpki).await?;
+            check_dpki_agent_validity(&*dpki, op.author().clone(), op.timestamp()).await?;
         }
     }
     match op {
@@ -757,7 +757,6 @@ async fn sys_validate_record_inner(
 /// Ops that fail this check should be dropped.
 pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysValidationResult<()> {
     verify_action_signature(signature, action).await?;
-    author_key_is_valid(action.author()).await?;
     Ok(())
 }
 
