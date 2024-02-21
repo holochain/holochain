@@ -87,6 +87,7 @@ use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_services::DpkiMutex;
 use holochain_conductor_services::DpkiService;
+use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -118,14 +119,7 @@ mod unit_tests;
 mod validate_op_tests;
 
 /// The sys validation worfklow. It is described in the module level documentation.
-#[instrument(skip(
-    workspace,
-    current_validation_dependencies,
-    trigger_app_validation,
-    trigger_self,
-    network,
-    config
-))]
+#[instrument(skip_all)]
 pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static>(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
@@ -246,6 +240,13 @@ async fn sys_validation_workflow_inner(
 
     let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
+
+    todo!(
+        "
+        MD: I'm assuming this is around where we should attempt to fetch the DPKI dependencies.
+            Then there is the question of how to track the deps along with all the others.
+        "
+    );
 
     retrieve_previous_actions_for_ops(
         current_validation_dependencies.clone(),
