@@ -12,7 +12,6 @@ use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::builder;
@@ -59,9 +58,7 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        let flushed_actions = HostFnWorkspace::from(workspace.clone())
-            .flush(&network)
-            .await?;
+        let flushed_actions = workspace.source_chain().flush(&network).await?;
 
         send_post_commit(
             conductor_handle,
@@ -243,7 +240,7 @@ mod tests {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
@@ -275,7 +272,7 @@ mod tests {
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 
@@ -321,7 +318,7 @@ mod tests {
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let (cell,) = app.into_tuple();
         let zome = cell.zome("create_entry");
 

@@ -33,7 +33,7 @@ use url2::prelude::*;
 use crate::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "glacial_tests")]
+#[cfg(feature = "slow_tests")]
 async fn call_admin() {
     holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
@@ -103,7 +103,7 @@ how_many: 42
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "glacial_tests")]
+#[cfg(feature = "slow_tests")]
 async fn call_zome() {
     holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
@@ -695,8 +695,6 @@ async fn network_stats() {
 
     let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
 
-    #[cfg(not(feature = "tx5"))]
-    const EXPECT: &str = "tx2-quic";
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";
 

@@ -396,7 +396,7 @@ impl Test {
 
 struct Setup2Nodes {
     tuning_params: KitsuneP2pTuningParams,
-    sig_abort: tokio::task::AbortHandle,
+    _sig_hnd: tx5_signal_srv::SrvHnd,
     pub addr1: String,
     pub send1: MetaNet,
     pub addr2: String,
@@ -406,7 +406,7 @@ struct Setup2Nodes {
 impl Setup2Nodes {
     pub async fn new(test: Test) -> Self {
         let tuning_params = KitsuneP2pTuningParams::default();
-        let (sig_addr, sig_abort) = start_signal_srv();
+        let (sig_addr, _sig_hnd) = start_signal_srv().await;
         let (test, i_s, evt_sender) = test.spawn().await;
 
         let (send1, recv1) = MetaNet::new_tx5(
@@ -439,7 +439,7 @@ impl Setup2Nodes {
 
         Self {
             tuning_params,
-            sig_abort,
+            _sig_hnd,
             addr1,
             send1,
             addr2,
@@ -448,15 +448,9 @@ impl Setup2Nodes {
     }
 
     pub async fn shutdown(self) {
-        let Self {
-            sig_abort,
-            send1,
-            send2,
-            ..
-        } = self;
+        let Self { send1, send2, .. } = self;
         send1.close(0, "").await;
         send2.close(0, "").await;
-        sig_abort.abort();
     }
 }
 

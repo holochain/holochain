@@ -25,6 +25,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
+    Clone,
     CounterSigning,
     Create,
     Crd,
@@ -49,6 +50,7 @@ pub enum TestWasm {
     MigrateAgentPass,
     MultipleCalls,
     MustGet,
+    MustGetAgentActivity,
     PostCommitSuccess,
     PostCommitVolley,
     Query,
@@ -128,6 +130,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
@@ -154,6 +157,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::MustGet => "must_get",
+            TestWasm::MustGetAgentActivity => "must_get_agent_activity",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
@@ -196,6 +200,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
+            TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
                 "wasm32-unknown-unknown/release/test_wasm_countersigning.wasm"
             }
@@ -240,6 +245,7 @@ impl From<TestWasm> for PathBuf {
                 "wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm"
             }
             TestWasm::MustGet => "wasm32-unknown-unknown/release/test_wasm_must_get.wasm",
+            TestWasm::MustGetAgentActivity => "wasm32-unknown-unknown/release/test_wasm_must_get_agent_activity.wasm",
             TestWasm::PostCommitSuccess => {
                 "wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
             }

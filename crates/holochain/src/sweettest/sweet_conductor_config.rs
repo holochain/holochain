@@ -5,7 +5,7 @@ use holochain_conductor_api::{
     conductor::{ConductorConfig, ConductorTuningParams},
     AdminInterfaceConfig, InterfaceDriver,
 };
-use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
@@ -52,7 +52,7 @@ impl SweetConductorConfig {
         #[cfg(feature = "tx5")]
         {
             for t in network.transport_pool.iter_mut() {
-                if let TransportConfig::WebRTC { signal_url } = t {
+                if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url } = t {
                     if signal_url == "rendezvous:" {
                         *signal_url = rendezvous.sig_addr().to_string();
                     }
@@ -90,7 +90,7 @@ impl SweetConductorConfig {
 
         #[cfg(feature = "tx5")]
         {
-            network.transport_pool = vec![TransportConfig::WebRTC {
+            network.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
                 signal_url: "rendezvous:".into(),
             }];
         }

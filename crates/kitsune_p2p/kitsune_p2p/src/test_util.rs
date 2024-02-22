@@ -10,6 +10,7 @@ use futures::future::FutureExt;
 use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tx5_signal_srv::SrvHnd;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {
@@ -66,22 +67,17 @@ pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
 }
 
 /// Start a test signal server
-pub fn start_signal_srv() -> (std::net::SocketAddr, tokio::task::AbortHandle) {
+pub async fn start_signal_srv() -> (std::net::SocketAddr, SrvHnd) {
     let mut config = tx5_signal_srv::Config::default();
     config.interfaces = "127.0.0.1".to_string();
     config.port = 0;
     config.demo = false;
-    let (sig_driver, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+    let (srv_hnd, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
 
     assert!(err_list.is_empty());
     assert_eq!(1, addr_list.len());
 
-    let abort_handle = tokio::spawn(async move {
-        sig_driver.await;
-    })
-    .abort_handle();
-
-    (*addr_list.first().unwrap(), abort_handle)
+    (*addr_list.first().unwrap(), srv_hnd)
 }
 
 mod harness_event;

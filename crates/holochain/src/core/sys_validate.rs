@@ -246,7 +246,7 @@ pub fn check_agent_validation_pkg_predecessor(
             }),
         ) => None,
         (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
-            "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
+            "**Every AgentValidationPkg must be followed b**y a Create or Update for an AgentPubKey",
         ),
         (
             _,
@@ -311,7 +311,7 @@ pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidation
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
     let t1 = prev_action.timestamp();
     let t2 = action.timestamp();
-    if t2 > t1 {
+    if t2 >= t1 {
         Ok(())
     } else {
         Err(PrevActionErrorKind::Timestamp(t1, t2))

@@ -27,7 +27,7 @@ async fn test_publish() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv();
+    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
 
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();

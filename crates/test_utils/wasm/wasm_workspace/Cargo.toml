@@ -4,6 +4,7 @@ members = [
     "anchor",
     "bench",
     "capability",
+    "clone",
     "coordinator_zome",
     "coordinator_zome_update",
     "countersigning",
@@ -33,6 +34,7 @@ members = [
     "migrate_agent_pass",
     "multiple_calls",
     "must_get",
+    "must_get_agent_activity",
     "post_commit_success",
     "post_commit_volley",
     "query",
@@ -55,12 +57,15 @@ members = [
     "zome_info",
 ]
 
+resolver = "2"
+
 [profile.release]
 opt-level = "z"
 
 [workspace.dependencies]
 derive_more = "0.99"
 serde = "1.0"
+tracing = "0.1"
 hdi = { path = "../../../hdi" }
 hdk = { path = "../../../hdk" }
 

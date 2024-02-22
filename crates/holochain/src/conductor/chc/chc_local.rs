@@ -196,7 +196,7 @@ mod tests {
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (cell,) = conductor
-            .setup_app_for_agent("app", agent.clone(), [&dna_file])
+            .setup_app_for_agent("app", agent.clone(), &[dna_file])
             .await
             .unwrap()
             .into_tuple();
@@ -268,7 +268,7 @@ mod tests {
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (c0,) = conductors[0]
-            .setup_app_for_agent("app", agent.clone(), [&dna_file])
+            .setup_app_for_agent("app", agent.clone(), &[dna_file.clone()])
             .await
             .unwrap()
             .into_tuple();
@@ -281,7 +281,7 @@ mod tests {
             let dna_file = dna_file.clone();
             async move {
                 let mut payload =
-                    get_install_app_payload_from_dnas("app", agent, [&dna_file]).await;
+                    get_install_app_payload_from_dnas("app", agent, &[(dna_file, None)]).await;
                 payload.ignore_genesis_failure = ignore;
                 payload
             }

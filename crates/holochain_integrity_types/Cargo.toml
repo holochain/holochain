@@ -1,6 +1,6 @@
 [package]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.26"
 description = "Holochain integrity types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,9 +10,9 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [dependencies]
-holo_hash = { version = "^0.3.0-beta-dev.19", path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", default-features = false }
+holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash" }
+holochain_serialized_bytes = { workspace = true }
+holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util", default-features = false }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
 paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -20,7 +20,7 @@ serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.5", path = "../kitsune_p2p/timestamp", default-features = false }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.7", path = "../kitsune_p2p/timestamp", default-features = false }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
@@ -37,7 +37,7 @@ tracing = { version = "0.1", optional = true }
 
 [dev-dependencies]
 holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"]}
-serde_json = "1"
+serde_json = { workspace = true }
 
 [features]
 default = []
@@ -51,8 +51,8 @@ full = ["default", "hashing", "subtle-encoding", "kitsune_p2p_timestamp/full"]
 full-dna-def = ["derive_builder"]
 
 fuzzing = [
-  "arbitrary", 
-  "proptest", 
+  "arbitrary",
+  "proptest",
   "proptest-derive",
   "kitsune_p2p_timestamp/fuzzing",
   "holochain_serialized_bytes/fuzzing",

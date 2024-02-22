@@ -25,20 +25,39 @@ macro_rules! trace {
         //      we also redundantly print a normal debug for better log readability
         let fact = $fact;
 
-        if std::env::var("AITIA_LOG").is_ok() {
-            tracing::info!(
+        let level = std::env::var("AITIA_LOG").unwrap_or("trace".to_string());
+        match level.as_str() {
+            "trace" => tracing::trace!(
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
                 $crate::logging::LogLine::encode(fact)
-            );
-        } else {
-            tracing::trace!(
+            ),
+            "debug" => tracing::debug!(
                 aitia = "json",
                 ?fact,
                 "<AITIA>{}</AITIA>",
                 $crate::logging::LogLine::encode(fact)
-            );
+            ),
+            "info" => tracing::info!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            "warn" => tracing::warn!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            "error" => tracing::error!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            level => unimplemented!("Invalid AITIA_LOG setting: {}", level),
         }
     };
 }

@@ -140,7 +140,7 @@ impl Existing {
         let sandboxes = crate::save::load(std::env::current_dir()?)?;
         if self.all {
             // Get all the sandboxes
-            self.existing_paths.extend(sandboxes.into_iter())
+            self.existing_paths.extend(sandboxes)
         } else if self.last && sandboxes.last().is_some() {
             // Get just the last sandbox
             self.existing_paths

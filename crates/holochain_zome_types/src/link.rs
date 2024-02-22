@@ -21,9 +21,9 @@ use kitsune_p2p_timestamp::Timestamp;
 pub struct Link {
     /// The author of this link
     pub author: holo_hash::AgentPubKey,
-    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked from
+    /// The [AnyLinkableHash] being linked from
     pub base: holo_hash::AnyLinkableHash,
-    /// The [`AnyLinkableHash`](holo_hash::AnyLinkableHash) being linked to
+    /// The [AnyLinkableHash] being linked to
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: Timestamp,

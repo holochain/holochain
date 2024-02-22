@@ -6,9 +6,6 @@ use std::net::SocketAddr;
 use crate::tx_utils::TxUrl;
 use url2::Url2;
 
-/// How long kitsune should wait before timing out when joining the network.
-pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
-
 /// Fifteen minutes
 pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 15);
 
@@ -212,21 +209,42 @@ pub mod tuning_params_struct {
         /// [Default: 60 seconds]
         tx5_implicit_timeout_ms: u32 = 1000 * 60,
 
-        /// Tx5 max pending send byte count limit.
+        /// Maximum count of open connections.
+        /// [Default: 4096]
+        tx5_connection_count_max: u32 = 4096,
+
+        /// Max backend send buffer bytes (per connection).
+        /// [Default: 64 KiB]
+        tx5_send_buffer_bytes_max: u32 = 64 * 1024,
+
+        /// Max backend recv buffer bytes (per connection).
+        /// [Default: 64 KiB]
+        tx5_recv_buffer_bytes_max: u32 = 64 * 1024,
+
+        /// Maximum receive message reconstruction bytes in memory
+        /// (accross entire endpoint).
+        /// [Default: 512 MiB]
+        tx5_incoming_message_bytes_max: u32 = 512 * 1024 * 1024,
+
+        /// Maximum size of an individual message.
         /// [Default: 16 MiB]
-        tx5_max_send_bytes: u32 = 16 * 1024 * 1024,
+        tx5_message_size_max: u32 = 16 * 1024 * 1024,
 
-        /// Tx5 max pending recv byte count limit.
-        /// [Default: 16 MiB]
-        tx5_max_recv_bytes: u32 = 16 * 1024 * 1024,
+        /// Internal event channel size.
+        /// [Default: 1024]
+        tx5_internal_event_channel_size: u32 = 1024,
 
-        /// Tx5 max concurrent connection limit.
-        /// [Default: 255]
-        tx5_max_conn_count: u32 = 255,
-
-        /// Tx5 max init (connect) time for a connection in seconds.
+        /// Default timeout for network operations.
         /// [Default: 60]
-        tx5_max_conn_init_s: u32 = 60,
+        tx5_timeout_s: u32 = 60,
+
+        /// Starting backoff duration for retries.
+        /// [Default: 60]
+        tx5_backoff_start_s: u32 = 5,
+
+        /// Max backoff duration for retries.
+        /// [Default: 60]
+        tx5_backoff_max_s: u32 = 60,
 
         /// Tx5 ban time in seconds.
         tx5_ban_time_s: u32 = 10,
@@ -286,11 +304,6 @@ pub mod tuning_params_struct {
         /// Get the gossip recent threshold param as a proper Duration
         pub fn danger_gossip_recent_threshold(&self) -> std::time::Duration {
             std::time::Duration::from_secs(self.danger_gossip_recent_threshold_secs)
-        }
-
-        /// Get the tx5_max_conn_init_s param as a Duration.
-        pub fn tx5_max_conn_init(&self) -> std::time::Duration {
-            std::time::Duration::from_secs(self.tx5_max_conn_init_s as u64)
         }
 
         /// get the tx5_ban_time_s param as a Duration.
@@ -393,7 +406,7 @@ impl KitsuneP2pConfig {
     pub fn is_tx5(&self) -> bool {
         #[cfg(feature = "tx5")]
         {
-            if let Some(t) = self.transport_pool.get(0) {
+            if let Some(t) = self.transport_pool.first() {
                 return matches!(t, TransportConfig::WebRTC { .. });
             }
         }

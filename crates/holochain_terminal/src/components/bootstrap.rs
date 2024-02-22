@@ -170,12 +170,12 @@ pub fn render_bootstrap_widget<B: Backend>(
             ListItem::new(format!(
                 "signed at   : {:?}",
                 DateTime::<Utc>::from_timestamp((agents[selected].signed_at_ms / 1000) as i64, 0)
-                    .unwrap_or(DateTime::default())
+                    .unwrap_or_default()
             )),
             ListItem::new(format!(
                 "expires at  : {:?}",
                 DateTime::<Utc>::from_timestamp((agents[selected].expires_at_ms / 1000) as i64, 0)
-                    .unwrap_or(DateTime::default())
+                    .unwrap_or_default()
             )),
         ])
         .block(Block::default().title(" Detail ").borders(Borders::ALL))

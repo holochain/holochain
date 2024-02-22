@@ -221,7 +221,7 @@ async fn create_meta_net(
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
-        let signal_url = match config.transport_pool.get(0).unwrap() {
+        let signal_url = match config.transport_pool.first().unwrap() {
             TransportConfig::WebRTC { signal_url } => signal_url.clone(),
             _ => unreachable!(),
         };
@@ -983,7 +983,7 @@ pub mod tests {
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _srv_hnd) = start_signal_srv().await;
         let config = KitsuneP2pConfig::from_signal_addr(signal_addr);
         let (meta_net, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
 
@@ -991,12 +991,11 @@ pub mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_bootstrap_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _srv_hnd) = start_signal_srv().await;
         let mut config = KitsuneP2pConfig::from_signal_addr(signal_addr);
         config.bootstrap_service = Some(url2!("ws://not-a-bootstrap.test"));
 
@@ -1006,7 +1005,6 @@ pub mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     async fn test_create_meta_net(

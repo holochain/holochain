@@ -76,9 +76,9 @@ mod tests {
         .await
         .unwrap();
         db.read_async(move |txn| -> DatabaseResult<()> {
-            assert!(contains(&txn, &wasm.as_hash()).unwrap());
+            assert!(contains(&txn, wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
-            let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();
+            let ret = get(&txn, wasm.as_hash()).unwrap().unwrap();
 
             // assert the round trip
             assert_eq!(ret, wasm);

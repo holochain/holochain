@@ -29,7 +29,7 @@ async fn test_coordinator_zome_update() {
     let dna_hash = dna.dna_hash().clone();
 
     println!("Install Dna with integrity and coordinator zomes.");
-    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
     println!("Create entry from the coordinator zome into the integrity zome.");
@@ -126,7 +126,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
 
     let dna_hash = dna.dna_hash().clone();
 
-    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
     let hash: ActionHash = conductor
@@ -217,7 +217,7 @@ async fn test_update_admin_interface() {
 
     let dna_hash = dna.dna_hash().clone();
 
-    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
     let hash: ActionHash = conductor
@@ -282,7 +282,7 @@ async fn test_wasm_memory() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
     #[derive(Debug, Serialize)]

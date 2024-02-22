@@ -72,7 +72,7 @@ impl ConductorBuilder {
 
     /// Initialize a "production" Conductor
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
-        tracing::info!(?self.config);
+        tracing::debug!(?self.config);
 
         let keystore = if let Some(keystore) = self.keystore {
             keystore
@@ -138,6 +138,8 @@ impl ConductorBuilder {
             }
         };
 
+        info!("Conductor startup: passphrase obtained.");
+
         let Self {
             ribosome_store,
             config,
@@ -167,6 +169,9 @@ impl ConductorBuilder {
                 cert_priv_key,
                 cert_digest,
             };
+
+        info!("Conductor startup: TLS cert created.");
+
         let strat = network_config.tuning_params.to_arq_strat();
 
         let host = KitsuneHostImpl::new(
@@ -186,6 +191,8 @@ impl ConductorBuilder {
                     return Err(err.into());
                 }
             };
+
+        info!("Conductor startup: networking started.");
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -299,7 +306,11 @@ impl ConductorBuilder {
             .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
             .await;
 
+        info!("Conductor startup: scheduler task started.");
+
         tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
+
+        info!("Conductor startup: p2p event task started.");
 
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();

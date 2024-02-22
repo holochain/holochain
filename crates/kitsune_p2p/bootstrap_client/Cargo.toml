@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.3.0-beta-dev.25"
+version = "0.3.0-beta-dev.27"
 description = "a client library for the bootstrap service used by Kitsune P2P"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,20 +11,20 @@ categories = ["network-programming"]
 edition = "2021"
 
 [dependencies]
-kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.19", path = "../bootstrap", features = ["sqlite"] }
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../types" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.14", path = "../bin_data" }
+kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.21", path = "../bootstrap", features = ["sqlite"] }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.16", path = "../bin_data" }
 tokio = "1"
 serde_bytes = "0.11"
 serde = "1"
 reqwest = "0.11.2"
-url2 = "0.0.6"
+url2 = { workspace = true }
 once_cell = "1.4.1"
 ed25519-dalek = "1"
 
 [dev-dependencies]
 kitsune_p2p_bootstrap_client = { path = ".", features = ["tx5", "test_utils"] }
-fixt = { version = "^0.3.0-beta-dev.0", path = "../../fixt" }
+fixt = { version = "^0.3.0-beta-dev.1", path = "../../fixt" }
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
 [features]
