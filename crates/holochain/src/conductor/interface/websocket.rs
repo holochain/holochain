@@ -886,7 +886,6 @@ pub mod test {
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
 
-
         let mut conductor = SweetConductor::from_standard_config().await;
         let agent = conductor.setup_app("app", &dnas).await.unwrap().cells()[0]
             .agent_pubkey()
