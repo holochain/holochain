@@ -27,6 +27,9 @@ pub fn generate(
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
+    if let Some(network) = network {
+        config.network = network;
+    }
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);

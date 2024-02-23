@@ -217,9 +217,7 @@ mod tests {
         let yaml = r#"---
     data_root_path: /path/to/env
     network:
-      transport_pool:
-        - type: webrtc
-          signal_url: wss://signal.holotest.net
+      transport_pool: []
     keystore:
       type: danger_test_keystore
     "#;
