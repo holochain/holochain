@@ -252,7 +252,6 @@ impl Drop for MetricSendGuard {
 
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
-    #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
         ep: Arc<tx5::Ep3>,
@@ -270,7 +269,6 @@ pub enum MetaNetCon {
 impl PartialEq for MetaNetCon {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            #[cfg(feature = "tx5")]
             (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => Arc::ptr_eq(a, b),
             _ => false,
         }
@@ -289,7 +287,6 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx5")]
         {
             if let MetaNetCon::Tx5 {
                 ep, rem_url, tun, ..
@@ -309,14 +306,11 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx5")]
         {
             // NOTE - tx5 connections are never exactly "closed"
             //        since it's more of a message queue...
             return false;
         }
-
-        true
     }
 
     async fn wire_is_authorized(&self, payload: &wire::Wire, now: Timestamp) -> MetaNetAuth {
@@ -350,7 +344,6 @@ impl MetaNetCon {
                         }
                     }
 
-                    #[cfg(feature = "tx5")]
                     {
                         if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
                             let wire = payload.encode_vec().map_err(KitsuneError::other)?;
@@ -405,7 +398,6 @@ impl MetaNetCon {
         let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
-                    #[cfg(feature = "tx5")]
                     {
                         if let MetaNetCon::Tx5 {
                             ep,
@@ -470,7 +462,6 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx5")]
         {
             if let MetaNetCon::Tx5 { rem_url, .. } = self {
                 let id = rem_url.id().unwrap();
@@ -522,7 +513,6 @@ impl MetaNetConTest {
 #[derive(Clone)]
 pub enum MetaNet {
     /// Tx5 Abstraction
-    #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
         ep: Arc<tx5::Ep3>,
@@ -534,7 +524,6 @@ pub enum MetaNet {
 
 impl MetaNet {
     /// Construct abstraction with tx5 backend.
-    #[cfg(feature = "tx5")]
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
         host: HostApiLegacy,
@@ -788,7 +777,6 @@ impl MetaNet {
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { url, .. } = self {
                 return Ok(url.to_string());
@@ -799,7 +787,6 @@ impl MetaNet {
     }
 
     pub fn local_id(&self) -> NodeCert {
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { url, .. } = self {
                 if let Some(id) = url.id() {
@@ -818,7 +805,6 @@ impl MetaNet {
     ) -> KitsuneResult<()> {
         let msg_id = next_msg_id();
 
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
                 let wire = payload.encode_vec().map_err(KitsuneError::other)?;
@@ -843,7 +829,6 @@ impl MetaNet {
         remote_url: String,
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<MetaNetCon> {
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 {
                 host, ep, res, tun, ..
@@ -867,7 +852,6 @@ impl MetaNet {
     ) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
         use futures::FutureExt;
 
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
                 let ep = ep.clone();

@@ -75,7 +75,6 @@ ed25519-dalek = "1"
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
 [features]
-default = [ "tx5" ]
 
 fuzzing = [
   "arbitrary",
@@ -104,7 +103,6 @@ mock_network = [
   "mockall",
 ]
 
-tx5 = [ "dep:tx5", "kitsune_p2p_types/tx5"]
 
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",

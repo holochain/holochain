@@ -14,7 +14,6 @@ use std::sync::Arc;
 
 // Test that two nodes can discover each other and connect. This checks that peer discovery
 // works and that networking works well enough for a request reply.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn two_agents_on_same_host_rpc_single() {
     holochain_trace::test_run().unwrap();
@@ -72,7 +71,6 @@ async fn two_agents_on_same_host_rpc_single() {
     assert_eq!("Hello from agent a".as_bytes().to_vec(), resp);
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn two_nodes_publish_and_fetch() {
@@ -169,7 +167,6 @@ async fn two_nodes_publish_and_fetch() {
     assert_eq!(1, harness_b.op_store().read().len());
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Takes nearly 5-10 minutes to run locally, that is far too slow for CI. Should it run quicker?"]
 async fn two_nodes_publish_and_fetch_large_number_of_ops() {
@@ -304,7 +301,6 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
 }
 
 // This is expected to test that agent info is broadcast to current peers when a new agent joins
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn two_nodes_broadcast_agent_info() {
     holochain_trace::test_run().unwrap();
@@ -402,7 +398,6 @@ async fn two_nodes_broadcast_agent_info() {
 
 // This is expected to test that agent info is gossiped to a new peer when it finds one peer who knows
 // about peers that are unkown to the new peer.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn two_nodes_gossip_agent_info() {
     holochain_trace::test_run().unwrap();
@@ -498,7 +493,6 @@ async fn two_nodes_gossip_agent_info() {
     assert_eq!(4, harness_b.agent_store().read().len());
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_stops_when_agent_leaves_space() {
     holochain_trace::test_run().unwrap();
@@ -619,7 +613,6 @@ async fn gossip_stops_when_agent_leaves_space() {
     assert!(harness_c.op_store().read().is_empty());
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_historical_ops() {
     holochain_trace::test_run().unwrap();
@@ -703,7 +696,6 @@ async fn gossip_historical_ops() {
     assert_eq!(3, harness_b.op_store().read().len());
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn publish_only_fetches_ops_once() {
     holochain_trace::test_run().unwrap();
@@ -885,7 +877,6 @@ async fn publish_only_fetches_ops_once() {
     .unwrap_err();
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn delegate_publish() {
     holochain_trace::test_run().unwrap();
@@ -1034,7 +1025,6 @@ async fn delegate_publish() {
 
 // Note that even with the ignore reason, this test isn't in perfect shape. I wrote it with the expectation that the bandwidth limits apply to op data
 // which they do not. That will need to be figured out then the test can be completed around that. For now I just want to keep what I've done so far.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "This doesn't really work, the bandwidth limits are only applied to gossip directly and not the fetch mechanism so this test can't work as is"]
 async fn single_large_op_exceeds_gossip_rate_limit() {
@@ -1121,7 +1111,6 @@ async fn single_large_op_exceeds_gossip_rate_limit() {
     assert_eq!(1, harness_b.op_store().read().len());
 }
 
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "This test deadlocks because the event receivers aren't consumed. This should not stall Kitsune"]
 async fn test_two_nodes_on_same_host_deadlock() {

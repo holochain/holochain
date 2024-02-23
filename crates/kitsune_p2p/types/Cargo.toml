@@ -55,7 +55,6 @@ name = "api_thru"
 harness = false
 
 [features]
-default = [ "tx5" ]
 
 fuzzing = [
   "arbitrary",
@@ -80,10 +79,6 @@ fixt = [
   "dep:fixt",
   "kitsune_p2p_bin_data/fixt"
 ]
-
-tx2 = []
-
-tx5 = []
 
 sqlite-encrypted = [
   "kitsune_p2p_dht/sqlite-encrypted",

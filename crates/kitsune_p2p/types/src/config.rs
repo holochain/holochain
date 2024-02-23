@@ -404,7 +404,6 @@ impl KitsuneP2pConfig {
     /// This config is making use of tx5 transport
     #[allow(dead_code)] // because of feature flipping
     pub fn is_tx5(&self) -> bool {
-        #[cfg(feature = "tx5")]
         {
             if let Some(t) = self.transport_pool.first() {
                 return matches!(t, TransportConfig::WebRTC { .. });
@@ -435,7 +434,6 @@ pub enum TransportConfig {
     Mem {},
 
     /// Configure to use Tx5 WebRTC for kitsune networking.
-    #[cfg(feature = "tx5")]
     #[serde(rename = "webrtc", alias = "web_r_t_c", alias = "web_rtc")]
     WebRTC {
         /// The url of the signal server to connect to for addressability.

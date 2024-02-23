@@ -49,7 +49,6 @@ impl SweetConductorConfig {
             network.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
         }
 
-        #[cfg(feature = "tx5")]
         {
             for t in network.transport_pool.iter_mut() {
                 if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url } = t {
@@ -79,16 +78,6 @@ impl SweetConductorConfig {
             network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }
 
-        /*#[cfg(not(feature = "tx5"))]
-        {
-            network.transport_pool = vec![TransportConfig::Quic {
-                bind_to: None,
-                override_host: None,
-                override_port: None,
-            }];
-        }*/
-
-        #[cfg(feature = "tx5")]
         {
             network.transport_pool = vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
                 signal_url: "rendezvous:".into(),

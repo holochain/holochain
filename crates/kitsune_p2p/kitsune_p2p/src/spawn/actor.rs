@@ -214,7 +214,6 @@ async fn create_meta_net(
     host: HostApiLegacy,
     _metrics: Tx2ApiMetrics,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
-    #[cfg(feature = "tx5")]
     {
         tracing::trace!("tx5");
         let signal_url = match config.transport_pool.first().unwrap() {
@@ -230,12 +229,6 @@ async fn create_meta_net(
         .await?;
 
         Ok((h, e, BootstrapNet::Tx5))
-    }
-
-    #[cfg(not(feature = "tx5"))]
-    {
-        panic!("tx5 feature must be enabled");
-        Err("tx5 feature must be enabled".into())
     }
 }
 
@@ -976,7 +969,6 @@ pub mod tests {
     use kitsune_p2p_types::tls::TlsConfig;
     use url2::url2;
 
-    #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
         let (signal_addr, _srv_hnd) = start_signal_srv().await;

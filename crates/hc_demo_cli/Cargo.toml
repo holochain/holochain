@@ -39,7 +39,7 @@ wasm-opt = "0.112.0"
 default = [ "build_demo" ]
 
 # The default demo feature builds the actual demo lib / executable.
-build_demo = [ "clap", "flate2", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "rand", "rand-utf8", "tracing", "tracing-subscriber" ]
+build_demo = [ "clap", "flate2", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain_keystore", "rand", "rand-utf8", "tracing", "tracing-subscriber" ]
 
 # You probably won't use this directly, it is used by build.rs when
 # cfg(build_wasm) is enabled.

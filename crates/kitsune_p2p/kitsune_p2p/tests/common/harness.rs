@@ -47,7 +47,6 @@ impl KitsuneTestHarness {
         })
     }
 
-    #[cfg(feature = "tx5")]
     pub fn configure_tx5_network(mut self, signal_url: SocketAddr) -> Self {
         self.config
             .transport_pool

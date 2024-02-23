@@ -695,7 +695,6 @@ async fn network_stats() {
 
     let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
 
-    #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";
 
     let req = AdminRequest::DumpNetworkStats;
