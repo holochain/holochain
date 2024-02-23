@@ -229,13 +229,13 @@ async fn create_meta_net(
         )
         .await?;
 
-        return Ok((h, e, BootstrapNet::Tx5));
+        Ok((h, e, BootstrapNet::Tx5))
     }
 
     #[cfg(not(feature = "tx5"))]
     {
         panic!("tx5 feature must be enabled");
-        return Err("tx5 feature must be enabled".into());
+        Err("tx5 feature must be enabled".into())
     }
 }
 

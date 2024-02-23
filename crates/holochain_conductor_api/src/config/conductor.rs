@@ -216,7 +216,10 @@ mod tests {
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
     data_root_path: /path/to/env
-
+    network:
+      transport_pool:
+        - type: webrtc
+          signal_url: wss://signal.holotest.net
     keystore:
       type: danger_test_keystore
     "#;
@@ -326,7 +329,8 @@ mod tests {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore_path: /path/to/keystore
-
+    network:
+      transport_pool: []
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
