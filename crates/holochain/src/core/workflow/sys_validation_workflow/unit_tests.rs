@@ -2,7 +2,6 @@ use super::sys_validation_workflow;
 use super::validation_deps::ValDeps;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
-use super::ValidationDependencies;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
@@ -39,7 +38,6 @@ use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
-use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
 

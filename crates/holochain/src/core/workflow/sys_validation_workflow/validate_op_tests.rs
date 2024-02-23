@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use super::retrieve_previous_actions_for_ops;
 use super::validation_deps::ValDeps;
-use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
 use crate::core::workflow::WorkflowResult;
@@ -16,7 +15,6 @@ use hdk::prelude::Dna as HdkDna;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_serialized_bytes::prelude::SerializedBytes;
-use parking_lot::Mutex;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
