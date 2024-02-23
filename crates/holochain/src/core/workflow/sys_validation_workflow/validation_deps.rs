@@ -9,17 +9,17 @@ use std::{
 #[derive(Clone)]
 pub struct ValDeps {
     /// Dependencies found in the same DHT as the dependent
-    pub local: Arc<parking_lot::Mutex<ValidationDependencies<SignedActionHashed>>>,
+    pub same_dht: Arc<parking_lot::Mutex<ValidationDependencies<SignedActionHashed>>>,
     /// Dependencies found in the DPKI service's Deepkey DNA
     /// (this is not generic for all possible DPKI implementations, only Deepkey)
-    pub deepkey: Arc<parking_lot::Mutex<ValidationDependencies<EntryHashed>>>,
+    pub deepkey_dht: Arc<parking_lot::Mutex<ValidationDependencies<EntryHashed>>>,
 }
 
 impl ValDeps {
     pub fn new() -> Self {
         Self {
-            local: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
-            deepkey: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
+            same_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
+            deepkey_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
         }
     }
 }
@@ -54,28 +54,6 @@ where
             retained_deps: HashSet::new(),
         }
     }
-
-    // impl<T> From<(T, CascadeSource)> for ValidationDependencyState<T> {
-    //     fn from((signed_action, fetched_from): (T, CascadeSource)) -> Self {
-    //         Self {
-    //             dependency: Some(ValidationDependency {
-    //                 signed_action,
-    //                 fetched_from,
-    //             }),
-    //         }
-    //     }
-    // }
-
-    // impl From<(Record, CascadeSource)> for ValidationDependencyState {
-    //     fn from((record, fetched_from): (Record, CascadeSource)) -> Self {
-    //         Self {
-    //             dependency: Some(ValidationDependency {
-    //                 signed_action: record.signed_action,
-    //                 fetched_from,
-    //             }),
-    //         }
-    //     }
-    // }
 
     /// Check whether a given dependency is currently held.
     /// Note that we may have this dependency as a key but the state won't contain the dependency because

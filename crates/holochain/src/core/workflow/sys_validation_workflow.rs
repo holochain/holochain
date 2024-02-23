@@ -147,7 +147,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
     // Now go to the network to try to fetch missing dependencies
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies
-        .local
+        .same_dht
         .lock()
         .get_missing_hashes();
     let num_fetched: usize = futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
@@ -159,7 +159,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + Clone + 'static
                 .await
             {
                 Ok(Some((action, source))) => {
-                    let mut deps = current_validation_dependencies.local.lock();
+                    let mut deps = current_validation_dependencies.same_dht.lock();
 
                     // If the source was local then that means some other fetch has put this action into the cache,
                     // that's fine we'll just grab it here.
@@ -227,7 +227,7 @@ async fn sys_validation_workflow_inner(
 
     // Forget what dependencies are currently in use
     current_validation_dependencies
-        .local
+        .same_dht
         .lock()
         .clear_retained_deps();
 
@@ -238,7 +238,7 @@ async fn sys_validation_workflow_inner(
 
         // If there's nothing to validate then we can clear the dependencies and save some memory.
         current_validation_dependencies
-            .local
+            .same_dht
             .lock()
             .purge_held_deps();
 
@@ -267,7 +267,7 @@ async fn sys_validation_workflow_inner(
 
     // Now drop all the dependencies that we didn't just try to access while searching the current set of ops to validate.
     current_validation_dependencies
-        .local
+        .same_dht
         .lock()
         .purge_held_deps();
 
@@ -347,7 +347,7 @@ async fn retrieve_actions(
     action_hashes: impl Iterator<Item = ActionHash>,
 ) {
     let action_fetches = action_hashes
-        .filter(|hash| !current_validation_dependencies.local.lock().has(hash))
+        .filter(|hash| !current_validation_dependencies.same_dht.lock().has(hash))
         .map(|h| {
             // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
             let cascade = cascade.clone();
@@ -378,7 +378,10 @@ async fn retrieve_actions(
             }
         }));
 
-    current_validation_dependencies.local.lock().merge(new_deps);
+    current_validation_dependencies
+        .same_dht
+        .lock()
+        .merge(new_deps);
 }
 
 fn get_dependency_hashes_from_actions(actions: impl Iterator<Item = Action>) -> Vec<ActionHash> {
@@ -590,7 +593,7 @@ async fn validate_op_inner(
                         session_data,
                     )? {
                         // Just require that we are holding all the other actions
-                        let mut validation_dependencies = validation_dependencies.local.lock();
+                        let mut validation_dependencies = validation_dependencies.same_dht.lock();
                         validation_dependencies
                             .get(&action_hash)
                             .and_then(|s| s.as_action())
@@ -620,7 +623,7 @@ async fn validate_op_inner(
                     session_data,
                 )? {
                     // Just require that we are holding all the other actions
-                    let mut validation_dependencies = validation_dependencies.local.lock();
+                    let mut validation_dependencies = validation_dependencies.same_dht.lock();
                     validation_dependencies
                         .get(&action_hash)
                         .and_then(|s| s.as_action())
@@ -786,7 +789,7 @@ fn register_agent_activity(
     check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
         // Just make sure we have the dependency and if not then don't mark this action as valid yet
-        let mut validation_dependencies = validation_dependencies.local.lock();
+        let mut validation_dependencies = validation_dependencies.same_dht.lock();
         validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -803,7 +806,7 @@ fn store_record(action: &Action, validation_dependencies: ValDeps) -> SysValidat
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let mut validation_dependencies = validation_dependencies.local.lock();
+        let mut validation_dependencies = validation_dependencies.same_dht.lock();
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -834,7 +837,7 @@ async fn store_entry(
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let mut validation_dependencies = validation_dependencies.local.lock();
+        let mut validation_dependencies = validation_dependencies.same_dht.lock();
         let original_action = validation_dependencies
             .get(original_action_address)
             .and_then(|s| s.as_action())
@@ -859,7 +862,7 @@ fn register_updated_content(
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let mut validation_dependencies = validation_dependencies.local.lock();
+    let mut validation_dependencies = validation_dependencies.same_dht.lock();
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -877,7 +880,7 @@ fn register_updated_record(
     // Get data ready to validate
     let original_action_address = &record_update.original_action_address;
 
-    let mut validation_dependencies = validation_dependencies.local.lock();
+    let mut validation_dependencies = validation_dependencies.same_dht.lock();
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -895,7 +898,7 @@ fn register_deleted_by(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let mut validation_dependencies = validation_dependencies.local.lock();
+    let mut validation_dependencies = validation_dependencies.same_dht.lock();
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -913,7 +916,7 @@ fn register_deleted_entry_action(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let mut validation_dependencies = validation_dependencies.local.lock();
+    let mut validation_dependencies = validation_dependencies.same_dht.lock();
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -936,7 +939,7 @@ fn register_delete_link(
     let link_add_address = &link_remove.link_add_address;
 
     // Just require that this link exists, don't need to check anything else about it here
-    let mut validation_dependencies = validation_dependencies.local.lock();
+    let mut validation_dependencies = validation_dependencies.same_dht.lock();
     let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())
