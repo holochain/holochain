@@ -26,7 +26,7 @@ kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.7", path = "../timestamp", 
 kitsune_p2p_block = { version = "^0.3.0-beta-dev.18", path = "../block" }
 kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.27", path = "../bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.16", path = "../bin_data" }
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../types", default-features = false }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../types" }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -59,7 +59,7 @@ tx5-signal-srv = { workspace = true, optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = ".", features = ["test_utils", "fuzzing", "sqlite"]}
+kitsune_p2p = { path = ".", features = ["test_utils", "fuzzing", "sqlite", "tx5"]}
 
 kitsune_p2p_fetch = { path = "../fetch", features = ["test_utils"] }
 kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }

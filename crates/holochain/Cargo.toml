@@ -42,7 +42,7 @@ holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holoch
 holochain_conductor_services = { version = "^0.2.0-beta-dev.7", path = "../holochain_conductor_services" }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
-kitsune_p2p = { version = "^0.3.0-beta-dev.31", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p = { version = "^0.3.0-beta-dev.31", path = "../kitsune_p2p/kitsune_p2p" }
 kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.27", path = "../kitsune_p2p/bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/bin_data" }
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/types" }

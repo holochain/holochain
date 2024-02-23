@@ -214,12 +214,8 @@ async fn create_meta_net(
     host: HostApiLegacy,
     _metrics: Tx2ApiMetrics,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
-    let mut ep_hnd = None;
-    let mut ep_evt = None;
-    let mut bootstrap_net = None;
-
     #[cfg(feature = "tx5")]
-    if ep_hnd.is_none() && config.is_tx5() {
+    {
         tracing::trace!("tx5");
         let signal_url = match config.transport_pool.first().unwrap() {
             TransportConfig::WebRTC { signal_url } => signal_url.clone(),
@@ -232,14 +228,14 @@ async fn create_meta_net(
             signal_url,
         )
         .await?;
-        ep_hnd = Some(h);
-        ep_evt = Some(e);
-        bootstrap_net = Some(BootstrapNet::Tx5);
+
+        return Ok((h, e, BootstrapNet::Tx5));
     }
 
-    match (ep_hnd, ep_evt, bootstrap_net) {
-        (Some(h), Some(e), Some(n)) => Ok((h, e, n)),
-        _ => Err("tx2 or tx5 feature must be enabled".into()),
+    #[cfg(not(feature = "tx5"))]
+    {
+        panic!("tx5 feature must be enabled");
+        return Err("tx5 feature must be enabled".into());
     }
 }
 
