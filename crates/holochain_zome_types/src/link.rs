@@ -93,6 +93,10 @@ pub struct GetLinksInput {
     /// The link types to include in this get.
     pub link_type: LinkTypeFilter,
 
+    /// Whether to fetch latest link metadata from the network or return only
+    /// locally available metadata. Defaults to fetching latest metadata.
+    pub get_options: GetOptions,
+
     /// The tag prefix to filter by.
     pub tag_prefix: Option<LinkTag>,
 
