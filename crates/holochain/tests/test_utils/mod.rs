@@ -39,6 +39,7 @@ use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
 use tracing::instrument;
+use tx5_signal_srv::SrvHnd;
 
 use hdk::prelude::*;
 use holochain::{
@@ -332,15 +333,19 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
-pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
-    ConductorConfig {
+pub async fn create_config(port: u16, data_root_path: DataRootPath) -> (ConductorConfig, SrvHnd) {
+    let (signal_addr, srv_hnd) = kitsune_p2p::test_util::start_signal_srv().await;
+    let network = kitsune_p2p_types::config::KitsuneP2pConfig::from_signal_addr(signal_addr);
+    let config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
+        network,
         ..ConductorConfig::empty()
-    }
+    };
+    (config, srv_hnd)
 }
 
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {

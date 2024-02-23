@@ -27,7 +27,6 @@ pub fn generate(
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
-    config.network = network.unwrap_or_else(KitsuneP2pConfig::empty);
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
