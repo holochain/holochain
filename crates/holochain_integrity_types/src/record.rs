@@ -11,6 +11,7 @@ use crate::signature::Signature;
 use crate::Action;
 use crate::Entry;
 use holo_hash::ActionHash;
+use holo_hash::HasHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
@@ -373,8 +374,19 @@ impl<C: HashableContent<HashType = T>, T: PrimitiveHashType> HashableContent for
     }
 
     fn hashable_content(&self) -> holo_hash::HashableContentBytes {
-        use holo_hash::HasHash;
         holo_hash::HashableContentBytes::Prehashed39(self.hashed.as_hash().get_raw_39().to_vec())
+    }
+}
+
+impl<C: HashableContent> HasHash for SignedHashed<C> {
+    type HashType = C::HashType;
+
+    fn as_hash(&self) -> &HoloHashOf<C> {
+        &self.hashed.as_hash()
+    }
+
+    fn into_hash(self) -> HoloHashOf<C> {
+        self.hashed.into_hash()
     }
 }
 

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::retrieve_previous_actions_for_ops;
+use super::validation_deps::ValDeps;
 use super::ValidationDependencies;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::core::workflow::sys_validation_workflow::validate_op;
@@ -280,6 +281,7 @@ async fn validate_create_op_with_prev_from_network() {
     // Simulate the dep being found on the network
     test_case
         .current_validation_dependencies
+        .local
         .lock()
         .insert(previous_action, CascadeSource::Network);
 
@@ -2174,14 +2176,9 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(
-        &op,
-        &dna_def,
-        Arc::new(Mutex::new(ValidationDependencies::new())),
-        None,
-    )
-    .await
-    .unwrap();
+    let validation_outcome = validate_op(&op, &dna_def, ValDeps::new(), None)
+        .await
+        .unwrap();
 
     assert!(matches!(validation_outcome, Outcome::Accepted));
 }
@@ -2190,7 +2187,7 @@ struct TestCase {
     op: Option<DhtOp>,
     keystore: holochain_keystore::MetaLairClient,
     cascade: MockCascade,
-    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    current_validation_dependencies: ValDeps,
     dna_def: DnaDef,
     agent: AgentPubKey,
 }
@@ -2206,7 +2203,7 @@ impl TestCase {
             op: None,
             keystore,
             cascade: MockCascade::new(),
-            current_validation_dependencies: Arc::new(Mutex::new(ValidationDependencies::new())),
+            current_validation_dependencies: ValDeps::new(),
             dna_def,
             agent,
         }
