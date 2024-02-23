@@ -382,7 +382,7 @@ impl<C: HashableContent> HasHash for SignedHashed<C> {
     type HashType = C::HashType;
 
     fn as_hash(&self) -> &HoloHashOf<C> {
-        &self.hashed.as_hash()
+        self.hashed.as_hash()
     }
 
     fn into_hash(self) -> HoloHashOf<C> {
