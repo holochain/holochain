@@ -9,34 +9,35 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 
 [dependencies]
-futures = "0.3"
-ghost_actor = "0.4.0-alpha.5"
+futures = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
-nanoid = "0.3"
-net2 = "0.2"
-must_future = "0.1"
-serde = { version = "1", features = [ "derive" ] }
-serde_bytes = "0.11"
-stream-cancel = "0.8.0"
-thiserror = "1.0.22"
-tokio = { version = "1.27", features = [ "full" ] }
-tokio-stream = { version = "0.1", features = ["net"] }
-tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
-tracing-futures = "0.2"
-tungstenite = "0.12"
-url2 = { workspace = true }
+
+#ghost_actor = "0.4.0-alpha.5"
+#nanoid = "0.3"
+#net2 = "0.2"
+#must_future = "0.1"
+#stream-cancel = "0.8.0"
+#thiserror = "1.0.22"
+#tokio-stream = { version = "0.1", features = ["net"] }
+#tracing-futures = "0.2"
+#tungstenite = "0.12"
+#url2 = { workspace = true }
 
 [dev-dependencies]
-holochain_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_types", features = ["sqlite"] }
-linefeed = "0.6"
-unwrap_to = "0.1.0"
+#holochain_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_types", features = ["sqlite"] }
+#linefeed = "0.6"
+#unwrap_to = "0.1.0"
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
-criterion = "0.3.4"
+#criterion = "0.3.4"
 
-[features]
-slow_tests = []
+#[features]
+#slow_tests = []
 
-[[bench]]
-name = "bench"
-harness = false
+#[[bench]]
+#name = "bench"
+#harness = false
