@@ -1,0 +1,337 @@
+repo_name: Wladoo/holochain
+report_id: 383389d353e6f1cb2cfc3f6b31ddb5f9
+version: 0.1
+repo_type: Public
+timestamp: '2024-02-25T10:26:15+00:00'
+requested_by: maackle
+provider: github
+branch: develop
+detected_tools_count: 27
+tools:
+- name: JavaScript
+  description: Lightweight, interpreted, object-oriented language with first-class
+    functions
+  website_url: https://developer.mozilla.org/en-US/docs/Web/JavaScript
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/1209/javascript.jpeg
+  detection_source_url: https://github.com/Wladoo/holochain
+  detection_source: Repo Metadata
+- name: Python
+  description: A clear and powerful object-oriented programming language, comparable
+    to Perl, Ruby, Scheme, or Java.
+  website_url: https://www.python.org
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/993/pUBY5pVj.png
+  detection_source_url: https://github.com/Wladoo/holochain
+  detection_source: Repo Metadata
+- name: Ruby
+  description: A dynamic, interpreted, open source programming language with a focus
+    on simplicity and productivity
+  website_url: https://www.ruby-lang.org
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/989/ruby.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/kitsune_p2p/kitsune_p2p/Cargo.toml
+  detection_source: crates/kitsune_p2p/kitsune_p2p/Cargo.toml
+  last_updated_by: neonphog
+  last_updated_on: 2020-05-21 16:17:53.000000000 Z
+- name: Rust
+  description: A safe, concurrent, practical language
+  website_url: http://www.rust-lang.org/
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/1070/v7txhrjp9pdqrkdtxxp0.png
+  detection_source_url: https://github.com/Wladoo/holochain
+  detection_source: Repo Metadata
+- name: SQL
+  description: It is a domain-specific language used in programming
+  website_url: https://en.wikipedia.org/wiki/SQL
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/2271/default_068d33483bba6b81ee13fbd4dc7aab9780896a54.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holochain_sqlite/src/sql/cell/fetch_hashes/any/fetch_op_hashes_continuous.sql
+  detection_source: crates/holochain_sqlite/src/sql/cell/fetch_hashes/any/fetch_op_hashes_continuous.sql
+  last_updated_by: Michael Dougherty
+  last_updated_on: 2021-06-09 18:45:51.000000000 Z
+- name: Swift
+  description: An innovative new programming language for Cocoa and Cocoa Touch.
+  website_url: https://developer.apple.com/swift/
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/1009/tuHsaI2U.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holo_hash/Cargo.toml
+  detection_source: crates/holo_hash/Cargo.toml
+  last_updated_by: Michael Dougherty
+  last_updated_on: 2020-07-17 06:58:26.000000000 Z
+- name: ".NET"
+  description: A free, cross-platform, open source developer platform for building
+    many different types of applications
+  website_url: http://www.microsoft.com/net/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Frameworks (Full Stack)
+  image_url: https://img.stackshare.io/service/1014/IoPy1dce_400x400.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/release-automation/Cargo.toml
+  detection_source: crates/release-automation/Cargo.toml
+  last_updated_by: Stefan Junker
+  last_updated_on: 2021-04-07 16:17:20.000000000 Z
+- name: Serde
+  description: Serialization framework for Rust
+  website_url: https://serde.rs
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Serialization Frameworks
+  image_url: https://img.stackshare.io/service/11028/no-img-open-source.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/hc_bundle/Cargo.toml
+  detection_source: crates/hc_bundle/Cargo.toml
+  last_updated_by: Michael Dougherty
+  last_updated_on: 2021-01-28 19:08:42.000000000 Z
+- name: Tokio
+  description: Runtime for writing reliable asynchronous applications with Rust
+  website_url: https://tokio.rs/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Concurrency Frameworks
+  image_url: https://img.stackshare.io/service/12187/bC40df3r_400x400.jpg
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/hc_bundle/Cargo.toml
+  detection_source: crates/hc_bundle/Cargo.toml
+  last_updated_by: freesig
+  last_updated_on: 2021-09-14 08:31:30.000000000 Z
+- name: Cron
+  description: Background-only application
+  website_url: https://directory.fsf.org/wiki/Cron
+  version: 0.9.0
+  open_source: false
+  hosted_saas: false
+  category: Data Stores
+  sub_category: Background Processing
+  image_url: https://img.stackshare.io/service/2416/default_274ed9bcc98502018f007cfcd8c09f3514d3d319.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/Cargo.lock
+  detection_source: crates/holochain_state/Cargo.toml
+  last_updated_by: thedavidmeister
+  last_updated_on: 2021-09-09 21:17:54.000000000 Z
+- name: ws
+  description: A Node.js WebSocket library
+  website_url: https://github.com/websockets/ws
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Application Hosting
+  sub_category: Realtime Backend / API
+  image_url: https://img.stackshare.io/service/11381/no-img-open-source.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holochain_websocket/examples/nodejs_echo_client/package.json
+  detection_source: crates/holochain_websocket/examples/nodejs_echo_client/package.json
+  last_updated_by: neonphog
+  last_updated_on: 2020-03-27 20:58:03.000000000 Z
+- name: Backtrace
+  description: Real-time automated error detection, response and analysis for enterprise-grade
+    software
+  website_url: http://backtrace.io
+  open_source: false
+  hosted_saas: false
+  category: Monitoring
+  sub_category: Exception Monitoring
+  image_url: https://img.stackshare.io/service/4920/QOo-sB4D_400x400.jpg
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holochain_types/Cargo.toml
+  detection_source: crates/holochain_types/Cargo.toml
+  last_updated_by: Holochain Core Dev Team
+  last_updated_on: 2021-09-22 13:12:34.000000000 Z
+- name: CircleCI
+  description: Automate your development process quickly, safely, and at scale
+  website_url: https://circleci.com/
+  open_source: false
+  hosted_saas: true
+  category: Build, Test, Deploy
+  sub_category: Continuous Integration
+  image_url: https://img.stackshare.io/service/190/CvqrSSFs_400x400.jpg
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/.circleci/config.yml
+  detection_source: ".circleci/config.yml"
+  last_updated_by: Stefan Junker
+  last_updated_on: 2021-09-20 12:34:26.000000000 Z
+- name: Ctop
+  description: Commandline monitoring for containers
+  website_url: http://ctop.sh/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Container Tools
+  image_url: https://img.stackshare.io/service/6731/favicon.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/hc_bundle/Cargo.toml
+  detection_source: crates/hc_bundle/Cargo.toml
+  last_updated_by: neonphog
+  last_updated_on: 2020-05-01 20:33:41.000000000 Z
+- name: Git
+  description: Fast, scalable, distributed revision control system
+  website_url: http://git-scm.com/
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Version Control System
+  image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/Wladoo/holochain
+  detection_source: Repo Metadata
+- name: GitHub Actions
+  description: Automate your workflow from idea to production
+  website_url: https://github.com/features/actions
+  open_source: false
+  hosted_saas: true
+  category: Build, Test, Deploy
+  sub_category: Continuous Integration
+  image_url: https://img.stackshare.io/service/11563/actions.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/.github/workflows/test.yml
+  detection_source: ".github/workflows/test.yml"
+  last_updated_by: Eric Harris-Braun
+  last_updated_on: 2020-03-27 21:10:49.000000000 Z
+- name: Nix
+  description: A package manager for Linux and other Unix systems
+  website_url: http://nixos.org/nix
+  license: LGPL-2.1
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Package Managers
+  image_url: https://img.stackshare.io/service/4348/ET9J1uY-_400x400.png
+  detection_source_url: https://github.com/Wladoo/holochain
+  detection_source: Repo Metadata
+- name: NuGet
+  description: The package manager for .NET
+  website_url: https://www.nuget.org/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Package Managers
+  image_url: https://img.stackshare.io/service/2637/6I3oEOP4_400x400.jpg
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/release-automation/Cargo.toml
+  detection_source: crates/release-automation/Cargo.toml
+  last_updated_by: Stefan Junker
+  last_updated_on: 2021-04-07 16:17:20.000000000 Z
+- name: PyPI
+  description: A repository of software for the Python programming language
+  website_url: https://pypi.org/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Hosted Package Repository
+  image_url: https://img.stackshare.io/service/12572/-RIWgodF_400x400.jpg
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holochain_types/Cargo.toml
+  detection_source: crates/holochain_types/Cargo.toml
+  last_updated_by: Michael Dougherty
+  last_updated_on: 2020-12-08 15:39:04.000000000 Z
+- name: RubyGems
+  description: Easily download, install, and use ruby software packages on your system
+  website_url: https://rubygems.org/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Package Managers
+  image_url: https://img.stackshare.io/service/12795/5jL6-BA5_400x400.jpeg
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/kitsune_p2p/kitsune_p2p/Cargo.toml
+  detection_source: crates/kitsune_p2p/kitsune_p2p/Cargo.toml
+  last_updated_by: neonphog
+  last_updated_on: 2020-05-21 16:17:53.000000000 Z
+- name: Vagrant
+  description: A tool for building and distributing development environments
+  website_url: http://www.vagrantup.com/
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Virtual Machine Management
+  image_url: https://img.stackshare.io/service/768/150px-Vagrant.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/containernet/Vagrantfile
+  detection_source: containernet/Vagrantfile
+  last_updated_by: neonphog
+  last_updated_on: 2020-11-19 03:32:10.000000000 Z
+- name: npm
+  description: The package manager for JavaScript.
+  website_url: https://www.npmjs.com/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Front End Package Manager
+  image_url: https://img.stackshare.io/service/1120/lejvzrnlpb308aftn31u.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/release-automation/Cargo.toml
+  detection_source: crates/release-automation/Cargo.toml
+  last_updated_by: Stefan Junker
+  last_updated_on: 2021-04-07 16:17:20.000000000 Z
+- name: warp
+  description: Secure and simple terminal sharing
+  website_url: https://github.com/spolu/warp
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: localhost Tools
+  image_url: https://img.stackshare.io/no-img-open-source.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/kitsune_p2p/bootstrap/Cargo.toml
+  detection_source: crates/kitsune_p2p/bootstrap/Cargo.toml
+  last_updated_by: neonphog
+  last_updated_on: 2021-06-23 18:56:40.000000000 Z
+- name: CocoaPods
+  description: A dependency manager for Swift and Objective-C Cocoa projects
+  website_url: https://cocoapods.org/
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: CocoaPods Packages
+  image_url: https://img.stackshare.io/service/2426/e1cbdef9d4b11484049a033886578e54_400x400.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holo_hash/Cargo.toml
+  detection_source: crates/holo_hash/Cargo.toml
+  last_updated_by: Michael Dougherty
+  last_updated_on: 2020-07-17 06:58:26.000000000 Z
+- name: Shell
+  description: A shell is a text-based terminal, used for manipulating programs and
+    files. Shell scripts typically manage program execution.
+  website_url: https://en.wikipedia.org/wiki/Shell_script
+  open_source: false
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/4631/default_c2062d40130562bdc836c13dbca02d318205a962.png
+  detection_source_url: https://github.com/Wladoo/holochain
+  detection_source: Repo Metadata
+- name: cargo
+  website_url: https://codehaus-cargo.github.io/cargo/Maven2+plugin.html
+  open_source: false
+  hosted_saas: false
+  image_url: https://img.stackshare.io/service/9137/no-img-open-source.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/release-automation/Cargo.toml
+  detection_source: crates/release-automation/Cargo.toml
+  last_updated_by: neonphog
+  last_updated_on: 2021-08-16 19:43:31.000000000 Z
+- name: msgpack-lite
+  description: Fast Pure JavaScript MessagePack Encoder and Decoder
+  package_url: https://www.npmjs.com/msgpack-lite
+  version: 0.1.26
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: npm Packages
+  image_url: https://img.stackshare.io/package/18775/default_cc86fe9878b0b7e40f2fad8460c629290f29bfee.png
+  detection_source_url: https://github.com/Wladoo/holochain/blob/develop/crates/holochain_websocket/examples/nodejs_echo_client/package-lock.json
+  detection_source: crates/holochain_websocket/examples/nodejs_echo_client/package.json
+  last_updated_by: neonphog
+  last_updated_on: 2020-03-27 20:58:03.000000000 Z
