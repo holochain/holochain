@@ -26,9 +26,7 @@ use matches::assert_matches;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
-use tokio_stream::StreamExt;
 use tracing::*;
-use url2::prelude::*;
 
 use crate::test_utils::*;
 
@@ -106,6 +104,7 @@ how_many: 42
 #[cfg(feature = "slow_tests")]
 async fn call_zome() {
     holochain_trace::test_run().ok();
+
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -121,7 +120,7 @@ async fn call_zome() {
     let admin_port = admin_port.await.unwrap();
 
     let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
-    let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
+    let (_, mut receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -201,11 +200,12 @@ async fn call_zome() {
     // responses are not broadcast to all connected clients, only the one
     // that made the request.
     // Err means the timeout elapsed
-    assert!(Box::pin(receiver2.timeout(Duration::from_millis(500)))
-        .next()
-        .await
-        .unwrap()
-        .is_err());
+    assert!(tokio::time::timeout(
+        Duration::from_millis(500),
+        receiver2.recv::<AdminResponse>(),
+    )
+    .await
+    .is_err());
 
     // Shutdown holochain
     std::mem::drop(holochain);
@@ -216,7 +216,7 @@ async fn call_zome() {
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -228,12 +228,12 @@ async fn call_zome() {
         _ => panic!("Unexpected response"),
     };
 
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
     call_zome_fn(
-        &mut app_tx,
+        &app_tx,
         cell_id.clone(),
         &signing_keypair,
         cap_secret,
@@ -386,11 +386,11 @@ async fn emit_signals() {
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
 
-    let (mut app_tx_1, app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
-    let (_, app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx_1, mut app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
+    let (_, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
 
     call_zome_fn(
-        &mut app_tx_1,
+        &app_tx_1,
         cell_id.clone(),
         &signing_keypair,
         cap_secret,
@@ -400,19 +400,15 @@ async fn emit_signals() {
     )
     .await;
 
-    let (sig1, msg1) = Box::pin(app_rx_1.timeout(Duration::from_secs(1)))
-        .next()
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(!msg1.is_request());
+    let sig1 = match app_rx_1.recv().await {
+        Ok(ReceiveMessage::Signal(sig1)) => sig1,
+        oth => panic!("unexpected: {oth:?}"),
+    };
 
-    let (sig2, msg2) = Box::pin(app_rx_2.timeout(Duration::from_secs(1)))
-        .next()
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(!msg2.is_request());
+    let sig2 = match app_rx_2.recv().await {
+        Ok(ReceiveMessage::Signal(sig2)) => sig2,
+        oth => panic!("unexpected: {oth:?}"),
+    };
 
     assert_eq!(
         Signal::App {
@@ -420,7 +416,7 @@ async fn emit_signals() {
             zome_name,
             signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
-        Signal::try_from(sig1.clone()).unwrap(),
+        sig1,
     );
     assert_eq!(sig1, sig2);
 
@@ -434,7 +430,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
-    let (mut client, _) = websocket_client(&conductor_handle).await?;
+    let (client, _) = websocket_client(&conductor_handle).await?;
 
     let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
@@ -462,12 +458,12 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        url2!("ws://127.0.0.1:{}", port),
+    let (client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         Arc::new(WebsocketConfig {
-            default_request_timeout_s: 1,
+            default_request_timeout: std::time::Duration::from_secs(1),
             ..Default::default()
         }),
+        ([127, 0, 0, 1], port).into(),
     )
     .await?;
 
@@ -501,12 +497,12 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
-        url2!("ws://127.0.0.1:{}", port),
+    let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         Arc::new(WebsocketConfig {
-            default_request_timeout_s: 1,
+            default_request_timeout: std::time::Duration::from_secs(1),
             ..Default::default()
         }),
+        ([127, 0, 0, 1], port).into(),
     )
     .await?;
 
@@ -521,7 +517,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         Err(ConductorError::ShuttingDown)
     );
 
-    assert!(rx.next().await.is_none());
+    assert!(rx.recv::<AdminResponse>().await.is_err());
 
     info!("About to make failing request");
 
@@ -541,7 +537,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     // request should have encountered an error since the conductor shut down,
     // but should not have timed out (which would be an `Err(Err(_))`)
-    assert_matches!(response, Ok(Err(WebsocketError::Shutdown)));
+    assert_matches!(response, Ok(Err(_)));
 
     Ok(())
 }
@@ -557,7 +553,7 @@ async fn connection_limit_is_respected() {
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
-    let url = url2!("ws://127.0.0.1:{}", port);
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     let cfg = Arc::new(WebsocketConfig::default());
 
     // Retain handles so that the test can control when to disconnect clients
@@ -565,7 +561,7 @@ async fn connection_limit_is_respected() {
 
     // The first `MAX_CONNECTIONS` connections should succeed
     for _ in 0..MAX_CONNECTIONS {
-        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let (sender, _) = connect(cfg.clone(), addr).await.unwrap();
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
@@ -575,7 +571,7 @@ async fn connection_limit_is_respected() {
 
     // Try lots of failed connections to make sure the limit is respected
     for _ in 0..2 * MAX_CONNECTIONS {
-        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let (sender, _) = connect(cfg.clone(), addr).await.unwrap();
 
         // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
         sender
@@ -589,7 +585,7 @@ async fn connection_limit_is_respected() {
 
     // Should now be possible to connect new clients
     for _ in 0..MAX_CONNECTIONS {
-        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let (sender, _) = connect(cfg.clone(), addr).await.unwrap();
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
@@ -693,7 +689,7 @@ async fn network_stats() {
     let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
     batch.exchange_peer_info().await;
 
-    let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
+    let (client, _) = batch.get(0).unwrap().admin_ws_client().await;
 
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";

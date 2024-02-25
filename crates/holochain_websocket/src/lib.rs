@@ -106,7 +106,7 @@ impl WebsocketConfig {
     };
 
     pub(crate) fn to_tungstenite(
-        &self,
+        self,
     ) -> tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
         tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
             max_message_size: Some(self.max_message_size),
@@ -247,22 +247,15 @@ where
     Request(D, WebsocketRespond),
 }
 
-/*
-impl<D> ReceiveMessage<D>
-where
-    D: std::fmt::Debug,
-    SerializedBytes: TryInto<D, Error = SerializedBytesError>,
-{
-    pub fn is_request(&self) -> bool {
-        matches!(self, Self::Request(_, _))
-    }
-}
-*/
-
 /// Receive signals and requests from a websocket connection.
-pub struct WebsocketReceiver(WsCoreSync);
+pub struct WebsocketReceiver(WsCoreSync, std::net::SocketAddr);
 
 impl WebsocketReceiver {
+    /// Peer address.
+    pub fn peer_addr(&self) -> std::net::SocketAddr {
+        self.1
+    }
+
     /// Receive the next message.
     pub async fn recv<D>(&mut self) -> Result<ReceiveMessage<D>>
     where
@@ -338,6 +331,7 @@ impl WebsocketReceiver {
 }
 
 /// Send requests and signals to the remote end of this websocket connection.
+#[derive(Clone)]
 pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 
 impl WebsocketSender {
@@ -428,6 +422,7 @@ impl WebsocketSender {
 fn split(
     stream: WsStream,
     timeout: std::time::Duration,
+    peer_addr: std::net::SocketAddr,
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
     let (sink, stream) = futures::stream::StreamExt::split(stream);
 
@@ -443,7 +438,7 @@ fn split(
 
     Ok((
         WebsocketSender(core_send, timeout),
-        WebsocketReceiver(core_recv),
+        WebsocketReceiver(core_recv, peer_addr),
     ))
 }
 
@@ -453,12 +448,13 @@ pub async fn connect(
     addr: std::net::SocketAddr,
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
     let stream = tokio::net::TcpStream::connect(addr).await?;
+    let peer_addr = stream.peer_addr()?;
     let url = format!("ws://{addr}");
     let (stream, _addr) =
         tokio_tungstenite::client_async_with_config(url, stream, Some(config.to_tungstenite()))
             .await
             .map_err(Error::other)?;
-    split(stream, config.default_request_timeout)
+    split(stream, config.default_request_timeout, peer_addr)
 }
 
 /// A Holochain websocket listener.
@@ -494,7 +490,7 @@ impl WebsocketListener {
             tokio_tungstenite::accept_async_with_config(stream, Some(self.config.to_tungstenite()))
                 .await
                 .map_err(Error::other)?;
-        split(stream, self.config.default_request_timeout)
+        split(stream, self.config.default_request_timeout, addr)
     }
 }
 

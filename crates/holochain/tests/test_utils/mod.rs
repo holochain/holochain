@@ -48,7 +48,6 @@ use holochain::{
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
 use holochain_util::tokio_helper;
-use holochain_websocket::*;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
 pub struct SupervisedChild(String, Child);
@@ -118,7 +117,7 @@ pub async fn grant_zome_call_capability(
 }
 
 pub async fn call_zome_fn<S>(
-    app_tx: &mut WebsocketSender,
+    app_tx: &WebsocketSender,
     cell_id: CellId,
     signing_keypair: &Keypair,
     cap_secret: CapSecret,
@@ -351,7 +350,7 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
 
 #[instrument(skip(response))]
 pub async fn check_timeout<T>(
-    response: impl Future<Output = Result<T, WebsocketError>>,
+    response: impl Future<Output = std::io::Result<T>>,
     timeout_ms: u64,
 ) -> T {
     check_timeout_named("<unnamed>", response, timeout_ms).await
@@ -360,7 +359,7 @@ pub async fn check_timeout<T>(
 #[instrument(skip(response))]
 async fn check_timeout_named<T>(
     name: &'static str,
-    response: impl Future<Output = Result<T, WebsocketError>>,
+    response: impl Future<Output = std::io::Result<T>>,
     timeout_millis: u64,
 ) -> T {
     // FIXME(stefan): remove this multiplier once it's faster on self-hosted CI
