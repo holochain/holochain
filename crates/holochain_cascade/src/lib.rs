@@ -697,18 +697,10 @@ where
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
+        // Only return what is in the database.
         if let GetStrategy::Local = options.strategy {
             let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+            return Ok(results);
         }
 
         // If we are not in the process of authoring this hash or its
@@ -740,18 +732,10 @@ where
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
+        // Only return what is in the database.
         if let GetStrategy::Local = options.strategy {
             let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+            return Ok(results);
         }
 
         // If we are not in the process of authoring this hash or its
