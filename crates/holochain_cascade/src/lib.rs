@@ -699,7 +699,7 @@ where
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
+        if let GetStrategy::Local = options.strategy {
             let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
@@ -742,7 +742,7 @@ where
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
+        if let GetStrategy::Local = options.strategy {
             let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
@@ -786,7 +786,7 @@ where
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
+        if let GetStrategy::Local = options.strategy {
             let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {
@@ -824,7 +824,7 @@ where
 
         // We don't need metadata and only need the content
         // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
+        if let GetStrategy::Local = options.strategy {
             let results = self.cascading(query.clone()).await?;
             // We got a result so can short circuit.
             if results.is_some() {

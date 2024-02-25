@@ -49,12 +49,10 @@ pub struct AppEntryDefLocation {
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-/// Options for controlling how get works
+/// Options for controlling how get is executed.
 pub struct GetOptions {
-    /// If this is true the get call will wait for
-    /// the latest data before returning.
-    /// If it is false you will get whatever is locally
-    /// available on this conductor.
+    /// Set if data should be fetched from the network or only from the local
+    /// databases.
     pub strategy: GetStrategy,
 }
 
@@ -77,7 +75,7 @@ impl GetOptions {
     /// is not found locally.
     pub fn content() -> Self {
         Self {
-            strategy: GetStrategy::Content,
+            strategy: GetStrategy::Local,
         }
     }
 }
@@ -89,18 +87,15 @@ impl Default for GetOptions {
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
-/// Describes the get call and what information
-/// the caller is concerned about.
-/// This helps the subconscious avoid unnecessary network calls.
+/// Set if data should be fetched from the network or only from the local
+/// databases.
 pub enum GetStrategy {
-    /// Will try to get the latest metadata from the network and fall back
-    /// to the cache if none is found.
-    /// Does not go to the network if you are an authority for the data.
+    /// Get the latest action or entry metadata from the network and fall back
+    /// to local databases if none is found.
+    /// Does not go to the network if you are an authority for the action/entry.
     Latest,
-    /// Will try to get the content locally but go
-    /// to the network if it is not found.
-    /// Does not go to the network if you are an authority for the data.
-    Content,
+    /// Get the action or entry from local databases only.
+    Local,
 }
 
 /// Zome input to create an entry.
