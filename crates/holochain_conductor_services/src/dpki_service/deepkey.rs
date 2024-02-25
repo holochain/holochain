@@ -1,5 +1,3 @@
-
-
 use super::*;
 
 use crate::CellRunner;
@@ -7,7 +5,7 @@ use holochain_keystore::MetaLairClient;
 
 /// The built-in implementation of the DPKI service contract, which runs a DNA
 pub struct DeepkeyBuiltin {
-    runner: Arc<dyn CellRunner>,
+    runner: Arc<tokio::sync::Mutex<Arc<dyn CellRunner>>>,
     keystore: MetaLairClient,
     installation: DeepkeyInstallation,
 }
@@ -31,15 +29,15 @@ pub struct DeepkeyInstallation {
 
 impl DeepkeyBuiltin {
     pub fn new(
-        runner: Arc<dyn CellRunner>,
+        runner: Arc<impl CellRunner>,
         keystore: MetaLairClient,
         installation: DeepkeyInstallation,
     ) -> DpkiMutex {
-        Arc::new(tokio::sync::Mutex::new(Self {
-            runner,
+        Arc::new(Self {
+            runner: Arc::new(tokio::sync::Mutex::new(runner)),
             keystore,
             installation,
-        }))
+        })
     }
 }
 
@@ -63,6 +61,8 @@ impl DpkiService for DeepkeyBuiltin {
         let cap_secret = None;
         let response = self
             .runner
+            .lock()
+            .await
             .call_zome(
                 &provenance,
                 cap_secret,
@@ -82,6 +82,8 @@ impl DpkiService for DeepkeyBuiltin {
         app_name: InstalledAppId,
         dna_hashes: Vec<DnaHash>,
     ) -> DpkiServiceResult<AgentPubKey> {
+        // dbg!(Timestamp::now());
+        let runner = self.runner.lock().await;
         let derivation_details: DerivationDetailsInput = {
             let cell_id = self.installation.cell_id.clone();
             let provenance = cell_id.agent_pubkey().clone();
@@ -89,7 +91,7 @@ impl DpkiService for DeepkeyBuiltin {
             let fn_name: FunctionName = "next_derivation_details".into();
             let payload = ExternIO::encode(app_name.clone())?;
             let cap_secret = None;
-            self.runner
+            runner
                 .call_zome(
                     &provenance,
                     cap_secret,
@@ -102,7 +104,7 @@ impl DpkiService for DeepkeyBuiltin {
                 .map_err(DpkiServiceError::ZomeCallFailed)?
                 .decode()?
         };
-
+        // dbg!(Timestamp::now());
         let info = self
             .keystore
             .lair_client()
@@ -118,13 +120,13 @@ impl DpkiService for DeepkeyBuiltin {
         let app_agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
 
         let dpki_agent = self.cell_id().agent_pubkey().clone();
-
+        // dbg!(Timestamp::now());
         // This is the signature Deepkey requires
         let signature = app_agent
             .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
             .await
             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-
+        // dbg!(Timestamp::now());
         #[cfg(test)]
         assert_eq!(
             hdk::prelude::verify_signature_raw(
@@ -134,7 +136,7 @@ impl DpkiService for DeepkeyBuiltin {
             ),
             Ok(true)
         );
-
+        // dbg!(Timestamp::now());
         let input = CreateKeyInput {
             key_generation: KeyGeneration {
                 new_key: app_agent.clone(),
@@ -147,7 +149,7 @@ impl DpkiService for DeepkeyBuiltin {
             },
             derivation_details,
         };
-
+        // dbg!(Timestamp::now());
         let _: (ActionHash, KeyRegistration, KeyMeta) = {
             let cell_id = self.installation.cell_id.clone();
             let provenance = cell_id.agent_pubkey().clone();
@@ -155,7 +157,7 @@ impl DpkiService for DeepkeyBuiltin {
             let fn_name: FunctionName = "create_key".into();
             let payload = ExternIO::encode(input)?;
             let cap_secret = None;
-            self.runner
+            runner
                 .call_zome(
                     &provenance,
                     cap_secret,
@@ -168,7 +170,7 @@ impl DpkiService for DeepkeyBuiltin {
                 .map_err(DpkiServiceError::ZomeCallFailed)?
                 .decode()?
         };
-
+        // dbg!(Timestamp::now());
         Ok(app_agent)
     }
 

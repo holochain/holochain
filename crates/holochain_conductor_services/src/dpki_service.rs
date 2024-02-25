@@ -18,7 +18,7 @@ use self::zome_types::*;
 /// and is used to distinguish the DPKI service from other apps.
 pub const DPKI_APP_ID: &str = "DPKI";
 
-pub type DpkiMutex = Arc<tokio::sync::Mutex<dyn DpkiService>>;
+pub type DpkiMutex = Arc<dyn DpkiService>;
 
 /// Interface for the DPKI service
 #[async_trait::async_trait]

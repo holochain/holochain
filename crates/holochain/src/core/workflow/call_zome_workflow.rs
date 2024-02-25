@@ -60,17 +60,19 @@ pub async fn call_zome_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
+    // dbg!(Timestamp::now());
     let coordinator_zome = args
         .ribosome
         .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
         .ok();
+    // dbg!(Timestamp::now());
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
-
+    // dbg!(Timestamp::now());
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -121,7 +123,7 @@ where
             }
         }
     };
-
+    // dbg!(Timestamp::now());
     Ok(result)
 }
 
@@ -258,19 +260,21 @@ where
     };
 
     if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
-        // Check the validity of the author as-at the first and the last record to be committed.
-        // If these are valid, then the author is valid for the entire commit.
-        let author = workspace.source_chain().agent_pubkey().clone();
-        let first = records.first();
-        let last = records.last();
-        if let Some(r) = first {
-            check_dpki_agent_validity(&*dpki.lock().await, author.clone(), r.action().timestamp())
-                .await?;
-        }
-        if let Some(r) = last {
-            if first != last {
-                check_dpki_agent_validity(&*dpki.lock().await, author, r.action().timestamp())
-                    .await?;
+        // Don't check DPKI validity on DPKI itself!
+        let is_dpki = *dpki.cell_id().dna_hash() == DnaHash::with_data_sync(&*workspace.dna_def());
+        if !is_dpki {
+            // Check the validity of the author as-at the first and the last record to be committed.
+            // If these are valid, then the author is valid for the entire commit.
+            let author = workspace.source_chain().agent_pubkey().clone();
+            let first = records.first();
+            let last = records.last();
+            if let Some(r) = first {
+                check_dpki_agent_validity(&*dpki, author.clone(), r.action().timestamp()).await?;
+            }
+            if let Some(r) = last {
+                if first != last {
+                    check_dpki_agent_validity(&*dpki, author, r.action().timestamp()).await?;
+                }
             }
         }
     }

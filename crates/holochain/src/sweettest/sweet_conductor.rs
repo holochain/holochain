@@ -415,15 +415,17 @@ impl SweetConductor {
             .iter()
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
+        // dbg!(Timestamp::now());
         self.setup_app_1_register_dna(dnas.clone()).await?;
+        // dbg!(Timestamp::now());
         let agent = self
             .setup_app_2_install_and_enable(installed_app_id, agent, dnas_with_roles.as_slice())
             .await?;
-
+        // dbg!(Timestamp::now());
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
-
+        // dbg!(Timestamp::now());
         let dna_hashes = dnas.iter().map(|r| r.dna_hash().clone());
         self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_hashes)
             .await

@@ -1348,9 +1348,9 @@ mod app_impls {
                 data,
             )
             .await;
-
+            // dbg!(Timestamp::now());
             let app = self.install_app_bundle(payload).await?;
-
+            // dbg!(Timestamp::now());
             Ok(app.agent_key().clone())
         }
 
@@ -1374,6 +1374,7 @@ mod app_impls {
                 network_seed,
                 ..
             } = payload;
+            // dbg!(Timestamp::now());
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
@@ -1391,6 +1392,7 @@ mod app_impls {
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
             let agent_key = if let Some(agent_key) = agent_key {
+                // dbg!(Timestamp::now());
                 if self.running_services().dpki.is_some() {
                     return Err(ConductorError::Other(
                         "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
@@ -1399,24 +1401,27 @@ mod app_impls {
                     agent_key
                 }
             } else if let Some(dpki) = self.running_services().dpki {
+                // dbg!(Timestamp::now());
                 // TODO: record the DNAs installed, important for key restoration.
                 let dnas = vec![];
-                dpki.lock()
-                    .await
-                    .derive_and_register_new_key(installed_app_id.clone(), dnas)
+                dpki.derive_and_register_new_key(installed_app_id.clone(), dnas)
                     .await?
             } else {
+                // dbg!(Timestamp::now());
                 self.keystore.new_sign_keypair_random().await?
             };
 
+            // dbg!(Timestamp::now());
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
+            // dbg!(Timestamp::now());
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
 
+            // dbg!(Timestamp::now());
             let cells_to_create = ops.cells_to_create();
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1434,6 +1439,7 @@ mod app_impls {
                     duplicate_cell_id.to_owned(),
                 ));
             };
+            // dbg!(Timestamp::now());
 
             for (dna, _) in ops.dnas_to_register {
                 self.clone().register_dna(dna).await?;
@@ -1447,6 +1453,7 @@ mod app_impls {
             let genesis_result =
                 crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
+            // dbg!(Timestamp::now());
             if genesis_result.is_ok() || ignore_genesis_failure {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
@@ -2108,6 +2115,8 @@ mod service_impls {
             let dna_hash = dna.dna_hash().clone();
             self.register_dna(dna.clone()).await?;
 
+            // dbg!(Timestamp::now());
+
             // FIXME: This "device seed" should be derived from the master seed and passed in here,
             //        not just generated like this. This is a placeholder.
             let device_seed_lair_tag = {
@@ -2118,9 +2127,11 @@ mod service_impls {
                     .await?;
                 tag
             };
+            // dbg!(Timestamp::now());
 
             let (derivation_path, dst_tag) =
                 derivation_path_for_dpki_instance(0, &device_seed_lair_tag);
+            // dbg!(Timestamp::now());
             let seed_info = self
                 .keystore()
                 .lair_client()
@@ -2132,6 +2143,7 @@ mod service_impls {
                     derivation_path,
                 )
                 .await?;
+            // dbg!(Timestamp::now());
 
             // The initial agent key is the first derivation from the device seed.
             // Updated DPKI agent keys are sequential derivations from the same device seed.
@@ -2143,7 +2155,9 @@ mod service_impls {
             self.clone()
                 .install_app_legacy(DPKI_APP_ID.into(), Some(agent), &[((role_name, dna), None)])
                 .await?;
+            // dbg!(Timestamp::now());
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
+            // dbg!(Timestamp::now());
 
             let installation = DeepkeyInstallation {
                 cell_id,
@@ -2155,7 +2169,9 @@ mod service_impls {
             })
             .await?;
 
+            // dbg!(Timestamp::now());
             self.initialize_service_dpki().await?;
+            // dbg!(Timestamp::now());
 
             Ok(())
         }
@@ -2594,7 +2610,7 @@ mod accessor_impls {
                 .running_services()
                 .dpki
                 .clone()
-                .map(|c| async move { c.lock().await.cell_id().dna_hash().clone().into() })
+                .map(|c| async move { c.cell_id().dna_hash().clone().into() })
                 .transpose();
             DnaCompatParams {
                 protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,

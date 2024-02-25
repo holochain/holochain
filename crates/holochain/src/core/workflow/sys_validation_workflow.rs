@@ -251,13 +251,6 @@ async fn sys_validation_workflow_inner(
     let cascade = Arc::new(workspace.local_cascade());
     let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
-    todo!(
-        "
-        MD: I'm assuming this is around where we should attempt to fetch the DPKI dependencies.
-            Then there is the question of how to track the deps along with all the others.
-        "
-    );
-
     retrieve_previous_actions_for_ops(
         current_validation_dependencies.clone(),
         cascade.clone(),
@@ -575,7 +568,6 @@ async fn validate_op_inner(
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     if let Some(dpki) = dpki {
-        let dpki = dpki.lock().await;
         // Don't run DPKI agent validity checks on the DPKI service itself
         if dpki.cell_id().dna_hash() != dna_def.as_hash() {
             check_dpki_agent_validity(&*dpki, op.author().clone(), op.timestamp()).await?;
