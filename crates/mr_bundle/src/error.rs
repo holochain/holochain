@@ -28,8 +28,8 @@ pub enum MrBundleError {
     #[error(transparent)]
     MsgpackEncodeError(#[from] rmp_serde::encode::Error),
 
-    #[error(transparent)]
-    MsgpackDecodeError(#[from] rmp_serde::decode::Error),
+    #[error("Failed to decode bundle to [{0}] due to a deserialization error: {1}")]
+    MsgpackDecodeError(String, rmp_serde::decode::Error),
 
     #[error("This bundle failed to validate because: {0}")]
     BundleValidationError(String),
