@@ -1,3 +1,8 @@
+#![deny(missing_docs)]
+//! Holochain websocket support library.
+//! This is currently a thin wrapper around tokio-tungstenite that
+//! provides rpc-style request/responses via u64 message ids.
+
 use holochain_serialized_bytes::prelude::*;
 pub use std::io::{Error, Result};
 use std::sync::Arc;
@@ -36,6 +41,7 @@ pub enum WireMessage {
 }
 
 impl WireMessage {
+    /// Deserialize a WireMessage.
     fn from_bytes(b: Vec<u8>) -> Result<Self> {
         let b = UnsafeBytes::from(b);
         let b = SerializedBytes::from(b);
@@ -43,6 +49,7 @@ impl WireMessage {
         Ok(b)
     }
 
+    /// Create a new request message (with new unique msg id).
     fn request<S>(s: S) -> Result<(Message, u64)>
     where
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -58,6 +65,7 @@ impl WireMessage {
         Ok((Message::Binary(UnsafeBytes::from(s3).into()), id))
     }
 
+    /// Create a new response message.
     fn response<S>(id: u64, s: S) -> Result<Message>
     where
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -71,6 +79,7 @@ impl WireMessage {
         Ok(Message::Binary(UnsafeBytes::from(s3).into()))
     }
 
+    /// Create a new signal message.
     fn signal<S>(s: S) -> Result<Message>
     where
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -99,12 +108,14 @@ pub struct WebsocketConfig {
 }
 
 impl WebsocketConfig {
+    /// The default WebsocketConfig.
     pub const DEFAULT: WebsocketConfig = WebsocketConfig {
         default_request_timeout: std::time::Duration::from_secs(60),
         max_message_size: 64 << 20,
         max_frame_size: 16 << 20,
     };
 
+    /// Internal convert to tungstenite config.
     pub(crate) fn to_tungstenite(
         self,
     ) -> tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
@@ -174,10 +185,14 @@ impl PartialEq for WsCoreSync {
 }
 
 impl WsCoreSync {
+    fn close(&self) {
+        self.0.lock().unwrap().take();
+    }
+
     fn close_if_err<R>(&self, r: Result<R>) -> Result<R> {
         match r {
             Err(err) => {
-                self.0.lock().unwrap().take();
+                self.close();
                 Err(err)
             }
             Ok(res) => Ok(res),
@@ -248,7 +263,16 @@ where
 }
 
 /// Receive signals and requests from a websocket connection.
+/// Note, This receiver must be polled (recv()) for responses to requests
+/// made on the Sender side to be received.
+/// If this receiver is dropped, the sender side will also be closed.
 pub struct WebsocketReceiver(WsCoreSync, std::net::SocketAddr);
+
+impl Drop for WebsocketReceiver {
+    fn drop(&mut self) {
+        self.0.close();
+    }
+}
 
 impl WebsocketReceiver {
     /// Peer address.
@@ -331,11 +355,15 @@ impl WebsocketReceiver {
 }
 
 /// Send requests and signals to the remote end of this websocket connection.
+/// Note, This receiver side must be polled (recv()) for responses to requests
+/// made on this sender to be received.
 #[derive(Clone)]
 pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 
 impl WebsocketSender {
     /// Make a request of the remote using the default configured timeout.
+    /// Note, This receiver side must be polled (recv()) for responses to
+    /// requests made on this sender to be received.
     pub async fn request<S, R>(&self, s: S) -> Result<R>
     where
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
@@ -356,6 +384,7 @@ impl WebsocketSender {
 
         let (s, id) = WireMessage::request(s)?;
 
+        /// Drop helper to remove our response callback if we timeout.
         struct D(RMap, u64);
 
         impl Drop for D {
@@ -369,10 +398,14 @@ impl WebsocketSender {
         let _drop = self
             .0
             .exec(move |_, core| async move {
+                // create the drop helper
                 let drop = D(core.rmap.clone(), id);
+
+                // register the response callback
                 core.rmap.insert(id, resp_s);
 
                 tokio::time::timeout_at(timeout_at, async move {
+                    // send the actual message
                     core.send.lock().await.send(s).await.map_err(Error::other)?;
 
                     Ok(drop)
@@ -382,9 +415,15 @@ impl WebsocketSender {
             })
             .await?;
 
+        // do the remainder outside the 'exec' because we don't actually
+        // want to close the connection down if an individual response is
+        // not returned... that is separate from the connection no longer
+        // being viable. (but we still want it to timeout at the same point)
         tokio::time::timeout_at(timeout_at, async {
+            // await the response
             let resp = resp_r.await.map_err(|_| Error::other("ResponderDropped"))?;
 
+            // decode the response
             decode(&Vec::from(UnsafeBytes::from(resp))).map_err(Error::other)
         })
         .await
@@ -426,6 +465,11 @@ fn split(
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
     let (sink, stream) = futures::stream::StreamExt::split(stream);
 
+    // Q: Why do we split the parts only to seemingly put them back together?
+    // A: They are in separate tokio mutexes, so we can still receive
+    //    and send at the same time in separate tasks, but being in the same
+    //    WsCore(Sync) lets us close them both at the same time if either
+    //    one errors.
     let core = WsCore {
         send: Arc::new(tokio::sync::Mutex::new(sink)),
         recv: Arc::new(tokio::sync::Mutex::new(stream)),

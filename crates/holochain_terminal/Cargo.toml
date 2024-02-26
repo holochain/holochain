@@ -24,3 +24,4 @@ holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
 holochain_conductor_api = { version = "^0.3.0-beta-dev.36", path = "../holochain_conductor_api" }
 holochain_websocket = { version = "^0.3.0-beta-dev.13", path = "../holochain_websocket" }
 holochain_types = { version = "^0.3.0-beta-dev.33", path = "../holochain_types" }
+tokio = { workspace = true }

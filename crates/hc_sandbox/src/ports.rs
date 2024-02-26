@@ -8,8 +8,6 @@ use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
 use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
-use url2::prelude::*;
-use ws::WebsocketResult;
 
 use crate::config::read_config;
 use crate::config::write_config;
@@ -46,17 +44,17 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     Ok(ports)
 }
 
-pub(crate) async fn get_admin_api(port: u16) -> WebsocketResult<WebsocketSender> {
+pub(crate) async fn get_admin_api(port: u16) -> std::io::Result<WebsocketSender> {
     tracing::debug!(port);
     websocket_client_by_port(port).await.map(|p| p.0)
 }
 
 async fn websocket_client_by_port(
     port: u16,
-) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+) -> std::io::Result<(WebsocketSender, WebsocketReceiver)> {
     ws::connect(
-        url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
+        ([127, 0, 0, 1], port).into(),
     )
     .await
 }

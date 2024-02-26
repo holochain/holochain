@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
-use url2::url2;
 use which::which;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
@@ -58,17 +57,26 @@ async fn new_websocket_client_for_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
-        url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
+        ([127, 0, 0, 1], port).into(),
     )
     .await?)
 }
 
 async fn get_app_info(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = new_websocket_client_for_port(port)
+    let (app_tx, mut rx) = new_websocket_client_for_port(port)
         .await
         .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
+    struct D(tokio::task::JoinHandle<()>);
+    impl Drop for D {
+        fn drop(&mut self) {
+            self.0.abort();
+        }
+    }
+    let _d = D(tokio::task::spawn(async move {
+        while rx.recv::<AppResponse>().await.is_ok() {}
+    }));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };
@@ -77,7 +85,7 @@ async fn get_app_info(port: u16) {
     assert_matches!(r, AppResponse::AppInfo(None));
 }
 
-async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::WebsocketError>>) -> T {
+async fn check_timeout<T>(response: impl Future<Output = std::io::Result<T>>) -> T {
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
