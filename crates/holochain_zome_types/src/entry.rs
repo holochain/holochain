@@ -67,13 +67,9 @@ impl GetOptions {
             strategy: GetStrategy::Latest,
         }
     }
-    /// Gets the content based on the locally cached metadata.
-    /// If the entry is cached in one of the local DBs, it will be returned
-    /// without a network call.
-    ///
-    /// Otherwise will fall back to the network if the content
-    /// is not found locally.
-    pub fn content() -> Self {
+    /// Gets the action/entry and its metadata from local databases only.
+    /// No network call is made.
+    pub fn local() -> Self {
         Self {
             strategy: GetStrategy::Local,
         }

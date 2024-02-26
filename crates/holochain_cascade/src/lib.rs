@@ -1096,7 +1096,7 @@ where
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::content(),
+                        GetOptions::local(),
                     )
                     .await?
                     .into_iter()
@@ -1119,7 +1119,7 @@ where
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::content(),
+                        GetOptions::local(),
                     )
                     .await?
                     .into_iter()

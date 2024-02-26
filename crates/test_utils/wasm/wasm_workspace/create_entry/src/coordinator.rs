@@ -70,7 +70,7 @@ fn delete_post(post_hash: ActionHash) -> ExternResult<ActionHash> {
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<Option<Record>> {
-    get(hash_entry(&post())?, GetOptions::content())
+    get(hash_entry(&post())?, GetOptions::local())
 }
 
 #[hdk_extern]
@@ -79,7 +79,7 @@ fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Record>>> {
         h.borrow().get(vec![
             GetInput::new(
                 hash_entry(&post())?.into(),
-                GetOptions::content()
+                GetOptions::local()
             );
             2
         ])
@@ -88,7 +88,7 @@ fn get_entry_twice(_: ()) -> ExternResult<Vec<Option<Record>>> {
 
 #[hdk_extern]
 fn get_post(hash: ActionHash) -> ExternResult<Option<Record>> {
-    get(hash, GetOptions::content())
+    get(hash, GetOptions::local())
 }
 
 #[hdk_extern]

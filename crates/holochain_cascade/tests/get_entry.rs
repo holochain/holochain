@@ -326,7 +326,7 @@ async fn content_not_authority_or_authoring() {
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::content()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::local()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -364,7 +364,7 @@ async fn content_authoring() {
         .with_scratch(scratch.into_sync())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::content()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::local()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -390,7 +390,7 @@ async fn content_authority() {
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
-    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::content()).await;
+    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::local()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
