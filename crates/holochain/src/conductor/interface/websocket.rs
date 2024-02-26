@@ -17,6 +17,12 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::*;
 
+/// Concurrency count for websocket message processing.
+/// This could represent a significant memory investment for
+/// e.g. app installations, but we also need enough buffer
+/// to accomodate interdependent operations.
+const CONCURRENCY_COUNT: usize = 128;
+
 // TODO: This is arbitrary, choose reasonable size.
 /// Number of signals in buffer before applying
 /// back pressure.
@@ -41,6 +47,7 @@ pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketLis
 struct TaskList(pub Vec<JoinHandle<()>>);
 impl Drop for TaskList {
     fn drop(&mut self) {
+        debug!("TaskList Dropped!");
         for h in self.0.iter() {
             h.abort();
         }
@@ -153,7 +160,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
         });
 
     rx_from_iface
-        .for_each_concurrent(4096, move |msg| {
+        .for_each_concurrent(CONCURRENCY_COUNT, move |msg| {
             let api = api.clone();
             async move {
                 if let Err(e) = handle_incoming_message(msg, api.clone()).await {
@@ -189,7 +196,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     task_list
         .0
         .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
-            4096,
+            CONCURRENCY_COUNT,
             move |signal| {
                 let tx_to_iface = tx_to_iface.clone();
                 async move {
@@ -220,7 +227,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     task_list
         .0
         .push(tokio::task::spawn(rx_from_iface.for_each_concurrent(
-            4096,
+            CONCURRENCY_COUNT,
             move |msg| {
                 let api = api.clone();
                 async move {
@@ -251,6 +258,7 @@ where
             // Have to jump through some hoops, because our response type
             // only implements try_into, but the responder needs try_from.
             let result = result.try_into();
+            #[derive(Debug)]
             struct Cnv(Result<SerializedBytes, SerializedBytesError>);
             impl std::convert::TryFrom<Cnv> for SerializedBytes {
                 type Error = SerializedBytesError;

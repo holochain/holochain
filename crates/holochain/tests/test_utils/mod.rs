@@ -69,10 +69,11 @@ pub async fn start_holochain(
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
+    let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
     cmd.arg("--structured")
         .arg("--config-path")
         .arg(config_path)
-        .env("RUST_LOG", "trace")
+        .env("RUST_LOG", rust_log)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -292,7 +293,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stdout) = stdout {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                trace!("holochain bin stdout: {}", &line);
+                println!("holochain bin stdout: {}", &line);
                 tx = tx
                     .take()
                     .and_then(|tx| match check_line_for_admin_port(&line) {
@@ -309,7 +310,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stderr) = stderr {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                trace!("holochain bin stderr: {}", &line);
+                eprintln!("holochain bin stderr: {}", &line);
             }
         }
     });

@@ -231,8 +231,10 @@ impl WebsocketRespond {
     /// Respond to an incoming request.
     pub async fn respond<S>(self, s: S) -> Result<()>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
+        tracing::trace!(?s, %self.id, "OutResponse");
         use futures::sink::SinkExt;
         self.core
             .exec(move |_, core| async move {
@@ -327,12 +329,14 @@ impl WebsocketReceiver {
                             let data: D = SerializedBytes::from(UnsafeBytes::from(data))
                                 .try_into()
                                 .map_err(Error::other)?;
+                            tracing::trace!(?data, %id, "InRequest");
                             Ok(Some(ReceiveMessage::Request(data, resp)))
                         }
                         WireMessage::Response { id, data } => {
                             if let Some(sender) = core.rmap.remove(id) {
                                 if let Some(data) = data {
                                     let data = SerializedBytes::from(UnsafeBytes::from(data));
+                                    tracing::trace!(%id, ?data, "InResponse");
                                     let _ = sender.send(data);
                                 }
                             }
@@ -342,6 +346,7 @@ impl WebsocketReceiver {
                             let data: D = SerializedBytes::from(UnsafeBytes::from(data))
                                 .try_into()
                                 .map_err(Error::other)?;
+                            tracing::trace!(?data, "InSignal");
                             Ok(Some(ReceiveMessage::Signal(data)))
                         }
                     }
@@ -366,6 +371,7 @@ impl WebsocketSender {
     /// requests made on this sender to be received.
     pub async fn request<S, R>(&self, s: S) -> Result<R>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
         R: serde::de::DeserializeOwned + std::fmt::Debug,
     {
@@ -375,6 +381,7 @@ impl WebsocketSender {
     /// Make a request of the remote.
     pub async fn request_timeout<S, R>(&self, s: S, timeout: std::time::Duration) -> Result<R>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
         R: serde::de::DeserializeOwned + std::fmt::Debug,
     {
@@ -382,7 +389,9 @@ impl WebsocketSender {
 
         use futures::sink::SinkExt;
 
+        tracing::trace!(?s, "OutRequest");
         let (s, id) = WireMessage::request(s)?;
+        tracing::trace!(%id, "OUtRequest");
 
         /// Drop helper to remove our response callback if we timeout.
         struct D(RMap, u64);
@@ -424,7 +433,9 @@ impl WebsocketSender {
             let resp = resp_r.await.map_err(|_| Error::other("ResponderDropped"))?;
 
             // decode the response
-            decode(&Vec::from(UnsafeBytes::from(resp))).map_err(Error::other)
+            let res = decode(&Vec::from(UnsafeBytes::from(resp))).map_err(Error::other)?;
+            tracing::trace!(?res, %id, "OutRequestResponse");
+            Ok(res)
         })
         .await
         .map_err(Error::other)?

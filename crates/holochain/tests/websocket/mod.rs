@@ -9,7 +9,7 @@ use holochain::sweettest::SweetDnaFile;
 use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
-        api::{AdminRequest, AdminResponse},
+        api::{AdminRequest, AdminResponse, AppResponse},
         error::ConductorError,
         Conductor,
     },
@@ -29,6 +29,26 @@ use tempfile::TempDir;
 use tracing::*;
 
 use crate::test_utils::*;
+
+struct PollRecv(tokio::task::JoinHandle<()>);
+
+impl Drop for PollRecv {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+impl PollRecv {
+    pub fn new<D>(mut rx: WebsocketReceiver) -> Self
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
+        Self(tokio::task::spawn(async move {
+            while rx.recv::<D>().await.is_ok() {}
+        }))
+    }
+}
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
@@ -54,7 +74,8 @@ async fn call_admin() {
     let (_holochain, port) = start_holochain(config_path.clone()).await;
     let port = port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+    let (mut client, rx) = websocket_client_by_port(port).await.unwrap();
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let original_dna_hash = dna.dna_hash().clone();
 
@@ -119,7 +140,8 @@ async fn call_zome() {
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
     let (_, mut receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
@@ -181,7 +203,8 @@ async fn call_zome() {
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
 
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = PollRecv::new::<AppResponse>(app_rx);
 
     // Call Zome
     tracing::info!("Calling zome");
@@ -216,7 +239,8 @@ async fn call_zome() {
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -228,7 +252,8 @@ async fn call_zome() {
         _ => panic!("Unexpected response"),
     };
 
-    let (app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = PollRecv::new::<AppResponse>(app_rx);
 
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
@@ -330,7 +355,8 @@ async fn emit_signals() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _admin_rx = PollRecv::new::<AdminResponse>(admin_rx);
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -387,7 +413,36 @@ async fn emit_signals() {
     // Emit signals (the real test!)
 
     let (app_tx_1, mut app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
+    let (sig1_send, sig1_recv) = tokio::sync::oneshot::channel();
+    let mut sig1_send = Some(sig1_send);
+    let sig1_task = tokio::task::spawn(async move {
+        loop {
+            match app_rx_1.recv().await {
+                Ok(ReceiveMessage::Signal(sig1)) => {
+                    if let Some(sig1_send) = sig1_send.take() {
+                        let _ = sig1_send.send(sig1);
+                    }
+                }
+                oth => panic!("unexpected: {oth:?}"),
+            }
+        }
+    });
+
     let (_, mut app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (sig2_send, sig2_recv) = tokio::sync::oneshot::channel();
+    let mut sig2_send = Some(sig2_send);
+    let sig2_task = tokio::task::spawn(async move {
+        loop {
+            match app_rx_2.recv().await {
+                Ok(ReceiveMessage::Signal(sig2)) => {
+                    if let Some(sig2_send) = sig2_send.take() {
+                        let _ = sig2_send.send(sig2);
+                    }
+                }
+                oth => panic!("unexpected: {oth:?}"),
+            }
+        }
+    });
 
     call_zome_fn(
         &app_tx_1,
@@ -400,15 +455,10 @@ async fn emit_signals() {
     )
     .await;
 
-    let sig1 = match app_rx_1.recv().await {
-        Ok(ReceiveMessage::Signal(sig1)) => sig1,
-        oth => panic!("unexpected: {oth:?}"),
-    };
-
-    let sig2 = match app_rx_2.recv().await {
-        Ok(ReceiveMessage::Signal(sig2)) => sig2,
-        oth => panic!("unexpected: {oth:?}"),
-    };
+    let sig1 = sig1_recv.await.unwrap();
+    let sig2 = sig2_recv.await.unwrap();
+    sig1_task.abort();
+    sig2_task.abort();
 
     assert_eq!(
         Signal::App {
