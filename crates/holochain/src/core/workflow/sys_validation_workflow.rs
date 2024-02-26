@@ -569,7 +569,7 @@ async fn validate_op_inner(
     check_entry_visibility(op)?;
     if let Some(dpki) = dpki {
         // Don't run DPKI agent validity checks on the DPKI service itself
-        if dpki.cell_id().dna_hash() != dna_def.as_hash() {
+        if dpki.should_run(dna_def.as_hash()) {
             check_dpki_agent_validity(&*dpki, op.author().clone(), op.timestamp()).await?;
         }
     }

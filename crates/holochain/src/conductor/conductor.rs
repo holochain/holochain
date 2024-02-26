@@ -256,8 +256,6 @@ impl Conductor {
 mod startup_shutdown_impls {
     use std::ops::Deref;
 
-    use kitsune_p2p_types::box_fut_plain;
-
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
     use super::*;
@@ -1423,6 +1421,7 @@ mod app_impls {
 
             // dbg!(Timestamp::now());
             let cells_to_create = ops.cells_to_create();
+            dbg!(&cells_to_create);
 
             // check if cells_to_create contains a cell identical to an existing one
             let state = self.get_state().await?;
@@ -2606,15 +2605,14 @@ mod accessor_impls {
 
         /// Construct the DnaCompatParams given the current setup
         pub async fn get_dna_compat(&self) -> DnaCompatParams {
-            let f = self
+            let dpki_hash = self
                 .running_services()
                 .dpki
                 .clone()
-                .map(|c| async move { c.cell_id().dna_hash().clone().into() })
-                .transpose();
+                .map(|c| DnaHash::from_raw_32(c.uuid().into()).into());
             DnaCompatParams {
                 protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
-                dpki_hash: f.await,
+                dpki_hash,
             }
         }
 

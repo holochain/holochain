@@ -46,6 +46,19 @@ impl DeepkeyBuiltin {
 #[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
 impl DpkiService for DeepkeyBuiltin {
+    fn uuid(&self) -> [u8; 32] {
+        self.installation
+            .cell_id
+            .dna_hash()
+            .get_raw_32()
+            .try_into()
+            .unwrap()
+    }
+
+    fn dpki_agent(&self) -> AgentPubKey {
+        self.installation.cell_id.agent_pubkey().clone()
+    }
+
     async fn key_state(
         &self,
         key: AgentPubKey,
@@ -119,7 +132,7 @@ impl DpkiService for DeepkeyBuiltin {
             .map_err(|e| DpkiServiceError::Lair(e.into()))?;
         let app_agent = AgentPubKey::from_raw_32(info.ed25519_pub_key.0.to_vec());
 
-        let dpki_agent = self.cell_id().agent_pubkey().clone();
+        let dpki_agent = self.dpki_agent();
         // dbg!(Timestamp::now());
         // This is the signature Deepkey requires
         let signature = app_agent
@@ -173,8 +186,62 @@ impl DpkiService for DeepkeyBuiltin {
         // dbg!(Timestamp::now());
         Ok(app_agent)
     }
+}
 
-    fn cell_id(&self) -> &CellId {
-        &self.installation.cell_id
+pub struct DeepkeyRunner {
+    runner: Box<dyn CellRunner>,
+    cell_id: CellId,
+}
+
+#[async_trait::async_trait]
+impl DpkiDerivation for DeepkeyRunner {
+    async fn next_derivation_details(
+        &self,
+        app_name: InstalledAppId,
+    ) -> DpkiServiceResult<DerivationDetailsInput> {
+        let cell_id = self.cell_id.clone();
+        let provenance = cell_id.agent_pubkey().clone();
+        let zome_name: ZomeName = "deepkey_csr".into();
+        let fn_name: FunctionName = "next_derivation_details".into();
+        let payload = ExternIO::encode(app_name.clone())?;
+        let cap_secret = None;
+        self.runner
+            .call_zome(
+                &provenance,
+                cap_secret,
+                cell_id,
+                zome_name,
+                fn_name,
+                payload,
+            )
+            .await
+            .map_err(DpkiServiceError::ZomeCallFailed)?
+            .decode()
+            .map_err(Into::into)
+    }
+
+    async fn create_key(
+        &self,
+        input: CreateKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)> {
+        let cell_id = self.cell_id.clone();
+        let provenance = cell_id.agent_pubkey().clone();
+        let zome_name: ZomeName = "deepkey_csr".into();
+        let fn_name: FunctionName = "create_key".into();
+        let payload = ExternIO::encode(input)?;
+        let cap_secret = None;
+        self.runner
+            .call_zome(
+                &provenance,
+                cap_secret,
+                cell_id,
+                zome_name,
+                fn_name,
+                payload,
+            )
+            .await
+            .map_err(DpkiServiceError::ZomeCallFailed)?
+            .decode()
+            .map_err(Into::into)
     }
 }

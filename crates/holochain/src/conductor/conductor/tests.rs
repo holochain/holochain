@@ -23,6 +23,8 @@ use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
+mod test_dpki;
+
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();

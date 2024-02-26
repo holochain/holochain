@@ -117,12 +117,10 @@ where
     // Don't proceed if DPKI is initialized and the agent key is not valid
     if let Some(dpki) = api.conductor_services().dpki.as_ref() {
         // When running genesis on DPKI itself, don't check the agent key
-        let is_dpki = dpki.cell_id().dna_hash() == dna_file.dna_hash();
-        if !is_dpki {
+        if dpki.should_run(dna_file.dna_hash()) {
             let now = Timestamp::now();
-
             let is_valid = dpki.key_state(agent_pubkey.clone(), now).await?.is_valid();
-            if !is_dpki && !is_valid {
+            if !is_valid {
                 return Err(SysValidationError::ValidationOutcome(
                     ValidationOutcome::DpkiAgentInvalid(agent_pubkey.clone(), now).into(),
                 )
@@ -189,8 +187,10 @@ mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApiT;
-    use crate::conductor::conductor::{mock_app_store, mock_dpki, ConductorServices};
+    use crate::conductor::conductor::{mock_app_store, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
+    use futures::FutureExt;
+    use holochain_conductor_services::{KeyState, MockDpkiService};
     use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
@@ -211,13 +211,21 @@ mod tests {
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
+        let mut mock_dpki = MockDpkiService::new();
+        let action = ::fixt::fixt!(SignedActionHashed);
+        mock_dpki.expect_key_state().returning(move |_, _| {
+            let action = action.clone();
+            async move { Ok(KeyState::Valid(action)) }.boxed()
+        });
+        mock_dpki.expect_should_run().returning(|_| true);
+
         {
             let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
 
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()
                 .return_const(ConductorServices {
-                    dpki: Some(Arc::new(mock_dpki())),
+                    dpki: Some(Arc::new(mock_dpki)),
                     app_store: Some(Arc::new(mock_app_store())),
                 });
             api.expect_keystore().return_const(keystore.clone());

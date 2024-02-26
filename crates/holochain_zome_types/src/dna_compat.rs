@@ -31,6 +31,11 @@ pub struct DnaCompatParams {
     /// with a DPKI service installed on the same network, but not vice versa,
     /// so we still ensure that both cases result in a different DNA hash so that we don't have
     /// to consider that kind of one-way communication.
+    ///
+    /// Because the default implementation of DPKI is via a DNA (Deepkey), we specify
+    /// compatibility in terms of a DNA hash. The actual implementation of a DPKI service
+    /// uses a 32-byte UUID via [`DpkiService::uuid`], and in general a DPKI service may not
+    /// make use a Holochain DNA at all, but we still convert that UUID to a DNA hash.
     pub dpki_hash: Option<DnaHashB64>,
 }
 

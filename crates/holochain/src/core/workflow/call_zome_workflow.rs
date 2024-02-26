@@ -261,8 +261,7 @@ where
 
     if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
         // Don't check DPKI validity on DPKI itself!
-        let is_dpki = *dpki.cell_id().dna_hash() == DnaHash::with_data_sync(&*workspace.dna_def());
-        if !is_dpki {
+        if dpki.should_run(&DnaHash::with_data_sync(&*workspace.dna_def())) {
             // Check the validity of the author as-at the first and the last record to be committed.
             // If these are valid, then the author is valid for the entire commit.
             let author = workspace.source_chain().agent_pubkey().clone();

@@ -25,6 +25,18 @@ pub type DpkiMutex = Arc<dyn DpkiService>;
 #[mockall::automock]
 #[allow(clippy::needless_lifetimes)]
 pub trait DpkiService: Send + Sync {
+    fn uuid(&self) -> [u8; 32];
+
+    fn dpki_agent(&self) -> AgentPubKey;
+
+    /// Allows the DPKI service to determine if it should run for a given DNA.
+    ///
+    /// This is primarily to allow a DNA-backed DPKI service to not run on itself
+    /// while it is being installed, which leads to deadlock.
+    fn should_run(&self, dna_hash: &DnaHash) -> bool {
+        dna_hash.get_raw_32() != &self.uuid()
+    }
+
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
     async fn key_state(
         &self,
@@ -38,9 +50,20 @@ pub trait DpkiService: Send + Sync {
         app_name: InstalledAppId,
         dna_hashes: Vec<DnaHash>,
     ) -> DpkiServiceResult<AgentPubKey>;
+}
 
-    /// The CellId which backs this service
-    fn cell_id(&self) -> &CellId;
+#[async_trait::async_trait]
+#[mockall::automock]
+pub trait DpkiDerivation: Send + Sync {
+    async fn next_derivation_details(
+        &self,
+        app_name: InstalledAppId,
+    ) -> DpkiServiceResult<DerivationDetailsInput>;
+
+    async fn create_key(
+        &self,
+        input: CreateKeyInput,
+    ) -> DpkiServiceResult<(ActionHash, KeyRegistration, KeyMeta)>;
 }
 
 #[async_trait::async_trait]
@@ -60,20 +83,3 @@ pub enum DpkiServiceError {
 }
 /// Alias
 pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
-
-/// Create a minimal usable mock of DPKI
-#[cfg(feature = "fuzzing")]
-pub fn mock_dpki() -> MockDpkiService {
-    use arbitrary::Arbitrary;
-    use futures::FutureExt;
-
-    let mut dpki = MockDpkiService::new();
-    let mut u = unstructured_noise();
-    let action = SignedActionHashed::arbitrary(&mut u).unwrap();
-    dpki.expect_key_state().returning(move |_, _| {
-        let action = action.clone();
-        async move { Ok(KeyState::Valid(action)) }.boxed()
-    });
-    dpki.expect_cell_id().return_const(fake_cell_id(0));
-    dpki
-}
