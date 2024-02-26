@@ -57,6 +57,9 @@
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
         passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
+
+        # CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+        # CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
       });
 
       holochain_chc = holochain.override { cargoExtraArgs = " --features chc"; };
@@ -214,6 +217,7 @@
           inherit
             holochain
             holochain_chc
+            # holochain_portable
 
             build-holochain-tests-unit
             build-holochain-tests-unit-wasm

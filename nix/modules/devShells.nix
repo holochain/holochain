@@ -163,6 +163,7 @@
 
           packages = (lib.lists.optionals pkgs.stdenv.isLinux [
             pkgs.mold
+            # pkgs.musl
             pkgs.pkgsStatic.openssl
           ]);
 
@@ -182,6 +183,7 @@
           '')
           + (lib.strings.optionalString pkgs.stdenv.isLinux ''
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="$CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -Clink-arg=-fuse-ld=mold"
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="$CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS -Clink-arg=-fuse-ld=mold"
           '')
           ;
         };
@@ -198,6 +200,18 @@
                 pkgs.llvmPackages.bintools
               ];
             };
+
+        musl = pkgs.mkShell {
+          inputsFrom = [
+            self'.packages.holochain_portable
+          ];
+
+          packages = [ pkgs.musl pkgs.mold ];
+          shellHook = ''
+            export PS1='\n\[\033[1;34m\][musl:\w]\$\[\033[0m\] '
+            echo Musl development shell spawned. Type 'exit' to leave.
+          '';
+        };
       };
     };
 }

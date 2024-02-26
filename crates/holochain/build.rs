@@ -121,4 +121,7 @@ mod version_info {
 
 fn main() {
     version_info::populate_env();
+
+    let env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap();
+    println!("cargo:warning=The env is {:?}", env);
 }

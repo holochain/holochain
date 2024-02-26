@@ -72,6 +72,7 @@
   outputs = inputs @ { self, nixpkgs, flake-parts, ... }:
     # all possible parameters for a module: https://flake.parts/module-arguments.html#top-level-module-arguments
     flake-parts.lib.mkFlake { inherit inputs; } {
+      debug = true;
       systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" "aarch64-linux" ];
 
       imports =

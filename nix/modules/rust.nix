@@ -34,6 +34,7 @@
 
         defaultTargets = [
           "wasm32-unknown-unknown"
+          # "x86_64-unknown-linux-musl"
         ];
 
         defaultStdenv = pkgs:

@@ -51,5 +51,5 @@
       });
 
     in
-    { packages = { lair-keystore = package; }; };
+    { packages = { lair-keystore = package; my_jq = pkgs.jq; }; };
 }

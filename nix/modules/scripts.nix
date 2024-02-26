@@ -170,7 +170,33 @@
             cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
           '';
         };
-    };
 
+      scripts-create-generic-linux-binaries =
+        pkgs.writeShellApplication {
+          name = "scripts-create-generic-linux-binaries";
+          runtimeInputs = [
+            pkgs.patchelf
+          ];
+          text = ''
+            set -xeu -o pipefail
+
+            function patch_binary() {
+              local binary=$1
+              nix run nixpkgs#patchelf -- --set-interpreter /lib64/ld-linux-x86-64.so.2 --output "$binary"-linux-x86_64 "$(which "$binary")"
+            }
+
+            which patchelf
+
+            # patch_binary holochain
+            # patch_binary hc
+            # patch_binary hc-sandbox
+            # patch_binary hc-app
+            # patch_binary hc-dna
+            # patch_binary hc-web-app
+            # patch_binary hc-run-local-services
+            # patch_binary hcterm
+          '';
+        };
+    };
   };
 }

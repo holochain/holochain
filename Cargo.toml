@@ -116,10 +116,10 @@ lto = true
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }
 # tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
-# tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
+tx5 = { git = "https://github.com/holochain/tx5.git", rev = "989ac62d3967133814d89e2b1b4afa2c967776dc" }
+tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "989ac62d3967133814d89e2b1b4afa2c967776dc" }
+tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "989ac62d3967133814d89e2b1b4afa2c967776dc" }
+tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "989ac62d3967133814d89e2b1b4afa2c967776dc" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
