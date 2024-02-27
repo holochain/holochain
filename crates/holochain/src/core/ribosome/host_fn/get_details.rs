@@ -227,6 +227,16 @@ pub mod slow_tests {
         // alice creates an entry
         let zome_alice = apps[0].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());
         let entry_action_hash: ActionHash = conductors[0].call(&zome_alice, "new", ()).await;
+        let local_entries_with_details: Vec<Option<Details>> = conductors[0]
+            .call(
+                &zome_alice,
+                "action_details",
+                vec![entry_action_hash.clone()],
+            )
+            .await;
+        // alice can get details of the entry
+        assert_eq!(local_entries_with_details.len(), 1);
+        assert!(local_entries_with_details[0].is_some());
 
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;
@@ -234,7 +244,7 @@ pub mod slow_tests {
         // bob gets details by action hash from local databases
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());
         let local_entries_with_details: Vec<Option<Details>> = conductors[1]
-            .call(&zome_bob, "action_details", vec![entry_action_hash.clone()])
+            .call(&zome_bob, "action_details", vec![entry_action_hash])
             .await;
         // entry should be none
         assert_eq!(local_entries_with_details.len(), 1);

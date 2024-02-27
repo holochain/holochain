@@ -101,6 +101,11 @@ pub mod slow_tests {
         let zome_alice = apps[0].cells()[0].zome(TestWasm::Create.coordinator_zome_name());
         let entry_action_hash: ActionHash =
             conductors[0].call(&zome_alice, "create_entry", ()).await;
+        let local_record_by_action_hash: Option<Record> = conductors[0]
+            .call(&zome_alice, "get_post", entry_action_hash.clone())
+            .await;
+        // alice can get the record
+        assert!(local_record_by_action_hash.is_some());
 
         // now make both agents aware of each other
         conductors.exchange_peer_info().await;

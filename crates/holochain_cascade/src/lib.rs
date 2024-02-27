@@ -696,8 +696,7 @@ where
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
         if let GetStrategy::Local = options.strategy {
             // Only return what is in the database.
-            let results = self.cascading(query.clone()).await?;
-            return Ok(results);
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
@@ -709,8 +708,7 @@ where
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Get the specified Record along with all Updates and Deletes associated with it.
@@ -731,8 +729,7 @@ where
 
         if let GetStrategy::Local = options.strategy {
             // Only return what is in the database.
-            let results = self.cascading(query.clone()).await?;
-            return self.cascading(query.clone()).await
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
@@ -745,8 +742,7 @@ where
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, options))]
@@ -767,8 +763,7 @@ where
 
         if let GetStrategy::Local = options.strategy {
             // Only return what is in the database.
-            let results = self.cascading(query.clone()).await?;
-            return Ok(results);
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
@@ -781,8 +776,7 @@ where
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, options))]
@@ -797,8 +791,7 @@ where
 
         if let GetStrategy::Local = options.strategy {
             // Only return what is in the database.
-            let results = self.cascading(query.clone()).await?;
-            return Ok(results);
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
@@ -810,8 +803,7 @@ where
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
@@ -900,8 +892,7 @@ where
             },
         );
 
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, key, options))]
@@ -921,8 +912,7 @@ where
             }
         }
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Count the number of links matching the `query`.
@@ -1153,7 +1143,6 @@ where
 
     async fn am_i_an_authority(&self, hash: OpBasis) -> CascadeResult<bool> {
         let network = some_or_return!(self.network.as_ref(), false);
-
         Ok(network.authority_for_hash(hash).await?)
     }
 
