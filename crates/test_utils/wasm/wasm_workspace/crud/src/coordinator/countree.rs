@@ -21,7 +21,7 @@ impl CounTree {
     /// commits if not exists else returns found action
     /// produces redundant actions in a partition
     pub fn ensure(countree: CounTree) -> ExternResult<ActionHash> {
-        match get(hash_entry(&countree)?, GetOptions::latest())? {
+        match get(hash_entry(&countree)?, GetOptions::network())? {
             Some(record) => Ok(record.action_address().to_owned()),
             None => create_entry(&IntegrityCrud(EntryTypes::Countree(countree))),
         }
@@ -32,7 +32,7 @@ impl CounTree {
             h.borrow().get_details(
                 action_hashes
                     .into_iter()
-                    .map(|action_hash| GetInput::new(action_hash.into(), GetOptions::latest()))
+                    .map(|action_hash| GetInput::new(action_hash.into(), GetOptions::network()))
                     .collect(),
             )
         })
@@ -44,7 +44,7 @@ impl CounTree {
             h.borrow().get_details(
                 entry_hashes
                     .into_iter()
-                    .map(|entry_hash| GetInput::new(entry_hash.into(), GetOptions::latest()))
+                    .map(|entry_hash| GetInput::new(entry_hash.into(), GetOptions::network()))
                     .collect(),
             )
         })
@@ -74,7 +74,7 @@ impl CounTree {
     /// increments the given action hash by 1 or creates it if not found
     /// this is silly as being offline resets the counter >.<
     pub fn incsert(action_hash: ActionHash) -> ExternResult<ActionHash> {
-        let current: CounTree = match get(action_hash.clone(), GetOptions::latest())? {
+        let current: CounTree = match get(action_hash.clone(), GetOptions::network())? {
             Some(record) => match record.entry().to_app_option().map_err(|e| wasm_error!(e))? {
                 Some(v) => v,
                 None => return Self::new(),

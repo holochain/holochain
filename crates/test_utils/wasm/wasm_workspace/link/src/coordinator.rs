@@ -290,7 +290,7 @@ fn get_link_details_local_only(_: ()) -> ExternResult<LinkDetails> {
 #[hdk_extern]
 fn get_links_from_network(_: ()) -> ExternResult<Vec<Link>> {
     let get_links_input = GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?
-        .get_options(GetStrategy::Latest)
+        .get_options(GetStrategy::Network)
         .build();
     hdk::prelude::get_links(get_links_input)
 }

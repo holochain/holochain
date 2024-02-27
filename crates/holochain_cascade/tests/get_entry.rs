@@ -232,7 +232,7 @@ async fn entry_not_authority_or_authoring() {
     // Cascade
     let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -270,7 +270,7 @@ async fn entry_authoring() {
         .with_scratch(scratch.into_sync())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -298,7 +298,7 @@ async fn entry_authority() {
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -412,7 +412,7 @@ async fn rejected_ops() {
 
     // Cascade
     let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
-    assert_rejected(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_rejected(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -434,7 +434,7 @@ async fn check_can_handle_rejected_ops_in_cache() {
 
     // Cascade
     let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
-    assert_rejected(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_rejected(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -484,16 +484,16 @@ async fn test_pending_data_isnt_returned() {
     // Cascade
     let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
-    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 
-    assert_can_retrieve(&td_entry, &cascade, GetOptions::latest()).await;
+    assert_can_retrieve(&td_entry, &cascade, GetOptions::network()).await;
 
     let network = PassThroughNetwork::authority_for_all(vec![authority.to_db().clone().into()]);
 
     // Cascade
     let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
-    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
+    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 
-    assert_can_retrieve(&td_entry, &cascade, GetOptions::latest()).await;
+    assert_can_retrieve(&td_entry, &cascade, GetOptions::network()).await;
 }

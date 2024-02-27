@@ -16,7 +16,7 @@ fn create(_: ()) -> ExternResult<ActionHash> {
 /// `read` seems to be a reserved worked that causes SIGSEGV invalid memory reference when used as `#[hdk_extern]`
 #[hdk_extern]
 fn reed(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    get(action_hash, GetOptions::latest())
+    get(action_hash, GetOptions::network())
 }
 
 #[hdk_extern]
@@ -67,7 +67,7 @@ pub mod test {
             .expect_get()
             .with(hdk::prelude::mockall::predicate::eq(vec![GetInput::new(
                 input_action_hash.clone().into(),
-                GetOptions::latest(),
+                GetOptions::network(),
             )]))
             .times(1)
             .return_once(move |_| Ok(vec![None]));

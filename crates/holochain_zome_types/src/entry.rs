@@ -57,14 +57,14 @@ pub struct GetOptions {
 }
 
 impl GetOptions {
-    /// Try to fetch latest metadata from the network,
+    /// Fetch latest metadata from the network,
     /// and otherwise fall back to locally cached metadata.
     ///
     /// If the current agent is an authority for this hash, this call will not
     /// go to the network.
-    pub fn latest() -> Self {
+    pub fn network() -> Self {
         Self {
-            strategy: GetStrategy::Latest,
+            strategy: GetStrategy::Network,
         }
     }
     /// Gets the action/entry and its metadata from local databases only.
@@ -78,7 +78,7 @@ impl GetOptions {
 
 impl Default for GetOptions {
     fn default() -> Self {
-        Self::latest()
+        Self::network()
     }
 }
 
@@ -86,11 +86,14 @@ impl Default for GetOptions {
 /// Set if data should be fetched from the network or only from the local
 /// databases.
 pub enum GetStrategy {
-    /// Get the latest action or entry metadata from the network and fall back
-    /// to local databases if none is found.
-    /// Does not go to the network if you are an authority for the action/entry.
-    Latest,
-    /// Get the action or entry from local databases only.
+    /// Fetch latest metadata from the network,
+    /// and otherwise fall back to locally cached metadata.
+    ///
+    /// If the current agent is an authority for this hash, this call will not
+    /// go to the network.
+    Network,
+    /// Gets the action/entry and its metadata from local databases only.
+    /// No network call is made.
     Local,
 }
 
