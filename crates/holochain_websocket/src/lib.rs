@@ -70,6 +70,7 @@ impl WireMessage {
     /// Create a new response message.
     fn response<S>(id: u64, s: S) -> Result<Message>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
@@ -84,8 +85,10 @@ impl WireMessage {
     /// Create a new signal message.
     fn signal<S>(s: S) -> Result<Message>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
+        tracing::trace!(?s, "SendSignal");
         let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
         let s2 = Self::Signal {
             data: UnsafeBytes::from(s1).into(),
@@ -284,7 +287,7 @@ where
     SerializedBytes: TryInto<D, Error = SerializedBytesError>,
 {
     /// Received a signal from the remote.
-    Signal(D),
+    Signal(Vec<u8>),
 
     /// Received a request from the remote.
     Request(D, WebsocketRespond),
@@ -345,6 +348,20 @@ impl WebsocketReceiver {
         D: std::fmt::Debug,
         SerializedBytes: TryInto<D, Error = SerializedBytesError>,
     {
+        match self.recv_inner().await {
+            Err(err) => {
+                tracing::warn!(?err, "WebsocketReceiver Error");
+                Err(err)
+            }
+            Ok(msg) => Ok(msg),
+        }
+    }
+
+    async fn recv_inner<D>(&mut self) -> Result<ReceiveMessage<D>>
+    where
+        D: std::fmt::Debug,
+        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+    {
         use futures::sink::SinkExt;
         use futures::stream::StreamExt;
         loop {
@@ -399,13 +416,7 @@ impl WebsocketReceiver {
                             }
                             Ok(None)
                         }
-                        WireMessage::Signal { data } => {
-                            let data: D = SerializedBytes::from(UnsafeBytes::from(data))
-                                .try_into()
-                                .map_err(Error::other)?;
-                            tracing::trace!(?data, "InSignal");
-                            Ok(Some(ReceiveMessage::Signal(data)))
-                        }
+                        WireMessage::Signal { data } => Ok(Some(ReceiveMessage::Signal(data))),
                     }
                 })
                 .await?
@@ -501,6 +512,7 @@ impl WebsocketSender {
     /// Send a signal to the remote using the default configured timeout.
     pub async fn signal<S>(&self, s: S) -> Result<()>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         self.signal_timeout(s, self.1).await
@@ -509,6 +521,7 @@ impl WebsocketSender {
     /// Send a signal to the remote.
     pub async fn signal_timeout<S>(&self, s: S, timeout: std::time::Duration) -> Result<()>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         use futures::sink::SinkExt;

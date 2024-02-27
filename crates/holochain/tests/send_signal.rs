@@ -3,6 +3,7 @@ use std::sync::Arc;
 use holochain::sweettest::{
     SweetConductor, SweetConductorConfig, SweetDnaFile, SweetLocalRendezvous,
 };
+use holochain_conductor_api::AppResponse;
 use holochain_types::signal::Signal;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketConfig;
@@ -52,19 +53,23 @@ async fn send_signal_after_conductor_restart() {
         .await
         .unwrap();
 
-    let received_signal_1 = app_ws_rx_1.recv().await.unwrap();
-    if let holochain_websocket::ReceiveMessage::Signal(Signal::App {
-        cell_id,
-        zome_name,
-        signal,
-    }) = received_signal_1
-    {
-        assert_eq!(cell_id, alice_cell_id);
-        assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
-        assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+    let received_signal_1 = app_ws_rx_1.recv::<AppResponse>().await.unwrap();
+    if let holochain_websocket::ReceiveMessage::Signal(v) = received_signal_1 {
+        if let Ok(Signal::App {
+            cell_id,
+            zome_name,
+            signal,
+        }) = Signal::from_vec(v)
+        {
+            assert_eq!(cell_id, alice_cell_id);
+            assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
+            assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+        } else {
+            panic!("not the expected app signal");
+        }
     } else {
-        panic!("not the expected app signal")
-    };
+        panic!("not the expected app signal");
+    }
 
     // restart conductor
     conductor.shutdown().await;
@@ -115,17 +120,21 @@ async fn send_signal_after_conductor_restart() {
         .unwrap();
 
     // signal can be received by connected websocket
-    let received_signal_2 = app_ws_rx_1.recv().await.unwrap();
-    if let holochain_websocket::ReceiveMessage::Signal(Signal::App {
-        cell_id,
-        zome_name,
-        signal,
-    }) = received_signal_2
-    {
-        assert_eq!(cell_id, alice_cell_id);
-        assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
-        assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+    let received_signal_2 = app_ws_rx_1.recv::<AppResponse>().await.unwrap();
+    if let holochain_websocket::ReceiveMessage::Signal(v) = received_signal_2 {
+        if let Ok(Signal::App {
+            cell_id,
+            zome_name,
+            signal,
+        }) = Signal::from_vec(v)
+        {
+            assert_eq!(cell_id, alice_cell_id);
+            assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
+            assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+        } else {
+            panic!("not the expected app signal");
+        }
     } else {
-        panic!("not the expected app signal")
-    };
+        panic!("not the expected app signal");
+    }
 }

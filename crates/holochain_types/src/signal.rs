@@ -24,6 +24,13 @@ pub enum Signal {
     System(SystemSignal),
 }
 
+impl Signal {
+    /// Parse from vec.
+    pub fn from_vec(v: Vec<u8>) -> Result<Self, SerializedBytesError> {
+        Self::try_from(SerializedBytes::from(UnsafeBytes::from(v)))
+    }
+}
+
 /// A Signal which originates from within the Holochain system, as opposed to
 /// from within a Cell
 ///

@@ -326,7 +326,10 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::sweettest::app_bundle_from_dnas;
+    use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
@@ -346,7 +349,7 @@ pub mod test {
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -359,6 +362,118 @@ pub mod test {
         let result: A::ApiResponse = api.handle_request(Ok(msg)).await?;
         respond(result);
         Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn signal_in_post_commit() {
+        struct PollRecv(tokio::task::JoinHandle<()>);
+
+        impl Drop for PollRecv {
+            fn drop(&mut self) {
+                self.0.abort();
+            }
+        }
+
+        impl PollRecv {
+            pub fn new<D>(mut rx: WebsocketReceiver) -> Self
+            where
+                D: std::fmt::Debug,
+                SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+            {
+                Self(tokio::task::spawn(async move {
+                    while rx.recv::<D>().await.is_ok() {}
+                }))
+            }
+        }
+
+        holochain_trace::test_run().ok();
+        let db_dir = test_db_dir();
+        let conductor_handle = ConductorBuilder::new()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
+
+        let admin_port = 65000;
+        conductor_handle
+            .clone()
+            .add_admin_interfaces(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket { port: admin_port },
+            }])
+            .await
+            .unwrap();
+
+        let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
+        let _rx = PollRecv::new::<AdminResponse>(rx);
+
+        let agent_key = conductor_handle
+            .keystore()
+            .new_sign_keypair_random()
+            .await
+            .unwrap();
+
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal]).await;
+        let app_bundle = app_bundle_from_dnas([&dna_file]).await;
+        let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
+            source: AppBundleSource::Bundle(app_bundle),
+            agent_key: agent_key.clone(),
+            installed_app_id: None,
+            membrane_proofs: HashMap::new(),
+            network_seed: None,
+        }));
+        let response: AdminResponse = admin_tx.request(request).await.unwrap();
+        let app_info = match response {
+            AdminResponse::AppInstalled(app_info) => app_info,
+            _ => panic!("didn't install app"),
+        };
+        let cell_id = match &app_info
+            .cell_info
+            .get(&dna_file.dna_hash().to_string())
+            .unwrap()[0]
+        {
+            CellInfo::Provisioned(cell) => cell.cell_id.clone(),
+            _ => panic!("emit_signal cell not available"),
+        };
+
+        // Activate cells
+        let request = AdminRequest::EnableApp {
+            installed_app_id: app_info.installed_app_id.clone(),
+        };
+        let response: AdminResponse = admin_tx.request(request).await.unwrap();
+        assert_matches!(response, AdminResponse::AppEnabled { .. });
+
+        // Attach App Interface
+        let request = AdminRequest::AttachAppInterface { port: None };
+        let response: AdminResponse = admin_tx.request(request).await.unwrap();
+        let app_port = match response {
+            AdminResponse::AppInterfaceAttached { port } => port,
+            _ => panic!("app interface couldn't be attached"),
+        };
+
+        let (app_tx, rx) = websocket_client_by_port(app_port).await.unwrap();
+        let _rx = PollRecv::new::<AppResponse>(rx);
+
+        // Call Zome
+        let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
+        let request = AppRequest::CallZome(Box::new(
+            ZomeCall::try_from_unsigned_zome_call(
+                conductor_handle.keystore(),
+                ZomeCallUnsigned {
+                    provenance: agent_key.clone(),
+                    cell_id: cell_id.clone(),
+                    zome_name: TestWasm::EmitSignal.coordinator_zome_name(),
+                    fn_name: "commit_entry_and_emit_signal_post_commit".into(),
+                    cap_secret: None,
+                    payload: ExternIO::encode(()).unwrap(),
+                    nonce,
+                    expires_at,
+                },
+            )
+            .await
+            .unwrap(),
+        ));
+        let _: AppResponse = app_tx.request(request).await.unwrap();
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {

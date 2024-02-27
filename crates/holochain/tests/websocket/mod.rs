@@ -417,7 +417,7 @@ async fn emit_signals() {
     let mut sig1_send = Some(sig1_send);
     let sig1_task = tokio::task::spawn(async move {
         loop {
-            match app_rx_1.recv().await {
+            match app_rx_1.recv::<AppResponse>().await {
                 Ok(ReceiveMessage::Signal(sig1)) => {
                     if let Some(sig1_send) = sig1_send.take() {
                         let _ = sig1_send.send(sig1);
@@ -433,7 +433,7 @@ async fn emit_signals() {
     let mut sig2_send = Some(sig2_send);
     let sig2_task = tokio::task::spawn(async move {
         loop {
-            match app_rx_2.recv().await {
+            match app_rx_2.recv::<AppResponse>().await {
                 Ok(ReceiveMessage::Signal(sig2)) => {
                     if let Some(sig2_send) = sig2_send.take() {
                         let _ = sig2_send.send(sig2);
@@ -455,8 +455,8 @@ async fn emit_signals() {
     )
     .await;
 
-    let sig1 = sig1_recv.await.unwrap();
-    let sig2 = sig2_recv.await.unwrap();
+    let sig1 = Signal::from_vec(sig1_recv.await.unwrap()).unwrap();
+    let sig2 = Signal::from_vec(sig2_recv.await.unwrap()).unwrap();
     sig1_task.abort();
     sig2_task.abort();
 
