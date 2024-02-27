@@ -24,11 +24,39 @@ use tracing::*;
 const CONCURRENCY_COUNT: usize = 128;
 
 // TODO: This is arbitrary, choose reasonable size.
+// ERROR TODO XXX (david.b): There is no such thing as backpressure in
+//                           broadcast queues! It'll just start deleting
+//                           items, and giving "Lagged" errors on receivers.
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 /// The maximum number of connections allowed to the admin interface
 pub const MAX_CONNECTIONS: usize = 400;
+
+/// For some reason, the "task manager" doesn't actually shut down tasks...
+/// We have to have this awkward workaround.
+trait TmExt {
+    fn ext_add_task<Fut: std::future::Future<Output = ()> + Send + 'static>(
+        &self,
+        name: &str,
+        f: impl FnOnce() -> Fut + Send + 'static,
+    );
+}
+
+impl TmExt for TaskManagerClient {
+    fn ext_add_task<Fut: std::future::Future<Output = ()> + Send + 'static>(
+        &self,
+        name: &str,
+        f: impl FnOnce() -> Fut + Send + 'static,
+    ) {
+        self.add_conductor_task_ignored(name, move |stop| async move {
+            let task = tokio::task::spawn(f());
+            let _ = stop.await;
+            task.abort();
+            Ok(())
+        });
+    }
+}
 
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
@@ -69,7 +97,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
     api: A,
     port: u16,
 ) {
-    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move |_stop| {
+    tm.ext_add_task(&format!("admin interface, port {}", port), move || {
         async move {
             let mut task_list = TaskList::default();
             // establish a new connection to a client
@@ -117,7 +145,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     trace!("LISTENING AT: {}", addr);
     let port = addr.port();
 
-    tm.add_conductor_task_ignored("app interface new connection handler", |_stop| {
+    tm.ext_add_task("app interface new connection handler", move || {
         async move {
             let mut task_list = TaskList::default();
             // establish a new connection to a client
@@ -153,7 +181,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
             match rx_from_iface.recv().await {
                 Ok(r) => Some((r, rx_from_iface)),
                 Err(err) => {
-                    error!(?err);
+                    info!(?err);
                     None
                 }
             }
@@ -186,10 +214,19 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     trace!("CONNECTION: {}", rx_from_iface.peer_addr());
 
     let rx_from_cell = futures::stream::unfold(rx_from_cell, |mut rx_from_cell| async move {
-        if let Ok(item) = rx_from_cell.recv().await {
-            Some((item, rx_from_cell))
-        } else {
-            None
+        loop {
+            match rx_from_cell.recv().await {
+                // We missed some signals, but the channel is still open
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                    warn!("SignalChannelOverloaded");
+                    continue;
+                }
+                Ok(item) => return Some((item, rx_from_cell)),
+                _ => {
+                    warn!("SignalChannelClosed");
+                    return None;
+                }
+            }
         }
     });
 
@@ -218,7 +255,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             match rx_from_iface.recv().await {
                 Ok(r) => Some((r, rx_from_iface)),
                 Err(err) => {
-                    error!(?err);
+                    info!(?err);
                     None
                 }
             }

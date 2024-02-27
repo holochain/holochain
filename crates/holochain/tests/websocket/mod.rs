@@ -480,7 +480,8 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
     let conductor_handle = Conductor::builder().config(config).build().await?;
-    let (client, _) = websocket_client(&conductor_handle).await?;
+    let (client, rx) = websocket_client(&conductor_handle).await?;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
@@ -508,7 +509,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
+    let (client, rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         Arc::new(WebsocketConfig {
             default_request_timeout: std::time::Duration::from_secs(1),
             ..Default::default()
@@ -516,6 +517,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
         ([127, 0, 0, 1], port).into(),
     )
     .await?;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let request = AdminRequest::ListAppInterfaces;
 
@@ -567,7 +569,13 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         Err(ConductorError::ShuttingDown)
     );
 
-    assert!(rx.recv::<AdminResponse>().await.is_err());
+    assert!(tokio::time::timeout(
+        std::time::Duration::from_secs(7),
+        rx.recv::<AdminResponse>(),
+    )
+    .await
+    .unwrap()
+    .is_err());
 
     info!("About to make failing request");
 
@@ -586,7 +594,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
         tokio::time::timeout(Duration::from_secs(1), client.request(request)).await;
 
     // request should have encountered an error since the conductor shut down,
-    // but should not have timed out (which would be an `Err(Err(_))`)
+    // but should not have timed out (which would be an `Err(_)`)
     assert_matches!(response, Ok(Err(_)));
 
     Ok(())

@@ -186,7 +186,12 @@ impl PartialEq for WsCoreSync {
 
 impl WsCoreSync {
     fn close(&self) {
-        self.0.lock().unwrap().take();
+        if let Some(core) = self.0.lock().unwrap().take() {
+            tokio::task::spawn(async move {
+                use futures::sink::SinkExt;
+                let _ = core.send.lock().await.close().await;
+            });
+        }
     }
 
     fn close_if_err<R>(&self, r: Result<R>) -> Result<R> {
@@ -268,15 +273,46 @@ where
 /// Note, This receiver must be polled (recv()) for responses to requests
 /// made on the Sender side to be received.
 /// If this receiver is dropped, the sender side will also be closed.
-pub struct WebsocketReceiver(WsCoreSync, std::net::SocketAddr);
+pub struct WebsocketReceiver(
+    WsCoreSync,
+    std::net::SocketAddr,
+    tokio::task::JoinHandle<()>,
+);
 
 impl Drop for WebsocketReceiver {
     fn drop(&mut self) {
         self.0.close();
+        self.2.abort();
     }
 }
 
 impl WebsocketReceiver {
+    fn new(core: WsCoreSync, addr: std::net::SocketAddr) -> Self {
+        let core2 = core.clone();
+        let ping_task = tokio::task::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                let core = core2.0.lock().unwrap().as_ref().cloned();
+                if let Some(core) = core {
+                    use futures::sink::SinkExt;
+                    if core
+                        .send
+                        .lock()
+                        .await
+                        .send(Message::Ping(Vec::new()))
+                        .await
+                        .is_err()
+                    {
+                        core2.close();
+                    }
+                } else {
+                    break;
+                }
+            }
+        });
+        Self(core, addr, ping_task)
+    }
+
     /// Peer address.
     pub fn peer_addr(&self) -> std::net::SocketAddr {
         self.1
@@ -493,7 +529,7 @@ fn split(
 
     Ok((
         WebsocketSender(core_send, timeout),
-        WebsocketReceiver(core_recv, peer_addr),
+        WebsocketReceiver::new(core_recv, peer_addr),
     ))
 }
 
@@ -516,6 +552,12 @@ pub async fn connect(
 pub struct WebsocketListener {
     config: Arc<WebsocketConfig>,
     listener: tokio::net::TcpListener,
+}
+
+impl Drop for WebsocketListener {
+    fn drop(&mut self) {
+        tracing::info!("WebsocketListenerDrop");
+    }
 }
 
 impl WebsocketListener {
