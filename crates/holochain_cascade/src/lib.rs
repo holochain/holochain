@@ -732,7 +732,7 @@ where
         if let GetStrategy::Local = options.strategy {
             // Only return what is in the database.
             let results = self.cascading(query.clone()).await?;
-            return Ok(results);
+            return self.cascading(query.clone()).await
         }
 
         // If we are not in the process of authoring this hash or its

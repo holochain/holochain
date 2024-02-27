@@ -51,7 +51,7 @@ pub struct AppEntryDefLocation {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get is executed.
 pub struct GetOptions {
-    /// Set if data should be fetched from the network or only from the local
+    /// Configure whether data should be fetched from the network or only from the local
     /// databases.
     pub strategy: GetStrategy,
 }
