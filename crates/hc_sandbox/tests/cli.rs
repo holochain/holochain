@@ -20,6 +20,8 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_path.push("../hc/Cargo.toml");
 
+    println!("@@ Warning, Building `hc` binary!");
+
     let out = escargot::CargoBuild::new()
         .bin("hc")
         .current_target()
@@ -32,12 +34,16 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
         .run()
         .unwrap();
 
+    println!("@@ `hc` binary built");
+
     out.path().to_path_buf()
 });
 
 static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_path.push("../holochain/Cargo.toml");
+
+    println!("@@ Warning, Building `holochain` binary!");
 
     let out = escargot::CargoBuild::new()
         .bin("holochain")
@@ -49,6 +55,8 @@ static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
         ))
         .run()
         .unwrap();
+
+    println!("@@ `holochain` binary built");
 
     out.path().to_path_buf()
 });
@@ -99,33 +107,39 @@ async fn package_fixture_if_not_packaged() {
         return;
     }
 
-    get_hc_command()
-        .arg("dna")
-        .arg("pack")
-        .arg("tests/fixtures/my-app/dna")
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .expect("Failed to pack DNA");
+    println!("@@ Package Fixture");
 
-    get_hc_command()
-        .arg("app")
-        .arg("pack")
-        .arg("tests/fixtures/my-app")
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .expect("Failed to pack hApp");
+    let mut cmd = get_hc_command();
+
+    cmd.arg("dna").arg("pack").arg("tests/fixtures/my-app/dna");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack DNA");
+
+    let mut cmd = get_hc_command();
+
+    cmd.arg("app").arg("pack").arg("tests/fixtures/my-app");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack hApp");
+
+    println!("@@ Package Fixture Complete");
 }
 
 async fn clean_sandboxes() {
-    get_sandbox_command()
-        .arg("clean")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .unwrap();
+    println!("@@ Clean");
+
+    let mut cmd = get_sandbox_command();
+
+    cmd.arg("clean");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.unwrap();
+
+    println!("@@ Clean Complete");
 }
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
@@ -150,6 +164,8 @@ async fn generate_sandbox_and_connect() {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
 
@@ -233,6 +249,7 @@ fn get_sandbox_command() -> Command {
 async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        println!("@@@@@-{line}-@@@@@");
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();

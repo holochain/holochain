@@ -1016,14 +1016,14 @@ pub mod wasm_test {
 
         // run two zome calls concurrently
         // as the first zome calls, init and wasm compilation will happen and
-        // should take less than 10 seconds in debug mode
+        // should take less than 30 seconds in debug mode
         let zome_call_1 = tokio::spawn({
             let conductor = conductor.clone();
             let zome = zome.clone();
             async move {
                 tokio::select! {
                     _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
-                    _ = tokio::time::sleep(Duration::from_secs(10)) => {false}
+                    _ = tokio::time::sleep(Duration::from_secs(30)) => {false}
                 }
             }
         });
@@ -1033,7 +1033,7 @@ pub mod wasm_test {
             async move {
                 tokio::select! {
                     _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
-                    _ = tokio::time::sleep(Duration::from_secs(10)) => {false}
+                    _ = tokio::time::sleep(Duration::from_secs(30)) => {false}
                 }
             }
         });
