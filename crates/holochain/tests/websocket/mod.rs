@@ -684,7 +684,8 @@ async fn concurrent_install_dna() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (client, rx) = websocket_client_by_port(admin_port).await.unwrap();
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     // let before = std::time::Instant::now();
 
@@ -752,7 +753,8 @@ async fn network_stats() {
     let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
     batch.exchange_peer_info().await;
 
-    let (client, _) = batch.get(0).unwrap().admin_ws_client().await;
+    let (client, rx) = batch.get(0).unwrap().admin_ws_client().await;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     #[cfg(feature = "tx5")]
     const EXPECT: &str = "go-pion";
@@ -790,7 +792,8 @@ async fn full_state_dump_cursor_works() {
 
     let cell_id = app.into_cells()[0].cell_id().clone();
 
-    let (mut client, _) = conductor.admin_ws_client().await;
+    let (mut client, rx) = conductor.admin_ws_client().await;
+    let _rx = PollRecv::new::<AdminResponse>(rx);
 
     let full_state = dump_full_state(&mut client, cell_id.clone(), None).await;
 
