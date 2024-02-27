@@ -50,15 +50,32 @@ impl CounTree {
         })
     }
 
+    pub fn action_details_local_only(
+        action_hashes: Vec<ActionHash>,
+    ) -> ExternResult<Vec<Option<Details>>> {
+        HDK.with(|h| {
+            h.borrow().get_details(
+                action_hashes
+                    .into_iter()
+                    .map(|action_hash| GetInput::new(action_hash.into(), GetOptions::local()))
+                    .collect(),
+            )
+        })
+    }
+
+    /// return the Option<Details> for the entry hash from the action
+    pub fn entry_details_local_only(entry_hash: EntryHash) -> ExternResult<Vec<Option<Details>>> {
+        HDK.with(|h| {
+            h.borrow()
+                .get_details(vec![GetInput::new(entry_hash.into(), GetOptions::local())])
+        })
+    }
+
     /// increments the given action hash by 1 or creates it if not found
     /// this is silly as being offline resets the counter >.<
     pub fn incsert(action_hash: ActionHash) -> ExternResult<ActionHash> {
         let current: CounTree = match get(action_hash.clone(), GetOptions::latest())? {
-            Some(record) => match record
-                .entry()
-                .to_app_option()
-                .map_err(|e| wasm_error!(e))?
-            {
+            Some(record) => match record.entry().to_app_option().map_err(|e| wasm_error!(e))? {
                 Some(v) => v,
                 None => return Self::new(),
             },

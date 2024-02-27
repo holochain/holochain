@@ -693,18 +693,17 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
-
-        // Only return what is in the database.
         if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
             let results = self.cascading(query.clone()).await?;
             return Ok(results);
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(entry_hash.into(), options.into()).await?;
         }
@@ -723,8 +722,6 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<RecordDetails>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetRecordDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
 
@@ -732,14 +729,16 @@ where
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // Only return what is in the database.
         if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
             let results = self.cascading(query.clone()).await?;
             return Ok(results);
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(action_hash.into(), options.into())
                 .await?;
@@ -760,22 +759,22 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // Only return what is in the database.
         if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
             let results = self.cascading(query.clone()).await?;
             return Ok(results);
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(action_hash.into(), options.into())
                 .await?;
@@ -794,18 +793,18 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        // Only return what is in the database.
         if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
             let results = self.cascading(query.clone()).await?;
             return Ok(results);
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(entry_hash.into(), options.into()).await?;
         }
