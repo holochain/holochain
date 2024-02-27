@@ -617,19 +617,23 @@ async fn connection_limit_is_respected() {
     // Retain handles so that the test can control when to disconnect clients
     let mut handles = Vec::new();
 
+    tracing::warn!("OPEN FIRST CONNECTION");
     // The first `MAX_CONNECTIONS` connections should succeed
-    for _ in 0..MAX_CONNECTIONS {
-        let (sender, _) = connect(cfg.clone(), addr).await.unwrap();
+    for count in 0..MAX_CONNECTIONS {
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let rx = PollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
-            .expect("Admin request should succeed because there are enough available connections");
-        handles.push(sender);
+            .map_err(|e| Error::other(format!("Admin request should succeed because there are enough available connections: {count}: {e:?}")))
+            .unwrap();
+        handles.push((sender, rx));
     }
 
     // Try lots of failed connections to make sure the limit is respected
     for _ in 0..2 * MAX_CONNECTIONS {
-        let (sender, _) = connect(cfg.clone(), addr).await.unwrap();
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let _rx = PollRecv::new::<AdminResponse>(rx);
 
         // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
         sender
@@ -643,12 +647,13 @@ async fn connection_limit_is_respected() {
 
     // Should now be possible to connect new clients
     for _ in 0..MAX_CONNECTIONS {
-        let (sender, _) = connect(cfg.clone(), addr).await.unwrap();
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let rx = PollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
             .expect("Admin request should succeed because there are enough available connections");
-        handles.push(sender);
+        handles.push((sender, rx));
     }
 
     conductor_handle.shutdown();

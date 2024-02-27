@@ -52,10 +52,12 @@ impl WireMessage {
     /// Create a new request message (with new unique msg id).
     fn request<S>(s: S) -> Result<(Message, u64)>
     where
+        S: std::fmt::Debug,
         SerializedBytes: TryFrom<S, Error = SerializedBytesError>,
     {
         static ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let id = ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        tracing::trace!(?s, %id, "OutRequest");
         let s1 = SerializedBytes::try_from(s).map_err(Error::other)?;
         let s2 = Self::Request {
             id,
@@ -133,30 +135,48 @@ impl Default for WebsocketConfig {
     }
 }
 
-#[derive(Clone)]
-struct RMap(
-    Arc<
-        std::sync::Mutex<
-            std::collections::HashMap<u64, tokio::sync::oneshot::Sender<SerializedBytes>>,
-        >,
-    >,
+struct RMapInner(
+    pub std::collections::HashMap<u64, tokio::sync::oneshot::Sender<Result<SerializedBytes>>>,
 );
+
+impl Drop for RMapInner {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+impl RMapInner {
+    fn close(&mut self) {
+        for (_, s) in self.0.drain() {
+            let _ = s.send(Err(Error::other("ConnectionClosed")));
+        }
+    }
+}
+
+#[derive(Clone)]
+struct RMap(Arc<std::sync::Mutex<RMapInner>>);
 
 impl Default for RMap {
     fn default() -> Self {
-        Self(Arc::new(std::sync::Mutex::new(
+        Self(Arc::new(std::sync::Mutex::new(RMapInner(
             std::collections::HashMap::default(),
-        )))
+        ))))
     }
 }
 
 impl RMap {
-    pub fn insert(&self, id: u64, sender: tokio::sync::oneshot::Sender<SerializedBytes>) {
-        self.0.lock().unwrap().insert(id, sender);
+    pub fn close(&self) {
+        if let Ok(mut lock) = self.0.lock() {
+            lock.close();
+        }
     }
 
-    pub fn remove(&self, id: u64) -> Option<tokio::sync::oneshot::Sender<SerializedBytes>> {
-        self.0.lock().unwrap().remove(&id)
+    pub fn insert(&self, id: u64, sender: tokio::sync::oneshot::Sender<Result<SerializedBytes>>) {
+        self.0.lock().unwrap().0.insert(id, sender);
+    }
+
+    pub fn remove(&self, id: u64) -> Option<tokio::sync::oneshot::Sender<Result<SerializedBytes>>> {
+        self.0.lock().unwrap().0.remove(&id)
     }
 }
 
@@ -187,6 +207,7 @@ impl PartialEq for WsCoreSync {
 impl WsCoreSync {
     fn close(&self) {
         if let Some(core) = self.0.lock().unwrap().take() {
+            core.rmap.close();
             tokio::task::spawn(async move {
                 use futures::sink::SinkExt;
                 let _ = core.send.lock().await.close().await;
@@ -373,7 +394,7 @@ impl WebsocketReceiver {
                                 if let Some(data) = data {
                                     let data = SerializedBytes::from(UnsafeBytes::from(data));
                                     tracing::trace!(%id, ?data, "InResponse");
-                                    let _ = sender.send(data);
+                                    let _ = sender.send(Ok(data));
                                 }
                             }
                             Ok(None)
@@ -425,9 +446,7 @@ impl WebsocketSender {
 
         use futures::sink::SinkExt;
 
-        tracing::trace!(?s, "OutRequest");
         let (s, id) = WireMessage::request(s)?;
-        tracing::trace!(%id, "OUtRequest");
 
         /// Drop helper to remove our response callback if we timeout.
         struct D(RMap, u64);
@@ -466,7 +485,9 @@ impl WebsocketSender {
         // being viable. (but we still want it to timeout at the same point)
         tokio::time::timeout_at(timeout_at, async {
             // await the response
-            let resp = resp_r.await.map_err(|_| Error::other("ResponderDropped"))?;
+            let resp = resp_r
+                .await
+                .map_err(|_| Error::other("ResponderDropped"))??;
 
             // decode the response
             let res = decode(&Vec::from(UnsafeBytes::from(resp))).map_err(Error::other)?;
