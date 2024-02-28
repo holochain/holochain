@@ -957,7 +957,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "hdi"
-version = "0.4.0-beta-dev.27"
+version = "0.4.0-beta-dev.28"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -973,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.31"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "getrandom",
  "hdi",
@@ -1122,7 +1122,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.31"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "hdk",
  "serde",
@@ -1171,7 +1171,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "derive_builder",
  "derive_more",
