@@ -63,7 +63,9 @@ async fn send_signal_after_conductor_restart() {
         {
             assert_eq!(cell_id, alice_cell_id);
             assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
-            assert_eq!(signal.into_inner().decode::<()>().unwrap(), ());
+            let signal = signal.into_inner();
+            println!("SIGNAL: {signal:?}");
+            assert_eq!(signal.decode::<()>().unwrap(), ());
         } else {
             panic!("not the expected app signal");
         }

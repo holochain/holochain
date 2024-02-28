@@ -326,25 +326,13 @@ async fn remote_signals() -> anyhow::Result<()> {
     tokio::time::timeout(Duration::from_secs(60), async move {
         let signal = AppSignal::new(signal);
         for mut rx in rxs {
-            // we have to ignore the post_commit one...
-            let mut got_it = false;
-            let mut last = None;
-            for _ in 0..2 {
-                let r = rx.recv().await;
-                // Each handle should recv a signal
-                match r {
-                    Ok(Signal::App { signal: r, .. }) => {
-                        if r == signal {
-                            got_it = true;
-                            last = Some(r);
-                            break;
-                        }
-                    }
-                    oth => panic!("unexpected: {oth:?}"),
+            let r = rx.recv().await;
+            // Each handle should recv a signal
+            match r {
+                Ok(Signal::App { signal: r, .. }) => {
+                    assert_eq!(r, signal);
                 }
-            }
-            if !got_it {
-                panic!("Expected: {signal:?}, got: {last:?}");
+                oth => panic!("unexpected: {oth:?}"),
             }
         }
     })

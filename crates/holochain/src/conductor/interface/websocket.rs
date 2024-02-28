@@ -413,7 +413,7 @@ pub mod test {
             .unwrap();
 
         let (dna_file, _, _) =
-            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal]).await;
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
         let app_bundle = app_bundle_from_dnas([&dna_file]).await;
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
@@ -421,6 +421,7 @@ pub mod test {
             installed_app_id: None,
             membrane_proofs: HashMap::new(),
             network_seed: None,
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         }));
         let response: AdminResponse = admin_tx.request(request).await.unwrap();

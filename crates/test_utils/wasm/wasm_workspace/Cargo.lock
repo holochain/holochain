@@ -2872,6 +2872,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_post_commit_signal"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "holochain_test_wasm_common",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
