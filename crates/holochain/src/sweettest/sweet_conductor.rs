@@ -426,7 +426,7 @@ impl SweetConductor {
             .iter()
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
-        
+
         self.setup_app_1_register_dna(dnas.clone()).await?;
 
         let dna_hashes = self

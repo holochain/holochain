@@ -44,16 +44,10 @@ async fn test_publish() -> anyhow::Result<()> {
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
-    dbg!(dna_file.dna_def());
-
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
-    
-    dbg!(alice.dna_hash());
-    dbg!(bobbo.dna_hash());
-    dbg!(carol.dna_hash());
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]

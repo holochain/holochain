@@ -1332,31 +1332,101 @@ mod app_impls {
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            agent_key: AgentPubKey,
+            agent: AgentPubKey,
             data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<Vec<DnaHash>> {
+            use crate::sweettest::DnaWithRole;
+
+            let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
+            let manifest = crate::sweettest::app_manifest_from_dnas(&dnas_with_roles);
             let compat = self.get_dna_compat();
-            let data: Vec<_> = data
+
+            let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
                 .iter()
                 .map(|(d, mp)| {
                     let (role, dna) = d.clone().into_tuple();
                     ((role, dna.update_compat(compat.clone())), mp.clone())
                 })
-                .collect();
-            let dna_hashes = data
-                .iter()
-                .map(|((_, dr), _)| dr.dna().as_hash().clone())
-                .collect();
-            let payload = crate::sweettest::get_install_app_payload_from_dnas(
-                installed_app_id,
-                agent_key,
-                data.as_slice(),
-            )
-            .await;
+                .map(|(dr, mp)| {
+                    let dna = dr.dna().clone();
+                    let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                    let dnas_to_register = (dna, mp.clone());
+                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 0));
+                    (dnas_to_register, role_assignments)
+                })
+                .unzip();
 
-            self.install_app_bundle(payload).await?;
+            let dna_hashes = dnas_to_register
+                .iter()
+                .map(|(dna, _)| dna.dna_hash().clone())
+                .collect();
+
+            let ops = AppRoleResolution {
+                agent: agent.clone(),
+                dnas_to_register,
+                role_assignments,
+            };
+
+            self.install_app_common(installed_app_id, manifest, ops, false)
+                .await?;
 
             Ok(dna_hashes)
+        }
+
+        async fn install_app_common(
+            self: Arc<Self>,
+            installed_app_id: InstalledAppId,
+            manifest: AppManifest,
+            ops: AppRoleResolution,
+            ignore_genesis_failure: bool,
+        ) -> ConductorResult<StoppedApp> {
+            let cells_to_create = ops.cells_to_create();
+
+            // check if cells_to_create contains a cell identical to an existing one
+            let state = self.get_state().await?;
+            let all_cells: HashSet<_> = state
+                .installed_apps_and_services()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
+            let maybe_duplicate_cell_id = cells_to_create
+                .iter()
+                .find(|(cell_id, _)| all_cells.contains(cell_id));
+            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                return Err(ConductorError::CellAlreadyExists(
+                    duplicate_cell_id.to_owned(),
+                ));
+            };
+
+            for (dna, _) in ops.dnas_to_register {
+                self.clone().register_dna(dna).await?;
+            }
+
+            let cell_ids: Vec<_> = cells_to_create
+                .iter()
+                .map(|(cell_id, _)| cell_id.clone())
+                .collect();
+
+            let genesis_result =
+                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
+
+            if genesis_result.is_ok() || ignore_genesis_failure {
+                let agent_key = ops.agent;
+                let roles = ops.role_assignments;
+                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+
+                // Update the db
+                let stopped_app = self.add_disabled_app_to_db(app).await?;
+
+                // Return the result, which be may an error if no_rollback was specified
+                genesis_result.map(|()| stopped_app)
+            } else if let Err(err) = genesis_result {
+                // Rollback created cells on error
+                self.remove_cells(&cell_ids).await;
+                Err(err)
+            } else {
+                unreachable!()
+            }
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
@@ -1399,57 +1469,14 @@ mod app_impls {
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
+
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
 
-            let cells_to_create = ops.cells_to_create();
-
-            // check if cells_to_create contains a cell identical to an existing one
-            let state = self.get_state().await?;
-            let all_cells: HashSet<_> = state
-                .installed_apps_and_services()
-                .values()
-                .flat_map(|app| app.all_cells())
-                .collect();
-            let maybe_duplicate_cell_id = cells_to_create
-                .iter()
-                .find(|(cell_id, _)| all_cells.contains(cell_id));
-            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
-                return Err(ConductorError::CellAlreadyExists(
-                    duplicate_cell_id.to_owned(),
-                ));
-            };
-
-            for (dna, _) in ops.dnas_to_register {
-                dbg!(dna.dna_def());
-                self.clone().register_dna(dna).await?;
-            }
-
-            let cell_ids: Vec<_> = cells_to_create
-                .iter()
-                .map(|(cell_id, _)| cell_id.clone())
-                .collect();
-
-            let genesis_result =
-                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
-
-            if genesis_result.is_ok() || ignore_genesis_failure {
-                let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
-
-                // Update the db
-                let stopped_app = self.add_disabled_app_to_db(app).await?;
-
-                // Return the result, which be may an error if no_rollback was specified
-                genesis_result.map(|()| stopped_app)
-            } else if let Err(err) = genesis_result {
-                // Rollback created cells on error
-                self.remove_cells(&cell_ids).await;
-                Err(err)
-            } else {
-                unreachable!()
-            }
+            self.clone()
+                .install_app_common(installed_app_id, manifest, ops, ignore_genesis_failure)
+                .await
         }
 
         /// Uninstall an app
@@ -1615,7 +1642,6 @@ mod cell_impls {
     impl Conductor {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
-            dbg!(&self.running_cells);
             if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
                 Ok(cell.cell)
             } else {
@@ -2796,8 +2822,6 @@ impl Conductor {
         let on_cells: HashSet<CellId> = self
             .running_cells
             .share_ref(|c| c.keys().cloned().collect());
-
-        dbg!(&app_cells);
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             self.clone()
