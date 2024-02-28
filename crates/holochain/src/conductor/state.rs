@@ -233,6 +233,13 @@ impl ConductorState {
     pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
     }
+
+    /// Find the app which contains the given cell by its [CellId].
+    pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
+        self.installed_apps_and_services
+            .values()
+            .find(|app| app.all_cells().any(|id| id == cell_id))
+    }
 }
 
 /// Here, interfaces are user facing and make available zome functions to

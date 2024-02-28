@@ -1,4 +1,6 @@
 mod agent_scaling;
+mod authored_test;
+mod clone_cell;
 mod conductor_services;
 mod dht_arc;
 mod dna_properties;

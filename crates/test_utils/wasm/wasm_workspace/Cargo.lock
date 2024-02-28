@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.3.0-beta-dev.0"
+version = "0.3.0-beta-dev.1"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -957,8 +957,9 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "hdi"
-version = "0.4.0-beta-dev.26"
+version = "0.4.0-beta-dev.28"
 dependencies = [
+ "getrandom",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
@@ -972,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "getrandom",
  "hdi",
@@ -991,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.3.0-beta-dev.25"
+version = "0.3.0-beta-dev.26"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1032,7 +1033,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.3.0-beta-dev.21"
+version = "0.3.0-beta-dev.22"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -1052,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.25"
+version = "0.3.0-beta-dev.26"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -1078,7 +1079,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.24"
 dependencies = [
  "getrandom",
  "holochain_secure_primitive",
@@ -1121,7 +1122,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.30"
+version = "0.3.0-beta-dev.32"
 dependencies = [
  "hdk",
  "serde",
@@ -1129,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.3.0-beta-dev.3"
+version = "0.3.0-beta-dev.4"
 dependencies = [
  "cfg-if 0.1.10",
  "derive_more",
@@ -1170,9 +1171,10 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.26"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "derive_builder",
+ "derive_more",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
@@ -1319,7 +1321,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.3.0-beta-dev.15"
+version = "0.3.0-beta-dev.16"
 dependencies = [
  "base64",
  "derive_more",
@@ -1332,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.18"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -1341,7 +1343,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.16"
+version = "0.3.0-beta-dev.17"
 dependencies = [
  "derivative",
  "derive_more",
@@ -1360,7 +1362,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.3.0-beta-dev.14"
+version = "0.3.0-beta-dev.15"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -1372,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.3.0-beta-dev.6"
+version = "0.3.0-beta-dev.7"
 dependencies = [
  "chrono",
  "serde",
@@ -2591,6 +2593,15 @@ dependencies = [
 name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_clone"
+version = "0.0.1"
+dependencies = [
+ "hdi",
  "hdk",
  "serde",
 ]

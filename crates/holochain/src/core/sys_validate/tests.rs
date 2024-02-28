@@ -563,8 +563,12 @@ async fn check_entry_size_test() {
 
     let keystore = test_keystore();
 
-    let (mut record, cascade) =
-        record_with_cascade(&keystore, Create::arbitrary(&mut g).unwrap().into()).await;
+    let action = contrafact::brute("app entry create", |a: &Create| {
+        matches!(a.entry_type, EntryType::App(_))
+    })
+    .build(&mut g);
+
+    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),

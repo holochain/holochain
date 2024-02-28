@@ -46,7 +46,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    versions.url = "github:holochain/holochain?dir=versions/0_1";
+    versions.url = "github:holochain/holochain?dir=versions/0_2";
 
     holochain.follows = "empty";
     holochain.flake = false;

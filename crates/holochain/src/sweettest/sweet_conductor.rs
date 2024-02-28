@@ -382,7 +382,7 @@ impl SweetConductor {
 
         let agent = self
             .raw_handle()
-            .install_app_legacy(installed_app_id.clone(), agent, &dnas_with_proof)
+            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
@@ -560,7 +560,7 @@ impl SweetConductor {
     pub async fn create_clone_cell(
         &mut self,
         payload: CreateCloneCellPayload,
-    ) -> ConductorApiResult<holochain_conductor_api::ClonedCell> {
+    ) -> ConductorApiResult<holochain_zome_types::clone::ClonedCell> {
         let clone = self.raw_handle().create_clone_cell(payload).await?;
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);

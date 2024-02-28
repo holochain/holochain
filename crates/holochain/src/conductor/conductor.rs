@@ -85,7 +85,6 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -104,6 +103,7 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_zome_types::prelude::ClonedCell;
 use itertools::Itertools;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use parking_lot::RwLock;
@@ -1329,12 +1329,11 @@ mod app_impls {
     use super::*;
 
     impl Conductor {
+        /// Install an app from minimal elements, without needing construct a whole AppBundle.
+        /// (This function constructs a bundle under the hood.)
+        /// This is just a convenience for testing.
         #[cfg(feature = "test_utils")]
-        /// Install an app without needing to create a bundle.
-        ///
-        /// Returns the agent key of the installed app, (useful if you did
-        /// not specify an agent key to install with).
-        pub(crate) async fn install_app_legacy(
+        pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             agent: Option<AgentPubKey>,
@@ -1699,7 +1698,7 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_conductor_api::ClonedCell;
+    use holochain_zome_types::prelude::ClonedCell;
 
     use super::*;
 
@@ -2178,7 +2177,7 @@ mod service_impls {
             // Use app ID for role name as well, since this is pretty arbitrary
             let role_name = DPKI_APP_ID.into();
             self.clone()
-                .install_app_legacy(DPKI_APP_ID.into(), Some(agent), &[((role_name, dna), None)])
+                .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[((role_name, dna), None)])
                 .await?;
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
 
@@ -2641,6 +2640,18 @@ mod accessor_impls {
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
+        }
+
+        /// Find the app which contains the given cell by its [CellId].
+        pub async fn find_app_containing_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InstalledApp>> {
+            Ok(self
+                .get_state()
+                .await?
+                .find_app_containing_cell(cell_id)
+                .cloned())
         }
     }
 }
