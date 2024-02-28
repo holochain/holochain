@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.3.0-beta-dev.33"
+version = "0.3.0-beta-dev.34"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -28,18 +28,18 @@ futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
 holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.3.0-beta-dev.28", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.3.0-beta-dev.29", path = "../holochain_keystore" }
 holochain_nonce = {version = "^0.3.0-beta-dev.24", path = "../holochain_nonce"}
 holochain_serialized_bytes = { workspace = true }
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.33"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.34"}
 holochain_wasmer_host = { workspace = true }
 holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util", features = ["backtrace"] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.27", features = ["full"] }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.28", features = ["full"] }
 itertools = { version = "0.10" }
 kitsune_p2p_dht = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.5"}
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.6"}
 must_future = "0.1.1"
 nanoid = "0.3"
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 - **BREAKING**: Rename `GetOptions` variants. `Content` becomes `Local` and queries now consistently only locally available data. No network calls are made. This applies to `get` and `get_details`. `Latest` becomes `Network` and fetches from the network if the caller is not an authority of the requested Action or Entry.
 
+## 0.3.0-beta-dev.28
+
 ## 0.3.0-beta-dev.27
 
 ## 0.3.0-beta-dev.26
