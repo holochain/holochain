@@ -453,8 +453,13 @@ pub mod test {
             _ => panic!("app interface couldn't be attached"),
         };
 
-        let (app_tx, rx) = websocket_client_by_port(app_port).await.unwrap();
-        let _rx = PollRecv::new::<AppResponse>(rx);
+        let (app_tx, mut rx) = websocket_client_by_port(app_port).await.unwrap();
+        let (s_send, mut s_recv) = tokio::sync::mpsc::unbounded_channel();
+        let app_rx_task = tokio::task::spawn(async move {
+            while let Ok(ReceiveMessage::Signal(s)) = rx.recv::<AppResponse>().await {
+                s_send.send(s).unwrap();
+            }
+        });
 
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
@@ -476,6 +481,23 @@ pub mod test {
             .unwrap(),
         ));
         let _: AppResponse = app_tx.request(request).await.unwrap();
+
+        #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+        #[serde(tag = "type")]
+        pub enum TestSignal {
+            Tested,
+        }
+
+        // ensure that the signal is received and is decodable
+        match Signal::from_vec(s_recv.recv().await.unwrap()).unwrap() {
+            Signal::App { signal, .. } => {
+                let expected = AppSignal::new(ExternIO::encode(TestSignal::Tested).unwrap());
+                assert_eq!(expected, signal);
+            }
+            oth => panic!("unexpected: {oth:?}"),
+        }
+
+        app_rx_task.abort();
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {

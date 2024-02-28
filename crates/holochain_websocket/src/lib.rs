@@ -42,7 +42,7 @@ pub enum WireMessage {
 
 impl WireMessage {
     /// Deserialize a WireMessage.
-    fn from_bytes(b: Vec<u8>) -> Result<Self> {
+    fn try_from_bytes(b: Vec<u8>) -> Result<Self> {
         let b = UnsafeBytes::from(b);
         let b = SerializedBytes::from(b);
         let b: WireMessage = b.try_into().map_err(Error::other)?;
@@ -394,7 +394,7 @@ impl WebsocketReceiver {
                         }
                         Message::Frame(_) => return Err(Error::other("UnexpectedRawFrame")),
                     };
-                    match WireMessage::from_bytes(msg)? {
+                    match WireMessage::try_from_bytes(msg)? {
                         WireMessage::Request { id, data } => {
                             let resp = WebsocketRespond {
                                 id,
