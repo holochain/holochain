@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.28"
+version = "0.3.0-beta-dev.29"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,7 +15,7 @@ base64 = "0.13.0"
 futures = "0.3.23"
 holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = { workspace = true }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.27"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.28"}
 kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/types" }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
 holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
