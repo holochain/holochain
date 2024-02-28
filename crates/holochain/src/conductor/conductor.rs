@@ -1337,19 +1337,122 @@ mod app_impls {
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            agent_key: Option<AgentPubKey>,
+            agent: Option<AgentPubKey>,
             data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<AgentPubKey> {
-            let payload = crate::sweettest::get_install_app_payload_from_dnas(
-                installed_app_id,
-                agent_key,
-                data,
-            )
-            .await;
-        
-            let app = self.install_app_bundle(payload).await?;
-            
-            Ok(app.agent_key().clone())
+            let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
+            let manifest = crate::sweettest::app_manifest_from_dnas(&dnas_with_roles);
+
+            let agent = self.resolve_agent(installed_app_id.clone(), agent).await?;
+
+            let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
+                .iter()
+                .map(|(dr, mp)| {
+                    let dna = dr.dna().clone();
+                    let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                    let dnas_to_register = (dna, mp.clone());
+                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 0));
+                    (dnas_to_register, role_assignments)
+                })
+                .unzip();
+
+            let ops = AppRoleResolution {
+                agent: agent.clone(),
+                dnas_to_register,
+                role_assignments,
+            };
+
+            self.install_app_common(installed_app_id, manifest, ops, false)
+                .await?;
+
+            Ok(agent)
+        }
+
+        async fn resolve_agent(
+            &self,
+            installed_app_id: InstalledAppId,
+            agent_key: Option<AgentPubKey>,
+        ) -> ConductorResult<AgentPubKey> {
+            Ok(if let Some(agent_key) = agent_key {
+                // dbg!(Timestamp::now());
+                if self.running_services().dpki.is_some() {
+                    // TODO: this ideally would actually modify the registration to include the new app and new DNAs,
+                    //       i.e. if possible, Deepkey would allow multiple apps to share the same agent key.
+                    return Err(ConductorError::Other(
+                        "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
+                    ));
+                } else {
+                    agent_key
+                }
+            } else if let Some(dpki) = self.running_services().dpki {
+                // dbg!(Timestamp::now());
+                // TODO: record the DNAs installed, important for key restoration.
+                let dnas = vec![];
+                dpki.derive_and_register_new_key(installed_app_id.clone(), dnas)
+                    .await?
+            } else {
+                // dbg!(Timestamp::now());
+                self.keystore.new_sign_keypair_random().await?
+            })
+        }
+
+        async fn install_app_common(
+            self: Arc<Self>,
+            installed_app_id: InstalledAppId,
+            manifest: AppManifest,
+            ops: AppRoleResolution,
+            ignore_genesis_failure: bool,
+        ) -> ConductorResult<StoppedApp> {
+            // dbg!(Timestamp::now());
+            let cells_to_create = ops.cells_to_create();
+
+            // check if cells_to_create contains a cell identical to an existing one
+            let state = self.get_state().await?;
+            let all_cells: HashSet<_> = state
+                .installed_apps_and_services()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
+            let maybe_duplicate_cell_id = cells_to_create
+                .iter()
+                .find(|(cell_id, _)| all_cells.contains(cell_id));
+            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                return Err(ConductorError::CellAlreadyExists(
+                    duplicate_cell_id.to_owned(),
+                ));
+            };
+            // dbg!(Timestamp::now());
+
+            for (dna, _) in ops.dnas_to_register {
+                self.clone().register_dna(dna).await?;
+            }
+
+            let cell_ids: Vec<_> = cells_to_create
+                .iter()
+                .map(|(cell_id, _)| cell_id.clone())
+                .collect();
+
+            let genesis_result =
+                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
+
+            // dbg!(Timestamp::now());
+            if genesis_result.is_ok() || ignore_genesis_failure {
+                let agent_key = ops.agent;
+                let roles = ops.role_assignments;
+                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+
+                // Update the db
+                let stopped_app = self.add_disabled_app_to_db(app).await?;
+
+                // Return the result, which be may an error if no_rollback was specified
+                genesis_result.map(|()| stopped_app)
+            } else if let Err(err) = genesis_result {
+                // Rollback created cells on error
+                self.remove_cells(&cell_ids).await;
+                Err(err)
+            } else {
+                unreachable!()
+            }
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
@@ -1389,87 +1492,23 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
-            let agent_key = if let Some(agent_key) = agent_key {
-                // dbg!(Timestamp::now());
-                if self.running_services().dpki.is_some() {
-                    // TODO: this ideally would actually modify the registration to include the new app and new DNAs,
-                    //       i.e. if possible, Deepkey would allow multiple apps to share the same agent key.
-                    return Err(ConductorError::Other(
-                        "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
-                    ));
-                } else {
-                    agent_key
-                }
-            } else if let Some(dpki) = self.running_services().dpki {
-                // dbg!(Timestamp::now());
-                // TODO: record the DNAs installed, important for key restoration.
-                let dnas = vec![];
-                dpki.derive_and_register_new_key(installed_app_id.clone(), dnas)
-                    .await?
-            } else {
-                // dbg!(Timestamp::now());
-                self.keystore.new_sign_keypair_random().await?
-            };
-
             // dbg!(Timestamp::now());
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
+
+            let agent_key = self
+                .resolve_agent(installed_app_id.clone(), agent_key)
+                .await?;
 
             // dbg!(Timestamp::now());
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
 
-            // dbg!(Timestamp::now());
-            let cells_to_create = ops.cells_to_create();
-
-            // check if cells_to_create contains a cell identical to an existing one
-            let state = self.get_state().await?;
-            let all_cells: HashSet<_> = state
-                .installed_apps_and_services()
-                .values()
-                .flat_map(|app| app.all_cells())
-                .collect();
-            let maybe_duplicate_cell_id = cells_to_create
-                .iter()
-                .find(|(cell_id, _)| all_cells.contains(cell_id));
-            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
-                return Err(ConductorError::CellAlreadyExists(
-                    duplicate_cell_id.to_owned(),
-                ));
-            };
-            // dbg!(Timestamp::now());
-
-            for (dna, _) in ops.dnas_to_register {
-                self.clone().register_dna(dna).await?;
-            }
-
-            let cell_ids: Vec<_> = cells_to_create
-                .iter()
-                .map(|(cell_id, _)| cell_id.clone())
-                .collect();
-
-            let genesis_result =
-                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
-
-            // dbg!(Timestamp::now());
-            if genesis_result.is_ok() || ignore_genesis_failure {
-                let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
-
-                // Update the db
-                let stopped_app = self.add_disabled_app_to_db(app).await?;
-
-                // Return the result, which be may an error if no_rollback was specified
-                genesis_result.map(|()| stopped_app)
-            } else if let Err(err) = genesis_result {
-                // Rollback created cells on error
-                self.remove_cells(&cell_ids).await;
-                Err(err)
-            } else {
-                unreachable!()
-            }
+            self.clone()
+                .install_app_common(installed_app_id, manifest, ops, ignore_genesis_failure)
+                .await
         }
 
         /// Uninstall an app

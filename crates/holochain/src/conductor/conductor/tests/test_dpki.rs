@@ -60,7 +60,7 @@ async fn validate_with_mock_dpki() {
     setup_mock_dpki(&conductors, 0, key_states.clone());
     setup_mock_dpki(&conductors, 1, key_states.clone());
 
-    let (app_dna_file, iz, cz) =
+    let (app_dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
     dbg!(&app_dna_file.dna().integrity_zomes);
     let ((alice,), (bob,), (carol,)) = conductors

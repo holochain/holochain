@@ -85,6 +85,9 @@ pub trait DnaWithRole: Clone + std::fmt::Debug + Sized {
     /// The DNA
     fn dna(&self) -> &DnaFile;
 
+    /// The DNA
+    fn into_dna(self) -> DnaFile;
+
     /// Replace the DNA without changing the role
     fn replace_dna(self, dna: DnaFile) -> (RoleName, DnaFile) {
         (self.role(), dna)
@@ -99,6 +102,10 @@ impl DnaWithRole for DnaFile {
     fn dna(&self) -> &DnaFile {
         self
     }
+
+    fn into_dna(self) -> DnaFile {
+        self
+    }
 }
 
 impl DnaWithRole for (RoleName, DnaFile) {
@@ -108,6 +115,10 @@ impl DnaWithRole for (RoleName, DnaFile) {
 
     fn dna(&self) -> &DnaFile {
         &self.1
+    }
+
+    fn into_dna(self) -> DnaFile {
+        self.1
     }
 }
 
