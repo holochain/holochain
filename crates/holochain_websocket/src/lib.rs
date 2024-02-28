@@ -428,14 +428,14 @@ impl WebsocketReceiver {
 }
 
 /// Send requests and signals to the remote end of this websocket connection.
-/// Note, This receiver side must be polled (recv()) for responses to requests
+/// Note, this receiver side must be polled (recv()) for responses to requests
 /// made on this sender to be received.
 #[derive(Clone)]
 pub struct WebsocketSender(WsCoreSync, std::time::Duration);
 
 impl WebsocketSender {
     /// Make a request of the remote using the default configured timeout.
-    /// Note, This receiver side must be polled (recv()) for responses to
+    /// Note, this receiver side must be polled (recv()) for responses to
     /// requests made on this sender to be received.
     pub async fn request<S, R>(&self, s: S) -> Result<R>
     where
