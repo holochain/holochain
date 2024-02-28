@@ -1346,9 +1346,9 @@ mod app_impls {
                 data,
             )
             .await;
-            // dbg!(Timestamp::now());
+        
             let app = self.install_app_bundle(payload).await?;
-            // dbg!(Timestamp::now());
+            
             Ok(app.agent_key().clone())
         }
 
@@ -1392,6 +1392,8 @@ mod app_impls {
             let agent_key = if let Some(agent_key) = agent_key {
                 // dbg!(Timestamp::now());
                 if self.running_services().dpki.is_some() {
+                    // TODO: this ideally would actually modify the registration to include the new app and new DNAs,
+                    //       i.e. if possible, Deepkey would allow multiple apps to share the same agent key.
                     return Err(ConductorError::Other(
                         "Cannot install app with provided agent key if DPKI is enabled. Try again with no agent key specified.".into(),
                     ));
@@ -1421,7 +1423,6 @@ mod app_impls {
 
             // dbg!(Timestamp::now());
             let cells_to_create = ops.cells_to_create();
-            dbg!(&cells_to_create);
 
             // check if cells_to_create contains a cell identical to an existing one
             let state = self.get_state().await?;
@@ -2925,13 +2926,14 @@ impl Conductor {
             })
             .await?;
         let original_dna_hash = base_cell_dna_hash.clone();
+        let compat = self.get_dna_compat().await;
 
         // clone cell from base cell DNA
         let clone_dna = ribosome_store.share_ref(|rs| {
             let mut dna_file = rs
                 .get_dna_file(&base_cell_dna_hash)
                 .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
-                .update_modifiers(dna_modifiers);
+                .update_modifiers(dna_modifiers, compat);
             if let Some(name) = name {
                 dna_file = dna_file.set_name(name);
             }

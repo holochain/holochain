@@ -161,6 +161,7 @@ impl HostFnCaller {
         self.dht_db.clone()
     }
 
+    #[instrument(skip(self), fields(cell_id = %self.zome_path.cell_id()))]
     pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, SourceChainWorkspace) {
         let HostFnCaller {
             authored_db,

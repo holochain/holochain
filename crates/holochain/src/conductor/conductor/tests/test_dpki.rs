@@ -60,13 +60,20 @@ async fn validate_with_mock_dpki() {
     setup_mock_dpki(&conductors, 0, key_states.clone());
     setup_mock_dpki(&conductors, 1, key_states.clone());
 
-    let (app_dna_file, _, _) =
+    let (app_dna_file, iz, cz) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
+    dbg!(&app_dna_file.dna().integrity_zomes);
     let ((alice,), (bob,), (carol,)) = conductors
-        .setup_app("app", [&app_dna_file])
+        .setup_app("app", [&("role".to_string(), app_dna_file)])
         .await
         .unwrap()
         .into_tuples();
+
+    dbg!(alice.dna_hash(), bob.dna_hash(), carol.dna_hash());
+    assert_eq!(alice.dna_hash(), bob.dna_hash());
+    // Because of carol's lack of DPKI, the DnaCompatParams are different and so is the DNA hash.
+    assert_ne!(alice.dna_hash(), carol.dna_hash());
+
     async fn key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeyState {
         conductor
             .running_services()

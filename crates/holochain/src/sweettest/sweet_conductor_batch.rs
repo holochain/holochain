@@ -137,14 +137,14 @@ impl SweetConductorBatch {
     pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dna_files: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetAppBatch> {
         let apps = self
             .0
             .iter_mut()
             .map(|conductor| {
-                let dna_files = dna_files.clone();
-                async move { conductor.setup_app(installed_app_id, dna_files).await }
+                let dnas_with_roles = dnas_with_roles.clone();
+                async move { conductor.setup_app(installed_app_id, dnas_with_roles).await }
             })
             .collect::<Vec<_>>();
 

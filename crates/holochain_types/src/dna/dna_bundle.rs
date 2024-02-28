@@ -137,7 +137,9 @@ impl DnaBundle {
                 };
 
                 let original_hash = DnaHash::with_data_sync(&dna_def);
-                let ddh = DnaDefHashed::from_content_sync(dna_def.update_modifiers(modifiers));
+                let ddh = DnaDefHashed::from_content_sync(
+                    dna_def.update_modifiers(modifiers, dna_compat),
+                );
                 Ok((ddh, original_hash))
             }
         }

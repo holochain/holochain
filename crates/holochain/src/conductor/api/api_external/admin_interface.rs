@@ -77,6 +77,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 trace!(register_dna_payload = ?payload);
                 let RegisterDnaPayload { modifiers, source } = *payload;
                 let modifiers = modifiers.serialized().map_err(SerializationError::Bytes)?;
+                let dna_compat = self.conductor_handle.get_dna_compat().await;
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
@@ -94,10 +95,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     hash
                                 ))
                             })?
-                            .update_modifiers(modifiers)
+                            .update_modifiers(modifiers, dna_compat)
                     }
                     DnaSource::Path(ref path) => {
-                        let dna_compat = self.conductor_handle.get_dna_compat().await;
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
                         let (dna_file, _original_hash) =
@@ -105,7 +105,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let dna_compat = self.conductor_handle.get_dna_compat().await;
                         let (dna_file, _original_hash) =
                             bundle.into_dna_file(modifiers, dna_compat).await?;
                         dna_file

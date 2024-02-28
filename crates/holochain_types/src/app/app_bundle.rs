@@ -225,17 +225,19 @@ impl AppBundle {
         modifiers: DnaModifiersOpt,
         dna_compat: DnaCompatParams,
     ) -> AppBundleResult<DnaFile> {
-        let dna_file = if let Some(hash) = installed_hash {
+        let dna_file = if let Some(expected_hash) = installed_hash {
+            let expected_hash = expected_hash.clone().into();
             let (dna_file, original_hash) =
-                if let Some(mut dna_file) = dna_store.get_dna(&hash.clone().into()) {
+                if let Some(mut dna_file) = dna_store.get_dna(&expected_hash) {
                     let original_hash = dna_file.dna_hash().clone();
-                    dna_file = dna_file.update_modifiers(modifiers);
+                    dbg!(&dna_compat);
+                    dna_file = dna_file.update_modifiers(modifiers, dna_compat);
+                    dbg!(dna_file.dna_hash(), &original_hash);
                     (dna_file, original_hash)
                 } else {
                     self.resolve_location(location, modifiers, dna_compat)
                         .await?
                 };
-            let expected_hash: DnaHash = hash.clone().into();
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
                     role_name,

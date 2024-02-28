@@ -14,6 +14,7 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::{CellInfo, ProvisionedCell};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -77,12 +78,17 @@ pub fn standard_config() -> SweetConductorConfig {
 /// This trait is implemented for both `DnaFile` and (`RoleName, DnaFile)` tuples.
 /// When a test doesn't need to specify a RoleName, it can use just the DnaFile,
 /// in which case an arbitrary RoleName will be assigned.
-pub trait DnaWithRole: Clone + Sized {
+pub trait DnaWithRole: Clone + std::fmt::Debug + Sized {
     /// The associated role name
     fn role(&self) -> RoleName;
 
     /// The DNA
     fn dna(&self) -> &DnaFile;
+
+    /// Replace the DNA without changing the role
+    fn replace_dna(self, dna: DnaFile) -> (RoleName, DnaFile) {
+        (self.role(), dna)
+    }
 }
 
 impl DnaWithRole for DnaFile {
@@ -350,10 +356,20 @@ impl SweetConductor {
     ) -> ConductorApiResult<AgentPubKey> {
         let installed_app_id = installed_app_id.to_string();
 
+        let dna_compat = self.get_dna_compat().await;
         let dnas_with_proof: Vec<_> = dnas_with_roles
             .iter()
-            .map(|dr| (dr.to_owned(), None))
+            .cloned()
+            .map(|dr| {
+                // Apply the DnaCompatParams to modify the DNAs
+                let dna = dr
+                    .dna()
+                    .clone()
+                    .update_modifiers(Default::default(), dna_compat.clone());
+                (dr.replace_dna(dna), None)
+            })
             .collect();
+
         let agent = self
             .raw_handle()
             .install_app_legacy(installed_app_id.clone(), agent, &dnas_with_proof)
@@ -372,15 +388,35 @@ impl SweetConductor {
         &self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_hashes: impl Iterator<Item = DnaHash>,
+        roles: &[RoleName],
     ) -> ConductorApiResult<SweetApp> {
-        let mut sweet_cells = Vec::new();
-        for dna_hash in dna_hashes {
-            // Initialize per-space databases
-            let _space = self.spaces.get_or_create_space(&dna_hash)?;
+        // Must get the app info to determine the actual DNA hash of what was installed,
+        // especially because of the modifying effect of DnaCompatParams
 
-            // Create and add the SweetCell
-            sweet_cells.push(self.get_sweet_cell(CellId::new(dna_hash, agent.clone()))?);
+        let info = self
+            .raw_handle()
+            .get_app_info(&installed_app_id.to_owned())
+            .await
+            .expect("Error getting AppInfo for just-installed app")
+            .expect("Couldn't get AppInfo for just-installed app");
+
+        dbg!(roles);
+        dbg!(&info.cell_info.keys().collect::<Vec<_>>());
+
+        let mut sweet_cells = Vec::new();
+
+        for role in roles {
+            if let Some(CellInfo::Provisioned(ProvisionedCell { cell_id, .. })) =
+                info.cell_info[role].first()
+            {
+                assert_eq!(cell_id.agent_pubkey(), &agent, "Agent mismatch for cell");
+
+                // Initialize per-space databases
+                let _space = self.spaces.get_or_create_space(cell_id.dna_hash())?;
+
+                // Create and add the SweetCell
+                sweet_cells.push(self.get_sweet_cell(cell_id.clone())?);
+            }
         }
 
         Ok(SweetApp::new(installed_app_id.into(), sweet_cells))
@@ -411,6 +447,7 @@ impl SweetConductor {
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
     ) -> ConductorApiResult<SweetApp> {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
+        dbg!(&dnas_with_roles);
         let dnas = dnas_with_roles
             .iter()
             .map(|dr| dr.dna())
@@ -426,8 +463,11 @@ impl SweetConductor {
             .reconcile_cell_status_with_app_status()
             .await?;
         // dbg!(Timestamp::now());
-        let dna_hashes = dnas.iter().map(|r| r.dna_hash().clone());
-        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_hashes)
+        let roles = dnas_with_roles
+            .iter()
+            .map(|dr| dr.role())
+            .collect::<Vec<_>>();
+        self.setup_app_3_create_sweet_app(installed_app_id, agent, &roles)
             .await
     }
 
@@ -449,15 +489,15 @@ impl SweetConductor {
     pub async fn setup_app<'a>(
         &mut self,
         installed_app_id: &str,
-        dnas: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
+        dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetApp> {
         // If DPKI is in use, we must let DPKI generate the agent key
         if self.running_services().dpki.is_some() {
-            self.setup_app_for_optional_agent(installed_app_id, None, dnas)
+            self.setup_app_for_optional_agent(installed_app_id, None, dnas_with_roles)
                 .await
         } else {
             let agent = SweetAgents::one(self.keystore()).await;
-            self.setup_app_for_optional_agent(installed_app_id, Some(agent), dnas)
+            self.setup_app_for_optional_agent(installed_app_id, Some(agent), dnas_with_roles)
                 .await
         }
     }
@@ -480,6 +520,7 @@ impl SweetConductor {
         let agents: Vec<_> = agents.into_iter().collect();
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
         let dnas: Vec<&DnaFile> = dnas_with_roles.iter().map(|dr| dr.dna()).collect();
+        let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
         self.setup_app_1_register_dna(dnas.clone()).await?;
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
@@ -499,12 +540,8 @@ impl SweetConductor {
         for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
-                self.setup_app_3_create_sweet_app(
-                    &installed_app_id,
-                    agent.clone(),
-                    dnas.clone().into_iter().map(|d| d.dna_hash().clone()),
-                )
-                .await?,
+                self.setup_app_3_create_sweet_app(&installed_app_id, agent.clone(), &roles)
+                    .await?,
             );
         }
 

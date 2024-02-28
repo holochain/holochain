@@ -306,6 +306,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             .with_network_seed("final seed".into())
             .serialized()
             .unwrap(),
+        conductor.get_dna_compat().await,
     );
     let installed_dna_hash = DnaHash::with_data_sync(installed_dna.dna_def());
 

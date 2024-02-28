@@ -15,13 +15,12 @@ pub async fn app_bundle_from_dnas<'a>(
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let modifiers = DnaModifiersOpt::none();
-            let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
             let manifest = AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
                     location: Some(DnaLocation::Bundled(path.clone())),
                     modifiers,
-                    installed_hash: Some(installed_dna_hash.into()),
+                    installed_hash: None,
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
