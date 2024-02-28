@@ -15,8 +15,8 @@ pub struct ValDeps {
     pub deepkey_dht: Arc<parking_lot::Mutex<ValidationDependencies<EntryHashed>>>,
 }
 
-impl ValDeps {
-    pub fn new() -> Self {
+impl Default for ValDeps {
+    fn default() -> Self {
         Self {
             same_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
             deepkey_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),

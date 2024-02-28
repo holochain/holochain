@@ -230,9 +230,7 @@ impl AppBundle {
             let (dna_file, original_hash) =
                 if let Some(mut dna_file) = dna_store.get_dna(&expected_hash) {
                     let original_hash = dna_file.dna_hash().clone();
-                    dbg!(&dna_compat);
                     dna_file = dna_file.update_modifiers(modifiers, dna_compat);
-                    dbg!(dna_file.dna_hash(), &original_hash);
                     (dna_file, original_hash)
                 } else {
                     self.resolve_location(location, modifiers, dna_compat)

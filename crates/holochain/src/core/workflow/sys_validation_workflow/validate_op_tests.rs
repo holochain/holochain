@@ -2174,7 +2174,7 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, ValDeps::new(), None)
+    let validation_outcome = validate_op(&op, &dna_def, ValDeps::default(), None)
         .await
         .unwrap();
 
@@ -2201,7 +2201,7 @@ impl TestCase {
             op: None,
             keystore,
             cascade: MockCascade::new(),
-            current_validation_dependencies: ValDeps::new(),
+            current_validation_dependencies: ValDeps::default(),
             dna_def,
             agent,
         }

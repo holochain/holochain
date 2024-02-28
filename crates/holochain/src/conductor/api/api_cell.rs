@@ -109,7 +109,6 @@ impl CellConductorApiT for CellConductorApi {
         let dna = self
             .get_dna(dna_hash)
             .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?;
-        dbg!(&dna);
         Ok(dna.dna_def().get_zome(zome_name)?)
     }
 

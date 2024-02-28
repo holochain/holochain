@@ -34,7 +34,7 @@ pub trait DpkiService: Send + Sync {
     /// This is primarily to allow a DNA-backed DPKI service to not run on itself
     /// while it is being installed, which leads to deadlock.
     fn should_run(&self, dna_hash: &DnaHash) -> bool {
-        dna_hash.get_raw_32() != &self.uuid()
+        dna_hash.get_raw_32() != self.uuid()
     }
 
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp

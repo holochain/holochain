@@ -50,11 +50,9 @@ where
     let conductor_handle = args.conductor_handle.clone();
     let coordinators = args.ribosome.dna_def().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
-    // dbg!(Timestamp::now());
     let result =
         initialize_zomes_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
-    // dbg!(Timestamp::now());
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -98,7 +96,6 @@ where
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
 
-    // dbg!(Timestamp::now());
     // Call the init callback
     let result = {
         let host_access = InitHostAccess::new(
@@ -117,7 +114,6 @@ where
     // this future never gets polled again.
     let ws = workspace.clone();
 
-    // dbg!(Timestamp::now());
     tokio::task::spawn(async move {
         ws.source_chain()
             .put(
@@ -129,11 +125,9 @@ where
     })
     .await??;
 
-    // dbg!(Timestamp::now());
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_handle, ribosome).await?;
 
-    // dbg!(Timestamp::now());
     Ok(result)
 }
 

@@ -410,9 +410,6 @@ impl SweetConductor {
             .expect("Error getting AppInfo for just-installed app")
             .expect("Couldn't get AppInfo for just-installed app");
 
-        dbg!(roles);
-        dbg!(&info.cell_info.keys().collect::<Vec<_>>());
-
         let mut sweet_cells = Vec::new();
 
         for role in roles {
@@ -457,22 +454,17 @@ impl SweetConductor {
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
     ) -> ConductorApiResult<SweetApp> {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
-        dbg!(&dnas_with_roles);
         let dnas = dnas_with_roles
             .iter()
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
-        // dbg!(Timestamp::now());
         self.setup_app_1_register_dna(dnas.clone()).await?;
-        // dbg!(Timestamp::now());
         let agent = self
             .setup_app_2_install_and_enable(installed_app_id, agent, dnas_with_roles.as_slice())
             .await?;
-        // dbg!(Timestamp::now());
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
-        // dbg!(Timestamp::now());
         let roles = dnas_with_roles
             .iter()
             .map(|dr| dr.role())

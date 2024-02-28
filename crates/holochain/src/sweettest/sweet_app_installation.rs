@@ -8,12 +8,12 @@ use super::DnaWithRole;
 /// with no modifiers, clone limit of 255, and arbitrary role names
 pub fn app_manifest_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppManifest {
     let roles: Vec<_> = dnas_with_roles
-        .into_iter()
+        .iter()
         .map(|dr| {
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let modifiers = DnaModifiersOpt::none();
-            let role_manifest = AppRoleManifest {
+            AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
                     location: Some(DnaLocation::Bundled(path.clone())),
@@ -22,8 +22,7 @@ pub fn app_manifest_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppManife
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
-            };
-            role_manifest
+            }
         })
         .collect();
 
@@ -40,7 +39,7 @@ pub fn app_manifest_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppManife
 /// with no modifiers, clone limit of 255, and arbitrary role names
 pub async fn app_bundle_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppBundle {
     let (roles, resources): (Vec<_>, Vec<_>) = dnas_with_roles
-        .into_iter()
+        .iter()
         .map(|dr| {
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));

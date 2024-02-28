@@ -299,7 +299,7 @@ impl TestCase {
             test_space,
             keystore,
             agent,
-            current_validation_dependencies: ValDeps::new(),
+            current_validation_dependencies: ValDeps::default(),
             app_validation_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,

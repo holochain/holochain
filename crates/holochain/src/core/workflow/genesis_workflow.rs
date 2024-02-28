@@ -122,7 +122,7 @@ where
             let is_valid = dpki.key_state(agent_pubkey.clone(), now).await?.is_valid();
             if !is_valid {
                 return Err(SysValidationError::ValidationOutcome(
-                    ValidationOutcome::DpkiAgentInvalid(agent_pubkey.clone(), now).into(),
+                    ValidationOutcome::DpkiAgentInvalid(agent_pubkey.clone(), now),
                 )
                 .into());
             }

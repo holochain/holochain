@@ -1374,7 +1374,6 @@ mod app_impls {
             agent_key: Option<AgentPubKey>,
         ) -> ConductorResult<AgentPubKey> {
             Ok(if let Some(agent_key) = agent_key {
-                // dbg!(Timestamp::now());
                 if self.running_services().dpki.is_some() {
                     // TODO: this ideally would actually modify the registration to include the new app and new DNAs,
                     //       i.e. if possible, Deepkey would allow multiple apps to share the same agent key.
@@ -1385,13 +1384,11 @@ mod app_impls {
                     agent_key
                 }
             } else if let Some(dpki) = self.running_services().dpki {
-                // dbg!(Timestamp::now());
                 // TODO: record the DNAs installed, important for key restoration.
                 let dnas = vec![];
                 dpki.derive_and_register_new_key(installed_app_id.clone(), dnas)
                     .await?
             } else {
-                // dbg!(Timestamp::now());
                 self.keystore.new_sign_keypair_random().await?
             })
         }
@@ -1403,7 +1400,6 @@ mod app_impls {
             ops: AppRoleResolution,
             ignore_genesis_failure: bool,
         ) -> ConductorResult<StoppedApp> {
-            // dbg!(Timestamp::now());
             let cells_to_create = ops.cells_to_create();
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1421,7 +1417,6 @@ mod app_impls {
                     duplicate_cell_id.to_owned(),
                 ));
             };
-            // dbg!(Timestamp::now());
 
             for (dna, _) in ops.dnas_to_register {
                 self.clone().register_dna(dna).await?;
@@ -1435,7 +1430,6 @@ mod app_impls {
             let genesis_result =
                 crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
-            // dbg!(Timestamp::now());
             if genesis_result.is_ok() || ignore_genesis_failure {
                 let agent_key = ops.agent;
                 let roles = ops.role_assignments;
@@ -1475,7 +1469,6 @@ mod app_impls {
                 network_seed,
                 ..
             } = payload;
-            // dbg!(Timestamp::now());
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
@@ -1492,7 +1485,6 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
-            // dbg!(Timestamp::now());
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
@@ -1501,7 +1493,6 @@ mod app_impls {
                 .resolve_agent(installed_app_id.clone(), agent_key)
                 .await?;
 
-            // dbg!(Timestamp::now());
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
@@ -2139,11 +2130,11 @@ mod service_impls {
         pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
             if let Some(installation) = self.get_state().await?.conductor_services.dpki {
                 self.running_services.share_mut(|s| {
-                    s.dpki = Some(DeepkeyBuiltin::new(
+                    s.dpki = Some(Arc::new(DeepkeyBuiltin::new(
                         self.clone(),
                         self.keystore().clone(),
                         installation,
-                    ));
+                    )));
                 });
             }
             Ok(())
@@ -2153,8 +2144,6 @@ mod service_impls {
         pub async fn install_dpki(self: Arc<Self>, dna: DnaFile) -> ConductorResult<()> {
             let dna_hash = dna.dna_hash().clone();
             self.register_dna(dna.clone()).await?;
-
-            // dbg!(Timestamp::now());
 
             // FIXME: This "device seed" should be derived from the master seed and passed in here,
             //        not just generated like this. This is a placeholder.
@@ -2166,11 +2155,9 @@ mod service_impls {
                     .await?;
                 tag
             };
-            // dbg!(Timestamp::now());
 
             let (derivation_path, dst_tag) =
                 derivation_path_for_dpki_instance(0, &device_seed_lair_tag);
-            // dbg!(Timestamp::now());
             let seed_info = self
                 .keystore()
                 .lair_client()
@@ -2182,7 +2169,6 @@ mod service_impls {
                     derivation_path,
                 )
                 .await?;
-            // dbg!(Timestamp::now());
 
             // The initial agent key is the first derivation from the device seed.
             // Updated DPKI agent keys are sequential derivations from the same device seed.
@@ -2194,9 +2180,7 @@ mod service_impls {
             self.clone()
                 .install_app_legacy(DPKI_APP_ID.into(), Some(agent), &[((role_name, dna), None)])
                 .await?;
-            // dbg!(Timestamp::now());
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
-            // dbg!(Timestamp::now());
 
             let installation = DeepkeyInstallation {
                 cell_id,
@@ -2208,9 +2192,7 @@ mod service_impls {
             })
             .await?;
 
-            // dbg!(Timestamp::now());
             self.initialize_service_dpki().await?;
-            // dbg!(Timestamp::now());
 
             Ok(())
         }
@@ -2676,7 +2658,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
     ) -> anyhow::Result<ExternIO> {
         let now = Timestamp::now();
         let (nonce, expires_at) =
-            holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
+            holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
         let call_unsigned = ZomeCallUnsigned {
             cell_id,
             zome_name,

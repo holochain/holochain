@@ -60,19 +60,16 @@ pub async fn call_zome_workflow<Ribosome>(
 where
     Ribosome: RibosomeT + 'static,
 {
-    // dbg!(Timestamp::now());
     let coordinator_zome = args
         .ribosome
         .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
         .ok();
-    // dbg!(Timestamp::now());
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
     let result =
         call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
             .await?;
-    // dbg!(Timestamp::now());
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -123,7 +120,6 @@ where
             }
         }
     };
-    // dbg!(Timestamp::now());
     Ok(result)
 }
 

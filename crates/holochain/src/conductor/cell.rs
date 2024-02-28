@@ -885,7 +885,6 @@ impl Cell {
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from
         // an already running init call.
-        // dbg!(Timestamp::now());
         if workspace_lock
             .as_ref()
             .map_or(true, |w| !w.called_from_init())
@@ -893,7 +892,6 @@ impl Cell {
             // Check if init has run if not run it
             self.check_or_run_zome_init().await?;
         }
-        // dbg!(Timestamp::now());
 
         let keystore = self.conductor_api.keystore().clone();
 
@@ -904,7 +902,6 @@ impl Cell {
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
         let dna_def = ribosome.dna_def().as_content().clone();
-        // dbg!(Timestamp::now());
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -922,7 +919,6 @@ impl Cell {
                 .await?
             }
         };
-        // dbg!(Timestamp::now());
         let args = CallZomeWorkflowArgs {
             cell_id: self.id.clone(),
             ribosome,
@@ -953,7 +949,6 @@ impl Cell {
         )
         .await
         .map_err(|_| CellError::InitTimeout)?;
-        // dbg!(Timestamp::now());
 
         // If not run it
         let keystore = self.conductor_api.keystore().clone();
@@ -964,7 +959,6 @@ impl Cell {
         let ribosome = self.get_ribosome()?;
 
         let dna_def = ribosome.dna_def().clone();
-        // dbg!(Timestamp::now());
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
@@ -977,14 +971,12 @@ impl Cell {
             Arc::new(dna_def.into_content()),
         )
         .await?;
-        // dbg!(Timestamp::now());
 
         // Check if initialization has run
         if workspace.source_chain().zomes_initialized().await? {
             return Ok(());
         }
         trace!("running init");
-        // dbg!(Timestamp::now());
 
         let signal_tx = self.signal_broadcaster();
 
@@ -1001,7 +993,6 @@ impl Cell {
                 .await
                 .map_err(Box::new)?;
         trace!(?init_result);
-        // dbg!(Timestamp::now());
         match init_result {
             InitResult::Pass => {}
             r => return Err(CellError::InitFailed(r)),

@@ -707,7 +707,7 @@ async fn sys_validate_record_inner(
         maybe_entry: Option<&Entry>,
         cascade: Arc<impl Cascade + Send + Sync>,
     ) -> SysValidationResult<()> {
-        let validation_dependencies = ValDeps::new();
+        let validation_dependencies = ValDeps::default();
         fetch_previous_actions(
             validation_dependencies.clone(),
             cascade.clone(),

@@ -21,7 +21,7 @@ pub fn spawn_sys_validation_consumer(
     let space = Arc::new(space);
     let config = conductor.config.clone();
 
-    let current_validation_dependencies = ValDeps::new();
+    let current_validation_dependencies = ValDeps::default();
 
     super::queue_consumer_dna_bound(
         "sys_validation_consumer",
