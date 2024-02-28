@@ -13,7 +13,6 @@ use crate::conductor::{
 };
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
-use holo_hash::DnaHash;
 use holochain_conductor_api::{CellInfo, ProvisionedCell};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;

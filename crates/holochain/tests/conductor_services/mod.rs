@@ -3,10 +3,7 @@ use std::path::PathBuf;
 use holochain::{
     conductor::api::{AdminInterfaceApi, RealAdminInterfaceApi},
     sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile},
-    test_utils::{
-        consistency_10s, consistency_10s_advanced, consistency_60s,
-        inline_zomes::simple_create_read_zome,
-    },
+    test_utils::{consistency_10s, consistency_60s, inline_zomes::simple_create_read_zome},
 };
 pub use holochain_conductor_api::*;
 use holochain_conductor_services::KeyState;
