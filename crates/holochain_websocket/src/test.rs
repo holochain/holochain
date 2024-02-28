@@ -24,7 +24,10 @@ async fn sanity() {
         let (_send, mut recv) = l.accept().await.unwrap();
 
         let res = recv.recv::<TestMsg>().await.unwrap();
-        assert_eq!(ReceiveMessage::Signal(TestMsg::Hello), res);
+        assert_eq!(
+            ReceiveMessage::Signal(encode(&TestMsg::Hello).unwrap()),
+            res
+        );
 
         let res = recv.recv::<TestMsg>().await.unwrap();
         match res {
