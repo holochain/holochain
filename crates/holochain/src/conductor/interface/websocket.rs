@@ -14,6 +14,7 @@ use holochain_websocket::WebsocketSender;
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Concurrency count for websocket message processing.
@@ -71,6 +72,25 @@ pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketLis
     Ok(listener)
 }
 
+/// Abort tokio tasks on Drop.
+#[derive(Default)]
+struct TaskList(pub Vec<JoinHandle<()>>);
+impl Drop for TaskList {
+    fn drop(&mut self) {
+        debug!("TaskList Dropped!");
+        for h in self.0.iter() {
+            h.abort();
+        }
+    }
+}
+
+impl TaskList {
+    /// Clean up already closed tokio tasks.
+    pub fn prune(&mut self) {
+        self.0.retain_mut(|h| !h.is_finished());
+    }
+}
+
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
 pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
@@ -81,12 +101,13 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 ) {
     tm.ext_add_task(&format!("admin interface, port {}", port), move || {
         async move {
-            let mut task_list = tokio::task::JoinSet::new();
+            let mut task_list = TaskList::default();
             // establish a new connection to a client
             loop {
                 match listener.accept().await {
                     Ok((_, rx_from_iface)) => {
-                        let conn_count = task_list.len();
+                        task_list.prune();
+                        let conn_count = task_list.0.len();
                         if conn_count >= MAX_CONNECTIONS {
                             warn!("Connection limit reached, dropping newly opened connection. num_connections={}", conn_count);
                             // Max connections so drop this connection
@@ -94,10 +115,10 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                             continue;
                         };
                         debug!("Accepting new connection with number of existing connections {}", conn_count);
-                        task_list.spawn(recv_incoming_admin_msgs(
+                        task_list.0.push(tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
                             rx_from_iface,
-                        ));
+                        )));
                     }
                     Err(err) => {
                         warn!("Admin socket connection failed: {}", err);
@@ -128,7 +149,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 
     tm.ext_add_task("app interface new connection handler", move || {
         async move {
-            let mut task_list = tokio::task::JoinSet::new();
+            let mut task_list = TaskList::default();
             // establish a new connection to a client
             loop {
                 match listener.accept().await {
@@ -186,7 +207,7 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
 fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
-    task_list: &mut tokio::task::JoinSet<()>,
+    task_list: &mut TaskList,
     api: A,
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
@@ -215,22 +236,25 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     });
 
     // TODO - metrics to indicate if we're getting overloaded here.
-    task_list.spawn(
-        rx_from_cell.for_each_concurrent(CONCURRENCY_COUNT, move |signal| {
-            let tx_to_iface = tx_to_iface.clone();
-            async move {
-                trace!(msg = "Sending signal!", ?signal);
-                if let Err(err) = async move {
-                    tx_to_iface.signal(signal).await?;
-                    InterfaceResult::Ok(())
+    task_list
+        .0
+        .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
+            CONCURRENCY_COUNT,
+            move |signal| {
+                let tx_to_iface = tx_to_iface.clone();
+                async move {
+                    trace!(msg = "Sending signal!", ?signal);
+                    if let Err(err) = async move {
+                        tx_to_iface.signal(signal).await?;
+                        InterfaceResult::Ok(())
+                    }
+                    .await
+                    {
+                        error!(?err, "error emitting signal");
+                    }
                 }
-                .await
-                {
-                    error!(?err, "error emitting signal");
-                }
-            }
-        }),
-    );
+            },
+        )));
 
     let rx_from_iface =
         futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
@@ -244,16 +268,19 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         });
 
     // TODO - metrics to indicate if we're getting overloaded here.
-    task_list.spawn(
-        rx_from_iface.for_each_concurrent(CONCURRENCY_COUNT, move |msg| {
-            let api = api.clone();
-            async move {
-                if let Err(err) = handle_incoming_message(msg, api).await {
-                    error!(?err, "error handling websocket message");
+    task_list
+        .0
+        .push(tokio::task::spawn(rx_from_iface.for_each_concurrent(
+            CONCURRENCY_COUNT,
+            move |msg| {
+                let api = api.clone();
+                async move {
+                    if let Err(err) = handle_incoming_message(msg, api).await {
+                        error!(?err, "error handling websocket message");
+                    }
                 }
-            }
-        }),
-    );
+            },
+        )));
 }
 
 /// Handles messages on all interfaces
