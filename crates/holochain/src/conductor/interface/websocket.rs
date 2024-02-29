@@ -161,6 +161,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
                             rx_from_iface,
                             rx_from_cell,
                             tx_to_iface,
+                            port,
                         );
                     }
                     Err(err) => {
@@ -210,22 +211,23 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
     tx_to_iface: WebsocketSender,
+    port: u16,
 ) {
     use futures::stream::StreamExt;
 
     trace!("CONNECTION: {}", rx_from_iface.peer_addr());
 
-    let rx_from_cell = futures::stream::unfold(rx_from_cell, |mut rx_from_cell| async move {
+    let rx_from_cell = futures::stream::unfold(rx_from_cell, move |mut rx_from_cell| async move {
         loop {
             match rx_from_cell.recv().await {
                 // We missed some signals, but the channel is still open
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                    warn!("SignalChannelOverloaded");
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(dropped)) => {
+                    warn!("Holochain app port {port} dropped {dropped} signals. The app is emitting signals too fast.");
                     continue;
                 }
                 Ok(item) => return Some((item, rx_from_cell)),
                 _ => {
-                    warn!("SignalChannelClosed");
+                    debug!("SignalChannelClosed");
                     return None;
                 }
             }
