@@ -23,7 +23,7 @@ pub use super::*;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
 pub use error::*;
-pub use keystore_config::KeystoreConfig;
+pub use keystore_config::{KeystoreConfig, PwHashStrength};
 //pub use signal_config::SignalConfig;
 use std::path::Path;
 
@@ -293,7 +293,10 @@ mod tests {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                keystore: KeystoreConfig::LairServerInProc { lair_root: None },
+                keystore: KeystoreConfig::LairServerInProc {
+                    lair_root: None,
+                    pw_hash_strength: None
+                },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),

@@ -96,7 +96,10 @@ impl ConductorBuilder {
                         }
                     }
                 }
-                KeystoreConfig::LairServerInProc { lair_root } => {
+                KeystoreConfig::LairServerInProc {
+                    lair_root,
+                    pw_hash_strength,
+                } => {
                     warn_no_encryption();
 
                     let keystore_root_path: KeystorePath = match lair_root {
@@ -114,7 +117,18 @@ impl ConductorBuilder {
                         .join("lair-keystore-config.yaml");
                     let passphrase = get_passphrase()?;
 
-                    match spawn_lair_keystore_in_proc(&keystore_config_path, passphrase).await {
+                    use holochain_conductor_api::config::conductor::PwHashStrength;
+                    use holochain_keystore::PwHashLimits;
+
+                    let limits = match pw_hash_strength.unwrap_or_default() {
+                        PwHashStrength::Moderate => PwHashLimits::Moderate,
+                        PwHashStrength::Sensitive => PwHashLimits::Sensitive,
+                        PwHashStrength::Interactive => PwHashLimits::Interactive,
+                    };
+
+                    match spawn_lair_keystore_in_proc(&keystore_config_path, passphrase, limits)
+                        .await
+                    {
                         Ok(keystore) => keystore,
                         Err(err) => {
                             tracing::error!(?err, "Failed to spawn Lair keystore in process");

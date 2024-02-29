@@ -21,8 +21,9 @@ pub async fn spawn_lair_keystore(
 pub async fn spawn_lair_keystore_in_proc(
     config_path: &PathBuf,
     passphrase: sodoken::BufRead,
+    limits: PwHashLimits,
 ) -> LairResult<MetaLairClient> {
-    let config = get_config(config_path, passphrase.clone()).await?;
+    let config = get_config(config_path, passphrase.clone(), limits).await?;
     let connection_url = config.connection_url.clone();
 
     // rather than using the in-proc server directly,
@@ -41,10 +42,11 @@ pub async fn spawn_lair_keystore_in_proc(
 async fn get_config(
     config_path: &PathBuf,
     passphrase: sodoken::BufRead,
+    limits: PwHashLimits,
 ) -> LairResult<LairServerConfig> {
     match read_config(config_path).await {
         Ok(config) => Ok(config),
-        Err(_) => write_config(config_path, passphrase).await,
+        Err(_) => write_config(config_path, passphrase, limits).await,
     }
 }
 
@@ -59,6 +61,7 @@ async fn read_config(config_path: &PathBuf) -> LairResult<LairServerConfig> {
 async fn write_config(
     config_path: &std::path::Path,
     passphrase: sodoken::BufRead,
+    limits: PwHashLimits,
 ) -> LairResult<LairServerConfig> {
     let lair_root = config_path
         .parent()
@@ -69,7 +72,9 @@ async fn write_config(
         .create(&lair_root)
         .await?;
 
-    let config = LairServerConfigInner::new(lair_root, passphrase).await?;
+    let config = limits
+        .with_exec(move || LairServerConfigInner::new(lair_root, passphrase))
+        .await?;
 
     let mut config_f = tokio::fs::OpenOptions::new()
         .write(true)
