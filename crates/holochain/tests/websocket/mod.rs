@@ -651,13 +651,14 @@ async fn connection_limit_is_respected() {
     handles.clear();
 
     // Should now be possible to connect new clients
-    for _ in 0..MAX_CONNECTIONS {
+    for count in 0..MAX_CONNECTIONS {
         let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
         let rx = PollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
-            .expect("Admin request should succeed because there are enough available connections");
+            .map_err(|e| Error::other(format!("Admin request should succeed because there are enough available connections: {count}: {e:?}")))
+            .unwrap();
         handles.push((sender, rx));
     }
 
