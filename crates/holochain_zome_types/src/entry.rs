@@ -22,8 +22,8 @@ pub use holochain_integrity_types::entry::*;
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 /// Either an [`EntryDefIndex`] or one of:
-/// - [`EntryType::CapGrant`](crate::prelude::EntryType::CapGrant)
-/// - [`EntryType::CapClaim`](crate::prelude::EntryType::CapClaim)
+/// - [EntryType::CapGrant]
+/// - [EntryType::CapClaim]
 /// Which don't have an index.
 pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index
@@ -59,26 +59,22 @@ pub struct GetOptions {
 }
 
 impl GetOptions {
-    /// This will get you the content
-    /// with latest metadata if it can
-    /// otherwise it will fallback to what
-    /// you have cached locally.
+    /// Try to fetch latest metadata from the network,
+    /// and otherwise fall back to locally cached metadata.
     ///
-    /// This call is guaranteed to not go to
-    /// the network if you are an authority
-    /// for this hash.
+    /// If the current agent is an authority for this hash, this call will not
+    /// go to the network.
     pub fn latest() -> Self {
         Self {
             strategy: GetStrategy::Latest,
         }
     }
-    /// Gets the content but does not
-    /// try to get the latest metadata.
-    /// This will save a network call if the
-    /// entry is local (cached, authored or integrated).
+    /// Gets the content based on the locally cached metadata.
+    /// If the entry is cached in one of the local DBs, it will be returned
+    /// without a network call.
     ///
-    /// This will fallback to the network if the content
-    /// is not found locally
+    /// Otherwise will fall back to the network if the content
+    /// is not found locally.
     pub fn content() -> Self {
         Self {
             strategy: GetStrategy::Content,
@@ -97,7 +93,7 @@ impl Default for GetOptions {
 /// the caller is concerned about.
 /// This helps the subconscious avoid unnecessary network calls.
 pub enum GetStrategy {
-    /// Will try to get the latest metadata but fallback
+    /// Will try to get the latest metadata from the network and fall back
     /// to the cache if none is found.
     /// Does not go to the network if you are an authority for the data.
     Latest,

@@ -1,13 +1,9 @@
-use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::time::Duration;
 
 use rusqlite::named_params;
 
 use holo_hash::AnyDhtHash;
-use holo_hash::EntryHash;
-use holochain::test_utils::conductor_setup::ConductorTestData;
-use holochain::test_utils::host_fn_caller::*;
+use holochain::sweettest::*;
 use holochain::test_utils::wait_for_integration;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasm;
@@ -27,36 +23,40 @@ async fn authored_test() {
     let delay_per_attempt = Duration::from_millis(100);
 
     let zomes = vec![TestWasm::Create];
-    let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
-    let handle = conductor_test.handle();
-    let alice_call_data = conductor_test.alice_call_data();
-    let bob_call_data = conductor_test.bob_call_data().unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
+    let ((alice,), (bob,)) = conductor
+        .setup_app_for_agents(
+            "app",
+            SweetAgents::get(conductor.keystore(), 2).await.as_slice(),
+            [&dna],
+        )
+        .await
+        .unwrap()
+        .into_tuples();
 
-    let entry = Post("Hi there".into());
-    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-    // 3
-    let h = alice_call_data.get_api(TestWasm::Create);
-    let zome_index = h.get_entry_type(TestWasm::Create, POST_INDEX).zome_index;
-    h.commit_entry(
-        entry.clone().try_into().unwrap(),
-        EntryDefLocation::app(zome_index, POST_INDEX),
-        EntryVisibility::Public,
-    )
-    .await;
+    let handle = conductor.raw_handle();
+
+    let _: ActionHash = conductor
+        .call(&alice.zome(TestWasm::Create), "create_entry", ())
+        .await;
+
+    let record: Option<Record> = conductor
+        .call(&alice.zome(TestWasm::Create), "get_entry", ())
+        .await;
+
+    let entry_hash = record.unwrap().action().entry_hash().cloned().unwrap();
 
     // publish these commits
-    let triggers = handle
-        .get_cell_triggers(&alice_call_data.cell_id)
-        .await
-        .unwrap();
+    let triggers = handle.get_cell_triggers(&alice.cell_id()).await.unwrap();
     triggers.integrate_dht_ops.trigger(&"authored_test");
 
     // Alice commits the entry
-    alice_call_data
-        .authored_db
+    alice
+        .authored_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
-            let alice_pk = alice_call_data.cell_id.agent_pubkey().clone();
+            let alice_pk = alice.cell_id().agent_pubkey().clone();
 
             move |txn| -> DatabaseResult<()> {
                 let has_authored_entry: bool = txn.query_row(
@@ -83,18 +83,18 @@ async fn authored_test() {
     let expected_count = 3 + 14;
 
     wait_for_integration(
-        &bob_call_data.dht_db,
+        bob.dht_db(),
         expected_count,
         num_attempts,
         delay_per_attempt,
     )
     .await;
 
-    bob_call_data
-        .authored_db
+    bob
+        .authored_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
-            let bob_pk = bob_call_data.cell_id.agent_pubkey().clone();
+            let bob_pk = bob.cell_id().agent_pubkey().clone();
 
             move |txn| -> DatabaseResult<()> {
                 let has_authored_entry: bool = txn.query_row(
@@ -115,8 +115,7 @@ async fn authored_test() {
         .await
         .unwrap();
 
-    bob_call_data
-        .dht_db
+    bob.dht_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
 
@@ -138,27 +137,19 @@ async fn authored_test() {
         .unwrap();
 
     // Now bob commits the entry
-    let h = bob_call_data.get_api(TestWasm::Create);
-    let zome_index = h.get_entry_type(TestWasm::Create, POST_INDEX).zome_index;
-    h.commit_entry(
-        entry.clone().try_into().unwrap(),
-        EntryDefLocation::app(zome_index, POST_INDEX),
-        EntryVisibility::Public,
-    )
-    .await;
+    let _: ActionHash = conductor
+        .call(&bob.zome(TestWasm::Create), "create_entry", ())
+        .await;
 
     // Produce and publish these commits
-    let triggers = handle
-        .get_cell_triggers(&bob_call_data.cell_id)
-        .await
-        .unwrap();
+    let triggers = handle.get_cell_triggers(&bob.cell_id()).await.unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
-    bob_call_data
-        .authored_db
+    bob
+        .authored_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
-            let bob_pk = bob_call_data.cell_id.agent_pubkey().clone();
+            let bob_pk = bob.cell_id().agent_pubkey().clone();
 
             move |txn| -> DatabaseResult<()> {
                 let has_authored_entry: bool = txn.query_row(
@@ -179,6 +170,4 @@ async fn authored_test() {
         })
         .await
         .unwrap();
-
-    conductor_test.shutdown_conductor().await;
 }

@@ -33,6 +33,7 @@ pub fn get_links<'a>(
                                 let GetLinksInput {
                                     base_address,
                                     link_type,
+                                    get_options,
                                     tag_prefix,
                                     after,
                                     before,
@@ -51,7 +52,13 @@ pub fn get_links<'a>(
                                     &call_context.host_context.workspace(),
                                     call_context.host_context.network().to_owned(),
                                 )
-                                .dht_get_links(key, GetLinksOptions::default())
+                                .dht_get_links(
+                                    key,
+                                    GetLinksOptions {
+                                        get_options,
+                                        ..Default::default()
+                                    },
+                                )
                                 .await?)
                             },
                         ),
@@ -96,14 +103,17 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::{
+        core::ribosome::wasm_test::RibosomeTestFixture,
+        sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile},
+    };
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashPath).await;
@@ -142,7 +152,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_list_anchors() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Anchor).await;
@@ -227,7 +237,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn baseless_get_links() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -244,7 +254,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn external_get_links() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -259,7 +269,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_get_links() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -314,7 +324,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -329,7 +339,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_links_filtered_by_tag_prefix() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -441,7 +451,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn get_links_filtered_by_timestamp_and_author() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run().unwrap();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -550,5 +560,34 @@ pub mod slow_tests {
                 .map(|l| l.create_link_hash)
                 .collect::<Vec<ActionHash>>()
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_links_local_only() {
+        holochain_trace::test_run().unwrap();
+        // agents should not pass around data
+        let config = SweetConductorConfig::rendezvous(false).tune(|config| {
+            config.disable_historical_gossip = true;
+            config.disable_recent_gossip = true;
+            config.disable_publish = true;
+        });
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
+        let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();
+
+        // alice creates a link
+        let zome_alice = apps[0].cells()[0].zome(TestWasm::Link.coordinator_zome_name());
+        let _: ActionHash = conductors[0].call(&zome_alice, "create_link", ()).await;
+
+        // now make both agents aware of each other
+        conductors.exchange_peer_info().await;
+
+        // bob gets links locally only
+        let zome_bob = apps[1].cells()[0].zome(TestWasm::Link.coordinator_zome_name());
+        let local_links: Vec<Link> = conductors[1]
+            .call(&zome_bob, "get_links_local_only", ())
+            .await;
+        // links should be empty
+        assert_eq!(local_links.len(), 0);
     }
 }

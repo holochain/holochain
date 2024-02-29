@@ -1,6 +1,6 @@
 [package]
 name = "hdi"
-version = "0.4.0-beta-dev.27"
+version = "0.4.0-beta-dev.28"
 description = "The HDI"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdi"
@@ -24,6 +24,12 @@ serde_bytes = "0.11"
 tracing = { version = "0.1", optional = true }
 tracing-core = { version = "0.1", optional = true }
 mockall = { version = "0.11.3", optional = true }
+
+# When building for the WASM target, we need to configure getrandom
+# to use the host system for the source of crypto-secure randomness.
+# NOTE: This needs to be kept in sync with what is actually being pulled in via holo_hash and holochain_wasmer_guest
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
 fixt = { path = "../fixt" }

@@ -14,6 +14,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20240228.004140
+
+## [hcterm-0.3.0-beta-dev.13](crates/hcterm/CHANGELOG.md#0.3.0-beta-dev.13)
+
+## [holochain\_cli-0.3.0-beta-dev.37](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.37)
+
+## [holochain-0.3.0-beta-dev.38](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.38)
+
+- Some of the function signatures around SweetConductor app installation have changed slightly. You may need to use a slice (`&[x]`) instead of a collection of references (`[&x]`), or vice versa, in some places. If this is cumbersome please open an issue. [\#3310](https://github.com/holochain/holochain/pull/3310)
+- Start refactoring app validation workflow by simplifying main validation loop. All op validations are awaited at once now instead of creating a stream of tasks and processing it in the background.
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.35](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.37](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.37)
+
+## [holochain\_cascade-0.3.0-beta-dev.37](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.37)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.37](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.37)
+
+## [holochain\_conductor\_services-0.2.0-beta-dev.8](crates/holochain_conductor_services/CHANGELOG.md#0.2.0-beta-dev.8)
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.32](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.32)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.35](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.35)
+
+## [holochain\_websocket-0.3.0-beta-dev.14](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.14)
+
+## [hdk-0.3.0-beta-dev.32](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.32)
+
+- Added `create_clone_cell`, `disable_clone_cell`, `enable_clone_cell` and `delete_clone_cell` functionality to the HDK. This was previously only available on the admin interface of Holochain which shouldn’t be used by apps. Exposing this functionality through the HDK allows happ developers to manage clones from their backend code without having to worry about their apps breaking when more security is added to the admin interface. The only restriction on the use of these methods is that they will not permit you to create clones in another app. You can create clones of any cell within the app you make the host function calls from.
+- **BREAKING**: Added parameter `GetOptions` to calls `get_links` and `get_link_details`, to allow for fetching only local data. With the default setting of this option - `Latest`, links and link details are fetched from the network. When specifically set to `Content`, the network call is skipped and the calls only consider locally available data.
+
+## [holochain\_state-0.3.0-beta-dev.36](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.36)
+
+## [hdi-0.4.0-beta-dev.28](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.28)
+
+## [holochain\_p2p-0.3.0-beta-dev.36](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.36)
+
+## [hc\_sleuth-0.2.0-beta-dev.7](crates/hc_sleuth/CHANGELOG.md#0.2.0-beta-dev.7)
+
+## [holochain\_types-0.3.0-beta-dev.34](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [holochain\_keystore-0.3.0-beta-dev.29](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.29)
+
+## [holochain\_sqlite-0.3.0-beta-dev.34](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.34)
+
+## [mr\_bundle-0.3.0-beta-dev.6](crates/mr_bundle/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_zome\_types-0.3.0-beta-dev.28](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.28)
+
 # 20240214.004310
 
 ## [holochain-0.3.0-beta-dev.37](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.37)
