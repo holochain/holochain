@@ -37,8 +37,8 @@ impl KitsuneTestHarness {
         let legacy_host_api = TestLegacyHost::new(keystore);
 
         Ok(Self {
+            config: KitsuneP2pConfig::empty(),
             name: name.to_string(),
-            config: Default::default(),
             tls_config: TlsConfig::new_ephemeral().await?,
             host_api,
             legacy_host_api,
@@ -47,7 +47,6 @@ impl KitsuneTestHarness {
         })
     }
 
-    #[cfg(feature = "tx5")]
     pub fn configure_tx5_network(mut self, signal_url: SocketAddr) -> Self {
         self.config
             .transport_pool
@@ -58,7 +57,6 @@ impl KitsuneTestHarness {
     }
 
     pub fn use_bootstrap_server(mut self, bootstrap_addr: SocketAddr) -> Self {
-        self.config.network_type = kitsune_p2p_types::config::NetworkType::QuicBootstrap;
         self.config.bootstrap_service = Some(url2::url2!("http://{:?}", bootstrap_addr));
         self
     }

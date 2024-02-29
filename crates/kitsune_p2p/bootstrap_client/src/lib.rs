@@ -16,14 +16,12 @@ pub mod prelude {
 /// The "net" flag / bucket to use when talking to the bootstrap server.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum BootstrapNet {
-    Tx2,
     Tx5,
 }
 
 impl BootstrapNet {
     fn value(&self) -> &'static str {
         match self {
-            BootstrapNet::Tx2 => "tx2",
             BootstrapNet::Tx5 => "tx5",
         }
     }
@@ -365,7 +363,7 @@ mod tests {
                 space: Arc::new(space.clone()),
                 ..Default::default()
             },
-            BootstrapNet::Tx2,
+            BootstrapNet::Tx5,
         )
         .await
         .unwrap();

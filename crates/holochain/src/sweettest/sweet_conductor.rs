@@ -270,7 +270,7 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_standard_config() -> SweetConductor {
-        Self::from_config(standard_config()).await
+        Self::from_config(SweetConductorConfig::rendezvous(false)).await
     }
 
     /// Get the rendezvous config that this conductor is using, if any

@@ -195,7 +195,7 @@ impl From<Network> for KitsuneP2pConfig {
             transport,
             bootstrap,
         } = n;
-        let mut kit = KitsuneP2pConfig::default();
+        let mut kit = KitsuneP2pConfig::empty();
         kit.bootstrap_service = bootstrap;
 
         match transport {

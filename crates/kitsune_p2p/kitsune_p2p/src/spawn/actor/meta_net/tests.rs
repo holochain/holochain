@@ -1,3 +1,8 @@
+use self::{
+    spawn::actor::{InternalHandler, InternalHandlerResult},
+    test_util::start_signal_srv,
+};
+
 use super::*;
 
 use kitsune_p2p_fetch::OpHashSized;
@@ -29,7 +34,7 @@ use crate::spawn::BroadcastData;
 use crate::event::GetAgentInfoSignedEvt;
 use crate::event::*;
 
-use crate::spawn::{Internal, InternalHandler, InternalHandlerResult};
+use crate::spawn::Internal;
 
 macro_rules! write_test_struct {
     ($(
@@ -387,19 +392,6 @@ impl Test {
         tokio::task::spawn(builder.spawn(test.clone()));
         (test, i_s, send)
     }
-}
-
-async fn start_signal_srv() -> (std::net::SocketAddr, tx5_signal_srv::SrvHnd) {
-    let mut config = tx5_signal_srv::Config::default();
-    config.interfaces = "127.0.0.1".to_string();
-    config.port = 0;
-    config.demo = false;
-    let (sig_hnd, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
-
-    assert!(err_list.is_empty());
-    assert_eq!(1, addr_list.len());
-
-    (addr_list.first().unwrap().clone(), sig_hnd)
 }
 
 struct Setup2Nodes {

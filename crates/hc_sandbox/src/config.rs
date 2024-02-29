@@ -13,7 +13,7 @@ pub fn create_config(
 ) -> anyhow::Result<ConductorConfig> {
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
-        ..Default::default()
+        ..ConductorConfig::empty()
     };
     match con_url {
         Some(url) => {

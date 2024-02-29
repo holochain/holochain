@@ -84,7 +84,7 @@
         ${self'.packages.release-automation}/bin/release-automation \
           --workspace-path=''${WORKSPACE_PATH} \
           --log-level=debug \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm)$" \
+          --match-filter="^(holochain|holochain_cli|hcterm)$" \
           release \
             --force-tag-creation \
             --force-branch-creation \

@@ -20,7 +20,7 @@ use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::tx_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
