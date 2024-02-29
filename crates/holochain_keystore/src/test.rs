@@ -7,9 +7,9 @@ async fn test_lair_in_proc_start_time() {
 
     // -- the Interactive one -- //
 
-    let tmp1 = tempdir::TempDir::new("test_lair_in_proc_start_time").unwrap();
+    let tmp1 = tempdir::TempDir::new("ks").unwrap();
     let mut path1 = tmp1.path().to_owned();
-    path1.push("lair-config.yaml");
+    path1.push("cfg.yml");
 
     println!("tmp1: {path1:?}");
 
@@ -29,9 +29,9 @@ async fn test_lair_in_proc_start_time() {
 
     // -- the Minimum one -- //
 
-    let tmp2 = tempdir::TempDir::new("test_lair_in_proc_start_time").unwrap();
+    let tmp2 = tempdir::TempDir::new("ks").unwrap();
     let mut path2 = tmp2.path().to_owned();
-    path2.push("lair-config.yaml");
+    path2.push("cfg.yml");
 
     println!("tmp2: {path2:?}");
 
