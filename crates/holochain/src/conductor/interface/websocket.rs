@@ -33,8 +33,9 @@ pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 /// The maximum number of connections allowed to the admin interface
 pub const MAX_CONNECTIONS: usize = 400;
 
-/// For some reason, the "task manager" doesn't actually shut down tasks...
-/// We have to have this awkward workaround.
+// TODO - if task motel just aborted the task when it should be shut down
+//        then we wouldn't have to apply this workaround to shut down the
+//        future when the stop future resolves.
 trait TmExt {
     fn ext_add_task<Fut: std::future::Future<Output = ()> + Send + 'static>(
         &self,
@@ -50,9 +51,10 @@ impl TmExt for TaskManagerClient {
         f: impl FnOnce() -> Fut + Send + 'static,
     ) {
         self.add_conductor_task_ignored(name, move |stop| async move {
-            let task = tokio::task::spawn(f());
-            let _ = stop.await;
-            task.abort();
+            tokio::select! {
+                _ = stop => (),
+                _ = f() => (),
+            }
             Ok(())
         });
     }
