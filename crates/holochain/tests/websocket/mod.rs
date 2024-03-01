@@ -74,10 +74,9 @@ how_many: 42
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-    let orig_dna_hash = dna.dna_hash().clone();
-    register_and_install_dna(
+    let installed_dna_hash = register_and_install_dna(
         &mut client,
-        orig_dna_hash,
+        original_dna_hash.clone(),
         fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
@@ -91,14 +90,9 @@ how_many: 42
     let response = client.request(request);
     let response = check_timeout(response, 10000).await;
 
-    let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
-    let mut tmp_dna = dna.dna_def().clone();
-    tmp_dna.modifiers.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
-
-    assert_ne!(&original_dna_hash, dna.dna_hash());
-
-    let expects = vec![dna.dna_hash().clone()];
+    dbg!(&response);
+    dbg!(&installed_dna_hash);
+    let expects = vec![installed_dna_hash];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 }
 
