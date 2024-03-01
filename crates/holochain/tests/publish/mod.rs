@@ -16,7 +16,6 @@ use std::time::Duration;
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     use holochain_zome_types::init::InitCallbackResult;
 
