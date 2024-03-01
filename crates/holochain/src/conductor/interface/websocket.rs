@@ -33,33 +33,6 @@ pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 /// The maximum number of connections allowed to the admin interface
 pub const MAX_CONNECTIONS: usize = 400;
 
-// TODO - if task motel just aborted the task when it should be shut down
-//        then we wouldn't have to apply this workaround to shut down the
-//        future when the stop future resolves.
-trait TmExt {
-    fn ext_add_task<Fut: std::future::Future<Output = ()> + Send + 'static>(
-        &self,
-        name: &str,
-        f: impl FnOnce() -> Fut + Send + 'static,
-    );
-}
-
-impl TmExt for TaskManagerClient {
-    fn ext_add_task<Fut: std::future::Future<Output = ()> + Send + 'static>(
-        &self,
-        name: &str,
-        f: impl FnOnce() -> Fut + Send + 'static,
-    ) {
-        self.add_conductor_task_ignored(name, move |stop| async move {
-            tokio::select! {
-                _ = stop => (),
-                _ = f() => (),
-            }
-            Ok(())
-        });
-    }
-}
-
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
@@ -99,7 +72,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
     api: A,
     port: u16,
 ) {
-    tm.ext_add_task(&format!("admin interface, port {}", port), move || {
+    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move || {
         async move {
             let mut task_list = TaskList::default();
             // establish a new connection to a client
@@ -147,7 +120,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     trace!("LISTENING AT: {}", addr);
     let port = addr.port();
 
-    tm.ext_add_task("app interface new connection handler", move || {
+    tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
             let mut task_list = TaskList::default();
             // establish a new connection to a client
