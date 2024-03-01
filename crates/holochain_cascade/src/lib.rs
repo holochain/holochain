@@ -693,33 +693,22 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
-
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Get the specified Record along with all Updates and Deletes associated with it.
@@ -731,8 +720,6 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<RecordDetails>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetRecordDetailsQuery =
             self.construct_query_with_data_access(action_hash.clone());
 
@@ -740,30 +727,22 @@ where
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(action_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, options))]
@@ -776,38 +755,28 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(action_hash.into(), options.into())
                 .await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, options))]
@@ -818,33 +787,23 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
-            }
+        if let GetStrategy::Local = options.strategy {
+            // Only return what is in the database.
+            return self.cascading(query.clone()).await;
         }
 
         // If we are not in the process of authoring this hash or its
         // authority we need a network call.
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
         if !(authoring || authority) {
             self.fetch_record(entry_hash.into(), options.into()).await?;
         }
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
@@ -915,7 +874,7 @@ where
     ) -> CascadeResult<Vec<Link>> {
         // only fetch links from network if i am not an authority and
         // GetStrategy is Latest
-        if let GetStrategy::Latest = options.get_options.strategy {
+        if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 self.fetch_links(key.clone(), options).await?;
@@ -933,8 +892,7 @@ where
             },
         );
 
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     #[instrument(skip(self, key, options))]
@@ -946,16 +904,15 @@ where
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
         // only fetch link details from network if i am not an authority and
-        // GetStrategy is Latest
-        if let GetStrategy::Latest = options.get_options.strategy {
+        // GetStrategy is Network
+        if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 self.fetch_links(key.clone(), options).await?;
             }
         }
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
-        let results = self.cascading(query).await?;
-        Ok(results)
+        self.cascading(query).await
     }
 
     /// Count the number of links matching the `query`.
@@ -1128,7 +1085,7 @@ where
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::content(),
+                        GetOptions::local(),
                     )
                     .await?
                     .into_iter()
@@ -1151,7 +1108,7 @@ where
                 let maybe_chain: Option<Vec<_>> = self
                     .get_concurrent(
                         hashes.into_iter().map(|(_, h)| h.into()),
-                        GetOptions::content(),
+                        GetOptions::local(),
                     )
                     .await?
                     .into_iter()
@@ -1186,7 +1143,6 @@ where
 
     async fn am_i_an_authority(&self, hash: OpBasis) -> CascadeResult<bool> {
         let network = some_or_return!(self.network.as_ref(), false);
-
         Ok(network.authority_for_hash(hash).await?)
     }
 

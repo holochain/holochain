@@ -74,7 +74,7 @@ pub(crate) fn get_original_entry_data(
     tokio_helper::block_forever_on(async move {
         let cascade = CascadeImpl::from_workspace_and_network(&workspace, network);
         let maybe_original_record: Option<SignedActionHashed> = cascade
-            .get_details(address.clone().into(), GetOptions::content())
+            .get_details(address.clone().into(), GetOptions::local())
             .await?
             .map(|el| {
                 match el {
