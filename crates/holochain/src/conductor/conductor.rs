@@ -2632,7 +2632,7 @@ mod accessor_impls {
                 .clone()
                 .map(|c| DnaHash::from_raw_32(c.uuid().into()).into());
             DnaCompatParams {
-                protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
+                protocol_version: KITSUNE_PROTOCOL_VERSION,
                 dpki_hash,
             }
         }

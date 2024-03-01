@@ -281,7 +281,8 @@ mod tests {
             let dna_file = dna_file.clone();
             async move {
                 let mut payload =
-                    get_install_app_payload_from_dnas("app", agent, &[(dna_file, None)]).await;
+                    get_install_app_payload_from_dnas("app", Some(agent), &[(dna_file, None)])
+                        .await;
                 payload.ignore_genesis_failure = ignore;
                 payload
             }
