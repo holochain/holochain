@@ -904,7 +904,7 @@ where
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
         // only fetch link details from network if i am not an authority and
-        // GetStrategy is Latest
+        // GetStrategy is Network
         if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
