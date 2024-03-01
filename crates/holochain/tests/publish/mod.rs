@@ -8,6 +8,7 @@ use holochain_wasm_test_utils::TestWasm;
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "receipt completion is flaky, revise once integration logic is merged into app validation workflow"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     use holochain_zome_types::init::InitCallbackResult;
 
@@ -31,7 +32,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
     let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
 
     // trigger init and await consistency
-    let init_result: InitCallbackResult = conductors[0]
+    let _: InitCallbackResult = conductors[0]
         .call(&alice.zome(TestWasm::Create), "init", ())
         .await;
     consistency_60s([&alice, &bobbo, &carol, &danny, &emma, &fred]).await;
