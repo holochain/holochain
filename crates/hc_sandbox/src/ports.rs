@@ -44,6 +44,8 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     Ok(ports)
 }
 
+/// Creates a [`WebsocketSender`] along with a task which simply consumes and discards
+/// all messages on the receiving side
 pub(crate) async fn get_admin_api(
     port: u16,
 ) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {

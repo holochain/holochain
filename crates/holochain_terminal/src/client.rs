@@ -19,6 +19,7 @@ impl Drop for AppClient {
 }
 
 impl AppClient {
+    /// Creates a App websocket client which can send messages but ignores any incoming messages
     async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
         let (tx, mut rx) = connect(Arc::new(WebsocketConfig::default()), addr).await?;
 
@@ -105,6 +106,7 @@ impl Drop for AdminClient {
 }
 
 impl AdminClient {
+    /// Creates an Admin websocket client which can send messages but ignores any incoming messages
     pub async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
         let (tx, mut rx) = connect(Arc::new(WebsocketConfig::default()), addr).await?;
 
