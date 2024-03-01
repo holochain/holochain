@@ -49,58 +49,52 @@ pub struct AppEntryDefLocation {
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-/// Options for controlling how get works
+/// Options for controlling how get is executed.
 pub struct GetOptions {
-    /// If this is true the get call will wait for
-    /// the latest data before returning.
-    /// If it is false you will get whatever is locally
-    /// available on this conductor.
+    /// Configure whether data should be fetched from the network or only from the local
+    /// databases.
     pub strategy: GetStrategy,
 }
 
 impl GetOptions {
-    /// Try to fetch latest metadata from the network,
+    /// Fetch latest metadata from the network,
     /// and otherwise fall back to locally cached metadata.
     ///
     /// If the current agent is an authority for this hash, this call will not
     /// go to the network.
-    pub fn latest() -> Self {
+    pub fn network() -> Self {
         Self {
-            strategy: GetStrategy::Latest,
+            strategy: GetStrategy::Network,
         }
     }
-    /// Gets the content based on the locally cached metadata.
-    /// If the entry is cached in one of the local DBs, it will be returned
-    /// without a network call.
-    ///
-    /// Otherwise will fall back to the network if the content
-    /// is not found locally.
-    pub fn content() -> Self {
+    /// Gets the action/entry and its metadata from local databases only.
+    /// No network call is made.
+    pub fn local() -> Self {
         Self {
-            strategy: GetStrategy::Content,
+            strategy: GetStrategy::Local,
         }
     }
 }
 
 impl Default for GetOptions {
     fn default() -> Self {
-        Self::latest()
+        Self::network()
     }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
-/// Describes the get call and what information
-/// the caller is concerned about.
-/// This helps the subconscious avoid unnecessary network calls.
+/// Set if data should be fetched from the network or only from the local
+/// databases.
 pub enum GetStrategy {
-    /// Will try to get the latest metadata from the network and fall back
-    /// to the cache if none is found.
-    /// Does not go to the network if you are an authority for the data.
-    Latest,
-    /// Will try to get the content locally but go
-    /// to the network if it is not found.
-    /// Does not go to the network if you are an authority for the data.
-    Content,
+    /// Fetch latest metadata from the network,
+    /// and otherwise fall back to locally cached metadata.
+    ///
+    /// If the current agent is an authority for this hash, this call will not
+    /// go to the network.
+    Network,
+    /// Gets the action/entry and its metadata from local databases only.
+    /// No network call is made.
+    Local,
 }
 
 /// Zome input to create an entry.
