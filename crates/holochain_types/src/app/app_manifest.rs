@@ -126,7 +126,7 @@ impl AppManifest {
                     dna: AppRoleDnaManifest {
                         location: Some(mr_bundle::Location::Bundled(path)),
                         modifiers: Default::default(),
-                        installed_hash: Some(cell_id.dna_hash().clone().into()),
+                        installed_hash: None,
                         clone_limit: 256,
                     },
                 }

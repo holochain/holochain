@@ -25,14 +25,13 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         .await;
         let path = PathBuf::from(format!("{}", dna.dna_hash()));
         let modifiers = DnaModifiersOpt::none();
-        let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
 
         let roles = vec![AppRoleManifest {
             name: "name".into(),
             dna: AppRoleDnaManifest {
                 location: Some(DnaLocation::Bundled(path.clone())),
                 modifiers: modifiers.clone(),
-                installed_hash: Some(installed_dna_hash.into()),
+                installed_hash: None,
                 clone_limit,
             },
             provisioning: Some(CellProvisioning::CloneOnly),
@@ -141,14 +140,13 @@ async fn reject_duplicate_app_for_same_agent() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
     let modifiers = DnaModifiersOpt::none();
-    let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
 
     let roles = vec![AppRoleManifest {
         name: "name".into(),
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(path.clone())),
             modifiers: modifiers.clone(),
-            installed_hash: Some(installed_dna_hash.into()),
+            installed_hash: None,
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -618,7 +616,7 @@ impl TestCase {
                     dna: AppRoleDnaManifest {
                         location: Some(DnaLocation::Path(dna_path.clone())),
                         modifiers: dna_modifiers.clone(),
-                        installed_hash: Some(dna_hash.clone().into()),
+                        installed_hash: None,
                         clone_limit: 0,
                     },
                     provisioning: None,
