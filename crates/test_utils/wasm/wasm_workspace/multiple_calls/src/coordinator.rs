@@ -15,7 +15,7 @@ fn create_entry_multiple(n: u32) -> ExternResult<()> {
 fn get_entry_multiple(n: u32) -> ExternResult<hdk::prelude::Bytes> {
     let mut bytes = vec![];
     'test_loop: for i in 0..n {
-        match get(hash_entry(&Val(i))?, GetOptions::content())? {
+        match get(hash_entry(&Val(i))?, GetOptions::local())? {
             Some(record) => {
                 match record
                     .entry()

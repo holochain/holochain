@@ -14,7 +14,7 @@ fn create_entry(_: ()) -> ExternResult<ActionHash> {
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<Option<Record>> {
-    get(hash_entry(&post())?, GetOptions::latest())
+    get(hash_entry(&post())?, GetOptions::network())
 }
 
 #[hdk_extern]
