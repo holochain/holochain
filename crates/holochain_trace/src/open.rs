@@ -6,7 +6,7 @@ pub use on::*;
 pub use context_wrap::MsgWrap;
 
 #[allow(missing_docs)]
-#[cfg(feature = "channels")]
+#[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
 pub mod channel;
 mod context_wrap;
 

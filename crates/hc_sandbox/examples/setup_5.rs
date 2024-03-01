@@ -52,6 +52,7 @@ async fn main() -> anyhow::Result<()> {
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
             network_seed: None,
+            ignore_genesis_failure: false,
         };
 
         let r = AdminRequest::InstallApp(Box::new(payload));
