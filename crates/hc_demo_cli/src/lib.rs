@@ -4,18 +4,17 @@
 //! on downstream projects such as launcher, dev hub, or the app store.
 //! Run `hc demo-cli help` to get started.
 
-mod coordinator_wasm;
-mod demo;
-mod integrity_wasm;
-
 cfg_if::cfg_if! {
     if #[cfg(feature = "build_demo")] {
+        mod demo;
         pub use demo::*;
         pub const BUILD_MODE: &str = "build_demo";
     } else if #[cfg(feature = "build_integrity_wasm")] {
+        mod integrity_wasm;
         pub use integrity_wasm::*;
         pub const BUILD_MODE: &str = "build_integrity_wasm";
     } else if #[cfg(feature = "build_coordinator_wasm")] {
+        mod coordinator_wasm;
         pub use coordinator_wasm::*;
         pub const BUILD_MODE: &str = "build_coordinator_wasm";
     }
