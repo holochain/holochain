@@ -3,15 +3,7 @@ use holochain::core::workflow::publish_dht_ops_workflow::num_still_needing_publi
 use holochain::sweettest::{
     consistency_60s, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
-use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
-use holochain_sqlite::error::DatabaseResult;
-use holochain_types::validation_receipt::{
-    SignedValidationReceipt, ValidationReceipt, ValidationReceiptBundle,
-};
 use holochain_wasm_test_utils::TestWasm;
-use rusqlite::named_params;
-use std::collections::HashSet;
-use std::time::Duration;
 
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
