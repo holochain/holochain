@@ -26,7 +26,7 @@ pub enum Signal {
 
 impl Signal {
     /// Parse from vec.
-    pub fn from_vec(v: Vec<u8>) -> Result<Self, SerializedBytesError> {
+    pub fn try_from_vec(v: Vec<u8>) -> Result<Self, SerializedBytesError> {
         Self::try_from(SerializedBytes::from(UnsafeBytes::from(v)))
     }
 }

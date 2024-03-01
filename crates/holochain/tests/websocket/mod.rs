@@ -460,8 +460,8 @@ async fn emit_signals() {
     )
     .await;
 
-    let sig1 = Signal::from_vec(sig1_recv.await.unwrap()).unwrap();
-    let sig2 = Signal::from_vec(sig2_recv.await.unwrap()).unwrap();
+    let sig1 = Signal::try_from_vec(sig1_recv.await.unwrap()).unwrap();
+    let sig2 = Signal::try_from_vec(sig2_recv.await.unwrap()).unwrap();
     sig1_task.abort();
     sig2_task.abort();
 

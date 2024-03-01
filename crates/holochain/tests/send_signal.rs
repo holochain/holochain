@@ -59,7 +59,7 @@ async fn send_signal_after_conductor_restart() {
             cell_id,
             zome_name,
             signal,
-        }) = Signal::from_vec(v)
+        }) = Signal::try_from_vec(v)
         {
             assert_eq!(cell_id, alice_cell_id);
             assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
@@ -128,7 +128,7 @@ async fn send_signal_after_conductor_restart() {
             cell_id,
             zome_name,
             signal,
-        }) = Signal::from_vec(v)
+        }) = Signal::try_from_vec(v)
         {
             assert_eq!(cell_id, alice_cell_id);
             assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());

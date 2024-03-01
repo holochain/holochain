@@ -469,7 +469,7 @@ pub mod test {
         }
 
         // ensure that the signal is received and is decodable
-        match Signal::from_vec(s_recv.recv().await.unwrap()).unwrap() {
+        match Signal::try_from_vec(s_recv.recv().await.unwrap()).unwrap() {
             Signal::App { signal, .. } => {
                 let expected = AppSignal::new(ExternIO::encode(TestSignal::Tested).unwrap());
                 assert_eq!(expected, signal);
