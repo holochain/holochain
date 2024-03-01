@@ -30,6 +30,9 @@ crossterm = "0.27.0"
 name = "thru"
 harness = false
 
+[lints]
+workspace = true
+
 [features]
 sqlite-encrypted = [
     "kitsune_p2p_types/sqlite-encrypted",

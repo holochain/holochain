@@ -44,6 +44,9 @@ serde_json = { workspace = true }
 jsonschema = "0.17"
 walkdir = "2"
 
+[lints]
+workspace = true
+
 [features]
 sqlite-encrypted = [
     "holochain_types/sqlite-encrypted",

@@ -72,6 +72,9 @@ sqlformat = "0.1.6"
 loom = { version = "0.6", features = ["futures", "checkpoint"] }
 holochain_sqlite = { path = ".", default-features = false, features = ["test_utils"] }
 
+[lints]
+workspace = true
+
 [features]
 default = [ "sqlite", "kitsune_p2p_types", "holochain_util" ]
 

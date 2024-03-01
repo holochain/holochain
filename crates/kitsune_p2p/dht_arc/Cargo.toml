@@ -31,6 +31,9 @@ rand = "0.8.5"
 statrs = "0.16.0"
 tracing = { workspace = true }
 
+[lints]
+workspace = true
+
 [features]
 sqlite-encrypted = [
     "rusqlite",

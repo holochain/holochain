@@ -38,6 +38,9 @@ holochain_wasmer_common = { workspace = true, optional = true }
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 
+[lints]
+workspace = true
+
 [features]
 default = ["serialization", "holochain-wasmer"]
 full = [

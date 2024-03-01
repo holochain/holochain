@@ -36,6 +36,9 @@ getrandom = { version = "0.2", features = ["custom"] }
 fixt = { path = "../fixt" }
 trybuild = "1.0"
 
+[lints]
+workspace = true
+
 [features]
 default = []
 mock = ["hdk_derive/mock", "mockall"]
