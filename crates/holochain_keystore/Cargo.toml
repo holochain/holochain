@@ -38,6 +38,9 @@ assert_cmd = "2.0.4"
 serde_yaml = "0.9.10"
 tempdir = "0.3.7"
 
+[lints]
+workspace = true
+
 [features]
 default = [ "sqlite" ]
 

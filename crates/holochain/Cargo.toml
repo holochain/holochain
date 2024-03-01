@@ -169,6 +169,9 @@ path = "src/lib.rs"
 name = "holochain"
 path = "src/bin/holochain/main.rs"
 
+[lints]
+workspace = true
+
 [features]
 default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
 
@@ -272,6 +275,3 @@ sweetest = [
   "test_utils",
   "sqlite",
 ]
-
-[lints]
-workspace = true

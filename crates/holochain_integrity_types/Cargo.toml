@@ -39,6 +39,9 @@ tracing = { version = "0.1", optional = true }
 holochain_integrity_types = { path = ".", features = ["test_utils", "fuzzing"]}
 serde_json = { workspace = true }
 
+[lints]
+workspace = true
+
 [features]
 default = []
 

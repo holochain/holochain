@@ -15,3 +15,6 @@ paste = "1.0"
 # TODO: Figure out if we can keep this dependency behind a feature flag,
 #       or limit it to test-only code, to reduce Wasm code bloat
 subtle = "2"
+
+[lints]
+workspace = true

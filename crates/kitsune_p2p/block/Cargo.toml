@@ -15,6 +15,9 @@ kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.7", path = "../timestamp" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.16", path = "../bin_data" }
 serde = { version = "1.0", features = ["derive"] }
 
+[lints]
+workspace = true
+
 [features]
 sqlite-encrypted = [
     "kitsune_p2p_timestamp/sqlite-encrypted",
