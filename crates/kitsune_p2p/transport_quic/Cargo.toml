@@ -20,6 +20,9 @@ webpki = "=0.22.2" # pinned until other libraries upgrade to ring 0.17
 rustls = { version = "0.20.4", features = [ "dangerous_configuration" ] }
 tokio = { version = "1.27", features = [ "full" ] }
 
+[lints]
+workspace = true
+
 [features]
 sqlite-encrypted = [
     "kitsune_p2p_types/sqlite-encrypted",

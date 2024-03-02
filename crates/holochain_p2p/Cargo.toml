@@ -40,6 +40,9 @@ holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
 [dev-dependencies]
 holochain_p2p = { path = ".", features = ["test_utils"] }
 
+[lints]
+workspace = true
+
 [features]
 
 test_utils = [

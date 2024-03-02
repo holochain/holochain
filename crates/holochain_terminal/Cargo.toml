@@ -24,3 +24,6 @@ holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
 holochain_conductor_api = { version = "^0.3.0-beta-dev.37", path = "../holochain_conductor_api" }
 holochain_websocket = { version = "^0.3.0-beta-dev.14", path = "../holochain_websocket" }
 holochain_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_types" }
+
+[lints]
+workspace = true

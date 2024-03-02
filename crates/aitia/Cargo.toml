@@ -29,6 +29,9 @@ maplit = "1"
 pretty_assertions = "1.4"
 test-case = "2.1"
 
+[lints]
+workspace = true
+
 [features]
 default = ["tracing"]
 

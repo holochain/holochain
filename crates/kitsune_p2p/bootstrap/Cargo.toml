@@ -43,6 +43,9 @@ path = "src/lib.rs"
 name = "kitsune-bootstrap"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [features]
 sqlite-encrypted = [
     "kitsune_p2p_types/sqlite-encrypted",

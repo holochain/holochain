@@ -36,6 +36,9 @@ serde_yaml = "0.9"
 tokio = { workspace = true }
 tempfile = "3"
 
+[lints]
+workspace = true
+
 [features]
 
 packing = ["serde_yaml", "holochain_util/tokio"]

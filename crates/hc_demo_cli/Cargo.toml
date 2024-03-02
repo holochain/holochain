@@ -35,6 +35,9 @@ getrandom = { version = "0.2", features = ["custom"] }
 flate2 = "1.0.25"
 wasm-opt = "0.112.0"
 
+[lints]
+workspace = true
+
 [features]
 default = [ "build_demo" ]
 
