@@ -10,8 +10,6 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "receipt completion is flaky, revise once integration logic is merged into app validation workflow"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
-    use holochain_zome_types::init::InitCallbackResult;
-
     holochain_trace::test_run().unwrap();
 
     // Need DEFAULT_RECEIPT_BUNDLE_SIZE peers to send validation receipts back
@@ -30,12 +28,6 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
-
-    // trigger init and await consistency
-    let _: InitCallbackResult = conductors[0]
-        .call(&alice.zome(TestWasm::Create), "init", ())
-        .await;
-    consistency_60s([&alice, &bobbo, &carol, &danny, &emma, &fred]).await;
 
     let _: ActionHash = conductors[0]
         .call(&alice.zome(TestWasm::Create), "create_entry", ())
