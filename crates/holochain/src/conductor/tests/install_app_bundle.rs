@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::conductor::api::error::ConductorApiError;

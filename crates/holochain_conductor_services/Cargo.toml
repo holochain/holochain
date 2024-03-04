@@ -21,3 +21,6 @@ thiserror = { workspace = true }
 
 holochain_keystore = { version = "^0.3.0-beta-dev.29", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_types" }
+
+[lints]
+workspace = true

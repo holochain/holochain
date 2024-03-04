@@ -29,6 +29,9 @@ holochain_cli_run_local_services = { path = "../hc_run_local_services", version 
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 tokio = { workspace = true }
 
+[lints]
+workspace = true
+
 [features]
 
 chc = [

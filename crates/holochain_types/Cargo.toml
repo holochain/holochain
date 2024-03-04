@@ -81,6 +81,9 @@ serde_json = { workspace = true }
 test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
 
+[lints]
+workspace = true
+
 [features]
 default = []
 
