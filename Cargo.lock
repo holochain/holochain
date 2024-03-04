@@ -2712,7 +2712,6 @@ dependencies = [
  "arbitrary",
  "fixt",
  "getrandom 0.2.12",
- "hdk",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",

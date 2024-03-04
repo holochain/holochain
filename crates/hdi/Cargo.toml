@@ -33,7 +33,6 @@ getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
 fixt = { path = "../fixt" }
-hdk = { version = "^0.3.0-beta-dev.32", path = "../hdk" }
 test-case = "2.1"
 arbitrary = { version = "1.0", features = ["derive"] }
 subtle-encoding = "0.5"
