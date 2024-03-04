@@ -229,15 +229,13 @@ pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyho
             match CmdRunner::try_new(port).await {
                 Ok(cmd) => cmds.push((cmd, None, None)),
                 Err(e) => {
-                    if let holochain_websocket::WebsocketError::Io(e) = &e {
-                        if let std::io::ErrorKind::ConnectionRefused
-                        | std::io::ErrorKind::AddrNotAvailable = e.kind()
-                        {
-                            let (port, holochain, lair) =
-                                run_async(holochain_path, path, None, structured.clone()).await?;
-                            cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
-                            continue;
-                        }
+                    if let std::io::ErrorKind::ConnectionRefused
+                    | std::io::ErrorKind::AddrNotAvailable = e.kind()
+                    {
+                        let (port, holochain, lair) =
+                            run_async(holochain_path, path, None, structured.clone()).await?;
+                        cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
+                        continue;
                     }
                     bail!(
                         "Failed to connect to running conductor or start one {:?}",

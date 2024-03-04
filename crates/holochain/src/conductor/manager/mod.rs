@@ -322,9 +322,15 @@ impl TaskManagerClient {
     pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+        f: impl FnOnce() -> Fut + Send + 'static,
     ) {
-        self.add_conductor_task(name, TaskKind::Ignore, f)
+        self.add_conductor_task(name, TaskKind::Ignore, move |stop| async move {
+            tokio::select! {
+                _ = stop => (),
+                _ = f() => (),
+            }
+            Ok(())
+        })
     }
 
     /// Add a conductor-level task which will cause the conductor to shut down if it fails

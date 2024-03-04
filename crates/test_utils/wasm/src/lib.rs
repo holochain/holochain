@@ -32,6 +32,7 @@ pub enum TestWasm {
     DnaProperties,
     EntryDefs,
     EmitSignal,
+    PostCommitSignal,
     HashEntry,
     Foo,
     GenesisSelfCheckValidLegacy,
@@ -135,6 +136,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::DnaProperties => "dna_properties",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::EmitSignal => "emit_signal",
+            TestWasm::PostCommitSignal => "post_commit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::GenesisSelfCheckValidLegacy => "genesis_self_check_legacy",
@@ -209,6 +211,7 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::EntryDefs => "wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm",
             TestWasm::EmitSignal => "wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm",
+            TestWasm::PostCommitSignal => "wasm32-unknown-unknown/release/test_wasm_post_commit_signal.wasm",
             TestWasm::HashEntry => "wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm",
             TestWasm::Foo => "wasm32-unknown-unknown/release/test_wasm_foo.wasm",
             TestWasm::GenesisSelfCheckValidLegacy => {
