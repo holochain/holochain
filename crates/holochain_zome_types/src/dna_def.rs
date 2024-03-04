@@ -60,6 +60,7 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     modifiers: &'a DnaModifiers,
+    compatibility: &'a DnaCompatParams,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -239,6 +240,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             modifiers: &self.modifiers,
+            compatibility: &self.compatibility,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
