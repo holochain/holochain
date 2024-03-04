@@ -48,7 +48,6 @@ use holochain::{
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
 use holochain_util::tokio_helper;
-use holochain_websocket::*;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
 pub struct SupervisedChild(String, Child);
@@ -70,10 +69,11 @@ pub async fn start_holochain(
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
+    let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
     cmd.arg("--structured")
         .arg("--config-path")
         .arg(config_path)
-        .env("RUST_LOG", "trace")
+        .env("RUST_LOG", rust_log)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -118,7 +118,7 @@ pub async fn grant_zome_call_capability(
 }
 
 pub async fn call_zome_fn<S>(
-    app_tx: &mut WebsocketSender,
+    app_tx: &WebsocketSender,
     cell_id: CellId,
     signing_keypair: &Keypair,
     cap_secret: CapSecret,
@@ -293,7 +293,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stdout) = stdout {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                trace!("holochain bin stdout: {}", &line);
+                println!("holochain bin stdout: {}", &line);
                 tx = tx
                     .take()
                     .and_then(|tx| match check_line_for_admin_port(&line) {
@@ -310,7 +310,7 @@ pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16
         if let Some(stderr) = stderr {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                trace!("holochain bin stderr: {}", &line);
+                eprintln!("holochain bin stderr: {}", &line);
             }
         }
     });
@@ -351,7 +351,7 @@ pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
 
 #[instrument(skip(response))]
 pub async fn check_timeout<T>(
-    response: impl Future<Output = Result<T, WebsocketError>>,
+    response: impl Future<Output = std::io::Result<T>>,
     timeout_ms: u64,
 ) -> T {
     check_timeout_named("<unnamed>", response, timeout_ms).await
@@ -360,7 +360,7 @@ pub async fn check_timeout<T>(
 #[instrument(skip(response))]
 async fn check_timeout_named<T>(
     name: &'static str,
-    response: impl Future<Output = Result<T, WebsocketError>>,
+    response: impl Future<Output = std::io::Result<T>>,
     timeout_millis: u64,
 ) -> T {
     // FIXME(stefan): remove this multiplier once it's faster on self-hosted CI
