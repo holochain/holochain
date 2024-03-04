@@ -2594,7 +2594,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
     ) -> anyhow::Result<ExternIO> {
         let now = Timestamp::now();
         let (nonce, expires_at) =
-            holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
+            holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
         let call_unsigned = ZomeCallUnsigned {
             cell_id,
             zome_name,
