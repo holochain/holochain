@@ -277,20 +277,20 @@ fn get_path_hash(s: String) -> ExternResult<AnyLinkableHash> {
 #[hdk_extern]
 fn get_links_local_only(_: ()) -> ExternResult<Vec<Link>> {
     let get_links_input = GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?
-        .get_options(GetStrategy::Content)
+        .get_options(GetStrategy::Local)
         .build();
     hdk::prelude::get_links(get_links_input)
 }
 
 #[hdk_extern]
 fn get_link_details_local_only(_: ()) -> ExternResult<LinkDetails> {
-    hdk::prelude::get_link_details(base()?, LinkTypes::SomeLinks, None, GetOptions::content())
+    hdk::prelude::get_link_details(base()?, LinkTypes::SomeLinks, None, GetOptions::local())
 }
 
 #[hdk_extern]
 fn get_links_from_network(_: ()) -> ExternResult<Vec<Link>> {
     let get_links_input = GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?
-        .get_options(GetStrategy::Latest)
+        .get_options(GetStrategy::Network)
         .build();
     hdk::prelude::get_links(get_links_input)
 }

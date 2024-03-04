@@ -87,6 +87,18 @@ uuid = { version = "0.7", features = [ "serde", "v4" ] }
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 
+[workspace.lints.clippy]
+nursery = "allow"
+cargo  = "allow"
+pedantic = "allow"
+restriction  = "allow"
+style = "deny"
+complexity = "deny"
+perf = "deny"
+correctness = "deny"
+dbg_macro = "deny"
+
+
 [profile.fast-test]
 inherits = "dev"
 debug = 1
@@ -102,7 +114,6 @@ codegen-units = 16
 [profile.release]
 opt-level = "z"
 lto = true
-
 
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }

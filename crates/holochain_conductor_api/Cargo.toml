@@ -35,6 +35,9 @@ matches = {version = "0.1.8"}
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 kitsune_p2p = { version = "^0.3.0-beta-dev.31", path = "../kitsune_p2p/kitsune_p2p" }
 
+[lints]
+workspace = true
+
 [features]
 chc = []
 sqlite-encrypted = [

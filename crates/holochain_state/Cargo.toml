@@ -65,6 +65,9 @@ pretty_assertions = "1.4"
 
 tempfile = "3.3"
 
+[lints]
+workspace = true
+
 [features]
 default = []
 

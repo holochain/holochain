@@ -27,6 +27,9 @@ kitsune_p2p_bootstrap_client = { path = ".", features = ["tx2", "test_utils"] }
 fixt = { version = "^0.3.0-beta-dev.1", path = "../../fixt" }
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
+[lints]
+workspace = true
+
 [features]
 default = ["tx5"]
 

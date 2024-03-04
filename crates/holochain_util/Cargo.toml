@@ -21,6 +21,9 @@ rpassword = { version = "7.0.0", optional = true }
 sodoken = { workspace = true, optional = true }
 getrandom = "0.2.7"
 
+[lints]
+workspace = true
+
 [features]
 default = [ "fs", "tokio" ]
 pw = [ "rpassword", "sodoken" ]

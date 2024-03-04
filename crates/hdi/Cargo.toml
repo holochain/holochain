@@ -37,6 +37,9 @@ test-case = "2.1"
 arbitrary = { version = "1.0", features = ["derive"] }
 subtle-encoding = "0.5"
 
+[lints]
+workspace = true
+
 [features]
 default = []
 trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]

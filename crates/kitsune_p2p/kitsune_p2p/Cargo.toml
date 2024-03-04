@@ -76,6 +76,9 @@ tx5-signal-srv = { workspace = true }
 ed25519-dalek = "1"
 rand_dalek = { version = "0.7", package = "rand" } # Compatibility with dalek
 
+[lints]
+workspace = true
+
 [features]
 default = [ "tx2", "tx5" ]
 

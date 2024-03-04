@@ -34,6 +34,9 @@ unwrap_to = "0.1.0"
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 criterion = "0.3.4"
 
+[lints]
+workspace = true
+
 [features]
 slow_tests = []
 

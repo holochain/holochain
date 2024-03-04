@@ -9,7 +9,7 @@ enum EntryZomes {
 
 #[hdk_extern]
 fn get_entry(hash: ActionHash) -> ExternResult<Option<Record>> {
-    get(hash, GetOptions::content())
+    get(hash, GetOptions::local())
 }
 
 #[hdk_extern]
