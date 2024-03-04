@@ -1053,29 +1053,41 @@ pub mod wasm_test {
             let zome_call_1 = tokio::spawn({
                 let conductor = conductor.clone();
                 let zome = zome.clone();
+                let now = tokio::time::Instant::now();
                 async move {
                     tokio::select! {
-                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
-                        _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
+                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {now.elapsed()}
+                        _ = tokio::time::sleep(Duration::from_millis(100)) => {now.elapsed()}
                     }
                 }
             });
             let zome_call_2 = tokio::spawn({
                 let conductor = conductor.clone();
                 let zome = zome.clone();
+                let now = tokio::time::Instant::now();
                 async move {
                     tokio::select! {
-                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {true}
-                        _ = tokio::time::sleep(Duration::from_millis(10)) => {false}
+                        _ = conductor.call::<_, CallInfo>(&zome, "call_info", ()) => {now.elapsed()}
+                        _ = tokio::time::sleep(Duration::from_millis(100)) => {now.elapsed()}
                     }
                 }
             });
-            let results: Result<Vec<bool>, _> =
-                futures::future::join_all([zome_call_1, zome_call_2])
-                    .await
-                    .into_iter()
-                    .collect();
-            assert_eq!(results.unwrap(), [true, true]);
+            let results = futures::future::join_all([zome_call_1, zome_call_2])
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+            assert!(
+                results[0] <= Duration::from_millis(10),
+                "{:?} > 10ms",
+                results[0]
+            );
+            assert!(
+                results[1] <= Duration::from_millis(10),
+                "{:?} > 10ms",
+                results[1]
+            );
         }
 
         // make sure the context map does not retain items
