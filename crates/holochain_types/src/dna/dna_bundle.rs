@@ -265,7 +265,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {
-        let dna_compat = DnaCompatParams::fake();
+        let dna_compat = DnaCompatParams::default();
 
         let path1 = PathBuf::from("1");
         let path2 = PathBuf::from("2");

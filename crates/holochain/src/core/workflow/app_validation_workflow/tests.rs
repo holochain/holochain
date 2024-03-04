@@ -368,7 +368,7 @@ async fn check_app_entry_def_test() {
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
-            compatibility: DnaCompatParams::fake(),
+            compatibility: DnaCompatParams::default(),
             integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
                 .coordinator

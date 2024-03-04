@@ -236,7 +236,7 @@ pub async fn register_and_install_dna_named(
         properties,
         ..Default::default()
     };
-    let dna_compat = DnaCompatParams::fake();
+    let dna_compat = DnaCompatParams::default();
 
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();

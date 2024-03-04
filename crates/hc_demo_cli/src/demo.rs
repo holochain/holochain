@@ -177,7 +177,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
                 .build()
                 .unwrap(),
         )
-        .compatibility(DnaCompatParams::fake())
+        .compatibility(DnaCompatParams::default())
         .integrity_zomes(vec![("integrity".into(), i_zome)])
         .coordinator_zomes(vec![("coordinator".into(), c_zome)])
         .build()
