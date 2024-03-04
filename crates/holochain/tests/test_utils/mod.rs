@@ -202,7 +202,6 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
 
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
@@ -211,7 +210,6 @@ pub async fn register_and_install_dna(
 ) -> DnaHash {
     register_and_install_dna_named(
         client,
-        orig_dna_hash,
         agent_key,
         dna_path,
         properties,
@@ -224,7 +222,6 @@ pub async fn register_and_install_dna(
 
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    _orig_dna_hash: DnaHash,
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
@@ -264,6 +261,8 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
+
+    dbg!(&manifest);
 
     let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
         .await
