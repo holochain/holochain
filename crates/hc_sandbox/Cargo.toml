@@ -44,6 +44,9 @@ matches = "0.1"
 escargot = "0.5.7"
 which = "4.4.0"
 
+[lints]
+workspace = true
+
 [features]
 
 chc = [

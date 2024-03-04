@@ -62,6 +62,9 @@ holochain_zome_types = { path = ".", features = ["test_utils"] }
 once_cell = { version = "1.4", optional = false }
 matches = "0.1"
 
+[lints]
+workspace = true
+
 [features]
 default = ["full-dna-def", "subtle-encoding"]
 

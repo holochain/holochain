@@ -89,6 +89,18 @@ tokio = { version = "1.36.0", features = ["full"] }
 tokio-tungstenite = { version = "0.21.0" }
 tracing = "0.1"
 
+[workspace.lints.clippy]
+nursery = "allow"
+cargo  = "allow"
+pedantic = "allow"
+restriction  = "allow"
+style = "deny"
+complexity = "deny"
+perf = "deny"
+correctness = "deny"
+dbg_macro = "deny"
+
+
 [profile.fast-test]
 inherits = "dev"
 debug = 1
@@ -104,7 +116,6 @@ codegen-units = 16
 [profile.release]
 opt-level = "z"
 lto = true
-
 
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }

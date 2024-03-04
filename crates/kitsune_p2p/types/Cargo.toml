@@ -54,6 +54,9 @@ tracing-subscriber = "0.3.16"
 name = "api_thru"
 harness = false
 
+[lints]
+workspace = true
+
 [features]
 default = [ "tx2" ]
 

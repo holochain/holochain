@@ -43,6 +43,9 @@ proptest = "1"
 rand = "0.8"
 test-case = "1.2"
 
+[lints]
+workspace = true
+
 [features]
 default = [
   "kitsune_p2p_timestamp/now"

@@ -184,7 +184,6 @@ pub mod slow_tests {
             .call(&zome_bob, "get_link_details_local_only", ())
             .await;
         // link details should be empty
-        println!("local link details {local_link_details:?}");
         assert_eq!(local_link_details.into_inner().len(), 0);
     }
 }

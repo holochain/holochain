@@ -32,6 +32,9 @@ rand = { version = "0.8", optional = true }
 holochain_serialized_bytes = { workspace = true }
 serde_yaml = "0.9"
 
+[lints]
+workspace = true
+
 [features]
 default = ["chrono"]
 now = ["chrono"]

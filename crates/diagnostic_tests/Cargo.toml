@@ -19,3 +19,6 @@ tokio-stream = "0.1"
 
 crossterm = "0.27"
 tui = "0.19"
+
+[lints]
+workspace = true

@@ -21,6 +21,9 @@ tracing = { workspace = true }
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 criterion = "0.3.4"
 
+[lints]
+workspace = true
+
 [[bench]]
 name = "bench"
 harness = false
