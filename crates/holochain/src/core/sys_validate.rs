@@ -390,7 +390,7 @@ pub async fn check_dpki_agent_validity(
     match dpki.key_state(author.clone(), timestamp).await? {
         KeyState::Valid(_) => Ok(()),
         KeyState::Invalidated(_) => {
-            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp.clone()).into())
+            Err(ValidationOutcome::DpkiAgentInvalid(author.clone(), timestamp).into())
         }
         KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author.clone()).into()),
     }

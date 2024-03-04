@@ -298,14 +298,18 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
+
+            // FIXME: A "device seed" should be derived from the master seed and passed in here.
+            //        Currently it just gets auto-generated, making re-derivation impossible.
             InitializeDeepkey { deepkey_dna } => {
                 let dna_compat = self.conductor_handle.get_dna_compat();
                 let (deepkey_dna, _) = deepkey_dna
                     .into_dna_file(Default::default(), dna_compat)
                     .await?;
+
                 self.conductor_handle
                     .clone()
-                    .initialize_deepkey(Some(deepkey_dna))
+                    .install_dpki(deepkey_dna)
                     .await?;
                 Ok(AdminResponse::Ok)
             }

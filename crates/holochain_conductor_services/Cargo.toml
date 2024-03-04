@@ -22,7 +22,7 @@ thiserror = { workspace = true }
 holochain_keystore = { version = "^0.3.0-beta-dev.29", path = "../holochain_keystore" }
 holochain_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_types" }
 
-arbitrary = { version = "*", optional = true }
+arbitrary = { version = "1.0", optional = true }
 
 [features]
 test_utils = ["fuzzing"]
