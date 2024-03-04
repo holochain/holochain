@@ -122,11 +122,6 @@ pub struct IntegrityManifest {
     /// All Action timestamps must come after this time.
     pub origin_time: HumanTimestamp,
 
-    /// Conductor compatibility parameters. DNAs with different compatibility
-    /// parameters will have different hashes and thus will not be able to communicate
-    /// over the network.
-    pub compatibility: DnaCompatParams,
-
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.
     /// The integrity zome manifests.

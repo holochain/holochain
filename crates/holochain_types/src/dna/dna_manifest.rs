@@ -51,19 +51,12 @@ impl DnaManifest {
         network_seed: Option<String>,
         properties: Option<YamlProperties>,
         origin_time: HumanTimestamp,
-        compat: DnaCompatParams,
         integrity_zomes: Vec<ZomeManifest>,
         coordinator_zomes: Vec<ZomeManifest>,
     ) -> Self {
         DnaManifestCurrent::new(
             name,
-            IntegrityManifest::new(
-                network_seed,
-                properties,
-                origin_time,
-                compat,
-                integrity_zomes,
-            ),
+            IntegrityManifest::new(network_seed, properties, origin_time, integrity_zomes),
             CoordinatorManifest {
                 zomes: coordinator_zomes,
             },

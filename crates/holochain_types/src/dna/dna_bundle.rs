@@ -209,7 +209,6 @@ impl DnaBundle {
             name: dna_def.name,
             integrity: IntegrityManifest {
                 network_seed: Some(dna_def.modifiers.network_seed),
-                compatibility: dna_def.compatibility,
                 properties: Some(dna_def.modifiers.properties.try_into().map_err(|e| {
                     DnaError::DnaFileToBundleConversionError(format!(
                         "DnaDef properties were not YAML-deserializable: {}",
@@ -280,7 +279,6 @@ mod tests {
                 network_seed: Some("original network seed".to_string()),
                 properties: Some(serde_yaml::Value::Null.into()),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
-                compatibility: DnaCompatParams::fake(),
                 zomes: vec![
                     ZomeManifest {
                         name: "zome1".into(),
