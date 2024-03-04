@@ -1,14 +1,12 @@
 use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
-use crate::conductor::conductor::CellStatus;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_conductor_services::DpkiServiceError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
-use holochain_websocket::WebsocketError;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -33,9 +31,6 @@ pub enum ConductorError {
 
     #[error("Cell is not initialized.")]
     CellNotInitialized,
-
-    #[error("Cell network is not ready. Status: {0:?}")]
-    CellNetworkNotReady(CellStatus),
 
     #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
     CellDisabled(CellId),
@@ -133,9 +128,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
-
-    #[error(transparent)]
-    WebsocketError(#[from] WebsocketError),
 
     /// Other
     #[error("Other: {0}")]

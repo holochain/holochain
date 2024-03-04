@@ -8,13 +8,17 @@ keywords = [ "holochain", "holo" ]
 edition = "2021"
 
 [dependencies]
+anyhow = { workspace = true }
 chashmap = "2.2"
 colored = "2"
 futures = { workspace = true }
 holochain_diagnostics = { path = "../holochain_diagnostics" }
 holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
-tokio = { version = "1.27", features = ["full"] }
+tokio = { workspace = true }
 tokio-stream = "0.1"
 
 crossterm = "0.27"
 tui = "0.19"
+
+[lints]
+workspace = true

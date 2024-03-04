@@ -24,7 +24,21 @@ fn main() -> anyhow::Result<()> {
     let (admin_client, app_client) = if let Some(admin_url) = &args.admin_url {
         match block_on(
             async {
-                let mut admin_client = AdminClient::connect(admin_url).await?;
+                let addr = if let url::Origin::Tuple(_, host, port) = admin_url.origin() {
+                    match tokio::net::lookup_host((host.to_string(), port)).await {
+                        Ok(mut addr_list) => addr_list.next(),
+                        Err(err) => return Err(anyhow!(err)),
+                    }
+                } else {
+                    None
+                };
+
+                let addr = match addr {
+                    None => return Err(anyhow!(format!("Invalid admin_url: {admin_url}"))),
+                    Some(addr) => addr,
+                };
+
+                let mut admin_client = AdminClient::connect(addr).await?;
                 let app_client = admin_client.connect_app_client().await?;
 
                 Ok((admin_client, app_client))

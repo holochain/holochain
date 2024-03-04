@@ -313,7 +313,7 @@ pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidation
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
     let t1 = prev_action.timestamp();
     let t2 = action.timestamp();
-    if t2 > t1 {
+    if t2 >= t1 {
         Ok(())
     } else {
         Err(PrevActionErrorKind::Timestamp(t1, t2))

@@ -69,6 +69,7 @@ impl HdkPathExt for TypedPath {
             self.path_entry_hash()?,
             LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             Some(holochain_zome_types::link::LinkTag::new([])),
+            GetOptions::default(),
         )
     }
 

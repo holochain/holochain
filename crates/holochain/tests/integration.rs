@@ -1,5 +1,6 @@
 mod agent_scaling;
 mod authored_test;
+mod clone_cell;
 mod conductor_services;
 mod dht_arc;
 mod dna_properties;
@@ -14,7 +15,6 @@ mod ser_regression;
 #[cfg(not(target_os = "macos"))]
 mod sharded_gossip;
 mod signals;
-mod speed_tests;
 mod test_cli;
 mod test_utils;
 mod websocket;

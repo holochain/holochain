@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_bootstrap"
-version = "0.2.0-beta-dev.19"
+version = "0.2.0-beta-dev.21"
 description = "Bootstrap server written in rust for kitsune nodes to find each other"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,8 +13,8 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.3.21", features = [ "derive" ] }
 futures = "0.3.15"
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.19", path = "../types" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.14", path = "../bin_data" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.16", path = "../bin_data" }
 parking_lot = "0.12.1"
 rand = "0.8.5"
 reqwest = "0.11.2"
@@ -27,7 +27,7 @@ warp = "0.3"
 [dev-dependencies]
 kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite"] }
-fixt = { path = "../../fixt" ,version = "^0.3.0-beta-dev.0"}
+fixt = { path = "../../fixt" ,version = "^0.3.0-beta-dev.1"}
 criterion = "0.5.1"
 reqwest = "0.11.2"
 
@@ -42,6 +42,9 @@ path = "src/lib.rs"
 [[bin]]
 name = "kitsune-bootstrap"
 path = "src/main.rs"
+
+[lints]
+workspace = true
 
 [features]
 sqlite-encrypted = [

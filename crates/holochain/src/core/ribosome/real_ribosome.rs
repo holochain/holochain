@@ -3,6 +3,9 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
+use super::host_fn::delete_clone_cell::delete_clone_cell;
+use super::host_fn::disable_clone_cell::disable_clone_cell;
+use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -34,6 +37,7 @@ use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
+use crate::core::ribosome::host_fn::create_clone_cell::create_clone_cell;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::delete::delete;
@@ -95,9 +99,7 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-use crate::conductor::paths::DataRootPath;
 use crate::core::ribosome::host_fn::count_links::count_links;
-use holochain_conductor_api::conductor::paths::WasmRootPath;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
@@ -123,7 +125,7 @@ pub struct RealRibosome {
     pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 
     /// File system and in-memory cache for wasm modules.
-    pub module_cache: Arc<RwLock<ModuleCache>>,
+    pub wasmer_module_cache: Arc<RwLock<ModuleCache>>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -210,20 +212,13 @@ impl RealRibosome {
     /// Create a new instance
     pub fn new(
         dna_file: DnaFile,
-        maybe_data_root_path: Option<DataRootPath>,
+        wasmer_module_cache: Arc<RwLock<ModuleCache>>,
     ) -> RibosomeResult<Self> {
-        let maybe_fs_dir = match maybe_data_root_path {
-            Some(data_root_path) => {
-                Some(WasmRootPath::try_from(data_root_path)?.as_ref().to_owned())
-            }
-            None => None,
-        };
-        // Create an empty ribosome.
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_fs_dir))),
+            wasmer_module_cache,
         };
 
         // Collect the number of entry and link types
@@ -259,7 +254,7 @@ impl RealRibosome {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Create the global zome types from the totals.
-        let map = GlobalZomeTypes::from_ordered_iterator(iter.into_iter());
+        let map = GlobalZomeTypes::from_ordered_iterator(iter);
 
         ribosome.zome_types = Arc::new(map?);
 
@@ -315,14 +310,14 @@ impl RealRibosome {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
-            module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
+            wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(None))),
         }
     }
 
     pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         let wasm = &self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        let module_cache = self.module_cache.write();
+        let module_cache = self.wasmer_module_cache.write();
         let module = module_cache.get(cache_key, wasm)?;
         Ok(module)
     }
@@ -430,7 +425,10 @@ impl RealRibosome {
             coordinator_zomes: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
-        let empty_ribosome = RealRibosome::new(empty_dna_file, None)?;
+        let empty_ribosome = RealRibosome::new(
+            empty_dna_file,
+            Arc::new(RwLock::new(ModuleCache::new(None))),
+        )?;
         let context_key = RealRibosome::next_context_key();
         let mut store = Store::default();
         // We just leave this Env uninitialized as default because we never make it
@@ -555,7 +553,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
+            .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
+            .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
+            .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell);
 
         imports.register_namespace("env", ns);
 
@@ -1094,7 +1096,7 @@ pub mod wasm_test {
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let apps = conductor
-            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], [&dna_file])
+            .setup_app_for_agents("app-", &[alice_pubkey.clone(), bob_pubkey], &[dna_file])
             .await
             .unwrap();
 
@@ -1158,13 +1160,17 @@ pub mod wasm_test {
                 "__hc__capability_info_1",
                 "__hc__count_links_1",
                 "__hc__create_1",
+                "__hc__create_clone_cell_1",
                 "__hc__create_link_1",
                 "__hc__create_x25519_keypair_1",
                 "__hc__delete_1",
+                "__hc__delete_clone_cell_1",
                 "__hc__delete_link_1",
+                "__hc__disable_clone_cell_1",
                 "__hc__dna_info_1",
                 "__hc__dna_info_2",
                 "__hc__emit_signal_1",
+                "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
                 "__hc__get_details_1",

@@ -180,6 +180,18 @@ wasm_io_types! {
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
     fn zome_info (()) -> zt::info::ZomeInfo;
+
+    // Create a clone of an existing cell.
+    fn create_clone_cell(zt::clone::CreateCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Disable a clone cell.
+    fn disable_clone_cell(zt::clone::DisableCloneCellInput) -> ();
+
+    // Enable a clone cell.
+    fn enable_clone_cell(zt::clone::EnableCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Delete a clone cell.
+    fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
 }
 
 /// Anything that can go wrong while calling a HostFnApi method

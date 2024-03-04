@@ -16,9 +16,12 @@ holochain = { path = "../holochain", default-features = false, features = ["swee
 kitsune_p2p = { path = "../kitsune_p2p/kitsune_p2p" }
 human-repr = "1"
 rand = "0.8"
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-appender = "0.2"
 tracing-subscriber = "0.3.16"
 
 crossterm = "0.27"
 tui = "0.19"
+
+[lints]
+workspace = true
