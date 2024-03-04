@@ -51,7 +51,6 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         network_seed,
         None,
         Timestamp::now().into(),
-        Default::default(),
         vec![],
         vec![],
     );

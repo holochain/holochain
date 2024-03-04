@@ -43,14 +43,3 @@ impl Default for DnaCompatParams {
         }
     }
 }
-
-#[cfg(feature = "test_utils")]
-impl DnaCompatParams {
-    /// Get a fake value for testing
-    pub fn fake() -> Self {
-        DnaCompatParams {
-            protocol_version: 0xFA73, // 64115
-            dpki_hash: None,
-        }
-    }
-}
