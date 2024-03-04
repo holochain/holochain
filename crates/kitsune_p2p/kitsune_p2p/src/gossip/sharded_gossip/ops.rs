@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::{FetchKey, FetchPoolPush, OpHashSized};
+use kitsune_p2p_fetch::{FetchKey, FetchPoolPush, OpHashSized, TransferMethod};
 use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;
@@ -297,16 +297,17 @@ impl ShardedGossipLocal {
         &self,
         source: FetchSource,
         ops: Vec<OpHashSized>,
+        transfer_method: TransferMethod,
     ) -> KitsuneResult<()> {
         for op_hash in ops {
             let (hash, size) = op_hash.into_inner();
             let request = FetchPoolPush {
                 key: FetchKey::Op(hash),
-                author: None,
                 context: None,
                 space: self.space.clone(),
                 source: source.clone(),
                 size,
+                transfer_method,
             };
             self.fetch_pool.push(request);
         }
@@ -392,7 +393,7 @@ impl OpsBatchQueueInner {
     fn push_back(&mut self, id: Option<usize>, queued: QueuedOps) -> usize {
         let id = id.unwrap_or_else(|| self.new_id());
         {
-            let queue = self.queues.entry(id).or_insert_with(VecDeque::new);
+            let queue = self.queues.entry(id).or_default();
             queue.push_back(queued);
         }
         self.queues.retain(|_, q| !q.is_empty());

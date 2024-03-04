@@ -22,6 +22,7 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod chain;
+pub mod clone;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;

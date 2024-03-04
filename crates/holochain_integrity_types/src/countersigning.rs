@@ -245,11 +245,11 @@ impl PreflightRequest {
         // both the signing agents and optional signing agents.
         if self.enzymatic
             && !self.optional_signing_agents.is_empty()
-            && self.signing_agents.get(0) != self.optional_signing_agents.get(0)
+            && self.signing_agents.first() != self.optional_signing_agents.first()
         {
             return Err(CounterSigningError::EnzymeMismatch(
-                self.signing_agents.get(0).cloned(),
-                self.optional_signing_agents.get(0).cloned(),
+                self.signing_agents.first().cloned(),
+                self.optional_signing_agents.first().cloned(),
             ));
         }
         if !self.enzymatic && !self.optional_signing_agents.is_empty() {
@@ -523,7 +523,7 @@ impl CounterSigningSessionData {
         optional_responses: Vec<PreflightResponse>,
     ) -> Result<Self, CounterSigningError> {
         let preflight_request = responses
-            .get(0)
+            .first()
             .ok_or(CounterSigningError::MissingResponse)?
             .to_owned()
             .request;

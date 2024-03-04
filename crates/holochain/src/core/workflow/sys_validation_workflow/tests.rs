@@ -25,7 +25,7 @@ async fn sys_validation_workflow_test() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
-        .setup_app(&"test_app", &[dna_file.clone()])
+        .setup_app(&"test_app", [&dna_file])
         .await
         .unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();

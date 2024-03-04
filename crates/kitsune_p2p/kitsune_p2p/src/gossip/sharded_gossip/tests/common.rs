@@ -9,6 +9,7 @@ use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::ArqStrat;
+use kitsune_p2p_types::dht_arc::MAX_HALF_LENGTH;
 use num_traits::Zero;
 
 #[derive(Debug)]
@@ -155,6 +156,7 @@ async fn standard_responses(
         strat: ArqStrat::default(),
         with_data,
     };
+    // Note that this mock is not realistic, query by agents should filter by input agents
     evt_handler.expect_handle_query_agents().returning({
         move |_| {
             let infos = infos.clone();
@@ -250,7 +252,7 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
     AgentInfoSigned::sign(
         Arc::new(fixt!(KitsuneSpace)),
         agent,
-        u32::MAX / 2,
+        MAX_HALF_LENGTH,
         vec![url2::url2!(
             "kitsune-proxy://CIW6PxKxs{}cKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/localhost/p/5778/-",
             rand_string

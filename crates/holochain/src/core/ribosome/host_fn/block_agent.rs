@@ -97,7 +97,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn zome_call_get_block() {
-        holochain_trace::test_run().ok();
+        hc_sleuth::init_subscriber();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -111,10 +111,7 @@ mod test {
                 c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
             });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
-        let apps = conductors
-            .setup_app("create", &[dna_file.clone()])
-            .await
-            .unwrap();
+        let apps = conductors.setup_app("create", [&dna_file]).await.unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 

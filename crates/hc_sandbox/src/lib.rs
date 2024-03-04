@@ -22,7 +22,6 @@ use std::path::Path;
 
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{AdminRequest, AdminResponse};
-use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
 use ports::get_admin_api;
 
@@ -56,6 +55,13 @@ mod ports;
 /// An active connection to a running conductor.
 pub struct CmdRunner {
     client: WebsocketSender,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for CmdRunner {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
 }
 
 impl CmdRunner {
@@ -69,9 +75,9 @@ impl CmdRunner {
     }
 
     /// Create a new connection for calling admin interface commands.
-    pub async fn try_new(port: u16) -> WebsocketResult<Self> {
-        let client = get_admin_api(port).await?;
-        Ok(Self { client })
+    pub async fn try_new(port: u16) -> std::io::Result<Self> {
+        let (client, task) = get_admin_api(port).await?;
+        Ok(Self { client, task })
     }
 
     /// Create a command runner from a sandbox path.

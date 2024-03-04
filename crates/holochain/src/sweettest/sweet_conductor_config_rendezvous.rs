@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 /// How conductors should learn about each other / speak to each other.
-/// Just a bootstrap server in tx2 mode.
 /// Signal/TURN + bootstrap in tx5 mode.
 pub trait SweetRendezvous: 'static + Send + Sync {
     /// Get the bootstrap address.
@@ -25,7 +24,7 @@ pub struct SweetLocalRendezvous {
     #[cfg(feature = "tx5")]
     sig_addr: String,
     #[cfg(feature = "tx5")]
-    sig_shutdown: Option<tokio::task::JoinHandle<()>>,
+    _sig_hnd: tx5_signal_srv::SrvHnd,
 }
 
 impl Drop for SweetLocalRendezvous {
@@ -38,10 +37,6 @@ impl Drop for SweetLocalRendezvous {
             tokio::task::spawn(async move {
                 let _ = s.stop().await;
             });
-        }
-        #[cfg(feature = "tx5")]
-        if let Some(s) = self.sig_shutdown.take() {
-            s.abort();
         }
     }
 }
@@ -95,11 +90,10 @@ impl SweetLocalRendezvous {
                 serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap()
             );
 
-            let (sig_driver, sig_addr_list, _sig_err_list) =
-                tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
-            let sig_port = sig_addr_list.get(0).unwrap().port();
+            let (_sig_hnd, sig_addr_list, _sig_err_list) =
+                tx5_signal_srv::exec_tx5_signal_srv(sig_conf).await.unwrap();
+            let sig_port = sig_addr_list.first().unwrap().port();
             let sig_addr: std::net::SocketAddr = (addr, sig_port).into();
-            let sig_shutdown = tokio::task::spawn(sig_driver);
             let sig_addr = format!("ws://{sig_addr}");
             tracing::info!("RUNNING SIG: {sig_addr:?}");
 
@@ -108,7 +102,7 @@ impl SweetLocalRendezvous {
                 bs_shutdown: Some(bs_shutdown),
                 turn_srv: Some(turn_srv),
                 sig_addr,
-                sig_shutdown: Some(sig_shutdown),
+                _sig_hnd,
             })
         }
     }

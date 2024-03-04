@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht_arc"
-version = "0.3.0-beta-dev.10"
+version = "0.3.0-beta-dev.15"
 description = "Kitsune P2p Dht Arc Utils"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,7 +16,7 @@ gcollections = "1.5.0"
 intervallum = "1.4.0"
 num-traits = "0.2"
 serde = {version = "1.0", features = ["derive"]}
-kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.5", path = "../timestamp" }
+kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.7", path = "../timestamp" }
 
 arbitrary = { version = "1", features = ["derive"], optional = true }
 proptest = { version = "1", optional = true }
@@ -25,11 +25,14 @@ rusqlite = { version = "0.29", optional = true }
 
 [dev-dependencies]
 maplit = "1"
-holochain_trace = { version = "^0.3.0-beta-dev.3", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 rand = "0.8.5"
 statrs = "0.16.0"
-tracing = "0.1"
+tracing = { workspace = true }
+
+[lints]
+workspace = true
 
 [features]
 sqlite-encrypted = [

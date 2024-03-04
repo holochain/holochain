@@ -3,7 +3,7 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_services::DPKI_APP_ID;
+use holochain_conductor_services::DPKI_APP_ID;
 use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -231,6 +231,13 @@ impl ConductorState {
     /// Returns the interface configuration with the given ID if present
     pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
+    }
+
+    /// Find the app which contains the given cell by its [CellId].
+    pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
+        self.installed_apps_and_services
+            .values()
+            .find(|app| app.all_cells().any(|id| id == cell_id))
     }
 }
 

@@ -36,7 +36,7 @@ pub fn must_get_valid_record<'a>(
                     ),
                 };
                 match cascade
-                    .get_record_details(action_hash.clone(), GetOptions::content())
+                    .get_record_details(action_hash.clone(), GetOptions::local())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()

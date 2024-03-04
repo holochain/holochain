@@ -33,10 +33,13 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -87,10 +90,13 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
-    let spaces = Spaces::new(&ConductorConfig {
-        data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..Default::default()
-    })
+    let spaces = Spaces::new(
+        ConductorConfig {
+            data_root_path: Some(db_dir.path().to_path_buf().into()),
+            ..Default::default()
+        }
+        .into(),
+    )
     .unwrap();
     let conductor = Conductor::new(
         Default::default(),
@@ -160,6 +166,9 @@ async fn can_set_fake_state() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "This kind of cell sharing is no longer possible. 
+            Keeping the test here to highlight the intention, 
+            though it will have to be removed or totally rewritten some day."]
 async fn test_list_running_apps_for_dependent_cell_id() {
     holochain_trace::test_run().ok();
 
@@ -380,7 +389,7 @@ async fn test_signing_error_during_genesis() {
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
         db_dir.into(),
-        config,
+        config.into(),
         None,
     )
     .await;
@@ -388,7 +397,7 @@ async fn test_signing_error_during_genesis() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor
-        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], &[dna])
+        .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], [&dna])
         .await;
 
     // - Assert that we got an error during Genesis. However, this test is
@@ -782,7 +791,7 @@ async fn name_has_no_effect_on_dna_hash() {
     assert_eq!(clone2.cell_id.dna_hash(), clone3.cell_id.dna_hash());
 }
 
-fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
+fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_zome_types::clone::ClonedCell {
     match cell_info {
         CellInfo::Cloned(cell) => cell,
         _ => panic!("wrong cell type: {:?}", cell_info),
@@ -1010,7 +1019,6 @@ async fn test_cell_and_app_status_reconciliation() {
     holochain_trace::test_run().ok();
     use AppStatusFx::*;
     use AppStatusKind::*;
-    use CellStatus::*;
     let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new(), 0));
     let dnas = [
         mk_dna(mk_zome()).await.0,
@@ -1021,7 +1029,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids: Vec<_> = conductor.running_cell_ids(None).into_iter().collect();
+    let cell_ids: Vec<_> = conductor.running_cell_ids().into_iter().collect();
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
@@ -1029,44 +1037,15 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.running_cell_ids(Some(Joined)).len(),
-            conductor
-                .running_cell_ids(Some(PendingJoin(PendingJoinReason::Initial)))
-                .len()
-                + conductor
-                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Retry)))
-                    .len()
-                + conductor
-                    .running_cell_ids(Some(PendingJoin(PendingJoinReason::Failed)))
-                    .len(),
+            conductor.running_cell_ids().len(),
         )
     };
 
-    assert_eq!(check().await, (Running, 3, 0));
-
-    // - Simulate a cell failing to join the network
-    conductor.update_cell_status(
-        cell1
-            .iter()
-            .map(|c| (c, PendingJoin(PendingJoinReason::Failed))),
-    );
-    assert_eq!(check().await, (Running, 2, 1));
-
-    // - Reconciled app state is Paused due to one unjoined Cell
-    let delta = conductor
-        .reconcile_app_status_with_cell_status(None)
-        .await
-        .unwrap();
-    assert_eq!(delta, SpinDown);
-    assert_eq!(check().await, (Paused, 2, 1));
-
-    // - Can start the app again and get all cells joined
-    conductor.start_app(app_id.clone()).await.unwrap();
-    assert_eq!(check().await, (Running, 3, 0));
+    assert_eq!(check().await, (Running, 3));
 
     // - Simulate a cell being removed due to error
     conductor.remove_cells(cell1).await;
-    assert_eq!(check().await, (Running, 2, 0));
+    assert_eq!(check().await, (Running, 2));
 
     // - Again, app state should be reconciled to Paused due to missing cell
     let delta = conductor
@@ -1074,22 +1053,22 @@ async fn test_cell_and_app_status_reconciliation() {
         .await
         .unwrap();
     assert_eq!(delta, SpinDown);
-    assert_eq!(check().await, (Paused, 2, 0));
+    assert_eq!(check().await, (Paused, 2));
 
     // - Disabling the app causes all cells to be removed
     conductor
         .disable_app(app_id.clone(), DisabledAppReason::User)
         .await
         .unwrap();
-    assert_eq!(check().await, (Disabled, 0, 0));
+    assert_eq!(check().await, (Disabled, 0));
 
     // - Starting a disabled app does nothing
     conductor.start_app(app_id.clone()).await.unwrap();
-    assert_eq!(check().await, (Disabled, 0, 0));
+    assert_eq!(check().await, (Disabled, 0));
 
     // - ...but enabling one does
     conductor.enable_app(app_id).await.unwrap();
-    assert_eq!(check().await, (Running, 3, 0));
+    assert_eq!(check().await, (Running, 3));
 }
 
 #[tokio::test(flavor = "multi_thread")]

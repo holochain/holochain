@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.38"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.26"
-async-trait = "0.1"
+async-trait = { workspace = true }
 base64 = "0.13"
 byteorder = "1.3.4"
 cfg-if = "0.1"
@@ -19,42 +19,42 @@ derive_more = { workspace = true }
 directories = "2.0.2"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
-fixt = { version = "^0.3.0-beta-dev.0", path = "../fixt" }
+fixt = { version = "^0.3.0-beta-dev.1", path = "../fixt" }
 futures = "0.3.1"
 getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
 ghost_actor = "0.3.0-alpha.6"
-holo_hash = { version = "^0.3.0-beta-dev.16", path = "../holo_hash", features = ["full"] }
-holochain_cascade = { version = "^0.3.0-beta-dev.29", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.3.0-beta-dev.29", path = "../holochain_conductor_api" }
-holochain_keystore = { version = "^0.3.0-beta-dev.21", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.3.0-beta-dev.28", path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.3.0-beta-dev.26", path = "../holochain_sqlite" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_state = { version = "^0.3.0-beta-dev.28", path = "../holochain_state" }
-holochain_types = { version = "^0.3.0-beta-dev.26", path = "../holochain_types" }
-holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util", features = [ "pw" ] }
-holochain_wasmer_host = "=0.0.91"
-holochain_websocket = { version = "^0.3.0-beta-dev.6", path = "../holochain_websocket" }
-holochain_zome_types = { version = "^0.3.0-beta-dev.20", path = "../holochain_zome_types", features = ["full"] }
-holochain_nonce = { version = "^0.3.0-beta-dev.22", path = "../holochain_nonce" }
+holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["full"] }
+holochain_cascade = { version = "^0.3.0-beta-dev.37", path = "../holochain_cascade" }
+holochain_conductor_api = { version = "^0.3.0-beta-dev.37", path = "../holochain_conductor_api" }
+holochain_keystore = { version = "^0.3.0-beta-dev.29", path = "../holochain_keystore", default-features = false }
+holochain_p2p = { version = "^0.3.0-beta-dev.36", path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.3.0-beta-dev.34", path = "../holochain_sqlite" }
+holochain_serialized_bytes = { workspace = true }
+holochain_state = { version = "^0.3.0-beta-dev.36", path = "../holochain_state" }
+holochain_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_types" }
+holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util", features = [ "pw" ] }
+holochain_wasmer_host = { workspace = true }
+holochain_websocket = { version = "^0.3.0-beta-dev.14", path = "../holochain_websocket" }
+holochain_zome_types = { version = "^0.3.0-beta-dev.28", path = "../holochain_zome_types", features = ["full"] }
+holochain_nonce = { version = "^0.3.0-beta-dev.24", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive" }
-holochain_services = { version = "^0.2.0-beta-dev.0", path = "../holochain_services" }
+holochain_conductor_services = { version = "^0.2.0-beta-dev.8", path = "../holochain_conductor_services" }
 human-panic = "1.0.3"
 itertools = { version = "0.10" }
-kitsune_p2p = { version = "^0.3.0-beta-dev.25", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
-kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.22", path = "../kitsune_p2p/bootstrap_client" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.11", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/types" }
-kitsune_p2p_block = { version = "^0.3.0-beta-dev.13", path = "../kitsune_p2p/block" }
+kitsune_p2p = { version = "^0.3.0-beta-dev.31", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p_bootstrap_client = { version = "^0.3.0-beta-dev.27", path = "../kitsune_p2p/bootstrap_client" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.16", path = "../kitsune_p2p/bin_data" }
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/types" }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/block" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
-mr_bundle = { version = "^0.3.0-beta-dev.3", path = "../mr_bundle" }
+mr_bundle = { version = "^0.3.0-beta-dev.6", path = "../mr_bundle" }
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
-holochain_trace = { version = "^0.3.0-beta-dev.3", path = "../holochain_trace" }
-holochain_metrics = { version = "^0.3.0-beta-dev.7", path = "../holochain_metrics", default_features = false }
+holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
+holochain_metrics = { version = "^0.3.0-beta-dev.8", path = "../holochain_metrics", default_features = false }
 once_cell = "1.4.1"
 async-once-cell = "0.5"
 one_err = "0.0.8"
@@ -70,13 +70,13 @@ serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
-sodoken = "=0.0.9"
+sodoken = { workspace = true }
 structopt = "0.3.11"
 strum = "0.18.0"
 subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = [ "full"] }
+tokio = { workspace = true }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 task-motel = "0.1.0"
 toml = "0.5.6"
@@ -84,31 +84,35 @@ tracing = "0.1.37"
 tracing-futures = "0.2.5"
 tracing-subscriber = "0.3.16"
 url = "2.4"
-url2 = "0.0.6"
+url2 = { workspace = true }
 url_serde = "0.2.0"
-uuid = { version = "0.7", features = [ "serde", "v4" ] }
-holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.27", path = "../test_utils/wasm" }
+uuid = { workspace = true }
+holochain_wasm_test_utils = { version = "^0.3.0-beta-dev.35", path = "../test_utils/wasm" }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 async-recursion = "0.3"
-wasmer = "=4.2.4"
-wasmer-middlewares = "=4.2.4"
+wasmer = { workspace = true }
+wasmer-middlewares = { workspace = true }
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 contrafact = {version = "0.2.0-rc.1", optional = true }
 diff = {version = "0.1", optional = true }
-hdk = { version = "^0.3.0-beta-dev.24", path = "../hdk", optional = true }
+hdk = { version = "^0.3.0-beta-dev.32", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
-holochain_test_wasm_common = { version = "^0.3.0-beta-dev.24", path = "../test_utils/wasm_common", optional = true  }
-kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.16", path = "../kitsune_p2p/bootstrap", optional = true }
+holochain_test_wasm_common = { version = "^0.3.0-beta-dev.32", path = "../test_utils/wasm_common", optional = true  }
+kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.21", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-tx5-go-pion-turn = { version = "=0.0.5-alpha", optional = true }
-tx5-signal-srv = { version = "=0.0.5-alpha", optional = true }
+tx5-go-pion-turn = { version = "=0.0.7-alpha", optional = true }
+tx5-signal-srv = { workspace = true, optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
 reqwest = { version = "0.11.2", features = ["json"], optional = true }
+
+# TODO: make optional?
+aitia = { version = "^0.2.0-beta-dev.4", path = "../aitia" }
+hc_sleuth = { version = "^0.2.0-beta-dev.7", path = "../hc_sleuth" }
 
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
@@ -121,7 +125,7 @@ sd-notify = "0.3.0"
 
 
 [dev-dependencies]
-holochain = { path = ".", features = ["test_utils"] }
+holochain = { path = ".", default-features = false, features = ["test_utils", "slow_tests", "tx2", "tx5", "metrics_influxive"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
@@ -141,12 +145,13 @@ test-case = "1.2.1"
 tokio-tungstenite = "0.13"
 
 [build-dependencies]
-hdk = { version = "^0.3.0-beta-dev.24", path = "../hdk"}
+hdk = { version = "^0.3.0-beta-dev.32", path = "../hdk"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0.51" }
 toml = "0.5.6"
 chrono = { version = "0.4.6", features = [ "serde" ] }
 hostname = "0.3.1"
+lair_keystore = { workspace = true, features = [ "rusqlite-bundled-sqlcipher-vendored-openssl" ] }
 
 [[bench]]
 name = "bench"
@@ -164,8 +169,11 @@ path = "src/lib.rs"
 name = "holochain"
 path = "src/bin/holochain/main.rs"
 
+[lints]
+workspace = true
+
 [features]
-default = ["slow_tests", "glacial_tests", "sqlite", "tx2", "tx5", "metrics_influxive"]
+default = ["sqlite-encrypted", "tx2", "tx5", "metrics_influxive"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
@@ -187,7 +195,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
   "holochain_cascade/test_utils",
-  "holochain_services/test_utils",
+  "holochain_conductor_services/test_utils",
   "kitsune_p2p/test_utils",
   "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",

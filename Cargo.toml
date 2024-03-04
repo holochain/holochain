@@ -28,11 +28,12 @@ members = [
   "crates/holochain_metrics",
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
-  "crates/holochain_services",
+  "crates/holochain_conductor_services",
 
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_sleuth",
   "crates/hc_run_local_services",
   "crates/hc_demo_cli",
   "crates/holochain_terminal",
@@ -56,22 +57,48 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-resolver = "2"
-
 exclude = ["crates/release-automation"]
+
+resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
 derive_more = "0.99"
 futures = "0.3"
+holochain_wasmer_common = "=0.0.92"
+holochain_wasmer_guest = "=0.0.92"
+holochain_wasmer_host = "=0.0.92"
+holochain_serialized_bytes = "=0.0.53"
 mockall = "0.11"
 must_future = "0.1"
+lair_keystore = { version = "0.4.3", default-features = false }
+lair_keystore_api = "=0.4.3"
+rmp-serde = "=0.15.5"
 serde = "1.0"
+serde_bytes = "0.11.14"
+serde_json = "1.0"
+sodoken = "=0.0.10"
 thiserror = "1.0"
+tx5-signal-srv = "=0.0.7-alpha"
+url2 = "0.0.6"
+wasmer = "=4.2.4"
+wasmer-middlewares = "=4.2.4"
+uuid = { version = "0.7", features = [ "serde", "v4" ] }
+tokio = { version = "1.36.0", features = ["full"] }
+tokio-tungstenite = { version = "0.21.0" }
+tracing = "0.1"
 
-holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
-holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
+[workspace.lints.clippy]
+nursery = "allow"
+cargo  = "allow"
+pedantic = "allow"
+restriction  = "allow"
+style = "deny"
+complexity = "deny"
+perf = "deny"
+correctness = "deny"
+dbg_macro = "deny"
 
 
 [profile.fast-test]
@@ -89,7 +116,6 @@ codegen-units = 16
 [profile.release]
 opt-level = "z"
 lto = true
-
 
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }

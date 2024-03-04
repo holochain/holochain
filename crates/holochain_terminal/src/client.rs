@@ -4,20 +4,26 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppInfo, AppRequest, AppResponse, CellInfo, NetworkInfo,
 };
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
-use holochain_websocket::{
-    connect, WebsocketConfig, WebsocketError, WebsocketReceiver, WebsocketSender,
-};
+use holochain_websocket::{connect, WebsocketConfig, WebsocketSender};
 use std::sync::Arc;
-use url::Url;
 
 pub struct AppClient {
     tx: WebsocketSender,
-    rx: WebsocketReceiver,
+    rx: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for AppClient {
+    fn drop(&mut self) {
+        self.rx.abort();
+    }
 }
 
 impl AppClient {
-    async fn connect(url: &Url) -> anyhow::Result<Self> {
-        let (tx, rx) = connect(url.clone().into(), Arc::new(WebsocketConfig::default())).await?;
+    /// Creates a App websocket client which can send messages but ignores any incoming messages
+    async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
+        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::default()), addr).await?;
+
+        let rx = tokio::task::spawn(async move { while rx.recv::<AppResponse>().await.is_ok() {} });
 
         Ok(AppClient { tx, rx })
     }
@@ -78,7 +84,7 @@ impl AppClient {
     }
 
     async fn send(&mut self, msg: AppRequest) -> anyhow::Result<AppResponse> {
-        let response = self.tx.request(msg).await.map_err(WebsocketError::from)?;
+        let response = self.tx.request(msg).await?;
 
         match response {
             AppResponse::Error(error) => Err(anyhow!("External error: {:?}", error)),
@@ -87,29 +93,27 @@ impl AppClient {
     }
 }
 
-impl Drop for AppClient {
+pub struct AdminClient {
+    tx: WebsocketSender,
+    rx: tokio::task::JoinHandle<()>,
+    addr: std::net::SocketAddr,
+}
+
+impl Drop for AdminClient {
     fn drop(&mut self) {
-        if let Some(h) = self.rx.take_handle() {
-            h.close();
-        }
+        self.rx.abort();
     }
 }
 
-pub struct AdminClient {
-    tx: WebsocketSender,
-    rx: WebsocketReceiver,
-    url: Url,
-}
-
 impl AdminClient {
-    pub async fn connect(url: &Url) -> anyhow::Result<Self> {
-        let (tx, rx) = connect(url.clone().into(), Arc::new(WebsocketConfig::default())).await?;
+    /// Creates an Admin websocket client which can send messages but ignores any incoming messages
+    pub async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
+        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::default()), addr).await?;
 
-        Ok(AdminClient {
-            tx,
-            rx,
-            url: url.clone(),
-        })
+        let rx =
+            tokio::task::spawn(async move { while rx.recv::<AdminResponse>().await.is_ok() {} });
+
+        Ok(AdminClient { tx, rx, addr })
     }
 
     pub async fn connect_app_client(&mut self) -> anyhow::Result<AppClient> {
@@ -120,12 +124,9 @@ impl AdminClient {
             *app_interfaces.first().unwrap()
         };
 
-        let mut app_url = self.url.clone();
-        app_url
-            .set_port(Some(app_port))
-            .map_err(|_| anyhow!("Failed to set port on app_url"))?;
+        let app_addr = (self.addr.ip(), app_port).into();
 
-        AppClient::connect(&app_url).await
+        AppClient::connect(app_addr).await
     }
 
     async fn list_app_interfaces(&mut self) -> anyhow::Result<Vec<u16>> {
@@ -147,19 +148,11 @@ impl AdminClient {
     }
 
     async fn send(&mut self, msg: AdminRequest) -> anyhow::Result<AdminResponse> {
-        let response = self.tx.request(msg).await.map_err(WebsocketError::from)?;
+        let response = self.tx.request(msg).await?;
 
         match response {
             AdminResponse::Error(error) => Err(anyhow!("External error: {:?}", error)),
             _ => Ok(response),
-        }
-    }
-}
-
-impl Drop for AdminClient {
-    fn drop(&mut self) {
-        if let Some(h) = self.rx.take_handle() {
-            h.close();
         }
     }
 }

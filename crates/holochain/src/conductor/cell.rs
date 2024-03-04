@@ -240,7 +240,7 @@ impl Cell {
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let author = self.id.agent_pubkey().clone();
-        let lives = self
+        let live_fns = self
             .space
             .authored_db
             .write_async(move |txn: &mut Transaction| {
@@ -257,14 +257,14 @@ impl Cell {
             })
             .await;
 
-        match lives {
+        match live_fns {
             // Cannot proceed if we don't know what to run.
             Err(e) => {
                 error!("error calling scheduled fn: {:?}", e);
             }
-            Ok(lives) => {
+            Ok(live_fns) => {
                 let mut tasks = vec![];
-                for (scheduled_fn, schedule) in &lives {
+                for (scheduled_fn, schedule) in &live_fns {
                     // Failing to encode a schedule should never happen.
                     // If it does log the error and bail.
                     let payload = match ExternIO::encode(schedule) {
@@ -326,7 +326,7 @@ impl Cell {
                     .space
                     .authored_db
                     .write_async(move |txn: &mut Transaction| {
-                        for ((scheduled_fn, _), result) in lives.iter().zip(results.iter()) {
+                        for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
                                     let next_schedule: Schedule = match extern_io.decode() {
@@ -365,6 +365,11 @@ impl Cell {
 
     #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
+    //
+    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
+    // we would disallow zome calls for cells which had not joined. If we want that behavior,
+    // we can do that check at the time of this function call, rather than at the time of trying
+    // to access the Cell itself, as it was previously done.
     pub async fn handle_holochain_p2p_event(
         &self,
         evt: holochain_p2p::event::HolochainP2pEvent,
@@ -868,7 +873,11 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    // #[instrument(skip(self, call, workspace_lock))]
+    //
+    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
+    // we would disallow zome calls for cells which had not joined. If we want that behavior,
+    // we can do that check at the time of the zome call, rather than at the time of trying
+    // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
         call: ZomeCall,
@@ -934,7 +943,7 @@ impl Cell {
 
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[tracing::instrument(skip(self))]
-    async fn check_or_run_zome_init(&self) -> CellResult<()> {
+    pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),
