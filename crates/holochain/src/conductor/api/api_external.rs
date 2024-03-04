@@ -10,9 +10,15 @@ pub use app_interface::*;
 #[async_trait::async_trait]
 pub trait InterfaceApi: 'static + Send + Sync + Clone {
     /// Which request is being made
-    type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    type ApiRequest: TryFrom<SerializedBytes, Error = SerializedBytesError>
+        + Send
+        + Sync
+        + std::fmt::Debug;
     /// Which response is sent to the above request
-    type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError> + Send + Sync;
+    type ApiResponse: TryInto<SerializedBytes, Error = SerializedBytesError>
+        + Send
+        + Sync
+        + std::fmt::Debug;
     /// Handle a request on this API
     async fn handle_request(
         &self,

@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdout, Command};
-use url2::url2;
 use which::which;
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
@@ -20,6 +19,8 @@ const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_path.push("../hc/Cargo.toml");
+
+    println!("@@ Warning, Building `hc` binary!");
 
     let out = escargot::CargoBuild::new()
         .bin("hc")
@@ -33,12 +34,16 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
         .run()
         .unwrap();
 
+    println!("@@ `hc` binary built");
+
     out.path().to_path_buf()
 });
 
 static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_path.push("../holochain/Cargo.toml");
+
+    println!("@@ Warning, Building `holochain` binary!");
 
     let out = escargot::CargoBuild::new()
         .bin("holochain")
@@ -51,6 +56,8 @@ static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
         .run()
         .unwrap();
 
+    println!("@@ `holochain` binary built");
+
     out.path().to_path_buf()
 });
 
@@ -58,17 +65,26 @@ async fn new_websocket_client_for_port(
     port: u16,
 ) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
-        url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
+        ([127, 0, 0, 1], port).into(),
     )
     .await?)
 }
 
 async fn get_app_info(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = new_websocket_client_for_port(port)
+    let (app_tx, mut rx) = new_websocket_client_for_port(port)
         .await
         .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
+    struct D(tokio::task::JoinHandle<()>);
+    impl Drop for D {
+        fn drop(&mut self) {
+            self.0.abort();
+        }
+    }
+    let _d = D(tokio::task::spawn(async move {
+        while rx.recv::<AppResponse>().await.is_ok() {}
+    }));
     let request = AppRequest::AppInfo {
         installed_app_id: "Stub".to_string(),
     };
@@ -77,7 +93,7 @@ async fn get_app_info(port: u16) {
     assert_matches!(r, AppResponse::AppInfo(None));
 }
 
-async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::WebsocketError>>) -> T {
+async fn check_timeout<T>(response: impl Future<Output = std::io::Result<T>>) -> T {
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
@@ -91,33 +107,39 @@ async fn package_fixture_if_not_packaged() {
         return;
     }
 
-    get_hc_command()
-        .arg("dna")
-        .arg("pack")
-        .arg("tests/fixtures/my-app/dna")
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .expect("Failed to pack DNA");
+    println!("@@ Package Fixture");
 
-    get_hc_command()
-        .arg("app")
-        .arg("pack")
-        .arg("tests/fixtures/my-app")
-        .stdout(Stdio::null())
-        .status()
-        .await
-        .expect("Failed to pack hApp");
+    let mut cmd = get_hc_command();
+
+    cmd.arg("dna").arg("pack").arg("tests/fixtures/my-app/dna");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack DNA");
+
+    let mut cmd = get_hc_command();
+
+    cmd.arg("app").arg("pack").arg("tests/fixtures/my-app");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.expect("Failed to pack hApp");
+
+    println!("@@ Package Fixture Complete");
 }
 
 async fn clean_sandboxes() {
-    get_sandbox_command()
-        .arg("clean")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .unwrap();
+    println!("@@ Clean");
+
+    let mut cmd = get_sandbox_command();
+
+    cmd.arg("clean");
+
+    println!("@@ {cmd:?}");
+
+    cmd.status().await.unwrap();
+
+    println!("@@ Clean Complete");
 }
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
@@ -142,6 +164,8 @@ async fn generate_sandbox_and_connect() {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
 
@@ -225,6 +249,7 @@ fn get_sandbox_command() -> Command {
 async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        println!("@@@@@-{line}-@@@@@");
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
