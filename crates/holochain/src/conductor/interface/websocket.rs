@@ -306,11 +306,11 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::sweettest::app_bundle_from_dnas;
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
+    use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
