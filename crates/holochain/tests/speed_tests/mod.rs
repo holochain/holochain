@@ -35,7 +35,6 @@ use holochain_test_wasm_common::AnchorInput;
 
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
 use test_case::test_case;
@@ -222,7 +221,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     async fn call(
         app_interface: &mut WebsocketSender,
         invocation: ZomeCall,
-    ) -> WebsocketResult<AppResponse> {
+    ) -> std::io::Result<AppResponse> {
         let request = AppRequest::CallZome(Box::new(invocation));
         app_interface.request(request).await
     }

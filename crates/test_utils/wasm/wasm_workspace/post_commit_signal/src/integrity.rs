@@ -4,7 +4,7 @@ use hdk::prelude::*;
 pub struct TestEntry(pub String);
 
 #[derive(Serialize, Deserialize)]
-#[hdk_entry_types]
+#[hdk_entry_defs]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     TestEntry(TestEntry),

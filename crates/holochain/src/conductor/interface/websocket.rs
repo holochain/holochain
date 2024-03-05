@@ -306,6 +306,7 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::sweettest::app_bundle_from_dnas;
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
@@ -371,8 +372,7 @@ pub mod test {
         holochain_trace::test_run().ok();
         let db_dir = test_db_dir();
         let conductor_handle = ConductorBuilder::new()
-            .with_data_root_path(db_dir.path().to_path_buf().into())
-            .test(&[])
+            .test(db_dir.path(), &[])
             .await
             .unwrap();
 
@@ -444,7 +444,7 @@ pub mod test {
         });
 
         // Call Zome
-        let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
+        let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(Timestamp::now()).unwrap();
         let request = AppRequest::CallZome(Box::new(
             ZomeCall::try_from_unsigned_zome_call(
                 conductor_handle.keystore(),
