@@ -237,10 +237,11 @@ pub async fn register_and_install_dna_named(
 
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let (_dna, dna_hash) = dna_bundle1
+    let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap(), dna_compat)
         .await
         .unwrap();
+    let dna_hash = dna.dna_hash().clone();
 
     let roles = vec![AppRoleManifest {
         name: role_name,

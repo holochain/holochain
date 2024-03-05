@@ -106,14 +106,9 @@ how_many: 42
     let response = client.request(request);
     let response = check_timeout(response, 10000).await;
 
-    let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
-    let mut tmp_dna = dna.dna_def().clone();
-    tmp_dna.modifiers.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
-
     assert_ne!(&installed_dna_hash, dna.dna_hash());
 
-    let expects = vec![dna.dna_hash().clone()];
+    let expects = vec![installed_dna_hash];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 }
 
@@ -150,7 +145,7 @@ async fn call_zome() {
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let dna_hash = register_and_install_dna(
+    let installed_dna_hash = register_and_install_dna(
         &mut admin_tx,
         agent_key.clone(),
         fake_dna_path,
@@ -159,14 +154,14 @@ async fn call_zome() {
         10000,
     )
     .await;
-    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
+    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
-    let expects = vec![dna_hash.clone()];
+    let expects = vec![installed_dna_hash.clone()];
     assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
@@ -367,7 +362,7 @@ async fn emit_signals() {
     let agent_key = fake_agent_pubkey_1();
 
     // Install Dna
-    let dna_hash = register_and_install_dna(
+    let installed_dna_hash = register_and_install_dna(
         &mut admin_tx,
         agent_key.clone(),
         fake_dna_path,
@@ -376,7 +371,7 @@ async fn emit_signals() {
         10000,
     )
     .await;
-    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
+    let cell_id = CellId::new(installed_dna_hash.clone(), agent_key.clone());
 
     // Activate cells
     let request = AdminRequest::EnableApp {
