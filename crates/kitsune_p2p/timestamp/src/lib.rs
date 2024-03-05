@@ -27,6 +27,13 @@ pub mod noise;
 /// One million
 pub const MM: i64 = 1_000_000;
 
+/// This represents general compatibility between kitsune versions.
+/// Instances are compatible if and only if they share the same protocol version.
+///
+/// If there is a breaking change at any level of the wire protocol, including
+/// changes to serialization, this version should be incremented.
+pub const KITSUNE_PROTOCOL_VERSION: u32 = 0;
+
 /// A microsecond-precision UTC timestamp for use in Holochain's actions.
 ///
 /// It is assumed to be untrustworthy:

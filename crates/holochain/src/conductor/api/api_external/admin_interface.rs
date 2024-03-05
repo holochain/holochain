@@ -97,13 +97,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                             .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
+                        let compat = self.conductor_handle.get_dna_compat();
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(modifiers, compat).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
+                        let compat = self.conductor_handle.get_dna_compat();
+                        let (dna_file, _original_hash) =
+                            bundle.into_dna_file(modifiers, compat).await?;
                         dna_file
                     }
                 };

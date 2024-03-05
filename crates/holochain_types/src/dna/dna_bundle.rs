@@ -36,9 +36,14 @@ impl DnaBundle {
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
     /// been without the provided modifier overrides
-    pub async fn into_dna_file(self, modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
+    pub async fn into_dna_file(
+        self,
+        modifiers: DnaModifiersOpt,
+        compat: DnaCompatParams,
+    ) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
+        let (dna_def, original_hash) =
+            self.to_dna_def(integrity, coordinator, modifiers, compat)?;
 
         Ok((
             DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
@@ -112,6 +117,7 @@ impl DnaBundle {
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
         modifiers: DnaModifiersOpt,
+        dna_compat: DnaCompatParams,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
@@ -125,6 +131,7 @@ impl DnaBundle {
                         origin_time: manifest.integrity.origin_time.into(),
                         quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
                     },
+                    compatibility: dna_compat,
                     integrity_zomes,
                     coordinator_zomes,
                 };
@@ -300,7 +307,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(DnaModifiersOpt::none()).await,
+            bad_bundle.into_dna_file(DnaModifiersOpt::none(), DnaCompatParams::default()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
@@ -314,7 +321,7 @@ mod tests {
         .unwrap()
         .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(DnaModifiersOpt::none())
+            .into_dna_file(DnaModifiersOpt::none(), DnaCompatParams::default())
             .await
             .unwrap()
             .0;
@@ -334,6 +341,7 @@ mod tests {
                     .with_properties(properties.clone())
                     .serialized()
                     .unwrap(),
+                DnaCompatParams::default(),
             )
             .await
             .unwrap()

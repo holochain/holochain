@@ -42,6 +42,8 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+pub use ::kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION;
+
 pub mod metrics;
 
 mod types;

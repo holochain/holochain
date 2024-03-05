@@ -61,6 +61,7 @@ async fn provisioning_1_create() {
             &std::collections::HashMap::new(),
             agent.clone(),
             Default::default(),
+            DnaCompatParams::default(),
         )
         .await
         .unwrap();

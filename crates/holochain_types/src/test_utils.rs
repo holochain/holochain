@@ -37,6 +37,10 @@ pub fn fake_dna_zomes_named(
     name: &str,
     zomes: Vec<(ZomeName, DnaWasm)>,
 ) -> DnaFile {
+    let dna_compat = DnaCompatParams {
+        protocol_version: 42,
+        dpki_hash: None,
+    };
     let mut dna = DnaDef {
         name: name.to_string(),
         modifiers: DnaModifiers {
@@ -47,6 +51,7 @@ pub fn fake_dna_zomes_named(
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
+        compatibility: dna_compat,
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
     };

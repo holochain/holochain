@@ -252,7 +252,6 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use std::ops::Deref;
 
     use kitsune_p2p_types::box_fut_plain;
 
@@ -275,10 +274,7 @@ mod startup_shutdown_impls {
             outcome_sender: OutcomeSender,
         ) -> Self {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
-            let maybe_data_root_path = config
-                .data_root_path
-                .clone()
-                .map(|path| PathBuf::from(path.deref()));
+            let maybe_data_root_path = config.data_root_path.clone().map(|path| (*path).clone());
 
             Self {
                 spaces,
@@ -1338,23 +1334,52 @@ mod app_impls {
         /// Install an app from minimal elements, without needing construct a whole AppBundle.
         /// (This function constructs a bundle under the hood.)
         /// This is just a convenience for testing.
+        ///
+        /// Returns the list of DnaHashes actually installed, in the same order as they were passed in.
+        /// (The hashes themselves will be different due to DnaCompatParams.)
         #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            agent_key: AgentPubKey,
+            agent: AgentPubKey,
             data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
-        ) -> ConductorResult<()> {
-            let payload = crate::sweettest::get_install_app_payload_from_dnas(
-                installed_app_id,
-                agent_key,
-                data,
-            )
-            .await;
+        ) -> ConductorResult<Vec<DnaHash>> {
+            use crate::sweettest::DnaWithRole;
 
-            self.install_app_bundle(payload).await?;
+            let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).collect();
+            let manifest = crate::sweettest::app_manifest_from_dnas(&dnas_with_roles);
+            let compat = self.get_dna_compat();
 
-            Ok(())
+            let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
+                .iter()
+                .map(|(d, mp)| {
+                    let (role, dna) = d.clone().into_tuple();
+                    ((role, dna.update_compat(compat.clone())), mp.clone())
+                })
+                .map(|(dr, mp)| {
+                    let dna = dr.dna().clone();
+                    let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
+                    let dnas_to_register = (dna, mp.clone());
+                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 0));
+                    (dnas_to_register, role_assignments)
+                })
+                .unzip();
+
+            let dna_hashes = dnas_to_register
+                .iter()
+                .map(|(dna, _)| dna.dna_hash().clone())
+                .collect();
+
+            let ops = AppRoleResolution {
+                agent: agent.clone(),
+                dnas_to_register,
+                role_assignments,
+            };
+
+            self.install_app_common(installed_app_id, manifest, ops, false)
+                .await?;
+
+            Ok(dna_hashes)
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
@@ -1366,6 +1391,8 @@ mod app_impls {
             let ignore_genesis_failure = payload.ignore_genesis_failure;
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
+
+            let dna_compat = self.get_dna_compat();
 
             let InstallAppPayload {
                 source,
@@ -1395,10 +1422,23 @@ mod app_impls {
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
+
             let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
 
+            self.clone()
+                .install_app_common(installed_app_id, manifest, ops, ignore_genesis_failure)
+                .await
+        }
+
+        async fn install_app_common(
+            self: Arc<Self>,
+            installed_app_id: InstalledAppId,
+            manifest: AppManifest,
+            ops: AppRoleResolution,
+            ignore_genesis_failure: bool,
+        ) -> ConductorResult<StoppedApp> {
             let cells_to_create = ops.cells_to_create();
 
             // check if cells_to_create contains a cell identical to an existing one
@@ -1430,6 +1470,7 @@ mod app_impls {
                 crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
 
             if genesis_result.is_ok() || ignore_genesis_failure {
+                let agent_key = ops.agent;
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
@@ -2446,6 +2487,16 @@ mod accessor_impls {
         /// Get the conductor config
         pub fn get_config(&self) -> &ConductorConfig {
             &self.config
+        }
+
+        /// Construct the DnaCompatParams given the current setup
+        pub fn get_dna_compat(&self) -> DnaCompatParams {
+            // TODO
+            let dpki_hash = None;
+            DnaCompatParams {
+                protocol_version: kitsune_p2p::KITSUNE_PROTOCOL_VERSION,
+                dpki_hash,
+            }
         }
 
         /// Get a TaskManagerClient
