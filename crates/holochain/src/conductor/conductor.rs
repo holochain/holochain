@@ -1325,23 +1325,38 @@ mod app_impls {
         /// Install an app from minimal elements, without needing construct a whole AppBundle.
         /// (This function constructs a bundle under the hood.)
         /// This is just a convenience for testing.
+        ///
+        /// Returns the list of DnaHashes actually installed, in the same order as they were passed in.
+        /// (The hashes themselves will be different due to DnaCompatParams.)
         #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             agent_key: AgentPubKey,
             data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
-        ) -> ConductorResult<()> {
+        ) -> ConductorResult<Vec<DnaHash>> {
+            let compat = self.get_dna_compat();
+            let data: Vec<_> = data
+                .iter()
+                .map(|(d, mp)| {
+                    let (role, dna) = d.clone().into_tuple();
+                    ((role, dna.update_compat(compat.clone())), mp.clone())
+                })
+                .collect();
+            let dna_hashes = data
+                .iter()
+                .map(|((_, dr), _)| dr.dna().as_hash().clone())
+                .collect();
             let payload = crate::sweettest::get_install_app_payload_from_dnas(
                 installed_app_id,
                 agent_key,
-                data,
+                data.as_slice(),
             )
             .await;
 
             self.install_app_bundle(payload).await?;
 
-            Ok(())
+            Ok(dna_hashes)
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle

@@ -83,6 +83,9 @@ pub trait DnaWithRole: Clone + Sized {
 
     /// The DNA
     fn dna(&self) -> &DnaFile;
+
+    /// Into an explicit tuple of RoleName and DnaFile
+    fn into_tuple(self) -> (RoleName, DnaFile);
 }
 
 impl DnaWithRole for DnaFile {
@@ -93,6 +96,10 @@ impl DnaWithRole for DnaFile {
     fn dna(&self) -> &DnaFile {
         self
     }
+
+    fn into_tuple(self) -> (RoleName, DnaFile) {
+        (self.role(), self)
+    }
 }
 
 impl DnaWithRole for (RoleName, DnaFile) {
@@ -102,6 +109,10 @@ impl DnaWithRole for (RoleName, DnaFile) {
 
     fn dna(&self) -> &DnaFile {
         &self.1
+    }
+
+    fn into_tuple(self) -> (RoleName, DnaFile) {
+        self
     }
 }
 
@@ -347,19 +358,21 @@ impl SweetConductor {
         installed_app_id: &str,
         agent: AgentPubKey,
         dnas_with_roles: &[impl DnaWithRole],
-    ) -> ConductorApiResult<()> {
+    ) -> ConductorApiResult<Vec<DnaHash>> {
         let installed_app_id = installed_app_id.to_string();
 
         let dnas_with_proof: Vec<_> = dnas_with_roles
             .iter()
             .map(|dr| (dr.to_owned(), None))
             .collect();
-        self.raw_handle()
+        let dna_hashes = self
+            .raw_handle()
             .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
+        // app.all_cells()
 
         self.raw_handle().enable_app(installed_app_id).await?;
-        Ok(())
+        Ok(dna_hashes)
     }
 
     /// Build the SweetCells after `setup_cells` has been run
@@ -413,20 +426,22 @@ impl SweetConductor {
             .iter()
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
+        
         self.setup_app_1_register_dna(dnas.clone()).await?;
-        self.setup_app_2_install_and_enable(
-            installed_app_id,
-            agent.clone(),
-            dnas_with_roles.as_slice(),
-        )
-        .await?;
+
+        let dna_hashes = self
+            .setup_app_2_install_and_enable(
+                installed_app_id,
+                agent.clone(),
+                dnas_with_roles.as_slice(),
+            )
+            .await?;
 
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
 
-        let dna_hashes = dnas.iter().map(|r| r.dna_hash().clone());
-        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_hashes)
+        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_hashes.into_iter())
             .await
     }
 
@@ -461,15 +476,20 @@ impl SweetConductor {
         let agents: Vec<_> = agents.into_iter().collect();
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
         let dnas: Vec<&DnaFile> = dnas_with_roles.iter().map(|dr| dr.dna()).collect();
+
         self.setup_app_1_register_dna(dnas.clone()).await?;
+
+        let mut agents_and_dna_hashes = vec![];
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_2_install_and_enable(
-                &installed_app_id,
-                agent.to_owned(),
-                &dnas_with_roles,
-            )
-            .await?;
+            let dna_hashes = self
+                .setup_app_2_install_and_enable(
+                    &installed_app_id,
+                    agent.to_owned(),
+                    &dnas_with_roles,
+                )
+                .await?;
+            agents_and_dna_hashes.push((agent.clone(), dna_hashes));
         }
 
         self.raw_handle()
@@ -477,13 +497,13 @@ impl SweetConductor {
             .await?;
 
         let mut apps = Vec::new();
-        for agent in agents {
+        for (agent, dna_hashes) in agents_and_dna_hashes {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
                 self.setup_app_3_create_sweet_app(
                     &installed_app_id,
                     agent.clone(),
-                    dnas.clone().into_iter().map(|d| d.dna_hash().clone()),
+                    dna_hashes.into_iter(),
                 )
                 .await?,
             );
