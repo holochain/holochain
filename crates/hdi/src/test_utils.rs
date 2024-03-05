@@ -65,6 +65,13 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
             todo!()
         }
 
+        fn ed_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<XSalsa20Poly1305Data> {
+            todo!()
+        }
+
         fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
             todo!()
         }

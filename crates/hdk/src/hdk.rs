@@ -201,6 +201,10 @@ mockall::mock! {
             &self,
             x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+        fn ed_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<XSalsa20Poly1305Data>;
     }
 
 }
@@ -278,6 +282,13 @@ impl HdiT for ErrHdk {
         &self,
         _x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        Self::err()
+    }
+
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
         Self::err()
     }
 }
@@ -486,6 +497,12 @@ impl HdiT for HostHdk {
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         HostHdi::new().x_25519_x_salsa20_poly1305_decrypt(x_25519_x_salsa20_poly1305_decrypt)
+    }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        HostHdi::new().ed_25519_x_salsa20_poly1305_decrypt(ed_25519_x_salsa20_poly1305_decrypt)
     }
 }
 
