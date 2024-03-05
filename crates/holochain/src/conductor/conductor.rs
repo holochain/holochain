@@ -71,6 +71,7 @@ use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUN
 use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
 use crate::core::ribosome::RibosomeT;
 use crate::core::workflow::ZomeCallResult;
+use crate::sweettest::DnaWithRole;
 use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
