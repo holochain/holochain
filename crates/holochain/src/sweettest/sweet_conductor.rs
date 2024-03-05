@@ -656,10 +656,10 @@ impl SweetConductor {
 /// Get a websocket client on localhost at the specified port
 pub async fn websocket_client_by_port(
     port: u16,
-) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+) -> std::io::Result<(WebsocketSender, WebsocketReceiver)> {
     holochain_websocket::connect(
-        url2::url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
+        ([127, 0, 0, 1], port).into(),
     )
     .await
 }

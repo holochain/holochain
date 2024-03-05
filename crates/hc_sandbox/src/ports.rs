@@ -6,9 +6,7 @@ use std::sync::Arc;
 use holochain_conductor_api::{
     config::conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver,
 };
-use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
-use url2::prelude::*;
-use ws::WebsocketResult;
+use holochain_websocket::{self as ws, WebsocketConfig, WebsocketSender};
 
 use crate::config::read_config;
 use crate::config::write_config;
@@ -44,19 +42,31 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
     Ok(ports)
 }
 
-pub(crate) async fn get_admin_api(port: u16) -> WebsocketResult<WebsocketSender> {
+/// Creates a [`WebsocketSender`] along with a task which simply consumes and discards
+/// all messages on the receiving side
+pub(crate) async fn get_admin_api(
+    port: u16,
+) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     tracing::debug!(port);
-    websocket_client_by_port(port).await.map(|p| p.0)
+    websocket_client_by_port(port).await
 }
 
 async fn websocket_client_by_port(
     port: u16,
-) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    ws::connect(
-        url2!("ws://127.0.0.1:{}", port),
+) -> std::io::Result<(WebsocketSender, tokio::task::JoinHandle<()>)> {
+    let (send, mut recv) = ws::connect(
         Arc::new(WebsocketConfig::default()),
+        ([127, 0, 0, 1], port).into(),
     )
-    .await
+    .await?;
+    let task = tokio::task::spawn(async move {
+        while recv
+            .recv::<holochain_conductor_api::AdminResponse>()
+            .await
+            .is_ok()
+        {}
+    });
+    Ok((send, task))
 }
 
 pub(crate) fn random_admin_port(config: &mut ConductorConfig) {

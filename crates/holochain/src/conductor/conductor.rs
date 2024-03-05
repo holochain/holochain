@@ -398,12 +398,10 @@ mod interface_impls {
                 async move {
                     match driver {
                         InterfaceDriver::Websocket { port } => {
-                            let (listener_handle, listener) =
-                                spawn_websocket_listener(port).await?;
-                            let port = listener_handle.local_addr().port().unwrap_or(port);
+                            let listener = spawn_websocket_listener(port).await?;
+                            let port = listener.local_addr()?.port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
-                                listener_handle,
                                 listener,
                                 admin_api.clone(),
                                 port,
