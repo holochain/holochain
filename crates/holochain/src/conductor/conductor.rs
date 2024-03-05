@@ -1422,6 +1422,7 @@ mod app_impls {
             };
 
             for (dna, _) in ops.dnas_to_register {
+                dbg!(dna.dna_def());
                 self.clone().register_dna(dna).await?;
             }
 
@@ -1614,6 +1615,7 @@ mod cell_impls {
     impl Conductor {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
+            dbg!(&self.running_cells);
             if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
                 Ok(cell.cell)
             } else {
@@ -2794,6 +2796,8 @@ impl Conductor {
         let on_cells: HashSet<CellId> = self
             .running_cells
             .share_ref(|c| c.keys().cloned().collect());
+
+        dbg!(&app_cells);
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             self.clone()
