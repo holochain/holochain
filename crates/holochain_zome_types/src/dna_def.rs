@@ -46,6 +46,7 @@ pub struct DnaDef {
     /// Parameters defined by the conductor into which this DNA is installed.
     /// These specify various constraints on network compatibility based on the
     /// runtime environment. These do affect the DNA hash.
+    #[cfg_attr(feature = "full-dna-def", builder(default))]
     pub compatibility: DnaCompatParams,
 
     /// A vector of zomes associated with your DNA.
