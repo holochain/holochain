@@ -1,4 +1,4 @@
-//! # DNA Properties Support types
+//! DNA compatibility parameters
 
 use holo_hash::DnaHashB64;
 use holochain_serialized_bytes::prelude::*;
@@ -38,7 +38,6 @@ impl Default for DnaCompatParams {
     fn default() -> Self {
         DnaCompatParams {
             protocol_version: kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION,
-            // TODO: define the "current" DPKI hash to be used
             dpki_hash: None,
         }
     }

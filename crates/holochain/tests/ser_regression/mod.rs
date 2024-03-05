@@ -51,7 +51,6 @@ async fn ser_regression_test() {
                 quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
             compatibility: DnaCompatParams::default(),
-
             integrity_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .integrity
                 .into_inner()],

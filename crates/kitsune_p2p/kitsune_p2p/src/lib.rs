@@ -42,6 +42,8 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+pub use ::kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION;
+
 pub mod metrics;
 
 mod types;
@@ -55,8 +57,6 @@ pub use spawn::*;
 
 mod host_api;
 pub use host_api::*;
-
-pub use kitsune_p2p_timestamp::KITSUNE_PROTOCOL_VERSION;
 
 #[allow(missing_docs)]
 #[cfg(feature = "test_utils")]

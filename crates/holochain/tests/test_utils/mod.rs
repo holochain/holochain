@@ -202,7 +202,6 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
 
 pub async fn register_and_install_dna(
     client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
@@ -211,7 +210,6 @@ pub async fn register_and_install_dna(
 ) -> DnaHash {
     register_and_install_dna_named(
         client,
-        orig_dna_hash,
         agent_key,
         dna_path,
         properties,
@@ -224,7 +222,6 @@ pub async fn register_and_install_dna(
 
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    _orig_dna_hash: DnaHash,
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
@@ -237,20 +234,20 @@ pub async fn register_and_install_dna_named(
         ..Default::default()
     };
     let dna_compat = DnaCompatParams::default();
-
     let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
     let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let (_dna, dna_hash) = dna_bundle1
+    let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap(), dna_compat)
         .await
         .unwrap();
+    let dna_hash = dna.dna_hash().clone();
 
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(dna_path.clone())),
             modifiers: mods,
-            installed_hash: Some(dna_hash.clone().into()),
+            installed_hash: None,
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -264,6 +261,8 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
+
+    dbg!(&manifest);
 
     let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
         .await

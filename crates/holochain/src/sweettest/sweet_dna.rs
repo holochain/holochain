@@ -10,13 +10,9 @@ pub struct SweetDnaFile(DnaFile);
 
 impl SweetDnaFile {
     /// Create a DnaFile from a path to a *.dna bundle
-    pub async fn from_bundle(path: &Path, dna_compat: DnaCompatParams) -> DnaResult<DnaFile> {
-        Self::from_bundle_with_overrides(
-            path,
-            DnaModifiersOpt::<SerializedBytes>::none(),
-            dna_compat,
-        )
-        .await
+    pub async fn from_bundle(path: &Path, compat: DnaCompatParams) -> DnaResult<DnaFile> {
+        Self::from_bundle_with_overrides(path, DnaModifiersOpt::<SerializedBytes>::none(), compat)
+            .await
     }
 
     /// Create a DnaFile from a path to a *.dna bundle, applying the specified
@@ -24,7 +20,7 @@ impl SweetDnaFile {
     pub async fn from_bundle_with_overrides<P, E>(
         path: &Path,
         modifiers: DnaModifiersOpt<P>,
-        dna_compat: DnaCompatParams,
+        compat: DnaCompatParams,
     ) -> DnaResult<DnaFile>
     where
         P: TryInto<SerializedBytes, Error = E>,
@@ -34,7 +30,7 @@ impl SweetDnaFile {
             .await?
             .into_dna_file(
                 modifiers.serialized().map_err(SerializedBytesError::from)?,
-                dna_compat,
+                compat,
             )
             .await?
             .0)

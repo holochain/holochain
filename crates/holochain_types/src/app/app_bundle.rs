@@ -63,7 +63,7 @@ impl AppBundle {
         dna_store: &impl DnaStore,
         agent: AgentPubKey,
         membrane_proofs: HashMap<RoleName, MembraneProof>,
-        dna_compat: DnaCompatParams,
+        compat: DnaCompatParams,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
@@ -72,7 +72,7 @@ impl AppBundle {
             Ok((
                 role_name.clone(),
                 bundle
-                    .resolve_cell(dna_store, role_name, role, dna_compat.clone())
+                    .resolve_cell(dna_store, role_name, role, compat.clone())
                     .await?,
             ))
         });
@@ -136,7 +136,7 @@ impl AppBundle {
         dna_store: &impl DnaStore,
         role_name: RoleName,
         role: AppRoleManifestValidated,
-        dna_compat: DnaCompatParams,
+        compat: DnaCompatParams,
     ) -> AppBundleResult<CellProvisioningOp> {
         Ok(match role {
             AppRoleManifestValidated::Create {
@@ -153,7 +153,7 @@ impl AppBundle {
                         &location,
                         installed_hash.as_ref(),
                         modifiers,
-                        dna_compat,
+                        compat,
                     )
                     .await?;
                 CellProvisioningOp::CreateFromDnaFile(dna, clone_limit)
@@ -180,7 +180,7 @@ impl AppBundle {
                             &location,
                             Some(&installed_hash),
                             modifiers,
-                            dna_compat,
+                            compat,
                         )
                         .await?;
                     CellProvisioningOp::CreateFromDnaFile(dna, clone_limit)
@@ -208,7 +208,7 @@ impl AppBundle {
                         &location,
                         installed_hash.as_ref(),
                         modifiers,
-                        dna_compat,
+                        compat,
                     )
                     .await?;
                 CellProvisioningOp::ProvisionOnly(dna, clone_limit)
@@ -223,7 +223,7 @@ impl AppBundle {
         location: &mr_bundle::Location,
         installed_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompatParams,
+        compat: DnaCompatParams,
     ) -> AppBundleResult<DnaFile> {
         let dna_file = if let Some(hash) = installed_hash {
             let (dna_file, original_hash) =
@@ -232,8 +232,7 @@ impl AppBundle {
                     dna_file = dna_file.update_modifiers(modifiers);
                     (dna_file, original_hash)
                 } else {
-                    self.resolve_location(location, modifiers, dna_compat)
-                        .await?
+                    self.resolve_location(location, modifiers, compat).await?
                 };
             let expected_hash: DnaHash = hash.clone().into();
             if expected_hash != original_hash {
@@ -244,9 +243,7 @@ impl AppBundle {
             }
             dna_file
         } else {
-            self.resolve_location(location, modifiers, dna_compat)
-                .await?
-                .0
+            self.resolve_location(location, modifiers, compat).await?.0
         };
         Ok(dna_file)
     }
@@ -263,11 +260,11 @@ impl AppBundle {
         &self,
         location: &mr_bundle::Location,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompatParams,
+        compat: DnaCompatParams,
     ) -> AppBundleResult<(DnaFile, DnaHash)> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, original_hash) = dna_bundle.into_dna_file(modifiers, dna_compat).await?;
+        let (dna_file, original_hash) = dna_bundle.into_dna_file(modifiers, compat).await?;
         Ok((dna_file, original_hash))
     }
 }

@@ -39,11 +39,11 @@ impl DnaBundle {
     pub async fn into_dna_file(
         self,
         modifiers: DnaModifiersOpt,
-        dna_compat: DnaCompatParams,
+        compat: DnaCompatParams,
     ) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
         let (dna_def, original_hash) =
-            self.to_dna_def(integrity, coordinator, modifiers, dna_compat)?;
+            self.to_dna_def(integrity, coordinator, modifiers, compat)?;
 
         Ok((
             DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
@@ -131,7 +131,7 @@ impl DnaBundle {
                         origin_time: manifest.integrity.origin_time.into(),
                         quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
                     },
-                    compatibility: dna_compat.clone(),
+                    compatibility: dna_compat,
                     integrity_zomes,
                     coordinator_zomes,
                 };
@@ -309,7 +309,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(DnaModifiersOpt::none(), dna_compat.clone()).await,
+            bad_bundle.into_dna_file(DnaModifiersOpt::none(), DnaCompatParams::default()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
@@ -323,7 +323,7 @@ mod tests {
         .unwrap()
         .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(DnaModifiersOpt::none(), dna_compat.clone())
+            .into_dna_file(DnaModifiersOpt::none(), DnaCompatParams::default())
             .await
             .unwrap()
             .0;
@@ -343,7 +343,7 @@ mod tests {
                     .with_properties(properties.clone())
                     .serialized()
                     .unwrap(),
-                dna_compat.clone(),
+                DnaCompatParams::default(),
             )
             .await
             .unwrap()

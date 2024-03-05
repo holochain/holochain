@@ -1,6 +1,6 @@
 //! Defines DnaDef struct
 
-use crate::prelude::*;
+use crate::{dna_compat::DnaCompatParams, prelude::*};
 
 #[cfg(feature = "full-dna-def")]
 use holochain_integrity_types::DnaModifiersBuilder;
@@ -46,6 +46,7 @@ pub struct DnaDef {
     /// Parameters defined by the conductor into which this DNA is installed.
     /// These specify various constraints on network compatibility based on the
     /// runtime environment. These do affect the DNA hash.
+    #[cfg_attr(feature = "full-dna-def", builder(default))]
     pub compatibility: DnaCompatParams,
 
     /// A vector of zomes associated with your DNA.
@@ -60,6 +61,7 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     modifiers: &'a DnaModifiers,
+    compatibility: &'a DnaCompatParams,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -239,6 +241,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             modifiers: &self.modifiers,
+            compatibility: &self.compatibility,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
