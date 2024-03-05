@@ -1326,6 +1326,37 @@ mod network_impls {
     }
 }
 
+/// Get a "standard" AppBundle from a single DNA, with Create provisioning,
+/// with no modifiers, clone limit of 255, and arbitrary role names
+pub fn app_manifest_from_dnas(dnas_with_roles: &[&impl DnaWithRole]) -> AppManifest {
+    let roles: Vec<_> = dnas_with_roles
+        .iter()
+        .map(|dr| {
+            let dna = dr.dna();
+            let path = PathBuf::from(format!("{}", dna.dna_hash()));
+            let modifiers = DnaModifiersOpt::none();
+            AppRoleManifest {
+                name: dr.role(),
+                dna: AppRoleDnaManifest {
+                    location: Some(DnaLocation::Bundled(path.clone())),
+                    modifiers,
+                    installed_hash: None,
+                    clone_limit: 255,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }
+        })
+        .collect();
+
+    AppManifestCurrentBuilder::default()
+        .name("[generated]".into())
+        .description(None)
+        .roles(roles)
+        .build()
+        .unwrap()
+        .into()
+}
+
 /// Methods related to app installation and management
 mod app_impls {
     use super::*;
@@ -1347,7 +1378,7 @@ mod app_impls {
             use crate::sweettest::DnaWithRole;
 
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).collect();
-            let manifest = crate::sweettest::app_manifest_from_dnas(&dnas_with_roles);
+            let manifest = app_manifest_from_dnas(&dnas_with_roles);
             let compat = self.get_dna_compat();
 
             let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
@@ -1360,7 +1391,7 @@ mod app_impls {
                     let dna = dr.dna().clone();
                     let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
                     let dnas_to_register = (dna, mp.clone());
-                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 0));
+                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 255));
                     (dnas_to_register, role_assignments)
                 })
                 .unzip();

@@ -263,8 +263,6 @@ pub async fn register_and_install_dna_named(
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
 
-    dbg!(&manifest);
-
     let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
         .await
         .unwrap();

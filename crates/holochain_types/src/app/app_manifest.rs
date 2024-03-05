@@ -127,7 +127,7 @@ impl AppManifest {
                         location: Some(mr_bundle::Location::Bundled(path)),
                         modifiers: Default::default(),
                         installed_hash: None,
-                        clone_limit: 256,
+                        clone_limit: 255,
                     },
                 }
             })

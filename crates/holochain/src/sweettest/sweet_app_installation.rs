@@ -2,38 +2,9 @@ use std::path::PathBuf;
 
 use holochain_types::prelude::*;
 
+use crate::conductor::conductor::app_manifest_from_dnas;
+
 use super::DnaWithRole;
-
-/// Get a "standard" AppBundle from a single DNA, with Create provisioning,
-/// with no modifiers, clone limit of 255, and arbitrary role names
-pub fn app_manifest_from_dnas(dnas_with_roles: &[&impl DnaWithRole]) -> AppManifest {
-    let roles: Vec<_> = dnas_with_roles
-        .iter()
-        .map(|dr| {
-            let dna = dr.dna();
-            let path = PathBuf::from(format!("{}", dna.dna_hash()));
-            let modifiers = DnaModifiersOpt::none();
-            AppRoleManifest {
-                name: dr.role(),
-                dna: AppRoleDnaManifest {
-                    location: Some(DnaLocation::Bundled(path.clone())),
-                    modifiers,
-                    installed_hash: None,
-                    clone_limit: 255,
-                },
-                provisioning: Some(CellProvisioning::Create { deferred: false }),
-            }
-        })
-        .collect();
-
-    AppManifestCurrentBuilder::default()
-        .name("[generated]".into())
-        .description(None)
-        .roles(roles)
-        .build()
-        .unwrap()
-        .into()
-}
 
 /// Get a "standard" AppBundle from a single DNA, with Create provisioning,
 /// with no modifiers, clone limit of 255, and arbitrary role names
