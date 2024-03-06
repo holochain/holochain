@@ -11,5 +11,5 @@ categories = [ "fixtures" ]
 edition = "2021"
 
 [dependencies]
-fixt = { path = ".." ,version = "^0.3.0-beta-dev.1"}
+fixt = { path = ".." ,version = "^0.3.0-beta-dev.2"}
 paste = "1.0.12"
