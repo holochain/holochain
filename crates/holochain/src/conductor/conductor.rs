@@ -1376,8 +1376,6 @@ mod app_impls {
             agent: AgentPubKey,
             data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<Vec<DnaHash>> {
-            use crate::sweettest::DnaWithRole;
-
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles);
             let compat = self.get_dna_compat();
@@ -1458,6 +1456,8 @@ mod app_impls {
             let ops = bundle
                 .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
                 .await?;
+
+            debug_assert_eq!(ops.agent, agent_key);
 
             self.clone()
                 .install_app_common(installed_app_id, manifest, ops, ignore_genesis_failure)

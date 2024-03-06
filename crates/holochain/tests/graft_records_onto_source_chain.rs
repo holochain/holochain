@@ -4,19 +4,22 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
-use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile, SweetInlineZomes};
-use holochain::test_utils::inline_zomes::simple_crud_zome;
+use holochain::sweettest::{DynSweetRendezvous, SweetConductor, SweetDnaFile};
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
 use holochain_types::record::SignedActionHashedExt;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::bytes::Bytes;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    // NOTE: using an inline zome here fails because the DNA hash changes.
+    //       Something to look into some day.
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::RandomBytes]).await;
     let mut config = ConductorConfig::default();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
@@ -27,29 +30,25 @@ async fn grafting() {
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
 
-    let zome = alice.zome(SweetInlineZomes::COORDINATOR);
-
     // Trigger init.
-    let _: Vec<Option<Record>> = conductor
-        .call(
-            &zome,
-            "read_entry",
-            EntryHash::from(alice.cell_id().agent_pubkey().clone()),
-        )
+    let _: Bytes = conductor
+        .call(&alice.zome("random_bytes"), "random_bytes", 8)
         .await;
 
     // Get the current chain source chain.
     let get_chain = |env: DbWrite<DbKindAuthored>| async move {
-        env.read_async(move |txn| -> DatabaseResult<Vec<(ActionHash, u32)>> {
-            let chain: Vec<(ActionHash, u32)> = txn
-                .prepare("SELECT hash, seq FROM Action ORDER BY seq")
-                .unwrap()
-                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-                .unwrap()
-                .collect::<Result<_, _>>()
-                .unwrap();
-            Ok(chain)
-        })
+        env.read_async(
+            move |txn| -> DatabaseResult<Vec<(ActionHash, u32, String)>> {
+                let chain: Vec<(ActionHash, u32, String)> = txn
+                    .prepare("SELECT hash, seq, type FROM Action ORDER BY seq")
+                    .unwrap()
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                    .unwrap()
+                    .collect::<Result<_, _>>()
+                    .unwrap();
+                Ok(chain)
+            },
+        )
         .await
         .unwrap()
     };
@@ -72,7 +71,7 @@ async fn grafting() {
         .await
         .unwrap();
     // Chain should be 4 long.
-    assert_eq!(chain.len(), 4);
+    assert_eq!(chain.len(), 4, "Chain should be 4 long: {:#?}", chain);
     // Last seq should be 3.
     assert_eq!(chain.last().unwrap().1, 3);
 
@@ -185,7 +184,7 @@ async fn grafting() {
         .await;
 
     // Fork is detected
-    assert!(dbg!(result).is_err());
+    assert!(result.is_err());
 
     // Restore and validate the original records
     // (there has been no change at this point, but it helps for clarity to reset the chain anyway)

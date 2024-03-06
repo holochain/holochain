@@ -70,7 +70,6 @@ impl SweetDnaFile {
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 quantum_time: STANDARD_QUANTUM_TIME,
             })
-            .compatibility(DnaCompatParams::default())
             .integrity_zomes(iz)
             .coordinator_zomes(cz)
             .build()
