@@ -2625,6 +2625,7 @@ dependencies = [
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
+ "cfg-if 0.1.10",
  "clap 4.5.1",
  "flate2",
  "getrandom 0.2.12",

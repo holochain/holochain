@@ -8,6 +8,7 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+cfg-if = "0.1"
 clap = { version = "4.2.2", features = [ "derive", "wrap_help" ], optional = true }
 flate2 = { version = "1.0.25", optional = true }
 hdi = { path = "../hdi", version = "^0.4.0-beta-dev.28", optional = true }

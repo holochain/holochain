@@ -3,6 +3,7 @@ mod authored_test;
 mod clone_cell;
 mod dht_arc;
 mod dna_properties;
+mod graft_records_onto_source_chain;
 mod inline_zome_spec;
 mod integrity_zome;
 mod multi_conductor;
