@@ -856,28 +856,29 @@ impl MetaNet {
                 }),
                 Arc::new(move |url, data| {
                     let e_s = evt_sender.clone();
-                    Box::pin(async move {
-                        match PreflightData::decode_ref(&data) {
-                            Ok((
-                                _,
-                                PreflightData::V0(V0 {
+                    let url = url.clone();
+                    match PreflightData::decode_ref(&data) {
+                        Ok((
+                            _,
+                            PreflightData::V0(V0 {
+                                kitsune_protocol_version,
+                                peer_list,
+                                user_data,
+                            }),
+                        )) => {
+                            if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
+                                tracing::warn!(
+                                    ?url,
+                                    "kitsune protocol version mismatch: ours = {}, theirs = {}",
+                                    KITSUNE_PROTOCOL_VERSION,
                                     kitsune_protocol_version,
-                                    peer_list,
-                                    user_data,
-                                }),
-                            )) => {
-                                if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
-                                    tracing::warn!(
-                                        "kitsune protocol version mismatch with: ours == {}, theirs == {}. Url: {}",
-                                        KITSUNE_PROTOCOL_VERSION,
-                                        kitsune_protocol_version,
-                                        url
-                                    );
-                                    return Ok(());
-                                }
+                                );
+                                return box_fut_plain(Ok(()));
+                            }
 
-                                todo!("call host-supplied callback to validate user data");
+                            todo!("call host-supplied callback to validate user data");
 
+                            Box::pin(async move {
                                 // @todo This loop only exists because we have
                                 // to put a space on PutAgentInfoSignedEvt, if
                                 // the internal peer space was used instead we
@@ -897,12 +898,15 @@ impl MetaNet {
                                         );
                                     }
                                 }
-                            }
-                            Err(err) => tracing::warn!(?err, "error decoding connection peers"),
-                            _ => {}
+                                Ok(())
+                            })
                         }
-                        Ok(())
-                    })
+                        Err(err) => {
+                            tracing::warn!(?err, ?url, "Could not decode PreflightData");
+                            box_fut_plain(Ok(()))
+                        }
+                        _ => box_fut_plain(Ok(())),
+                    }
                 }),
             )),
             //..Default::default()
