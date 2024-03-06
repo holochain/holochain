@@ -257,15 +257,9 @@ impl DnaFile {
     }
 
     /// Change the DNA modifiers while leaving the actual DNA code intact.
-    pub fn update_modifiers(
-        &self,
-        dna_modifiers: DnaModifiersOpt,
-        compatibility: DnaCompatParams,
-    ) -> Self {
+    pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
-        clone.dna = DnaDefHashed::from_content_sync(
-            clone.dna.update_modifiers(dna_modifiers, compatibility),
-        );
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));
         clone
     }
 }
@@ -273,31 +267,5 @@ impl DnaFile {
 impl std::fmt::Debug for DnaFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("DnaFile(dna = {:?})", self.dna))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use arbitrary::Arbitrary;
-
-    use super::*;
-
-    #[test]
-    fn dna_compat_changes_hash() {
-        let mut u = unstructured_noise();
-        let mut modifiers = DnaModifiersOpt::none();
-        let mut compat = DnaCompatParams::default();
-
-        let dna1 = DnaFile::arbitrary(&mut u)
-            .unwrap()
-            .update_modifiers(modifiers.clone(), compat.clone());
-
-        modifiers.network_seed = Some("foo".into());
-        let dna2 = dna1.update_modifiers(modifiers.clone(), compat.clone());
-        compat.dpki_hash = Some(DnaHash::from_raw_32(vec![3; 32]).into());
-        let dna3 = dna2.update_modifiers(modifiers.clone(), compat);
-
-        assert_ne!(dna1.dna_hash(), dna2.dna_hash());
-        assert_ne!(dna2.dna_hash(), dna3.dna_hash());
     }
 }

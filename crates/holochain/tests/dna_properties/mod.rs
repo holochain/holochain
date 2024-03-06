@@ -21,15 +21,12 @@ async fn test_dna_properties_macro() {
         contract_address: String::from("0x12345"),
     };
     let properties_sb: SerializedBytes = properties.clone().try_into().unwrap();
-    let dnas = &[dna_file.update_modifiers(
-        DnaModifiersOpt {
-            network_seed: None,
-            properties: Some(properties_sb),
-            origin_time: None,
-            quantum_time: None,
-        },
-        DnaCompatParams::default(),
-    )];
+    let dnas = &[dna_file.update_modifiers(DnaModifiersOpt {
+        network_seed: None,
+        properties: Some(properties_sb),
+        origin_time: None,
+        quantum_time: None,
+    })];
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;
@@ -67,8 +64,7 @@ async fn test_dna_properties_fails_with_invalid_properties() {
         origin_time: None,
         quantum_time: None,
     };
-    let compat = DnaCompatParams::default();
-    let dnas = &[dna_file.update_modifiers(modifiers, compat)];
+    let dnas = &[dna_file.update_modifiers(modifiers)];
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_config(ConductorConfig::default()).await;

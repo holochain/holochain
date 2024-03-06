@@ -857,7 +857,6 @@ pub mod test {
                     origin_time: Timestamp::HOLOCHAIN_EPOCH,
                     quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
                 },
-                compatibility: DnaCompatParams::fake(),
                 integrity_zomes: zomes
                     .clone()
                     .into_iter()

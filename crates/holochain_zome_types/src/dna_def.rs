@@ -43,13 +43,6 @@ pub struct DnaDef {
     /// computation.
     pub modifiers: DnaModifiers,
 
-    /// Parameters defined by the conductor into which this DNA is installed.
-    /// These specify various constraints on network compatibility based on the
-    /// runtime environment. These do affect the DNA hash.
-    // TODO: remove default
-    #[serde(default)]
-    pub compatibility: DnaCompatParams,
-
     /// A vector of zomes associated with your DNA.
     pub integrity_zomes: IntegrityZomes,
 
@@ -62,7 +55,6 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     modifiers: &'a DnaModifiers,
-    compatibility: &'a DnaCompatParams,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -79,7 +71,6 @@ impl DnaDef {
             .integrity_zomes(integrity)
             .coordinator_zomes(coordinator)
             .random_network_seed()
-            .compatibility(DnaCompatParams::fake())
             .build()
             .unwrap()
     }
@@ -225,14 +216,9 @@ impl DnaDef {
 
     /// Change the DNA modifiers -- the network seed, properties and origin time -- while
     /// leaving the actual DNA code intact.
-    pub fn update_modifiers(
-        &self,
-        modifiers: DnaModifiersOpt,
-        compatibility: DnaCompatParams,
-    ) -> Self {
+    pub fn update_modifiers(&self, modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
         clone.modifiers = clone.modifiers.update(modifiers);
-        clone.compatibility = compatibility;
         clone
     }
 
@@ -282,7 +268,6 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             modifiers: &self.modifiers,
-            compatibility: &self.compatibility,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(

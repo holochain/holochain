@@ -70,8 +70,7 @@ async fn validate_with_mock_dpki() {
         .into_tuples();
 
     assert_eq!(alice.dna_hash(), bob.dna_hash());
-    // Because of carol's lack of DPKI, the DnaCompatParams are different and so is the DNA hash.
-    assert_ne!(alice.dna_hash(), carol.dna_hash());
+    assert_eq!(alice.dna_hash(), carol.dna_hash());
 
     async fn key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeyState {
         conductor

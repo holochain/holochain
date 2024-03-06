@@ -77,7 +77,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 trace!(register_dna_payload = ?payload);
                 let RegisterDnaPayload { modifiers, source } = *payload;
                 let modifiers = modifiers.serialized().map_err(SerializationError::Bytes)?;
-                let dna_compat = self.conductor_handle.get_dna_compat().await;
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
@@ -95,18 +94,16 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                                     hash
                                 ))
                             })?
-                            .update_modifiers(modifiers, dna_compat)
+                            .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(modifiers, dna_compat).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(modifiers, dna_compat).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                 };
@@ -298,10 +295,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.storage_info().await?,
             )),
             InstallDpki { dpki_dna } => {
-                let network_params = self.conductor_handle.get_dna_compat().await;
-                let (dpki_dna, _) = dpki_dna
-                    .into_dna_file(Default::default(), network_params)
-                    .await?;
+                let (dpki_dna, _) = dpki_dna.into_dna_file(Default::default()).await?;
                 self.conductor_handle.clone().install_dpki(dpki_dna).await?;
                 Ok(AdminResponse::Ok)
             }

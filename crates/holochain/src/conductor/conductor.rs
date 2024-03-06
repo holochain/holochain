@@ -1458,8 +1458,6 @@ mod app_impls {
             #[cfg(not(feature = "chc"))]
             let ignore_genesis_failure = false;
 
-            let dna_compat = self.get_dna_compat().await;
-
             let InstallAppPayload {
                 source,
                 agent_key,
@@ -1493,7 +1491,7 @@ mod app_impls {
                 .await?;
 
             let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs, dna_compat)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
                 .await?;
 
             self.clone()
@@ -2624,19 +2622,6 @@ mod accessor_impls {
             &self.config
         }
 
-        /// Construct the DnaCompatParams given the current setup
-        pub async fn get_dna_compat(&self) -> DnaCompatParams {
-            let dpki_hash = self
-                .running_services()
-                .dpki
-                .clone()
-                .map(|c| DnaHash::from_raw_32(c.uuid().into()).into());
-            DnaCompatParams {
-                protocol_version: KITSUNE_PROTOCOL_VERSION,
-                dpki_hash,
-            }
-        }
-
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
@@ -2958,14 +2943,13 @@ impl Conductor {
             })
             .await?;
         let original_dna_hash = base_cell_dna_hash.clone();
-        let compat = self.get_dna_compat().await;
 
         // clone cell from base cell DNA
         let clone_dna = ribosome_store.share_ref(|rs| {
             let mut dna_file = rs
                 .get_dna_file(&base_cell_dna_hash)
                 .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
-                .update_modifiers(dna_modifiers, compat);
+                .update_modifiers(dna_modifiers);
             if let Some(name) = name {
                 dna_file = dna_file.set_name(name);
             }

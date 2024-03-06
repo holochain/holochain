@@ -366,16 +366,11 @@ impl SweetConductor {
     ) -> ConductorApiResult<AgentPubKey> {
         let installed_app_id = installed_app_id.to_string();
 
-        let dna_compat = self.get_dna_compat().await;
         let dnas_with_proof: Vec<_> = dnas_with_roles
             .iter()
             .cloned()
             .map(|dr| {
-                // Apply the DnaCompatParams to modify the DNAs
-                let dna = dr
-                    .dna()
-                    .clone()
-                    .update_modifiers(Default::default(), dna_compat.clone());
+                let dna = dr.dna().clone().update_modifiers(Default::default());
                 (dr.replace_dna(dna), None)
             })
             .collect();
@@ -400,9 +395,6 @@ impl SweetConductor {
         agent: AgentPubKey,
         roles: &[RoleName],
     ) -> ConductorApiResult<SweetApp> {
-        // Must get the app info to determine the actual DNA hash of what was installed,
-        // especially because of the modifying effect of DnaCompatParams
-
         let info = self
             .raw_handle()
             .get_app_info(&installed_app_id.to_owned())

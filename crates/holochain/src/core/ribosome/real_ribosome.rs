@@ -417,10 +417,6 @@ impl RealRibosome {
                 origin_time: Timestamp(0),
                 quantum_time: Default::default(),
             },
-            compatibility: DnaCompatParams {
-                protocol_version: 0,
-                dpki_hash: None,
-            },
             integrity_zomes: Default::default(),
             coordinator_zomes: Default::default(),
         };
