@@ -609,19 +609,14 @@ pub mod test {
             .next()
             .unwrap();
 
-        let dna_hash = dna.dna_hash().clone();
-        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let agent = fake_agent_pubkey_1();
 
-        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
-            cell_id.agent_pubkey().clone(),
-            vec![(dna, None)],
-        )
-        .await;
+        let (_tmpdir, _, handle, cell_ids) =
+            setup_app_in_new_conductor("test app".to_string(), agent, vec![(dna, None)]).await;
 
         call_zome(
             handle.clone(),
-            cell_id.clone(),
+            cell_ids[0].clone(),
             TestWasm::Foo,
             "foo".into(),
             |response: AppResponse| {
@@ -650,18 +645,18 @@ pub mod test {
             .next()
             .unwrap();
 
-        let dna_hash = dna.dna_hash().clone();
         let agent_pub_key = fake_agent_pubkey_1();
 
-        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+        let (_tmpdir, app_api, handle, cell_ids) = setup_app_in_new_conductor(
             "test app".to_string(),
             agent_pub_key.clone(),
             vec![(dna, None)],
         )
         .await;
+
         let request = NetworkInfoRequestPayload {
             agent_pub_key,
-            dnas: vec![dna_hash],
+            dnas: vec![cell_ids[0].dna_hash().clone()],
             last_time_queried: None,
         };
 
@@ -710,32 +705,28 @@ pub mod test {
             .next()
             .unwrap();
 
-        let cell_id_1 = CellId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
+        let agent_1 = fake_agent_pubkey_1();
+        let agent_2 = fake_agent_pubkey_2();
 
-        let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
-
-        // Run the same DNA in cell 3 to check that grouping works correctly
-        let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
-
-        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
+        let (_tmpdir, _, handle, _cell_ids_1) = setup_app_in_new_conductor(
             "test app 1".to_string(),
-            cell_id_1.agent_pubkey().clone(),
+            agent_1.clone(),
             vec![(dna_1, None)],
         )
         .await;
 
-        install_app_in_conductor(
+        let _cell_ids_2 = install_app_in_conductor(
             handle.clone(),
             "test app 2".to_string(),
-            cell_id_2.agent_pubkey().clone(),
+            agent_1.clone(),
             &[(dna_2.clone(), None)],
         )
         .await;
 
-        install_app_in_conductor(
+        let _cell_ids_3 = install_app_in_conductor(
             handle.clone(),
             "test app 3".to_string(),
-            cell_id_3.agent_pubkey().clone(),
+            agent_2.clone(),
             &[(dna_2, None)],
         )
         .await;
