@@ -42,6 +42,10 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+/// This value determines protocol compatibility.
+/// Any time there is a protocol breaking change, this number must be incremented.
+pub const KITSUNE_PROTOCOL_VERSION: u16 = 0;
+
 pub mod metrics;
 
 mod types;

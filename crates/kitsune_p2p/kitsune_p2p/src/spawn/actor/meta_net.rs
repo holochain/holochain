@@ -74,6 +74,22 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
+kitsune_p2p_types::write_codec_enum! {
+    /// Preflight data for tx5
+    codec PreflightData {
+        /// Version 0
+        V0(0) {
+            /// Kitsune protocol version which is bumped at every breaking change
+            kitsune_protocol_version.0: u16,
+            /// Our local peer info
+            peer_list.1: Vec<AgentInfoSigned>,
+            /// Data provided by the host, which must match across nodes in order
+            /// for preflight to succeed
+            user_data.2: Vec<u8>,
+        },
+    }
+}
+
 fn next_msg_id() -> u64 {
     static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     // MAYBE - track these message ids at the connection level
@@ -830,17 +846,38 @@ impl MetaNet {
                             .get_all_local_joined_agent_infos()
                             .await
                             .unwrap_or_default();
-                        wire::Wire::peer_unsolicited(agent_list).encode_vec()
+                        PreflightData::v0(
+                            KITSUNE_PROTOCOL_VERSION,
+                            agent_list,
+                            todo!("get from host"),
+                        )
+                        .encode_vec()
                     })
                 }),
-                Arc::new(move |_, data| {
+                Arc::new(move |url, data| {
                     let e_s = evt_sender.clone();
                     Box::pin(async move {
-                        match wire::Wire::decode_ref(&data) {
+                        match PreflightData::decode_ref(&data) {
                             Ok((
                                 _,
-                                wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
+                                PreflightData::V0(V0 {
+                                    kitsune_protocol_version,
+                                    peer_list,
+                                    user_data,
+                                }),
                             )) => {
+                                if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
+                                    tracing::warn!(
+                                        "kitsune protocol version mismatch with: ours == {}, theirs == {}. Url: {}",
+                                        KITSUNE_PROTOCOL_VERSION,
+                                        kitsune_protocol_version,
+                                        url
+                                    );
+                                    return Ok(());
+                                }
+
+                                todo!("call host-supplied callback to validate user data");
+
                                 // @todo This loop only exists because we have
                                 // to put a space on PutAgentInfoSignedEvt, if
                                 // the internal peer space was used instead we
