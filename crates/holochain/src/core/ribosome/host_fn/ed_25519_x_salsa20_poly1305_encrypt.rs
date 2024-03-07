@@ -10,30 +10,30 @@ use wasmer::RuntimeError;
 pub fn ed_25519_x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    _input: Ed25519XSalsa20Poly1305Encrypt,
+    input: Ed25519XSalsa20Poly1305Encrypt,
 ) -> Result<XSalsa20Poly1305EncryptedData, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore: Permission::Allow,
             ..
         } => {
-            todo!()
-            /*
             tokio_helper::block_forever_on(async move {
-                // zome_types too restrictive,
-                // causing us to have to clone everything because there's
-                // no access to the actual internal data (*$%&^#(*$&^
-                let mut s_pk: [u8; 32] = [0; 32];
-                s_pk.copy_from_slice(input.as_sender_ref().as_ref());
-                let mut r_pk: [u8; 32] = [0; 32];
-                r_pk.copy_from_slice(input.as_recipient_ref().as_ref());
-                let data = input.as_data_ref().as_ref().to_vec();
-
-                let (nonce, cipher) = call_context
+                let client = call_context
                     .host_context
                     .keystore()
-                    .crypto_box_xsalsa(s_pk.into(), r_pk.into(), data.into())
-                    .await?;
+                    .lair_client();
+
+                let mut send = [0; 32];
+                send.copy_from_slice(input.as_sender_ref().get_raw_32());
+                let mut recv = [0; 32];
+                recv.copy_from_slice(input.as_recipient_ref().get_raw_32());
+
+                let (nonce, cipher) = client.crypto_box_xsalsa_by_sign_pub_key(
+                    send.into(),
+                    recv.into(),
+                    None,
+                    input.as_data_ref().as_ref().to_vec().into(),
+                ).await?;
 
                 holochain_keystore::LairResult::Ok(XSalsa20Poly1305EncryptedData::new(
                     nonce.into(),
@@ -43,7 +43,6 @@ pub fn ed_25519_x_salsa20_poly1305_encrypt(
             .map_err(|keystore_error| -> RuntimeError {
                 wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()
             })
-            */
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
