@@ -170,9 +170,10 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let network_compat = todo!(
-            "get network compat params from conductor state, but we have to write a way to do that before initializing the conductor..."
-        );
+        let network_compat = crate::conductor::space::query_conductor_state(&spaces.conductor_db)
+            .await?
+            .map(|s| s.get_network_compat())
+            .unwrap_or_default();
 
         let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
             network_config,
