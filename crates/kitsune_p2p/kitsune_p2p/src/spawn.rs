@@ -11,11 +11,14 @@ use actor::*;
 #[cfg(any(test, feature = "test_utils"))]
 pub use actor::MockKitsuneP2pEventHandler;
 
+use self::meta_net::PreflightUserData;
+
 /// Spawn a new KitsuneP2p actor.
-pub async fn spawn_kitsune_p2p(
+pub async fn spawn_kitsune_p2p<U: PreflightUserData>(
     config: KitsuneP2pConfig,
     tls_config: kitsune_p2p_types::tls::TlsConfig,
     host: HostApi,
+    user_data: U,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -30,9 +33,19 @@ pub async fn spawn_kitsune_p2p(
     let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
     let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(builder.spawn(
-        KitsuneP2pActor::new(config, tls_config, channel_factory, internal_sender, host).await?,
-    ));
+    tokio::task::spawn(
+        builder.spawn(
+            KitsuneP2pActor::new(
+                config,
+                tls_config,
+                channel_factory,
+                internal_sender,
+                host,
+                user_data,
+            )
+            .await?,
+        ),
+    );
 
     Ok((sender, evt_recv))
 }

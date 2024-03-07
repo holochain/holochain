@@ -85,9 +85,19 @@ kitsune_p2p_types::write_codec_enum! {
             peer_list.1: Vec<AgentInfoSigned>,
             /// Data provided by the host, which must match across nodes in order
             /// for preflight to succeed
-            user_data.2: Vec<u8>,
+            user_data.2: Arc<[u8]>,
         },
     }
+}
+
+pub trait PreflightUserData:
+    std::fmt::Debug + serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static
+{
+}
+
+impl<T> PreflightUserData for T where
+    T: std::fmt::Debug + serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static
+{
 }
 
 fn next_msg_id() -> u64 {
@@ -817,14 +827,23 @@ impl MetaNet {
 
     /// Construct abstraction with tx5 backend.
     #[cfg(feature = "tx5")]
-    pub async fn new_tx5(
+    pub async fn new_tx5<UserData: PreflightUserData>(
         tuning_params: KitsuneP2pTuningParams,
         host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         signal_url: String,
+        user_data: UserData,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+        use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
+
+        let mut user_data_bytes_sent = vec![];
+        rmp_encode(&mut user_data_bytes_sent, &user_data)?;
+        let user_data_sent = Arc::new(user_data);
+        let user_data_bytes_sent: Arc<[u8]> = user_data_bytes_sent.into();
+        let user_data_bytes_sent_clone = user_data_bytes_sent.clone();
 
         let evt_sender = host.legacy.clone();
         let tx5_config = tx5::Config3 {
@@ -840,6 +859,7 @@ impl MetaNet {
             preflight: Some((
                 Arc::new(move |_| {
                     let i_s = kitsune_internal_sender.clone();
+                    let user_data_bytes_sent = user_data_bytes_sent_clone.clone();
 
                     Box::pin(async move {
                         let agent_list = i_s
@@ -849,7 +869,7 @@ impl MetaNet {
                         PreflightData::v0(
                             KITSUNE_PROTOCOL_VERSION,
                             agent_list,
-                            todo!("get from host"),
+                            user_data_bytes_sent,
                         )
                         .encode_vec()
                     })
@@ -857,28 +877,49 @@ impl MetaNet {
                 Arc::new(move |url, data| {
                     let e_s = evt_sender.clone();
                     let url = url.clone();
+                    let user_data_sent = user_data_sent.clone();
+                    let user_data_bytes_sent = user_data_bytes_sent.clone();
                     match PreflightData::decode_ref(&data) {
                         Ok((
                             _,
                             PreflightData::V0(V0 {
                                 kitsune_protocol_version,
                                 peer_list,
-                                user_data,
+                                user_data: user_data_bytes_received,
                             }),
                         )) => {
-                            if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
-                                tracing::warn!(
-                                    ?url,
-                                    "kitsune protocol version mismatch: ours = {}, theirs = {}",
-                                    KITSUNE_PROTOCOL_VERSION,
-                                    kitsune_protocol_version,
-                                );
-                                return box_fut_plain(Ok(()));
-                            }
-
-                            todo!("call host-supplied callback to validate user data");
-
                             Box::pin(async move {
+                                if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
+                                    tracing::warn!(
+                                        ?url,
+                                        "kitsune protocol version mismatch: ours = {}, theirs = {}",
+                                        KITSUNE_PROTOCOL_VERSION,
+                                        kitsune_protocol_version,
+                                    );
+                                    return Ok(());
+                                }
+
+                                if user_data_bytes_received != user_data_bytes_sent {
+                                    if let Ok(user_data_received) =
+                                        rmp_decode::<_, UserData>(&mut &*user_data_bytes_received)
+                                    {
+                                        tracing::warn!(
+                                            ?url,
+                                            ?user_data_sent,
+                                            ?user_data_received,
+                                            "tx5 preflight user_data mismatch"
+                                        );
+                                    } else {
+                                        tracing::warn!(
+                                            ?url,
+                                            ?user_data_sent,
+                                            ?user_data_bytes_received,
+                                            "tx5 preflight user_data mismatch (and received user_data could not be decoded)"
+                                        );
+                                    }
+                                    return Ok(());
+                                }
+
                                 // @todo This loop only exists because we have
                                 // to put a space on PutAgentInfoSignedEvt, if
                                 // the internal peer space was used instead we

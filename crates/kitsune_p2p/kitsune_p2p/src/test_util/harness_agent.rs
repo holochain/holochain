@@ -78,6 +78,7 @@ pub(crate) async fn spawn_test_agent(
             .await
             .unwrap(),
         host,
+        (),
     )
     .await?;
 

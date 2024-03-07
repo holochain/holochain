@@ -425,6 +425,7 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            (),
         )
         .await
         .unwrap();
@@ -439,6 +440,7 @@ impl Setup2Nodes {
             },
             i_s.clone(),
             format!("ws://{sig_addr}"),
+            (),
         )
         .await
         .unwrap();
