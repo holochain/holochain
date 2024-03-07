@@ -4,7 +4,6 @@ pub mod encrypted_data;
 pub mod key_ref;
 pub mod nonce;
 pub mod x25519;
-pub mod ed25519;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -68,18 +67,17 @@ impl X25519XSalsa20Poly1305Decrypt {
     }
 }
 
-
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct Ed25519XSalsa20Poly1305Decrypt {
-    pub recipient: Ed25519PubKey,
-    pub sender: Ed25519PubKey,
+    pub recipient: AgentPubKey,
+    pub sender: AgentPubKey,
     pub encrypted_data: XSalsa20Poly1305EncryptedData,
 }
 
 impl Ed25519XSalsa20Poly1305Decrypt {
     pub fn new(
-        recipient: Ed25519PubKey,
-        sender: Ed25519PubKey,
+        recipient: AgentPubKey,
+        sender: AgentPubKey,
         encrypted_data: XSalsa20Poly1305EncryptedData,
     ) -> Self {
         Self {
@@ -89,11 +87,11 @@ impl Ed25519XSalsa20Poly1305Decrypt {
         }
     }
 
-    pub fn as_sender_ref(&self) -> &Ed25519PubKey {
+    pub fn as_sender_ref(&self) -> &AgentPubKey {
         &self.sender
     }
 
-    pub fn as_recipient_ref(&self) -> &Ed25519PubKey {
+    pub fn as_recipient_ref(&self) -> &AgentPubKey {
         &self.recipient
     }
 

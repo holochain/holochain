@@ -87,6 +87,10 @@ pub trait HdkT: HdiT {
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn ed_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
     // Cloning
     fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
     fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
@@ -164,6 +168,10 @@ mockall::mock! {
         fn x_25519_x_salsa20_poly1305_encrypt(
             &self,
             x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
+        ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+        fn ed_25519_x_salsa20_poly1305_encrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
         ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
         fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
         fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
@@ -424,6 +432,13 @@ impl HdkT for ErrHdk {
         Self::err()
     }
 
+    fn ed_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        _ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
     // Cloning
     fn create_clone_cell(&self, _input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
         Self::err()
@@ -658,6 +673,16 @@ impl HdkT for HostHdk {
         host_call::<X25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
             __hc__x_25519_x_salsa20_poly1305_encrypt_1,
             x_25519_x_salsa20_poly1305_encrypt,
+        )
+    }
+
+    fn ed_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        host_call::<Ed25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
+            __hc__ed_25519_x_salsa20_poly1305_encrypt_1,
+            ed_25519_x_salsa20_poly1305_encrypt,
         )
     }
 

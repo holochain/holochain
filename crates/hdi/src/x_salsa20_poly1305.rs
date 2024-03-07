@@ -50,8 +50,8 @@ pub fn x_25519_x_salsa20_poly1305_decrypt(
 /// WARNING: Please first understand the downsides of using this function:
 /// <https://doc.libsodium.org/advanced/ed25519-curve25519>
 pub fn ed_25519_x_salsa20_poly1305_decrypt(
-    recipient: Ed25519PubKey,
-    sender: Ed25519PubKey,
+    recipient: AgentPubKey,
+    sender: AgentPubKey,
     encrypted_data: XSalsa20Poly1305EncryptedData,
 ) -> ExternResult<XSalsa20Poly1305Data> {
     HDI.with(|h| {

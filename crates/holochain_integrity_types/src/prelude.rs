@@ -23,7 +23,6 @@ pub use crate::x_salsa20_poly1305::data::*;
 pub use crate::x_salsa20_poly1305::encrypted_data::*;
 pub use crate::x_salsa20_poly1305::key_ref::*;
 pub use crate::x_salsa20_poly1305::x25519::*;
-pub use crate::x_salsa20_poly1305::ed25519::*;
 pub use crate::x_salsa20_poly1305::*;
 pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
