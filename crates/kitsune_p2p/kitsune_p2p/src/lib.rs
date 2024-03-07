@@ -60,6 +60,8 @@ pub use spawn::*;
 mod host_api;
 pub use host_api::*;
 
+pub use meta_net::PreflightUserData;
+
 #[allow(missing_docs)]
 #[cfg(feature = "test_utils")]
 pub mod test_util;

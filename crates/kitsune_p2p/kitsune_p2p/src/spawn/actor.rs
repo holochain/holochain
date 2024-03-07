@@ -127,13 +127,13 @@ pub(crate) struct KitsuneP2pActor {
 }
 
 impl KitsuneP2pActor {
-    pub async fn new<U: PreflightUserData>(
+    pub async fn new(
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         host_api: HostApiLegacy,
-        user_data: U,
+        preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
@@ -160,7 +160,7 @@ impl KitsuneP2pActor {
             internal_sender.clone(),
             host_api.clone(),
             metrics,
-            user_data,
+            preflight_user_data,
         )
         .await?;
 
@@ -210,13 +210,13 @@ impl KitsuneP2pActor {
     }
 }
 
-async fn create_meta_net<U: PreflightUserData>(
+async fn create_meta_net(
     config: &KitsuneP2pConfig,
     tls_config: tls::TlsConfig,
     internal_sender: ghost_actor::GhostSender<Internal>,
     host: HostApiLegacy,
     metrics: Tx2ApiMetrics,
-    user_data: U,
+    preflight_user_data: PreflightUserData,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
     let mut ep_hnd = None;
     let mut ep_evt = None;
@@ -243,7 +243,7 @@ async fn create_meta_net<U: PreflightUserData>(
             host.clone(),
             internal_sender.clone(),
             signal_url,
-            user_data,
+            preflight_user_data,
         )
         .await?;
         ep_hnd = Some(h);
@@ -979,6 +979,7 @@ impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
 mod tests {
+    use crate::meta_net::PreflightUserData;
     use crate::spawn::actor::create_meta_net;
     use crate::spawn::actor::MetaNet;
     use crate::spawn::actor::MetaNetEvtRecv;
@@ -1069,7 +1070,7 @@ mod tests {
             internal_sender,
             HostStub::new().legacy(sender),
             Tx2ApiMetrics::new(),
-            (),
+            PreflightUserData::default(),
         )
         .await
     }

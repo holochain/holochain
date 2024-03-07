@@ -413,13 +413,18 @@ struct Setup2Nodes {
 
 impl Setup2Nodes {
     pub async fn new(test: Test) -> Self {
-        Self::new_with_user_data(test, (), ()).await
+        Self::new_with_user_data(
+            test,
+            PreflightUserData::default(),
+            PreflightUserData::default(),
+        )
+        .await
     }
 
-    pub async fn new_with_user_data<A: PreflightUserData, B: PreflightUserData>(
+    pub async fn new_with_user_data(
         test: Test,
-        user_data_a: A,
-        user_data_b: B,
+        user_data_a: PreflightUserData,
+        user_data_b: PreflightUserData,
     ) -> Self {
         let mut tuning_params = config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.tx2_implicit_timeout_ms = 500;
@@ -780,57 +785,24 @@ async fn preflight_user_data_mismatch() {
         });
     }
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    struct UserData(String);
+    let ud1 = PreflightUserData {
+        bytes: vec![1, 2, 3],
+        comparator: Box::new(|_, r| {
+            (r == &[1, 2, 3])
+                .then_some(())
+                .ok_or("preflight mismatch".into())
+        }),
+    };
+    let ud2 = PreflightUserData {
+        bytes: vec![9, 8, 7, 6, 5],
+        comparator: Box::new(|_, r| {
+            (r == &[9, 8, 7, 6, 5])
+                .then_some(())
+                .ok_or("preflight mismatch".into())
+        }),
+    };
 
-    let nodes =
-        Setup2Nodes::new_with_user_data(test, UserData("apple".into()), UserData("orange".into()))
-            .await;
-
-    let con = nodes
-        .send1
-        .get_connection(nodes.addr2.clone(), nodes.tuning_params.implicit_timeout())
-        .await
-        .unwrap();
-
-    con.notify(
-        &wire::Wire::failure("Hello World!".into()),
-        nodes.tuning_params.implicit_timeout(),
-    )
-    .await
-    .unwrap();
-
-    // Should timeout because preflight user data doesn't match
-    tokio::time::timeout(std::time::Duration::from_millis(500), recv_wait)
-        .await
-        .unwrap_err();
-
-    nodes.shutdown().await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn preflight_user_data_deserialization_fail() {
-    let (recv_not, recv_wait) = notify_pair();
-
-    let mut test = Test::default();
-
-    {
-        let agent_info = crate::test_util::data::mk_agent_info(1).await;
-        test.handle_get_all_local_joined_agent_infos = Arc::new(move || {
-            let agent_info = agent_info.clone();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(vec![agent_info]) }).into())
-        });
-        test.handle_put_agent_info_signed = Arc::new(move |_| {
-            recv_not.notify();
-            Ok(futures::future::FutureExt::boxed(async move { Ok(()) }).into())
-        });
-    }
-
-    #[derive(Debug, serde::Serialize, serde::Deserialize)]
-    struct UserData(String);
-
-    let nodes =
-        Setup2Nodes::new_with_user_data(test, UserData("apple".into()), vec![1, 3, 3, 7]).await;
+    let nodes = Setup2Nodes::new_with_user_data(test, ud1, ud2).await;
 
     let con = nodes
         .send1
