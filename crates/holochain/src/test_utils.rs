@@ -259,6 +259,7 @@ where
         .await
         .unwrap(),
         test_host,
+        CompatibilityData::default(),
     )
     .await
     .unwrap();
