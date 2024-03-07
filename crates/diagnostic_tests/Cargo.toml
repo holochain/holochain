@@ -13,7 +13,7 @@ chashmap = "2.2"
 colored = "2"
 futures = { workspace = true }
 holochain_diagnostics = { path = "../holochain_diagnostics" }
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.7", path = "../holochain_trace" }
 tokio = { workspace = true }
 tokio-stream = "0.1"
 

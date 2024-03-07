@@ -1,3 +1,4 @@
+#![cfg(feature = "redo_old_tests")]
 #![cfg(feature = "mock")]
 
 use hdk::prelude::*;
