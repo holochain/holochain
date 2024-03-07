@@ -762,19 +762,18 @@ impl Space {
 pub async fn query_conductor_state(
     db: &DbRead<DbKindConductor>,
 ) -> ConductorResult<Option<ConductorState>> {
-    Ok(db
-        .read_async(|txn| {
-            let state = txn
-                .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                    row.get("blob")
-                })
-                .optional()?;
-            match state {
-                Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
-                None => ConductorResult::Ok(None),
-            }
-        })
-        .await?)
+    db.read_async(|txn| {
+        let state = txn
+            .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                row.get("blob")
+            })
+            .optional()?;
+        match state {
+            Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
+            None => ConductorResult::Ok(None),
+        }
+    })
+    .await
 }
 
 #[cfg(test)]

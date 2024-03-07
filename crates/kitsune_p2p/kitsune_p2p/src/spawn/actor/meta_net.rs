@@ -106,6 +106,7 @@ pub struct PreflightUserData {
     ///
     /// Typically this will be a closure that captures the bytes sent, so that the two values can
     /// be compared.
+    #[allow(clippy::type_complexity)]
     pub comparator: Box<dyn Fn(&tx5::Tx5Url, &[u8]) -> Result<(), String> + Send + Sync + 'static>,
 }
 
