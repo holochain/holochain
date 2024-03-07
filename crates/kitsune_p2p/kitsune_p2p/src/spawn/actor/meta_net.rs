@@ -75,7 +75,9 @@ kitsune_p2p_types::write_codec_enum! {
 }
 
 kitsune_p2p_types::write_codec_enum! {
-    /// Preflight data for tx5
+    /// Preflight data for tx5.
+    /// Since this is all about compatibility, the codec itself contains versioned payloads,
+    /// in case the preflight check needs to evolve over time.
     codec PreflightData {
         /// Version 0
         V0(0) {
