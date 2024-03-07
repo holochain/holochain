@@ -356,7 +356,7 @@ impl HolochainP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
         host: kitsune_p2p::HostApi,
-        compat: CompatibilityData,
+        compat: NetworkCompatParams,
     ) -> HolochainP2pResult<Self> {
         let (kitsune_p2p, kitsune_p2p_events) =
             kitsune_p2p::spawn_kitsune_p2p(config.clone(), tls_config, host.clone(), compat)

@@ -11,7 +11,7 @@ pub async fn spawn_holochain_p2p(
     config: kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig,
     tls_config: kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig,
     host: kitsune_p2p::HostApi,
-    compat: CompatibilityData,
+    compat: NetworkCompatParams,
 ) -> HolochainP2pResult<(
     ghost_actor::GhostSender<HolochainP2p>,
     HolochainP2pEventReceiver,
@@ -33,7 +33,7 @@ pub async fn spawn_holochain_p2p(
 
 /// Some parameters used as part of a protocol compability check during tx5 preflight
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct CompatibilityData {
+pub struct NetworkCompatParams {
     /// The hash of the installed DPKI service
     pub dpki_hash: Option<DnaHash>,
 }

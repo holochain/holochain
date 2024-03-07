@@ -779,6 +779,7 @@ mod dna_impls {
 mod network_impls {
     use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
+    use holochain_p2p::NetworkCompatParams;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
@@ -1325,6 +1326,18 @@ mod network_impls {
                 Ok(Ok(response)) => Ok(zome_call_response_to_conductor_api_result(response)?),
                 Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
                 Err(error) => Err(error),
+            }
+        }
+
+        /// Get network compability params
+        /// (but this can't actually be on the Conductor since it must be retrieved before
+        /// conductor initialization)
+        pub async fn get_network_compat(&self) -> NetworkCompatParams {
+            NetworkCompatParams {
+                dpki_hash: {
+                    tracing::warn!("Using default NetworkCompatParams");
+                    None
+                },
             }
         }
     }

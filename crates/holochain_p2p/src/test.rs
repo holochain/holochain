@@ -272,7 +272,7 @@ mod tests {
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
-            CompatibilityData::default(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -355,7 +355,7 @@ mod tests {
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
-            CompatibilityData::default(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -436,7 +436,7 @@ mod tests {
             config,
             TlsConfig::new_ephemeral().await.unwrap(),
             test_host,
-            CompatibilityData::default(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -523,7 +523,7 @@ mod tests {
             config,
             cert,
             kitsune_p2p::HostStub::new(),
-            CompatibilityData::default(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -622,7 +622,7 @@ mod tests {
             config,
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
-            CompatibilityData::default(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();

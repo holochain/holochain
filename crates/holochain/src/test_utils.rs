@@ -30,6 +30,7 @@ use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
+use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::from_blob;
@@ -259,7 +260,7 @@ where
         .await
         .unwrap(),
         test_host,
-        CompatibilityData::default(),
+        NetworkCompatParams::default(),
     )
     .await
     .unwrap();

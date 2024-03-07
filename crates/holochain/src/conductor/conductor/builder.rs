@@ -170,14 +170,24 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let (holochain_p2p, p2p_evt) =
-            match holochain_p2p::spawn_holochain_p2p(network_config, tls_config, host).await {
-                Ok(r) => r,
-                Err(err) => {
-                    tracing::error!(?err, "Error spawning networking");
-                    return Err(err.into());
-                }
-            };
+        let network_compat = todo!(
+            "get network compat params from conductor state, but we have to write a way to do that before initializing the conductor..."
+        );
+
+        let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
+            network_config,
+            tls_config,
+            host,
+            network_compat,
+        )
+        .await
+        {
+            Ok(r) => r,
+            Err(err) => {
+                tracing::error!(?err, "Error spawning networking");
+                return Err(err.into());
+            }
+        };
 
         info!("Conductor startup: networking started.");
 
@@ -361,6 +371,8 @@ impl ConductorBuilder {
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
+        use holochain_p2p::NetworkCompatParams;
+
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
@@ -387,9 +399,10 @@ impl ConductorBuilder {
             Some(tag_ed),
             Some(keystore.lair_client()),
         );
+        let network_compat = NetworkCompatParams::default();
 
         let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
+                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
                     .await?;
 
         let (post_commit_sender, post_commit_receiver) =
