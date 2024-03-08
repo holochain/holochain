@@ -44,6 +44,8 @@ use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::dna_info_1::dna_info_1;
 use crate::core::ribosome::host_fn::dna_info_2::dna_info_2;
+use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_decrypt::ed_25519_x_salsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_encrypt::ed_25519_x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
@@ -510,6 +512,16 @@ impl RealRibosome {
                 &mut ns,
                 "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
                 x_25519_x_salsa20_poly1305_decrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__ed_25519_x_salsa20_poly1305_encrypt_1",
+                ed_25519_x_salsa20_poly1305_encrypt,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__ed_25519_x_salsa20_poly1305_decrypt_1",
+                ed_25519_x_salsa20_poly1305_decrypt,
             )
             .with_host_function(&mut ns, "__hc__zome_info_1", zome_info)
             .with_host_function(&mut ns, "__hc__dna_info_1", dna_info_1)
@@ -1177,6 +1189,8 @@ pub mod wasm_test {
                 "__hc__disable_clone_cell_1",
                 "__hc__dna_info_1",
                 "__hc__dna_info_2",
+                "__hc__ed_25519_x_salsa20_poly1305_decrypt_1",
+                "__hc__ed_25519_x_salsa20_poly1305_encrypt_1",
                 "__hc__emit_signal_1",
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",

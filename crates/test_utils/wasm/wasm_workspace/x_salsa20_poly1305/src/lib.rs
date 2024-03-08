@@ -62,3 +62,21 @@ fn x_25519_x_salsa20_poly1305_decrypt(input: X25519XSalsa20Poly1305Decrypt) -> E
         input.as_encrypted_data_ref().to_owned()
     )
 }
+
+#[hdk_extern]
+fn ed_25519_x_salsa20_poly1305_encrypt(input: Ed25519XSalsa20Poly1305Encrypt) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+    hdk::prelude::ed_25519_x_salsa20_poly1305_encrypt(
+        input.as_sender_ref().to_owned(),
+        input.as_recipient_ref().to_owned(),
+        input.as_data_ref().to_owned()
+    )
+}
+
+#[hdk_extern]
+fn ed_25519_x_salsa20_poly1305_decrypt(input: Ed25519XSalsa20Poly1305Decrypt) -> ExternResult<XSalsa20Poly1305Data> {
+    hdk::prelude::ed_25519_x_salsa20_poly1305_decrypt(
+        input.as_recipient_ref().to_owned(),
+        input.as_sender_ref().to_owned(),
+        input.as_encrypted_data_ref().to_owned()
+    )
+}
