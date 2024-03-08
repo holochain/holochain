@@ -65,7 +65,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_ed_25519_x_salsa20_poly1305_encrypt_test() {
+    async fn invoke_import_ed_25519_x_salsa20_poly1305_encrypt_decrypt_test() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, alice_pubkey, bob_pubkey, ..
