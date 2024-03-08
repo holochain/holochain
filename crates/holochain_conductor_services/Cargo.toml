@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_services"
-version = "0.2.0-beta-dev.8"
+version = "0.2.0-beta-dev.9"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,8 +21,8 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
-holochain_keystore = { version = "^0.3.0-beta-dev.29", path = "../holochain_keystore" }
-holochain_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_types" }
+holochain_keystore = { version = "^0.3.0-beta-dev.30", path = "../holochain_keystore" }
+holochain_types = { version = "^0.3.0-beta-dev.35", path = "../holochain_types" }
 
 arbitrary = { version = "1.0", optional = true }
 
@@ -33,3 +33,6 @@ hdk = { version = "^0.3.0-beta-dev.30", path = "../hdk" }
 test_utils = ["fuzzing"]
 
 fuzzing = ["arbitrary"]
+
+[lints]
+workspace = true

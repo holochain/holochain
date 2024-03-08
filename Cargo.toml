@@ -77,19 +77,29 @@ lair_keystore = { version = "0.4.3", default-features = false }
 lair_keystore_api = "=0.4.3"
 rmp-serde = "=0.15.5"
 serde = "1.0"
+serde_bytes = "0.11.14"
 serde_json = "1.0"
 sodoken = "=0.0.10"
 thiserror = "1.0"
-tokio = { version = "1.27", features = ["full"] }
 tx5-signal-srv = "=0.0.7-alpha"
 url2 = "0.0.6"
 wasmer = "=4.2.4"
 wasmer-middlewares = "=4.2.4"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
+tokio = { version = "1.36.0", features = ["full"] }
+tokio-tungstenite = { version = "0.21.0" }
 tracing = "0.1"
 
-holochain_keystore = { version = "^0.3.0-beta-dev.18", path = "crates/holochain_keystore", default-features = false }
-holochain_types = { version = "^0.3.0-beta-dev.17", path = "crates/holochain_types" }
+[workspace.lints.clippy]
+nursery = "allow"
+cargo  = "allow"
+pedantic = "allow"
+restriction  = "allow"
+style = "deny"
+complexity = "deny"
+perf = "deny"
+correctness = "deny"
+dbg_macro = "deny"
 
 
 [profile.fast-test]
@@ -107,7 +117,6 @@ codegen-units = 16
 [profile.release]
 opt-level = "z"
 lto = true
-
 
 [patch.crates-io]
 # task-motel = { path = "../task-motel" }

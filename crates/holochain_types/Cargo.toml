@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.3.0-beta-dev.34"
+version = "0.3.0-beta-dev.35"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -22,27 +22,27 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 derive_builder = "0.9.0"
 derive_more = { workspace = true }
 either = "1.5"
-fixt = { path = "../fixt", version = "^0.3.0-beta-dev.1"}
+fixt = { path = "../fixt", version = "^0.3.0-beta-dev.2"}
 flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
-holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.3.0-beta-dev.29", path = "../holochain_keystore" }
-holochain_nonce = {version = "^0.3.0-beta-dev.24", path = "../holochain_nonce"}
+holo_hash = { version = "^0.3.0-beta-dev.23", path = "../holo_hash", features = ["encoding"] }
+holochain_keystore = { version = "^0.3.0-beta-dev.30", path = "../holochain_keystore" }
+holochain_nonce = {version = "^0.3.0-beta-dev.25", path = "../holochain_nonce"}
 holochain_serialized_bytes = { workspace = true }
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.34"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.3.0-beta-dev.35"}
+holochain_trace = { version = "^0.3.0-beta-dev.7", path = "../holochain_trace" }
+holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util", features = ["backtrace"] }
 holochain_wasmer_host = { workspace = true }
-holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util", features = ["backtrace"] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.28", features = ["full"] }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.29", features = ["full"] }
 itertools = { version = "0.10" }
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.6"}
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.3.0-beta-dev.7"}
 must_future = "0.1.1"
 nanoid = { workspace = true }
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 parking_lot = "0.10"
 rand = "0.8.5"
 regex = "1.4"
@@ -80,6 +80,9 @@ pretty_assertions = "1.4"
 serde_json = { workspace = true }
 test-case = "2.1.0"
 tokio = { version = "1.11", features = [ "full" ] }
+
+[lints]
+workspace = true
 
 [features]
 default = []

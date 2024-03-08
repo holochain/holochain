@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.3.0-beta-dev.7"
+version = "0.3.0-beta-dev.8"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -31,6 +31,9 @@ rand = { version = "0.8", optional = true }
 [dev-dependencies]
 holochain_serialized_bytes = { workspace = true }
 serde_yaml = "0.9"
+
+[lints]
+workspace = true
 
 [features]
 default = ["chrono"]

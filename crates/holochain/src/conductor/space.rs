@@ -249,22 +249,7 @@ impl Spaces {
 
     /// Get the holochain conductor state
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let state = self
-            .conductor_db
-            .read_async(|txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                match state {
-                    Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
-                    None => ConductorResult::Ok(None),
-                }
-            })
-            .await?;
-
-        match state {
+        match query_conductor_state(&self.conductor_db).await? {
             Some(state) => Ok(state),
             // update_state will again try to read the state. It's a little
             // inefficient in the infrequent case where we haven't saved the
@@ -771,6 +756,24 @@ impl Space {
         )
         .await?)
     }
+}
+
+/// Get the holochain conductor state
+pub async fn query_conductor_state(
+    db: &DbRead<DbKindConductor>,
+) -> ConductorResult<Option<ConductorState>> {
+    db.read_async(|txn| {
+        let state = txn
+            .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                row.get("blob")
+            })
+            .optional()?;
+        match state {
+            Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
+            None => ConductorResult::Ok(None),
+        }
+    })
+    .await
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use holochain_types::prelude::*;
 async fn dpki_dna_bundle() -> DnaBundle {
     // let deepkey_path = "./tests/conductor_services/deepkey.dna";
     // let deepkey_path = "/home/michael/Downloads/deepkey.dna";
-    let deepkey_path = "/home/michael/Holo/deepkey/dnas/deepkey/deepkey.dna";
+    let deepkey_path = "/home/michael/Holo/deepkey/dnas/deepkey.dna";
     DnaBundle::read_from_file(&PathBuf::from(deepkey_path))
         .await
         .unwrap()
@@ -21,7 +21,7 @@ async fn dpki_dna_bundle() -> DnaBundle {
 async fn dpki_dna() -> DnaFile {
     dpki_dna_bundle()
         .await
-        .into_dna_file(Default::default(), Default::default())
+        .into_dna_file(Default::default())
         .await
         .unwrap()
         .0

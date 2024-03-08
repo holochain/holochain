@@ -72,55 +72,6 @@ pub fn standard_config() -> SweetConductorConfig {
     SweetConductorConfig::standard()
 }
 
-/// A DnaFile with a role name assigned.
-///
-/// This trait is implemented for both `DnaFile` and (`RoleName, DnaFile)` tuples.
-/// When a test doesn't need to specify a RoleName, it can use just the DnaFile,
-/// in which case an arbitrary RoleName will be assigned.
-pub trait DnaWithRole: Clone + std::fmt::Debug + Sized {
-    /// The associated role name
-    fn role(&self) -> RoleName;
-
-    /// The DNA
-    fn dna(&self) -> &DnaFile;
-
-    /// The DNA
-    fn into_dna(self) -> DnaFile;
-
-    /// Replace the DNA without changing the role
-    fn replace_dna(self, dna: DnaFile) -> (RoleName, DnaFile) {
-        (self.role(), dna)
-    }
-}
-
-impl DnaWithRole for DnaFile {
-    fn role(&self) -> RoleName {
-        self.dna_hash().to_string()
-    }
-
-    fn dna(&self) -> &DnaFile {
-        self
-    }
-
-    fn into_dna(self) -> DnaFile {
-        self
-    }
-}
-
-impl DnaWithRole for (RoleName, DnaFile) {
-    fn role(&self) -> RoleName {
-        self.0.clone()
-    }
-
-    fn dna(&self) -> &DnaFile {
-        &self.1
-    }
-
-    fn into_dna(self) -> DnaFile {
-        self.1
-    }
-}
-
 impl SweetConductor {
     /// Get the ID of this conductor for manual equality checks.
     pub fn id(&self) -> String {
@@ -790,10 +741,10 @@ impl SweetConductor {
 /// Get a websocket client on localhost at the specified port
 pub async fn websocket_client_by_port(
     port: u16,
-) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+) -> std::io::Result<(WebsocketSender, WebsocketReceiver)> {
     holochain_websocket::connect(
-        url2::url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
+        ([127, 0, 0, 1], port).into(),
     )
     .await
 }

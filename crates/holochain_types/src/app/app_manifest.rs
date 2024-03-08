@@ -118,7 +118,7 @@ impl AppManifest {
     /// with defaults.
     pub fn from_legacy(cells: impl Iterator<Item = InstalledCell>) -> Self {
         let roles = cells
-            .map(|InstalledCell { role_name, cell_id }| {
+            .map(|InstalledCell { role_name, .. }| {
                 let path = PathBuf::from(role_name.clone());
                 AppRoleManifest {
                     name: role_name,

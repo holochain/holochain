@@ -55,6 +55,8 @@ async fn validate_with_mock_dpki() {
         conductors[index].running_services.share_mut(|s| {
             s.dpki = Some(Arc::new(dpki));
         });
+
+        todo!("make this work with the tx5 preflight compat check, which does not change when DPKI is installed...")
     }
 
     setup_mock_dpki(&conductors, 0, key_states.clone());

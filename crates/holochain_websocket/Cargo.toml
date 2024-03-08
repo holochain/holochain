@@ -1,6 +1,6 @@
 [package]
 name = "holochain_websocket"
-version = "0.3.0-beta-dev.14"
+version = "0.3.0-beta-dev.15"
 description = "Holochain utilities for serving and connection with websockets"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -9,34 +9,32 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2021"
 
 [dependencies]
-futures = "0.3"
+futures = { workspace = true }
 ghost_actor = "0.4.0-alpha.5"
 nanoid = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 net2 = "0.2"
 must_future = "0.1"
-serde = { version = "1", features = [ "derive" ] }
-serde_bytes = "0.11"
+serde = { workspace = true }
+serde_bytes = { workspace = true }
 stream-cancel = "0.8.0"
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = [ "full" ] }
+tokio = { workspace = true }
 tokio-stream = { version = "0.1", features = ["net"] }
-tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
+tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
-tracing-futures = "0.2"
-tungstenite = "0.12"
-url2 = { workspace = true }
 
 [dev-dependencies]
-holochain_types = { version = "^0.3.0-beta-dev.34", path = "../holochain_types", features = ["sqlite"] }
-linefeed = "0.6"
-unwrap_to = "0.1.0"
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
+holochain_trace = { version = "^0.3.0-beta-dev.7", path = "../holochain_trace" }
 criterion = "0.3.4"
 
-[features]
-slow_tests = []
+[lints]
+workspace = true
 
 [[bench]]
 name = "bench"
+harness = false
+
+[[bench]]
+name = "full_connect"
 harness = false

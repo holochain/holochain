@@ -300,7 +300,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(DnaModifiersOpt::none().await),
+            bad_bundle.into_dna_file(DnaModifiersOpt::none()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );

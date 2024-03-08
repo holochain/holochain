@@ -396,12 +396,10 @@ mod interface_impls {
                 async move {
                     match driver {
                         InterfaceDriver::Websocket { port } => {
-                            let (listener_handle, listener) =
-                                spawn_websocket_listener(port).await?;
-                            let port = listener_handle.local_addr().port().unwrap_or(port);
+                            let listener = spawn_websocket_listener(port).await?;
+                            let port = listener.local_addr()?.port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
-                                listener_handle,
                                 listener,
                                 admin_api.clone(),
                                 port,
@@ -1332,15 +1330,14 @@ mod app_impls {
         /// Install an app from minimal elements, without needing construct a whole AppBundle.
         /// (This function constructs a bundle under the hood.)
         /// This is just a convenience for testing.
-        #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             agent: Option<AgentPubKey>,
-            data: &[(impl crate::sweettest::DnaWithRole, Option<MembraneProof>)],
+            data: &[(impl DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-            let manifest = crate::sweettest::app_manifest_from_dnas(&dnas_with_roles);
+            let manifest = app_manifest_from_dnas(&dnas_with_roles);
 
             let agent = self.resolve_agent(installed_app_id.clone(), agent).await?;
 
@@ -3142,6 +3139,37 @@ pub(crate) async fn genesis_cells(
     } else {
         Ok(())
     }
+}
+
+/// Get a "standard" AppBundle from a single DNA, with Create provisioning,
+/// with no modifiers, clone limit of 255, and arbitrary role names
+pub fn app_manifest_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppManifest {
+    let roles: Vec<_> = dnas_with_roles
+        .iter()
+        .map(|dr| {
+            let dna = dr.dna();
+            let path = PathBuf::from(format!("{}", dna.dna_hash()));
+            let modifiers = DnaModifiersOpt::none();
+            AppRoleManifest {
+                name: dr.role(),
+                dna: AppRoleDnaManifest {
+                    location: Some(DnaLocation::Bundled(path.clone())),
+                    modifiers,
+                    installed_hash: None,
+                    clone_limit: 255,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }
+        })
+        .collect();
+
+    AppManifestCurrentBuilder::default()
+        .name("[generated]".into())
+        .description(None)
+        .roles(roles)
+        .build()
+        .unwrap()
+        .into()
 }
 
 /// Dump the integration json state.

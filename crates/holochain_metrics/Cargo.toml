@@ -1,6 +1,6 @@
 [package]
 name = "holochain_metrics"
-version = "0.3.0-beta-dev.8"
+version = "0.3.0-beta-dev.9"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "metrics helpers"
@@ -14,6 +14,9 @@ reqwest = "=0.11.24" # pinned until other libraries upgrade to ring 0.17
 sct = "=0.7.0" # pinned until other libraries upgrade to ring 0.17
 opentelemetry_api = { version = "=0.20.0", features = [ "metrics" ] }
 tracing = "0.1.37"
+
+[lints]
+workspace = true
 
 [features]
 default = [ "influxive" ]

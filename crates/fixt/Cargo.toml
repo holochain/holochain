@@ -1,6 +1,6 @@
 [package]
 name = "fixt"
-version = "0.3.0-beta-dev.1"
+version = "0.3.0-beta-dev.2"
 description = "minimum viable fixtures"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,6 +20,9 @@ rand_core = "0.6"
 serde = { version = "1.0", features = [ "derive" ] }
 strum = "0.18.0"
 strum_macros = "0.18.0"
+
+[lints]
+workspace = true
 
 [features]
 fixt = [ ]

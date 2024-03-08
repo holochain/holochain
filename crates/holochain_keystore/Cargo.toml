@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.30"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,12 +13,12 @@ edition = "2021"
 [dependencies]
 base64 = "0.13.0"
 futures = "0.3.23"
-holo_hash = { version = "^0.3.0-beta-dev.22", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.3.0-beta-dev.23", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = { workspace = true }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.28"}
-kitsune_p2p_types = { version = "^0.3.0-beta-dev.21", path = "../kitsune_p2p/types" }
-holochain_secure_primitive = { version = "^0.3.0-beta-dev.21", path = "../holochain_secure_primitive"}
-holochain_util = { version = "^0.3.0-beta-dev.4", path = "../holochain_util" }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.3.0-beta-dev.29"}
+kitsune_p2p_types = { version = "^0.3.0-beta-dev.22", path = "../kitsune_p2p/types" }
+holochain_secure_primitive = { version = "^0.3.0-beta-dev.22", path = "../holochain_secure_primitive"}
+holochain_util = { version = "^0.3.0-beta-dev.5", path = "../holochain_util" }
 lair_keystore = { workspace = true, default-features = false }
 must_future = "0.1.2"
 nanoid = { workspace = true }
@@ -37,6 +37,9 @@ derive_more = "0.99"
 assert_cmd = "2.0.4"
 serde_yaml = "0.9.10"
 tempdir = "0.3.7"
+
+[lints]
+workspace = true
 
 [features]
 default = [ "sqlite" ]

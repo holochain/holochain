@@ -1,31 +1,32 @@
 //! Module for establishing Websocket-based Interfaces,
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
-use super::error::InterfaceError;
 use super::error::InterfaceResult;
 use crate::conductor::interface::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::conductor::manager::TaskManagerClient;
-use futures::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
-use holochain_websocket::ListenerHandle;
-use holochain_websocket::ListenerItem;
+use holochain_websocket::ReceiveMessage;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
-use holochain_websocket::WebsocketMessage;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
-use std::convert::TryFrom;
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
-use tokio_stream::StreamExt;
 use tracing::*;
-use url2::url2;
+
+/// Concurrency count for websocket message processing.
+/// This could represent a significant memory investment for
+/// e.g. app installations, but we also need enough buffer
+/// to accomodate interdependent operations.
+const CONCURRENCY_COUNT: usize = 128;
 
 // TODO: This is arbitrary, choose reasonable size.
+// ERROR TODO XXX (david.b): There is no such thing as backpressure in
+//                           broadcast queues! It'll just start deleting
+//                           items, and giving "Lagged" errors on receivers.
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
@@ -33,54 +34,61 @@ pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 pub const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
-pub async fn spawn_websocket_listener(
-    port: u16,
-) -> InterfaceResult<(
-    ListenerHandle,
-    impl futures::stream::Stream<Item = ListenerItem>,
-)> {
+pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
-    let listener = WebsocketListener::bind_with_handle(
-        url2!("ws://127.0.0.1:{}", port),
+    let listener = WebsocketListener::bind(
         Arc::new(WebsocketConfig::default()),
+        format!("127.0.0.1:{}", port),
     )
     .await?;
-    trace!("LISTENING AT: {}", listener.0.local_addr());
+    trace!("LISTENING AT: {}", listener.local_addr()?);
     Ok(listener)
+}
+
+/// Abort tokio tasks on Drop.
+#[derive(Default)]
+struct TaskList(pub Vec<JoinHandle<()>>);
+impl Drop for TaskList {
+    fn drop(&mut self) {
+        debug!("TaskList Dropped!");
+        for h in self.0.iter() {
+            h.abort();
+        }
+    }
+}
+
+impl TaskList {
+    /// Clean up already closed tokio tasks.
+    pub fn prune(&mut self) {
+        self.0.retain_mut(|h| !h.is_finished());
+    }
 }
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
 pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
     tm: TaskManagerClient,
-    handle: ListenerHandle,
-    listener: impl futures::stream::Stream<Item = ListenerItem> + Send + 'static,
+    listener: WebsocketListener,
     api: A,
     port: u16,
 ) {
-    // Task that will kill the listener and all child connections.
-    tm.add_conductor_task_ignored("admin interface websocket closer", |stop| {
-        handle.close_on(stop.map(|_| true)).map(Ok)
-    });
-
-    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |_stop| {
+    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move || {
         async move {
-            let mut active_connections = Vec::new();
-            futures::pin_mut!(listener);
+            let mut task_list = TaskList::default();
             // establish a new connection to a client
-            while let Some(connection) = listener.next().await {
-                active_connections.retain_mut(|handle: &mut JoinHandle<()>| !handle.is_finished());
-
-                match connection {
+            loop {
+                match listener.accept().await {
                     Ok((_, rx_from_iface)) => {
-                        if active_connections.len() >= MAX_CONNECTIONS {
-                            warn!("Connection limit reached, dropping newly opened connection. num_connections={}", active_connections.len());
+                        task_list.prune();
+                        let conn_count = task_list.0.len();
+                        if conn_count >= MAX_CONNECTIONS {
+                            warn!("Connection limit reached, dropping newly opened connection. num_connections={}", conn_count);
                             // Max connections so drop this connection
                             // which will close it.
                             continue;
                         };
-                        debug!("Accepting new connection with number of existing connections {}", active_connections.len());
-                        active_connections.push(tokio::task::spawn(recv_incoming_admin_msgs(
+                        debug!("Accepting new connection with number of existing connections {}", conn_count);
+                        task_list.0.push(tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
                             rx_from_iface,
                         )));
@@ -90,7 +98,6 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                     }
                 }
             }
-            ManagedTaskResult::Ok(())
         }
     });
 }
@@ -104,41 +111,37 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     signal_broadcaster: broadcast::Sender<Signal>,
 ) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
-    let (handle, mut listener) = WebsocketListener::bind_with_handle(
-        url2!("ws://127.0.0.1:{}", port),
+    let listener = WebsocketListener::bind(
         Arc::new(WebsocketConfig::default()),
+        format!("127.0.0.1:{}", port),
     )
     .await?;
-    trace!("LISTENING AT: {}", handle.local_addr());
-    let port = handle
-        .local_addr()
-        .port()
-        .ok_or(InterfaceError::PortError)?;
-    // Task that will kill the listener and all child connections.
-    tm.add_conductor_task_ignored("app interface websocket closer", |stop| {
-        handle.close_on(stop.map(|_| true)).map(Ok)
-    });
-    tm.add_conductor_task_ignored("app interface new connection handler", |_stop| {
+    let addr = listener.local_addr()?;
+    trace!("LISTENING AT: {}", addr);
+    let port = addr.port();
+
+    tm.add_conductor_task_ignored("app interface new connection handler", move || {
         async move {
+            let mut task_list = TaskList::default();
             // establish a new connection to a client
-            while let Some(connection) = listener.next().await {
-                match connection {
+            loop {
+                match listener.accept().await {
                     Ok((tx_to_iface, rx_from_iface)) => {
                         let rx_from_cell = signal_broadcaster.subscribe();
                         spawn_recv_incoming_msgs_and_outgoing_signals(
+                            &mut task_list,
                             api.clone(),
                             rx_from_iface,
                             rx_from_cell,
                             tx_to_iface,
+                            port,
                         );
                     }
                     Err(err) => {
-                        warn!("Admin socket connection failed: {}", err);
+                        warn!("App socket connection failed: {}", err);
                     }
                 }
             }
-
-            ManagedTaskResult::Ok(())
         }
     });
     Ok(port)
@@ -149,8 +152,20 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
+    let rx_from_iface =
+        futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
+            match rx_from_iface.recv().await {
+                Ok(r) => Some((r, rx_from_iface)),
+                Err(err) => {
+                    info!(?err);
+                    None
+                }
+            }
+        });
+
+    // TODO - metrics to indicate if we're getting overloaded here.
     rx_from_iface
-        .for_each_concurrent(4096, move |msg| {
+        .for_each_concurrent(CONCURRENCY_COUNT, move |msg| {
             let api = api.clone();
             async move {
                 if let Err(e) = handle_incoming_message(msg, api.clone()).await {
@@ -165,58 +180,114 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: Websoc
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
 fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
+    task_list: &mut TaskList,
     api: A,
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
     tx_to_iface: WebsocketSender,
+    port: u16,
 ) {
     use futures::stream::StreamExt;
 
-    trace!("CONNECTION: {}", rx_from_iface.remote_addr());
+    trace!("CONNECTION: {}", rx_from_iface.peer_addr());
 
-    let rx_from_cell = futures::stream::unfold(rx_from_cell, |mut rx_from_cell| async move {
-        if let Ok(item) = rx_from_cell.recv().await {
-            Some((item, rx_from_cell))
-        } else {
-            None
+    let rx_from_cell = futures::stream::unfold(rx_from_cell, move |mut rx_from_cell| async move {
+        loop {
+            match rx_from_cell.recv().await {
+                // We missed some signals, but the channel is still open
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(dropped)) => {
+                    warn!("Holochain app port {port} dropped {dropped} signals. The app is emitting signals too fast.");
+                    continue;
+                }
+                Ok(item) => return Some((item, rx_from_cell)),
+                _ => {
+                    debug!("SignalChannelClosed");
+                    return None;
+                }
+            }
         }
     });
 
-    tokio::task::spawn(rx_from_cell.for_each_concurrent(4096, move |signal| {
-        let mut tx_to_iface = tx_to_iface.clone();
-        async move {
-            trace!(msg = "Sending signal!", ?signal);
-            if let Err(err) = async move {
-                let bytes = SerializedBytes::try_from(signal)?;
-                tx_to_iface.signal(bytes).await?;
-                InterfaceResult::Ok(())
-            }
-            .await
-            {
-                error!(?err, "error emitting signal");
-            }
-        }
-    }));
+    // TODO - metrics to indicate if we're getting overloaded here.
+    task_list
+        .0
+        .push(tokio::task::spawn(rx_from_cell.for_each_concurrent(
+            CONCURRENCY_COUNT,
+            move |signal| {
+                let tx_to_iface = tx_to_iface.clone();
+                async move {
+                    trace!(msg = "Sending signal!", ?signal);
+                    if let Err(err) = async move {
+                        tx_to_iface.signal(signal).await?;
+                        InterfaceResult::Ok(())
+                    }
+                    .await
+                    {
+                        error!(?err, "error emitting signal");
+                    }
+                }
+            },
+        )));
 
-    tokio::task::spawn(rx_from_iface.for_each_concurrent(4096, move |msg| {
-        let api = api.clone();
-        async move {
-            if let Err(err) = handle_incoming_message(msg, api).await {
-                error!(?err, "error handling websocket message");
+    let rx_from_iface =
+        futures::stream::unfold(rx_from_iface, move |mut rx_from_iface| async move {
+            match rx_from_iface.recv().await {
+                Ok(r) => Some((r, rx_from_iface)),
+                Err(err) => {
+                    info!(?err);
+                    None
+                }
             }
-        }
-    }));
+        });
+
+    // TODO - metrics to indicate if we're getting overloaded here.
+    task_list
+        .0
+        .push(tokio::task::spawn(rx_from_iface.for_each_concurrent(
+            CONCURRENCY_COUNT,
+            move |msg| {
+                let api = api.clone();
+                async move {
+                    if let Err(err) = handle_incoming_message(msg, api).await {
+                        error!(?err, "error handling websocket message");
+                    }
+                }
+            },
+        )));
 }
 
 /// Handles messages on all interfaces
-async fn handle_incoming_message<A>(ws_msg: WebsocketMessage, api: A) -> InterfaceResult<()>
+async fn handle_incoming_message<A>(
+    ws_msg: ReceiveMessage<A::ApiRequest>,
+    api: A,
+) -> InterfaceResult<()>
 where
     A: InterfaceApi,
 {
-    let (bytes, respond) = ws_msg;
-    Ok(respond
-        .respond(api.handle_request(bytes.try_into()).await?.try_into()?)
-        .await?)
+    match ws_msg {
+        ReceiveMessage::Signal(_) => {
+            warn!("Unexpected Signal From Client!");
+            Ok(())
+        }
+        ReceiveMessage::Request(data, respond) => {
+            use holochain_serialized_bytes::SerializedBytesError;
+            let result: A::ApiResponse = api.handle_request(Ok(data)).await?;
+            // Have to jump through some hoops, because our response type
+            // only implements try_into, but the responder needs try_from.
+            let result = result.try_into();
+            #[derive(Debug)]
+            struct Cnv(Result<SerializedBytes, SerializedBytesError>);
+            impl std::convert::TryFrom<Cnv> for SerializedBytes {
+                type Error = SerializedBytesError;
+                fn try_from(b: Cnv) -> Result<SerializedBytes, Self::Error> {
+                    b.0
+                }
+            }
+            let result = Cnv(result);
+            respond.respond(result).await?;
+            Ok(())
+        }
+    }
 }
 
 /// Test items needed by other crates
@@ -235,10 +306,12 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::sweettest::app_bundle_from_dnas;
+    use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
-    use futures::future::FutureExt;
     use holochain_keystore::test_keystore;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
@@ -249,7 +322,6 @@ pub mod test {
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestZomes;
-    use holochain_websocket::Respond;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
@@ -257,16 +329,155 @@ pub mod test {
     use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
     use tempfile::TempDir;
     use uuid::Uuid;
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-    #[serde(rename_all = "snake_case", tag = "type", content = "data")]
-    // NB: intentionally misspelled to test for serialization errors :)
-    enum AdmonRequest {
-        InstallsDna(String),
+    async fn test_handle_incoming_message<A: InterfaceApi>(
+        msg: A::ApiRequest,
+        respond: impl FnOnce(A::ApiResponse) + 'static + Send,
+        api: A,
+    ) -> InterfaceResult<()> {
+        let result: A::ApiResponse = api.handle_request(Ok(msg)).await?;
+        respond(result);
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn signal_in_post_commit() {
+        struct PollRecv(tokio::task::JoinHandle<()>);
+
+        impl Drop for PollRecv {
+            fn drop(&mut self) {
+                self.0.abort();
+            }
+        }
+
+        impl PollRecv {
+            pub fn new<D>(mut rx: WebsocketReceiver) -> Self
+            where
+                D: std::fmt::Debug,
+                SerializedBytes: TryInto<D, Error = SerializedBytesError>,
+            {
+                Self(tokio::task::spawn(async move {
+                    while rx.recv::<D>().await.is_ok() {}
+                }))
+            }
+        }
+
+        holochain_trace::test_run().ok();
+        let db_dir = test_db_dir();
+        let conductor_handle = ConductorBuilder::new()
+            .with_data_root_path(db_dir.path().to_path_buf().into())
+            .test(&[])
+            .await
+            .unwrap();
+
+        let admin_port = 65000;
+        conductor_handle
+            .clone()
+            .add_admin_interfaces(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket { port: admin_port },
+            }])
+            .await
+            .unwrap();
+
+        let (admin_tx, rx) = websocket_client_by_port(admin_port).await.unwrap();
+        let _rx = PollRecv::new::<AdminResponse>(rx);
+
+        let agent_key = conductor_handle
+            .keystore()
+            .new_sign_keypair_random()
+            .await
+            .unwrap();
+
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
+        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()]).await;
+        let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
+            source: AppBundleSource::Bundle(app_bundle),
+            agent_key: Some(agent_key.clone()),
+            installed_app_id: None,
+            membrane_proofs: HashMap::new(),
+            network_seed: None,
+            #[cfg(feature = "chc")]
+            ignore_genesis_failure: false,
+        }));
+        let response: AdminResponse = admin_tx.request(request).await.unwrap();
+        let app_info = match response {
+            AdminResponse::AppInstalled(app_info) => app_info,
+            _ => panic!("didn't install app"),
+        };
+        let cell_id = match &app_info
+            .cell_info
+            .get(&dna_file.dna_hash().to_string())
+            .unwrap()[0]
+        {
+            CellInfo::Provisioned(cell) => cell.cell_id.clone(),
+            _ => panic!("emit_signal cell not available"),
+        };
+
+        // Activate cells
+        let request = AdminRequest::EnableApp {
+            installed_app_id: app_info.installed_app_id.clone(),
+        };
+        let response: AdminResponse = admin_tx.request(request).await.unwrap();
+        assert_matches!(response, AdminResponse::AppEnabled { .. });
+
+        // Attach App Interface
+        let request = AdminRequest::AttachAppInterface { port: None };
+        let response: AdminResponse = admin_tx.request(request).await.unwrap();
+        let app_port = match response {
+            AdminResponse::AppInterfaceAttached { port } => port,
+            _ => panic!("app interface couldn't be attached"),
+        };
+
+        let (app_tx, mut rx) = websocket_client_by_port(app_port).await.unwrap();
+        let (s_send, mut s_recv) = tokio::sync::mpsc::unbounded_channel();
+        let app_rx_task = tokio::task::spawn(async move {
+            while let Ok(ReceiveMessage::Signal(s)) = rx.recv::<AppResponse>().await {
+                s_send.send(s).unwrap();
+            }
+        });
+
+        // Call Zome
+        let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
+        let request = AppRequest::CallZome(Box::new(
+            ZomeCall::try_from_unsigned_zome_call(
+                conductor_handle.keystore(),
+                ZomeCallUnsigned {
+                    provenance: agent_key.clone(),
+                    cell_id: cell_id.clone(),
+                    zome_name: TestWasm::EmitSignal.coordinator_zome_name(),
+                    fn_name: "commit_entry_and_emit_signal_post_commit".into(),
+                    cap_secret: None,
+                    payload: ExternIO::encode(()).unwrap(),
+                    nonce,
+                    expires_at,
+                },
+            )
+            .await
+            .unwrap(),
+        ));
+        let _: AppResponse = app_tx.request(request).await.unwrap();
+
+        #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+        #[serde(tag = "type")]
+        pub enum TestSignal {
+            Tested,
+        }
+
+        // ensure that the signal is received and is decodable
+        match Signal::try_from_vec(s_recv.recv().await.unwrap()).unwrap() {
+            Signal::App { signal, .. } => {
+                let expected = AppSignal::new(ExternIO::encode(TestSignal::Tested).unwrap());
+                assert_eq!(expected, signal);
+            }
+            oth => panic!("unexpected: {oth:?}"),
+        }
+
+        app_rx_task.abort();
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
@@ -321,12 +532,12 @@ pub mod test {
         conductor_handle
     }
 
-    async fn call_zome(
+    async fn call_zome<R: FnOnce(AppResponse) + 'static + Send>(
         conductor_handle: ConductorHandle,
         cell_id: CellId,
         wasm: TestWasm,
         function_name: String,
-        respond: holochain_websocket::Response,
+        respond: R,
     ) {
         // Now make sure we can call a zome once again
         let mut request: ZomeCall =
@@ -346,32 +557,13 @@ pub mod test {
             .unwrap();
 
         let msg = AppRequest::CallZome(Box::new(request));
-        let msg = msg.try_into().unwrap();
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, RealAppInterfaceApi::new(conductor_handle.clone()))
-            .await
-            .unwrap();
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn serialization_failure() {
-        let (_tmpdir, conductor_handle) = setup_admin().await;
-        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-        let msg = AdmonRequest::InstallsDna("".into());
-        let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(
-                response,
-                AdminResponse::Error(ExternalApiWireError::Deserialization(_))
-            );
-            async { Ok(()) }.boxed().into()
-        };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown();
+        test_handle_incoming_message(
+            msg,
+            respond,
+            RealAppInterfaceApi::new(conductor_handle.clone()),
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -391,17 +583,15 @@ pub mod test {
         // };
         let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = |response: AdminResponse| {
             assert_matches!(
                 response,
                 AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
             );
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap();
+        test_handle_incoming_message(msg, respond, admin_api)
+            .await
+            .unwrap();
         conductor_handle.shutdown();
     }
 
@@ -434,11 +624,9 @@ pub mod test {
             cell_id.clone(),
             TestWasm::Foo,
             "foo".into(),
-            Box::new(|bytes: SerializedBytes| {
-                let response: AppResponse = bytes.try_into().unwrap();
+            |response: AppResponse| {
                 assert_matches!(response, AppResponse::ZomeCalled { .. });
-                async { Ok(()) }.boxed().into()
-            }),
+            },
         )
         .await;
 
@@ -478,30 +666,25 @@ pub mod test {
         };
 
         let msg = AppRequest::NetworkInfo(Box::new(request));
-        let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AppResponse = bytes.try_into().unwrap();
-            match response {
-                AppResponse::NetworkInfo(info) => {
-                    assert_eq!(
-                        info,
-                        vec![NetworkInfo {
-                            fetch_pool_info: FetchPoolInfo::default(),
-                            current_number_of_peers: 1,
-                            arc_size: 1.0,
-                            total_network_peers: 1,
-                            bytes_since_last_time_queried: 1848,
-                            completed_rounds_since_last_time_queried: 0,
-                        }]
-                    )
-                }
-                other => panic!("unexpected response {:?}", other),
+        let respond = |response: AppResponse| match response {
+            AppResponse::NetworkInfo(info) => {
+                assert_eq!(
+                    info,
+                    vec![NetworkInfo {
+                        fetch_pool_info: FetchPoolInfo::default(),
+                        current_number_of_peers: 1,
+                        arc_size: 1.0,
+                        total_network_peers: 1,
+                        bytes_since_last_time_queried: 1848,
+                        completed_rounds_since_last_time_queried: 0,
+                    }]
+                )
             }
-            async { Ok(()) }.boxed().into()
+            other => panic!("unexpected response {:?}", other),
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, app_api).await.unwrap();
+        test_handle_incoming_message(msg, respond, app_api)
+            .await
+            .unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
 
@@ -558,47 +741,40 @@ pub mod test {
         .await;
 
         let msg = AdminRequest::StorageInfo;
-        let msg = msg.try_into().unwrap();
-        let respond = move |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
-            match response {
-                AdminResponse::StorageInfo(info) => {
-                    assert_eq!(info.blobs.len(), 2);
+        let respond = move |response: AdminResponse| match response {
+            AdminResponse::StorageInfo(info) => {
+                assert_eq!(info.blobs.len(), 2);
 
-                    let blob_one: &DnaStorageInfo =
-                        get_app_data_storage_info(&info, "test app 1".to_string());
+                let blob_one: &DnaStorageInfo =
+                    get_app_data_storage_info(&info, "test app 1".to_string());
 
-                    assert_eq!(blob_one.used_by, vec!["test app 1".to_string()]);
-                    assert!(blob_one.authored_data_size > 12000);
-                    assert!(blob_one.authored_data_size_on_disk > 114000);
-                    assert!(blob_one.dht_data_size > 12000);
-                    assert!(blob_one.dht_data_size_on_disk > 114000);
-                    assert!(blob_one.cache_data_size > 7000);
-                    assert!(blob_one.cache_data_size_on_disk > 114000);
+                assert_eq!(blob_one.used_by, vec!["test app 1".to_string()]);
+                assert!(blob_one.authored_data_size > 12000);
+                assert!(blob_one.authored_data_size_on_disk > 114000);
+                assert!(blob_one.dht_data_size > 12000);
+                assert!(blob_one.dht_data_size_on_disk > 114000);
+                assert!(blob_one.cache_data_size > 7000);
+                assert!(blob_one.cache_data_size_on_disk > 114000);
 
-                    let blob_two: &DnaStorageInfo =
-                        get_app_data_storage_info(&info, "test app 2".to_string());
+                let blob_two: &DnaStorageInfo =
+                    get_app_data_storage_info(&info, "test app 2".to_string());
 
-                    let mut used_by_two = blob_two.used_by.clone();
-                    used_by_two.sort();
-                    assert_eq!(
-                        used_by_two,
-                        vec!["test app 2".to_string(), "test app 3".to_string()]
-                    );
-                    assert!(blob_two.authored_data_size > 17000);
-                    assert!(blob_two.authored_data_size_on_disk > 114000);
-                    assert!(blob_two.dht_data_size > 17000);
-                    assert!(blob_two.dht_data_size_on_disk > 114000);
-                    assert!(blob_two.cache_data_size > 7000);
-                    assert!(blob_two.cache_data_size_on_disk > 114000);
-                }
-                other => panic!("unexpected response {:?}", other),
+                let mut used_by_two = blob_two.used_by.clone();
+                used_by_two.sort();
+                assert_eq!(
+                    used_by_two,
+                    vec!["test app 2".to_string(), "test app 3".to_string()]
+                );
+                assert!(blob_two.authored_data_size > 17000);
+                assert!(blob_two.authored_data_size_on_disk > 114000);
+                assert!(blob_two.dht_data_size > 17000);
+                assert!(blob_two.dht_data_size_on_disk > 114000);
+                assert!(blob_two.cache_data_size > 7000);
+                assert!(blob_two.cache_data_size_on_disk > 114000);
             }
-            async { Ok(()) }.boxed().into()
+            other => panic!("unexpected response {:?}", other),
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+        test_handle_incoming_message(msg, respond, RealAdminInterfaceApi::new(handle.clone()))
             .await
             .unwrap();
 
@@ -641,17 +817,17 @@ pub mod test {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppEnabled { .. });
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
-            .await
-            .unwrap();
+        test_handle_incoming_message(
+            msg,
+            respond,
+            RealAdminInterfaceApi::new(conductor_handle.clone()),
+        )
+        .await
+        .unwrap();
 
         // Get the state
         let initial_state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
@@ -664,11 +840,9 @@ pub mod test {
             cell_id_0.clone(),
             TestWasm::Link,
             "get_links".into(),
-            Box::new(|bytes: SerializedBytes| {
-                let response: AppResponse = bytes.try_into().unwrap();
+            |response: AppResponse| {
                 assert_matches!(response, AppResponse::ZomeCalled { .. });
-                async { Ok(()) }.boxed().into()
-            }),
+            },
         )
         .await;
 
@@ -712,17 +886,17 @@ pub mod test {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppDisabled);
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
-            .await
-            .unwrap();
+        test_handle_incoming_message(
+            msg,
+            respond,
+            RealAdminInterfaceApi::new(conductor_handle.clone()),
+        )
+        .await
+        .unwrap();
 
         // Get the state
         let state = conductor_handle.get_state_from_handle().await.unwrap();
@@ -757,17 +931,17 @@ pub mod test {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppEnabled { .. });
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
 
-        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
-            .await
-            .unwrap();
+        test_handle_incoming_message(
+            msg,
+            respond,
+            RealAdminInterfaceApi::new(conductor_handle.clone()),
+        )
+        .await
+        .unwrap();
 
         // Get the state again after reenabling, make sure it's identical to the initial state.
         let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
@@ -781,11 +955,9 @@ pub mod test {
             cell_id_0.clone(),
             TestWasm::Link,
             "get_links".into(),
-            Box::new(|bytes: SerializedBytes| {
-                let response: AppResponse = bytes.try_into().unwrap();
+            |response: AppResponse| {
                 assert_matches!(response, AppResponse::ZomeCalled { .. });
-                async { Ok(()) }.boxed().into()
-            }),
+            },
         )
         .await;
 
@@ -799,14 +971,12 @@ pub mod test {
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = |response: AdminResponse| {
             assert_matches!(response, AdminResponse::AppInterfaceAttached { .. });
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap();
+        test_handle_incoming_message(msg, respond, admin_api)
+            .await
+            .unwrap();
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
@@ -836,14 +1006,12 @@ pub mod test {
             cell_id: Box::new(cell_id),
         };
         let msg = msg.try_into().unwrap();
-        let respond = move |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = move |response: AdminResponse| {
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, admin_api).await.unwrap();
+        test_handle_incoming_message(msg, respond, admin_api)
+            .await
+            .unwrap();
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
@@ -961,15 +1129,13 @@ pub mod test {
         let msg = req.try_into().unwrap();
         let (tx, rx) = tokio::sync::oneshot::channel();
 
-        let respond = move |bytes: SerializedBytes| {
-            let response: AdminResponse = bytes.try_into().unwrap();
+        let respond = move |response: AdminResponse| {
             tx.send(response).unwrap();
-            async { Ok(()) }.boxed().into()
         };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
 
-        handle_incoming_message(msg, admin_api).await.unwrap();
+        test_handle_incoming_message(msg, respond, admin_api)
+            .await
+            .unwrap();
         rx
     }
 
