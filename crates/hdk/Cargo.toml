@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.2.7-rc.0"
+version = "0.2.7-rc.1"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -11,7 +11,7 @@ categories = [ "cryptography" ]
 edition = "2021"
 
 [dependencies]
-hdi = { version = "=0.3.6", path = "../hdi", features = ["trace"] }
+hdi = { version = "=0.3.7-rc.0", path = "../hdi", features = ["trace"] }
 hdk_derive = { version = "^0.2.6", path = "../hdk_derive" }
 holo_hash = { version = "^0.2.6", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.92"

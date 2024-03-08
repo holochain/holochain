@@ -7,10 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- *BREAKING* This is a breaking change ONLY if you are using the holochain_websocket API, e.g. if you are using it directly as a websocket client rust library to connect to holochain. This is *NOT* breaking if you are using an existing other client, as the protocol remains the same. Many updates, fixes, and simplifications to the holochain websocket code. Including fixing websocket shutdowns when signals were emitted in post_commit hooks and during overload conditions of emitted signal count. [\#3372](https://github.com/holochain/holochain/pull/3372)
+## 0.2.7-rc.0
+
+- *BREAKING* This is a breaking change ONLY if you are using the holochain\_websocket API, e.g. if you are using it directly as a websocket client rust library to connect to holochain. This is *NOT* breaking if you are using an existing other client, as the protocol remains the same. Many updates, fixes, and simplifications to the holochain websocket code. Including fixing websocket shutdowns when signals were emitted in post\_commit hooks and during overload conditions of emitted signal count. [\#3372](https://github.com/holochain/holochain/pull/3372)
 
 ## 0.2.6
-
 
 ## 0.2.6-rc.0
 
