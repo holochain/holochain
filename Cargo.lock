@@ -2606,6 +2606,7 @@ version = "0.3.6"
 dependencies = [
  "arbitrary",
  "fixt",
+ "getrandom 0.2.12",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
