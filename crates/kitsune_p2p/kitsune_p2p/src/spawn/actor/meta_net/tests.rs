@@ -810,17 +810,21 @@ async fn preflight_user_data_mismatch() {
         .await
         .unwrap();
 
-    con.notify(
-        &wire::Wire::failure("Hello World!".into()),
-        nodes.tuning_params.implicit_timeout(),
-    )
-    .await
-    .unwrap();
-
-    // Should timeout because preflight user data doesn't match
-    tokio::time::timeout(std::time::Duration::from_millis(500), recv_wait)
+    // This should error out because preflight failed due to user data mismatch
+    if con
+        .notify(
+            &wire::Wire::failure("Hello World!".into()),
+            nodes.tuning_params.implicit_timeout(),
+        )
         .await
-        .unwrap_err();
+        .is_ok()
+    {
+        // ...but if it *doesn't* error, the request should at least timeout because
+        // preflight user data doesn't match
+        tokio::time::timeout(std::time::Duration::from_millis(500), recv_wait)
+            .await
+            .unwrap_err();
+    }
 
     nodes.shutdown().await;
 }
