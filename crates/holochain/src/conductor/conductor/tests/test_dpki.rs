@@ -4,18 +4,17 @@ use parking_lot::Mutex;
 use super::*;
 
 /// Crude check that an agent without the same DPKI instance as others can't
-/// validate actions
+/// validate actions.
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_with_mock_dpki() {
     holochain_trace::test_run().ok();
 
-    const NUM_CONDUCTORS: usize = 3;
-
     // The DPKI state of each conductor about all other agents.
-    type KeyStates = Arc<Mutex<[HashMap<AgentPubKey, KeyState>; NUM_CONDUCTORS]>>;
+    type KeyStates = Arc<Mutex<Vec<HashMap<AgentPubKey, KeyState>>>>;
 
     fn make_builder(
         index: usize,
+        config: ConductorConfig,
         keystores: &[MetaLairClient],
         key_states: KeyStates,
     ) -> ConductorBuilder {
@@ -53,24 +52,39 @@ async fn validate_with_mock_dpki() {
 
         let dpki = Arc::new(dpki);
 
-        let mut builder = ConductorBuilder::default();
+        let mut builder = Conductor::builder()
+            .config(config.clone())
+            .with_keystore(keystores[index].clone())
+            .no_print_setup();
         builder.dpki = Some(dpki);
-        builder.keystore = Some(keystores[index].clone());
         builder
     }
 
-    let key_states = [HashMap::new(), HashMap::new(), HashMap::new()];
+    let key_states = vec![HashMap::new(), HashMap::new()];
     let key_states: KeyStates = Arc::new(Mutex::new(key_states));
     let keystores = [
         holochain_keystore::test_keystore(),
         holochain_keystore::test_keystore(),
-        holochain_keystore::test_keystore(),
     ];
 
+    let rendezvous = SweetLocalRendezvous::new().await;
+
+    let config: ConductorConfig = SweetConductorConfig::rendezvous(true)
+        .into_conductor_config(&*rendezvous)
+        .await;
+
     let mut conductors = SweetConductorBatch::new(vec![
-        SweetConductor::from_builder(make_builder(0, &keystores, key_states.clone())).await,
-        SweetConductor::from_builder(make_builder(1, &keystores, key_states.clone())).await,
-        SweetConductor::from_builder(make_builder(2, &keystores, key_states.clone())).await,
+        SweetConductor::from_builder_rendezvous(
+            make_builder(0, config.clone(), &keystores, key_states.clone()),
+            rendezvous.clone(),
+        )
+        .await,
+        SweetConductor::from_builder_rendezvous(
+            make_builder(1, config.clone(), &keystores, key_states.clone()),
+            rendezvous.clone(),
+        )
+        .await,
+        SweetConductor::from_config_rendezvous(config, rendezvous.clone()).await,
     ]);
 
     let (app_dna_file, _, _) =
@@ -112,7 +126,7 @@ async fn validate_with_mock_dpki() {
         KeyState::Valid(_)
     ));
 
-    conductors.exchange_peer_info().await;
+    // conductors.exchange_peer_info().await;
 
     {
         // exchange all

@@ -209,13 +209,25 @@ impl SweetConductor {
     /// Create a SweetConductor from a partially-configured ConductorBuilder
     pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
+        let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
         let config = builder.config.clone();
-        let handle = builder
-            .with_data_root_path(db_dir.as_ref().to_path_buf().into())
-            .test(&[])
-            .await
-            .unwrap();
+        let handle = builder.test(&[]).await.unwrap();
         Self::new(handle, db_dir, Arc::new(config), None).await
+    }
+
+    /// Create a SweetConductor from a partially-configured ConductorBuilder
+    pub async fn from_builder_rendezvous<R>(
+        builder: ConductorBuilder,
+        rendezvous: R,
+    ) -> SweetConductor
+    where
+        R: Into<DynSweetRendezvous> + Clone,
+    {
+        let db_dir = TestDir::new(test_db_dir());
+        let builder = builder.with_data_root_path(db_dir.as_ref().to_path_buf().into());
+        let config = builder.config.clone();
+        let handle = builder.test(&[]).await.unwrap();
+        Self::new(handle, db_dir, Arc::new(config), Some(rendezvous.into())).await
     }
 
     /// Create a handle from an existing environment and config
