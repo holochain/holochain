@@ -294,11 +294,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             StorageInfo => Ok(AdminResponse::StorageInfo(
                 self.conductor_handle.storage_info().await?,
             )),
-            InstallDpki { dpki_dna } => {
-                let (dpki_dna, _) = dpki_dna.into_dna_file(Default::default()).await?;
-                self.conductor_handle.clone().install_dpki(dpki_dna).await?;
-                Ok(AdminResponse::Ok)
-            }
         }
     }
 }

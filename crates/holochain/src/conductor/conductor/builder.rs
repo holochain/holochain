@@ -6,21 +6,31 @@ use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
+use holochain_p2p::NetworkCompatParams;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
     pub config: ConductorConfig,
+
     /// The RibosomeStore (mockable)
     pub ribosome_store: RibosomeStore,
+
     /// For new lair, passphrase is required
     pub passphrase: Option<sodoken::BufRead>,
+
     /// Optional keystore override
     pub keystore: Option<MetaLairClient>,
-    #[cfg(any(test, feature = "test_utils"))]
+
     /// Optional state override (for testing)
+    #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
+
+    /// Optional DPKI service implementation
+    #[cfg(any(test, feature = "test_utils"))]
+    pub dpki: Option<DpkiMutex>,
+
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 }
@@ -170,10 +180,23 @@ impl ConductorBuilder {
             Some(keystore.lair_client()),
         );
 
-        let network_compat = crate::conductor::space::query_conductor_state(&spaces.conductor_db)
-            .await?
-            .map(|s| s.get_network_compat())
-            .unwrap_or_default();
+        let dpki_dna_to_install = match &config.dpki {
+            Some(dpki_config) => {
+                let dna = DnaBundle::read_from_file(&dpki_config.dna_path)
+                    .await?
+                    .into_dna_file(Default::default())
+                    .await?
+                    .0;
+
+                Some(dna)
+            }
+            _ => None,
+        };
+
+        let dpki_uuid = dpki_dna_to_install
+            .as_ref()
+            .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
+        let network_compat = NetworkCompatParams { dpki_uuid };
 
         let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
             network_config,
@@ -214,6 +237,11 @@ impl ConductorBuilder {
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
+
+        // Install DPKI from DNA
+        if let Some(dna) = dpki_dna_to_install {
+            handle.clone().install_dpki(dna).await?;
+        }
 
         {
             let handle = handle.clone();
@@ -372,8 +400,6 @@ impl ConductorBuilder {
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
-        use holochain_p2p::NetworkCompatParams;
-
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
@@ -400,7 +426,23 @@ impl ConductorBuilder {
             Some(tag_ed),
             Some(keystore.lair_client()),
         );
-        let network_compat = NetworkCompatParams::default();
+
+        let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &config.dpki) {
+            (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
+            (None, Some(dpki_config)) => {
+                let dna = DnaBundle::read_from_file(&dpki_config.dna_path)
+                    .await?
+                    .into_dna_file(Default::default())
+                    .await?
+                    .0;
+                (
+                    Some(dna.dna_hash().get_raw_32().try_into().expect("32 bytes")),
+                    Some(dna),
+                )
+            }
+            _ => (None, None),
+        };
+        let network_compat = NetworkCompatParams { dpki_uuid };
 
         let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
@@ -425,6 +467,20 @@ impl ConductorBuilder {
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
+
+        // Install DPKI from DNA or mock
+        match (self.dpki, dpki_dna_to_install) {
+            (_, Some(dna)) => {
+                handle.clone().install_dpki(dna).await?;
+            }
+            (Some(dpki_impl), None) => {
+                // This is a mock DPKI impl, so inject it into the conductor directly
+                handle.running_services_mutex().share_mut(|s| {
+                    s.dpki = Some(dpki_impl);
+                });
+            }
+            (None, None) => (),
+        }
 
         // Install extra DNAs, in particular:
         // the ones with InlineZomes will not be registered in the Wasm DB

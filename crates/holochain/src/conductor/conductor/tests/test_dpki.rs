@@ -11,17 +11,16 @@ async fn validate_with_mock_dpki() {
 
     const NUM_CONDUCTORS: usize = 3;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
-
     // The DPKI state of each conductor about all other agents.
     type KeyStates = Arc<Mutex<[HashMap<AgentPubKey, KeyState>; NUM_CONDUCTORS]>>;
 
-    let key_states = [HashMap::new(), HashMap::new(), HashMap::new()];
-    let key_states: KeyStates = Arc::new(Mutex::new(key_states));
-
-    fn setup_mock_dpki(conductors: &SweetConductorBatch, index: usize, key_states: KeyStates) {
+    fn make_builder(
+        index: usize,
+        keystores: &[MetaLairClient],
+        key_states: KeyStates,
+    ) -> ConductorBuilder {
         let mut dpki = MockDpkiService::new();
-        let keystore = conductors[index].keystore().clone();
+        let keystore = keystores[index].clone();
 
         dpki.expect_uuid().return_const([1; 32]);
         dpki.expect_should_run().return_const(true);
@@ -52,15 +51,27 @@ async fn validate_with_mock_dpki() {
             }
         });
 
-        conductors[index].running_services.share_mut(|s| {
-            s.dpki = Some(Arc::new(dpki));
-        });
+        let dpki = Arc::new(dpki);
 
-        todo!("make this work with the tx5 preflight compat check, which does not change when DPKI is installed...")
+        let mut builder = ConductorBuilder::default();
+        builder.dpki = Some(dpki);
+        builder.keystore = Some(keystores[index].clone());
+        builder
     }
 
-    setup_mock_dpki(&conductors, 0, key_states.clone());
-    setup_mock_dpki(&conductors, 1, key_states.clone());
+    let key_states = [HashMap::new(), HashMap::new(), HashMap::new()];
+    let key_states: KeyStates = Arc::new(Mutex::new(key_states));
+    let keystores = [
+        holochain_keystore::test_keystore(),
+        holochain_keystore::test_keystore(),
+        holochain_keystore::test_keystore(),
+    ];
+
+    let mut conductors = SweetConductorBatch::new(vec![
+        SweetConductor::from_builder(make_builder(0, &keystores, key_states.clone())).await,
+        SweetConductor::from_builder(make_builder(1, &keystores, key_states.clone())).await,
+        SweetConductor::from_builder(make_builder(2, &keystores, key_states.clone())).await,
+    ]);
 
     let (app_dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;

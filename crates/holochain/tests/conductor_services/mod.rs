@@ -9,13 +9,10 @@ pub use holochain_conductor_api::*;
 use holochain_conductor_services::KeyState;
 use holochain_types::prelude::*;
 
+const DEEPKEY_PATH: PathBuf = "/home/michael/Holo/deepkey/dnas/deepkey.dna".into();
+
 async fn dpki_dna_bundle() -> DnaBundle {
-    // let deepkey_path = "./tests/conductor_services/deepkey.dna";
-    // let deepkey_path = "/home/michael/Downloads/deepkey.dna";
-    let deepkey_path = "/home/michael/Holo/deepkey/dnas/deepkey.dna";
-    DnaBundle::read_from_file(&PathBuf::from(deepkey_path))
-        .await
-        .unwrap()
+    DnaBundle::read_from_file(&DEEPKEY_PATH).await.unwrap()
 }
 
 async fn dpki_dna() -> DnaFile {
@@ -31,17 +28,12 @@ async fn dpki_dna() -> DnaFile {
 async fn initialize_dpki() {
     holochain_trace::test_run().ok();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let admin_api = RealAdminInterfaceApi::new(conductor.raw_handle());
-
-    // Initialize dpki
-    {
-        let dpki_dna = dpki_dna_bundle().await;
-        let response = admin_api
-            .handle_admin_request(AdminRequest::InstallDpki { dpki_dna })
-            .await;
-        assert!(matches!(response, AdminResponse::Ok));
-    }
+    let mut config = standard_config();
+    config.dpki = Some(DpkiConfig {
+        dna_path: DEEPKEY_PATH.clone(),
+        device_seed_lair_tag: "TODO".to_string(),
+    });
+    let mut conductor = SweetConductor::from_config(config).await;
 
     assert!(conductor.running_services().dpki.is_some());
 
@@ -63,11 +55,18 @@ async fn initialize_dpki() {
 async fn validate_with_dpki() {
     holochain_trace::test_run().ok();
 
-    let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+    let mut config = standard_config();
+    config.dpki = Some(DpkiConfig {
+        dna_path: DEEPKEY_PATH.clone(),
+        device_seed_lair_tag: "TODO".to_string(),
+    });
+    let mut conductors = SweetConductorBatch::new(vec![
+        SweetConductor::from_config(config).await,
+        SweetConductor::from_config(config).await,
+        SweetConductor::from_config(standard_config()).await,
+    ]);
     dbg!(Timestamp::now());
     let dpki_dna = dpki_dna().await;
-    conductors[0].install_dpki(dpki_dna.clone()).await;
-    conductors[1].install_dpki(dpki_dna).await;
     dbg!(Timestamp::now());
 
     let (app_dna_file, _, _) =

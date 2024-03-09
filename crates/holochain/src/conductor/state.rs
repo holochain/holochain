@@ -247,7 +247,7 @@ impl ConductorState {
     /// conductor initialization)
     pub fn get_network_compat(&self) -> NetworkCompatParams {
         NetworkCompatParams {
-            dpki_hash: {
+            dpki_uuid: {
                 tracing::warn!("Using default NetworkCompatParams");
                 None
             },

@@ -2116,6 +2116,12 @@ mod service_impls {
             self.running_services.share_ref(|s| s.clone())
         }
 
+        #[cfg(feature = "test_utils")]
+        /// Access the current conductor services mutably
+        pub fn running_services_mutex(&self) -> &RwShare<ConductorServices> {
+            &self.running_services
+        }
+
         pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
             self.initialize_service_dpki().await?;
             Ok(())
