@@ -914,12 +914,13 @@ impl MetaNet {
                             }
 
                             if let Err(reason) = user_data_cmp(&url, &user_data_bytes_received) {
-                                tracing::warn!(?url, "tx5 preflight user_data mismatch");
+                                tracing::warn!(?url, "tx5 preflight user_data mismatch: {reason}");
                                 return box_fut_plain(Err(std::io::Error::new(
                                     std::io::ErrorKind::Other,
                                     "tx5 preflight user_data mismatch",
                                 )));
                             }
+
                             Box::pin(async move {
                                 // @todo This loop only exists because we have
                                 // to put a space on PutAgentInfoSignedEvt, if
