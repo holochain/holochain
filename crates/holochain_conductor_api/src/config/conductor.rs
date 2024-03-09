@@ -47,8 +47,17 @@ pub struct ConductorConfig {
     #[serde(default)]
     pub keystore: KeystoreConfig,
 
-    /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances.
+    /// Optional path to a DPKI DNA file. If present, this will enable a DPKI service backed by
+    /// the given DNA.
+    ///
+    /// Some implications of providing this config:
+    /// - All new agent keys for all DNAs and hApps will be generated using DPKI's key derivation scheme and
+    ///   registered with DPKI.
+    /// - All DNAs will incorporate DPKI agent validity checks into its system validation rules.
+    /// - All DNAs will only be able to communicate with other nodes using the same DPKI service.
+    /// - The conductor will panic on startup if it was ever started up with a different value for this item,
+    ///   i.e. this value can never change over the lifetime of the conductor.
+    #[serde(default)]
     pub dpki: Option<DpkiConfig>,
 
     /// Setup admin interfaces to control this conductor through a websocket connection.
@@ -237,8 +246,8 @@ mod tests {
       type: lair_server_in_proc
 
     dpki:
-      instance_id: some_id
-      init_params: some_params
+      dna_path: path/to/dna.dna
+      device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
       - driver:
@@ -290,8 +299,8 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 dpki: Some(DpkiConfig {
-                    instance_id: "some_id".into(),
-                    init_params: "some_params".into()
+                    dna_path: "path/to/dna.dna".into(),
+                    device_seed_lair_tag: "device-seed".into()
                 }),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {

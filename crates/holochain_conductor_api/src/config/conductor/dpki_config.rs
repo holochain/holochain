@@ -1,6 +1,8 @@
 // Legacy config that will probably change
 #![allow(missing_docs)]
 
+use std::path::PathBuf;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -8,6 +10,10 @@ use serde::Serialize;
 /// as well as what parameters to pass it on its initialization.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
-    pub instance_id: String,
-    pub init_params: String,
+    /// Path to a DNA which implements the DPKI service, i.e. Deepkey
+    pub dna_path: PathBuf,
+
+    /// The lair tag used to refer to the "device seed" which was used to generate
+    /// the AgentPubKey for the DPKI cell
+    pub device_seed_lair_tag: String,
 }
