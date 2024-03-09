@@ -68,6 +68,10 @@ use hdi::prelude::*;
             &self,
             x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+        fn ed_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<XSalsa20Poly1305Data>;
     }
 
 }
