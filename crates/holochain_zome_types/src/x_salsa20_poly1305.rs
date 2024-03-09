@@ -134,3 +134,36 @@ impl X25519XSalsa20Poly1305Encrypt {
         &self.data
     }
 }
+
+#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct Ed25519XSalsa20Poly1305Encrypt {
+    pub sender: AgentPubKey,
+    pub recipient: AgentPubKey,
+    pub data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+}
+
+impl Ed25519XSalsa20Poly1305Encrypt {
+    pub fn new(
+        sender: AgentPubKey,
+        recipient: AgentPubKey,
+        data: crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    ) -> Self {
+        Self {
+            sender,
+            recipient,
+            data,
+        }
+    }
+
+    pub fn as_sender_ref(&self) -> &AgentPubKey {
+        &self.sender
+    }
+
+    pub fn as_recipient_ref(&self) -> &AgentPubKey {
+        &self.recipient
+    }
+
+    pub fn as_data_ref(&self) -> &XSalsa20Poly1305Data {
+        &self.data
+    }
+}
