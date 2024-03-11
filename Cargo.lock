@@ -2646,9 +2646,9 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a160a11a63c03f180389bcbdb8f4823f84805bd07169160e4a0ede592512338"
+checksum = "1524f81cc7a05bfacd666324692d1cd46c9f8dce68aa524a4c8a993449617f6b"
 dependencies = [
  "futures",
  "one_err",
@@ -2656,7 +2656,7 @@ dependencies = [
  "rmpv",
  "serde",
  "serde_bytes",
- "sodoken",
+ "sodoken 0.0.11",
 ]
 
 [[package]]
@@ -2958,7 +2958,7 @@ dependencies = [
  "serde_yaml",
  "serial_test",
  "shrinkwraprs",
- "sodoken",
+ "sodoken 0.0.11",
  "structopt",
  "strum 0.18.0",
  "subtle-encoding",
@@ -3106,7 +3106,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sodoken",
+ "sodoken 0.0.11",
  "tokio",
  "tracing",
  "url2",
@@ -3222,7 +3222,7 @@ dependencies = [
  "serde_bytes",
  "serde_yaml",
  "shrinkwraprs",
- "sodoken",
+ "sodoken 0.0.11",
  "tempdir",
  "thiserror",
  "tokio",
@@ -3541,7 +3541,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rpassword 7.3.1",
- "sodoken",
+ "sodoken 0.0.11",
  "tokio",
 ]
 
@@ -4539,9 +4539,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7397cd6d05160fe7041f8c0e7de6672b3345bd68326cd2dc06dfb701669f8bf3"
+checksum = "56689c6c7f318e5909c9de1d7eac7f2d383370341632ab845c2da24b5b6bb7aa"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4555,9 +4555,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e485174546b1a95bbf801ce241e1039d182ec99c8ab4a5c0b90af0c8d8c651b"
+checksum = "aa27af83a127b28c06d7c175dfc34d762fb66ea36d6ac2110d93a55d0e058dd5"
 dependencies = [
  "base64 0.13.1",
  "dunce",
@@ -7361,6 +7361,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sodoken"
+version = "0.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "907e0ea9699b846c2586ea5685e9abf5963fca64a5179a406e6ac02b94564e30"
+dependencies = [
+ "libc",
+ "libsodium-sys-stable",
+ "num_cpus",
+ "once_cell",
+ "one_err",
+ "parking_lot 0.12.1",
+ "tokio",
+]
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8552,7 +8567,7 @@ dependencies = [
  "once_cell",
  "prometheus",
  "rand 0.8.5",
- "sodoken",
+ "sodoken 0.0.10",
  "tokio",
  "tracing",
  "tracing-subscriber",
