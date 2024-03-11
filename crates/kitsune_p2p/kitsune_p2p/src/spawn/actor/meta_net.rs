@@ -907,16 +907,14 @@ impl MetaNet {
                                     KITSUNE_PROTOCOL_VERSION,
                                     kitsune_protocol_version,
                                 );
-                                return box_fut_plain(Err(std::io::Error::new(
-                                    std::io::ErrorKind::Other,
+                                return box_fut_plain(Err(std::io::Error::other(
                                     "kitsune protocol version mismatch",
                                 )));
                             }
 
                             if let Err(reason) = user_data_cmp(&url, &user_data_bytes_received) {
                                 tracing::warn!(?url, "tx5 preflight user_data mismatch");
-                                return box_fut_plain(Err(std::io::Error::new(
-                                    std::io::ErrorKind::Other,
+                                return box_fut_plain(Err(std::io::Error::other(
                                     "tx5 preflight user_data mismatch",
                                 )));
                             }
@@ -945,15 +943,11 @@ impl MetaNet {
                         }
                         Err(err) => {
                             tracing::warn!(?err, ?url, "Could not decode PreflightData");
-                            box_fut_plain(Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            box_fut_plain(Err(std::io::Error::other(
                                 "Could not decode PreflightData",
                             )))
                         }
-                        _ => box_fut_plain(Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "Unexpected wire message",
-                        ))),
+                        _ => box_fut_plain(Err(std::io::Error::other("Unexpected wire message"))),
                     }
                 }),
             )),
