@@ -1,18 +1,20 @@
 use std::path::PathBuf;
 
 use holochain::{
-    conductor::api::{AdminInterfaceApi, RealAdminInterfaceApi},
-    sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile},
+    conductor::api::RealAdminInterfaceApi,
+    conductor::config::DpkiConfig,
+    sweettest::*,
     test_utils::{consistency_10s, consistency_60s, inline_zomes::simple_create_read_zome},
 };
 pub use holochain_conductor_api::*;
 use holochain_conductor_services::KeyState;
 use holochain_types::prelude::*;
 
-const DEEPKEY_PATH: PathBuf = "/home/michael/Holo/deepkey/dnas/deepkey.dna".into();
+const DEEPKEY_PATH: &str = "/home/michael/Holo/deepkey/dnas/deepkey.dna";
 
 async fn dpki_dna_bundle() -> DnaBundle {
-    DnaBundle::read_from_file(&DEEPKEY_PATH).await.unwrap()
+    let path = PathBuf::from(DEEPKEY_PATH);
+    DnaBundle::read_from_file(&path).await.unwrap()
 }
 
 async fn dpki_dna() -> DnaFile {
@@ -28,9 +30,10 @@ async fn dpki_dna() -> DnaFile {
 async fn initialize_dpki() {
     holochain_trace::test_run().ok();
 
-    let mut config = standard_config();
+    let mut config = SweetConductorConfig::standard();
+    let dna_path = PathBuf::from(DEEPKEY_PATH);
     config.dpki = Some(DpkiConfig {
-        dna_path: DEEPKEY_PATH.clone(),
+        dna_path,
         device_seed_lair_tag: "TODO".to_string(),
     });
     let mut conductor = SweetConductor::from_config(config).await;
@@ -55,15 +58,17 @@ async fn initialize_dpki() {
 async fn validate_with_dpki() {
     holochain_trace::test_run().ok();
 
-    let mut config = standard_config();
+    let rendezvous = SweetLocalRendezvous::new().await;
+    let mut config = SweetConductorConfig::rendezvous(true);
+    let dna_path = PathBuf::from(DEEPKEY_PATH);
     config.dpki = Some(DpkiConfig {
-        dna_path: DEEPKEY_PATH.clone(),
+        dna_path,
         device_seed_lair_tag: "TODO".to_string(),
     });
     let mut conductors = SweetConductorBatch::new(vec![
-        SweetConductor::from_config(config).await,
-        SweetConductor::from_config(config).await,
-        SweetConductor::from_config(standard_config()).await,
+        SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,
+        SweetConductor::from_config_rendezvous(config.clone(), rendezvous.clone()).await,
+        SweetConductor::from_config_rendezvous(standard_config(), rendezvous.clone()).await,
     ]);
     dbg!(Timestamp::now());
     let dpki_dna = dpki_dna().await;
