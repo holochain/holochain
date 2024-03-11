@@ -20,7 +20,6 @@ use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
 pub use error::*;
-use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -32,7 +31,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
-use std::collections::HashSet;
 use tracing::*;
 pub use types::Outcome;
 
@@ -43,6 +41,9 @@ mod tests;
 
 #[cfg(test)]
 mod validation_tests;
+
+#[cfg(test)]
+mod unit_tests;
 
 mod error;
 mod types;
@@ -443,7 +444,7 @@ pub async fn validate_op<R>(
 where
     R: RibosomeT,
 {
-    check_entry_def(op, &network.dna_hash(), conductor_handle)
+    check_entry_def(op, ribosome.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
@@ -494,8 +495,8 @@ where
         ribosome,
         workspace,
         network.clone(),
-        (HashSet::<AnyDhtHash>::new(), 0),
-        HashSet::new(),
+        // (HashSet::<AnyDhtHash>::new(), 0),
+        // HashSet::new(),
     )
     .await?;
 
@@ -644,8 +645,6 @@ async fn run_validation_callback_inner<R>(
     ribosome: &R,
     workspace_read: HostFnWorkspaceRead,
     network: HolochainP2pDna,
-    (mut fetched_deps, recursion_depth): (HashSet<AnyDhtHash>, usize),
-    mut visited_activity: HashSet<ChainFilter>,
 ) -> AppValidationResult<Outcome>
 where
     R: RibosomeT,
@@ -658,71 +657,34 @@ where
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
-            // This is the base case where we've been recursing and start seeing
-            // all the same hashes unresolved that we already tried to fetch.
-            // At this point we should just give up on the inline recursing and
-            // let some future background task attempt to fetch these hashes
-            // again. Hopefully by then the hashes are fetchable.
-            // 20 is a completely arbitrary max recursion depth.
-            if recursion_depth > 20 || hashes.iter().all(|hash| fetched_deps.contains(hash)) {
-                Ok(Outcome::AwaitingDeps(hashes))
-            } else {
-                let in_flight = hashes.into_iter().map(|hash| async {
-                    let cascade_workspace = workspace_read.clone();
-                    let cascade = CascadeImpl::from_workspace_and_network(
-                        &cascade_workspace,
-                        network.clone(),
-                    );
-                    cascade
-                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
-                        .await?;
-                    Ok(hash)
-                });
-                let results: Vec<_> = futures::stream::iter(in_flight)
-                    // 10 is completely arbitrary.
-                    .buffered(10)
-                    .collect()
-                    .await;
-                let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
-                for hash in results? {
-                    fetched_deps.insert(hash);
-                }
-                run_validation_callback_inner(
-                    invocation,
-                    ribosome,
-                    workspace_read,
-                    network,
-                    (fetched_deps, recursion_depth + 1),
-                    visited_activity,
-                )
-                .await
-            }
+            // tokio::spawn(async {
+            //     let in_flight = hashes.into_iter().map(|hash| async {
+            //         let cascade_workspace = workspace_read.clone();
+            //         let cascade = CascadeImpl::from_workspace_and_network(
+            //             &cascade_workspace,
+            //             network.clone(),
+            //         );
+            //         cascade
+            //             .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+            //             .await?;
+            //         Ok(hash)
+            //     });
+            //     let results: Vec<_> = futures::stream::iter(in_flight)
+            //         // 10 is completely arbitrary.
+            //         .buffered(10)
+            //         .collect()
+            //         .await;
+            //     let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
+            //     for hash in results? {
+            //         fetched_deps.insert(hash);
+            //     }
+            // });
+            Ok(Outcome::AwaitingDeps(hashes))
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
             author,
             filter,
-        )) => {
-            if recursion_depth > 20 || visited_activity.contains(&filter) {
-                Ok(Outcome::AwaitingDeps(vec![author.into()]))
-            } else {
-                let cascade_workspace = workspace_read.clone();
-                let cascade =
-                    CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
-                cascade
-                    .must_get_agent_activity(author.clone(), filter.clone())
-                    .await?;
-                visited_activity.insert(filter);
-                run_validation_callback_inner(
-                    invocation,
-                    ribosome,
-                    workspace_read,
-                    network,
-                    (fetched_deps, recursion_depth + 1),
-                    visited_activity,
-                )
-                .await
-            }
-        }
+        )) => Ok(Outcome::AwaitingDeps(vec![author.into()])),
     }
 }
 
