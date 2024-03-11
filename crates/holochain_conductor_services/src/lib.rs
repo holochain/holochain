@@ -31,7 +31,7 @@ pub trait CellRunner: Send + Sync + 'static {
 #[derive(Clone, Default)]
 pub struct ConductorServices {
     /// The DPKI service
-    pub dpki: Option<DpkiMutex>,
+    pub dpki: Option<DpkiImpl>,
     /// The AppStore service
     pub app_store: Option<Arc<dyn AppStoreService>>,
 }

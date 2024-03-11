@@ -85,7 +85,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_services::DpkiMutex;
+use holochain_conductor_services::DpkiImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
@@ -506,7 +506,7 @@ pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: ValDeps,
-    dpki: Option<DpkiMutex>,
+    dpki: Option<DpkiImpl>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(op, dna_def, validation_dependencies, dpki).await {
         Ok(_) => Ok(Outcome::Accepted),
@@ -561,7 +561,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: ValDeps,
-    dpki: Option<DpkiMutex>,
+    dpki: Option<DpkiImpl>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     if let Some(dpki) = dpki {
@@ -958,7 +958,7 @@ pub struct SysValidationWorkspace {
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
     sys_validation_retry_delay: Duration,
-    dpki: Option<DpkiMutex>,
+    dpki: Option<DpkiImpl>,
 }
 
 impl SysValidationWorkspace {
@@ -968,7 +968,7 @@ impl SysValidationWorkspace {
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
-        dpki: Option<DpkiMutex>,
+        dpki: Option<DpkiImpl>,
         sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {

@@ -29,7 +29,7 @@ pub struct ConductorBuilder {
 
     /// Optional DPKI service implementation
     #[cfg(any(test, feature = "test_utils"))]
-    pub dpki: Option<DpkiMutex>,
+    pub dpki: Option<DpkiImpl>,
 
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
