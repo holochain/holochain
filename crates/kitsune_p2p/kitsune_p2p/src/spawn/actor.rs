@@ -133,6 +133,7 @@ impl KitsuneP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         host_api: HostApiLegacy,
+        preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
@@ -159,6 +160,7 @@ impl KitsuneP2pActor {
             internal_sender.clone(),
             host_api.clone(),
             metrics,
+            preflight_user_data,
         )
         .await?;
 
@@ -214,6 +216,7 @@ async fn create_meta_net(
     internal_sender: ghost_actor::GhostSender<Internal>,
     host: HostApiLegacy,
     metrics: Tx2ApiMetrics,
+    preflight_user_data: PreflightUserData,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
     let mut ep_hnd = None;
     let mut ep_evt = None;
@@ -240,6 +243,7 @@ async fn create_meta_net(
             host.clone(),
             internal_sender.clone(),
             signal_url,
+            preflight_user_data,
         )
         .await?;
         ep_hnd = Some(h);
@@ -975,6 +979,7 @@ impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
 mod tests {
+    use crate::meta_net::PreflightUserData;
     use crate::spawn::actor::create_meta_net;
     use crate::spawn::actor::MetaNet;
     use crate::spawn::actor::MetaNetEvtRecv;
@@ -1065,6 +1070,7 @@ mod tests {
             internal_sender,
             HostStub::new().legacy(sender),
             Tx2ApiMetrics::new(),
+            PreflightUserData::default(),
         )
         .await
     }

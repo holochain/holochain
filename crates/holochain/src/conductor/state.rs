@@ -3,6 +3,7 @@
 
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
+use holochain_p2p::NetworkCompatParams;
 use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -199,6 +200,18 @@ impl ConductorState {
         self.installed_apps
             .values()
             .find(|app| app.all_cells().any(|id| id == cell_id))
+    }
+
+    /// Get network compability params
+    /// (but this can't actually be on the Conductor since it must be retrieved before
+    /// conductor initialization)
+    pub fn get_network_compat(&self) -> NetworkCompatParams {
+        NetworkCompatParams {
+            dpki_hash: {
+                tracing::warn!("Using default NetworkCompatParams");
+                None
+            },
+        }
     }
 }
 

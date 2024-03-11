@@ -2,7 +2,8 @@ use std::{net::SocketAddr, sync::Arc};
 
 use super::{test_keystore, RecordedKitsuneP2pEvent, TestHost, TestHostOp, TestLegacyHost};
 use kitsune_p2p::{
-    actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi, KitsuneP2pResult,
+    actor::KitsuneP2p, event::KitsuneP2pEventReceiver, spawn_kitsune_p2p, HostApi,
+    KitsuneP2pResult, PreflightUserData,
 };
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -92,8 +93,13 @@ impl KitsuneTestHarness {
         let mut config = self.config.clone();
         config.tracing_scope = Some(name);
 
-        let (sender, receiver) =
-            spawn_kitsune_p2p(config, self.tls_config.clone(), self.host_api.clone()).await?;
+        let (sender, receiver) = spawn_kitsune_p2p(
+            config,
+            self.tls_config.clone(),
+            self.host_api.clone(),
+            PreflightUserData::default(),
+        )
+        .await?;
 
         Ok((sender, receiver))
     }

@@ -272,6 +272,7 @@ mod tests {
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -354,6 +355,7 @@ mod tests {
             KitsuneP2pConfig::default(),
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
@@ -430,10 +432,14 @@ mod tests {
         };
         //let test_host = TestHost::default();
 
-        let (p2p, mut evt) =
-            spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap(), test_host)
-                .await
-                .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            config,
+            TlsConfig::new_ephemeral().await.unwrap(),
+            test_host,
+            NetworkCompatParams::default(),
+        )
+        .await
+        .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio_stream::StreamExt;
@@ -513,9 +519,14 @@ mod tests {
         params.default_rpc_multi_remote_request_grace_ms = 100;
         let mut config = KitsuneP2pConfig::default();
         config.tuning_params = Arc::new(params);
-        let (p2p, mut evt) = spawn_holochain_p2p(config, cert, kitsune_p2p::HostStub::new())
-            .await
-            .unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            config,
+            cert,
+            kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
+        )
+        .await
+        .unwrap();
 
         let test_1 = WireOps::Record(WireRecordOps {
             action: Some(Judged::valid(SignedAction(fixt!(Action), fixt!(Signature)))),
@@ -611,6 +622,7 @@ mod tests {
             config,
             TlsConfig::new_ephemeral().await.unwrap(),
             kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
         )
         .await
         .unwrap();
