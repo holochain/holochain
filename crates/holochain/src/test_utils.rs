@@ -519,7 +519,6 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 /// Wait for num_attempts * delay, or until all published ops have been integrated.
 /// If the timeout is reached, print a report including a diff of all published ops
 /// which were not integrated.
-#[tracing::instrument(skip(db, published))]
 async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     node_ids: &[SleuthId],
     db: &Db,
@@ -542,7 +541,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 
     let num_published = published.len();
     let mut num_integrated = 0;
-    for i in 0..num_attempts {
+    for _i in 0..num_attempts {
         num_integrated = get_integrated_count(db).await;
         if num_integrated >= num_published {
             if num_integrated > num_published {
@@ -550,9 +549,6 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
                 Consistency may not be complete.", num_integrated, num_published)
             }
             return;
-        } else {
-            let total_time_waited = delay * i as u32;
-            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
         }
         tokio::time::sleep(delay).await;
     }

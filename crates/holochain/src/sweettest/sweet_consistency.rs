@@ -42,7 +42,6 @@ pub async fn consistency_60s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell,
 }
 
 /// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
 pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
     all_cells: I,
     num_attempts: usize,
@@ -62,7 +61,6 @@ pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
 /// Cells paired with a `false` value will have their authored ops counted towards the total,
 /// but not their integrated ops (since they are not online to integrate things).
 /// This is useful for tests where nodes go offline.
-#[tracing::instrument(skip(all_cells))]
 pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
     all_cells: I,
     num_attempts: usize,
