@@ -240,7 +240,6 @@ pub async fn register_and_install_dna_named(
         .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
-    let dna_hash = dna.dna_hash().clone();
 
     let roles = vec![AppRoleManifest {
         name: role_name,
@@ -261,8 +260,6 @@ pub async fn register_and_install_dna_named(
         .unwrap();
 
     let resources = vec![(dna_path.clone(), dna_bundle)];
-
-    dbg!(&manifest);
 
     let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
         .await

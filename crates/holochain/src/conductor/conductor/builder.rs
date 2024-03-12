@@ -182,7 +182,7 @@ impl ConductorBuilder {
 
         let dpki_dna_to_install = match &config.dpki {
             Some(dpki_config) => {
-                let dna = DnaBundle::read_from_file(&dpki_config.dna_path)
+                let dna = get_dpki_dna(dpki_config.dna_path.as_ref())
                     .await?
                     .into_dna_file(Default::default())
                     .await?
@@ -400,8 +400,6 @@ impl ConductorBuilder {
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
-        use holochain_p2p::NetworkCompatParams;
-
         let keystore = self
             .keystore
             .unwrap_or_else(holochain_keystore::test_keystore);
@@ -428,12 +426,11 @@ impl ConductorBuilder {
             Some(tag_ed),
             Some(keystore.lair_client()),
         );
-        let network_compat = NetworkCompatParams::default();
 
         let (dpki_uuid, dpki_dna_to_install) = match (&self.dpki, &config.dpki) {
             (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
             (None, Some(dpki_config)) => {
-                let dna = DnaBundle::read_from_file(&dpki_config.dna_path)
+                let dna = get_dpki_dna(dpki_config.dna_path.as_ref())
                     .await?
                     .into_dna_file(Default::default())
                     .await?
@@ -505,5 +502,13 @@ impl ConductorBuilder {
             self.no_print_setup,
         )
         .await
+    }
+}
+
+async fn get_dpki_dna(dna_path: Option<&std::path::PathBuf>) -> DnaResult<DnaBundle> {
+    if let Some(dna_path) = dna_path {
+        DnaBundle::read_from_file(dna_path).await
+    } else {
+        holochain_deepkey_dna::deepkey_dna()
     }
 }

@@ -10,8 +10,9 @@ use serde::Serialize;
 /// as well as what parameters to pass it on its initialization.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
-    /// Path to a DNA which implements the DPKI service, i.e. Deepkey
-    pub dna_path: PathBuf,
+    /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
+    /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
+    pub dna_path: Option<PathBuf>,
 
     /// The lair tag used to refer to the "device seed" which was used to generate
     /// the AgentPubKey for the DPKI cell

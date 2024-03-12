@@ -29,7 +29,7 @@ holochain_cascade = { version = "^0.3.0-beta-dev.38", path = "../holochain_casca
 holochain_conductor_api = { version = "^0.3.0-beta-dev.38", path = "../holochain_conductor_api" }
 
 # # TODO: publish to crates.io
-# holochain_deepkey_dna = { path = "/home/michael/Holo/deepkey/crates/holochain_deepkey_dna" }
+holochain_deepkey_dna = { path = "/home/michael/Holo/deepkey/crates/holochain_deepkey_dna" }
 
 holochain_keystore = { version = "^0.3.0-beta-dev.30", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.3.0-beta-dev.37", path = "../holochain_p2p" }

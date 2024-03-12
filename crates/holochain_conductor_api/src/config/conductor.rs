@@ -299,7 +299,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 dpki: Some(DpkiConfig {
-                    dna_path: "path/to/dna.dna".into(),
+                    dna_path: Some("path/to/dna.dna".into()),
                     device_seed_lair_tag: "device-seed".into()
                 }),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },

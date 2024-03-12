@@ -2911,6 +2911,7 @@ dependencies = [
  "holochain_cascade",
  "holochain_conductor_api",
  "holochain_conductor_services",
+ "holochain_deepkey_dna",
  "holochain_keystore",
  "holochain_metrics",
  "holochain_nonce",
@@ -3172,6 +3173,13 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "holochain_deepkey_dna"
+version = "0.1.0"
+dependencies = [
+ "holochain_types",
 ]
 
 [[package]]

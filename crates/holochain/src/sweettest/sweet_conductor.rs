@@ -417,7 +417,7 @@ impl SweetConductor {
 
         self.setup_app_1_register_dna(dnas.clone()).await?;
 
-        let dna_hashes = self
+        let agent = self
             .setup_app_2_install_and_enable(
                 installed_app_id,
                 agent.clone(),
@@ -488,7 +488,6 @@ impl SweetConductor {
         let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
         self.setup_app_1_register_dna(dnas.clone()).await?;
 
-        let mut agents_and_dna_hashes = vec![];
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             self.setup_app_2_install_and_enable(
@@ -504,7 +503,7 @@ impl SweetConductor {
             .await?;
 
         let mut apps = Vec::new();
-        for (agent, dna_hashes) in agents_and_dna_hashes {
+        for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
                 self.setup_app_3_create_sweet_app(&installed_app_id, agent.clone(), &roles)
