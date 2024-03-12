@@ -12,14 +12,8 @@ use holochain_types::prelude::*;
 
 const DEEPKEY_PATH: &str = "/home/michael/Holo/deepkey/dnas/deepkey.dna";
 
-async fn dpki_dna_bundle() -> DnaBundle {
-    let path = PathBuf::from(DEEPKEY_PATH);
-    DnaBundle::read_from_file(&path).await.unwrap()
-}
-
 async fn dpki_dna() -> DnaFile {
-    dpki_dna_bundle()
-        .await
+    holochain_deepkey_dna::deepkey_dna()
         .into_dna_file(Default::default())
         .await
         .unwrap()
