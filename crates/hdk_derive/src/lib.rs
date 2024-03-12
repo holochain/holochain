@@ -156,13 +156,25 @@ impl quote::ToTokens for EntryDef {
 #[proc_macro_attribute]
 pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
-    let item_fn = syn::parse_macro_input!(item as syn::ItemFn);
+    let mut item_fn = syn::parse_macro_input!(item as syn::ItemFn);
 
     // extract the ident of the fn
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
     let input_type = if item_fn.sig.inputs.is_empty() {
-        Box::new(syn::Type::Verbatim(quote::quote!{ () }))
+        let param_type = syn::Type::Verbatim(quote::quote! { () });
+        let param_pat = syn::Pat::Wild(syn::PatWild {
+            underscore_token: syn::token::Underscore::default(),
+            attrs: Vec::new(),
+        });
+        let param = syn::FnArg::Typed(syn::PatType {
+            attrs: Vec::new(),
+            pat: Box::new(param_pat),
+            colon_token: syn::token::Colon::default(),
+            ty: Box::new(param_type.clone()),
+        });
+        item_fn.sig.inputs.push(param);
+        Box::new(param_type)
     } else if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
         pat_type.ty.clone()
     } else {
