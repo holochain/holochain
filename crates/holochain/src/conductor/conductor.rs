@@ -3160,7 +3160,7 @@ pub fn app_manifest_from_dnas(
                     location: Some(DnaLocation::Bundled(path.clone())),
                     modifiers,
                     installed_hash: None,
-                    clone_limit: 255,
+                    clone_limit,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
             }

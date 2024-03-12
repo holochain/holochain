@@ -1771,6 +1771,7 @@ dependencies = [
  "futures",
  "holochain_diagnostics",
  "holochain_trace",
+ "kitsune_p2p",
  "tokio",
  "tokio-stream",
  "tui",

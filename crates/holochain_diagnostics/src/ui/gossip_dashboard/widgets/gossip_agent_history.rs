@@ -1,3 +1,5 @@
+use kitsune_p2p::metrics::PeerAgentHistory;
+
 use super::*;
 
 pub fn _ui_gossip_agent_history_table(

@@ -52,6 +52,7 @@ async fn main() -> anyhow::Result<()> {
             source: AppBundleSource::Bundle(bundle),
             membrane_proofs: Default::default(),
             network_seed: None,
+            #[cfg(feature = "chc")]
             ignore_genesis_failure: false,
         };
 

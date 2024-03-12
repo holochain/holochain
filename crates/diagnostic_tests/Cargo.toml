@@ -12,6 +12,7 @@ anyhow = { workspace = true }
 chashmap = "2.2"
 colored = "2"
 futures = { workspace = true }
+kitsune_p2p = { version = "^0.3.0-beta-dev.32", path = "../kitsune_p2p/kitsune_p2p" }
 holochain_diagnostics = { path = "../holochain_diagnostics" }
 holochain_trace = { version = "^0.3.0-beta-dev.7", path = "../holochain_trace" }
 tokio = { workspace = true }
