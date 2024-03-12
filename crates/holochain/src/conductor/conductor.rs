@@ -1333,7 +1333,7 @@ mod app_impls {
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-            let manifest = app_manifest_from_dnas(&dnas_with_roles);
+            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255);
 
             let agent = self.resolve_agent(installed_app_id.clone(), agent).await?;
 
@@ -1343,7 +1343,7 @@ mod app_impls {
                     let dna = dr.dna().clone();
                     let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
                     let dnas_to_register = (dna, mp.clone());
-                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 0));
+                    let role_assignments = (dr.role(), AppRoleAssignment::new(cell_id, true, 255));
                     (dnas_to_register, role_assignments)
                 })
                 .unzip();
@@ -3142,8 +3142,12 @@ pub(crate) async fn genesis_cells(
 }
 
 /// Get a "standard" AppBundle from a single DNA, with Create provisioning,
-/// with no modifiers, clone limit of 255, and arbitrary role names
-pub fn app_manifest_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppManifest {
+/// with no modifiers, and arbitrary role names.
+/// Allows setting the clone_limit for every DNA.
+pub fn app_manifest_from_dnas(
+    dnas_with_roles: &[impl DnaWithRole],
+    clone_limit: u32,
+) -> AppManifest {
     let roles: Vec<_> = dnas_with_roles
         .iter()
         .map(|dr| {

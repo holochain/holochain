@@ -38,7 +38,7 @@ pub async fn app_bundle_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppBu
 
     debug_assert_eq!(
         manifest,
-        app_manifest_from_dnas(dnas_with_roles),
+        app_manifest_from_dnas(dnas_with_roles, 255),
         "app_bundle_from_dnas and app_manifest_from_dnas should produce the same manifest"
     );
 
