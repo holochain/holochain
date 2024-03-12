@@ -176,6 +176,12 @@ wasm_io_types! {
     // Recipient, Sender, Encrypted data.
     fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
+    // Sender, Recipient, Data.
+    fn ed_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn ed_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Decrypt) -> zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
+
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.

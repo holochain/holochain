@@ -10,6 +10,7 @@ use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 use kitsune_p2p::KOp;
 use kitsune_p2p::KitsuneOpData;
+use kitsune_p2p::PreflightUserData;
 use kitsune_p2p_fetch::FetchContext;
 
 use crate::types::AgentPubKeyExt;
@@ -356,9 +357,44 @@ impl HolochainP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
         host: kitsune_p2p::HostApi,
+        compat: NetworkCompatParams,
     ) -> HolochainP2pResult<Self> {
-        let (kitsune_p2p, kitsune_p2p_events) =
-            kitsune_p2p::spawn_kitsune_p2p(config.clone(), tls_config, host.clone()).await?;
+        let mut bytes = vec![];
+        kitsune_p2p_types::codec::rmp_encode(&mut bytes, &compat)
+            .map_err(HolochainP2pError::other)?;
+
+        let preflight_user_data = PreflightUserData {
+            bytes: bytes.clone(),
+            comparator: Box::new(move |url, mut recvd_bytes| {
+                if bytes.as_slice() != recvd_bytes {
+                    let common = "Cannot complete preflight handshake with peer because network compatibility params don't match";
+                    Err(
+                        match kitsune_p2p_types::codec::rmp_decode::<_, NetworkCompatParams>(
+                            &mut recvd_bytes,
+                        ) {
+                            Ok(theirs) => {
+                                format!("{common}. ours={compat:?}, theirs={theirs:?}, url={url}")
+                            }
+                            Err(err) => {
+                                format!(
+                                "{common}. (Can't decode peer's sent hash.) url={url}, err={err}"
+                            )
+                            }
+                        },
+                    )
+                } else {
+                    Ok(())
+                }
+            }),
+        };
+
+        let (kitsune_p2p, kitsune_p2p_events) = kitsune_p2p::spawn_kitsune_p2p(
+            config.clone(),
+            tls_config,
+            host.clone(),
+            preflight_user_data,
+        )
+        .await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 

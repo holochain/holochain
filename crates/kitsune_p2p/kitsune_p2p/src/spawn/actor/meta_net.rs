@@ -74,6 +74,51 @@ kitsune_p2p_types::write_codec_enum! {
     }
 }
 
+kitsune_p2p_types::write_codec_enum! {
+    /// Preflight data for tx5.
+    /// Since this is all about compatibility, the codec itself contains versioned payloads,
+    /// in case the preflight check needs to evolve over time.
+    codec PreflightData {
+        /// Version 0
+        V0(0) {
+            /// Kitsune protocol version which is bumped at every breaking change
+            kitsune_protocol_version.0: u16,
+            /// Our local peer info
+            peer_list.1: Vec<AgentInfoSigned>,
+            /// Data provided by the host, which must match across nodes in order
+            /// for preflight to succeed
+            user_data.2: Vec<u8>,
+        },
+    }
+}
+
+/// Host-defined data used to implement custom connection preflight checks.
+///
+/// The `bytes` are sent with every preflight, and the `comparator` is used to validate
+/// the bytes sent by the remote peer. If the comparator returns an Err, the preflight
+/// fails and no connection is made.
+///
+/// The string returned in the Err is logged from kitsune to indicate the point of failure.
+pub struct PreflightUserData {
+    /// The bytes to send with every preflight.
+    pub bytes: Vec<u8>,
+    /// The comparator function to use to validate the bytes sent by the remote peer.
+    ///
+    /// Typically this will be a closure that captures the bytes sent, so that the two values can
+    /// be compared.
+    #[allow(clippy::type_complexity)]
+    pub comparator: Box<dyn Fn(&tx5::Tx5Url, &[u8]) -> Result<(), String> + Send + Sync + 'static>,
+}
+
+impl Default for PreflightUserData {
+    fn default() -> Self {
+        Self {
+            bytes: Vec::new(),
+            comparator: Box::new(|_, _| Ok(())),
+        }
+    }
+}
+
 fn next_msg_id() -> u64 {
     static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     // MAYBE - track these message ids at the connection level
@@ -806,9 +851,17 @@ impl MetaNet {
         host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         signal_url: String,
+        preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+        use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
+
+        let PreflightUserData {
+            bytes: user_data_sent,
+            comparator: user_data_cmp,
+        } = preflight_user_data;
 
         let evt_sender = host.legacy.clone();
         let tx5_config = tx5::Config3 {
@@ -824,23 +877,48 @@ impl MetaNet {
             preflight: Some((
                 Arc::new(move |_| {
                     let i_s = kitsune_internal_sender.clone();
+                    let user_data_sent = user_data_sent.clone();
 
                     Box::pin(async move {
                         let agent_list = i_s
                             .get_all_local_joined_agent_infos()
                             .await
                             .unwrap_or_default();
-                        wire::Wire::peer_unsolicited(agent_list).encode_vec()
+                        PreflightData::v0(KITSUNE_PROTOCOL_VERSION, agent_list, user_data_sent)
+                            .encode_vec()
                     })
                 }),
-                Arc::new(move |_, data| {
+                Arc::new(move |url, data| {
                     let e_s = evt_sender.clone();
-                    Box::pin(async move {
-                        match wire::Wire::decode_ref(&data) {
-                            Ok((
-                                _,
-                                wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
-                            )) => {
+                    let url = url.clone();
+                    match PreflightData::decode_ref(&data) {
+                        Ok((
+                            _,
+                            PreflightData::V0(V0 {
+                                kitsune_protocol_version,
+                                peer_list,
+                                user_data: user_data_bytes_received,
+                            }),
+                        )) => {
+                            if kitsune_protocol_version != KITSUNE_PROTOCOL_VERSION {
+                                tracing::warn!(
+                                    ?url,
+                                    "kitsune protocol version mismatch: ours = {}, theirs = {}",
+                                    KITSUNE_PROTOCOL_VERSION,
+                                    kitsune_protocol_version,
+                                );
+                                return box_fut_plain(Err(std::io::Error::other(
+                                    "kitsune protocol version mismatch",
+                                )));
+                            }
+
+                            if let Err(reason) = user_data_cmp(&url, &user_data_bytes_received) {
+                                tracing::warn!(?url, "tx5 preflight user_data mismatch");
+                                return box_fut_plain(Err(std::io::Error::other(
+                                    "tx5 preflight user_data mismatch",
+                                )));
+                            }
+                            Box::pin(async move {
                                 // @todo This loop only exists because we have
                                 // to put a space on PutAgentInfoSignedEvt, if
                                 // the internal peer space was used instead we
@@ -860,12 +938,17 @@ impl MetaNet {
                                         );
                                     }
                                 }
-                            }
-                            Err(err) => tracing::warn!(?err, "error decoding connection peers"),
-                            _ => {}
+                                Ok(())
+                            })
                         }
-                        Ok(())
-                    })
+                        Err(err) => {
+                            tracing::warn!(?err, ?url, "Could not decode PreflightData");
+                            box_fut_plain(Err(std::io::Error::other(
+                                "Could not decode PreflightData",
+                            )))
+                        }
+                        _ => box_fut_plain(Err(std::io::Error::other("Unexpected wire message"))),
+                    }
                 }),
             )),
             //..Default::default()

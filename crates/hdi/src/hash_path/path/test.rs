@@ -1,7 +1,7 @@
 use mockall::predicate::eq;
 
 use crate::hash_path::path::root_hash;
-use crate::prelude::*;
+use hdk::prelude::*;
 
 const LINK_TYPE: ScopedLinkType = ScopedLinkType {
     zome_index: ZomeIndex(0),
