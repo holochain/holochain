@@ -281,7 +281,6 @@ pub mod x_salsa20_poly1305;
 
 /// Rexporting the paste macro as it is used internally and may help structure downstream code.
 pub use paste;
-use prelude::map_extern::ExternResult;
 
 /// Create and verify signatures for serializable Rust structures and raw binary data.
 ///
