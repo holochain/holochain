@@ -35,7 +35,6 @@ pub mod dna_def;
 pub mod entry_def;
 pub mod host_fn_workspace;
 pub mod integrate;
-pub mod mutations;
 pub mod nonce;
 #[allow(missing_docs)]
 pub mod prelude;
@@ -49,6 +48,9 @@ pub mod validation_receipts;
 #[allow(missing_docs)]
 pub mod wasm;
 pub mod workspace;
+
+#[cfg(feature = "test_utils")]
+pub mod mutations;
 
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "test_utils"))]
