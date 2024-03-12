@@ -342,6 +342,7 @@ impl SweetConductor {
             .raw_handle()
             .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof)
             .await?;
+        // app.all_cells()
 
         self.raw_handle().enable_app(installed_app_id).await?;
         Ok(agent)
@@ -413,10 +414,17 @@ impl SweetConductor {
             .iter()
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
+
         self.setup_app_1_register_dna(dnas.clone()).await?;
-        let agent = self
-            .setup_app_2_install_and_enable(installed_app_id, agent, dnas_with_roles.as_slice())
+
+        let dna_hashes = self
+            .setup_app_2_install_and_enable(
+                installed_app_id,
+                agent.clone(),
+                dnas_with_roles.as_slice(),
+            )
             .await?;
+
         self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
@@ -479,6 +487,8 @@ impl SweetConductor {
         let dnas: Vec<&DnaFile> = dnas_with_roles.iter().map(|dr| dr.dna()).collect();
         let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
         self.setup_app_1_register_dna(dnas.clone()).await?;
+
+        let mut agents_and_dna_hashes = vec![];
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             self.setup_app_2_install_and_enable(
@@ -494,7 +504,7 @@ impl SweetConductor {
             .await?;
 
         let mut apps = Vec::new();
-        for agent in agents {
+        for (agent, dna_hashes) in agents_and_dna_hashes {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
                 self.setup_app_3_create_sweet_app(&installed_app_id, agent.clone(), &roles)

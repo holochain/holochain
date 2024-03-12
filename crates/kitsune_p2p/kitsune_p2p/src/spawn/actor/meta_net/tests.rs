@@ -821,6 +821,9 @@ async fn preflight_user_data_mismatch() {
     {
         // ...but if it *doesn't* error, the request should at least timeout because
         // preflight user data doesn't match
+        //
+        // FIXME: this may indicate a bug in tx5. We expect that the notify should
+        //        always fail, but it doesn't.
         tokio::time::timeout(std::time::Duration::from_millis(500), recv_wait)
             .await
             .unwrap_err();

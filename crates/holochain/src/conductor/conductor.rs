@@ -254,7 +254,6 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use std::ops::Deref;
 
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
@@ -275,10 +274,7 @@ mod startup_shutdown_impls {
             outcome_sender: OutcomeSender,
         ) -> Self {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
-            let maybe_data_root_path = config
-                .data_root_path
-                .clone()
-                .map(|path| PathBuf::from(path.deref()));
+            let maybe_data_root_path = config.data_root_path.clone().map(|path| (*path).clone());
 
             Self {
                 spaces,
@@ -2175,10 +2171,8 @@ mod service_impls {
             let agent = holo_hash::AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.0.to_vec());
             let cell_id = CellId::new(dna_hash, agent.clone());
 
-            // Use app ID for role name as well, since this is pretty arbitrary
-            let role_name = DPKI_APP_ID.into();
             self.clone()
-                .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[((role_name, dna), None)])
+                .install_app_minimal(DPKI_APP_ID.into(), Some(agent), &[(dna, None)])
                 .await?;
             self.clone().enable_app(DPKI_APP_ID.into()).await?;
 

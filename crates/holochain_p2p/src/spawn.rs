@@ -3,6 +3,7 @@ use crate::event::*;
 
 mod actor;
 use actor::*;
+use holo_hash::DnaHash;
 
 /// Spawn a new HolochainP2p actor.
 /// Conductor will call this on initialization.

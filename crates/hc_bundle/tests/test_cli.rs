@@ -87,7 +87,7 @@ async fn test_packed_hash_consistency() {
 
 #[tokio::test]
 async fn test_integrity() {
-    let pack_dna = move |path| async move {
+    let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
