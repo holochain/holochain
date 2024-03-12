@@ -262,15 +262,6 @@ impl DnaFile {
         clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));
         clone
     }
-
-    /// Change the DnaCompatParams (and the hash) without changing anything else
-    pub fn update_compat(&self, compat: DnaCompatParams) -> Self {
-        let mut clone = self.clone();
-        let mut dna = self.dna.clone().into_content();
-        dna.compatibility = compat;
-        clone.dna = DnaDefHashed::from_content_sync(dna);
-        clone
-    }
 }
 
 impl std::fmt::Debug for DnaFile {
