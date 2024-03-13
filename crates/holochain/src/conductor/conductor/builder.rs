@@ -509,6 +509,6 @@ async fn get_dpki_dna(dna_path: Option<&std::path::PathBuf>) -> DnaResult<DnaBun
     if let Some(dna_path) = dna_path {
         DnaBundle::read_from_file(dna_path).await
     } else {
-        holochain_deepkey_dna::deepkey_dna()
+        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES)
     }
 }
