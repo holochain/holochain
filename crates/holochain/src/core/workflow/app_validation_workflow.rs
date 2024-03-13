@@ -1,9 +1,5 @@
 //! The workflow and queue consumer for sys validation
 
-use std::convert::TryInto;
-use std::sync::Arc;
-use std::time::Duration;
-
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
 use crate::conductor::entry_def_store::get_entry_def;
@@ -31,6 +27,9 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
+use std::convert::TryInto;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::*;
 pub use types::Outcome;
 
@@ -683,7 +682,7 @@ where
         }
         ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
             author,
-            filter,
+            _filter,
         )) => Ok(Outcome::AwaitingDeps(vec![author.into()])),
     }
 }

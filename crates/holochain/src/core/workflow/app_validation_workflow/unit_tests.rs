@@ -38,6 +38,7 @@ use holochain_zome_types::{
     record::SignedActionHashed,
     Action,
 };
+use matches::assert_matches;
 use parking_lot::RwLock;
 use std::{hash::Hash, sync::Arc};
 
@@ -114,9 +115,7 @@ async fn validation_callback_must_get_action() {
     .await
     .unwrap();
     // validation should indicate it is awaiting create action hash
-    assert!(
-        matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()])
-    );
+    assert_matches!(outcome, Outcome::AwaitingDeps(hashes) if hashes == vec![create_action.to_hash().into()]);
 
     // write action to be must got during validation to dht cache db
     let dht_op = DhtOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
@@ -137,7 +136,7 @@ async fn validation_callback_must_get_action() {
     )
     .await
     .unwrap();
-    assert!(matches!(outcome, Outcome::Accepted));
+    assert_matches!(outcome, Outcome::Accepted);
 }
 
 #[tokio::test(flavor = "multi_thread")]
