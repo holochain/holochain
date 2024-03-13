@@ -954,7 +954,7 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 
 [[package]]
 name = "hdi"
-version = "0.4.0-beta-dev.29"
+version = "0.4.0-beta-dev.30"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -970,7 +970,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.3.0-beta-dev.33"
+version = "0.3.0-beta-dev.34"
 dependencies = [
  "getrandom",
  "hdi",
@@ -989,7 +989,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1030,7 +1030,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.3.0-beta-dev.23"
+version = "0.3.0-beta-dev.24"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -1050,7 +1050,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.3.0-beta-dev.27"
+version = "0.3.0-beta-dev.28"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.3.0-beta-dev.33"
+version = "0.3.0-beta-dev.34"
 dependencies = [
  "hdk",
  "serde",
@@ -1168,7 +1168,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.30"
 dependencies = [
  "derive_builder",
  "derive_more",
@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.3.0-beta-dev.17"
+version = "0.3.0-beta-dev.18"
 dependencies = [
  "base64",
  "derive_more",
@@ -1331,7 +1331,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.3.0-beta-dev.19"
+version = "0.3.0-beta-dev.20"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -1340,7 +1340,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.3.0-beta-dev.18"
+version = "0.3.0-beta-dev.19"
 dependencies = [
  "derivative",
  "derive_more",
@@ -1359,7 +1359,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.3.0-beta-dev.16"
+version = "0.3.0-beta-dev.17"
 dependencies = [
  "derive_more",
  "gcollections",

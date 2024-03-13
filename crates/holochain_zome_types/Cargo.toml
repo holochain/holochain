@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.3.0-beta-dev.29"
+version = "0.3.0-beta-dev.30"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,12 +12,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kitsune_p2p_dht = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/dht", optional = true }
+kitsune_p2p_dht = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/dht", optional = true }
 kitsune_p2p_timestamp = { version = "^0.3.0-beta-dev.8", path = "../kitsune_p2p/timestamp" }
-kitsune_p2p_block = { version = "^0.3.0-beta-dev.19", path = "../kitsune_p2p/block" }
-kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.17", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.3.0-beta-dev.23", path = "../holo_hash", features = ["encoding"] }
-holochain_integrity_types = { version = "^0.3.0-beta-dev.27", path = "../holochain_integrity_types", features = ["tracing"] }
+kitsune_p2p_block = { version = "^0.3.0-beta-dev.20", path = "../kitsune_p2p/block" }
+kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.18", path = "../kitsune_p2p/bin_data" }
+holo_hash = { version = "^0.3.0-beta-dev.24", path = "../holo_hash", features = ["encoding"] }
+holochain_integrity_types = { version = "^0.3.0-beta-dev.28", path = "../holochain_integrity_types", features = ["tracing"] }
 holochain_serialized_bytes = { workspace = true }
 holochain_secure_primitive = { version = "^0.3.0-beta-dev.22", path = "../holochain_secure_primitive"}
 holochain_nonce = {version = "^0.3.0-beta-dev.25", path = "../holochain_nonce"}
