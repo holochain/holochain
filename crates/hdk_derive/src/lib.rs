@@ -161,7 +161,12 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extract the ident of the fn
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
-    let input_type = if item_fn.sig.inputs.is_empty() {
+    if item_fn.sig.inputs.len() > 1 {
+        panic!("hdk_extern functions must take a single parameter or none");
+    }
+    let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
+        pat_type.ty.clone()
+    } else {
         let param_type = syn::Type::Verbatim(quote::quote! { () });
         let param_pat = syn::Pat::Wild(syn::PatWild {
             underscore_token: syn::token::Underscore::default(),
@@ -175,10 +180,6 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
         });
         item_fn.sig.inputs.push(param);
         Box::new(param_type)
-    } else if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
-        pat_type.ty.clone()
-    } else {
-        panic!("hdk_extern functions must take a single parameter");
     };
     let output_type = if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
         ty.clone()
