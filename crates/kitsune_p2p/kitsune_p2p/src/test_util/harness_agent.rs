@@ -1,3 +1,5 @@
+use self::meta_net::PreflightUserData;
+
 use super::*;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
@@ -78,6 +80,7 @@ pub(crate) async fn spawn_test_agent(
             .await
             .unwrap(),
         host,
+        PreflightUserData::default(),
     )
     .await?;
 

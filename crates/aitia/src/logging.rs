@@ -21,15 +21,44 @@ macro_rules! trace {
         // Note the tracing level doesn't matter when using the AitiaWriter, but it
         // of course affects whether this will be present in the normal logs
 
-        // XXX: bedep the JSON representation is wonky, especially for hashes,
+        // XXX: because the JSON representation is wonky, especially for hashes,
         //      we also redundantly print a normal debug for better log readability
         let fact = $fact;
-        tracing::info!(
-            aitia = "json",
-            ?fact,
-            "<AITIA>{}</AITIA>",
-            $crate::logging::LogLine::encode(fact)
-        );
+
+        let level = std::env::var("AITIA_LOG").unwrap_or("trace".to_string());
+        match level.as_str() {
+            "trace" => tracing::trace!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            "debug" => tracing::debug!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            "info" => tracing::info!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            "warn" => tracing::warn!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            "error" => tracing::error!(
+                aitia = "json",
+                ?fact,
+                "<AITIA>{}</AITIA>",
+                $crate::logging::LogLine::encode(fact)
+            ),
+            level => unimplemented!("Invalid AITIA_LOG setting: {}", level),
+        }
     };
 }
 
@@ -85,21 +114,21 @@ pub fn tracing_layer<S: Subscriber + for<'a> LookupSpan<'a>>(
 }
 
 #[derive(derive_more::Deref)]
-pub struct LogWriter<L: Log>(Arc<parking_lot::Mutex<L>>);
+pub struct AitiaSubscriber<L: Log>(Arc<parking_lot::Mutex<L>>);
 
-impl<L: Log> Clone for LogWriter<L> {
+impl<L: Log> Clone for AitiaSubscriber<L> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<L: Log> Default for LogWriter<L> {
+impl<L: Log> Default for AitiaSubscriber<L> {
     fn default() -> Self {
         Self(Arc::new(parking_lot::Mutex::new(L::default())))
     }
 }
 
-impl<L: Log> std::io::Write for LogWriter<L> {
+impl<L: Log> std::io::Write for AitiaSubscriber<L> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let mut g = self.0.lock();
         let line = String::from_utf8_lossy(buf);
@@ -119,7 +148,7 @@ mod tests {
         prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, Registry,
     };
 
-    use crate::{dep::DepResult, logging::LogWriter, Fact};
+    use crate::{dep::DepResult, logging::AitiaSubscriber, Fact};
 
     use super::{tracing_layer, FactLogJson};
 
@@ -165,7 +194,7 @@ mod tests {
 
     #[test]
     fn sample_log() {
-        let log = LogWriter::<Log>::default();
+        let log = AitiaSubscriber::<Log>::default();
         let log2 = log.clone();
         Registry::default()
             .with(tracing_layer(move || log2.clone()))

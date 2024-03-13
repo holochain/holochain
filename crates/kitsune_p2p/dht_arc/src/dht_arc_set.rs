@@ -20,6 +20,23 @@ pub enum DhtArcSet {
     Partial(IntervalSet<DhtLocation>),
 }
 
+impl std::hash::Hash for DhtArcSet {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Full => {
+                state.write_u8(0);
+            }
+            Self::Partial(p) => {
+                state.write_u8(1);
+                for loc in p {
+                    loc.lower().hash(state);
+                    loc.upper().hash(state);
+                }
+            }
+        }
+    }
+}
+
 impl std::fmt::Debug for DhtArcSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

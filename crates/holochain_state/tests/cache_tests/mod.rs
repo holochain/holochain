@@ -41,7 +41,7 @@ fn set_integrated(
         let u = u.clone();
         let op_hash = op_hash.clone();
         move |txn| {
-            mutations::set_validation_stage(txn, &op_hash, ValidationLimboStatus::Pending).unwrap();
+            mutations::set_validation_stage(txn, &op_hash, ValidationStage::Pending).unwrap();
             mutations::set_when_integrated(
                 txn,
                 &op_hash,
@@ -54,7 +54,7 @@ fn set_integrated(
 
 fn set_ready_to_integrate(db: &DbWrite<DbKindDht>, op_hash: DhtOpHash) {
     db.test_write(move |txn| {
-        mutations::set_validation_stage(txn, &op_hash, ValidationLimboStatus::AwaitingIntegration)
+        mutations::set_validation_stage(txn, &op_hash, ValidationStage::AwaitingIntegration)
             .unwrap();
         mutations::set_validation_status(txn, &op_hash, ValidationStatus::Valid).unwrap();
     });

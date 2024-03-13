@@ -47,8 +47,6 @@ mod validation_tests;
 mod error;
 mod types;
 
-const NUM_CONCURRENT_OPS: usize = 50;
-
 #[instrument(skip(
     workspace,
     trigger_integration,
@@ -91,10 +89,9 @@ async fn app_validation_workflow_inner(
     let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let num_ops_to_validate = sorted_ops.len();
     tracing::debug!("validating {num_ops_to_validate} ops");
-    let start = (num_ops_to_validate >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
-    let saturated = start.is_some();
+    let sleuth_id = conductor.config.sleuth_id();
 
-    // Validate all the ops
+    // Build an iterator of all op validations
     let iter = sorted_ops.into_iter().map({
         let network = network.clone();
         let workspace = workspace.clone();
@@ -107,7 +104,7 @@ async fn app_validation_workflow_inner(
                 let (op, op_hash) = so.into_inner();
                 let op_type = op.get_type();
                 let action = op.action();
-                let dependency = get_dependency(op_type, &action);
+                let dependency = op.sys_validation_dependency();
                 let op_lite = op.to_lite();
 
                 // If this is agent activity, track it for the cache.
@@ -115,7 +112,7 @@ async fn app_validation_workflow_inner(
                     (
                         action.author().clone(),
                         action.action_seq(),
-                        matches!(dependency, Dependency::Null),
+                        dependency.is_none(),
                     )
                 });
 
@@ -132,135 +129,99 @@ async fn app_validation_workflow_inner(
         }
     });
 
-    // Create a stream of concurrent validation futures.
-    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
-    // return up to NUM_CONCURRENT_OPS * 100 results.
-    let mut iter = futures::stream::iter(iter)
-        .buffer_unordered(NUM_CONCURRENT_OPS)
-        .ready_chunks(NUM_CONCURRENT_OPS * 100);
+    let validation_results = futures::future::join_all(iter).await;
 
-    // Spawn a task to actually drive the stream.
-    // This allows the stream to make progress in the background while
-    // we are committing previous results to the database.
-    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
-    let jh = tokio::spawn(async move {
-        while let Some(op) = iter.next().await {
-            // Send the result to task that will commit to the database.
-            if tx
-                .send_timeout(op, std::time::Duration::from_secs(10))
-                .await
-                .is_err()
-            {
-                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
-                break;
-            }
-        }
-    });
-
-    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
-    let mut iter =
-        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
-
+    tracing::debug!("Committing {} ops", validation_results.len());
     let mut ops_validated = 0;
-    let mut round_time = start.is_some().then(std::time::Instant::now);
-    // Pull in a chunk of results.
-    while let Some(chunk) = iter.next().await {
-        tracing::debug!(
-            "Committing {} ops",
-            chunk.iter().map(|c| c.len()).sum::<usize>()
-        );
-        let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
-            .dht_db
-            .write_async(move |txn| {
-                let mut accepted = 0;
-                let mut awaiting = 0;
-                let mut rejected = 0;
-                let mut agent_activity = Vec::new();
-                for outcome in chunk.into_iter().flatten() {
-                    let (op_hash, dependency, op_lites, outcome, activity) = outcome;
-                    // Get the outcome or return the error
-                    let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
+    let sleuth_id = sleuth_id.clone();
+    let (accepted_ops, awaiting_ops, rejected_ops, activity) = workspace
+        .dht_db
+        .write_async(move |txn| {
+            let mut accepted = 0;
+            let mut awaiting = 0;
+            let mut rejected = 0;
+            let mut agent_activity = Vec::new();
+            for outcome in validation_results {
+                let (op_hash, dependency, op_lite, outcome, activity) = outcome;
+                // Get the outcome or return the error
+                let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
-                    // Collect all agent activity.
-                    if let Some(activity) = activity {
-                        // If the activity is accepted or rejected then it's ready to integrate.
-                        if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
-                            agent_activity.push(activity);
+                // Collect all agent activity.
+                if let Some(activity) = activity {
+                    // If the activity is accepted or rejected then it's ready to integrate.
+                    if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
+                        agent_activity.push(activity);
+                    }
+                }
+
+                if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
+                    warn!(
+                        msg = "DhtOp has failed app validation",
+                        outcome = ?outcome,
+                    );
+                }
+                match outcome {
+                    Outcome::Accepted => {
+                        accepted += 1;
+                        aitia::trace!(&hc_sleuth::Event::AppValidated {
+                            by: sleuth_id.clone(),
+                            op: op_hash.clone()
+                        });
+
+                        if dependency.is_none() {
+                            aitia::trace!(&hc_sleuth::Event::Integrated {
+                                by: sleuth_id.clone(),
+                                op: op_hash.clone()
+                            });
+
+                            put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
+                        } else {
+                            put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
                         }
                     }
-
-                    if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
-                        warn!(
-                            msg = "DhtOp has failed app validation",
-                            outcome = ?outcome,
+                    Outcome::AwaitingDeps(deps) => {
+                        awaiting += 1;
+                        let status = ValidationStage::AwaitingAppDeps(deps);
+                        put_validation_limbo(txn, &op_hash, status)?;
+                    }
+                    Outcome::Rejected(_) => {
+                        rejected += 1;
+                        tracing::info!(
+                            "Received invalid op. The op author will be blocked.\nOp: {:?}",
+                            op_lite
                         );
-                    }
-                    match outcome {
-                        Outcome::Accepted => {
-                            accepted += 1;
-                            if let Dependency::Null = dependency {
-                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
-                            }
-                        }
-                        Outcome::AwaitingDeps(deps) => {
-                            awaiting += 1;
-                            let status = ValidationLimboStatus::AwaitingAppDeps(deps);
-                            put_validation_limbo(txn, &op_hash, status)?;
-                        }
-                        Outcome::Rejected(_) => {
-                            rejected += 1;
-                            tracing::info!(
-                                "Received invalid op. The op author will be blocked.\nOp: {:?}",
-                                op_lites
-                            );
-                            if let Dependency::Null = dependency {
-                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
-                            }
+                        if dependency.is_none() {
+                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
+                        } else {
+                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                         }
                     }
                 }
-                WorkflowResult::Ok((accepted, awaiting, rejected, agent_activity))
-            })
-            .await?;
-
-        // Once the database transaction is committed, add agent activity to the cache
-        // that is ready for integration.
-        for (author, seq, has_no_dependency) in activity {
-            // Any activity with no dependency is integrated in this workflow.
-            // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
-            if has_no_dependency {
-                dht_query_cache
-                    .set_activity_to_integrated(&author, seq)
-                    .await?;
-            } else {
-                dht_query_cache
-                    .set_activity_ready_to_integrate(&author, seq)
-                    .await?;
             }
+            WorkflowResult::Ok((accepted, awaiting, rejected, agent_activity))
+        })
+        .await?;
+
+    // Once the database transaction is committed, add agent activity to the cache
+    // that is ready for integration.
+    for (author, seq, has_no_dependency) in activity {
+        // Any activity with no dependency is integrated in this workflow.
+        // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
+        if has_no_dependency {
+            dht_query_cache
+                .set_activity_to_integrated(&author, seq)
+                .await?;
+        } else {
+            dht_query_cache
+                .set_activity_ready_to_integrate(&author, seq)
+                .await?;
         }
-        ops_validated += accepted_ops;
-        ops_validated += rejected_ops;
-        if let (Some(start), Some(round_time)) = (start, &mut round_time) {
-            let round_el = round_time.elapsed();
-            *round_time = std::time::Instant::now();
-            let avg_ops_ps =
-                ops_validated as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
-            let ops_ps = accepted_ops as f64 / round_el.as_micros() as f64 * 1_000_000.0;
-            tracing::warn!(
-                "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
-                (num_ops_to_validate - ops_validated) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
-                avg_ops_ps,
-                ops_ps
-            );
-        }
-        tracing::debug!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
     }
-    jh.await?;
-    Ok(if saturated || ops_validated < num_ops_to_validate {
+    ops_validated += accepted_ops;
+    ops_validated += rejected_ops;
+    tracing::debug!("{accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected. {ops_validated} validated in total so far out of {num_ops_to_validate} ops to validate in this workflow run");
+
+    Ok(if ops_validated < num_ops_to_validate {
         // trigger app validation workflow again in 10 seconds
         WorkComplete::Incomplete(Some(Duration::from_secs(10)))
     } else {
@@ -820,7 +781,7 @@ impl AppValidationWorkspace {
 pub fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
-    status: ValidationLimboStatus,
+    status: ValidationStage,
 ) -> WorkflowResult<()> {
     set_validation_stage(txn, hash, status)?;
     Ok(())
@@ -832,7 +793,7 @@ pub fn put_integration_limbo(
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
-    set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
     Ok(())
 }
 
@@ -844,7 +805,7 @@ pub fn put_integrated(
     set_validation_status(txn, hash, status)?;
     // This set the validation stage to pending which is correct when
     // it's integrated.
-    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+    set_validation_stage(txn, hash, ValidationStage::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
 
     // If the op is rejected then force a receipt to be processed because the

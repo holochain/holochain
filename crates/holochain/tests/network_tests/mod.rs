@@ -195,7 +195,7 @@ async fn get_from_another_agent() {
     )
     .await;
 
-    let options = GetOptions::latest();
+    let options = GetOptions::network();
 
     // Bob store record
     let entry = Post("Bananas are good for you".into());

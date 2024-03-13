@@ -1,5 +1,7 @@
 //! Methods for awaiting consistency between cells of the same DNA
 
+use hc_sleuth::SleuthId;
+
 use crate::{prelude::*, test_utils::consistency_dbs};
 use std::time::Duration;
 
@@ -66,7 +68,9 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
     num_attempts: usize,
     delay: Duration,
 ) {
+    #[allow(clippy::type_complexity)]
     let all_cell_dbs: Vec<(
+        SleuthId,
         AgentPubKey,
         DbRead<DbKindAuthored>,
         Option<DbRead<DbKindDht>>,
@@ -74,6 +78,7 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
         .into_iter()
         .map(|(c, online)| {
             (
+                c.conductor_config().sleuth_id(),
                 c.agent_pubkey().clone(),
                 c.authored_db().clone().into(),
                 online.then(|| c.dht_db().clone().into()),
@@ -82,7 +87,7 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
         .collect();
     let all_cell_dbs: Vec<_> = all_cell_dbs
         .iter()
-        .map(|c| (&c.0, &c.1, c.2.as_ref()))
+        .map(|c| (&c.0, &c.1, &c.2, c.3.as_ref()))
         .collect();
     consistency_dbs(&all_cell_dbs[..], num_attempts, delay).await
 }

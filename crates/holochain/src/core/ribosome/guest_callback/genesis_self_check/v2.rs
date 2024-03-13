@@ -109,7 +109,7 @@ pub(crate) mod slow_tests {
         )
         .await;
 
-        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("app", [&dna]).await.unwrap();
         let cells = app.into_cells();
 
         let _: EntryHashed = conductor

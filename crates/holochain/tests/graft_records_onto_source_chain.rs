@@ -24,10 +24,7 @@ async fn grafting() {
     let mut conductor = SweetConductor::from_config(config.clone()).await;
     let keystore = conductor.keystore();
 
-    let apps = conductor
-        .setup_app("app", &[dna_file.clone()])
-        .await
-        .unwrap();
+    let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
 
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
@@ -211,7 +208,7 @@ async fn grafting() {
     let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
         "app",
         alice.agent_pubkey().clone(),
-        [&dna_file],
+        &[(dna_file, None)],
     )
     .await;
 

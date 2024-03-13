@@ -5,7 +5,7 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.71.1";
+        version = "1.75.0";
       };
 
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
@@ -143,7 +143,33 @@
         cargoArtifacts = holochainDeps;
         doCheck = false;
 
-        cargoClippyExtraArgs = "-- ${import ../../.config/clippy-args.nix}";
+        cargoClippyExtraArgs =
+          let
+            # contains a set with items like 'nursery = allow'
+            workspaceClippyLints = (builtins.fromTOML (builtins.readFile "${self}/Cargo.toml")).workspace.lints.clippy;
+            workspaceClippyLints1 = builtins.mapAttrs
+              (name: value:
+                builtins.concatStringsSep " " [
+                  (
+                    if value == "allow" then "-A"
+                    else if value == "deny" then "-D"
+                    else throw "unsupported lint: ${name} = ${value}"
+                  )
+                  "clippy::${name}"
+                ]
+              )
+              workspaceClippyLints
+            ;
+
+            # contains a list of e.g. "-A clippy::nursery"
+            workspaceClippyLints2 = builtins.attrValues workspaceClippyLints1;
+
+            # contains the final argument string
+            workspaceClippyLints3 = builtins.concatStringsSep " " workspaceClippyLints2;
+          in
+          # the outcome will be: "-- -A clippy::nursery -D ..."
+          "-- ${workspaceClippyLints3}"
+        ;
 
         dontPatchELF = true;
         dontFixup = true;

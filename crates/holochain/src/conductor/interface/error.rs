@@ -24,7 +24,7 @@ pub enum InterfaceError {
     #[error("Interface closed")]
     Closed,
     #[error(transparent)]
-    WebsocketError(#[from] holochain_websocket::WebsocketError),
+    IoError(#[from] std::io::Error),
     #[error("Failed to find free port")]
     PortError,
 }

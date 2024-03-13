@@ -54,6 +54,8 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
+mod check_clone_access;
+
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
@@ -871,11 +873,7 @@ pub mod wasm_test {
             let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
             let apps = conductor
-                .setup_app_for_agents(
-                    "app-",
-                    &[alice_pubkey.clone(), bob_pubkey.clone()],
-                    [&dna_file],
-                )
+                .setup_app_for_agents("app-", [&alice_pubkey, &bob_pubkey], [&dna_file])
                 .await
                 .unwrap();
 

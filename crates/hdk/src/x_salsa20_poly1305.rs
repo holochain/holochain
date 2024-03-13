@@ -158,3 +158,20 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
             ))
     })
 }
+
+/// Libsodium crypto_box encryption, but converts ed25519 *signing*
+/// keys into x25519 encryption keys.
+/// WARNING: Please first understand the downsides of using this function:
+/// <https://doc.libsodium.org/advanced/ed25519-curve25519>
+pub fn ed_25519_x_salsa20_poly1305_encrypt(
+    sender: AgentPubKey,
+    recipient: AgentPubKey,
+    data: XSalsa20Poly1305Data,
+) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+    HDK.with(|h| {
+        h.borrow()
+            .ed_25519_x_salsa20_poly1305_encrypt(Ed25519XSalsa20Poly1305Encrypt::new(
+                sender, recipient, data,
+            ))
+    })
+}

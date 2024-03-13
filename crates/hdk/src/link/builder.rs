@@ -16,11 +16,18 @@ impl GetLinksInputBuilder {
         Ok(GetLinksInputBuilder(GetLinksInput {
             base_address: base_address.into(),
             link_type: link_type.try_into_filter()?,
+            get_options: GetOptions::default(),
             tag_prefix: None,
             before: None,
             after: None,
             author: None,
         }))
+    }
+
+    /// Fetch links from network or local only.
+    pub fn get_options(mut self, get_strategy: GetStrategy) -> Self {
+        self.0.get_options.strategy = get_strategy;
+        self
     }
 
     /// Filter for links with the given tag prefix.

@@ -133,6 +133,7 @@ impl KitsuneP2pActor {
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         host_api: HostApiLegacy,
+        preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
@@ -159,6 +160,7 @@ impl KitsuneP2pActor {
             internal_sender.clone(),
             host_api.clone(),
             metrics,
+            preflight_user_data,
         )
         .await?;
 
@@ -214,6 +216,7 @@ async fn create_meta_net(
     internal_sender: ghost_actor::GhostSender<Internal>,
     host: HostApiLegacy,
     metrics: Tx2ApiMetrics,
+    preflight_user_data: PreflightUserData,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet)> {
     let mut ep_hnd = None;
     let mut ep_evt = None;
@@ -231,7 +234,7 @@ async fn create_meta_net(
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
-        let signal_url = match config.transport_pool.get(0).unwrap() {
+        let signal_url = match config.transport_pool.first().unwrap() {
             TransportConfig::WebRTC { signal_url } => signal_url.clone(),
             _ => unreachable!(),
         };
@@ -240,6 +243,7 @@ async fn create_meta_net(
             host.clone(),
             internal_sender.clone(),
             signal_url,
+            preflight_user_data,
         )
         .await?;
         ep_hnd = Some(h);
@@ -832,7 +836,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
             for peer in all_peers {
                 for peer in peer? {
-                    if let Some(net_key) = peer.url_list.get(0).map(|u| {
+                    if let Some(net_key) = peer.url_list.first().map(|u| {
                         kitsune_p2p_proxy::ProxyUrl::from(u.as_url2())
                             .digest()
                             .to_string()
@@ -975,6 +979,7 @@ impl ghost_actor::GhostControlHandler for MockKitsuneP2pEventHandler {}
 
 #[cfg(test)]
 mod tests {
+    use crate::meta_net::PreflightUserData;
     use crate::spawn::actor::create_meta_net;
     use crate::spawn::actor::MetaNet;
     use crate::spawn::actor::MetaNetEvtRecv;
@@ -988,7 +993,6 @@ mod tests {
     use kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p_types::tx2::tx2_api::Tx2ApiMetrics;
     use std::net::SocketAddr;
-    use tokio::task::AbortHandle;
     use url2::url2;
 
     #[cfg(feature = "tx2")]
@@ -1009,7 +1013,7 @@ mod tests {
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_mdns_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
@@ -1024,12 +1028,11 @@ mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create_tx5_with_bootstrap_meta_net() {
-        let (signal_addr, abort_handle) = start_signal_srv();
+        let (signal_addr, _sig_hnd) = start_signal_srv().await;
 
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool = vec![TransportConfig::WebRTC {
@@ -1044,7 +1047,6 @@ mod tests {
         assert_eq!(BootstrapNet::Tx5, bootstrap_net);
 
         meta_net.close(0, "test").await;
-        abort_handle.abort();
     }
 
     async fn test_create_meta_net(
@@ -1068,26 +1070,22 @@ mod tests {
             internal_sender,
             HostStub::new().legacy(sender),
             Tx2ApiMetrics::new(),
+            PreflightUserData::default(),
         )
         .await
     }
 
-    fn start_signal_srv() -> (SocketAddr, AbortHandle) {
+    async fn start_signal_srv() -> (SocketAddr, tx5_signal_srv::SrvHnd) {
         let mut config = tx5_signal_srv::Config::default();
         config.interfaces = "127.0.0.1".to_string();
         config.port = 0;
         config.demo = false;
-        let (sig_driver, addr_list, err_list) =
-            tx5_signal_srv::exec_tx5_signal_srv(config).unwrap();
+        let (sig_hnd, addr_list, err_list) =
+            tx5_signal_srv::exec_tx5_signal_srv(config).await.unwrap();
 
         assert!(err_list.is_empty());
         assert_eq!(1, addr_list.len());
 
-        let abort_handle = tokio::spawn(async move {
-            sig_driver.await;
-        })
-        .abort_handle();
-
-        (*addr_list.first().unwrap(), abort_handle)
+        (*addr_list.first().unwrap(), sig_hnd)
     }
 }

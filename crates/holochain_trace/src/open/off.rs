@@ -2,6 +2,7 @@ use super::*;
 #[derive(Debug, Clone, Default)]
 pub struct Context;
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct WireContext {
     span_context: WireSpanContext,
