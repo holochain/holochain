@@ -1,5 +1,6 @@
 #![crate_type = "proc-macro"]
 
+use proc_macro::Span;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::TokenStreamExt;
@@ -7,6 +8,7 @@ use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 
 mod dna_properties;
 mod entry_helper;
@@ -154,6 +156,7 @@ impl quote::ToTokens for EntryDef {
 }
 
 #[proc_macro_attribute]
+#[proc_macro_error]
 pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
     let mut item_fn = syn::parse_macro_input!(item as syn::ItemFn);
@@ -162,7 +165,7 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
     if item_fn.sig.inputs.len() > 1 {
-        panic!("hdk_extern functions must take a single parameter or none");
+        proc_macro_error::abort!(Span::call_site(), "hdk_extern functions must take a single parameter or none");
     }
     let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
         pat_type.ty.clone()
