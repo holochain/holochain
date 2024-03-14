@@ -8,7 +8,6 @@ use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
 
 mod dna_properties;
 mod entry_helper;
@@ -155,8 +154,8 @@ impl quote::ToTokens for EntryDef {
     }
 }
 
-#[proc_macro_attribute]
 #[proc_macro_error]
+#[proc_macro_attribute]
 pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
     let mut item_fn = syn::parse_macro_input!(item as syn::ItemFn);
