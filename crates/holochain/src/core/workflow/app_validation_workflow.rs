@@ -261,42 +261,6 @@ pub async fn record_to_op(
     Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
 }
 
-pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
-    match op {
-        Op::StoreRecord(StoreRecord { mut record }) => {
-            if let Some(e) = omitted_entry {
-                // NOTE: this is only possible in this situation because we already removed
-                // this exact entry from this Record earlier. DON'T set entries on records
-                // anywhere else without recomputing hashes and signatures!
-                record.entry = RecordEntry::Present(e);
-            }
-            record
-        }
-        Op::StoreEntry(StoreEntry { action, entry }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
-        }
-        Op::RegisterUpdate(RegisterUpdate {
-            update, new_entry, ..
-        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
-        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(delete),
-            omitted_entry,
-        ),
-        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(action),
-            omitted_entry,
-        ),
-        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(create_link),
-            omitted_entry,
-        ),
-        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
-            SignedActionHashed::raw_from_same_hash(delete_link),
-            omitted_entry,
-        ),
-    }
-}
-
 async fn dhtop_to_op(op: DhtOp, cascade: Arc<impl Cascade>) -> AppValidationOutcome<Op> {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
