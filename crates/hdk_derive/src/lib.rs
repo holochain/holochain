@@ -164,7 +164,10 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
     if item_fn.sig.inputs.len() > 1 {
-        proc_macro_error::abort!(Span::call_site(), "hdk_extern functions must take a single parameter or none");
+        proc_macro_error::abort!(
+            Span::call_site(),
+            "hdk_extern functions must take a single parameter or none"
+        );
     }
     let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
         pat_type.ty.clone()
