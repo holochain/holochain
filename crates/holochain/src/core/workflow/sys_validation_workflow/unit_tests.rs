@@ -355,7 +355,9 @@ impl TestCase {
         let workspace = SysValidationWorkspace::new(
             self.test_space
                 .space
-                .get_or_create_authored_db(self.agent.clone()).unwrap().into(),
+                .get_or_create_authored_db(self.agent.clone())
+                .unwrap()
+                .into(),
             self.test_space.space.dht_db.clone().into(),
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone().into(),
