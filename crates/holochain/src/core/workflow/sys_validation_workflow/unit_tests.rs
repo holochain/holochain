@@ -353,7 +353,13 @@ impl TestCase {
 
     async fn run(&mut self) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
-            self.test_space.space.get_all_authored_dbs().first().cloned().unwrap().into(),
+            self.test_space
+                .space
+                .get_all_authored_dbs()
+                .first()
+                .cloned()
+                .unwrap()
+                .into(),
             self.test_space.space.dht_db.clone().into(),
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone().into(),

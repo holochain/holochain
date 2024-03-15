@@ -22,7 +22,10 @@ async fn test_cell_handle_publish() {
     let agent = cell_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]);
-    let db = spaces.test_spaces[&dna].space.get_or_create_authored_db(cell_id.agent_pubkey().clone()).unwrap();
+    let db = spaces.test_spaces[&dna]
+        .space
+        .get_or_create_authored_db(cell_id.agent_pubkey().clone())
+        .unwrap();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
     let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
