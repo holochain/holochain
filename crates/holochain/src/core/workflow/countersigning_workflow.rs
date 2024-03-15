@@ -279,7 +279,7 @@ pub(crate) async fn countersigning_success(
                 .into_iter()
                 .map(|(op_hash, _)| op_hash)
                 .collect(),
-            authored_db.into_read(),
+            authored_db.into(),
             dht_db,
             &dht_db_cache,
         )

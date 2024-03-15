@@ -22,7 +22,7 @@ impl Conductor {
         enable_app: Option<InstalledAppId>,
     ) -> ConductorApiResult<()> {
         if let Some(chc) = self.chc(self.keystore().clone(), &cell_id) {
-            let db = self.get_or_create_authored_db(cell_id.dna_hash())?;
+            let db = self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let author = cell_id.agent_pubkey().clone();
             let top_hash = db
                 .read_async(move |txn| {

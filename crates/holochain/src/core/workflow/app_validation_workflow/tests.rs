@@ -60,7 +60,7 @@ async fn main_loop_app_validation_workflow() {
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
-            .get_or_create_authored_db(&dna_hash)
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap()
             .into(),
         conductor.get_dht_db(&dna_hash).unwrap(),

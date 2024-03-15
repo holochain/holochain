@@ -62,7 +62,7 @@ async fn signed_zome_call() {
 
     // create a source chain read to query for the cap grant
     let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash())
+        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
     let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
@@ -217,7 +217,7 @@ async fn signed_zome_call_wildcard() {
 
     // create a source chain read to query for the cap grant
     let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash())
+        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
     let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();

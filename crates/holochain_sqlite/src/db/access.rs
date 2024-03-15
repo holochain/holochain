@@ -418,11 +418,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             })
     }
 
-    /// Downgrade this write handle to a read-only handle
-    pub fn into_read(self) -> DbRead<Kind> {
-        self.0
-    }
-
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]

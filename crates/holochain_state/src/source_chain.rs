@@ -401,7 +401,7 @@ impl SourceChain {
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
-                    self.vault.clone().into_read(),
+                    self.vault.clone().into(),
                     self.dht_db.clone(),
                     &self.dht_db_cache,
                 )
@@ -1078,7 +1078,7 @@ pub async fn genesis(
         .await?;
     authored_ops_to_dht_db_without_check(
         ops_to_integrate,
-        authored.clone().into_read(),
+        authored.clone().into(),
         dht_db,
         dht_db_cache,
     )

@@ -110,7 +110,7 @@ pub(crate) async fn graft_records_onto_source_chain(
             ops_to_integrate,
             space
                 .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
-                .into_read(),
+                .into(),
             space.dht_db.clone(),
             &space.dht_query_cache,
         )

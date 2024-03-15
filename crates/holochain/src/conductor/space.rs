@@ -870,7 +870,7 @@ impl TestSpace {
         Self {
             space: Space::new(
                 Arc::new(dna_hash),
-                &temp_dir.path().to_path_buf().into(),
+                temp_dir.path().to_path_buf(),
                 Default::default(),
             )
             .unwrap(),
