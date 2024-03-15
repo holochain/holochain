@@ -349,7 +349,7 @@ async fn retrieve_actions(
             .boxed()
         });
 
-    let new_deps: ValidationDependencies = ValidationDependencies::from_iter(futures::future::join_all(action_fetches)
+    let new_deps: ValidationDependencies = ValidationDependencies::new_from_iter(futures::future::join_all(action_fetches)
         .await
         .into_iter()
         .filter_map(|r| {

@@ -152,7 +152,7 @@ where
         self.states.extend(other.states);
     }
 
-    pub fn from_iter<
+    pub fn new_from_iter<
         I: IntoIterator<Item = (HoloHash<T::HashType>, ValidationDependencyState<T>)>,
     >(
         iter: I,

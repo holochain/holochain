@@ -11,12 +11,15 @@ use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{StateMutationError, Store, Txn};
+use holochain_types::chc::ChainHeadCoordinatorExt;
 use holochain_types::record::SignedActionHashedExt;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    dbg!(dna_file.dna_def());
+    dbg!(dna_file.dna_hash());
     let mut config = ConductorConfig::default();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
@@ -26,7 +29,7 @@ async fn grafting() {
 
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
-
+    dbg!(alice.cell_id());
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // Trigger init.
@@ -211,6 +214,27 @@ async fn grafting() {
         &[(dna_file, None)],
     )
     .await;
+
+    dbg!(&payload);
+
+    let records = conductor
+        .get_chc(alice.cell_id())
+        .unwrap()
+        .clone()
+        .get_record_data(None)
+        .await
+        .unwrap();
+    dbg!(records.len());
+    dbg!(alice.cell_id());
+
+    // let records = holochain::conductor::chc::CHC_LOCAL_MAP
+    //     .lock()
+    //     .get(&alice.cell_id())
+    //     .unwrap()
+    //     .clone()
+    //     .get_record_data(None)
+    //     .await
+    //     .unwrap();
 
     // This results in an error since the CHC already contains genesis, but this
     // is just to create the necessary cell for grafting onto.

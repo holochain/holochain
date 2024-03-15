@@ -18,7 +18,12 @@ pub async fn app_bundle_from_dnas(dnas_with_roles: &[impl DnaWithRole]) -> AppBu
                 dna: AppRoleDnaManifest {
                     location: Some(DnaLocation::Bundled(path.clone())),
                     modifiers,
-                    installed_hash: None,
+                    // NOTE: for testing with inline zomes, it's essential that the
+                    //       installed_hash is included, so it can be used to fetch
+                    //       the DNA file from the conductor's DNA store rather
+                    //       than the one in the bundle which lacks inline zomes
+                    //       due to serialization.
+                    installed_hash: Some(dr.dna().dna_hash().clone().into()),
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),

@@ -1475,6 +1475,10 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
+            // NOTE: for testing with inline zomes when the conductor is restarted, it's
+            //       essential that the installed_hash is included in the app manifest,
+            //       so that the local DNAs with inline zomes can be loaded from
+            //       local storage
             let local_dnas = self
                 .ribosome_store()
                 .share_ref(|store| bundle.get_all_dnas_from_store(store));
@@ -2790,7 +2794,7 @@ impl Conductor {
         self: Arc<Self>,
         cell_id: CellId,
     ) -> CellResult<(Cell, InitialQueueTriggers)> {
-        let chc = self.chc(self.keystore().clone(), &cell_id);
+        let chc = self.get_chc(&cell_id);
         let space = self.get_or_create_space(cell_id.dna_hash())?;
 
         let holochain_p2p_cell = self.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
@@ -3102,7 +3106,7 @@ pub(crate) async fn genesis_cells(
             let authored_db = space.authored_db;
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
-            let chc = conductor.chc(conductor.keystore().clone(), &cell_id_inner);
+            let chc = conductor.get_chc(&cell_id_inner);
             let ribosome = conductor
                 .get_ribosome(cell_id_inner.dna_hash())
                 .map_err(Box::new)?;
@@ -3159,7 +3163,7 @@ pub fn app_manifest_from_dnas(
                 dna: AppRoleDnaManifest {
                     location: Some(DnaLocation::Bundled(path.clone())),
                     modifiers,
-                    installed_hash: None,
+                    installed_hash: Some(dr.dna().dna_hash().clone().into()),
                     clone_limit,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
