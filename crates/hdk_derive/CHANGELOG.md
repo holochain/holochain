@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Added support for `#[hdk_extern]` usage with parameterless functions
+
+## 0.3.0-beta-dev.28
+
 ## 0.3.0-beta-dev.27
 
 ## 0.3.0-beta-dev.26

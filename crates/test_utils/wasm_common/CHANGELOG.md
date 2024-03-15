@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.34
+
 ## 0.3.0-beta-dev.33
 
 ## 0.3.0-beta-dev.32
