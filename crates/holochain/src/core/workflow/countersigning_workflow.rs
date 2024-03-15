@@ -154,7 +154,7 @@ pub(crate) async fn countersigning_success(
     trigger: QueueTriggers,
     mut signal: SignalBroadcaster,
 ) -> WorkflowResult<()> {
-    let authored_db = space.authored_db;
+    let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db;
     let dht_db_cache = space.dht_query_cache;
     let QueueTriggers {
@@ -279,8 +279,8 @@ pub(crate) async fn countersigning_success(
                 .into_iter()
                 .map(|(op_hash, _)| op_hash)
                 .collect(),
-            &(authored_db.into()),
-            &dht_db,
+            authored_db.into_read(),
+            dht_db,
             &dht_db_cache,
         )
         .await?;

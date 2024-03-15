@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
@@ -114,7 +116,7 @@ pub async fn send_post_commit(
 pub struct PostCommitArgs {
     pub host_access: PostCommitHostAccess,
     pub invocation: PostCommitInvocation,
-    pub cell_id: CellId,
+    pub cell_id: Arc<CellId>,
 }
 
 #[cfg(test)]

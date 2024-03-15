@@ -388,7 +388,9 @@ impl SweetConductor {
     /// Construct a SweetCell for a cell which has already been created
     pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
         let (dna_hash, agent) = cell_id.into_dna_and_agent();
-        let cell_authored_db = self.raw_handle().get_authored_db(&dna_hash)?;
+        let cell_authored_db = self
+            .raw_handle()
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())?;
         let cell_dht_db = self.raw_handle().get_dht_db(&dna_hash)?;
         let conductor_config = self.config.clone();
         let cell_id = CellId::new(dna_hash, agent);
@@ -618,7 +620,7 @@ impl SweetConductor {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
             let iter = handle.running_cell_ids().into_iter().map(|id| async move {
-                let db = self.get_authored_db(id.dna_hash()).unwrap();
+                let db = self.get_or_create_authored_db(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).await.unwrap();
                 (db, trigger)
             });

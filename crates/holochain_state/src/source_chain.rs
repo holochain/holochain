@@ -401,8 +401,8 @@ impl SourceChain {
                 authored_ops_to_dht_db(
                     network,
                     ops_to_integrate,
-                    &self.vault,
-                    &self.dht_db,
+                    self.vault.clone().into_read(),
+                    self.dht_db.clone(),
                     &self.dht_db_cache,
                 )
                 .await?;
@@ -1076,7 +1076,7 @@ pub async fn genesis(
             SourceChainResult::Ok(ops_to_integrate)
         })
         .await?;
-    authored_ops_to_dht_db_without_check(ops_to_integrate, &authored, &dht_db, dht_db_cache)
+    authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into_read(), dht_db, dht_db_cache)
         .await?;
     Ok(())
 }

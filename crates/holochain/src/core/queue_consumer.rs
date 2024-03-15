@@ -56,6 +56,7 @@ use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::*;
 use publish_dht_ops_consumer::*;
+use holochain_sqlite::prelude::DatabaseResult;
 
 mod countersigning_consumer;
 use countersigning_consumer::*;
@@ -79,9 +80,8 @@ pub async fn spawn_queue_consumer_tasks(
     network: HolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
-) -> (QueueTriggers, InitialQueueTriggers) {
+) -> DatabaseResult<(QueueTriggers, InitialQueueTriggers)> {
     let Space {
-        authored_db,
         dht_db,
         cache_db: cache,
         dht_query_cache,
@@ -91,14 +91,11 @@ pub async fn spawn_queue_consumer_tasks(
     let keystore = conductor.keystore().clone();
     let dna_hash = Arc::new(cell_id.dna_hash().clone());
     let queue_consumer_map = conductor.get_queue_consumer_workflows();
+    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
 
     // Publish
-    let tx_publish = spawn_publish_dht_ops_consumer(
-        cell_id,
-        authored_db.clone(),
-        conductor.clone(),
-        network.clone(),
-    );
+    let tx_publish =
+        spawn_publish_dht_ops_consumer(cell_id, authored_db.clone(), conductor.clone(), network.clone());
 
     // Validation Receipt
     // One per space.
@@ -184,7 +181,7 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    (
+    Ok((
         QueueTriggers {
             sys_validation: tx_sys.clone(),
             publish_dht_ops: tx_publish.clone(),
@@ -192,7 +189,7 @@ pub async fn spawn_queue_consumer_tasks(
             integrate_dht_ops: tx_integration.clone(),
         },
         InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
-    )
+    ))
 }
 
 #[derive(Clone)]
